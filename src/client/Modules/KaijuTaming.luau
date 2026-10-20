@@ -1,21 +1,22 @@
 --[[
-	Taming, on screen (KaijuWilds runs it; Shared.Kaiju.Tame has the rules).
+	Catching a wild kaiju, on screen (players see "catch"; the code says
+	tame: KaijuWilds runs it, Shared.Kaiju.Tame has the rules).
 
 	  Ready     a wild kaiju near you worn down to half its health glows gold
-	            (a pulsing Highlight) with READY TO TAME and the chance over
+	            (a pulsing Highlight) with READY TO CATCH and the chance over
 	            it: it can be caught now. Not while someone's taming it.
 	  The cast  while a tame is cast on one (its KaijuTameBy, till
 	            KaijuTameEnds), everyone sees a beam of gold light from its
 	            tamer to it and motes of light closing in round it as it
 	            struggles (its "Bound" pose, CreatureMotion). The tamer gets
-	            the cast bar: TAMING, the chance, and to stay close and not
+	            the cast bar: CATCHING, the chance, and to stay close and not
 	            get hit.
-	  The end   the tamer's TameResult (at TameResultAt): TAMED! with a burst,
-	            IT BROKE FREE, IT FLED or TAME BROKEN on the bar, then it fades.
+	  The end   the tamer's TameResult (at TameResultAt): CAUGHT! with a burst,
+	            IT BROKE FREE, IT FLED or CATCH BROKEN on the bar, then it fades.
 
 	  KaijuTaming.start()                         once (KaijuHud.start)
 	  KaijuTaming.cast(model, chance, seconds)    the tamer's bar, at once
-	                                              (KaijuHud's TAME)
+	                                              (KaijuHud's CATCH)
 	  KaijuTaming.casting() -> boolean            a cast of yours is under way
 	  KaijuTaming.ready(model) -> boolean         this one can be tamed now
 ]]
@@ -279,7 +280,7 @@ function KaijuTaming.cast(model: Model, chance: number, seconds: number)
 	local name = (model.Name or "kaiju"):upper()
 	cast = { Model = model, Ends = os.clock() + seconds, Seconds = seconds, Chance = chance }
 	resultAt = nil
-	title.Text = "TAMING " .. name
+	title.Text = "CATCHING " .. name
 	title.TextColor3 = GOLD
 	barStroke.Color = GOLD
 	odds.Text = string.format("%d%%", math.floor(chance * 100 + 0.5))
@@ -294,13 +295,13 @@ end
 -- How it ended (the server's TameResult on you).
 local RESULTS = {
 	Tamed = {
-		Text = "TAMED!",
+		Text = "CAUGHT!",
 		Hint = "It's yours: find it in your kaiju panel.",
 		Color = Color3.fromRGB(120, 230, 140),
 	},
 	Broke = { Text = "IT BROKE FREE", Hint = "Wear it down more and try again.", Color = Color3.fromRGB(255, 120, 90) },
 	Fled = { Text = "IT FLED", Hint = "It burrowed away after its third escape.", Color = Color3.fromRGB(255, 120, 90) },
-	Interrupted = { Text = "TAME BROKEN", Hint = "Stay close and don't get hit.", Color = P.Dim },
+	Interrupted = { Text = "CATCH BROKEN", Hint = "Stay close and don't get hit.", Color = P.Dim },
 }
 
 local function showResult(kind: string)
@@ -350,7 +351,7 @@ local function step()
 						local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
 						local chance = Kaiju.tameChance(humanoid.Health, humanoid.MaxHealth)
 						markOf(model, root).Text.Text =
-							string.format("READY TO TAME · %d%%", math.floor(chance * 100 + 0.5))
+							string.format("READY TO CATCH · %d%%", math.floor(chance * 100 + 0.5))
 					else
 						unmark(model)
 					end

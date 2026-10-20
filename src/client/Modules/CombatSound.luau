@@ -85,6 +85,11 @@ CombatSound.Ids = {
 	RoarBulwark = 0, -- roar_bulwark.mp3
 	RoarRazorback = 0, -- roar_razorback.mp3
 	RoarCarapace = 0, -- roar_carapace.mp3
+	-- A rift critter's evil giggles and its cackle (tools/make_critter_sounds.py).
+	Giggle1 = 0, -- critter_giggle_1.mp3
+	Giggle2 = 0, -- critter_giggle_2.mp3
+	Giggle3 = 0, -- critter_giggle_3.mp3
+	Cackle = 0, -- critter_cackle.mp3
 }
 
 -- 0 mutes combat, 1 is full.
@@ -112,6 +117,8 @@ local LEVEL = {
 	RoarBulwark = 0.95,
 	RoarRazorback = 0.9,
 	RoarCarapace = 0.9,
+	Giggle = 0.85,
+	Cackle = 0.95,
 }
 
 -- Built-in stand-ins until a sound is uploaded: layers of { sound, speed,
@@ -180,11 +187,36 @@ local FALLBACK = {
 		{ S .. "swordlunge.wav", 0.3, 0.6 },
 		{ S .. "clickfast.wav", 0.5, 0.25, 0.2 },
 	},
+	-- A critter's giggle: the old "uuhhh" sped up into squeaky little
+	-- "hee"s, falling; its cackle lower and longer.
+	Giggle = {
+		{ S .. "uuhhh.mp3", 2.9, 0.32 },
+		{ S .. "uuhhh.mp3", 2.65, 0.3, 0.12 },
+		{ S .. "uuhhh.mp3", 2.45, 0.28, 0.24 },
+		{ S .. "uuhhh.mp3", 2.25, 0.24, 0.37 },
+	},
+	Cackle = {
+		{ S .. "uuhhh.mp3", 1.7, 0.4 },
+		{ S .. "uuhhh.mp3", 2.1, 0.3, 0.2 },
+		{ S .. "uuhhh.mp3", 1.95, 0.3, 0.31 },
+		{ S .. "uuhhh.mp3", 1.8, 0.28, 0.42 },
+		{ S .. "uuhhh.mp3", 1.65, 0.26, 0.53 },
+	},
 }
 
 -- Shortest gap between two plays of the same sound, so a flurry doesn't pile up.
-local MIN_GAP =
-	{ Hit = 0.04, Burn = 0.25, Corrode = 0.25, Freeze = 0.25, Zap = 0.08, Warn = 0.4, Hurt = 0.08, Combo = 0.05 }
+local MIN_GAP = {
+	Hit = 0.04,
+	Burn = 0.25,
+	Corrode = 0.25,
+	Freeze = 0.25,
+	Zap = 0.08,
+	Warn = 0.4,
+	Hurt = 0.08,
+	Combo = 0.05,
+	Giggle = 0.35, -- (a swarm giggling at once is one giggle, not a din)
+	Cackle = 0.6,
+}
 local DEFAULT_GAP = 0.03
 local MAX_VOICES = 28
 local CRITICAL = { Parry = true, GuardBreak = true, Hurt = true, NovaWarn = true, Warn = true }

@@ -88,11 +88,11 @@ it: pacing, sniffing about, napping. It looks over anyone who comes close
 and roars at them now and then, but leaves them be. The first swing at its
 vein stirs it, the second makes it roar, the third wakes it, and it goes
 for the miners as well as their kaiju (a plain miner is
-knocked down, not killed). Beat it or tame it and the vein is yours until
+knocked down, not killed). Beat it or catch it and the vein is yours until
 it moves on. A beaten guardian pays 40 coins on top of its Gemsoul. When
 the vein moves, a fresh guardian sleeps at the new site, and the banner
 says "A guarded Rift Vein surfaced to the …". The other two veins, and the
-two packs of wild kaiju roaming the quarry for taming, stay open to
+two packs of wild kaiju roaming the quarry for catching, stay open to
 everyone. The rest
 is in [kaiju.md](kaiju.md#the-vein-guardian).
 
@@ -242,7 +242,10 @@ shrunk down. One that came through a rift:
   nobody drew.
 
 A critter's finishing blow doesn't kill you in the Outpost: it knocks you
-down for a few seconds, as in a spar, and you get up healed.
+down for a few seconds, as in a spar, and you get up healed. Scraped but on
+your feet, you heal quickly in the Outpost: 6% of your health a second once
+4 seconds have passed without a hit, with a soft green shimmer off you while
+it mends (`HealthRegen.Lobby`; elsewhere it's still 1% after 5 seconds).
 
 Ones from the Edge are tougher: a quarter more health and a fifth more
 damage.
@@ -267,6 +270,43 @@ What one pays:
 - **Hunt**: press HUNT and fight them yourself.
 - **Run back in**: past the core's edge they give up and go back through
   their rifts.
+
+### Gem raids: when your kaiju are all down
+
+Out past the core with your whole team knocked out, the critters smell
+your gems (`Frontier.Raid`; `FrontierServer.raid`, from
+`KaijuServer.onTeamDown`). At most once every 75 seconds:
+
+- **More come through**: four more critters for you at once (six, stirred
+  right up), on top of your band's cap, and every critter out for you, or
+  coming through for the next minute, turns **gem snatcher**. You're told:
+  "Your kaiju are down... the critters smell your gems!" and you hear them
+  cackle.
+- **They trip you.** A snatcher within 6.5 studs winds up a **TRIP** at your
+  legs (0.75 s, on its cast bar: step out of reach, or bonk it to cut it
+  short). Landed, you're knocked down for 4 seconds, your health untouched,
+  "Tripped by a gem snatcher!" on your screen. Each snatcher trips every 5
+  to 8 seconds, and never twice within 3 seconds of the last trip on you.
+  Being beaten down the usual way counts too.
+- **They snatch your haul.** Your haul is the gems you mined this trip out:
+  every gem from a rock past the core, the newest 12. Back in the core it's
+  safe, and a new trip starts a new haul. With you down, snatchers run in,
+  and each grabs the newest gem still loose in your pouch (never one on
+  your gear), at most 3 a knock-down. Nothing left to take, a snatcher
+  giggles and slips away.
+- **They run off with it.** A snatcher holds the gem up over its head (a
+  glowing stone in its colour, its arms up), cackles, and runs for a rift
+  that tears open 26 to 38 studs away from you and waits 6 seconds for it,
+  giggling as it goes ("hee hee!" over it, `CritterFx`). Its outline shows
+  through rocks so you can chase it.
+- **Get it back.** Bonk it with your pick or knock it out before it hops
+  in, and the gem pops out and flies back to you ("GOT IT BACK!"), back in
+  your pouch even if it's full again. Let it hop in and the gem's gone:
+  "A critter got away with your ...".
+
+The giggles are synthesized by `tools/make_critter_sounds.py`
+(`critter_giggle_1..3.mp3`, `critter_cackle.mp3`); until they're uploaded,
+the old "uuhhh" sped up into squeaky "hee"s stands in.
 
 ## Performance
 

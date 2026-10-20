@@ -46,8 +46,10 @@
 	  The roll        a player still owed starter kaiju (from before the
 	                  roll, say) gets the roll here, once (KaijuRoll).
 	  No nameplates  nothing over a creature's head (yours, others', wild
-	                  kaiju, moon bugs): its body shows its health (BodyHealth,
-	                  handed every creature this finds).
+	                  kaiju, moon bugs): its body shows its health, an
+	                  outline in its health's colour, a wild kaiju's always
+	                  and through rocks (BodyHealth, handed every creature
+	                  this finds).
 
 	  KaijuHud.start()     once, from Lobby.client
 	  KaijuHud.open(id?, tab?)   the panel, on kaiju `id` (else your lead),
@@ -353,7 +355,7 @@ autoState.TextXAlignment = Enum.TextXAlignment.Center
 local autoWant: boolean? = nil -- (switched here, till the roster says so)
 local autoArt: string? = nil
 
--- TAME: beside the strip, when there's a wild kaiju to tame.
+-- CATCH: beside the strip, when there's a wild kaiju to catch.
 local tame = new("TextButton", {
 	Name = "Tame",
 	Text = "",
@@ -364,7 +366,7 @@ local tame = new("TextButton", {
 }, gui)
 UiKit.round(tame, 10)
 new("UIStroke", { Color = P.Gold, Thickness = 2 }, tame)
-local tameTitle = label(tame, "TAME", 18, P.Gold, Enum.Font.GothamBlack)
+local tameTitle = label(tame, "CATCH", 18, P.Gold, Enum.Font.GothamBlack)
 tameTitle.Position, tameTitle.Size = UDim2.fromOffset(0, 6), UDim2.new(1, 0, 0, 22)
 tameTitle.TextXAlignment = Enum.TextXAlignment.Center
 local tameOdds = label(tame, "", 11, P.Text, IronUi.Bold)
@@ -1055,7 +1057,7 @@ local function drawList(data, team: { string })
 	local note = label(
 		listFrame,
 		string.format(
-			"%d of %d kaiju kept. Tame more in the far quarry: wear one down to half health without killing it.",
+			"%d of %d kaiju kept. Catch more in the far quarry: wear one down to half health without killing it.",
 			Kaiju.count(data),
 			Kaiju.MaxOwned
 		),
@@ -1775,6 +1777,7 @@ function KaijuHud.start()
 	end
 	started = true
 	KaijuTaming.start()
+	BodyHealth.start()
 	layout()
 	local ok, err = pcall(refresh)
 	if not ok then

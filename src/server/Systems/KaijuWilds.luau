@@ -70,6 +70,22 @@
 	              (Frontier.critterExp), coins to whoever did the most
 	              (Frontier.Coins, a day's cap). A pickaxe bonks one
 	              (KaijuWilds.bonk, from OutpostServer).
+	  Snatchers   in a gem raid (FrontierServer: your team all knocked out
+	              out past the core; Shared.Frontier.Raid) every critter out
+	              for you is a snatcher (Raider, on its model too): it goes
+	              for you before any kaiju, winds up a TRIP at your legs
+	              (its cast bar) and, landing it, knocks you down
+	              (KaijuWilds.knockDown: SparServer's). You down, snatchers
+	              run in, and each grabs one of this trip's gems
+	              (KaijuWilds.steal: FrontierServer's haul; Snatch.Max a
+	              knock-down), holds it up over its head (a glowing stone
+	              welded there, CarryingGem on its model, its arms up),
+	              cackles and runs for a rift that tears open Carry.Away
+	              studs off and waits for it (KaijuWilds.escape). It
+	              giggles all the way. Bonk it or knock it out first and the
+	              gem drops back to you (KaijuWilds.recover); let it hop in
+	              and it's gone (KaijuWilds.lost). Nothing left to take, it
+	              blows a raspberry and slips away.
 
 	Both are ordinary Enemies (so every attack, status and nameplate works on
 	them) with their own brains, marked OutpostCreature for the kaiju out.
@@ -96,6 +112,9 @@
 	                                            sets it: wandering rifts cleared)
 	  KaijuWilds.veinSwing(index, player)       a swing at vein `index`'s rocks
 	  KaijuWilds.veinMoved(index, scar)         vein `index` surfaced at `scar`
+	  KaijuWilds.raid(enemy)                    a critter out turns snatcher
+	  KaijuWilds.knockDown, steal, recover, lost, escape   a gem raid's hooks
+	                                            (Main and FrontierServer set them)
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -163,6 +182,9 @@ type Wild = {
 	Noticed: { [Player]: number }?, -- when it last stopped to look at each player
 	Taming: any?, -- a tame being cast on it: { Player, Ends, Health (the tamer's, to see a hit) }
 	Serial: number, -- its number (a steady order when they share out their foes)
+	Raider: boolean?, -- a rift's critter in a gem raid: it trips and snatches (Frontier.Raid)
+	Loot: any?, -- the gem a snatcher's running off with
+	Carry: any?, -- where it's running to: { Spot, Life (its rift's timeline), GiggleAt, Gem (the stone over its head) }
 }
 
 -- A pack of roaming wild kaiju: its den out in the frontier (they wander
@@ -485,6 +507,13 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 	end
 	local function valid(victim): boolean
 		return fairFor(enemy, wild, victim)
+	end
+	-- A snatcher goes for its player before any kaiju: it's after the gems.
+	if wild.Raider and wild.Prey and wild.Prey.Parent then
+		local victim = { Root = rootOf(wild.Prey), Player = wild.Prey }
+		if valid(victim) then
+			return victim
+		end
 	end
 	-- A rift's critter goes for a kaiju out close by before any player (your
 	-- kaiju draws them off you: Kaiju.Bug.Draw), sharing them out with the
@@ -896,6 +925,10 @@ KaijuWilds._wander = wander
 
 -- A critter in a fight ----------------------------------------------------------------------------------
 
+local RAID = Frontier.Raid
+local giggle, trippable -- (a gem raid's: below)
+local tripped: { [Player]: number } = {} -- when each player was last tripped (os.clock)
+
 -- What its body is doing, for every client to pose (BodyPoses: a bite is a
 -- Slash) and, for a named move, the cast bar (FoeCastBar).
 local function act(enemy, kind: string, windup: number, side: number?, name: string?)
@@ -1145,6 +1178,26 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 			root.AssemblyLinearVelocity = -dir * rules.HopBack * 4 + Vector3.new(0, 8, 0)
 			e.RecoverUntil = now + rules.Recover * (if wary then rules.Wary else 1)
 			e.Circle = if rng:NextNumber() < 0.5 then 1 else -1
+		elseif action.Kind == "Trip" then
+			-- A snatcher's trip: a lunge at the legs; landed, its player's down.
+			enemy.LastAttack = now
+			root.AssemblyLinearVelocity = dir * math.min(50, distance * 6) + Vector3.new(0, 6, 0)
+			e.RecoverUntil = now + rules.Recover
+			local player = victim.Player
+			if not player or distance > reach + 2.5 then
+				return -- (it lunged at nothing)
+			end
+			local amount = kind.Damage * RAID.Trip.Damage * (1 - Enemies.weakness(enemy))
+			local dealt, guarded = Enemies.hitPlayer(player, amount, wild.Element, enemy, true)
+			if
+				not guarded
+				and (dealt or 0) > 0
+				and trippable(player, now)
+				and KaijuWilds.knockDown(player, RAID.Trip.Down, "Snatcher")
+			then
+				tripped[player] = now
+				giggle(enemy, "Cackle")
+			end
 		elseif action.Kind == "Lob" then
 			enemy.LastAttack = now
 			local lobRules = move.Lob
@@ -1226,6 +1279,20 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 		lookAt(root, victim.Root.Position)
 		return
 	end
+	-- A snatcher's trip at its player's legs, wound up on its cast bar (TRIP:
+	-- step out of reach, or bonk it): landed, they're down for the snatching.
+	if wild.Raider and victim.Player and not ranged then
+		e.NextTrip = e.NextTrip or now + rng:NextNumber(1, 2.5)
+		if distance <= RAID.Trip.Range and now >= e.NextTrip and trippable(victim.Player, now) then
+			e.NextTrip = now + rng:NextNumber(RAID.Trip.Every[1], RAID.Trip.Every[2])
+			e.Action = { Kind = "Trip", At = now + RAID.Trip.Windup }
+			e.Windup = { At = now + RAID.Trip.Windup, Heavy = true }
+			act(enemy, "Lunge", RAID.Trip.Windup, nil, "Trip")
+			humanoid:MoveTo(root.Position)
+			lookAt(root, victim.Root.Position)
+			return
+		end
+	end
 	-- The swarm's pounce: every fighter on this foe leaps in at once.
 	if not ranged and distance <= reach + rules.Rush.Leap and rushNow(enemy, victim, now) then
 		e.RushedAt = rushes[victim.Root].At
@@ -1280,6 +1347,259 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 	end
 end
 
+-- Gem raids --------------------------------------------------------------------------------------------
+
+-- Knocks `player` down for `seconds`, `by` what (Main sets it: SparServer.knockDown).
+KaijuWilds.knockDown = function(_player: Player, _seconds: number, _by: string?): boolean
+	return false
+end
+-- The newest gem of `player`'s haul, out of their pouch (FrontierServer sets it).
+KaijuWilds.steal = function(_player: Player): any
+	return nil
+end
+-- A snatched gem dropped at `at`: back to `player` (FrontierServer sets it).
+KaijuWilds.recover = function(_player: Player?, _gem, _at: Vector3) end
+-- A snatcher got away with `player`'s gem (FrontierServer sets it).
+KaijuWilds.lost = function(_player: Player?, _gem) end
+-- A rift at `at` that waits `wait` seconds for a snatcher: its timeline (FrontierServer sets it).
+KaijuWilds.escape = function(_at: Vector3, _facing: Vector3, _wait: number): any
+	return nil
+end
+
+local snatched: { [Player]: { Down: number, Count: number } } = {} -- gems taken this knock-down
+
+-- A giggle (or a cackle) for everyone near to hear, "hee hee!" over it.
+function giggle(enemy, kind: string?)
+	local root = enemy.Root
+	if root and root.Parent then
+		fx("CritterGiggle", root.Position + Vector3.new(0, 2, 0), kind or "Giggle")
+	end
+end
+
+-- One of a gem raid's critters turns snatcher.
+function KaijuWilds.raid(enemy)
+	local wild = enemy and wilds[enemy]
+	if wild and wild.Bug and not wild.Raider and enemy.Alive then
+		wild.Raider = true
+		enemy.Model:SetAttribute("Raider", true)
+	end
+end
+
+-- Whether `player` can be tripped now: not down, and not too soon after the last.
+function trippable(player: Player, now: number): boolean
+	return now - (tripped[player] or -math.huge) >= RAID.Trip.Gap and not Spar.isDown(player)
+end
+
+-- How many more gems snatchers may take from `player` this knock-down.
+local function snatchesLeft(player: Player): number
+	local down = player:GetAttribute("SparDown")
+	if type(down) ~= "number" then
+		return 0
+	end
+	local entry = snatched[player]
+	if not entry or entry.Down ~= down then
+		entry = { Down = down, Count = 0 }
+		snatched[player] = entry
+	end
+	return RAID.Snatch.Max - entry.Count
+end
+
+local function weld(part: BasePart, to: BasePart)
+	local joint = Instance.new("WeldConstraint")
+	joint.Part0, joint.Part1 = part, to
+	joint.Parent = part
+end
+
+-- The stone over a snatcher's head: a glowing gem in its colour, held high
+-- (its arms up: a held "Buff", BodyPoses). Returns its parts.
+local function holdUp(enemy, gem): { BasePart }
+	local root, model = enemy.Root, enemy.Model
+	local color = GemConfig.ElementColors[gem.Element]
+		or GemConfig.TierColors[gem.Tier]
+		or Color3.fromRGB(120, 230, 255)
+	local top = 2
+	pcall(function()
+		local box, size = model:GetBoundingBox()
+		top = box.Position.Y + size.Y / 2 - root.Position.Y
+	end)
+	local at = root.CFrame * CFrame.new(0, top + 0.9, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45))
+	local function piece(name: string, size: number, material: Enum.Material, transparency: number)
+		local part = Instance.new("Part")
+		part.Name = name
+		part.Size = Vector3.one * size
+		part.Material = material
+		part.Transparency = transparency
+		part.Color = color
+		part.CanCollide, part.CanQuery, part.CanTouch, part.Massless = false, false, false, true
+		part.CastShadow = false
+		part.CFrame = at
+		return part
+	end
+	local stone = piece("StolenGem", 1, Enum.Material.Glass, 0.2)
+	local core = piece("StolenGemCore", 0.5, Enum.Material.Neon, 0)
+	local light = Instance.new("PointLight")
+	light.Color, light.Brightness, light.Range = color, 2.5, 10
+	light.Parent = core
+	local sparkle = Instance.new("ParticleEmitter")
+	sparkle.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+	sparkle.LightEmission = 1
+	sparkle.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 0) })
+	sparkle.Lifetime = NumberRange.new(0.4, 0.7)
+	sparkle.Rate = 8
+	sparkle.Speed = NumberRange.new(1, 2.5)
+	sparkle.SpreadAngle = Vector2.new(180, 180)
+	sparkle.Parent = core
+	weld(stone, root)
+	weld(core, stone)
+	stone.Parent, core.Parent = model, model
+	model:SetAttribute("CarryingGem", gem.Tier or "Common")
+	act(enemy, "Buff", 0.25)
+	model:SetAttribute("ActionHold", serverNow() + 600)
+	return { stone, core }
+end
+
+-- Its hands empty again.
+local function letGo(enemy, wild: Wild)
+	local carrying = wild.Carry
+	if carrying and carrying.Gem then
+		for _, part in carrying.Gem do
+			part:Destroy()
+		end
+	end
+	wild.Carry, wild.Loot = nil, nil
+	enemy.Model:SetAttribute("CarryingGem", nil)
+	enemy.Model:SetAttribute("ActionHold", nil)
+end
+
+-- A snatcher drops what it's carrying (bonked, or knocked out): back to its player.
+local function drop(enemy, wild: Wild)
+	local gem = wild.Loot
+	if not gem then
+		return
+	end
+	local at = enemy.Root.Position
+	letGo(enemy, wild)
+	KaijuWilds.recover(wild.Prey, gem, at)
+end
+
+-- Into its rift with the gem: gone for good.
+local function getAway(enemy, wild: Wild)
+	local gem = wild.Loot
+	giggle(enemy, "Giggle")
+	letGo(enemy, wild)
+	wild.Leaving = true
+	KaijuWilds.done(enemy, false, nil)
+	if gem then
+		KaijuWilds.lost(wild.Prey, gem)
+	end
+	wilds[enemy] = nil
+	Enemies.remove(enemy)
+end
+
+-- Running off with a gem to the rift waiting for it, giggling all the way.
+local function carry(enemy, wild: Wild, now: number)
+	local c = wild.Carry
+	local humanoid, root = enemy.Humanoid, enemy.Root
+	humanoid.WalkSpeed = RAID.Carry.Speed * (1 - (if now < enemy.SlowUntil then enemy.Slow else 0))
+	if now >= c.GiggleAt then
+		c.GiggleAt = now + rng:NextNumber(RAID.Carry.Giggle[1], RAID.Carry.Giggle[2])
+		giggle(enemy, "Giggle")
+	end
+	local t = serverNow()
+	-- (Its rift sealing before it got through: a fresh one where it is.)
+	if not c.Life or t >= c.Life.CloseAt - 0.3 then
+		c.Spot = root.Position
+		c.Life = KaijuWilds.escape(root.Position, root.Position + root.CFrame.LookVector * 10, Frontier.Rift.Hop)
+	end
+	if flat(c.Spot - root.Position).Magnitude > 3 then
+		humanoid:MoveTo(c.Spot)
+		return
+	end
+	humanoid:MoveTo(root.Position)
+	if c.Life and t >= c.Life.HopAt then
+		getAway(enemy, wild)
+	end
+end
+
+-- Its player down: in for a grab, and off with the newest gem of their haul.
+-- Returns whether it's busy at it.
+local function snatch(enemy, wild: Wild, now: number): boolean
+	local player = wild.Prey :: Player
+	local target = rootOf(player)
+	if not target then
+		return false
+	end
+	local e = enemy :: any
+	local humanoid, root = enemy.Humanoid, enemy.Root
+	local offset = flat(target.Position - root.Position)
+	local action = e.Action
+	if action and action.Kind == "Snatch" then
+		humanoid:MoveTo(root.Position)
+		lookAt(root, target.Position)
+		if now < action.At then
+			return true
+		end
+		e.Action, e.Windup = nil, nil
+		if offset.Magnitude > RAID.Snatch.Reach + 1.5 or snatchesLeft(player) <= 0 then
+			return true
+		end
+		local gem = KaijuWilds.steal(player)
+		if not gem then
+			-- Nothing worth taking: a raspberry, and off it goes.
+			giggle(enemy, "Giggle")
+			slipBack(wild)
+			return true
+		end
+		snatched[player].Count += 1
+		wild.Loot = gem
+		local spot =
+			KaijuServer.ground(Frontier.escapeSpot(root.Position, target.Position, Outpost.Location.Position, rng))
+		wild.Carry = {
+			Spot = spot,
+			GiggleAt = now + 0.9,
+			Gem = holdUp(enemy, gem),
+			Life = KaijuWilds.escape(spot, root.Position, RAID.Carry.Wait),
+		}
+		giggle(enemy, "Cackle")
+		return true
+	end
+	if offset.Magnitude > RAID.Snatch.Rush or snatchesLeft(player) <= 0 then
+		return false
+	end
+	e.Action, e.Windup = nil, nil
+	if offset.Magnitude > RAID.Snatch.Reach then
+		humanoid:MoveTo(target.Position)
+		return true
+	end
+	e.Action = { Kind = "Snatch", At = now + RAID.Snatch.Windup }
+	e.Windup = { At = now + RAID.Snatch.Windup }
+	act(enemy, "Slash", RAID.Snatch.Windup, nil, "Snatch")
+	humanoid:MoveTo(root.Position)
+	lookAt(root, target.Position)
+	return true
+end
+
+-- Its player down and nothing for it to grab: it hops round them, giggling.
+local function taunt(enemy, wild: Wild, now: number): boolean
+	local target = rootOf(wild.Prey :: Player)
+	if not target then
+		return false
+	end
+	local e = enemy :: any
+	local root = enemy.Root
+	if now >= (e.TauntAt or 0) then
+		e.TauntAt = now + rng:NextNumber(0.9, 1.6)
+		local angle = rng:NextNumber(0, math.pi * 2)
+		e.TauntSpot = target.Position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(5, 8)
+		if rng:NextNumber() < 0.45 then
+			root.AssemblyLinearVelocity += Vector3.new(0, 18, 0) -- (a gleeful hop)
+			giggle(enemy, "Giggle")
+		end
+	end
+	enemy.Humanoid:MoveTo(e.TauntSpot or root.Position)
+	return true
+end
+
 -- The brain both kinds share: find a foe and fight it (a wild kaiju as a
 -- duellist, KaijuFighter; a moon bug chases and bites), else go home (a
 -- rift's critter slips back through a rift).
@@ -1314,6 +1634,17 @@ local function brain(enemy, now: number)
 	if wild.Leaving then
 		humanoid:MoveTo(root.Position)
 		return
+	end
+	-- A snatcher with a gem runs for its rift; with its player down, it
+	-- goes in for a grab (or hops round them, giggling).
+	if wild.Loot then
+		carry(enemy, wild, now)
+		return
+	end
+	if wild.Raider and wild.Prey and Spar.isDown(wild.Prey) then
+		if snatch(enemy, wild, now) or taunt(enemy, wild, now) then
+			return
+		end
 	end
 	if not wild.Bug and root.Position.Y < enemy.Home.Y - 40 then
 		-- (Fallen through the floor: back up at its den.)
@@ -1890,7 +2221,7 @@ local function resolveTame(enemy, wild: Wild, player: Player, now: number)
 		soul.Id = PlayerData.newGemId()
 		local record = KaijuServer.adopt(player, wild.Species, soul, wild.Level)
 		if not record then
-			tell(player, "Couldn't tame it right now.")
+			tell(player, "Couldn't catch it right now.")
 			tameResult(player, "Interrupted")
 			return
 		end
@@ -1898,7 +2229,7 @@ local function resolveTame(enemy, wild: Wild, player: Player, now: number)
 		Enemies.remove(enemy)
 		gone(wild)
 		PlayerData.milestone(player, "KaijuTamed")
-		tell(player, string.format("Tamed! The %s (level %d) is yours.", title, wild.Level))
+		tell(player, string.format("Caught! The %s (level %d) is yours.", title, wild.Level))
 		tameResult(player, "Tamed")
 		return
 	end
@@ -1934,11 +2265,11 @@ function tameStep(enemy, wild: Wild, now: number)
 	enemy.Humanoid:MoveTo(enemy.Root.Position)
 	local broke = nil
 	if not player.Parent or not root or not body or body.Health <= 0 or player:GetAttribute("Outpost") ~= true then
-		broke = "The tame broke."
+		broke = "The catch broke."
 	elseif flat(root.Position - enemy.Root.Position).Magnitude > Kaiju.Tame.Break then
-		broke = "Too far away: the tame broke."
+		broke = "Too far away: the catch broke."
 	elseif body.Health < taming.Health - 0.5 then
-		broke = "You were hit: the tame broke."
+		broke = "You were hit: the catch broke."
 	end
 	if broke then
 		release(wild)
@@ -1967,23 +2298,23 @@ local function tame(player: Player, model: any)
 	local enemy = typeof(model) == "Instance" and Enemies.get(model) or nil
 	local wild = enemy and wilds[enemy]
 	if not wild or wild.Bug or not enemy.Alive then
-		return reply(false, "There's no wild kaiju there to tame.")
+		return reply(false, "There's no wild kaiju there to catch.")
 	end
 	local root = rootOf(player)
 	if not root or player:GetAttribute("Outpost") ~= true then
 		return reply(false, "Not right now.")
 	end
 	if (root.Position - enemy.Root.Position).Magnitude > TAME_RANGE then
-		return reply(false, "Get closer to tame it.")
+		return reply(false, "Get closer to catch it.")
 	end
 	if wild.Taming then
 		return reply(
 			false,
-			if wild.Taming.Player == player then "Hold steady: you're taming it." else "Someone's taming that one."
+			if wild.Taming.Player == player then "Hold steady: you're catching it." else "Someone's catching that one."
 		)
 	end
 	if tamingOf(player) then
-		return reply(false, "You're already taming one.")
+		return reply(false, "You're already catching one.")
 	end
 	local now = os.clock()
 	local last = wild.TameAt[player]
@@ -2057,6 +2388,7 @@ local function bugDied(enemy)
 	if not wild then
 		return
 	end
+	drop(enemy, wild) -- (a snatcher knocked out lets go of your gem)
 	wilds[enemy] = nil
 	local best, totals = credits(enemy)
 	local band = wild.Band or "Fringe"
@@ -2120,6 +2452,8 @@ function KaijuWilds.bonk(enemy, player: Player, from: Vector3): boolean
 	local root = enemy.Root
 	local away = flat(root.Position - from)
 	away = if away.Magnitude > 0.1 then away.Unit else -root.CFrame.LookVector
+	-- (A snatcher bonked lets go of the gem it's running off with.)
+	drop(enemy, wild)
 	Enemies.damage(enemy, enemy.Humanoid.MaxHealth * Frontier.Bonk.Share, player, false, Color3.fromRGB(255, 220, 140))
 	fx("BlockSpark", root.Position, false)
 	if enemy.Alive then
@@ -2140,6 +2474,7 @@ end
 --   Hop      its leap out of the tear (a velocity)
 --   Wander   out of a wandering rift: { Home, Roam, Notice }: it roams there
 --   Life     seconds before it slips back (Frontier.Life)
+--   Raider   a gem raid's: a snatcher from the start
 -- }
 function KaijuWilds.spawnBug(at: Vector3, opts)
 	Duelist = Duelist or require(script.Parent.Duelist)
@@ -2210,8 +2545,12 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Wander = opts.Wander,
 			Life = opts.Life,
 			Serial = serial + 1,
+			Raider = opts.Raider == true or nil,
 		}
 		serial += 1
+		if opts.Raider then
+			rig:SetAttribute("Raider", true)
+		end
 		-- Out of the tear, at its prey.
 		if opts.Hop then
 			enemy.Root.AssemblyLinearVelocity = opts.Hop
@@ -2275,6 +2614,7 @@ end
 -- For tests.
 KaijuWilds._tame, KaijuWilds._brain, KaijuWilds._wilds = tame, brain, wilds
 KaijuWilds._challenge = challenge
+KaijuWilds._snatched, KaijuWilds._tripped = snatched, tripped
 KaijuWilds._rushes = rushes
 KaijuWilds._spawnWild, KaijuWilds._packs = spawnWild, packs
 KaijuWilds._spawnGuardian, KaijuWilds._lifetimes = spawnGuardian, lifetimes

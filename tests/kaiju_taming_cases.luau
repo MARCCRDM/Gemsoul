@@ -1,4 +1,4 @@
--- KaijuTaming on screen: a weakened wild kaiju glows gold with READY TO TAME
+-- KaijuTaming on screen: a weakened wild kaiju glows gold with READY TO CATCH
 -- and its chance (not a healthy one, not a far one, not one being tamed);
 -- a tame cast draws a beam and motes closing in; the tamer's bar fills and
 -- ends on the server's result, then goes.
@@ -31,7 +31,7 @@ local glow = weak:FindFirstChildOfClass("Highlight")
 check(glow ~= nil and glow.Adornee == weak, "A weakened kaiju near you doesn't glow")
 local chance = Kaiju.tameChance(90, 300)
 check(
-	textOf(boardFor(weak)) == string.format("READY TO TAME · %d%%", math.floor(chance * 100 + 0.5)),
+	textOf(boardFor(weak)) == string.format("READY TO CATCH · %d%%", math.floor(chance * 100 + 0.5)),
 	"The ready words are wrong: " .. tostring(textOf(boardFor(weak)))
 )
 check(far:FindFirstChildOfClass("Highlight") == nil, "A kaiju across the quarry glows")
@@ -75,7 +75,7 @@ local function spread()
 	return total / #motes
 end
 local early = spread()
--- The tamer's bar: TAMING, the chance, filling.
+-- The tamer's bar: CATCHING, the chance, filling.
 local gui = playerGui:FindFirstChild("KaijuTaming")
 check(gui and gui.Enabled, "No cast bar")
 local function labels()
@@ -87,7 +87,7 @@ local function labels()
 	end
 	return out
 end
-check(labels()["TAMING WILD FROST RAZORBACK"], "The bar doesn't say what you're taming")
+check(labels()["CATCHING WILD FROST RAZORBACK"], "The bar doesn't say what you're taming")
 check(Taming.casting(), "casting() false mid-cast")
 local fillAt = nil
 for _, o in objects do
@@ -102,11 +102,11 @@ check(fillAt.Size.X.Scale > filled, "The bar didn't fill")
 check(spread() < early, "The motes didn't close in")
 check(table.find(sounds, "Shield"), "No sound when the cast starts")
 
--- The end: TAMED! from the server, then the bar goes; the beam goes with
+-- The end: CAUGHT! from the server, then the bar goes; the beam goes with
 -- the hold.
 localPlayer:SetAttribute("TameResult", "Tamed")
 localPlayer:SetAttribute("TameResultAt", serverClock)
-check(labels()["TAMED!"] and not Taming.casting(), "The bar didn't say TAMED!")
+check(labels()["CAUGHT!"] and not Taming.casting(), "The bar didn't say CAUGHT!")
 check(table.find(sounds, "Combo"), "No sound for a tame")
 weak:SetAttribute("KaijuTameBy", nil)
 frames(0.3)
@@ -117,7 +117,7 @@ check(not gui.Enabled, "The bar stayed up after the result")
 Taming.cast(weak, chance, Kaiju.Tame.Cast)
 localPlayer:SetAttribute("TameResult", "Interrupted")
 localPlayer:SetAttribute("TameResultAt", serverClock + 1)
-check(labels()["TAME BROKEN"] and gui.Enabled, "A broken tame didn't show")
+check(labels()["CATCH BROKEN"] and gui.Enabled, "A broken tame didn't show")
 -- A model gone takes its marks with it.
 weak.Parent = nil
 frames(0.3)

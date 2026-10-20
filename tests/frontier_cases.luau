@@ -691,10 +691,39 @@ local index, studs = FrontierHud.nearest(spots, Vector3.zero, FrontierHud.Sighti
 check(index == 2 and math.abs(studs - 40) < 1e-6, "The sighting isn't the nearest wild kaiju")
 check(FrontierHud.nearest(spots, Vector3.new(-1000, 0, 0), FrontierHud.Sighting) == nil, "A sighting past its reach")
 check(FrontierHud.nearest({}, Vector3.zero, 100) == nil, "A sighting with none about")
+-- Gem raids: more critters stirred up, the haul newest first and only
+-- what's still loose, a snatcher's rift off away from you, and one that
+-- waits for it.
+;
+(function()
+	local Raid = Frontier.Raid
+	check(Frontier.raidSize(0) == Raid.Size and Frontier.raidSize(1) == Raid.Size + Raid.StirBonus, "Raid sizes")
+	check(Frontier.raidSize(1) > Frontier.raidSize(0), "Stirred up, no bigger a raid")
+	local haul = { { Id = "a" }, { Id = "b" }, { Id = "c" }, { Id = "d" } }
+	local picked = Frontier.haulPick(haul, { a = true, b = true, d = true }, 2)
+	check(#picked == 2 and picked[1] == "d" and picked[2] == "b", "Not the newest loose gems first")
+	check(#Frontier.haulPick(haul, {}, 3) == 0, "Took a gem no longer loose")
+	check(#Frontier.haulPick({}, { a = true }, 3) == 0, "Took from an empty haul")
+	local middle = Vector3.new(0, 0, 0)
+	local rng = Random.new(5)
+	for _ = 1, 40 do
+		local from = Vector3.new(220, 3, 10)
+		local player = Vector3.new(215, 3, 10)
+		local spot = Frontier.escapeSpot(from, player, middle, rng)
+		local away = Vector3.new(spot.X - from.X, 0, spot.Z - from.Z)
+		check(away.Magnitude >= Raid.Carry.Away[1] * 0.5, "A snatcher's rift right where it stood")
+		check(away.Unit:Dot(Vector3.new(1, 0, 0)) > 0, "A snatcher's rift back toward the player")
+		local out = Frontier.distance(spot, middle)
+		check(out >= Frontier.Core - 0.01 and out <= Frontier.Rim + 0.01, "A snatcher's rift outside the frontier")
+	end
+	local life = Frontier.timeline(100, 1.5, Raid.Carry.Wait)
+	check(life.HopAt - life.OpenAt == Raid.Carry.Wait and life.CloseAt - life.HopAt == 1.5, "A rift that waits")
+	check(Frontier.timeline(100).HopAt - 100 == Frontier.Rift.Hop, "A rift's usual wait changed")
+end)()
 
 print(
 	string.format(
-		"PASS: %d frontier checks (bands, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD)",
+		"PASS: %d frontier checks (bands, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids)",
 		checks
 	)
 )

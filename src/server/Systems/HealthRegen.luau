@@ -5,26 +5,57 @@
 	removed and replaced by this rule, the same for everyone:
 
 	  · no recovery during an Arena fight (a PvP or Training session)
-	  · elsewhere, 1% of max health a second once 5 seconds have passed
-	    without taking damage
+	  · in the Outpost lobby (mining, hunting, out among the critters and
+	    wild kaiju), Lobby.Rate of max health a second once Lobby.Delay
+	    seconds have passed without taking damage: back on your feet
+	    quickly after a scrape, with a soft green glow while it mends
+	    (LobbyMend on the player, for every client)
+	  · elsewhere (a spar with someone, a match), 1% of max health a second
+	    once 5 seconds have passed without taking damage
 ]]
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Spar = require(ReplicatedStorage.Shared.Spar)
 
 local HealthRegen = {}
 
 local RATE = 0.01 -- of max health, per second
 local DELAY = 5 -- seconds without damage before recovery starts
-local STEP = 1
+local STEP = 0.5
+HealthRegen.Lobby = { Rate = 0.06, Delay = 4 }
 
 -- [humanoid] = { Health = last seen, HurtAt = os.clock() of the last drop }
 local seen = setmetatable({}, { __mode = "k" })
 
--- Pure, for testing: how much to restore this step.
-function HealthRegen.amount(health: number, maxHealth: number, inArena: boolean, sinceHurt: number, dt: number): number
-	if inArena or health <= 0 or health >= maxHealth or sinceHurt < DELAY then
+-- Pure, for testing: how much to restore this step (`lobby`: in the
+-- Outpost, out of a match or a spar with someone: Lobby's rate).
+function HealthRegen.amount(
+	health: number,
+	maxHealth: number,
+	inArena: boolean,
+	sinceHurt: number,
+	dt: number,
+	lobby: boolean?
+): number
+	local rate, delay = RATE, DELAY
+	if lobby then
+		rate, delay = HealthRegen.Lobby.Rate, HealthRegen.Lobby.Delay
+	end
+	if inArena or health <= 0 or health >= maxHealth or sinceHurt < delay then
 		return 0
 	end
-	return math.min(maxHealth - health, maxHealth * RATE * dt)
+	return math.min(maxHealth - health, maxHealth * rate * dt)
+end
+
+-- In the Outpost lobby: mining, hunting, out among its creatures; not in a
+-- match started from it, nor sparring with someone (a spar keeps its own
+-- pace), nor knocked down (you get up whole anyway).
+function HealthRegen.lobby(player: Player): boolean
+	return player:GetAttribute("Outpost") == true
+		and not Spar.inMatch(player)
+		and player:GetAttribute("SparWith") == nil
+		and not Spar.isDown(player)
 end
 
 local function removeDefault(character: Model)
@@ -48,11 +79,17 @@ local function step(dt: number)
 				entry.HurtAt = now
 			end
 			local inArena = player:GetAttribute("CombatSession") ~= nil
-			local heal = HealthRegen.amount(humanoid.Health, humanoid.MaxHealth, inArena, now - entry.HurtAt, dt)
+			local lobby = HealthRegen.lobby(player)
+			local heal = HealthRegen.amount(humanoid.Health, humanoid.MaxHealth, inArena, now - entry.HurtAt, dt, lobby)
 			if heal > 0 then
 				humanoid.Health += heal
 			end
 			entry.Health = humanoid.Health
+			-- (Mending in the lobby: a glow for everyone to see.)
+			local mending = if lobby and heal > 0 then true else nil
+			if player:GetAttribute("LobbyMend") ~= mending then
+				player:SetAttribute("LobbyMend", mending)
+			end
 		end
 	end
 end

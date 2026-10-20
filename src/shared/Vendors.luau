@@ -301,8 +301,8 @@ Vendors.InfoBot = {
 					Reply = "Your free pick gets a swing back every 12 seconds, full again in two hours. PROBE-7 sells refills, and 1v1 win streaks at the Arena Uplink restore swings.",
 				},
 				{
-					Text = "How do I tame a wild kaiju?",
-					Reply = "Challenge one out in the quarry and wear it down to half health without knocking it out: it glows gold. Then cast your tame and hold it. Get hit or wander off and the cast breaks.",
+					Text = "How do I catch a wild kaiju?",
+					Reply = "Challenge one out in the quarry and wear it down to half health without knocking it out: it glows gold. Then press CATCH and hold it in your gem's light. Get hit or wander off and the catch breaks.",
 				},
 				{
 					Text = "Can I drive a mech?",

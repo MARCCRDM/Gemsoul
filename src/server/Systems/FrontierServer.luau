@@ -30,6 +30,18 @@
 	                 more may be about them (Frontier.capFor), higher-
 	                 levelled (Frontier.Disturbance).
 
+	Gem raids      your whole team knocked out while you're out past the
+	                 core (KaijuServer.onTeamDown), no sooner than Raid.Gap
+	                 after the last: the critters out for you turn snatchers
+	                 (KaijuWilds.raid) and more come through for you at once
+	                 (Frontier.raidSize, past your band's cap), snatchers
+	                 all. They trip you and grab from your haul: the gems
+	                 you mined this trip out (OutpostServer.onGemMined: out
+	                 past the core, the newest Raid.Haul.Keep; back in the
+	                 core it's safe and starts again). A snatcher's rift
+	                 waits for it (Raid.Carry.Wait); bonk or knock it out
+	                 first and the gem's back in your pouch.
+
 	Nobody gets more critters than their band's cap or a fair share of the
 	Outpost's (Frontier.share); critters still on their way through count.
 	Nobody gets one in the core, in a fight elsewhere, in a spar, or down.
@@ -46,6 +58,8 @@
 
 	  FrontierServer.start(site)
 	  FrontierServer.swing(player, swings)   a swing out there (OutpostServer)
+	  FrontierServer.mined(player, gem)      a gem mined (OutpostServer): this trip's haul
+	  FrontierServer.raid(player) -> boolean   a gem raid on them (their team's all down)
 	  FrontierServer.open(at, facing, opts?) -> anchor, timeline   a rift on the ground at `at`
 	  FrontierServer.scar(at) -> anchor   a dormant rift (a vein's)
 	  FrontierServer.moveScar(index, at)  vein `index`'s dormant rift moves with it
@@ -55,11 +69,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local Outpost = require(ReplicatedStorage.Shared.Outpost)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local KaijuServer = require(script.Parent.KaijuServer)
 local KaijuWilds = require(script.Parent.KaijuWilds)
+local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 
 local FrontierServer = {}
@@ -82,6 +99,14 @@ local groupOf = setmetatable({}, { __mode = "k" }) -- [enemy] = its wandering ri
 local playersOut = 0 -- those out past the core, last step (for a fair share)
 local scars: { [number]: BasePart } = {} -- each vein's dormant rift
 local nextWander = 0
+-- [player] = this trip out's gems ({ Id }, oldest first): what snatchers take
+local hauls: { [Player]: { any } } = {}
+-- [player] = when they last had a gem raid (os.clock)
+local raids: { [Player]: number } = {}
+-- [player] = till when a raid's on for them (os.clock): whatever comes
+-- through for them till then is a snatcher too
+local raiding: { [Player]: number } = {}
+local RAID_FOR = 60
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -156,13 +181,14 @@ end
 
 -- A rift on the ground at `at`, facing `facing`: its anchor (for the
 -- clients) and its timeline. Gone once it's sealed. `opts` = { Linger,
--- Critter (roster id), Prey (a Player) }.
+-- Critter (roster id), Prey (a Player), Hop (seconds open before the hop:
+-- a snatcher's waits for it) }.
 function FrontierServer.open(at: Vector3, facing: Vector3, opts: any?)
 	opts = opts or {}
 	nextSeed += 1
 	local seed = rng:NextInteger(1, 2 ^ 30) + nextSeed
 	local height = rng:NextNumber(Frontier.Rift.Height[1], Frontier.Rift.Height[2])
-	local life = Frontier.timeline(serverNow(), opts.Linger)
+	local life = Frontier.timeline(serverNow(), opts.Linger, opts.Hop)
 	local anchor = Instance.new("Part")
 	anchor.Name = "Rift"
 	anchor.Anchored = true
@@ -235,6 +261,10 @@ end
 local function keep(player: Player, enemy)
 	critters[player] = critters[player] or {}
 	table.insert(critters[player], enemy)
+	-- (Through while a raid's on for them: a snatcher too.)
+	if (raiding[player] or 0) > os.clock() then
+		KaijuWilds.raid(enemy)
+	end
 end
 
 local function arrived(player: Player)
@@ -272,7 +302,7 @@ end
 -- them one after another (Frontier.trickle), each well clear of the tears
 -- still open (Rift.Apart), Frontier.Swarm.PerRift critters out of each once
 -- it has crackled its warning, any ranged ones last (KaijuWilds.pickWave).
-local function incursion(player: Player, band: string, count: number)
+local function incursion(player: Player, band: string, count: number, raider: boolean?)
 	pending[player] = (pending[player] or 0) + count
 	local wave = KaijuWilds.pickWave(count, rng)
 	local swarm = Frontier.Swarm
@@ -330,6 +360,7 @@ local function incursion(player: Player, band: string, count: number)
 						Level = Frontier.critterLevel(band, rng, stateOf(player).Stir),
 						Facing = target.Position,
 						Hop = toward * (if Kaiju.isRanged(critter) then 10 else 24) + side + Vector3.new(0, 26, 0),
+						Raider = raider,
 					})
 					if enemy then
 						keep(player, enemy)
@@ -382,6 +413,117 @@ function FrontierServer.swing(player: Player, swings: number?)
 	end
 	consider(player, state, band)
 	show(player, state)
+end
+
+-- Gem raids --------------------------------------------------------------------------------------------
+
+-- A gem `player` mined: out past the core, it joins this trip's haul.
+function FrontierServer.mined(player: Player, gem)
+	local root = rootOf(player)
+	if not root or type(gem) ~= "table" or not gem.Id then
+		return
+	end
+	if Frontier.band(Frontier.distance(root.Position, center())) == "Core" then
+		return
+	end
+	local haul = hauls[player] or {}
+	hauls[player] = haul
+	table.insert(haul, { Id = gem.Id })
+	while #haul > Frontier.Raid.Haul.Keep do
+		table.remove(haul, 1)
+	end
+end
+
+-- Their whole team's down out there: a gem raid. The critters out for
+-- them turn snatchers, and more come through, snatchers all.
+function FrontierServer.raid(player: Player): boolean
+	local root = rootOf(player)
+	if not root or not eligible(player) or KaijuServer.battling(player) then
+		return false
+	end
+	local band = Frontier.band(Frontier.distance(root.Position, center()))
+	local now = os.clock()
+	if band == "Core" or now - (raids[player] or -math.huge) < Frontier.Raid.Gap then
+		return false
+	end
+	raids[player] = now
+	raiding[player] = now + RAID_FOR
+	for _, enemy in critters[player] or {} do
+		KaijuWilds.raid(enemy)
+	end
+	local count = math.min(Frontier.raidSize(stateOf(player).Stir), math.max(0, Frontier.Caps.Server - total()))
+	if count > 0 then
+		incursion(player, band, count, true)
+	end
+	Remotes.Notify:FireClient(
+		player,
+		"Your kaiju are down... the critters smell your gems! Fight them off or run for the core."
+	)
+	Remotes.CombatFx:FireAllClients("CritterGiggle", root.Position + Vector3.new(0, 3, 0), "Cackle")
+	return true
+end
+
+-- A snatcher's grab: the newest loose gem of their haul, out of their pouch.
+local function steal(player: Player)
+	local haul, profile = hauls[player], PlayerData.get(player)
+	if not haul or not profile then
+		return nil
+	end
+	local loose = {}
+	for _, gem in GemInventory.available(profile) do
+		loose[gem.Id] = true
+	end
+	local id = Frontier.haulPick(haul, loose, 1)[1]
+	local gem = id and PlayerData.removeGem(player, id)
+	if not gem then
+		return nil
+	end
+	for i = #haul, 1, -1 do
+		if haul[i].Id == id then
+			table.remove(haul, i)
+		end
+	end
+	Remotes.Notify:FireClient(
+		player,
+		string.format("A critter snatched your %s! Bonk it before it hops into its rift.", GemConfig.displayName(gem))
+	)
+	return gem
+end
+
+-- A snatcher dropped it (bonked, or knocked out): back in their pouch,
+-- and back in their haul.
+local function recover(player: Player?, gem, at: Vector3)
+	if not player or not player.Parent or type(gem) ~= "table" then
+		return
+	end
+	PlayerData.returnGem(player, gem)
+	local haul = hauls[player] or {}
+	hauls[player] = haul
+	table.insert(haul, { Id = gem.Id })
+	local root = rootOf(player)
+	Remotes.CombatFx:FireAllClients(
+		"GemRecovered",
+		at,
+		if root then root.Position else at,
+		GemConfig.ElementColors[gem.Element] or GemConfig.TierColors[gem.Tier]
+	)
+	Remotes.Notify:FireClient(
+		player,
+		string.format("Got it back! Your %s is safe in your pouch.", GemConfig.displayName(gem))
+	)
+end
+
+-- A snatcher got through its rift with it: gone.
+local function lost(player: Player?, gem)
+	if player and player.Parent and type(gem) == "table" then
+		Remotes.Notify:FireClient(
+			player,
+			string.format(
+				"A critter got away with your %s! Back in the core, your haul is safe.",
+				GemConfig.displayName(gem)
+			)
+		)
+	end
 end
 
 -- Wandering rifts --------------------------------------------------------------------------------------
@@ -566,6 +708,9 @@ local function step(dt: number)
 			if away and player:GetAttribute("FrontierBand") ~= nil then
 				player:SetAttribute("FrontierBand", nil)
 			end
+			if away then
+				hauls[player], raiding[player] = nil, nil -- (gone from the Outpost: the trip's over)
+			end
 			-- (Down, in a spar or a fight, it settles as if they'd stopped;
 			-- gone from the Outpost, as fast as in the core.)
 			state.Stir = Frontier.settle(state.Stir, if away then "Core" else "Fringe", dt, now - state.LastSwing)
@@ -579,8 +724,10 @@ local function step(dt: number)
 		state.Stir = Frontier.settle(state.Stir, band, dt, now - state.LastSwing)
 		state.Told = math.min(state.Told, (Frontier.stage(state.Stir + 0.1)))
 		if band == "Core" then
-			-- (Back in the core it quiets down again, over a minute or so.)
+			-- (Back in the core it quiets down again, over a minute or so,
+			-- and the trip's haul is safe.)
 			state.Noise = math.max(0, state.Noise - dt / 60)
+			hauls[player], raiding[player] = nil, nil
 		else
 			table.insert(out, { Player = player, Root = root, Band = band })
 			state.Noise = Frontier.noise(state.Noise, band, 0, dt)
@@ -645,8 +792,17 @@ function FrontierServer.start(site)
 		return life
 	end
 	KaijuWilds.done = critterDone
+	-- Gem raids: the team down starts one; snatchers take from the haul,
+	-- drop it back, or get away with it through a rift that waits for them.
+	KaijuServer.onTeamDown = FrontierServer.raid
+	KaijuWilds.steal, KaijuWilds.recover, KaijuWilds.lost = steal, recover, lost
+	KaijuWilds.escape = function(at: Vector3, facing: Vector3, wait: number)
+		local _, life = FrontierServer.open(KaijuServer.ground(at), facing, { Hop = wait, Linger = 1.5 })
+		return life
+	end
 	Players.PlayerRemoving:Connect(function(player)
 		states[player], critters[player], pending[player] = nil, nil, nil
+		hauls[player], raids[player], raiding[player] = nil, nil, nil
 	end)
 	nextWander = os.clock() + rng:NextNumber(Frontier.Wander.Every[1], Frontier.Wander.Every[2])
 	local timer = 0
@@ -667,6 +823,8 @@ end
 FrontierServer._step, FrontierServer._states, FrontierServer._critters = step, states, critters
 FrontierServer._pending, FrontierServer._wanders, FrontierServer._wander = pending, wanders, wander
 FrontierServer._critterDone = critterDone
+FrontierServer._hauls, FrontierServer._raids = hauls, raids
+FrontierServer._steal, FrontierServer._recover, FrontierServer._lost = steal, recover, lost
 FrontierServer._setWanderAt = function(at: number)
 	nextWander = at
 end

@@ -28,7 +28,7 @@ at its peak). Ribs run up the outside, with heavier corners.
 | West wall | **STORE** booth (opens the Store) and **MARKET** booth (opens the player Market), each a counter with a prompt, a canopy and a lit sign. The Store shows what it sells on stands: helmets, weapon skins and pickaxes behind the counter, suits on turntables either side ([the Store's stands](probe-store-crew-quarry.md#the-stores-stands)). |
 | East wall | **PROBE-7** (the swing refills Exchange), the probe that landed and unfolded into the station ([PROBE-7](probe-store-crew-quarry.md#probe-7-the-probe-that-became-the-station)), and the **leaderboard**. |
 | By the door | The **1V1 ARENA UPLINK** (duels, "win streaks restore your swings": see [swing-restores.md](swing-restores.md)) and **HOW IT WORKS** on the wall: mine outside, win 1v1s for swings, heal your kaiju once you're clear, mechs in the garage, invite friends for coupons. |
-| Over the door, inside | **TO THE QUARRY**: mine rocks, kite critters, tame kaiju. |
+| Over the door, inside | **TO THE QUARRY**: mine rocks, kite critters, catch kaiju. |
 
 ![From the spawn: the arena ahead, the garage beyond](shelter/hall.png)
 

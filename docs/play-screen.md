@@ -66,10 +66,18 @@ the action. Each creature's body now shows its own health
 
 | | What you see |
 | --- | --- |
-| Hurt | Its colours sink toward a scorched red-black as its health drops. The first blows already show; at no health left it's 60% of the way there. |
-| Struck | A white flash on every blow that lands (0.08 s) |
+| Outlined | A glowing outline round its body in its health's colour: green when it's well, amber from 60%, red from 30%, with a faint wash of the colour over it. A wild kaiju is always outlined, even well, and seen through rocks (up to 320 studs) so you can find it and see how close it is to being caught; so is a critter running off with your gem. Anything else once it's hurt, within 150 studs. |
+| Hurt | Its colours sink a little toward a scorched red-black as its health drops (30% of the way at none: the outline says the rest) |
+| Struck | A white flash on every blow that lands (0.08 s), and its outline flares |
 | In danger | Below 30% it smokes: a dark wisp off its back, sized to it |
-| Healed | Its colours come back |
+| Healed | Its colours come back, its outline greener |
+
+- Roblox draws 31 outlines at most, so at most 10 creatures are outlined at
+  once: the wild kaiju (and gem snatchers) first, then the nearest hurt ones
+  (`BodyHealth.choose`). Gear's gem outlines keep 16 (`OutlineBudget`).
+  One glowing gold to be caught keeps its gold glow instead.
+- A player mending in the lobby gives off a soft green shimmer
+  (`BodyHealth.mend`, from `HealthRegen`'s `LobbyMend`).
 
 - Glowing parts (eyes, element glows) keep their light, so a kaiju still
   reads as its element.
@@ -128,7 +136,7 @@ Now a kaiju in a fight stays on its foe until the foe is down
 
 | Suite | What it covers |
 | --- | --- |
-| `tests/run_body_health.py` (new) | The tint curve; the flash, including overlapping flashes; smoke when low; a heal; glows and hidden parts left alone; parts that stream in later; a creature gone gets its colours back |
+| `tests/run_body_health.py` (new) | The tint curve; the flash, including overlapping flashes; smoke when low; a heal; glows and hidden parts left alone; parts that stream in later; a creature gone gets its colours back; outlines (green to red, who gets one in the budget, a wild kaiju's through rocks, the flare on a blow, none once down); the mending shimmer |
 | `tests/run_kaiju.py` | Walking off mid-fight: it stays on its foe past the leash and the teleport range, gives up past Battle, and takes the fight up again |
 | `tests/run_lobby.py` | The board without a task card, and none on a phone |
 | `tests/run_mobile_layout.py` | Seven tiles in the dock, TASKS among them; nothing else at the top right; the full loot card |

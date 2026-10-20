@@ -318,6 +318,10 @@ local PlayerData = {
 		profiles[player].Coins += coins
 	end,
 	milestone = function() end,
+	returnGem = function(player, gem)
+		table.insert(profiles[player].Gems, gem)
+		return true
+	end,
 }
 
 -- Enemies: the parts the kaiju use, as the real module does them.
@@ -507,8 +511,13 @@ end
 env = setmetatable({
 	Color3 = Color3,
 	Vector3 = Vector3,
+	Vector2 = roblox.Vector2,
 	CFrame = CFrame,
 	UDim2 = roblox.UDim2,
+	ColorSequence = roblox.ColorSequence,
+	NumberSequence = roblox.NumberSequence,
+	NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
+	NumberRange = roblox.NumberRange,
 	Enum = roblox.Enum,
 	Instance = Instance,
 	RaycastParams = {
@@ -1671,7 +1680,7 @@ check(not enemy.Root:FindFirstChild("ChallengePrompt").Enabled, "Its Challenge p
 local heldHealth = enemy.Humanoid.Health
 Enemies.damage(enemy, 500, b, false, nil, nil, nil)
 check(enemy.Alive and enemy.Humanoid.Health == heldHealth, "A held kaiju was hurt")
-check(Tame(a, enemy.Model).Message:find("taming") ~= nil, "Cast twice on one")
+check(Tame(a, enemy.Model).Message:find("catching") ~= nil, "Cast twice on one")
 now += Kaiju.Tame.Cast / 2
 KaijuWilds._brain(enemy, now)
 check(enemy.Model:GetAttribute("KaijuTameBy") == a.UserId and wild.Tries == 0, "The cast ended early")
@@ -3820,6 +3829,183 @@ do
 	end
 	run()
 end
+-- Gem raids: your team all down out past the core, the critters out for
+-- you turn snatchers and more come through; they trip you, grab the newest
+-- gems of this trip's haul, hold them up and run for a rift that waits for
+-- them; bonked or knocked out they drop it back to you. (In a function of
+-- its own: this file is at Luau's 200 locals.)
+;
+(function()
+	clearCritters()
+	table.clear(notes)
+	table.clear(fxs)
+	b:SetAttribute("SparDown", nil)
+	local Raid = Frontier.Raid
+	local downs = {}
+	KaijuWilds.knockDown = function(player, seconds, by)
+		table.insert(downs, { player, seconds, by })
+		player:SetAttribute("SparDown", now + seconds)
+		return true
+	end
+	check(KaijuServer.onTeamDown == FrontierServer.raid, "A team all down doesn't start a raid")
+	local profile = profiles[b]
+	profile.Gems = {}
+	local function has(id)
+		for _, gem in profile.Gems do
+			if gem.Id == id then
+				return true
+			end
+		end
+		return false
+	end
+	-- The haul: only gems mined out past the core.
+	stand(center + Vector3.new(60, 5, 0))
+	local coreGem = { Id = "core-1", Tier = "Common", Element = "Fire" }
+	table.insert(profile.Gems, coreGem)
+	FrontierServer.mined(b, coreGem)
+	check(FrontierServer._hauls[b] == nil, "A gem mined in the core joined the haul")
+	FrontierServer._raids[b] = nil
+	check(not FrontierServer.raid(b), "A raid in the core")
+	stand(center + Vector3.new(200, 5, 0))
+	for i = 1, 4 do
+		local gem = { Id = "haul-" .. i, Tier = if i == 4 then "Rare" else "Common", Element = "Frost" }
+		table.insert(profile.Gems, gem)
+		FrontierServer.mined(b, gem)
+	end
+	check(FrontierServer._hauls[b] and #FrontierServer._hauls[b] == 4, "The trip's haul")
+	-- The raid: snatchers come through for them.
+	check(FrontierServer.raid(b), "No raid with the team down out there")
+	check(noted(b, "smell your gems"), "Not told of the raid")
+	check(not FrontierServer.raid(b), "A second raid straight after the first")
+	for _ = 1, 40 do
+		now += 0.25
+		runDelayed()
+	end
+	local raiders = critterFor(b)
+	local melee = {}
+	local snatchers = 0
+	for _, enemy in raiders do
+		local entry = KaijuWilds._wilds[enemy]
+		if entry.Raider and enemy.Model:GetAttribute("Raider") then
+			snatchers += 1
+		end
+		if entry.Raider and not Kaiju.isRanged(entry.Species) then
+			table.insert(melee, enemy)
+		end
+	end
+	check(snatchers == #raiders and snatchers >= Raid.Size, "Not all snatchers: " .. snatchers .. "/" .. #raiders)
+	check(#melee >= 3, "Too few snatchers to grab with")
+	local function near(enemy)
+		enemy.Root.CFrame = CFrame.new(rootB.Position + Vector3.new(3, 0, 0))
+	end
+	-- The trip: wound up on its cast bar, then they're down.
+	local thief = melee[1]
+	near(thief)
+	thief.NextTrip, thief.NextMove, thief.LastAttack = 0, now + 60, now
+	KaijuWilds._brain(thief, now)
+	check(thief.Model:GetAttribute("ActionName") == "Trip", "No trip wound up on the cast bar")
+	check(#downs == 0, "Tripped before the wind-up was over")
+	now += Raid.Trip.Windup + 0.05
+	near(thief)
+	KaijuWilds._brain(thief, now)
+	check(#downs == 1 and downs[1][1] == b and downs[1][3] == "Snatcher", "The trip didn't knock them down")
+	check(downs[1][2] == Raid.Trip.Down, "Down for the wrong time")
+	-- Down: it goes in for a grab, and off with the newest gem of the haul.
+	near(thief)
+	KaijuWilds._brain(thief, now)
+	check(thief.Model:GetAttribute("ActionName") == "Snatch", "No grab at a player down")
+	now += Raid.Snatch.Windup + 0.05
+	KaijuWilds._brain(thief, now)
+	local wild = KaijuWilds._wilds[thief]
+	check(wild.Loot and wild.Loot.Id == "haul-4", "It didn't take the newest gem of the haul")
+	check(not has("haul-4") and has("core-1"), "The pouch after the grab")
+	check(noted(b, "snatched your"), "Not told what was snatched")
+	check(thief.Model:GetAttribute("CarryingGem") == "Rare", "Not held up for all to see")
+	check(thief.Model:FindFirstChild("StolenGem") ~= nil, "No stone over its head")
+	check(thief.Model:GetAttribute("ActionKind") == "Buff", "Its arms aren't up")
+	local giggled = false
+	for _, f in fxs do
+		if f[1] == "CritterGiggle" and f[3] == "Cackle" then
+			giggled = true
+		end
+	end
+	check(giggled, "No cackle")
+	local escape = wild.Carry.Life
+	check(escape and escape.HopAt - now >= Raid.Carry.Wait - 0.2, "Its rift doesn't wait for it")
+	local spot = wild.Carry.Spot
+	check(
+		Vector3.new(spot.X - rootB.Position.X, 0, spot.Z - rootB.Position.Z).Magnitude >= 12,
+		"Its rift opened on them"
+	)
+	-- Two more grabs this knock-down at most, then the rest taunt.
+	for i = 2, 3 do
+		local other = melee[i]
+		near(other)
+		KaijuWilds._brain(other, now)
+	end
+	now += Raid.Snatch.Windup + 0.05
+	for i = 2, 3 do
+		near(melee[i])
+		KaijuWilds._brain(melee[i], now)
+	end
+	local carrying = 0
+	for _, enemy in raiders do
+		local entry = KaijuWilds._wilds[enemy]
+		if entry and entry.Loot then
+			carrying += 1
+		end
+	end
+	check(carrying == 3 and not has("haul-3") and not has("haul-2") and has("haul-1"), "Three grabs a knock-down")
+	if melee[4] then
+		near(melee[4])
+		KaijuWilds._brain(melee[4], now)
+		check(melee[4].Model:GetAttribute("ActionName") ~= "Snatch", "A fourth grab in one knock-down")
+	end
+	-- Running off with it, giggling, the gem gone through its rift.
+	thief.Root.CFrame = CFrame.new(spot + Vector3.new(0, 2, 0))
+	now = escape.HopAt + 0.05
+	KaijuWilds._brain(thief, now)
+	check(not thief.Alive and KaijuWilds._wilds[thief] == nil, "It never hopped into its rift")
+	check(noted(b, "got away with"), "Not told it got away")
+	check(not has("haul-4"), "A gem that got away came back")
+	-- Bonked: it drops it, and the gem flies back to them.
+	local bonked = melee[2]
+	check(KaijuWilds.bonk(bonked, b, rootB.Position), "A snatcher couldn't be bonked")
+	check(has("haul-3") and KaijuWilds._wilds[bonked].Loot == nil, "A bonked snatcher kept the gem")
+	check(bonked.Model:GetAttribute("CarryingGem") == nil, "Still holding it up")
+	check(noted(b, "Got it back"), "Not told it came back")
+	local flew = false
+	for _, f in fxs do
+		if f[1] == "GemRecovered" then
+			flew = true
+		end
+	end
+	check(flew, "The gem didn't fly back")
+	-- Knocked out: the same.
+	local beaten = melee[3]
+	Enemies.damage(beaten, beaten.Humanoid.MaxHealth * 10, b)
+	check(has("haul-2"), "A snatcher knocked out kept the gem")
+	-- Nothing left to take: it blows a raspberry and slips away.
+	if melee[4] and melee[4].Alive then
+		FrontierServer._hauls[b] = {}
+		b:SetAttribute("SparDown", now + 4) -- (a new knock-down)
+		near(melee[4])
+		melee[4].Action = nil
+		KaijuWilds._brain(melee[4], now)
+		now += Raid.Snatch.Windup + 0.05
+		KaijuWilds._brain(melee[4], now)
+		local entry = KaijuWilds._wilds[melee[4]]
+		check(entry == nil or entry.Leaving, "A snatcher with nothing to take stayed")
+	end
+	-- Back in the core, the haul is safe.
+	b:SetAttribute("SparDown", nil)
+	FrontierServer._hauls[b] = { { Id = "haul-1" } }
+	stand(center + Vector3.new(60, 5, 0))
+	FrontierServer._step(0.5)
+	check(FrontierServer._hauls[b] == nil, "The haul wasn't safe back in the core")
+	clearCritters()
+	FrontierServer._raids[b] = nil
+end)()
 
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
@@ -3835,7 +4021,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, gem raids)",
 		checks
 	)
 )

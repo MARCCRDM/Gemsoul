@@ -478,8 +478,34 @@ check(Hunt(a, true).Ok, "Couldn't hunt")
 now += Spar.SheatheLock + 1
 check(Spar_(a, false).Ok and a:GetAttribute("Hunt") == nil, "1 didn't end the hunt")
 
+-- Tripped by a gem raid's snatcher (a miner, kit away): down for the trip's
+-- seconds with their health untouched, then up with it still untouched.
+do
+	SparServer._stop(b)
+	b:SetAttribute("SparDown", nil)
+	b:SetAttribute("Outpost", true)
+	local guard = b.Character and b.Character:FindFirstChild("SparGuard")
+	if guard then
+		guard:Destroy()
+	end
+	hb.Health = 60
+	check(SparServer.knockDown(b, 4, "Snatcher"), "A snatcher's trip didn't knock a miner down")
+	check(Spar.isDown(b) and hb.Health == 60, "Tripped: not down, or hurt by it")
+	check(math.abs(b:GetAttribute("SparDown") - now - 4) < 0.01, "Down for the wrong time")
+	check(not SparServer.knockDown(b, 4, "Snatcher"), "Tripped again while down")
+	SparServer._getUp(b, hb, true, true)
+	check(hb.Health == 60 and b:GetAttribute("SparDown") == nil, "A trip healed them, or kept them down")
+	local stray = b.Character and b.Character:FindFirstChild("SparGuard")
+	if stray then
+		stray:Destroy()
+	end
+	b:SetAttribute("MatchId", "m1")
+	check(not SparServer.knockDown(b, 4, "Snatcher"), "Tripped in a match")
+	b:SetAttribute("MatchId", nil)
+end
+
 print(
 	"PASS: "
 		.. checks
-		.. " spar checks (asking, answering, partners only, knock-downs, getting up, ending it for both, hunting)"
+		.. " spar checks (asking, answering, partners only, knock-downs, getting up, ending it for both, hunting, a snatcher's trip)"
 )

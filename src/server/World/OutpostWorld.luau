@@ -1725,7 +1725,7 @@ local function shelter(parent, at: CFrame, rules)
 		"FORWARD OPERATING BASE  ·  MECH GARAGE  ·  STORE  ·  MARKET", SAGA)
 	light(name, SAGA, 24, 1)
 	signPanel(m, facing(0, 25, D - 0.2, 0, -1), Vector3.new(26, 3.2, 0.4), "TO THE QUARRY",
-		"MINE ROCKS  ·  KITE CRITTERS  ·  TAME KAIJU", GLOW)
+		"MINE ROCKS  ·  KITE CRITTERS  ·  CATCH KAIJU", GLOW)
 
 	-- The ramps: a wide one from the main door down to the quarry, and one
 	-- from each garage door for the mechs (lift over ShelterRamp studs: a

@@ -1076,6 +1076,18 @@ function PlayerData.addGem(player: Player, gem: Gem): boolean
 	return true
 end
 
+-- Gives back a gem that was theirs (a gem raid's snatcher dropped it): into
+-- the pouch even if it's full again, since taking it made the room.
+function PlayerData.returnGem(player: Player, gem: Gem): boolean
+	local profile = profiles[player]
+	if not profile then
+		return false
+	end
+	table.insert(profile.Gems, gem)
+	sync(player)
+	return true
+end
+
 function PlayerData.removeGem(player: Player, gemId: string): Gem?
 	local profile = profiles[player]
 	if not profile then

@@ -16,7 +16,7 @@ local RunService = game:GetService("RunService")
 local Tags = require(ReplicatedStorage.Shared.Tags)
 
 local OutlineBudget = {}
-OutlineBudget.Budget = 24 -- of Roblox's 31, leaving room for other outlines
+OutlineBudget.Budget = 16 -- of Roblox's 31, leaving room for other outlines (BodyHealth's 10, catch glows, target lock)
 
 -- The `budget` nearest entries: { [entry] = true }.
 function OutlineBudget.choose(entries, budget: number)

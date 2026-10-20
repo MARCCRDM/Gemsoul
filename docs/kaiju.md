@@ -3,7 +3,7 @@
 Small monsters that follow you around the Outpost and fight on their
 own, like the heroes in Heroes RNG: you run about and pull enemies in, and
 your kaiju do the fighting while you fight beside them. You find new ones in
-the wild and tame them, and in the arena two players' kaiju fight one on one,
+the wild and catch them, and in the arena two players' kaiju fight one on one,
 for keeps.
 
 They replace the critter pets in [pet-system-proposal.md](pet-system-proposal.md).
@@ -244,7 +244,7 @@ but never on top of each other.
 
 ![The team strip on a phone with AUTO HEAL on, and the HEAL tab](kaiju/hud.png)
 
-On a computer the strip sits at the bottom left, TAME above it:
+On a computer the strip sits at the bottom left, CATCH above it:
 [the lobby on a computer](kaiju/hud-desktop.png).
 
 - **The team strip:** a tile for each of your team, the lead first (edged in
@@ -259,9 +259,9 @@ On a computer the strip sits at the bottom left, TAME above it:
     Commons are gone), how many spare Commons and Uncommons you have, and
     ON or OFF. Tap it to switch. On, your spare Commons, then your spare
     Uncommons, heal your team by themselves (see [Healing](#healing)).
-- **TAME**, beside the strip, when a wild kaiju near you is down to half its
-  health: the chance right now and the tries left. It starts the taming
-  cast (see Taming), and hides while the cast is under way.
+- **CATCH**, beside the strip, when a wild kaiju near you is down to half its
+  health: the chance right now and the tries left. It starts the catch
+  (see [Catching](#catching)), and hides while it's under way.
 - **The kaiju panel:** on the left every kaiju you have: YOUR TEAM (numbered,
   1 leads; health, EXP, and DOWN: REVIVE IT on one knocked out) and AT HOME
   (their health too: it doesn't come back at home either). Pick one for it
@@ -368,7 +368,7 @@ put back at its den.
 
 - **Kill it:** every kaiju that fought it gets 40 + 12 × its level EXP, and
   the player who (with their kaiju) did the most gets its Gemsoul.
-- **Tame it:** it joins you, Gemsoul and all, at its level.
+- **Catch it:** it joins you, Gemsoul and all, at its level.
 
 ### The vein guardian
 
@@ -388,24 +388,29 @@ and beats a kaiju of its own level.
 - Awake, it goes for whoever woke it, and anyone else who mines its vein,
   **a plain miner too**, not only hunters. Its finishing blow knocks a
   miner down rather than killing them. And it fights their kaiju.
-- Challenge it, fight it or tame it like any other wild kaiju. Killed, it
+- Challenge it, fight it or catch it like any other wild kaiju. Killed, it
   also pays **40 coins** (within the 300 a day from critters).
 - Lead it 70 studs from home and it walks back. Home 8 seconds with
   nobody fighting it, it forgets everyone and goes back to sleep: three
   swings again.
-- It never burrows of old age. Beat it or tame it and the vein is yours
+- It never burrows of old age. Beat it or catch it and the vein is yours
   until the vein moves on; then a fresh guardian sleeps at the new site. If
   the vein moves while its guardian is still about, the guardian goes with
   it.
 
-### Taming
+### Catching
+
+Players see **catch** everywhere (CATCH, CATCHING, CAUGHT!): "tame" read
+like a chore, and catching is what everyone already knows. The code keeps
+its old names (`Kaiju.Tame`, `KaijuTame`, `KaijuTaming`, `TameResult`), so
+saves and remotes are unchanged.
 
 Bring it to half its health or less **without killing it**. When it's
 ready to be caught, it **glows gold** (a pulsing outline you can see
-through rocks) with **READY TO TAME** and the chance over it. Anyone within
+through rocks) with **READY TO CATCH** and the chance over it. Anyone within
 140 studs sees that.
 
-Then tap **TAME**. Taming is a **cast** of 2.5 seconds (`Kaiju.Tame`):
+Then tap **CATCH**. Catching is a **cast** of 2.5 seconds (`Kaiju.Tame`):
 
 - A beam of gold light runs from your hand to it, and motes of light
   spiral in round it, closing in as the cast goes on. Everyone near sees
@@ -413,7 +418,7 @@ Then tap **TAME**. Taming is a **cast** of 2.5 seconds (`Kaiju.Tame`):
 - It's **held**: it stops where it is and struggles against the hold
   (crouched, twisting, jaws snapping: the `Bound` pose). It can't move,
   fight back or be hurt, and your kaiju (anyone's) leaves it alone.
-- Your **cast bar** says TAMING and what it is, with the chance, and fills
+- Your **cast bar** says CATCHING and what it is, with the chance, and fills
   as it goes: "Stay close and don't get hit."
 - The cast **breaks** if you're hit (by a critter, say), if you stray more
   than 38 studs from it, or if you leave the Outpost. A broken cast costs
@@ -428,14 +433,14 @@ Then tap **TAME**. Taming is a **cast** of 2.5 seconds (`Kaiju.Tame`):
 | 5% | 60% |
 | 1 HP | nearly 80% |
 
-The bar ends on the result: **TAMED!** (it's yours, in the kaiju panel),
+The bar ends on the result: **CAUGHT!** (it's yours, in the kaiju panel),
 **IT BROKE FREE** (a try spent), **IT FLED** (it burrowed away after the
-third) or **TAME BROKEN** (cut short). You start a cast from within 30
-studs; tries are at least 2 seconds apart, and you tame one at a time
-(and nobody else can tame one you're holding).
+third) or **CATCH BROKEN** (cut short). You start a cast from within 30
+studs; tries are at least 2 seconds apart, and you catch one at a time
+(and nobody else can catch one you're holding).
 
 The hard part is not killing it. Every hit on a wild kaiju lands anywhere
-from 60% to 140% of its usual damage, so one big hit can end the tame. To
+from 60% to 140% of its usual damage, so one big hit can end the catch. To
 hit gently, use its own element (it takes 75% from that); its weakness
 element hits harder (125%). Recall your kaiju when it would finish the job.
 
@@ -457,6 +462,14 @@ They're built light (no armour, nothing too small to see at their size),
 since twenty can be about at once. Let your kaiju fight them, bonk them
 with your pick, hunt them, or run back to the core, where they give up and
 slip back through rifts of their own.
+
+**Your team all down, they come for your gems.** With every kaiju of your
+team knocked out out past the core, more critters come through, and they
+turn gem snatchers: they trip you (TRIP on the cast bar), grab the newest
+gems of this trip's haul while you're down, and run giggling for a rift
+that waits for them, the gem held up over their heads. Bonk one or knock it
+out first and your gem flies back to you. See
+[frontier.md](frontier.md#gem-raids-when-your-kaiju-are-all-down).
 
 **A critter goes for a kaiju before a player.** If a kaiju is out within 30
 studs of it, it goes for a kaiju, your own before anyone else's, the
@@ -665,9 +678,10 @@ Proposed guardrails:
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look, all at its caster's size (`Size`; effects sent `"Sized"`); its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |
 | `SparServer` | `Hunt`: the kit out alone |
-| `KaijuHud` (client) | The team strip, AUTO HEAL, TAME, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
+| `KaijuHud` (client) | The team strip, AUTO HEAL, CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
-| `KaijuTaming` (client) | The gold glow and READY TO TAME on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
+| `KaijuTaming` (client) | The gold glow and READY TO CATCH on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
+| `CritterFx` (client) | A gem raid's snatchers on screen: their giggles and cackles with "hee hee!" over them, and a dropped gem flying back ("GOT IT BACK!") |
 | `FxSize` (client) | How big the effect being drawn is: a creature's size, held while its effect draws (`run`), kept through its delays and frame loops (`keep`); `CombatFx`, `CombatSound`, `CombatVfx`, `MoveVfx`, `TriadVfx` and `ElementalDeath` draw at it |
 | `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk, their fight poses and their moods (`KaijuMood`: `CreatureMotion.Moods`) |
 
@@ -754,10 +768,10 @@ The rules also check every Gemsoul's three moves (a kaiju's own, waking at
 5 and 10), every move's plan, an old Gemsoul's seeded Q and R, and each
 key's power. `tests/kaiju_models_cases.luau` checks each mood's pose (a held kaiju
 crouches and struggles). `tests/run_kaiju_taming.py` drives the taming
-screen: a weakened kaiju near you glows with READY TO TAME and its chance (a
+screen: a weakened kaiju near you glows with READY TO CATCH and its chance (a
 healthy one, a far one, one being tamed or one out of the Outpost doesn't),
 the glow pulses, a cast draws two beams from your hand and twelve motes
-that close in, the bar fills, and it ends on TAMED! or TAME BROKEN and
+that close in, the bar fills, and it ends on CAUGHT! or CATCH BROKEN and
 goes.
 `tests/run_spar.py` covers hunting, and `tests/run_mobile_layout.py` the
 card's place on every phone. `tests/run_body_health.py` covers health on

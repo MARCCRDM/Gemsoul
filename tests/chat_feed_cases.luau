@@ -359,7 +359,7 @@ check(gui.IgnoreGuiInset == false, "The feed ignores the top bar inset")
 -- Windowless: no background anywhere but the line you type in.
 check(w.holder().BackgroundTransparency == 1 and w.part("Lines").BackgroundTransparency == 1, "The feed has a window")
 check(w.part("Lines"):GetAttribute("NoTranslate") == true, "Players' words would be translated")
--- Bottom left, above the kaiju card and its TAME button, under the PLAY stack.
+-- Bottom left, above the kaiju card and its CATCH button, under the PLAY stack.
 local holder = w.holder()
 check(holder.AnchorPoint.X == 0 and holder.AnchorPoint.Y == 1, "Not anchored at its bottom left")
 check(holder.Position.X.Offset == 24 and holder.Position.Y.Scale == 1 and holder.Position.Y.Offset == -(24 + 62 + 8 + 62 + 12), "Not above the kaiju card")

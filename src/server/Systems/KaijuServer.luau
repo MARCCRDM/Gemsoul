@@ -137,6 +137,8 @@ local teams: { [Player]: { [string]: Pet } } = {}
 KaijuServer.battle = function(_pet, _now): any
 	return nil
 end
+-- The whole team out knocked out (FrontierServer sets it: a gem raid).
+KaijuServer.onTeamDown = function(_player: Player) end
 KaijuServer.battling = function(_player: Player): boolean
 	return false
 end
@@ -714,6 +716,18 @@ local function knockOut(pet: Pet)
 	local wait = Kaiju.reviveSeconds(record)
 	record.Down, record.Health, record.DownUntil = true, 0, os.time() + wait
 	PlayerData.sync(player)
+	-- The last of the team down: the critters smell your gems.
+	if profile and profile.Kaiju then
+		local ids, standing = Kaiju.teamIds(profile.Kaiju), 0
+		for _, other in ids do
+			if not profile.Kaiju.List[other].Down then
+				standing += 1
+			end
+		end
+		if #ids > 0 and standing == 0 then
+			task.spawn(KaijuServer.onTeamDown, player)
+		end
+	end
 	Remotes.Notify:FireClient(
 		player,
 		string.format(

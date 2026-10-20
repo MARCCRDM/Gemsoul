@@ -95,7 +95,7 @@ players arrive. Talk to it (E) for:
   why to mine further out, and what to do with spare gems.
 - **Kaiju.** How they fight, how to heal them, what happens when one is
   knocked out, and how kaiju battles work.
-- **Swings, mechs and more.** Running out of swings, taming, driving a mech,
+- **Swings, mechs and more.** Running out of swings, catching kaiju, driving a mech,
   and what invites give.
 
 A topic is an option with `Options` of its own. The dialogue

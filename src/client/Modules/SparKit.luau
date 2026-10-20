@@ -276,7 +276,7 @@ local function refreshBar()
 	local hunting = Spar.hunting(player)
 	versus.Text = if hunting then "HUNTING" else "SPAR vs " .. string.upper(partnerName())
 	caption.Text = if hunting
-		then "HUNTING  ·  only creatures can hit you  ·  wear a wild kaiju down to tame it"
+		then "HUNTING  ·  only creatures can hit you  ·  wear a wild kaiju down to catch it"
 		else "FRIENDLY SPAR  ·  only you two can hit each other"
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	-- (Touch: no key to show; the chip itself is the button.)
@@ -469,7 +469,9 @@ local function refreshDown()
 	local down = Spar.isDown(player)
 	if down and not downGui.Enabled then
 		downGui.Enabled = true
-		downBy.Text = if lastAttacker then "by " .. lastAttacker else ""
+		if lastAttacker then
+			downBy.Text = "by " .. lastAttacker
+		end
 		CombatSound.play("KnockDown")
 	elseif not down and downGui.Enabled then
 		downGui.Enabled = false
@@ -478,6 +480,7 @@ local function refreshDown()
 			flash("BACK UP", "Full health  ·  keep going, or 1 to stop", Color3.fromRGB(110, 230, 150))
 		end
 		lastAttacker = nil
+		downBy.Text = ""
 	end
 	if down then
 		local left = (player:GetAttribute("SparDown") or 0) - workspace:GetServerTimeNow()
@@ -502,12 +505,16 @@ local banner = new("TextLabel", {
 }, flashGui)
 local bannerScale = new("UIScale", { Scale = 1 }, banner)
 local bannerId = 0
-local function knockedDown(victimId: number, attackerId: number)
+-- (`by`: what tripped them, when it wasn't a player: a gem snatcher.)
+local function knockedDown(victimId: number, attackerId: number, by: string?)
 	local victim = Players:GetPlayerByUserId(victimId)
 	local attacker = Players:GetPlayerByUserId(attackerId)
 	if victim == player then
 		lastAttacker = attacker and attacker.DisplayName or nil
-		downBy.Text = if lastAttacker then "by " .. lastAttacker else ""
+		downBy.Text = if lastAttacker
+			then "by " .. lastAttacker
+			elseif by == "Snatcher" then "Tripped by a gem snatcher! Get up and bonk it."
+			else ""
 		local from = attacker and attacker.Character and attacker.Character:FindFirstChild("HumanoidRootPart")
 		fall(if from then (from :: BasePart).Position else nil)
 	elseif attacker == player and victim then
@@ -634,9 +641,9 @@ function SparKit.start()
 	end)
 	task.spawn(function()
 		local fx = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CombatFx")
-		fx.OnClientEvent:Connect(function(kind, a, b)
+		fx.OnClientEvent:Connect(function(kind, a, b, c)
 			if kind == "SparKO" and type(a) == "number" and type(b) == "number" then
-				knockedDown(a, b)
+				knockedDown(a, b, if type(c) == "string" then c else nil)
 			end
 		end)
 	end)

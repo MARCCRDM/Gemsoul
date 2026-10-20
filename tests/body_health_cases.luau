@@ -64,6 +64,7 @@ local function part(name: string, color, material, transparency)
 		Material = material or Enum.Material.SmoothPlastic,
 		Transparency = transparency or 0,
 		Size = Vector3.new(4, 4, 4),
+		Position = Vector3.new(0, 0, 0),
 	})
 end
 local inWorld = true
@@ -94,6 +95,10 @@ local function model(parts, humanoid)
 	end
 	function m:IsDescendantOf()
 		return inWorld
+	end
+	m.Attributes = {}
+	function m:GetAttribute(name)
+		return m.Attributes[name]
 	end
 	return m
 end
@@ -222,4 +227,86 @@ end
 BodyHealth.watch(statue)
 check(statue.Parts[1].Color == HIDE, "A body without health was tinted")
 
-print("PASS: " .. checks .. " body health checks (the tint curve, flash, smoke, heal, glow and hidden parts, streaming, gone)")
+-- The outline's colour: green when well, amber worn down, red nearly done.
+local O = BodyHealth.Outline
+check(
+	near(BodyHealth.outlineColor(1), O.Good) and near(BodyHealth.outlineColor(O.WarnAt), O.Warn),
+	"Outline green/amber ends"
+)
+check(near(BodyHealth.outlineColor(O.BadAt), O.Bad) and near(BodyHealth.outlineColor(0), O.Bad), "Outline red end")
+check(BodyHealth.outlineColor(0.45).G > BodyHealth.outlineColor(0.35).G, "The outline doesn't redden as health drops")
+
+-- Who gets one: the wild kaiju first (even well, even far), then the
+-- nearest hurt ones; never one glowing gold to be caught, nor a well tame one.
+local wildFar = { Wild = true, Hurt = false, Distance = 300 }
+local wildHeld = { Wild = true, Hurt = true, Distance = 5, Held = true }
+local bugNear = { Hurt = true, Distance = 10 }
+local bugFar = { Hurt = true, Distance = 120 }
+local bugWell = { Hurt = false, Distance = 3 }
+local bugAway = { Hurt = true, Distance = O.Range + 5 }
+local picked = BodyHealth.choose({ bugFar, bugWell, wildFar, bugNear, wildHeld, bugAway }, 2)
+check(
+	picked[wildFar] and picked[bugNear] and not picked[bugFar],
+	"The outline budget didn't go wild first, then nearest"
+)
+check(
+	not picked[wildHeld] and not picked[bugWell] and not picked[bugAway],
+	"Outlined one held in gold, a well one or one out of range"
+)
+check(
+	BodyHealth.choose({ { Wild = true, Distance = O.WildRange + 1 } }, 5)[1] == nil,
+	"A wild kaiju out of range was outlined"
+)
+
+-- On a body: a wild kaiju, well, outlined green through rocks; hurt, red,
+-- flaring on the blow; down, none.
+made = {}
+local wildHide = part("Torso", HIDE)
+local wildRoot = part("HumanoidRootPart", HIDE, nil, 1)
+local wh = humanoid(100, 100)
+local wm = model({ wildRoot, wildHide }, wh)
+wm.Attributes.KaijuWild = true
+inWorld = true
+BodyHealth.watch(wm)
+BodyHealth.step(Vector3.new(0, 0, 20))
+local ring
+for _, o in made do
+	if o.ClassName == "Highlight" then
+		ring = o
+	end
+end
+check(ring and ring.Adornee == wm and ring.Parent == wm, "A wild kaiju isn't outlined")
+check(ring.DepthMode == Enum.HighlightDepthMode.AlwaysOnTop, "A wild kaiju's outline doesn't show through rocks")
+check(near(ring.OutlineColor, O.Good), "A well wild kaiju's outline isn't green")
+hit(wh, 20)
+check(
+	near(ring.OutlineColor, BodyHealth.outlineColor(0.2)) and ring.FillTransparency == O.Flare,
+	"A blow didn't redden and flare the outline"
+)
+task.wait(BodyHealth.Flash.Seconds * 2 + 0.05)
+check(ring.FillTransparency == O.Fill, "The outline's flare didn't settle")
+hit(wh, 0)
+BodyHealth.step(Vector3.new(0, 0, 20))
+check(ring.Destroyed == true, "A creature that's down kept its outline")
+
+-- Mending in the lobby: a green shimmer off the player, on and off.
+made = {}
+local body = model({ part("HumanoidRootPart", HIDE, nil, 1) }, humanoid(50, 100))
+BodyHealth.mend(body, true)
+local shimmer
+for _, o in made do
+	if o.ClassName == "ParticleEmitter" then
+		shimmer = o
+	end
+end
+check(shimmer and shimmer.Enabled == true, "A player mending doesn't shimmer")
+BodyHealth.mend(body, true)
+check(#made == 2, "Mending twice made two shimmers")
+BodyHealth.mend(body, false)
+check(shimmer.Enabled == false, "The shimmer didn't stop with the mending")
+
+print(
+	"PASS: "
+		.. checks
+		.. " body health checks (the tint curve, flash, smoke, heal, glow and hidden parts, streaming, gone, outlines, mending)"
+)

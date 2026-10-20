@@ -115,7 +115,8 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 	CouponServer.restoreSwings = OutpostServer.restoreSwings
 	-- Friendly sparring there: 1 swaps the pick for your combat kit.
 	if Config.CombatEnabled or not Config.MenuOnly then
-		require(script.Parent.Systems.SparServer).start()
+		local SparServer = require(script.Parent.Systems.SparServer)
+		SparServer.start()
 		-- Mini kaiju: yours beside you, wild ones to hunt, and moon bugs
 		-- through rifts round anyone out past the core (the frontier).
 		if Config.Features == nil or Config.Features.Kaiju ~= false then
@@ -136,6 +137,10 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			-- Swings out past the core draw critters; a pick bonks them.
 			OutpostServer.onSwing = FrontierServer.swing
 			OutpostServer.bonker = KaijuWilds
+			-- Gem raids: the gems mined out there are a trip's haul, and a
+			-- snatcher's trip knocks you down as a spar's blow would.
+			OutpostServer.onGemMined = FrontierServer.mined
+			KaijuWilds.knockDown = SparServer.knockDown
 			-- A Rift Vein surfacing somewhere new takes its dormant rift (and its
 			-- guardian) along; a swing at a vein's rocks wakes its guardian.
 			OutpostServer.onVeinMoved = function(index, scar)

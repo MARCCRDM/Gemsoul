@@ -105,6 +105,8 @@ OutpostServer.onVeinSwing = function(_index: number, _player: Player) end
 -- A rock `player` broke (its Size): their kaiju out gets a little EXP
 -- (KaijuServer.mined).
 OutpostServer.onRockMined = function(_player: Player, _size: string) end
+-- A gem `player` mined (FrontierServer keeps this trip's haul: a gem raid's snatchers take from it).
+OutpostServer.onGemMined = function(_player: Player, _gem) end
 local secretParts: { [string]: BasePart } = {}
 local rng = Random.new()
 
@@ -556,6 +558,7 @@ local function loot(player: Player, node, profile)
 		result.Rarity = gem.Tier
 		result.Text = GemConfig.displayName(gem)
 		PlayerData.milestone(player, "Mined")
+		OutpostServer.onGemMined(player, gem)
 		-- Ultra Rare and Legendary finds are called out to the whole server.
 		if (GemConfig.TierRank[gem.Tier] or 0) >= 4 then
 			ChatChannels.announce(

@@ -2435,6 +2435,11 @@ end
 function handlers.TriadEmpowerHit(position, kind, final)
 	TriadVfx.empowerHit(position, kind, final)
 end
+-- A rift critter's giggle or cackle, and a snatched gem flying back
+-- (CritterFx; a gem raid, Shared.Frontier.Raid).
+handlers.CritterGiggle = require(script.Parent.Modules.CritterFx).giggle
+handlers.GemRecovered = require(script.Parent.Modules.CritterFx).recovered
+
 -- A creature's effect (a kaiju's, a critter's), drawn, sounded and shaken
 -- at its size: how big it stands next to a player (FxSize).
 function handlers.Sized(size, kind, ...)

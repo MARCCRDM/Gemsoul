@@ -57,6 +57,19 @@
 	Charged (Charged: luckier gems for a while). A pickaxe can bonk a
 	critter (Bonk) so a miner without a kaiju isn't helpless.
 
+	Gem raids (Raid): your whole team knocked out while you're out past
+	the core, the critters smell your gems. More come through for you at
+	once (raidSize), and every critter out for you turns gem snatcher: it
+	winds up a TRIP at your legs (on its cast bar: step away or bonk it)
+	and, landing it, knocks you down. Down (tripped, or beaten down), the
+	snatchers run in and each grabs one of the gems you mined this trip
+	out (your haul: the newest first, never one on your gear; at most
+	Snatch.Max a knock-down), holds it over its head, giggling, and runs
+	for a rift that tears open a little way off (escapeSpot), waiting
+	there for it (Carry.Wait). Bonk it or knock it out before it hops in
+	and the gem's yours again; let it hop in and it's gone. Back in the
+	core your haul is safe (it starts again on your next trip out).
+
 	  Frontier.distance(position, center) -> studs across the ground
 	  Frontier.band(distance) -> "Core" | "Fringe" | "Edge"
 	  Frontier.zoneOf(distance, vein?) -> a Shared.Outpost.Zones id
@@ -78,6 +91,9 @@
 	  Frontier.critterExp(level, band, today) -> EXP for a kaiju that fought it
 	  Frontier.riftSpot(position, facing, center, rng, others?, past?, usable?) -> Vector3?   where a rift opens
 	  Frontier.trickle(count, rng?) -> { seconds }   when each of an encounter's tears opens
+	  Frontier.raidSize(stir?) -> critters through for a gem raid
+	  Frontier.haulPick(haul, loose, max) -> { gem id }   what snatchers can take, newest first
+	  Frontier.escapeSpot(from, player, center, rng) -> Vector3   where a snatcher's rift opens
 	  Frontier.wanderSpot(position, center, rng) -> Vector3   where a wandering rift opens
 	  Frontier.timeline(at, linger?) -> { OpenAt, HopAt, CloseAt, EndAt }
 	  Frontier.openness(timeline, now) -> 0..1   how wide a tear is
@@ -230,6 +246,24 @@ Frontier.Charged = { Luck = 0.1, Seconds = 60 }
 -- knocked Knock studs back; from Reach studs (the client offers it at
 -- Offer). It costs no swings.
 Frontier.Bonk = { Share = 0.12, Cooldown = 0.6, Knock = 10, Reach = 8, Offer = 6 }
+-- Gem raids: your team all knocked out out there. Size critters through
+-- (StirBonus more, stirred right up), no sooner than Gap seconds after the
+-- last. Trip: from Range studs, a Windup on its cast bar, then you're down
+-- for Down seconds (Damage: a share of its bite); each critter every Every
+-- seconds, and Gap seconds at least between two trips on you. Snatch:
+-- Max gems a knock-down, grabbed from Reach studs after Windup. Haul: the
+-- last Keep gems you mined this trip out. Carry: a snatcher runs at Speed
+-- for a rift Away studs off, which waits Wait seconds for it, giggling
+-- every Giggle seconds.
+Frontier.Raid = {
+	Size = 4,
+	StirBonus = 2,
+	Gap = 75,
+	Trip = { Range = 6.5, Windup = 0.75, Every = { 5, 8 }, Gap = 3, Down = 4, Damage = 0.4 },
+	Snatch = { Max = 3, Reach = 5, Windup = 0.5, Rush = 45 },
+	Haul = { Keep = 12 },
+	Carry = { Speed = 13, Away = { 26, 38 }, Wait = 6, Giggle = { 1.3, 2.4 } },
+}
 
 function Frontier.distance(position: Vector3, center: Vector3): number
 	return Vector3.new(position.X - center.X, 0, position.Z - center.Z).Magnitude
@@ -613,16 +647,59 @@ end
 
 -- A rift opening at `at` (server time): when it's open, the critter hops,
 -- it starts to seal, and it's gone. `linger`: seconds it stays open after
--- the hop (Rift.Linger unless given).
-function Frontier.timeline(at: number, linger: number?)
+-- the hop (Rift.Linger unless given); `hop`: seconds from opening to the
+-- hop (Rift.Hop unless given: a snatcher's waits longer for it).
+function Frontier.timeline(at: number, linger: number?, hop: number?)
 	local rift = Frontier.Rift
 	local stay = linger or rift.Linger
+	local wait = hop or rift.Hop
 	return {
 		OpenAt = at,
-		HopAt = at + rift.Hop,
-		CloseAt = at + rift.Hop + stay,
-		EndAt = at + rift.Hop + stay + rift.Close,
+		HopAt = at + wait,
+		CloseAt = at + wait + stay,
+		EndAt = at + wait + stay + rift.Close,
 	}
+end
+
+-- Gem raids --------------------------------------------------------------------------------------------
+
+-- Critters through for a gem raid (more, stirred up).
+function Frontier.raidSize(stir: number?): number
+	return Frontier.Raid.Size + math.floor(math.clamp(stir or 0, 0, 1) * Frontier.Raid.StirBonus + 0.5)
+end
+
+-- What snatchers can take from `haul` (the gems mined this trip out:
+-- { { Id } }, oldest first): those still loose in the pouch (`loose`: a
+-- set of ids), newest first, `max` at most.
+function Frontier.haulPick(haul: { any }, loose: { [string]: boolean }, max: number): { string }
+	local picked = {}
+	for i = #haul, 1, -1 do
+		if #picked >= max then
+			break
+		end
+		local id = haul[i].Id
+		if loose[id] and not table.find(picked, id) then
+			table.insert(picked, id)
+		end
+	end
+	return picked
+end
+
+-- Where a snatcher's rift tears open: Carry.Away studs on from `from`,
+-- away from the player it robbed (at `player`) and a little outward,
+-- inside the frontier.
+function Frontier.escapeSpot(from: Vector3, player: Vector3, center: Vector3, rng): Vector3
+	local away = Vector3.new(from.X - player.X, 0, from.Z - player.Z)
+	away = if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)
+	local out = Vector3.new(from.X - center.X, 0, from.Z - center.Z)
+	out = if out.Magnitude > 0.1 then out.Unit else away
+	local turn = rng:NextNumber(-0.5, 0.5)
+	local dir = (away * 0.7 + out * 0.3)
+	dir =
+		Vector3.new(dir.X * math.cos(turn) - dir.Z * math.sin(turn), 0, dir.X * math.sin(turn) + dir.Z * math.cos(turn))
+	dir = if dir.Magnitude > 0.01 then dir.Unit else away
+	local reach = rng:NextNumber(Frontier.Raid.Carry.Away[1], Frontier.Raid.Carry.Away[2])
+	return Frontier.inFrontier(from + dir * reach, center, from.Y)
 end
 
 local function ease(t: number): number

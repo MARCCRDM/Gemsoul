@@ -203,6 +203,17 @@ check(HealthRegen.amount(50, 100, true, 60, 1) == 0, "Player healed during an Ar
 check(HealthRegen.amount(50, 100, false, 2, 1) == 0, "Player healed right after taking damage")
 check(HealthRegen.amount(50, 100, false, 6, 1) == 1, "Player never recovered out of combat")
 check(HealthRegen.amount(99.5, 100, false, 6, 1) == 0.5, "Recovery overfilled health")
+-- In the Outpost lobby (after a critter or a wild kaiju): back quickly.
+do
+	local rule = HealthRegen.Lobby
+	check(HealthRegen.amount(50, 100, false, rule.Delay - 0.5, 1, true) == 0, "Lobby healed mid-scrape")
+	check(
+		HealthRegen.amount(50, 100, false, rule.Delay + 0.1, 1, true) == 100 * rule.Rate,
+		"Lobby didn't heal at its rate"
+	)
+	check(rule.Rate >= 0.05 and rule.Delay <= 5, "Lobby healing is no quicker than anywhere else")
+	check(HealthRegen.amount(50, 100, true, 60, 1, true) == 0, "Lobby rate healed in an Arena fight")
+end
 check(HealthRegen.amount(0, 100, false, 60, 1) == 0, "A fallen player recovered")
 -- Status effects: what a fighter is suffering from, shown like an RPG's.
 local encoded = StatusEffects.encode({

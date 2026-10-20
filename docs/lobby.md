@@ -170,7 +170,7 @@ On a computer, the chat is a plain feed in the bottom left corner, like a
 standard game's: lines stack up from the bottom with no box, no tabs and no
 background (`ChatFeed`).
 
-- **Where.** It sits above your kaiju's card and its TAME button, and under
+- **Where.** It sits above your kaiju's card and its CATCH button, and under
   the PLAY stack. It gets shorter on a low screen, so it never runs into
   either. On a short screen with a keyboard it takes the bottom left corner,
   left of the dock.
