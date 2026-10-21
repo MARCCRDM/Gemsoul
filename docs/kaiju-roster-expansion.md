@@ -1,12 +1,12 @@
-# Kaiju roster expansion: 26 new kinds
+# Kaiju roster expansion: 30 new kinds
 
 A proposal (Oct 21, draft, not signed off). The game has four kinds of mini
 kaiju, each in four elements (`Shared.Kaiju.Species`, `Shared.KaijuRoles`;
-see [kaiju.md](kaiju.md)). This adds **26 more kinds**, drawn from the
+see [kaiju.md](kaiju.md)). This adds **30 more kinds**, drawn from the
 kaiju canon (Toho, Gamera, Pacific Rim, Ultraman, Evangelion) but renamed and
 reshaped so they are ours: blocky, knee-high, one glow zone, readable at a
 glance. Every kind still comes in Thermal, Cryo, Ion and Corrosive, so this
-is 104 new kaiju in all. Ship them in waves (below), not at once.
+is 120 new kaiju in all. Ship them in waves (below), not at once.
 
 ## What a kind is
 
@@ -36,9 +36,9 @@ Warrior and every Warden to Ranged, and the kits still work.
 
 ## The roster
 
-![Wave 1 concepts: Emberjaw, Stormwing, Ironhide, Sickleclaw, Moonmoth](kaiju-concepts/wave1-lineup.png)
+![All 30 kinds](kaiju-concepts/roster-30-sheet.png)
 
-(AI concept renders in the style of `kaiju/species.png`, one element each; every kind comes in all four. Individual renders in `kaiju-concepts/`.)
+(AI concept renders in the style of `kaiju/species.png`, one element each; every kind comes in all four. Individual renders in `kaiju-concepts/kaiju-<name>.png`; the first wave alone is `kaiju-concepts/wave1-lineup.png`.)
 
 Stats: **HP / Damage / Rate (s per blow) / Speed / Guard**. Fight: the quick
 blow combo, the heavy (its multiplier and sweep), and the guard pose with the
@@ -212,6 +212,34 @@ share of a blow it still takes. Moves: E (surge) / Q (strike) / R (defense).
 - Q **Drill Beam**: a 16-stud beam that pierces every foe in it.
 - R **Shift Shape**: a shell of 35%; a foe striking the shell is pushed back 4 studs.
 
+### Four more (27 to 30)
+
+**27. Clawtide** (after Ebirah). Tank. A giant lobster: one oversized crusher claw, one cutter, a fanned tail, antennae.
+300 / 13 / 1.4 / 10 / 0.25. Combo: Cutter Snip x2. Heavy: Crusher Clamp 1.9x (holds its foe 0.8s). Guard: claws crossed, takes 15%.
+- E **Clamp**: seizes its target for 1.5s (rooted, cannot cast) and squeezes for a blow every 0.5s.
+- Q **Tail Fan**: a 180° sweep behind it that pushes foes back 4 studs.
+- R **Shell Harden**: a shell of 35% health; while it stands, it cannot be rooted or knocked back.
+
+**28. Bladebrow** (after Knifehead, Pacific Rim). Warrior. A hunched brute with a flat blade of a head that juts forward and four arms.
+255 / 21 / 1.6 / 12 / 0.10. Combo: Twin Fist x2 (both big arms). Heavy: Head Spear 2.0x (a lunge, the blade first). Guard: all four arms up, takes 25%.
+- E **Head Spear**: a 7-stud lunge that pierces a shell outright.
+- Q **Four-Arm Flurry**: four quick blows of 0.45 each over 1s.
+- R **Hunker**: a ward (-35% for 3s); it cannot be staggered while it holds.
+
+**29. Lankshade** (after Clover). Assassin. A tall gangly stalker on long thin limbs, a hunched spine, a wide mouth.
+170 / 16 / 0.9 / 20 / 0.00. Combo: Rake x3. Heavy: Stomp Down 1.8x (from above, 150°). Guard: folds its limbs, takes 45%.
+- E **Loom**: rises to its full height and drops onto their back row from 8 studs, staggering 0.5s.
+- Q **Rake Flurry**: three rakes of 0.6 that each apply its element's status.
+- R **Scuttle**: untouchable 1.5s, moving 10 studs; it drops a parasite (a critter of 0.3 of a blow per bite, 4s) where it stood.
+
+**30. Voltfin** (after Eleking, Ultraman). Ranged. An eel kaiju on two short legs, a ridged dorsal fin its whole length, a dragging tail.
+185 / 12 / 0.9 / 16 / 0.05. Combo: Arc Spit x2. Heavy: Tail Discharge 1.6x (a ring in 5 studs). Guard: fin flattens, takes 40%.
+- E **Discharge Ring**: a ring round it for 2 blows that applies its element's status to all in 6 studs.
+- Q **Arc Lash**: a shot that jumps to one more foe within 5 studs for half.
+- R **Grounding**: a shell of 25% health; while it stands, its team is immune to Stun and Slow.
+
+Build order addition: Clawtide and Voltfin join wave 2 (the Rift's caves), Bladebrow wave 3, Lankshade wave 4.
+
 ## Balance notes for the sim
 
 - **Stat budget.** Health x (Damage / Rate) sits between 2,600 and 3,000 at level 1 for the four current kinds. Every line above was drafted to land in that band, with Tanks trading damage for Guard and Assassins trading Guard for Speed. Treat Breakers like Warriors (higher damage, lower Guard) and Wardens like Ranged (low damage, high utility).
@@ -236,7 +264,7 @@ Ship in waves of five or six so each wave can be balanced and so the Season has 
 - `Shared.Kaiju.Species`: one entry per kind (Id, Name, Role, Blurb, Health, Damage, Rate, Speed, Reach, Guard), and `Kaiju.Order` extended.
 - `Shared.KaijuRoles.Species`: map each kind to its role; add `Breaker` and `Warden` to `Roles` and `Order` (Front = false for both; Breaker targets the highest-Guard foe in `target`, Warden picks the lowest-health ally for its E).
 - `Shared.KaijuRoles.Kits`: key by species first, fall back to the role kit, so the four current kinds are unchanged. `KaijuRoles.kit(species)` reads `Kits[species] or Kits[role]`.
-- `Shared.KaijuRoles.Moves`: 78 new entries (3 per kind), each with `From` (the gem surge it copies), `IconSource` and a `Plan`.
-- `Shared.KaijuModels`: 26 new blocky models, each with one glow zone that takes the element colour; fight poses for quick, heavy and guard; the Frontier's wild-size (0.9) and pet-size (0.55) scales as now.
+- `Shared.KaijuRoles.Moves`: 90 new entries (3 per kind), each with `From` (the gem surge it copies), `IconSource` and a `Plan`.
+- `Shared.KaijuModels`: 30 new blocky models, each with one glow zone that takes the element colour; fight poses for quick, heavy and guard; the Frontier's wild-size (0.9) and pet-size (0.55) scales as now.
 - `Server.KaijuBattleBrain`: two new role behaviours; the fight pattern tables (combo count, heavy multiplier and arc, guard share) extend `KaijuFight`.
 - The starter roll (`Kaiju.RollVersion`) should keep rolling only the four original kinds for new players, so the first team is readable; new kinds come from catching, the Season track and events.
