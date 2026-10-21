@@ -1,12 +1,12 @@
-# Kaiju roster expansion: 30 new kinds
+# Kaiju roster expansion: 60 new kinds
 
 A proposal (Oct 21, draft, not signed off). The game has four kinds of mini
 kaiju, each in four elements (`Shared.Kaiju.Species`, `Shared.KaijuRoles`;
-see [kaiju.md](kaiju.md)). This adds **30 more kinds**, drawn from the
+see [kaiju.md](kaiju.md)). This adds **60 more kinds** (in two sets of thirty), drawn from the
 kaiju canon (Toho, Gamera, Pacific Rim, Ultraman, Evangelion) but renamed and
 reshaped so they are ours: blocky, knee-high, one glow zone, readable at a
 glance. Every kind still comes in Thermal, Cryo, Ion and Corrosive, so this
-is 120 new kaiju in all. Ship them in waves (below), not at once.
+is 240 new kaiju in all. Ship them in waves (below), not at once.
 
 ## What a kind is
 
@@ -240,6 +240,218 @@ share of a blow it still takes. Moves: E (surge) / Q (strike) / R (defense).
 
 Build order addition: Clawtide and Voltfin join wave 2 (the Rift's caves), Bladebrow wave 3, Lankshade wave 4.
 
+## The second thirty (31 to 60)
+
+Same rules as the first thirty: a silhouette, a role, a level-1 stat line
+(**HP / Damage / Rate / Speed / Guard**), a fight pattern and three moves of
+its own. Stat lines sit in the same bands and are sim inputs, not final.
+
+![Kinds 31 to 60](kaiju-concepts/roster-31-60-sheet.png)
+
+### Tanks (5)
+
+**31. Tuskmound** (after Behemoth). A woolly mammoth kaiju: curved tusks, a humped back, pillar legs.
+330 / 12 / 1.5 / 9 / 0.25. Combo: Tusk Swing x2. Heavy: Trample 1.8x (walks through, 150°). Guard: lowers its head, takes 15%.
+- E **Stampede**: a 10-stud charge that carries every foe in its path along and drops them.
+- Q **Tusk Toss**: flings its foe 5 studs into the air (stunned on landing, 0.5s).
+- R **Thick Hide**: a ward (-35% for 4s); it cannot be slowed while it holds.
+
+**32. Steamhide** (after the Colossal Titan). A skinless giant, all muscle blocks, steam venting from its back and shoulders.
+310 / 14 / 1.5 / 9 / 0.20. Combo: Palm Slam x2. Heavy: Body Drop 2.0x (falls forward, 150°). Guard: arms crossed, takes 15%.
+- E **Steam Vent**: a 6-stud cloud for 3s; foes inside take its element's status and lose 30% damage.
+- Q **Palm Sweep**: a 180° sweep that pushes foes back 4 studs.
+- R **Pressure Shell**: a shell of 30%; when it breaks, it scalds everyone in 6 studs for a blow.
+
+**33. Hillback** (after Methuselah). A kaiju that looks like a walking hillside: a mossy slab back, a short snout, four thick legs.
+340 / 11 / 1.6 / 8 / 0.25. Combo: Snout Butt x2. Heavy: Landslide 1.7x (shakes its back, debris in 150°). Guard: lies flat, takes 10%.
+- E **Settle**: for 3s it cannot move and takes 50% less; foes attacking it are slowed 30%.
+- Q **Rockfall**: boulders roll off its back down a 10-stud line.
+- R **Bedrock**: a shell of 40%, the biggest in the roster, but it cannot move while it stands.
+
+**34. Inkwrap** (after Oodako). A boxy octopus kaiju: a dome head, eight thick tentacles, big lamp eyes.
+290 / 13 / 1.3 / 10 / 0.20. Combo: Tentacle Slap x3. Heavy: Wrap 1.8x (holds its foe 0.8s). Guard: tentacles bunch in front, takes 15%.
+- E **Ink Cloud**: an 8-stud cloud for 3s; foes inside miss 40% of their blows.
+- Q **Eight-Arm Grab**: pulls every foe in 6 studs 3 studs toward it.
+- R **Jet Away**: a shell of 25% and it slides 5 studs back behind its line.
+
+**35. Nullplate** (after the Zillo Beast). A long, low, armoured lizard: overlapping plates, a spiked tail, six legs.
+300 / 14 / 1.4 / 11 / 0.30. Combo: Claw x2. Heavy: Tail Hammer 1.8x (220°). Guard: plates lock, takes 10%.
+- E **Impervious**: for 2.5s it ignores all status and casts (blows still land).
+- Q **Plate Rake**: a 7-stud claw lunge.
+- R **Shed Plate**: a shell of 30%; when it breaks, the plate flies off and hits the breaker for a blow.
+
+### Warriors (6)
+
+**36. Crestbull** (after Gomora). A horned dinosaur kaiju: two long brow horns, a nose horn, a thick tail, a bull's shoulders.
+260 / 20 / 1.5 / 13 / 0.10. Combo: Horn Hook x2. Heavy: Tail Spike 1.9x. Guard: horns down, takes 30%.
+- E **Horn Rush**: an 8-stud charge; the foe hit is stunned 0.6s.
+- Q **Tail Whip**: a 220° sweep behind.
+- R **Dig In**: a ward (-30% for 3s); it heals 10% when it ends if it took a blow.
+
+**37. Rubbleking** (after Red King). A hulking brute: a tiny head on a huge ridged body, long arms, boulder fists.
+270 / 22 / 1.7 / 11 / 0.10. Combo: Boulder Fist x2. Heavy: Double Hammer 2.1x (the biggest heavy). Guard: fists up, takes 30%.
+- E **Rock Toss**: tears a rock from the ground and throws it 12 studs; 1.5 of a blow.
+- Q **Ground Rip**: a 6-stud line of cracked ground that staggers.
+- R **Bellow**: foes in 8 studs lose 20 mana; it gains it.
+
+**38. Kickjaw** (after Gorosaurus). A lean upright dinosaur with huge legs; it fights with kangaroo kicks.
+250 / 19 / 1.4 / 15 / 0.05. Combo: Bite x2. Heavy: Drop Kick 2.0x (leaps, both feet, knocks back 6). Guard: a hop back, takes 40%.
+- E **Drop Kick**: a leap and kick that sends its foe 6 studs into its own back row.
+- Q **Tail Balance Kick**: a 180° kick that hits twice (0.7 each).
+- R **Spring Back**: a vault 6 studs away and its next blow is 1.5x.
+
+**39. Ogretoad** (after Gabara). A squat ogre kaiju with a toad's face, warty hide, clawed hands that spark.
+255 / 18 / 1.5 / 12 / 0.15. Combo: Claw x2. Heavy: Belly Slam 1.8x. Guard: hunches, takes 30%.
+- E **Shock Grip**: grabs its foe for 1.5s and applies its element's status every 0.5s.
+- Q **Cackle**: foes in 6 studs are blinded (miss 30%) for 2s.
+- R **Warty Hide**: a ward (-30% for 3s); foes striking it take its status.
+
+**40. Tritail** (after Slattern, Pacific Rim). A tall, slim giant with three long bladed tails, a crowned head, a hunched gait. A flagship.
+240 / 21 / 1.4 / 15 / 0.10. Combo: Tail Lash x3 (one per tail). Heavy: Triple Impale 2.0x (three lines). Guard: tails fan in front, takes 30%.
+- E **Three Tails**: three lashes at three foes in 8 studs, 0.9 each.
+- Q **Crown Shriek**: a cone that empties 25 mana from foes in it.
+- R **Tail Shield**: a shell of 30%; blows on it answer with a tail lash (0.4).
+
+**41. Ashcrawler** (after the fourth form). A hunched, cracked, half-molten reptile; a tail longer than its body; small arms.
+265 / 20 / 1.6 / 10 / 0.15. Combo: Tail Drag x2 (the tail does the fighting). Heavy: Tail Beam 1.9x (down a 12-stud line). Guard: hunches, takes 30%.
+- E **Back Rays**: beams from its spine at every foe in 8 studs, 0.6 each.
+- Q **Tail Beam**: a 12-stud line.
+- R **Harden**: a shell of 30%; while it stands it is slowed 50% but takes no status.
+
+### Ranged (5)
+
+**42. Shrieker** (after Gyaos). A bat-bird kaiju: a flat triangular head, leathery wings, hooked feet, hovering.
+175 / 12 / 0.8 / 21 / 0.00. Combo: Peck x2. Heavy: Sonic Scalpel 1.7x (a thin cutting beam). Guard: wheels away, takes 45%.
+- E **Sonic Scalpel**: a 14-stud line so thin it hits one foe, 1.6 of a blow, ignoring Guard.
+- Q **Screech**: foes in 6 studs are stunned 0.4s.
+- R **Night Flight**: untouchable 1.5s, repositions behind its line.
+
+**43. Tonguefrost** (after Barugon). A low lizard with a long horn and a tongue it shoots like a whip.
+190 / 12 / 1.0 / 13 / 0.10. Combo: Tongue Whip x2 (reach 8). Heavy: Tongue Pull 1.6x (pulls its foe 4 studs). Guard: tongue coiled, takes 35%.
+- E **Tongue Pull**: yanks a back-row foe into its own front line.
+- Q **Horn Spray**: a 7-stud cone of its element.
+- R **Rainbow Hide**: a ward (-30% for 3s) that reflects beams.
+
+**44. Glidespine** (after Varan). A spined lizard with skin flaps between its limbs; it glides.
+180 / 12 / 0.9 / 19 / 0.05. Combo: Spine Flick x2. Heavy: Glide Slam 1.7x. Guard: flaps spread, takes 40%.
+- E **Glide Strike**: glides 10 studs over the line and drops on a back-row foe.
+- Q **Spine Fan**: five spines in a fan, 0.4 each.
+- R **Updraft**: untouchable 1.5s, lands behind its own line.
+
+**45. Fathomweb** (after Scylla). A spider-squid: six legs, a hooded crystal head, a dragging abdomen.
+185 / 13 / 1.0 / 15 / 0.05. Combo: Leg Jab x2. Heavy: Web Burst 1.6x (roots in 4 studs). Guard: legs fold, takes 40%.
+- E **Freezing Web**: a 6-stud patch for 3s; foes inside are slowed 50% and cannot hop.
+- Q **Hood Beam**: a 12-stud line.
+- R **Burrow**: untouchable 2s, surfaces behind its line.
+
+**46. Spitgill** (after Zigra). A shark kaiju on two legs: a fin on its back, gills, a long snout.
+185 / 13 / 1.0 / 16 / 0.05. Combo: Snap x2. Heavy: Water Jet 1.6x (line). Guard: turns side-on, takes 40%.
+- E **Pressure Jet**: a 12-stud line that pushes foes back 4 studs.
+- Q **Gill Spray**: a 7-stud cone.
+- R **Slick**: a 5-stud slick for 3s under it; foes crossing slip (stunned 0.4s).
+
+### Assassins (6)
+
+**47. Duskbat** (after Camazotz). A bat kaiju: wide wings, a snub face, long ears, hooked thumbs.
+170 / 16 / 0.9 / 21 / 0.00. Combo: Claw x3. Heavy: Dive Bite 1.8x. Guard: wings wrap, takes 45%.
+- E **Blackout**: a 6-stud cloud for 2s; foes inside cannot see to cast.
+- Q **Dive Bite**: a dive onto a back-row foe.
+- R **Vanish Wing**: untouchable 1.5s; its next blow is 1.5x.
+
+**48. Tendrilis** (after Iris). A tall, thin kaiju with four tentacles from its back and a spear-like head.
+165 / 17 / 0.9 / 19 / 0.05. Combo: Tendril Stab x3. Heavy: Spear Lunge 1.9x. Guard: tendrils cross, takes 45%.
+- E **Four Tendrils**: four stabs over 1s at up to four foes in 8 studs, 0.5 each, healing it 20% of the damage.
+- Q **Spear Lunge**: a 7-stud lunge.
+- R **Absorb**: a shell of 25%; damage on the shell heals it 50%.
+
+**49. Snipclaw** (after Baltan). A crab-faced alien: two huge scissor claws, a split head, a cackling mouth.
+170 / 16 / 0.9 / 19 / 0.05. Combo: Snip x3. Heavy: Double Snip 1.8x. Guard: claws cross, takes 45%.
+- E **Split**: makes a decoy for 3s that foes target first; the real one leaps onto the back row.
+- Q **Scissor Cut**: a cut that bleeds for 2 blows over 3s.
+- R **Phase Out**: untouchable 1.5s, repositions.
+
+**50. Needlewing** (after Megaguirus). A dragonfly kaiju: four long wings, a needle tail, grasping legs.
+160 / 18 / 0.8 / 22 / 0.00. Combo: Needle Jab x3. Heavy: Tail Drill 1.9x. Guard: darts aside, takes 45%.
+- E **Siphon**: its tail drains 20 mana from its target and gives it to itself.
+- Q **Hypersonic Pass**: a 10-stud dash through the line.
+- R **Afterimage**: untouchable 1.5s; foes targeting it are confused (hit the nearest ally) once.
+
+**51. Hollowbone** (after Monster X). A skeletal, upright kaiju: a bone-plated frame, two shoulder horns, glowing eye sockets.
+175 / 17 / 0.9 / 18 / 0.05. Combo: Bone Claw x2. Heavy: Shoulder Beam 1.8x (two lines). Guard: arms cross, takes 40%.
+- E **Gravity Beams**: two beams at two foes, 0.9 each, that pull them 2 studs.
+- Q **Bone Spur**: a 7-stud lunge that staggers.
+- R **Hollow Form**: untouchable 1.5s; it leaves a bone decoy that explodes (0.6) when struck.
+
+**52. Ribbonarm** (after Zeruel). A tall faceless kaiju with two long, flat ribbon arms that unroll into blades.
+170 / 18 / 1.0 / 16 / 0.10. Combo: Ribbon Cut x2 (reach 9, the longest in the roster). Heavy: Ribbon Scissor 1.9x. Guard: ribbons wrap it, takes 35%.
+- E **Unfurl**: both ribbons sweep 10 studs across the whole enemy line, 0.8 each.
+- Q **Ribbon Pierce**: a 10-stud line through one foe.
+- R **Cocoon Fold**: a shell of 30%; it cannot be rooted while it stands.
+
+### Breakers (4)
+
+**53. Frostmaw** (after Shimo). A hunched, pale ice titan: a sail of ice on its back, a wide fanged jaw, long forearms.
+245 / 17 / 1.3 / 12 / 0.15. Combo: Claw x2. Heavy: Ice Breath 1.9x (cone). Guard: hunches into its sail, takes 30%.
+- E **Deep Freeze**: a cone that shatters every shell and ward in it and slows 50% for 2s.
+- Q **Rime Claw**: a blow that does 1.5x to a frozen or slowed foe.
+- R **Glacier Back**: a shell of 30%; foes striking it are slowed 30%.
+
+**54. Hivecrystal** (after Legion). An insect kaiju with a crystal horn and shoulder crystals; it carries a swarm.
+235 / 16 / 1.3 / 13 / 0.15. Combo: Mandible x2. Heavy: Horn Beam 1.8x (line). Guard: shoulder crystals forward, takes 30%.
+- E **Swarm**: releases six soldier crystals (0.2 of a blow each per bite, 4s) onto the foe with the highest Guard.
+- Q **Horn Beam**: a 12-stud line that ignores Guard.
+- R **Crystal Seed**: plants a crystal that absorbs the next cast aimed at its team.
+
+**55. Peelcroc** (after Raiju, Pacific Rim). An armoured crocodile kaiju whose head opens in three jaws.
+240 / 18 / 1.4 / 14 / 0.15. Combo: Bite x2. Heavy: Triple Jaw 1.9x. Guard: jaws shut, takes 30%.
+- E **Peel**: a bite that strips 50% of its target's Guard for 4s and bursts any shell.
+- Q **Death Roll**: grabs and rolls 4 studs with its foe, 1.4 of a blow.
+- R **Armour Lock**: a shell of 30%.
+
+**56. Magnetjaw** (after Antlar). A stag-beetle kaiju with great pincer horns that pull.
+250 / 16 / 1.4 / 11 / 0.20. Combo: Pincer x2. Heavy: Magnet Pull 1.7x (pulls all in 6 studs). Guard: horns forward, takes 25%.
+- E **Magnet Field**: pulls every foe in 8 studs 4 studs toward it and drops their Guard to 0 for 2s.
+- Q **Pincer Crush**: a blow that does 1.5x to a foe with no Guard.
+- R **Polarize**: a ward (-30% for 3s); shots at its team curve to it.
+
+### Wardens (4)
+
+**57. Skyjelly** (after Dogora). A floating jellyfish kaiju: a dome, trailing boxy tentacles, no face.
+185 / 10 / 1.2 / 10 / 0.15. Combo: Tentacle Brush x1. Heavy: Drain Pulse 1.6x (ring). Guard: it rises out of reach, takes 30%.
+- E **Lift**: lifts its lowest ally out of reach for 2s and heals it 10%.
+- Q **Drain Pulse**: a 6-stud ring that heals it 50% of the damage.
+- R **Dome**: a shell of 30% on its whole team's front line.
+
+**58. Capspore** (after Matango). A walking mushroom kaiju: a wide cap, a stumpy body, spore vents under the cap.
+200 / 10 / 1.3 / 9 / 0.20. Combo: Cap Butt x1. Heavy: Spore Puff 1.5x (cloud). Guard: cap tilts, takes 30%.
+- E **Healing Spores**: a 6-stud cloud for 3s that heals allies 4% a second.
+- Q **Spore Puff**: a cloud that applies its status.
+- R **Root**: a shell of 30%; while it stands, allies in 6 studs cannot be knocked back.
+
+**59. Coinmaw** (after Kanegon). A coin-purse kaiju with a zipper mouth, bulging eyes on stalks, stubby legs. It eats gems. The Outpost's mascot.
+190 / 9 / 1.2 / 12 / 0.15. Combo: Chomp x1. Heavy: Coin Spit 1.6x (lob). Guard: zips shut, takes 25%.
+- E **Share the Hoard**: gives every ally 20 mana.
+- Q **Coin Spit**: a lob that bursts in 4 studs.
+- R **Zip Up**: a shell of 35%; while it stands, allies' Q cooldowns run 50% faster.
+
+**60. Silkling** (after the larva). A great caterpillar kaiju: a segmented body, a blunt head, blue eyes; it spits silk.
+210 / 9 / 1.2 / 9 / 0.20. Combo: Headbutt x1. Heavy: Silk Spray 1.5x (roots). Guard: curls, takes 25%.
+- E **Silk Wrap**: a shell of 30% on its lowest ally; the ally heals 5% a second while it stands.
+- Q **Silk Spray**: a 7-stud cone that roots for 1s.
+- R **Cocoon**: a shell of 40% on itself; it cannot move; when it ends it heals its team 10%.
+
+### Where the second thirty roam
+
+| Wave | Kinds |
+| --- | --- |
+| 6 | Crestbull, Shrieker, Tuskmound, Duskbat, Capspore, Peelcroc |
+| 7 | Kickjaw, Tonguefrost, Steamhide, Snipclaw, Skyjelly, Frostmaw |
+| 8 | Rubbleking, Glidespine, Inkwrap, Needlewing, Coinmaw, Magnetjaw |
+| 9 | Ogretoad, Fathomweb, Hillback, Hollowbone, Silkling, Hivecrystal |
+| 10 | Ashcrawler, Spitgill, Nullplate, Tendrilis, Ribbonarm, Tritail (boss-adjacent flagship, like Triskull) |
+
+Coinmaw should be an event or quest kaiju (it eats gems: a catch that costs you a Common to lure), not a wild roll.
+
 ## Balance notes for the sim
 
 - **Stat budget.** Health x (Damage / Rate) sits between 2,600 and 3,000 at level 1 for the four current kinds. Every line above was drafted to land in that band, with Tanks trading damage for Guard and Assassins trading Guard for Speed. Treat Breakers like Warriors (higher damage, lower Guard) and Wardens like Ranged (low damage, high utility).
@@ -264,7 +476,7 @@ Ship in waves of five or six so each wave can be balanced and so the Season has 
 - `Shared.Kaiju.Species`: one entry per kind (Id, Name, Role, Blurb, Health, Damage, Rate, Speed, Reach, Guard), and `Kaiju.Order` extended.
 - `Shared.KaijuRoles.Species`: map each kind to its role; add `Breaker` and `Warden` to `Roles` and `Order` (Front = false for both; Breaker targets the highest-Guard foe in `target`, Warden picks the lowest-health ally for its E).
 - `Shared.KaijuRoles.Kits`: key by species first, fall back to the role kit, so the four current kinds are unchanged. `KaijuRoles.kit(species)` reads `Kits[species] or Kits[role]`.
-- `Shared.KaijuRoles.Moves`: 90 new entries (3 per kind), each with `From` (the gem surge it copies), `IconSource` and a `Plan`.
-- `Shared.KaijuModels`: 30 new blocky models, each with one glow zone that takes the element colour; fight poses for quick, heavy and guard; the Frontier's wild-size (0.9) and pet-size (0.55) scales as now.
+- `Shared.KaijuRoles.Moves`: 180 new entries (3 per kind), each with `From` (the gem surge it copies), `IconSource` and a `Plan`.
+- `Shared.KaijuModels`: 60 new blocky models, each with one glow zone that takes the element colour; fight poses for quick, heavy and guard; the Frontier's wild-size (0.9) and pet-size (0.55) scales as now.
 - `Server.KaijuBattleBrain`: two new role behaviours; the fight pattern tables (combo count, heavy multiplier and arc, guard share) extend `KaijuFight`.
 - The starter roll (`Kaiju.RollVersion`) should keep rolling only the four original kinds for new players, so the first team is readable; new kinds come from catching, the Season track and events.
