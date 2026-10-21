@@ -24,7 +24,7 @@ Character references: [Tung Tung Tung Sahur and related characters](https://know
 ## Combat reuse
 Dungeon fighters use `Duelist.spawnDungeon`, the existing `DuelistBrain`, `RivalPose`, leg animations, server combat damage, Stamina/Charge, guards, parries, dodges, charged strikes, and telegraphed Surges. Creature geometry is welded to the same animated bones. Dungeon actors have their own registry so several fighters can operate concurrently without replacing a player's Arena rival.
 
-All three boss Surge slots use its main element at tiers 2/3/4 and rank III. Regular fighters use lower-tier, rank-I Surges. Each archetype has a fixed maneuver pool. The Colossus has increased health and damage over its regular fighter version. The existing AI currently chooses one squad member at a time; this is not a new raid-wide threat/pathfinding system.
+All three boss Surge slots use its main element at tiers 2/3/4 and rank III. Regular fighters use lower-tier, rank-I Surges. Each archetype has three fixed moves: a room fighter has its signature move and two rig maneuvers, and a boss has three moves of its own, one a big telegraphed attack ([creature-moves.md](creature-moves.md)). The Colossus has increased health and damage over its regular fighter version. The existing AI currently chooses one squad member at a time; this is not a new raid-wide threat/pathfinding system.
 
 A cleared dungeon gives each surviving, still-enrolled player **300 coins and SlayBrute XP**, once. There is no additional gem loot in this first implementation. There is no revive or checkpoint resurrection system. Failed runs grant no completion reward.
 

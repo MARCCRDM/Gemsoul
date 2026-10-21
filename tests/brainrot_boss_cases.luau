@@ -57,6 +57,60 @@ local maneuvers = {}
 for name in string.gmatch(string.match(read("src/shared/CombatTechnology.luau"), "RigManeuvers = (%b{})"), '"(%w+)"') do
 	maneuvers[name] = true
 end
+local Creature = load("src/shared/CreatureMoves.luau", "CreatureMoves")
+-- Every creature move is whole: a shape it lands as, a wind-up, damage,
+-- a cooldown, how far it reaches; a ring wide enough to step out of, a
+-- dash a length and a path, bombs a count.
+local SHAPED = { Slam = "Radius", Roar = "Radius", Blast = "Radius", Bombs = "Count", Leap = "Leap", Dash = "Length" }
+for id, move in Creature.Catalog do
+	check(type(move.Name) == "string" and Creature.Shapes[move.Shape], id .. ": no shape")
+	check(move.Windup and move.Windup > 0 and move.Damage and move.Damage > 0, id .. ": no wind-up or damage")
+	check(move.Cooldown and move.Cooldown >= 4 and move.Range and move.Range > 0, id .. ": no cooldown or reach")
+	check((move.Min or 0) < move.Range, id .. ": reaches nowhere")
+	if SHAPED[move.Shape] then
+		check(move[SHAPED[move.Shape]], id .. ": no " .. SHAPED[move.Shape])
+	end
+	if move.Shape ~= "Strike" and move.Shape ~= "Dash" then
+		check(move.Radius and move.Radius >= 4, id .. ": a ring too small to see")
+	end
+	if move.Shape == "Dash" then
+		check(move.Width and move.Width > 0, id .. ": a dash with no path")
+	end
+	if move.Big then
+		-- Its big one: a long, readable wind-up, a wide ring, a long cooldown.
+		check(move.Windup >= 1.3 and move.Cooldown >= 14, id .. ": a big attack too quick to read")
+		check(move.Shape ~= "Strike" and move.Shape ~= "Dash", id .. ": a big attack with no ring")
+	end
+	if move.CC then
+		check(move.Shape == "Slam" or move.Shape == "Leap", id .. ": a core stun on a move with no core")
+	end
+	for rider in move.Riders or {} do
+		check(
+			({ Burn = 1, BurnTime = 1, Poison = 1, PoisonTime = 1, Slow = 1, SlowTime = 1, Stun = 1, StunKind = 1, Blind = 1, BlindTime = 1, Sunder = 1, SunderTime = 1 })[rider],
+			id .. ": a rider nothing lands: " .. rider
+		)
+	end
+end
+-- The room fighters: their signature move (as the Outpost's critters have
+-- it, Shared.Kaiju.BugMoves) beside two rig maneuvers.
+local bugMoves = {}
+for id, name in string.gmatch(read("src/shared/Kaiju.luau"), '\n\t(%w+) = {\n\t\tName = "([^"]+)"') do
+	bugMoves[id] = name
+end
+for _, spec in Rules.Roster do
+	local own = 0
+	for _, move in spec.Moves do
+		local creature = Creature.get(move)
+		check(creature or maneuvers[move], spec.Id .. ": no move " .. move)
+		if creature then
+			own += 1
+			check(creature.Name == bugMoves[spec.Id], spec.Id .. ": not its own critter move " .. move)
+			check(not creature.Big, spec.Id .. ": a room fighter with a boss's big attack")
+		end
+	end
+	check(own == 1 and #spec.Moves == 3, spec.Id .. ": not its signature and two maneuvers")
+end
+local usedBy = {}
 
 -- The ten, from the picture (not the teacup ballerina nor the cows): how
 -- many heads each has.
@@ -90,10 +144,19 @@ for _, spec in Rules.Bosses do
 	check(HEADS[spec.Shape], spec.Id .. ": not one of the ten")
 	check(Bosses.Builders[spec.Shape], spec.Id .. ": nothing builds it")
 	check(weakness[spec.Element] == spec.Weakness, spec.Id .. ": weak to the wrong element")
+	-- Three of its own, one of them its big telegraphed attack.
 	check(#spec.Moves == 3, spec.Id .. ": three moves")
+	local big = 0
 	for _, move in spec.Moves do
-		check(maneuvers[move], spec.Id .. ": no maneuver " .. move)
+		local creature = Creature.get(move)
+		check(creature, spec.Id .. ": not its own move " .. move)
+		check(not usedBy[move], spec.Id .. ": " .. move .. " is " .. tostring(usedBy[move]) .. "'s")
+		usedBy[move] = spec.Id
+		if creature.Big then
+			big += 1
+		end
 	end
+	check(big == 1, spec.Id .. ": not one big attack")
 end
 for shape in HEADS do
 	check(seen.Shape[shape], shape .. " isn't a boss")

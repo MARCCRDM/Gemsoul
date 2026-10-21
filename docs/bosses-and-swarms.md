@@ -42,9 +42,11 @@ end.
 
 ## The dungeon bosses
 
-They have since been rebuilt as rift titans, with the same names, elements
-and moves: see [boss-titans.md](boss-titans.md). The pictures and the
-"What it is" column here are their first bodies.
+They have since been rebuilt as rift titans, with the same names and
+elements: see [boss-titans.md](boss-titans.md). The pictures and the
+"What it is" column here are their first bodies. The moves in this table
+were their first moves. Each now has three moves of its own: see
+[creature-moves.md](creature-moves.md).
 
 ![The ten bosses, ready](bosses-and-swarms/bosses.png)
 

@@ -743,13 +743,20 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	end
 	return damage, guarded
 end
-local function addDot(player, source, perTick, duration)
+-- `element`: Fire (a burn, the default) or Poison.
+local function addDot(player, source, perTick, duration, element: string?)
 	if duration <= 0 or perTick <= 0 then
 		return
 	end
 	local st, now = state(player), os.clock()
-	st.Dots[source] =
-		{ Source = source, Damage = perTick, Last = now, Ends = now + duration, Next = now + math.min(1, duration) }
+	st.Dots[source] = {
+		Source = source,
+		Damage = perTick,
+		Element = element,
+		Last = now,
+		Ends = now + duration,
+		Next = now + math.min(1, duration),
+	}
 end
 local enemyCC = setmetatable({}, { __mode = "k" })
 local publishStatuses
@@ -2294,8 +2301,11 @@ function CombatServer.comboFlags(player)
 	return comboFlags({ Player = player }, os.clock())
 end
 -- A rival's surge riders landing on `player`, as a player's land: Blind
--- (Solar Flare) and Slow (Armor Melt, Cryo Stream).
-function CombatServer.afflict(player, riders)
+-- (Solar Flare) and Slow (Armor Melt, Cryo Stream). A creature's move
+-- (Shared.CreatureMoves) may also leave a Burn or Poison (a share of
+-- `hit` every second, from `source`; Poison cuts healing too), a Stun or
+-- an armor Sunder.
+function CombatServer.afflict(player, riders, source, hit: number?)
 	local st, now = state(player), os.clock()
 	if riders.Blind then
 		st.Blind, st.BlindUntil = riders.Blind, math.max(st.BlindUntil, now + (riders.BlindTime or 2.5))
@@ -2303,6 +2313,20 @@ function CombatServer.afflict(player, riders)
 	if riders.Slow then
 		st.Slow = CrowdControl.applyDebuff(st.CC, "Slow", riders.Slow, riders.SlowTime or 0.75, now, true)
 		st.SlowUntil = st.CC.Debuffs.Slow.Until
+	end
+	if riders.Burn and source then
+		addDot(player, source, riders.Burn * (hit or 0), riders.BurnTime or 3, "Fire")
+	end
+	if riders.Poison and source then
+		addDot(player, source, riders.Poison * (hit or 0), riders.PoisonTime or 4, "Poison")
+		CrowdControl.applyHealCut(st.CC, "GrievousWounds", now)
+	end
+	if riders.Sunder then
+		st.Sunder = CrowdControl.applyDebuff(st.CC, "Sunder", riders.Sunder, riders.SunderTime or 4, now, true)
+		st.SunderUntil = st.CC.Debuffs.Sunder.Until
+	end
+	if riders.Stun then
+		applyCC({ Player = player }, riders.Stun, riders.StunKind or "Stunned")
 	end
 end
 -- A rival duelist's Corrosive aura while it blocks (a gem defence).
@@ -2370,7 +2394,7 @@ local function playerStatuses(st, now)
 	add("Silenced", st.SilenceUntil)
 	add("GuardBroken", st.BlockBrokenUntil)
 	for _, dot in st.Dots do
-		add("Burning", dot.Ends)
+		add(if dot.Element == "Poison" then "Poisoned" else "Burning", dot.Ends)
 	end
 	add("Slowed", st.SlowUntil, st.Slow * 100)
 	add("ArmorShred", st.SunderUntil, st.Sunder * 100)
@@ -2563,11 +2587,12 @@ local function tick(dt)
 				st.Dots[source] = nil
 			elseif now >= dot.Next then
 				local through = math.min(now, dot.Ends)
-				local previous = DamageLog.push("Burning", "Fire")
+				local element = dot.Element or "Fire"
+				local previous = DamageLog.push(if element == "Poison" then "Poisoned" else "Burning", element)
 				if fromEnemy then
-					receive(player, dot.Damage * (through - dot.Last), "Fire", nil, nil, false, false, false, source)
+					receive(player, dot.Damage * (through - dot.Last), element, nil, nil, false, false, false, source)
 				else
-					receive(player, dot.Damage * (through - dot.Last), "Fire", source, nil, false, false, false)
+					receive(player, dot.Damage * (through - dot.Last), element, source, nil, false, false, false)
 				end
 				DamageLog.pop(previous)
 				dot.Last, dot.Next = through, math.min(through + 1, dot.Ends)

@@ -8,6 +8,10 @@ Dungeon.RoomCount = 5
 Dungeon.TimeLimit = 900
 Dungeon.RoomSize = 64
 Dungeon.Spacing = 90
+-- Moves: a fighter's three, on its 1, 2 and 3 (Server.Duelist): its kind's
+-- own (Shared.CreatureMoves) and rig maneuvers (CombatTechnology.Catalog).
+-- A room fighter has its signature move beside two maneuvers; a boss has
+-- three of its own, the last its big telegraphed attack.
 Dungeon.Roster = {
 	{
 		Id = "Sahur",
@@ -15,7 +19,7 @@ Dungeon.Roster = {
 		Element = "Fire",
 		Weakness = "Frost",
 		Shape = "Wood",
-		Moves = { "HydraulicSlam", "BreachHammer", "TremorSlam" },
+		Moves = { "BatSlam", "HydraulicSlam", "BreachHammer" },
 	},
 	{
 		Id = "Tralalero",
@@ -23,7 +27,7 @@ Dungeon.Roster = {
 		Element = "Frost",
 		Weakness = "Shock",
 		Shape = "Shark",
-		Moves = { "ServoFlurry", "StimDodge", "KineticRam" },
+		Moves = { "SharkDash", "ServoFlurry", "StimDodge" },
 	},
 	{
 		Id = "Patapim",
@@ -31,7 +35,7 @@ Dungeon.Roster = {
 		Element = "Poison",
 		Weakness = "Fire",
 		Shape = "Tree",
-		Moves = { "TremorSlam", "SeismicBreaker", "HydraulicSlam" },
+		Moves = { "SporeBurst", "TremorSlam", "HydraulicSlam" },
 	},
 	{
 		Id = "Crocodilo",
@@ -39,7 +43,7 @@ Dungeon.Roster = {
 		Element = "Shock",
 		Weakness = "Poison",
 		Shape = "Crocodile",
-		Moves = { "ArmorPiercer", "KineticRam", "ServoFlurry" },
+		Moves = { "CarpetBomb", "ArmorPiercer", "KineticRam" },
 	},
 }
 -- The bosses: the last room's, and an open expedition's middle camp
@@ -53,7 +57,7 @@ Dungeon.Bosses = {
 		Element = "Shock",
 		Weakness = "Poison",
 		Shape = "TwinCat",
-		Moves = { "ServoFlurry", "StimDodge", "ThrusterLeap" },
+		Moves = { "TwinPounce", "ClawFrenzy", "StaticStorm" },
 	},
 	{
 		Id = "Drago",
@@ -61,7 +65,7 @@ Dungeon.Bosses = {
 		Element = "Fire",
 		Weakness = "Frost",
 		Shape = "DragonCroc",
-		Moves = { "ArmorPiercer", "ThrusterLeap", "KineticRam" },
+		Moves = { "FlameBreath", "TailSweep", "FirebombDive" },
 	},
 	{
 		Id = "Paperotti",
@@ -69,7 +73,7 @@ Dungeon.Bosses = {
 		Element = "Frost",
 		Weakness = "Shock",
 		Shape = "TwinDuck",
-		Moves = { "KineticRam", "StimDodge", "PneumaticJab" },
+		Moves = { "IcePeck", "HailVolley", "QuackSquall" },
 	},
 	{
 		Id = "Ranocchio",
@@ -77,7 +81,7 @@ Dungeon.Bosses = {
 		Element = "Poison",
 		Weakness = "Fire",
 		Shape = "FrogAvocado",
-		Moves = { "ThrusterLeap", "TremorSlam", "PneumaticJab" },
+		Moves = { "TongueLash", "ToxicPits", "BogLeap" },
 	},
 	{
 		Id = "Chimpanzini",
@@ -85,7 +89,7 @@ Dungeon.Bosses = {
 		Element = "Shock",
 		Weakness = "Poison",
 		Shape = "Chimpanzini",
-		Moves = { "ServoFlurry", "BreachHammer", "ThrusterLeap" },
+		Moves = { "PeelToss", "JungleRush", "BananaSmash" },
 	},
 	{
 		Id = "SahurTrio",
@@ -93,7 +97,7 @@ Dungeon.Bosses = {
 		Element = "Fire",
 		Weakness = "Frost",
 		Shape = "SahurTrio",
-		Moves = { "HydraulicSlam", "BreachHammer", "TremorSlam" },
+		Moves = { "TungTungTung", "ThreeHeadRoar", "EmberQuake" },
 		PoseProfile = "SahurBat",
 	},
 	{
@@ -102,7 +106,7 @@ Dungeon.Bosses = {
 		Element = "Frost",
 		Weakness = "Shock",
 		Shape = "TwinShark",
-		Moves = { "ServoFlurry", "StimDodge", "KineticRam" },
+		Moves = { "TwinSharkDash", "JawSnap", "TidalCrash" },
 	},
 	{
 		Id = "PatapimTrio",
@@ -110,7 +114,7 @@ Dungeon.Bosses = {
 		Element = "Poison",
 		Weakness = "Fire",
 		Shape = "TreeTrio",
-		Moves = { "TremorSlam", "SeismicBreaker", "RiposteStance" },
+		Moves = { "BranchSweep", "RootSnare", "SporeStorm" },
 	},
 	{
 		Id = "Frigo",
@@ -118,7 +122,7 @@ Dungeon.Bosses = {
 		Element = "Frost",
 		Weakness = "Shock",
 		Shape = "Frigo",
-		Moves = { "KineticRam", "SeismicBreaker", "RiposteStance" },
+		Moves = { "IceSpit", "DoorSlam", "FreezerBlast" },
 	},
 	{
 		Id = "Cappuccino",
@@ -126,7 +130,7 @@ Dungeon.Bosses = {
 		Element = "Shock",
 		Weakness = "Poison",
 		Shape = "Cappuccino",
-		Moves = { "ServoFlurry", "ArmorPiercer", "StimDodge" },
+		Moves = { "KnifeFlurry", "ShadowStep", "KunaiStorm" },
 	},
 }
 -- What fights as foe `kind` (an index) in `room` (a room or a camp): a

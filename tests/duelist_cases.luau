@@ -91,6 +91,36 @@ check(DuelistBrain.pickMove(counters, "Guard", 10, 4, 0.9) == nil, "Rival braced
 check(DuelistBrain.pickMove(counters, "Light", 10, 4, 0.1) ~= jab and DuelistBrain.pickMove(counters, "Light", 10, 4, 0.1) ~= riposte, "Rival wasted a counter on a plain swing")
 slam.Next, hammer.Next, ram.Next = 20, 20, 20
 check(DuelistBrain.pickMove(moves, "Light", 10, 4, 0.1) == nil, "Maneuver used on cooldown")
+do
+	-- A creature's own moves (Shared.CreatureMoves) come out whenever its foe
+	-- is in their reach, whatever it was about to do: its big one first; not
+	-- while it dodges, seldom from behind its guard, never before it's free to
+	-- attack again.
+	local combo = { Id = "TungTungTung", Power = 1.1, Signature = true, Range = 7, Next = 0 }
+	local roar = { Id = "ThreeHeadRoar", Power = 0.4, Signature = true, Range = 11, Next = 0 }
+	local quake = { Id = "EmberQuake", Power = 4, Signature = true, Big = true, Range = 10, Next = 0 }
+	local boss = { combo, roar, quake }
+	check(DuelistBrain.pickMove(boss, "Strafe", 10, 5, 0.5) == quake, "Boss didn't open with its big attack")
+	check(DuelistBrain.pickMove(boss, "Approach", 10, 10.5, 0.5) == roar, "Boss didn't roar at a foe in its ring")
+	check(DuelistBrain.pickMove(boss, "Approach", 10, 12, 0.1) == nil, "Boss used a move on a foe out of its reach")
+	check(DuelistBrain.pickMove(boss, "Dodge", 10, 5, 0.1) == nil, "Boss stopped mid-dodge for its own move")
+	check(DuelistBrain.pickMove(boss, "Guard", 10, 5, 0.5) == nil, "Boss dropped its guard for its own move every time")
+	check(DuelistBrain.pickMove(boss, "Guard", 10, 5, 0.1) == quake, "Boss never struck from behind its guard")
+	check(DuelistBrain.pickMove(boss, "Strafe", 10, 5, 0.1, false) == nil, "Boss used its own move before it was free to attack")
+	check(DuelistBrain.pickMove(boss, "Light", 10, 5, 0.95) == nil, "Boss used its own moves on every chance")
+	quake.Next = 20
+	check(DuelistBrain.pickMove(boss, "Strafe", 10, 5, 0.5) == combo, "Boss didn't use its strongest move in reach")
+	local pounce = { Id = "TwinPounce", Power = 2, Signature = true, Min = 7, Range = 26, Next = 0 }
+	check(DuelistBrain.pickMove({ pounce }, "Approach", 10, 5, 0.1) == nil, "Boss pounced on a foe right beside it")
+	check(DuelistBrain.pickMove({ pounce }, "Approach", 10, 15, 0.1) == pounce, "Boss never pounced from range")
+	-- A room fighter's signature move sits beside rig maneuvers: on cooldown,
+	-- a heavy is still swapped for its maneuver, never its signature.
+	local bat = { Id = "BatSlam", Power = 2.2, Signature = true, Range = 6, Windup = 0.9, Next = 20 }
+	local hydraulic = { Id = "HydraulicSlam", Power = 2, Next = 0 }
+	check(DuelistBrain.pickMove({ bat, hydraulic }, "Heavy", 10, 4, 0.1) == hydraulic, "Room fighter's maneuver lost beside its signature")
+	bat.Next = 0
+	check(DuelistBrain.pickMove({ bat, hydraulic }, "Light", 10, 4, 0.1) == bat, "Room fighter never used its signature move")
+end
 -- Its blows meet the player's guard like any monster's: quick ones are
 -- reduced, heavy ones break it.
 local guardian, gh, gr = makePlayer(31, arena, nil)
@@ -255,6 +285,44 @@ brute.Alive = false
 now += 0.1
 CombatServer._tick(0.1)
 check(not string.find(struck:GetAttribute("Statuses") or "", "Burning", 1, true), "Burn outlived the rival that set it")
+do
+	-- A creature's move leaves its own riders (Shared.CreatureMoves): a poison
+	-- (a share of its hit every second, and less healing), a stun, an armor
+	-- shred, a blind and a slow.
+	local bitten, bh = makePlayer(44, arena, nil)
+	local patapim = { Alive = true, Root = { Position = arena } }
+	now += 30
+	CombatServer.afflict(bitten, {
+		Poison = 0.2,
+		PoisonTime = 4,
+		Stun = 0.6,
+		StunKind = "Frozen",
+		Sunder = 0.2,
+		SunderTime = 4,
+		Blind = 0.3,
+		BlindTime = 2,
+		Slow = 0.3,
+		SlowTime = 2,
+	}, patapim, 50)
+	CombatServer._tick(0.1)
+	local shown = {}
+	for _, active in StatusEffects.decode(bitten:GetAttribute("Statuses")) do
+		shown[active.Id] = active
+end
+local statuses = tostring(bitten:GetAttribute("Statuses"))
+check(shown.Poisoned and not shown.Burning, "A creature's poison didn't show as Poisoned: " .. statuses)
+check(shown.Frozen and shown.ArmorShred and shown.Blinded and shown.Slowed, "A creature's riders didn't all land: " .. statuses)
+check(CrowdControl.healingMultiplier(CombatServer._state(bitten).CC, now) < 1, "A creature's poison left healing whole")
+local before = bh.Health
+now += 1.2
+CombatServer._tick(1.2)
+check(bh.Health < before and bh.Health > before - 50 * 0.2 * 1.5, "A creature's poison didn't hurt as a share of its hit")
+-- (Without its creature, nothing to keep a poison or burn going.)
+local plain = makePlayer(45, arena, nil)
+CombatServer.afflict(plain, { Burn = 0.2, BurnTime = 3 }, nil, 50)
+CombatServer._tick(0.1)
+check(not string.find(plain:GetAttribute("Statuses") or "", "Burning", 1, true), "A burn with no creature behind it")
+end
 -- The combat log: what hit you, with what, for how much, and how much your
 -- guard and shields stopped.
 local logged, lh, lr = makePlayer(51, arena, nil)

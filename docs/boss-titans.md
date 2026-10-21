@@ -2,8 +2,9 @@
 
 The ten dungeon bosses (`DungeonRules.Bosses`: the last room of a dungeon,
 an open expedition's middle camp, the Rift's boss) are rebuilt from scratch.
-Their names, elements, moves, stats and animations don't change. Only their
-bodies do (`Server.BrainrotBosses`).
+Their names, elements, stats and animations don't change. Only their
+bodies do (`Server.BrainrotBosses`). Their moves changed later: see
+[creature-moves.md](creature-moves.md).
 
 The images here are offline renders (three.js) of the game's own boss code
 on Duelist's combat skeleton, not Roblox screenshots. Neon reads paler in

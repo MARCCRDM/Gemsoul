@@ -2226,8 +2226,12 @@ function handlers.Blasted(kind: string, seconds: number, push: Vector3?)
 	cancel()
 	cast = nil
 	nextAttack = math.max(nextAttack, os.clock() + seconds)
-	local stunned = kind == "Stunned"
-	hint.Text, feedbackUntil = if stunned then "STUNNED!" else "STAGGERED", os.clock() + seconds + 0.3
+	-- (A creature's big slam may freeze or shock you instead: Shared.CreatureMoves.)
+	local stunned = kind == "Stunned" or kind == "Frozen" or kind == "Shocked"
+	hint.Text, feedbackUntil = if kind == "Frozen" then "FROZEN!"
+		elseif kind == "Shocked" then "SHOCKED!"
+		elseif stunned then "STUNNED!"
+		else "STAGGERED", os.clock() + seconds + 0.3
 	CombatFx.shake(if stunned then 0.06 else 0.035, if stunned then 0.5 else 0.3)
 	CombatVfx.screen("Stun", seconds)
 	CombatSound.play(if stunned then "Stun" else "Hurt", nil, { Volume = if stunned then 1 else 0.7 })

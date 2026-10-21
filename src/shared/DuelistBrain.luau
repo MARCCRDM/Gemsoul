@@ -198,7 +198,14 @@ end
 
 -- Swaps a basic action for one of its Rig Maneuvers (keys 1, 2, 3) when one
 -- fits, as a player would. Moves are { Id, Power, Windup?, Next }.
-function Brain.pickMove(moves, choice: string, now: number, distance: number, roll: number)
+--
+-- A creature's own moves (Signature: Shared.CreatureMoves) come out
+-- whenever one is ready and its foe is in its reach (Min to Range studs),
+-- whatever it was about to do, once it's free to attack (`free`, true when
+-- left out): its big one (Big) first. It doesn't stop to use one while it
+-- dodges, and seldom from behind its guard.
+Brain.SignatureChance = { Big = 0.9, Other = 0.6, Guard = 0.25 }
+function Brain.pickMove(moves, choice: string, now: number, distance: number, roll: number, free: boolean?)
 	local function ready(id: string)
 		for _, move in moves do
 			if move.Id == id and now >= move.Next then
@@ -206,6 +213,23 @@ function Brain.pickMove(moves, choice: string, now: number, distance: number, ro
 			end
 		end
 		return nil
+	end
+	if free ~= false and choice ~= "Dodge" and choice ~= "Interrupt" and choice ~= "Retreat" then
+		local best = nil
+		for _, move in moves do
+			local fits = move.Signature
+				and now >= move.Next
+				and distance >= (move.Min or 0)
+				and distance <= (move.Range or Brain.Reach)
+			local bigger = best and (move.Big == true) ~= (best.Big == true)
+			if fits and (not best or (if bigger then move.Big == true else move.Power > best.Power)) then
+				best = move
+			end
+		end
+		local chance = Brain.SignatureChance
+		if best and roll < (if choice == "Guard" then chance.Guard elseif best.Big then chance.Big else chance.Other) then
+			return best
+		end
 	end
 	if choice == "Dodge" then
 		return ready("StimDodge") -- a dodge that also heals
@@ -229,6 +253,7 @@ function Brain.pickMove(moves, choice: string, now: number, distance: number, ro
 				and move.Id ~= "StimDodge"
 				and move.Id ~= "RiposteStance"
 				and move.Id ~= "PneumaticJab"
+				and not move.Signature
 				and (choice == "Heavy" or not move.Windup)
 				and (not best or move.Power > best.Power)
 			then

@@ -51,6 +51,7 @@ local Lottery = require(ReplicatedStorage.Shared.StarterLottery)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
+local CreatureMoves = require(ReplicatedStorage.Shared.CreatureMoves)
 local ArenaSessions = require(script.Parent.ArenaSessions)
 local CombatServer = require(script.Parent.CombatServer)
 local Enemies = require(script.Parent.Enemies)
@@ -726,14 +727,210 @@ end
 -- or until its Charge runs dry or the player steps out of reach).
 local CHANNEL_HOLD = 2
 
+-- A creature's own moves (Shared.CreatureMoves). The end of a wind-up it
+-- spends moving: a Dash's charge and a Leap's flight, in seconds.
+local DASH_TIME = 0.3
+local LEAP_AIR = 0.5
+
+-- Who its area moves catch: everyone it fights (a raid's members), not
+-- only the one it's on.
+local function areaFoes(duel): { Player }
+	return if duel.Raid then duel.Raid.Members else { duel.Owner }
+end
+
+-- Its blow on `player`, who may not be the one it's on (strike only hits
+-- duel.Owner).
+local function strikeAt(duel, player: Player, ...)
+	if player == duel.Owner then
+		return strike(duel, ...)
+	end
+	return strike(setmetatable({ Owner = player }, { __index = duel }), ...)
+end
+
+-- What a creature's blow leaves on `player` (its Riders) once it lands;
+-- a guard keeps it off, but not off a Roar's.
+local function creatureRiders(duel, player: Player, stats, dealt, guarded)
+	local landed = type(dealt) == "number" and dealt > 0
+	if stats.Riders and (if stats.Shape == "Roar" then landed or guarded else landed and not guarded) then
+		CombatServer.afflict(player, stats.Riders, duel.Enemy, duel.Damage)
+	end
+end
+
+-- Starts one: a ring where it lands for its whole wind-up (round its feet,
+-- under its foe, or where it jumps), or a crouch before a dash.
+local function creatureMove(enemy, duel, move, now: number, target: BasePart)
+	local root, stats = enemy.Root, move.Creature
+	local color = GemConfig.ElementColors[duel.Element] or P_GOLD
+	local windup = stats.Windup or Actions.CastTime.Move
+	setStance(duel, if stats.Big then "Heavy" else "Maneuver")
+	duel.CastElement = duel.Element
+	animate(duel, stats.Pose or "Heavy", windup, nil, move.Name)
+	local action = {
+		Kind = "Creature",
+		Name = move.Name,
+		At = now + windup,
+		Move = stats,
+		Power = move.Power,
+		Hits = stats.Hits or 1,
+	}
+	local shape = stats.Shape
+	if shape == "Slam" or shape == "Roar" then
+		action.Centers = { root.Position }
+	elseif shape == "Blast" then
+		action.Centers = { target.Position }
+	elseif shape == "Bombs" then
+		-- The first where you stand, the rest scattered round you.
+		action.Centers = { target.Position }
+		for _ = 2, stats.Count or 1 do
+			local angle, out = math.random() * math.pi * 2, (0.4 + math.random() * 0.6) * (stats.Spread or 5)
+			table.insert(action.Centers, target.Position + Vector3.new(math.cos(angle) * out, 0, math.sin(angle) * out))
+		end
+	elseif shape == "Leap" then
+		-- Onto where you stood as it crouched (as far as it jumps).
+		local offset = flat(target.Position - root.Position)
+		action.Centers = { root.Position + (if offset.Magnitude > stats.Leap then offset.Unit * stats.Leap else offset) }
+		action.LaunchAt = action.At - math.min(LEAP_AIR, windup)
+	elseif shape == "Dash" then
+		action.LaunchAt = action.At - math.min(DASH_TIME, windup)
+	end
+	for _, center in action.Centers or {} do
+		fx("Nova", center - Vector3.new(0, 2.5, 0), stats.Radius, color, windup)
+	end
+	duel.Action = action
+end
+
+-- Off the ground: a Dash charges straight at its foe, a Leap jumps for its
+-- ring. (It runs there as fast as it must: Humanoid:MoveTo.)
+local function launch(enemy, action, target: BasePart, now: number)
+	local root, stats = enemy.Root, action.Move
+	local from = root.Position
+	local to
+	if stats.Shape == "Dash" then
+		local offset = flat(target.Position - from)
+		local dir = if offset.Magnitude > 0.1 then offset.Unit else flat(root.CFrame.LookVector).Unit
+		to = from + dir * math.min(stats.Length, offset.Magnitude + 4)
+		fx("DodgeRoll", nil, from, dir, (to - from).Magnitude, false)
+	else
+		to = action.Centers[1]
+		root.AssemblyLinearVelocity = flat(to - from) / LEAP_AIR
+			+ Vector3.new(0, workspace.Gravity * LEAP_AIR / 2, 0)
+	end
+	action.From, action.To = from, to
+	action.Speed = math.max(16, flat(to - from).Magnitude / math.max(0.05, action.At - now))
+end
+
+-- How far `point` is from its Dash's path, across the ground.
+local function offPath(action, point: Vector3): number
+	local a, b, p = flat(action.From), flat(action.To), flat(point)
+	local ab = b - a
+	local t = if ab.Magnitude > 0.01 then math.clamp((p - a):Dot(ab) / ab:Dot(ab), 0, 1) else 0
+	return (p - (a + ab * t)).Magnitude
+end
+
+-- It lands: on whoever's in its rings, along its dash, or in its reach.
+-- True if it strikes again (a Strike's next blow).
+local function landCreature(enemy, duel, action, now: number, damage: number, dir: Vector3, distance: number): boolean
+	local stats, root = action.Move, enemy.Root
+	local color = GemConfig.ElementColors[duel.Element] or P_GOLD
+	local power = damage * action.Power
+	local shape = stats.Shape
+	if shape == "Strike" then
+		local last = action.Hits <= 1
+		local heavy = stats.Heavy == true or (stats.HeavyLast == true and last)
+		local reach = stats.Reach or Brain.Reach + 2
+		fx("Swing", nil, root.Position, dir, reach, 150, color, heavy)
+		if distance <= reach then
+			local dealt, guarded = strike(duel, power, duel.Element, heavy, duel.WeaponGem, action.Name)
+			creatureRiders(duel, duel.Owner, stats, dealt, guarded)
+		end
+		if not last then
+			-- The next blow, at its own pace (the last one wound up heavier).
+			action.Hits -= 1
+			action.At = now + (stats.Gap or 0.2)
+			duel.Action = action
+			animate(duel, if action.Hits == 1 and stats.HeavyLast then "Heavy" else "Slash", stats.Gap or 0.2, nil, action.Name)
+			return true
+		end
+		return false
+	end
+	for _, player in areaFoes(duel) do
+		local foeRoot = ownerRoot(player)
+		if foeRoot then
+			if shape == "Dash" then
+				if action.From and offPath(action, foeRoot.Position) <= (stats.Width or 4) then
+					local dealt, guarded = strikeAt(duel, player, power, duel.Element, stats.Heavy == true, nil, action.Name)
+					creatureRiders(duel, player, stats, dealt, guarded)
+				end
+			else
+				-- Each ring hits once (a bomb each).
+				for _, center in action.Centers do
+					local away = flat(foeRoot.Position - center).Magnitude
+					if away <= stats.Radius then
+						local scale, cc, seconds = 1, nil, 0
+						if shape == "Slam" or shape == "Leap" then
+							scale, cc, seconds = Actions.blastFalloff(away, stats.Radius)
+						end
+						local dealt, guarded =
+							strikeAt(duel, player, power * scale, duel.Element, stats.Heavy == true, nil, action.Name)
+						creatureRiders(duel, player, stats, dealt, guarded)
+						if cc and type(dealt) == "number" and dealt > 0 then
+							if guarded then
+								cc, seconds = if cc == "Stunned" then "Staggered" else nil, 0.4
+							end
+							if cc then
+								CombatServer.blastCC(
+									player,
+									if cc == "Stunned" then stats.CC or cc else cc,
+									seconds,
+									center,
+									if cc == "Stunned" then Actions.Blast.Knockback else 0
+								)
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	-- Ground that stays harmful (it ticks on the one it's on: see Zones).
+	if stats.Cloud then
+		duel.Zones = duel.Zones or {}
+		for _, center in action.Centers or {} do
+			table.insert(duel.Zones, {
+				Name = action.Name,
+				Center = center,
+				Radius = stats.Radius,
+				Every = stats.Cloud.Every,
+				Next = now + stats.Cloud.Every,
+				Until = now + stats.Cloud.Duration,
+				Power = stats.Cloud.Damage,
+				Element = duel.Element,
+			})
+			fx("Zone", center, stats.Radius, stats.Cloud.Duration, color)
+		end
+	end
+	return false
+end
+
 -- Uses one of its Rig Maneuvers (keys 1, 2, 3), like a player would.
 local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Vector3, side: Vector3, distance: number)
 	local root, model = enemy.Root, enemy.Model
 	move.Next = now + move.Cooldown
 	model:SetAttribute("MoveReadyAt" .. move.Slot, workspace:GetServerTimeNow() + move.Cooldown)
 	press(duel, tostring(move.Slot))
-	Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", duel.Name .. " uses " .. move.Name .. "!")
+	if move.Big then
+		-- Its big one: everyone in the fight is told to get clear.
+		for _, player in areaFoes(duel) do
+			Remotes.CombatFx:FireClient(player, "TechStatus", duel.Name .. " winds up " .. move.Name .. "! Get out of the ring!")
+		end
+	else
+		Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", duel.Name .. " uses " .. move.Name .. "!")
+	end
 	face(root, target.Position)
+	if move.Creature then
+		creatureMove(enemy, duel, move, now, target)
+		return
+	end
 	if move.Id == "StimDodge" then
 		-- Dodge and patch up.
 		local sign = if math.random() < 0.5 then 1 else -1
@@ -1206,7 +1403,15 @@ local function think(enemy, now: number)
 			animate(duel, "Stagger", 0)
 			return
 		end
-		humanoid:MoveTo(root.Position)
+		if action.LaunchAt and now >= action.LaunchAt then
+			if not action.To then
+				launch(enemy, action, target, now)
+			end
+			humanoid.WalkSpeed = action.Speed
+			humanoid:MoveTo(action.To)
+		else
+			humanoid:MoveTo(root.Position)
+		end
 		face(root, target.Position)
 		if now < action.At then
 			return
@@ -1334,6 +1539,12 @@ local function think(enemy, now: number)
 					Hits = action.Hits - 1,
 				}
 				animate(duel, "Slash", 0.2)
+				return
+			end
+			duel.NextAttack = now + duel.Rate
+			setStance(duel, "")
+		elseif action.Kind == "Creature" then
+			if landCreature(enemy, duel, action, now, damage, dir, distance) then
 				return
 			end
 			duel.NextAttack = now + duel.Rate
@@ -1514,7 +1725,7 @@ local function think(enemy, now: number)
 	-- Like a player, it reaches for a maneuver (1, 2, 3) when one fits.
 	local move = (Tech.ManeuversEnabled or duel.Dungeon or duel.Raid)
 		and choice ~= "Stagger"
-		and Brain.pickMove(duel.Moves, choice, now, distance, math.random())
+		and Brain.pickMove(duel.Moves, choice, now, distance, math.random(), now >= duel.NextAttack)
 	if move and duel.Stamina < (move.Cost or 0) then
 		move = nil -- can't afford it, like a player
 	end
@@ -2143,7 +2354,8 @@ function spawnRival(owner: Player, raid, encounter)
 	local pool = table.clone(if encounter then encounter.Spec.Moves else Tech.Order.RigManeuvers)
 	for slot = 1, math.min(3, #pool) do
 		local id = table.remove(pool, rng:NextInteger(1, #pool))
-		local stats = Tech.Catalog[id]
+		local creature = CreatureMoves.get(id)
+		local stats = creature or Tech.Catalog[id]
 		local move = {
 			Slot = slot,
 			Id = id,
@@ -2162,7 +2374,15 @@ function spawnRival(owner: Player, raid, encounter)
                 Prepaid = stats.Prepaid,
 			Crit = stats.Crit,
 			Cooldown = math.max(stats.Cooldown or stats.Recovery or 1, 1.5),
-			Next = now + 2 + slot,
+			-- Its own moves (Shared.CreatureMoves): when and from how far it
+			-- reaches for them (DuelistBrain.pickMove); the big one not
+			-- straight away.
+			Creature = creature,
+			Signature = creature ~= nil,
+			Big = stats.Big == true,
+			Range = stats.Range,
+			Min = stats.Min,
+			Next = now + (if stats.Big then 6 else 2 + slot),
 		}
 		table.insert(duel.Moves, move)
 		model:SetAttribute("RivalMove" .. slot, move.Name)
