@@ -1,7 +1,8 @@
 -- A strong, sticky lock (see TargetLockRules): your Arena rival is always
 -- the target, and the camera keeps pulling toward its head (gentler while
 -- you're looking around yourself). Selection is local; hits remain
--- server-validated.
+-- server-validated. On desktop it only picks targets by itself in a 1v1
+-- (Lock.auto); elsewhere a mouse player aims freely and X locks on.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -20,6 +21,11 @@ local state, candidates, records = Rules.new(), {}, {}
 local sight: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any -- last line-of-sight check
 local params = RaycastParams.new()
 params.FilterType = Enum.RaycastFilterType.Exclude
+-- A gamepad in hand counts as a gamepad, mouse or not (Lock.auto).
+local padInHand = false
+UserInputService.LastInputTypeChanged:Connect(function(kind)
+	padInHand = string.find(kind.Name, "Gamepad", 1, true) ~= nil
+end)
 local outline = Instance.new("Highlight")
 outline.Name = "CombatTargetLock"
 outline.FillTransparency = 1
@@ -153,12 +159,20 @@ function Lock.target()
 	end
 	return model
 end
--- Moves the lock to the next target within SwitchRange (left to right).
+-- Does the lock pick targets by itself right now? With touch or a gamepad
+-- always; with a mouse and keyboard only in a 1v1 (the Arena, a 1v1 match).
+function Lock.auto(): boolean
+	local desktop = UserInputService.MouseEnabled and UserInputService.KeyboardEnabled and not padInHand
+	return Rules.auto(player:GetAttribute("CombatSession"), desktop == true)
+end
+-- X: moves the lock to the next target within SwitchRange (left to right).
+-- Without the automatic lock it locks what you're aiming at, moves on, and
+-- past the last one lets go.
 function Lock.switch()
 	if not active then
 		return nil
 	end
-	local target = Rules.switch(state, records)
+	local target = if Lock.auto() then Rules.switch(state, records) else Rules.toggle(state, records)
 	outline.Adornee, outline.Enabled = target, target ~= nil
 	return target
 end
@@ -278,7 +292,9 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 			end
 		end
 	end
-	local target = Rules.update(state, records, now, now < manualUntil)
+	local target = if Lock.auto()
+		then Rules.update(state, records, now, now < manualUntil)
+		else Rules.hold(state, records, now)
 	outline.Adornee, outline.Enabled = target, target ~= nil
 	if target and not paused then
 		-- A hard pull; a little softer (never released) while you look around.

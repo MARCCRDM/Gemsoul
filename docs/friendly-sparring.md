@@ -116,7 +116,9 @@ On a phone the key cap is hidden and END is the button:
 
 Players in a spar show a small ⚔ over their heads, but only while you're not
 sparring yourself. Once you are, the fight HUD's own targeting takes over, and
-it only ever locks onto your partner.
+it only ever locks onto your partner. On desktop it doesn't lock by itself in a
+spar: you aim with the mouse and press X to lock on (see
+[target-lock.md](target-lock.md)).
 
 ## How it's built
 

@@ -187,8 +187,48 @@ do
 	check(Rules.pick(p, list, "critter") == "critter", "Couldn't pick a critter with a leader about")
 	check(Rules.update(p, list, 1, false) == "critter", "A picked critter didn't hold against the leader")
 end
+-- On desktop the lock picks targets by itself only in a 1v1 (the Arena, a
+-- 1v1 match); touch screens and gamepads always.
+for _, session in { "PvP", "Training", "Duel" } do
+	check(Rules.auto(session, true), "No automatic lock on desktop in " .. session)
+end
+check(not Rules.auto(nil, true), "Automatic lock on desktop in the lobby, the quarry or the Rift")
+check(not Rules.auto("Raid", true), "Automatic lock on desktop in a raid or dungeon")
+check(Rules.auto(nil, false) and Rules.auto("Raid", false), "A touch screen or gamepad lost the automatic lock")
+do
+	local function b(id, distance, facing, bearing, visible)
+		local candidate = c(id, distance, facing, visible)
+		candidate.Bearing = bearing
+		return candidate
+	end
+	local h = Rules.new()
+	-- Without it nothing is picked for you, not even what's hitting you.
+	check(
+		Rules.hold(h, { b("near", 8, 1, 0), c("hitter", 3, -1, true, true, nil, true) }, 0) == nil,
+		"A target was picked without the automatic lock"
+	)
+	-- X locks what you're aiming at: in sight and range, nearest the middle of the view.
+	local list =
+		{ b("left", 5, 0.95, -0.5), b("right", 6, 0.96, 0.4), b("ahead", 20, 0.999, 0), b("wall", 4, 1, 0.1, false) }
+	check(Rules.toggle(h, list) == "ahead", "X didn't lock what you're aiming at")
+	check(Rules.hold(h, list, 0.1) == "ahead", "A target you locked wasn't held")
+	-- Then the next one around you, left to right, and past the last it lets go.
+	check(Rules.toggle(h, list) == "left", "X didn't move to a target around you")
+	check(Rules.toggle(h, list) == "wall", "X skipped a target around you")
+	check(Rules.toggle(h, list) == "right", "X didn't move on to the right")
+	check(Rules.toggle(h, list) == nil and Rules.hold(h, list, 0.2) == nil, "X didn't let go past the last target")
+	-- Nothing in front of you: X locks nothing.
+	check(Rules.toggle(Rules.new(), { b("behind", 3, -1, 0) }) == nil, "X locked something behind you")
+	-- A chosen target is held through cover for the grace, then let go.
+	Rules.toggle(h, list)
+	check(Rules.hold(h, { b("ahead", 20, 0.999, 0, false) }, 1) == "ahead", "Brief cover broke a chosen lock")
+	check(
+		Rules.hold(h, { b("ahead", 20, 0.999, 0, false) }, 1 + Rules.HiddenGrace + 0.1) == nil,
+		"A chosen lock held a hidden target too long"
+	)
+end
 print(
 	"PASS: "
 		.. checks
-		.. " nearest-enemy lock, rival hold, a pack's leader first, auto-engage, cover grace, range and target switching checks"
+		.. " nearest-enemy lock, rival hold, a pack's leader first, auto-engage, cover grace, range and target switching checks; on desktop, automatic only in a 1v1, X to lock on elsewhere"
 )

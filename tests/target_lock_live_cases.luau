@@ -76,4 +76,37 @@ check(Lock.target()==dummy,"Attacker behind you not locked")
 check(Lock.switchCount()==1 and Lock.switch()==dummy and Lock.target()==dummy,"Switch with one nearby target lost it")
 Lock.setActive(false)
 check(Lock.switchCount()==0 and Lock.switch()==nil,"Switching worked outside combat")
-print("PASS: "..checks.." real target-lock camera, input, LOS, PvP, pause, auto-engage and lifecycle and switching checks")
+-- On desktop (mouse and keyboard) the lock only picks targets by itself in a
+-- 1v1: the Arena (a player or a rival) and a 1v1 match. Anywhere else you
+-- aim with the mouse: nothing's locked for you, not even what hit you; X
+-- locks what you're aiming at and, on the only target, lets go.
+Lock.setActive(true)
+input.KeyboardEnabled,player.Session=true,nil
+camera.CFrame=pose(camera.CFrame.Position,Vector3.new(0,0,-1))
+now+=0.2; local beforeDesk=lerps; bound(1/60)
+check(not Lock.auto() and Lock.target()==nil and lerps==beforeDesk,"Desktop auto-locked (or pulled the camera) outside a 1v1")
+Lock.engageNear(Vector3.new(600,0,-8)); now+=0.02; bound(1/60)
+check(Lock.target()==nil,"Desktop auto-locked what hit it outside a 1v1")
+check(Lock.switch()==dummy and Lock.target()==dummy,"X didn't lock what you're aiming at")
+now+=0.02; bound(1/60)
+check(Lock.target()==dummy and lerps>beforeDesk,"A target you locked wasn't held, or the camera didn't follow it")
+check(Lock.switch()==nil and Lock.target()==nil,"X on the only target didn't let go")
+now+=0.2; bound(1/60)
+check(Lock.target()==nil,"Let go, the lock picked it straight back up")
+for _,session in {"PvP","Training","Duel"} do
+ player.Session=session
+ check(Lock.auto(),"No automatic lock in a 1v1 on desktop ("..session..")")
+end
+player.Session="Training"; now+=0.2; bound(1/60)
+check(Lock.target()==dummy,"The Arena on desktop didn't lock by itself")
+player.Session="Raid"
+check(not Lock.auto(),"Desktop auto-locks in a raid or dungeon")
+player.Session=nil
+lastInput({Name="Gamepad1"})
+check(Lock.auto(),"A gamepad in hand lost the automatic lock")
+lastInput({Name="MouseMovement"})
+check(not Lock.auto(),"Back on the mouse, the lock stayed automatic")
+input.KeyboardEnabled=false
+check(Lock.auto(),"A touch screen (no keyboard) lost the automatic lock")
+Lock.setActive(false)
+print("PASS: "..checks.." real target-lock camera, input, LOS, PvP, pause, auto-engage, lifecycle, switching and desktop 1v1-only checks")

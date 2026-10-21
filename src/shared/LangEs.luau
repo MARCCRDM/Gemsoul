@@ -582,6 +582,7 @@ return {
 	["Tap"] = "Toca",
 	["TAP·{1}×"] = "TOCA·{1}×",
 	["LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×{1} Roll | Q/E/R Surges | X Switch Target | K Tree | L Log"] = "Clic izq. golpe | Shift+clic izq. otra mano | Clic der. guardia | Espacio salto · Espacio×{1} rodar | Q/E/R Descargas | X cambiar objetivo | K árbol | L registro",
+	["LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×{1} Roll | Q/E/R Surges | X Lock On | K Tree | L Log"] = "Clic izq. golpe | Shift+clic izq. otra mano | Clic der. guardia | Espacio salto · Espacio×{1} rodar | Q/E/R Descargas | X fijar objetivo | K árbol | L registro",
 	["OPPONENT SCOUTING"] = "ANÁLISIS DEL RIVAL",
 	["YOUR EDGE / WEAK"] = "TU VENTAJA / DEBILIDAD",
 	["RIVAL'S EDGE / WEAK"] = "VENTAJA / DEBILIDAD DEL RIVAL",

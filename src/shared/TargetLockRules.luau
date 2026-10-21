@@ -17,6 +17,12 @@
 --     them left to right; a target you switched to is kept until it's lost
 --   * Rules.pick locks a target chosen directly (the target list), pinned
 --     the same way
+-- On desktop (a mouse to aim with) the lock is only automatic in a 1v1: the
+-- Arena (against a player or a rival) and a 1v1 match (Rules.auto). In
+-- spars, quarry hunts, the Rift, raids and dungeons you aim with the mouse:
+-- nothing is picked for you (Rules.hold keeps only what you chose), and X
+-- locks what you're aiming at, then the next one around you, then lets go
+-- (Rules.toggle). Touch screens and gamepads keep the automatic lock.
 local Rules = {
 	Range = 90, -- picking up a new target in front of you
 	RetainRange = 140, -- keeping an ordinary one
@@ -24,7 +30,15 @@ local Rules = {
 	HiddenGrace = 4,
 	SwitchRange = 10, -- studs: the targets around you that switching cycles through
 	SwitchMargin = 2, -- studs: how much nearer another enemy must be to take the lock
+	AimDot = math.cos(math.rad(25)), -- how near the middle of the view X looks for a target to lock
+	-- The 1v1s that keep the automatic lock on desktop (the player's CombatSession).
+	AutoSessions = { PvP = true, Training = true, Duel = true },
 }
+-- Does the lock pick targets by itself? Always with touch or a gamepad;
+-- with a mouse, only in a 1v1 (`session`: the player's CombatSession).
+function Rules.auto(session: any, desktop: boolean): boolean
+	return not desktop or Rules.AutoSessions[session] == true
+end
 function Rules.new()
 	return { Target = nil, HiddenSince = nil, Priority = false, Pinned = false }
 end
@@ -136,6 +150,52 @@ local function nearestLeader(candidates)
 		end
 	end
 	return best
+end
+
+-- Without the automatic lock: a target you chose (X, the target list) is
+-- held as Rules.update holds it; nothing is picked for you.
+function Rules.hold(state, candidates, now)
+	if state.Pinned and state.Target and keep(state, candidates, now) then
+		return state.Target
+	end
+	state.Target, state.HiddenSince, state.Pinned = nil, nil, false
+	return nil
+end
+-- The target nearest the middle of your view, in range and in sight.
+function Rules.aimed(candidates)
+	local best
+	for _, candidate in candidates do
+		if Rules.valid(candidate, Rules.AimDot) and (not best or candidate.Facing > best.Facing) then
+			best = candidate
+		end
+	end
+	return best
+end
+-- X without the automatic lock: nothing locked, it locks what you're aiming
+-- at; locked, the next target around you (left to right), and past the last
+-- one (or with none around), it lets go.
+function Rules.toggle(state, candidates)
+	if not state.Target then
+		local aimed = Rules.aimed(candidates)
+		if aimed then
+			state.Target, state.HiddenSince, state.Pinned = aimed.Target, nil, true
+		end
+		return state.Target
+	end
+	local nearby = Rules.switchable(candidates)
+	local index = 0
+	for i, candidate in nearby do
+		if candidate.Target == state.Target then
+			index = i
+		end
+	end
+	if index >= #nearby then
+		state.Target, state.HiddenSince, state.Pinned = nil, nil, false
+		return nil
+	end
+	local pick = nearby[index + 1]
+	state.Target, state.HiddenSince, state.Pinned = pick.Target, nil, true
+	return state.Target
 end
 
 -- `_turning` is kept for callers; turning never breaks the lock.

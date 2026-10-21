@@ -1367,6 +1367,7 @@ local shown = {
 	Low = nil :: boolean?,
 	Keys = { Basic = "LMB", Heavy = "SHIFT+LMB", Block = "HOLD RMB", Dodge = "SPACE" },
 	TouchKeys = { Basic = "HOLD", Heavy = "HOLD", Block = "HOLD", Dodge = "TAP·2×" },
+	ControlsAuto = true, -- (what the controls reminder says X does: TargetLock.auto)
 }
 RunService.RenderStepped:Connect(function(dt)
 	-- The combat HUD never draws over the menu dashboard.
@@ -1700,6 +1701,13 @@ RunService.RenderStepped:Connect(function(dt)
 	-- Key reminder: shown for the first seconds of a fight, or with a free cursor.
 	local hintAge = now - fightSince
 	controlsHint.Visible = not UserInputService.TouchEnabled and (cursorFree or hintAge < 13)
+	-- (X switches targets where the lock is automatic, and locks on where you aim yourself.)
+	if controlsHint.Visible and TargetLock.auto() ~= shown.ControlsAuto then
+		shown.ControlsAuto = not shown.ControlsAuto
+		controlsHint.Text = if shown.ControlsAuto
+			then "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | X Switch Target | K Tree | L Log"
+			else "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | X Lock On | K Tree | L Log"
+	end
 	controlsHint.TextTransparency = if cursorFree then 0 else math.clamp(hintAge - 12, 0, 1)
 	cursorModal.Modal = cursorFree
 	-- Touch screens: the foe's health rides over its head (FoeBars) instead.

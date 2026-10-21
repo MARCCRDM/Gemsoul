@@ -1,4 +1,5 @@
 local now, bound, changed, lerps = 10, nil, nil, 0
+local lastInput -- (UserInputService.LastInputTypeChanged's handler)
 local os = {clock=function() return now end}
 vmt.__add=function(a,b) return Vector3.new(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end
 vmt.__sub=function(a,b) return Vector3.new(a.X-b.X,a.Y-b.Y,a.Z-b.Z) end
@@ -26,12 +27,12 @@ local function model(position,enemy)
 end
 local own=model(Vector3.new(600,0,0),nil)
 local dummy=model(Vector3.new(600,0,-8),"Dummy")
-local player={UserId=1,Character=own,Neutral=true,GetAttribute=function(self, key) if key=="ArenaDropUntil" then return nil elseif key=="Spar" or key=="SparDown" or key=="SparWith" then return self[key] end return true end,WaitForChild=function() return {} end}
+local player={UserId=1,Character=own,Neutral=true,GetAttribute=function(self, key) if key=="ArenaDropUntil" then return nil elseif key=="Spar" or key=="SparDown" or key=="SparWith" then return self[key] elseif key=="CombatSession" then return self.Session end return true end,WaitForChild=function() return {} end}
 local opponent={UserId=2,Character=model(Vector3.new(600,0,-4),nil),Neutral=true,GetAttribute=function(self, key) if key=="Spar" or key=="SparDown" or key=="SparWith" then return self[key] end return self.OptedIn==true end}
 local players={LocalPlayer=player,GetPlayers=function() return {player,opponent} end,GetPlayerFromCharacter=function(_,m) return if m==opponent.Character then opponent else nil end}
 local blocked=false
 local workspace={CurrentCamera=camera,GetServerTimeNow=function() return os.clock() end,FindFirstChild=function(_,key) return if key=="Enemies" then {GetChildren=function() return {dummy} end} else nil end,Raycast=function() return if blocked then {Instance={IsDescendantOf=function() return false end}} else nil end}
-local input={MouseEnabled=true,Delta=Vector3.new(0,0,0),GetMouseDelta=function(self) return self.Delta end,InputChanged={Connect=function(_,fn) changed=fn end}}
+local input={MouseEnabled=true,KeyboardEnabled=false,Delta=Vector3.new(0,0,0),GetMouseDelta=function(self) return self.Delta end,InputChanged={Connect=function(_,fn) changed=fn end},LastInputTypeChanged={Connect=function(_,fn) lastInput=fn end}}
 local run={BindToRenderStep=function(_,name,priority,fn) assert(name=="SagaTargetLock" and priority==201); bound=fn end}
 local ReplicatedStorage={}
 local CollectionService={HasTag=function(_,m) return m.Vendor==true end}
