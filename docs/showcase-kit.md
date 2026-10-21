@@ -24,15 +24,22 @@ parts). The window is a clipped frame, not a CanvasGroup, because 3D views
 don't draw inside one; that is also why its corners are rounded rather than
 a circle.
 
-Once the last gem gives up its surge, the kit is locked in and the fight
-starts by itself after 3 seconds: the button counts down ("TO THE FIGHT IN
-3") with a bar filling under it, and tapping it goes at once. Behind the
-cards is the arena you're heading to, in your element's colour: the stands
-in rings round a lit floor, two spotlights and a few stars. The strip under
-Roblox's top bar is dark too, all through the launch screens (it used to
-show the sky, and a planet in it).
+Once the last gem gives up its surge, the kit is locked in. The gem roll
+has no button of its own: "NEXT · YOUR KAIJU" shows with a bar filling
+under it, and after 4 seconds (or at once on a click) it goes on to the
+kaiju roll. The intro's one button is START, on the kaiju roll, its last
+screen (see [kaiju.md](kaiju.md)). There used to be a "TO THE FIGHT"
+button here, from before the kaiju roll came after the gems.
 
-![The locked-in kit, before and now](showcase-kit/locked-in.png)
+Behind the cards is the arena you're heading to, in your element's colour:
+the stands in rings round a lit floor, two spotlights and a few stars. The
+strip under Roblox's top bar is dark too, all through the launch screens (it
+used to show the sky, and a planet in it).
+
+![The locked-in kit, in an earlier render: the TO THE FIGHT button under it is gone now](showcase-kit/locked-in.png)
+
+(This picture predates the kaiju roll. Under the cards there is now the
+gold "NEXT · YOUR KAIJU" line with its bar, not a button.)
 
 ## The pools
 

@@ -156,7 +156,8 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 ![The starter roll: three reels spinning, then your three locked in](kaiju/roll.png)
 
 - **The starter roll.** Everyone starts with three kaiju, rolled on the
-  same reels as the gems in the intro: right after the move reveal, three
+  same reels as the gems in the intro: right after the move reveal (which
+  goes on to it by itself, with no button of its own), three
   cards (each with a numbered keycap) spin a reel of kaiju, every one on
   a glow in its Gemsoul's rarity and named under the window as it passes,
   and land, one after another, on yours (a random kind in a random
@@ -166,8 +167,8 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   move's badge rises out of the window, and the card fills in: its
   Gemsoul and rarity, its name, health, damage and speed, what it's like,
   and its moves with their icons (E ready now, Q at level 5, R at 10).
-  Until then the card holds blank slots where they go. START brings them
-  out (on its own after 20 seconds, the bar along its foot filling till
+  Until then the card holds blank slots where they go. START, the intro's
+  one button, brings them out (on its own after 20 seconds, the bar along its foot filling till
   then; a click while they spin lands them all at once), and **the three
   rolled are your team**. The server makes the roll once and keeps it till
   it's claimed, so leaving doesn't reroll it; a roll left unclaimed is given

@@ -27,7 +27,20 @@ local ColorSequence={new=function(...) return {...} end}
 local NumberSequence={new=function(...) return {...} end}
 local NumberSequenceKeypoint={new=function(...) return {...} end}
 local TweenInfo={new=function() return {} end}
-local task={delay=function() end}
+-- task.delay keeps its calls: they run only when a test runs them, in time
+-- order, up to a time (runDelayed).
+local delayed={}
+local task={delay=function(seconds,fn,...) table.insert(delayed,{At=now+seconds,Fn=fn,Args={...}}) end}
+local function runDelayed(upTo)
+ while true do
+  local first,at=nil,nil
+  for i,d in delayed do if d.At<=upTo and (first==nil or d.At<delayed[first].At) then first=i end end
+  if not first then return end
+  at=table.remove(delayed,first)
+  now=math.max(now,at.At)
+  at.Fn(table.unpack(at.Args))
+ end
+end
 local objects={}
 local function new(class,props,parent)
  local object={ClassName=class,children={},signals={},Activated=signal(),Destroying=signal(),MouseEnter=signal(),MouseLeave=signal(),AbsoluteSize=Vector2.new(1000,700),AbsolutePosition=Vector2.zero,CanvasPosition=Vector2.zero}
@@ -86,6 +99,9 @@ function Art.pose(record) assert(record.View.Parent,"Animating a destroyed previ
 local CardFX={Themes={},create=function() return {} end,update=function() end}
 -- The kaiju starter roll after the gem roll (KaijuRoll): straight on here.
 local KaijuRoll={play=function(after) if after then after() end end}
+-- The loading screen the intro hands over to when it closes (LoadingFlow).
+local held={}
+local LoadingFlow={home="Outpost",hold=function(name) table.insert(held,name) end}
 -- The starter reel's 3D gems (GemArt): a model, its view's camera, its pose.
 local reelModels=0
 local GemArt={

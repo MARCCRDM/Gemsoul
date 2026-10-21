@@ -187,4 +187,45 @@ for n=60,2,-1 do
  end
 end
 check(reelModels>=3 and reelModels<=45,"Reel gem models not reused: "..reelModels)
-print("PASS: "..checks.." starter picker checks ("..(if resuming then "saved kit" else "fresh choice")..", no automatic element, independent armor, disabled confirmation, responsive cards, strengths without moves and retry)")
+-- The gem roll has no button of its own: the intro's one button is START, on
+-- the kaiju roll. Once the gems are out it says what's next and goes on to
+-- your kaiju by itself, or at once on a click (not the click that landed
+-- them).
+local nextUp
+for _,obj in objects do if not obj.Destroyed and obj.Name=="NextUp" then nextUp=obj end end
+check(nextUp and nextUp.ClassName=="TextLabel" and not nextUp.Visible,"The gem roll has no next line waiting")
+local shade=nextUp.Parent
+while shade and shade.ClassName~="TextButton" do shade=shade.Parent end
+local function buttons(o,list)
+ for _,c in o.children do
+  if not c.Destroyed and c.ClassName=="TextButton" then table.insert(list,c.Text or "") end
+  buttons(c,list)
+ end
+ return list
+end
+check(shade and #buttons(shade,{})==0,"The gem roll has a button: "..table.concat(shade and buttons(shade,{}) or {},", "))
+local kaiju=0
+local play=KaijuRoll.play
+KaijuRoll.play=function(after) kaiju+=1; play(after) end
+table.clear(delayed)
+local landed=now
+shade.Activated.Fire()
+check(nextUp.Visible and kaiju==0,"The gems out: no next line, or it went on at once")
+shade.Activated.Fire()
+check(kaiju==0,"The click that landed the gems went straight past them")
+if resuming then
+ runDelayed(landed+3.9)
+ check(kaiju==0,"It went on to the kaiju too soon")
+ runDelayed(landed+4.1)
+ check(kaiju==1 and shade.Destroyed,"It didn't go on to the kaiju by itself")
+ check(held[1]=="Intro","After the kaiju, the intro didn't close")
+else
+ step(0.7)
+ shade.Activated.Fire()
+ check(kaiju==1 and shade.Destroyed,"A click didn't go on to the kaiju")
+ check(held[1]=="Intro","After the kaiju, the intro didn't close")
+end
+for _,obj in objects do
+ check(not (obj.ClassName=="TextButton" and string.find(obj.Text or "","TO THE FIGHT",1,true)),"The roll had a button to the fight: "..tostring(obj.Text))
+end
+print("PASS: "..checks.." starter picker checks ("..(if resuming then "saved kit" else "fresh choice")..", no automatic element, independent armor, disabled confirmation, responsive cards, strengths without moves and retry, no button on the gem roll: on to the kaiju by itself or on a click)")

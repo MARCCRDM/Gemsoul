@@ -1701,8 +1701,8 @@ local function rarityGlow(cell, tier)
 		UiKit.round(disc, 999)
 	end
 end
--- Seconds the locked-in kit stays up before the fight starts on its own.
-local AUTO_FIGHT = 3
+-- Seconds the locked-in kit stays up before it goes on to your kaiju by itself.
+local AUTO_NEXT = 4
 local function revealMoves(kit, after)
 	local moves = Lottery.starterMoves(kit.Element, kit)
 	local element = kit.Element
@@ -2082,22 +2082,20 @@ local function revealMoves(kit, after)
 		cards[index] = entry
 	end
 
-	-- The CTA, once every gem has given up its surge.
-	local go = new("TextButton", {
+	-- Once every gem has given up its surge: what's next, and a bar filling
+	-- under it till your kaiju roll. It isn't a button: the intro's one
+	-- button is START, on the kaiju roll (KaijuRoll).
+	local nextUp = label(board, "NEXT  ·  YOUR KAIJU", 15, C.Gold, Enum.Font.GothamBlack)
+	nextUp.Name, nextUp.TextXAlignment, nextUp.ZIndex = "NextUp", Enum.TextXAlignment.Center, 44
+	nextUp.Position, nextUp.Size, nextUp.Visible = UDim2.fromOffset(0, 540), UDim2.new(1, 0, 0, 20), false
+	local track = frame(nextUp, {
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 530),
-		Size = UDim2.fromOffset(300, 52),
-		BackgroundColor3 = C.Gold,
-		Text = "TO THE FIGHT   ›",
-		TextColor3 = C.Ink,
-		TextSize = 18,
-		Font = Enum.Font.GothamBlack,
-		AutoButtonColor = true,
+		Position = UDim2.new(0.5, 0, 1, 8),
+		Size = UDim2.fromOffset(220, 4),
+		BackgroundColor3 = C.Line,
 		ZIndex = 44,
-		Visible = false,
-	}, board)
-	UiKit.round(go, 10)
-	local goScale = new("UIScale", { Scale = 0.6 }, go)
+	})
+	UiKit.round(track, 2)
 
 	-- The 3D gems in a reel's window (cells middle-1 to middle+1): each takes a
 	-- free model of its rarity (built the first time one's short) and a free
@@ -2199,8 +2197,8 @@ local function revealMoves(kit, after)
 		end
 	end)
 
-	-- Into the fight: on its own a few seconds after the last gem, or at once
-	-- on the button.
+	-- On to your kaiju: on its own a few seconds after the last gem, or at
+	-- once on a click.
 	local done = false
 	local function proceed()
 		if done then
@@ -2211,40 +2209,28 @@ local function revealMoves(kit, after)
 		shade:Destroy()
 		after()
 	end
-	local fill = frame(go, {
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 10, 1, -5),
-		Size = UDim2.new(0, 0, 0, 4),
-		BackgroundColor3 = C.Ink,
-		BackgroundTransparency = 0.55,
+	local fill = frame(track, {
+		Size = UDim2.fromScale(0, 1),
+		BackgroundColor3 = C.Gold,
 		ZIndex = 45,
 	})
-	local function countdown(left: number)
-		if done or not shade.Parent then
-			return
-		end
-		if left <= 0 then
-			proceed()
-			return
-		end
-		go.Text = string.format("TO THE FIGHT IN %d   ›", left)
-		task.delay(1, function()
-			countdown(left - 1)
-		end)
-	end
+	UiKit.round(fill, 2)
 
-	local finished = false
+	local finished, outAt = false, 0
 	local function allOut()
 		if finished then
 			return
 		end
-		finished = true
+		finished, outAt = true, os.clock()
 		title.Text = "YOUR KIT IS LOCKED IN"
 		LotterySound.play("Attune")
-		go.Visible = true
-		tween(goScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
-		tween(fill, AUTO_FIGHT, { Size = UDim2.new(1, -20, 0, 4) }, Enum.EasingStyle.Linear)
-		countdown(AUTO_FIGHT)
+		nextUp.Visible = true
+		tween(fill, AUTO_NEXT, { Size = UDim2.fromScale(1, 1) }, Enum.EasingStyle.Linear)
+		task.delay(AUTO_NEXT, function()
+			if shade.Parent then
+				proceed()
+			end
+		end)
 	end
 	-- All three spin; Q stops first, then E, then R, each on its gem, which
 	-- cracks and lets its surge out.
@@ -2282,9 +2268,13 @@ local function revealMoves(kit, after)
 			end
 		end)
 	end
-	-- Click during the roll: every gem cracks at once.
+	-- Click during the roll: every gem cracks at once. Once they're out, a
+	-- click goes straight on to your kaiju (not the same double-click).
 	listen(shade.Activated, function()
 		if finished then
+			if os.clock() - outAt > 0.6 then
+				proceed()
+			end
 			return
 		end
 		for _, entry in cards do
@@ -2293,7 +2283,6 @@ local function revealMoves(kit, after)
 		LotterySound.play("Lock")
 		allOut()
 	end)
-	listen(go.Activated, proceed)
 end
 local function finish()
 	if busy or closed then
