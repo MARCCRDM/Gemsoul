@@ -215,9 +215,109 @@ for _, name in { "LevelUp", "KaijuLevelUp", "CallBack", "Deploy" } do
 	)
 end
 
+-- Your card (the banner): where it goes, a computer's and a phone's.
+local Vector2 = R.Vector2
+local MobileLayout = load("MobileLayout")
+local desk = Fx.cardLayout(Vector2.new(1366, 710), false)
+check(
+	math.abs(desk.X + desk.W / 2 - 683) <= 1 and desk.Y >= 60 and not desk.Stacked,
+	"A computer's card isn't across the top middle"
+)
+local function inside(r, screen)
+	return r.X >= 0 and r.Y >= 0 and r.X + r.W <= screen.X and r.Y + r.H <= screen.Y
+end
+for _, size in { { 667, 339 }, { 736, 378 }, { 812, 317 }, { 844, 332 }, { 896, 356 }, { 932, 372 } } do
+	local screen = Vector2.new(size[1], size[2])
+	local L = Fx.cardLayout(screen, true)
+	local what = size[1] .. "x" .. size[2]
+	check(inside(L, screen), what .. ": the card runs off the screen")
+	check(L.Y <= 8 and L.H <= screen.Y * 0.45, what .. ": the card isn't at the top, or is too tall")
+	for name, r in
+		{
+			["pick card"] = MobileLayout.card(),
+			toast = MobileLayout.toast(screen),
+			["loot card"] = MobileLayout.loot(screen),
+		}
+	do
+		check(not MobileLayout.overlaps(L, r), what .. ": the card covers the " .. name)
+	end
+	check(L.Stacked == (L.W < Fx.Card.Wide), what .. ": side by side without the room")
+end
+
+-- At rest: the medal with the new level (the old one ready to roll out),
+-- what it says, a kaiju's name kept as it is (not translated).
+local function find(root, name)
+	for _, d in root:GetDescendants() do
+		if d.Name == name then
+			return d
+		end
+	end
+	return nil
+end
+local mine = Fx.card(12, { "+1 augment point, +5 max health. Spend points with K." }, Fx.Miner, nil, desk)
+check(mine.Root.Name == "LevelUpCard" and mine.Number.Text == "12" and mine.Old.Text == "11", "The medal's numbers")
+check(
+	find(mine.Root, "Kicker").Text == "YOU REACHED LEVEL 12" and find(mine.Root, "Headline").Text == "LEVEL UP!",
+	"Your card doesn't say LEVEL UP! and the level"
+)
+check(find(mine.Root, "Detail") ~= nil and find(mine.Root, "Detail").TextWrapped, "What it brought isn't there")
+check(find(mine.Root, "Headline"):GetAttribute("NoTranslate") == nil, "LEVEL UP! isn't translated")
+local pet = Fx.card(10, { "Its R move, Magma Breaker, awakens." }, Color3.fromRGB(255, 96, 64), "THERMAL BULWARK", desk)
+check(
+	find(pet.Root, "Headline").Text == "THERMAL BULWARK"
+		and find(pet.Root, "Headline"):GetAttribute("NoTranslate") == true
+		and find(pet.Root, "Kicker").Text == "YOUR KAIJU REACHED LEVEL 10",
+	"A kaiju's card doesn't say its name and level"
+)
+check(
+	pet.Ring.Color == Color3.fromRGB(255, 96, 64) and pet.Timer.BackgroundColor3 == Color3.fromRGB(255, 96, 64),
+	"A kaiju's card isn't in its colour"
+)
+check(#mine.Rays >= 4 and #mine.Sparks >= 8, "The medal has no rays or sparks")
+local level1 = Fx.card(1, nil, Fx.Miner, nil, desk)
+check(level1.Old.Text == "" and find(level1.Root, "Detail") == nil, "Level 1 rolls up from a 0, or shows an empty line")
+
+-- Over time: it comes in from above, the number turns over with a burst of
+-- sparks, the line runs down, and it's gone at the end.
+local function y(card)
+	return card.Root.Position.Y.Offset
+end
+Fx.poseCard(mine, 0)
+check(mine.Body.GroupTransparency >= 0.99 and y(mine) < desk.Y, "The card doesn't come in from above")
+Fx.poseCard(mine, 0.3)
+check(mine.Old.TextTransparency < 0.5 and mine.Number.TextTransparency > 0.9, "The old level isn't showing first")
+Fx.poseCard(mine, 1.2)
+check(mine.Body.GroupTransparency == 0 and math.abs(y(mine) - desk.Y) < 0.5, "The card isn't in place")
+check(mine.Number.TextTransparency == 0 and mine.Old.TextTransparency >= 0.99, "The number hasn't turned over")
+check(math.abs(mine.BadgePop.Scale - 1) < 0.05, "The medal hasn't settled")
+local rayTurn = mine.Rays[1].Rotation
+Fx.poseCard(mine, Fx.Flip + 0.3)
+local sparked = 0
+for _, spark in mine.Sparks do
+	if spark.BackgroundTransparency < 0.9 then
+		sparked += 1
+	end
+end
+check(sparked == #mine.Sparks, "No sparks as the number turns over")
+check(mine.Rays[1].Rotation ~= rayTurn, "The rays don't turn")
+Fx.poseCard(mine, 1)
+local early = mine.Timer.Size.X.Scale
+Fx.poseCard(mine, 2.5)
+check(mine.Timer.Size.X.Scale < early, "The line doesn't run down")
+Fx.poseCard(mine, Fx.CardSeconds - 0.01)
+check(
+	mine.Body.GroupTransparency > 0.95 and mine.Glow.BackgroundTransparency > 0.95,
+	"The card doesn't fade at the end"
+)
+-- In Spanish too.
+local es = load("LangEs")
+for _, key in { "LEVEL UP!", "YOU REACHED LEVEL {1}", "YOUR KAIJU REACHED LEVEL {1}", "LV" } do
+	check(type(es[key]) == "string", "No Spanish for " .. key)
+end
+
 print(
 	string.format(
-		"PASS: %d level up checks (the column, the rings, the sparks, the flash, the plate, a kaiju's at its size, following its body, gone after %.1fs, sent and drawn, its sounds)",
+		"PASS: %d level up checks (the column, the rings, the sparks, the flash, the plate, a kaiju's at its size, following its body, gone after %.1fs, sent and drawn, its sounds; your card on a computer and a phone, clear of the top corners, its medal turning over, in Spanish)",
 		checks,
 		Fx.Seconds
 	)

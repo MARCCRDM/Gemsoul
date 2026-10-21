@@ -35,6 +35,17 @@ phone game should be.
 - **Level and coins** sit in a pill at the top left, under the pick card,
   where the CHAT button was (`MobileLayout.wallet`).
 - **The "online" pill is gone.** PLAY stands alone at the bottom centre.
+- **FIGHT / MINE** (your kit or your pick, the 1 key on a keyboard) is a
+  pill just left of PLAY, level with it and a little taller (44 points),
+  with its icon and word: ⚔ FIGHT with the pick out, ⛏ MINE with the kit
+  out. It stays clear of Roblox's thumbstick; where there's little room
+  beside PLAY it's narrower, down to round with just its icon. It used to
+  be a round button down the left, under your kaiju's card
+  (`MobileLayout.kitSwitch`).
+
+![FIGHT beside PLAY, and MINE with the kit out: 844 x 390 (top), 667 x 375 (bottom)](mobile/kit-switch.jpg)
+
+(The client code drawn by the UI harness, not Roblox screenshots.)
 - **The six buttons under PLAY** are icons with their name small under
   them, 44 points tall.
 - **Tasks:** a TASKS tile in the dock under PLAY (a clipboard), with a gold
@@ -64,6 +75,12 @@ bright.)
 - **The ring sits at the right edge**, under the right thumb: ATTACK in the
   corner, Q / E / R round it, GUARD and DODGE outside them.
 - **No chat box** in a fight (Roblox's chat button is still in the top bar).
+- **With your kit out in the Outpost**, MINE stays where FIGHT was, beside
+  where PLAY was. Your health and stamina, and the moves over them, keep to
+  its right, clear of the ring (`MobileLayout.vitals`), so they're narrower
+  than in other fights (at least 200 points). On the smaller phones (667
+  and 736 points wide) MINE is round with just ⛏ while the kit is out, from
+  the same left edge, to leave them that much. Elsewhere they're as before.
 
 ### Mining in the Outpost
 
@@ -120,7 +137,11 @@ their words. Now they stack in one column on the right:
 and the card (with its row) stay on the screen, clear of Roblox's tab, of
 each other, of the pick card, the coins, the dock, the teammates' cards and
 your kaiju's card, and that the card sits right under the toast and lines up
-with it.
+with it. It checks the same for FIGHT / MINE: just left of PLAY and level
+with it, room for its word, clear of PLAY, the tiles, Roblox's thumbstick
+and jump button, the cards and the fight's ring. It also checks that the
+fight's vitals and moves keep right of it and clear of GUARD, and that
+without it they're as they were.
 
 ## The Inventory
 

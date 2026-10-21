@@ -11,17 +11,47 @@ sees them:
 
 - **A miner's** (`Progress`): a column of amber light out of the ground,
   two rings running out over it, sparks spiralling up round the body, a
-  flash, and the new level on a plate over the head. You also get a plate
-  at the top of the screen: **LEVEL UP**, the number, and what it brought
-  ("+1 augment point, +5 max health. Spend points with K.").
+  flash, and the new level on a plate over the head. You also get your
+  level-up card at the top of the screen (below).
 - **A kaiju's** (`KaijuServer`): the same in its element's colour, at its
-  size, and a line saying what the level brought ("Its Q move, Tidal
-  Crush, awakens." or "More health and damage.").
+  size. Its card says what the level brought ("Its Q move, Tidal Crush,
+  awakens." or "More health and damage.").
 - Sounds: a climbing chime for a miner, higher and quicker for a kaiju
   (`tools/make_levelup_sounds.py`, `assets/sounds/combat/level_up.mp3`,
   `kaiju_level_up.mp3`; ids in `CombatSound` like the other combat sounds).
 - Built from plain parts posed from one clock, gone after 2.6 seconds; it
   follows the body it's on. The plate's words are translated in place.
+
+### Your level-up card
+
+The old card was a flat dark strip with a thin line on top. The new one
+(`LevelUpFx.banner`, `cardLayout`, `card`, `poseCard`):
+
+- **A medal** on the left, with the new level in it. The old number rolls
+  up out of it as the new one comes in, the medal pops, and sparks fly off
+  it. Rays turn slowly behind it. It's amber for you and the element's
+  colour for a kaiju.
+- **The words:** YOU REACHED LEVEL 12 over **LEVEL UP!**. For a kaiju it's
+  YOUR KAIJU REACHED LEVEL 10 over its name (the name shrinks to fit, and
+  isn't translated). Under them goes what the level brought, on up to two
+  lines.
+- **The card:** dark glass washed with its colour from the medal's side,
+  a rim and a soft halo in that colour, rounded corners, a shine running
+  over it once. A line along its foot runs down while it stays.
+- **Timing:** it drops in from above with a little overshoot, stays about
+  3 seconds, then lifts and fades (3.8 s in all). One at a time, as before.
+- **On a phone** it sits in the top middle, between the pick card and the
+  toasts, clear of the loot card. Where there's room (300 points: 812-wide
+  phones and up) it's side by side and 72 tall. On 667 and 736 it's the
+  medal over its words. While it's up, the live feed steps aside
+  (`MobileLayout.claimTop`).
+
+![Before (top) and after: yours and a kaiju's, on a computer](levelup-lobby/level-card.jpg)
+
+![On phones: a kaiju's at 844 x 390, yours at 667 x 375](levelup-lobby/level-card-phone.jpg)
+
+These are the client code drawn by the UI harness, 1.6 s in. They aren't
+Roblox screenshots.
 
 ## Kaiju levelling, slower
 
@@ -99,7 +129,7 @@ the stone sits beside the details.
 
 | Suite | What it checks |
 | --- | --- |
-| `run_levelup_fx` | The column, the rings, the sparks, the flash, the plate, a kaiju's at its size, following its body, gone after 2.6 s, sent and drawn, its sounds |
+| `run_levelup_fx` | The column, the rings, the sparks, the flash, the plate, a kaiju's at its size, following its body, gone after 2.6 s, sent and drawn, its sounds. Your card: across the top middle on a computer; on every phone size on the screen, at the top, clear of the pick card, toasts and loot card; its words and a kaiju's name (not translated); the number turning over with sparks, the rays turning, the line running down, gone at the end; its Spanish |
 | `run_kaiju` | The EXP curve and mining EXP; CALL BACK, DEPLOY and its danger check; kaiju jumping after you; `restoreAll` |
 | `run_gem_metric` | A gem's worth: grades, weights, points, rate, value |
 | `run_critter_fx` | The carried gem is the real gem |

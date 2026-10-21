@@ -48,8 +48,11 @@
 	                                       far up it sits
 	  MobileLayout.ring(height)            the fight's ring of buttons (Combat.client)
 	  MobileLayout.onRing(screen, ring, size, radius, degrees)   a button on it
-	  MobileLayout.kitSwitch(chat)         the pick/kit switch (SparKit): down
-	                                       the left, under your kaiju's card
+	  MobileLayout.vitals(viewport, ring, clear?)   where the fight's vitals
+	                                       go between the stick and the ring
+	  MobileLayout.kitSwitch(screen, viewport?)   the pick/kit switch
+	                                       (SparKit): just left of PLAY, and
+	                                       there still with your kit out
 	  MobileLayout.stick(screen)           a mech's drive stick on a touch
 	                                       screen (VehicleDrive): bottom left,
 	                                       where Roblox's thumbstick sits,
@@ -221,16 +224,61 @@ function MobileLayout.onRing(screen: Vector2, ring, size: number, radius: number
 	return { X = x - size / 2, Y = y - size / 2, W = size, H = size }
 end
 
--- The kit switch (Client.SparKit: your pick or your combat kit), round,
--- down the left under your kaiju's card (and CATCH, when that's under the
--- CHAT button): the same place whether you mine or fight, clear of the
--- fight's ring and the jump button on the right, and of the dock.
-MobileLayout.KitSwitch = { Size = 52, Gap = 10 }
-function MobileLayout.kitSwitch(chat: boolean?)
-	local k = MobileLayout.kaiju(chat)
-	local bottom = math.max(k.Y + k.H, if chat then k.TameY + k.H else 0)
-	local size = MobileLayout.KitSwitch.Size
-	return { X = 12, Y = bottom + MobileLayout.KitSwitch.Gap, W = size, H = size }
+-- How far right the fight's vitals may reach on a touch screen: short of
+-- the ring, with some room to spare.
+local function vitalsRight(viewport: Vector2, ring): number
+	local reserve = math.floor(math.clamp(viewport.X * 0.035, 16, 44))
+	return viewport.X - (ring.Cx + reserve + ring.Outer + ring.Guard / 2 + 14 * ring.K)
+end
+
+-- The kit switch (Client.SparKit: your pick or your combat kit): just to
+-- the left of PLAY, level with it and a touch taller (H, big enough to
+-- tap), a pill with its icon and word. Where the room between PLAY and the
+-- thumbstick's corner is short, it's narrower, down to round with just its
+-- icon (Icon: narrower than this, no word). It stays put with your kit out
+-- (PLAY's gone then; `viewport`: the camera's, the fight's ring and vitals
+-- up), the vitals keeping to its right (MobileLayout.vitals); if that would
+-- leave them under Room wide, it's round, from the same left edge.
+MobileLayout.KitSwitch = { W = 100, H = 44, Gap = 8, Icon = 80, Room = 200 }
+function MobileLayout.kitSwitch(screen: Vector2, viewport: Vector2?)
+	local spec = MobileLayout.KitSwitch
+	local dock = MobileLayout.dock(screen, 1)
+	local playLeft = math.floor((screen.X - dock.PlayWidth) / 2)
+	local stick = MobileLayout.stick(screen)
+	local room = playLeft - spec.Gap - (stick.X + stick.W + spec.Gap)
+	local w = math.clamp(room, spec.H, spec.W)
+	local rect = {
+		X = playLeft - spec.Gap - w,
+		Y = dock.Y + math.floor((dock.PlayHeight - spec.H) / 2),
+		W = w,
+		H = spec.H,
+	}
+	if viewport then
+		local right = vitalsRight(viewport, MobileLayout.ring(viewport.Y))
+		if right - (rect.X + rect.W + 8) < spec.Room then
+			rect.W = spec.H
+		end
+	end
+	return rect
+end
+
+-- The fight's vitals on a touch screen (Client.Combat): between the move
+-- stick's side (the left fifth) and the ring (with the room they had
+-- before the ring moved to the edge, so they keep their layout), and right
+-- of `clear` too when given (a rect: the kit switch, up in the lobby with
+-- your kit out). 240 to 420 wide; narrower (down to 160) only to keep
+-- clear of it. X, W, and Centre (its middle).
+function MobileLayout.vitals(viewport: Vector2, ring, clear)
+	local left = viewport.X * 0.2
+	if clear then
+		left = math.max(left, clear.X + clear.W + 8)
+	end
+	local right = vitalsRight(viewport, ring)
+	local room = right - left
+	local least = if clear then math.clamp(room, 160, 240) else 240
+	local width = math.clamp(room, least, 420)
+	local centre = math.max(left + width / 2, math.min(right - width / 2, viewport.X / 2))
+	return { X = centre - width / 2, W = width, Centre = centre }
 end
 
 function MobileLayout.overlaps(a, b): boolean

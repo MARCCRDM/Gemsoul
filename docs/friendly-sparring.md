@@ -9,7 +9,8 @@ There are two ways to ask:
 **1** is your kit switch: it takes your combat kit out to fight critters and
 wild kaiju beside your kaiju (**KIT OUT**: only creatures can hit you), and
 puts it away again for your pick (**MINE**). On a gamepad it's D-pad up; on a
-phone, the round **FIGHT / MINE** button under your kaiju card. It works the
+phone, the **FIGHT / MINE** button just left of PLAY (it stays there with your
+kit out, and the fight's health bars keep to its right). It works the
 same in the Outpost and in the Rift, but not while you're down. In a spar, 1
 ends the spar.
 

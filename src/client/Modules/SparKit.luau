@@ -7,9 +7,10 @@
 	                the kit out, you fight beside your kaiju (and only
 	                creatures can hit you); the pick out, you mine (in the
 	                Rift, its healing rocks). On a touch screen the kit
-	                switch does the same (MobileLayout.kitSwitch: round, down
-	                the left), showing what a tap swaps to: FIGHT with the
-	                pick out, MINE with the kit out. Never while you're down.
+	                switch does the same (MobileLayout.kitSwitch: a pill just
+	                left of PLAY), showing what a tap swaps to: FIGHT with
+	                the pick out, MINE with the kit out. Never while you're
+	                down.
 	  A spar        is asked for and agreed to: press Z over another player
 	                ("Ask to spar", OutpostServer's prompt). They get a card to
 	                accept (SocialUI). Once they do, both kits come out; 1
@@ -369,8 +370,10 @@ local function sparChanged()
 end
 
 -- The kit switch on a touch screen ------------------------------------------------------------------------
--- Round, down the left (MobileLayout.kitSwitch), wherever 1 would swap:
+-- A pill just left of PLAY (MobileLayout.kitSwitch), wherever 1 would swap:
 -- what a tap swaps to, ⚔ FIGHT with the pick out, ⛏ MINE with the kit out.
+-- (Short of room, round, with just its icon: on a small phone, with the kit
+-- out, to leave the fight's vitals room.)
 
 local switchGui = UiKit.gui("KitSwitch", 8)
 switchGui.IgnoreGuiInset = false
@@ -387,8 +390,7 @@ local switchStroke = new("UIStroke", { Color = FIGHT, Thickness = 2, Transparenc
 local switchIcon = new("TextLabel", {
 	Name = "Icon",
 	BackgroundTransparency = 1,
-	Position = UDim2.fromScale(0, 0.08),
-	Size = UDim2.fromScale(1, 0.52),
+	AnchorPoint = Vector2.new(0, 0.5),
 	Font = Enum.Font.GothamBold,
 	Text = "⚔",
 	TextScaled = true,
@@ -397,13 +399,14 @@ local switchIcon = new("TextLabel", {
 local switchLabel = new("TextLabel", {
 	Name = "Label",
 	BackgroundTransparency = 1,
-	Position = UDim2.fromScale(0, 0.6),
-	Size = UDim2.fromScale(1, 0.26),
-	Font = IronUi.Bold,
+	AnchorPoint = Vector2.new(0, 0.5),
+	Font = IronUi.Heading,
 	Text = "FIGHT",
 	TextScaled = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
 	TextColor3 = P.Text,
 }, switch)
+new("UITextSizeConstraint", { MaxTextSize = 15 }, switchLabel)
 local switchScale = new("UIScale", { Scale = 1 }, switch)
 local switchArmed: boolean? = nil
 local function refreshSwitch()
@@ -413,9 +416,21 @@ local function refreshSwitch()
 	if not want then
 		return
 	end
-	local rect = MobileLayout.kitSwitch(false)
-	switch.Position, switch.Size = UDim2.fromOffset(rect.X, rect.Y), UDim2.fromOffset(rect.W, rect.H)
+	-- (With the kit out, the fight's vitals keep to its right: it may be
+	-- round then, to leave them room.)
 	local armed = Spar.hunting(player)
+	local camera = workspace.CurrentCamera
+	local rect = MobileLayout.kitSwitch(switchGui.AbsoluteSize, if armed and camera then camera.ViewportSize else nil)
+	switch.Position, switch.Size = UDim2.fromOffset(rect.X, rect.Y), UDim2.fromOffset(rect.W, rect.H)
+	-- The icon and its word side by side; short of room, the icon alone,
+	-- in the middle.
+	local worded = rect.W >= MobileLayout.KitSwitch.Icon
+	local icon = rect.H - 18
+	switchLabel.Visible = worded
+	switchIcon.Size = UDim2.fromOffset(icon, icon)
+	switchIcon.Position = if worded then UDim2.new(0, 12, 0.5, 0) else UDim2.new(0.5, -icon / 2, 0.5, 0)
+	switchLabel.Position = UDim2.new(0, 12 + icon + 6, 0.5, 0)
+	switchLabel.Size = UDim2.new(1, -(12 + icon + 6 + 10), 0, 16)
 	if armed == switchArmed then
 		return
 	end

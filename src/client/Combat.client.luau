@@ -1306,14 +1306,18 @@ local function layoutThumb(viewport: Vector2): (number, number)
 		slot.Timer.Size = UDim2.new(1, -4, 0, math.floor(size * 0.3))
 		slot.Timer.TextSize = math.floor(size * 0.24)
 	end
-	-- Vitals: between the move stick's side (the left fifth) and the ring
-	-- (with the room they had before the ring moved to the edge, so they keep
-	-- their layout).
-	local left = viewport.X * 0.2
-	local reserve = math.floor(math.clamp(viewport.X * 0.035, 16, 44))
-	local right = viewport.X - (cx + reserve + outer + G / 2 + 14 * k)
-	local width = math.clamp(right - left, 240, 420)
-	local centre = math.max(left + width / 2, math.min(right - width / 2, viewport.X / 2))
+	-- Vitals: between the move stick's side and the ring, and clear of the
+	-- kit switch while it's up (in the lobby with your kit out, Client.SparKit:
+	-- it stays by where PLAY was).
+	local switchGui = player.PlayerGui:FindFirstChild("KitSwitch")
+	local switch = switchGui and switchGui:FindFirstChild("KitSwitch")
+	local clear = nil
+	if switch and switch:IsA("GuiObject") and switch.Visible and (switchGui :: ScreenGui).Enabled then
+		local at, size = switch.AbsolutePosition, switch.AbsoluteSize
+		clear = { X = at.X, Y = at.Y, W = size.X, H = size.Y }
+	end
+	local vitals = MobileLayout.vitals(viewport, ring, clear)
+	local width, centre = vitals.W, vitals.Centre
 	local stacked = width < 400
 	local height = HudChrome.layoutVitals(
 		hud,

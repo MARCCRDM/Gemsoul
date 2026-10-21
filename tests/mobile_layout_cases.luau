@@ -156,10 +156,13 @@ for _, s in SCREENS do
 			check(not MobileLayout.overlaps(k, closed), what .. ": the kaiju card overlaps the CHAT button")
 		end
 	end
-	-- The kit switch (pick or combat kit): big enough to tap, on the screen,
-	-- clear of the fight's ring (ATTACK, the surges, GUARD, DODGE) and of
-	-- everything there when you mine (the jump button, the dock, the top
-	-- right, the cards on the left), with or without the CHAT button.
+	-- The kit switch (pick or combat kit): just left of PLAY and level with
+	-- it, big enough to tap, on the screen, clear of PLAY, the tiles under
+	-- it, Roblox's thumbstick, the fight's ring (ATTACK, the surges, GUARD,
+	-- DODGE) and of everything there when you mine (the jump button, the top
+	-- right, the cards on the left), with or without the CHAT button. With
+	-- your kit out it stays put, and the fight's vitals (and the moves over
+	-- them) keep right of it, clear of the ring.
 	local ring = MobileLayout.ring(s[3])
 	local buttons = {
 		ATTACK = MobileLayout.onRing(screen, ring, ring.Attack, 0, 0),
@@ -172,14 +175,54 @@ for _, s in SCREENS do
 	for name, r in buttons do
 		check(inside(r), label .. ": the fight's " .. name .. " runs off the screen")
 	end
+	local switch = MobileLayout.kitSwitch(screen)
+	local playRect = { X = (screen.X - dock.PlayWidth) / 2, Y = dock.Y, W = dock.PlayWidth, H = dock.PlayHeight }
+	local tiles = { X = dock.X, Y = dock.Y + dock.PlayHeight + dock.Gap, W = dock.W, H = dock.TileHeight }
+	check(inside(switch), label .. ": the kit switch runs off the screen")
+	check(switch.W >= 44 and switch.H >= 44, label .. ": the kit switch is too small to tap")
+	check(switch.W >= MobileLayout.KitSwitch.Icon, label .. ": the kit switch has no room for its word (FIGHT, MINE)")
+	check(
+		switch.X + switch.W <= playRect.X and playRect.X - (switch.X + switch.W) <= 12,
+		label .. ": the kit switch isn't just left of PLAY"
+	)
+	check(
+		math.abs((switch.Y + switch.H / 2) - (playRect.Y + playRect.H / 2)) <= 1,
+		label .. ": the kit switch isn't level with PLAY"
+	)
+	-- (The fight's vitals, the moves over them (three at most) and the ring,
+	-- on the camera's viewport: the screen with Roblox's top bar.)
+	local view = Vector2.new(s[1], s[3])
+	local armed = MobileLayout.kitSwitch(screen, view)
+	check(
+		armed.X == switch.X and armed.Y == switch.Y and armed.H == switch.H and armed.W <= switch.W,
+		label .. ": the kit switch moves with the kit out"
+	)
+	check(armed.W >= 44, label .. ": the kit switch is too small to tap with the kit out")
+	local vitals = MobileLayout.vitals(view, ring, armed)
+	local Mv, mvGap = math.floor(46 * ring.K), math.floor(12 * ring.K)
+	local moves = 3 * Mv + 2 * mvGap
+	local guard = MobileLayout.onRing(view, ring, ring.Guard, ring.Outer, MobileLayout.Ring.Guard)
+	check(vitals.X >= armed.X + armed.W + 8 - 1e-6, label .. ": the fight's vitals run under the kit switch")
+	check(vitals.Centre - moves / 2 >= armed.X + armed.W, label .. ": the fight's moves run under the kit switch")
+	check(vitals.X + vitals.W <= guard.X, label .. ": the fight's vitals run under GUARD")
+	check(
+		vitals.W >= MobileLayout.KitSwitch.Room,
+		label .. ": the fight's vitals are too narrow (their words overlap) with the kit switch up"
+	)
+	-- (Without it, as they were.)
+	local plain = MobileLayout.vitals(view, ring)
+	check(
+		plain.W >= 240 and plain.X >= s[1] * 0.2 - 1e-6,
+		label .. ": the fight's vitals changed without the kit switch"
+	)
 	for _, chat in { false, true } do
-		local switch = MobileLayout.kitSwitch(chat)
 		local what = label .. (if chat then " (with CHAT)" else "")
-		check(inside(switch) and switch.W >= 44, what .. ": the kit switch runs off the screen, or is too small")
 		local k = MobileLayout.kaiju(chat)
 		local others = {
 			jump = jump,
-			dock = dock,
+			PLAY = playRect,
+			tiles = tiles,
+			["thumbstick"] = MobileLayout.stick(screen),
 			toast = toast,
 			["loot card"] = loot,
 			["teammates' cards"] = party,
@@ -222,5 +265,5 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch clear of the fight's ring, at 7 screen sizes)"
+		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, at 7 screen sizes)"
 )

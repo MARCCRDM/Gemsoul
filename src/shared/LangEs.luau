@@ -2275,6 +2275,10 @@ return {
 	["Daily challenges change every day. Finish all three for a bonus."] = "Los desafíos diarios cambian cada día. Completa los tres para ganar un extra.",
 	-- Level ups (LevelUpFx), the kaiju strip's CALL BACK / DEPLOY (KaijuHud), the lobby card (LobbyUI).
 	["LEVEL UP"] = "SUBISTE DE NIVEL",
+	["LEVEL UP!"] = "¡SUBISTE DE NIVEL!",
+	["YOU REACHED LEVEL {1}"] = "LLEGASTE AL NIVEL {1}",
+	["YOUR KAIJU REACHED LEVEL {1}"] = "TU KAIJU LLEGÓ AL NIVEL {1}",
+	["LV"] = "NV",
 	["+{1} augment point, +{2} max health. Spend points with K."] = "+{1} punto de mejora, +{2} de vida máx. Usa los puntos con K.",
 	["+{1} augment points, +{2} max health. Spend points with K."] = "+{1} puntos de mejora, +{2} de vida máx. Usa los puntos con K.",
 	["{=} reached level {=}."] = "{=} llegó al nivel {=}.",
