@@ -48,6 +48,10 @@ if Config.Features == nil or Config.Features.Kaiju ~= false then
 	require(script.Parent.Modules.KaijuHud).start()
 	-- Kaiju battles: the formation board, the battle bar and the result.
 	require(script.Parent.Modules.KaijuBattleUI).start()
+	-- The Kaiju Arena downstairs: its boards, the stake on show, your pad's card.
+	require(script.Parent.Modules.KaijuPitClient).start()
+	-- Yellow arrows on the ground, to a pad, the stairs down, the Rift's way on.
+	require(script.Parent.Modules.GroundGuide).start()
 end
 
 -- The lobby HUD: in the Outpost, not fighting (or sparring), not inside a

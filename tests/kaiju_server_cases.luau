@@ -3949,6 +3949,279 @@ do
 	end
 	run()
 end
+-- The Kaiju Arena downstairs: the Shelter's stairs take you down and its
+-- doorway back up; stand on a pad and you're waiting, with a stake if you
+-- like; a challenger on the other pad matches it and says FIGHT: both
+-- stakes in, the battle on that court (every kaiju at its place inside
+-- it, kept inside its rails), 25 seconds to place them, the winner's kaiju
+-- healed and both stakes theirs. A gem stake's matched by one as rare;
+-- walking up the stairs mid-battle forfeits it. A card's battle is brought
+-- down onto a free court. (In a function of its own: this file is at its
+-- limit of locals.)
+;(function()
+	local KaijuPit = shared("KaijuPit")
+	local KaijuBattle = shared("KaijuBattle")
+	local KaijuBattles = serverModule("KaijuBattles")
+	server.KaijuPitWorld = load("/src/server/World/KaijuPitWorld.luau", "KaijuPitWorld")
+	local KaijuPitServer = serverModule("KaijuPitServer")
+	KaijuPitServer.clock = function()
+		return now
+	end
+	PlayerData.spendCoins = PlayerData.spendCoins
+		or function(player, amount)
+			if profiles[player].Coins < amount then
+				return false
+			end
+			profiles[player].Coins -= amount
+			return true
+		end
+	-- (The stairs' landing somewhere nobody else stands.)
+	local landing = CFrame.new(outpost + Vector3.new(0, -60, -900))
+	local top = CFrame.new(outpost + Vector3.new(0, 3, -880))
+	KaijuPitServer.start({ Spawn = CFrame.new(outpost), Stairs = { Landing = landing, Size = Vector3.new(7, 6, 10), Top = top } })
+	check(registered.KaijuPitStake ~= nil and registered.KaijuPitFight ~= nil, "The arena's requests aren't there")
+	local pit = KaijuPitServer.pit()
+	check(pit and #pit.Courts == 8, "No courts downstairs")
+	for _, court in pit.Courts do
+		check(court.Model and court.Model:GetAttribute("State") == "Open", "A court isn't open to begin with")
+	end
+	Kaiju.SlotLevels = { 1, 1, 1 }
+	clearCritters()
+	-- (Moved whole, by their roots.)
+	a.Character.PrimaryPart, b.Character.PrimaryPart = rootA, rootB
+	for _, p in { a, b } do
+		for _, key in { "CombatSession", "MatchId", "DungeonId", "Expedition", "Hunt", "Spar", "KaijuBattle", "SparDown" } do
+			p:SetAttribute(key, nil)
+		end
+		p:SetAttribute("Outpost", true)
+	end
+	KaijuServer.reviveAll(a)
+	KaijuServer.reviveAll(b)
+	now += 10
+	KaijuServer._upkeep(a, now)
+	KaijuServer._upkeep(b, now)
+	local function told(player, kind)
+		local last = nil
+		for _, entry in socials do
+			if entry[1] == player and entry[2] == kind then
+				last = entry
+			end
+		end
+		return last
+	end
+	local function step(seconds)
+		now += seconds or 0.25
+		KaijuPitServer._step(now)
+	end
+	-- Down the stairs: onto the balcony, marked as downstairs; not straight
+	-- back up again; then up through the doorway to the stairs' top.
+	rootA.CFrame = landing
+	step(3)
+	check(a:GetAttribute("KaijuPit") == true, "The stairs didn't take you down")
+	check((rootA.Position - pit.Arrive.Position).Magnitude < 1, "Not on the balcony")
+	check(told(a, "KaijuPitCross") and told(a, "KaijuPitCross")[3] == "Down", "No cover going down")
+	check(KaijuPit.inHall(pit.Origin, rootA.Position), "The balcony isn't in the hall")
+	rootA.CFrame = pit.Origin * CFrame.new(KaijuPit.Leave.Center)
+	step(0.5)
+	check(a:GetAttribute("KaijuPit") == true, "Back up the moment you arrived")
+	step(3)
+	check(a:GetAttribute("KaijuPit") == nil and (rootA.Position - top.Position).Magnitude < 1, "The doorway didn't take you up")
+	-- Both down again.
+	for _, r in { rootA, rootB } do
+		r.CFrame = landing
+		step(3)
+	end
+	check(a:GetAttribute("KaijuPit") and b:GetAttribute("KaijuPit"), "Not both downstairs")
+	-- On a pad: waiting, and the board says so.
+	local court = pit.Courts[2]
+	local state = KaijuPitServer._stateOf(2)
+	rootA.CFrame = CFrame.new(court.PadA + Vector3.new(0, 3, 0))
+	step()
+	check(state.Pads.A and state.Pads.A.Player == a and state.Host == "A", "Standing on a pad isn't waiting")
+	check(court.Model:GetAttribute("State") == "Waiting" and court.Model:GetAttribute("AName") == a.DisplayName, "The board doesn't show who's waiting")
+	local card = told(a, "KaijuPitPad")
+	check(card and card[3] and card[3].Host == true and card[3].Court == 2, "The one waiting wasn't told")
+	-- A stake: only the one waiting, only what they have.
+	profiles[a].Coins, profiles[b].Coins = 100, 100
+	check(not registered.KaijuPitStake(b, { Kind = "Coins", Coins = 250 }).Ok, "Set a stake off the pads")
+	check(not registered.KaijuPitStake(a, { Kind = "Coins", Coins = 250 }).Ok, "Staked coins you don't have")
+	profiles[a].Coins = 1000
+	check(registered.KaijuPitStake(a, { Kind = "Coins", Coins = 250 }).Ok, "Couldn't stake coins")
+	check(court.Model:GetAttribute("Stake") == "250 coins each" and court.Model:GetAttribute("Pot") == "500 coins", "The board doesn't show the stake")
+	-- A challenger steps up: told who's waiting and for what, and that they're short.
+	rootB.CFrame = CFrame.new(court.PadB + Vector3.new(0, 3, 0))
+	step()
+	check(state.Pads.B and state.Pads.B.Player == b and state.Host == "A", "The challenger's step wasn't seen")
+	check(court.Model:GetAttribute("State") == "Challenged" and court.Model:GetAttribute("BName") == b.DisplayName, "The board doesn't show the challenger")
+	card = told(b, "KaijuPitPad")[3]
+	check(card and not card.Host and card.Foe == a.DisplayName and card.Stake and card.Stake.Coins == 250, "The challenger wasn't told the stake")
+	check(card.Problem ~= nil, "Short of the stake and not told")
+	check(not registered.KaijuPitFight(b).Ok, "Fought without covering the stake")
+	check(not registered.KaijuPitFight(a).Ok, "The one waiting said FIGHT to themselves")
+	profiles[b].Coins = 600
+	step()
+	check(told(b, "KaijuPitPad")[3].Problem == nil, "Covering it now, still told no")
+	-- FIGHT: both stakes in, the battle on that court.
+	check(registered.KaijuPitFight(b).Ok, "FIGHT didn't start the battle")
+	check(profiles[a].Coins == 750 and profiles[b].Coins == 350, "The stakes weren't taken")
+	local battle = KaijuBattles.of(a)
+	check(battle and battle.Court == court and KaijuBattles.of(b) == battle and battle.A == a, "Not a battle on that court")
+	check(battle.Phase == "Formation" and math.abs(battle.EndsAt - now - KaijuBattle.FormationSeconds) < 0.01 and KaijuBattle.FormationSeconds == 25, "Not 25 seconds to place them")
+	check((battle.Field.Center - court.Center).Magnitude < 1e-3 and battle.Field.Axis:Dot(court.Axis) > 0.999, "The field isn't the court's")
+	step()
+	check(court.Model:GetAttribute("State") == "Battle" and court.Model:GetAttribute("Phase") == "Formation", "The board doesn't show the battle")
+	check(state.Rest[a] and state.Rest[b] and not next(state.Pads), "The pads still count them mid-battle")
+	local stateA = told(a, "KaijuBattle")[3]
+	check(stateA.Court == 2 and stateA.Stake and stateA.Pot == "500 coins", "The battle's state doesn't show the court and the pot")
+	local teamA, teamB = KaijuServer.team(a), KaijuServer.team(b)
+	for _, pet in table.move(teamB, 1, #teamB, #teamA + 1, table.clone(teamA)) do
+		check(KaijuPit.inCourt(court, pet.Root.Position), "A kaiju wasn't put on the court")
+		local orders = KaijuServer.battle(pet, now)
+		check(orders and orders.Spot and KaijuPit.inCourt(court, orders.Spot, -1), "A kaiju's place isn't inside the court")
+	end
+	-- Both ready: it starts. A kaiju knocked out past the rails is put back in.
+	registered.KaijuBattleReady(a)
+	registered.KaijuBattleReady(b)
+	check(battle.Phase == "Battle", "Both ready didn't start it")
+	for _, pet in teamA do
+		pet.Humanoid.MaxHealth, pet.Humanoid.Health = 1e5, 1e5
+	end
+	for _, pet in teamB do
+		pet.Humanoid.Health = math.max(1, math.floor(pet.Humanoid.MaxHealth * 0.4))
+	end
+	for _, pet in table.move(teamB, 1, #teamB, #teamA + 1, table.clone(teamA)) do
+		pet.RecallUntil, pet.StunUntil, pet.Target, pet.Plan = 0, 0, nil, nil
+		settle(pet.Fighter)
+	end
+	local stray = teamA[1]
+	stray.Root.CFrame = CFrame.new(court.Center + court.Right * (court.HalfWidth + 12) + Vector3.new(0, 2, 0))
+	KaijuServer._think(stray, now, 0.15)
+	check(KaijuPit.inCourt(court, stray.Root.Position), "A kaiju well out past the rails wasn't put back")
+	-- They fight it out (yours hurt, to see them healed after); walk where
+	-- they're told, a step's worth.
+	for _, pet in teamA do
+		pet.Humanoid.Health = pet.Humanoid.MaxHealth * 0.6
+	end
+	for _ = 1, 800 do
+		now += 0.15
+		for _, pet in KaijuServer.all() do
+			if pet.Owner == a or pet.Owner == b then
+				KaijuServer._think(pet, now, 0.15)
+				local h, from = pet.Humanoid, pet.Root.Position
+				local to = h.MovingTo
+				if to then
+					local way = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+					local stride = math.min(way.Magnitude, (h.WalkSpeed or 16) * 0.15)
+					if stride > 0.01 then
+						pet.Root.CFrame = CFrame.new(from + way.Unit * stride)
+					end
+				end
+				if battle.Phase == "Battle" then
+					check(KaijuPit.inCourt(court, pet.Root.Position, 3), "A kaiju fought its way out of the court")
+				end
+			end
+		end
+		flush()
+		KaijuBattles.step(battle, now)
+		KaijuPitServer._step(now)
+		if battle.Phase == "Over" then
+			break
+		end
+	end
+	check(battle.Phase == "Over" and battle.Result[a] == "Win", "The battle on the court wasn't won")
+	-- The winner's kaiju healed, both stakes theirs; told so.
+	for _, pet in KaijuServer.team(a) do
+		check(pet.Humanoid.Health >= pet.Humanoid.MaxHealth - 1e-6, "The winner's kaiju weren't healed")
+	end
+	check(profiles[a].Coins == 1250 and profiles[b].Coins == 350, "The winner didn't take both stakes: " .. profiles[a].Coins)
+	check(noted(a, "You won 500 coins") and noted(b, "You lost your 250 coins"), "Not told what was won and lost")
+	local result = told(a, "KaijuBattle")[3]
+	check(result.Result == "Win" and result.Healed == true, "The result doesn't say your kaiju were healed")
+	check(court.Model:GetAttribute("Winner") == a.DisplayName, "The board doesn't show the winner")
+	-- It closes; standing on the pads still, nobody's waiting till they step off and back on.
+	now += KaijuBattle.OverSeconds + 0.1
+	KaijuBattles.step(battle, now)
+	step()
+	check(state.Battle == nil and court.Model:GetAttribute("State") == "Open", "The court wasn't freed")
+	check(state.Pads.A == nil, "Still on the pad after a battle counts as waiting")
+	rootA.CFrame = CFrame.new(court.PadA + court.Axis * -8 + Vector3.new(0, 3, 0))
+	rootB.CFrame = CFrame.new(court.PadB + court.Axis * 8 + Vector3.new(0, 3, 0))
+	step()
+	check(not state.Rest[a] and not state.Rest[b], "Stepping off didn't count")
+
+	-- A gem stake, matched by one as rare; walking up the stairs mid-battle
+	-- forfeits: the gems are the other's.
+	KaijuServer.reviveAll(b)
+	now += 5
+	KaijuServer._upkeep(b, now)
+	profiles[a].Gems = { { Id = "pitA", Tier = "Rare", Element = "Fire", Size = 5, Clarity = 5, Cut = 5 } }
+	profiles[b].Gems = {
+		{ Id = "pitC", Tier = "Common", Element = "Frost", Size = 2, Clarity = 2, Cut = 2 },
+		{ Id = "pitL", Tier = "Legendary", Element = "Shock", Size = 9, Clarity = 9, Cut = 9 },
+	}
+	rootA.CFrame = CFrame.new(court.PadA + Vector3.new(0, 3, 0))
+	step()
+	check(not registered.KaijuPitStake(a, { Kind = "Gem", GemId = "nope" }).Ok, "Staked a gem you don't have")
+	check(registered.KaijuPitStake(a, { Kind = "Gem", GemId = "pitA" }).Ok, "Couldn't stake a gem")
+	check(court.Model:GetAttribute("StakeKind") == "Gem" and court.Model:GetAttribute("StakeTier") == "Rare", "The board doesn't show the gem")
+	rootB.CFrame = CFrame.new(court.PadB + Vector3.new(0, 3, 0))
+	step()
+	card = told(b, "KaijuPitPad")[3]
+	check(card.Mine and #card.Mine == 1 and card.Mine[1].Id == "pitL", "The challenger isn't offered their gems that match")
+	check(not registered.KaijuPitFight(b, "pitC").Ok, "Matched a Rare with a Common")
+	check(registered.KaijuPitFight(b, "pitL").Ok, "Couldn't match with a Legendary")
+	check(#profiles[a].Gems == 0 and #profiles[b].Gems == 1, "The gems weren't put in")
+	battle = KaijuBattles.of(a)
+	check(battle and battle.Court == court, "No gem battle on the court")
+	rootB.CFrame = pit.Origin * CFrame.new(KaijuPit.Leave.Center)
+	step(3)
+	check(b:GetAttribute("KaijuPit") == nil, "Couldn't walk up mid-battle")
+	KaijuBattles.step(battle, now)
+	check(battle.Phase == "Over" and battle.Result[a] == "Win", "Walking up the stairs didn't forfeit")
+	local ids = {}
+	for _, gem in profiles[a].Gems do
+		ids[gem.Id] = true
+	end
+	check(ids.pitA and ids.pitL and #profiles[b].Gems == 1, "The winner didn't take both gems")
+	check(noted(a, "You won P2's"), "Not told which gem was won")
+	now += KaijuBattle.OverSeconds + 0.1
+	KaijuBattles.step(battle, now)
+
+	-- A battle asked for from the card: both brought down onto a free court.
+	for _, p in { a, b } do
+		KaijuServer.reviveAll(p)
+	end
+	now += 5
+	KaijuServer._upkeep(a, now)
+	KaijuServer._upkeep(b, now)
+	rootA.CFrame = top
+	rootB.CFrame = top * CFrame.new(6, 0, 0)
+	step(3)
+	KaijuPitServer.up(a)
+	check(a:GetAttribute("KaijuPit") == nil and b:GetAttribute("KaijuPit") == nil, "Still downstairs")
+	now += 25
+	check(registered.KaijuBattleAsk(a, b.UserId).Ok, "Couldn't ask from the card")
+	check(registered.KaijuBattleRespond(b, a.UserId, true).Ok, "Couldn't accept from the card")
+	battle = KaijuBattles.of(a)
+	check(battle and battle.Court ~= nil, "A card's battle wasn't put on a court")
+	check(a:GetAttribute("KaijuPit") == true and b:GetAttribute("KaijuPit") == true, "Not brought downstairs for it")
+	check(KaijuPit.padSide(battle.Court, rootA.Position) == "A" and KaijuPit.padSide(battle.Court, rootB.Position) == "B", "Not brought onto its pads")
+	registered.KaijuBattleLeave(a)
+	now += KaijuBattle.OverSeconds + 0.1
+	KaijuBattles.step(battle, now)
+	-- (Back up, and the arena left be for the tests after.)
+	KaijuPitServer.up(a)
+	KaijuPitServer.up(b)
+	for _, team in { KaijuServer.team(a), KaijuServer.team(b) } do
+		for _, pet in team do
+			pet.Humanoid.MaxHealth, pet.Humanoid.Health = pet.Stats.Health, pet.Stats.Health
+		end
+	end
+	rootA.CFrame = CFrame.new(outpost)
+	rootB.CFrame = CFrame.new(outpost + Vector3.new(500, 0, 0))
+	profiles[a].Coins, profiles[b].Coins = 0, 0
+	profiles[a].Gems, profiles[b].Gems = {}, {}
+end)()
 -- Gem raids: your team all down out past the core, the critters out for
 -- you turn snatchers and more come through; they trip you, grab the newest
 -- gems of this trip's haul, hold them up and run for a rift that waits for
@@ -4873,7 +5146,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, gem raids, robbed while down, the Rift and its healing crystals)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts), gem raids, robbed while down, the Rift and its healing crystals)",
 		checks
 	)
 )

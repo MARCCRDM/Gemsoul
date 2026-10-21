@@ -30,7 +30,18 @@
 	over the other's, Shared.Squad). A battle ends when one side's kaiju
 	are all down, when time's up, or when one of the two leaves the
 	Outpost, walks off past KaijuBattle.Leash, or leaves the game (the
-	other wins). What the kaiju lose stays lost.
+	other wins). What the kaiju lose stays lost, but the winner's are
+	healed (KaijuServer.restoreAll).
+
+	The Kaiju Arena downstairs (Server.KaijuPitServer) sets:
+	  KaijuBattles.findCourt(a, b) -> court?   a free court for a battle
+	      asked for from a card, both brought down onto its pads (nil:
+	      every court's taken)
+	  KaijuBattles.onOver(battle, winner)   the stakes paid out
+	  KaijuBattles.inPit(player) -> boolean   still downstairs
+	and starts the ones on its pads itself: KaijuBattles.beginOn(a, b,
+	court, pot). On a court the field is the court's (Shared.KaijuPit), and
+	the kaiju are kept inside its rails (orders' Bounds).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +49,7 @@ local RunService = game:GetService("RunService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuBattle = require(ReplicatedStorage.Shared.KaijuBattle)
+local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local Squad = require(ReplicatedStorage.Shared.Squad)
 local KaijuServer = require(script.Parent.KaijuServer)
@@ -66,7 +78,15 @@ type Battle = {
 	Plan: { [any]: any },
 	Flanks: { [any]: Vector3 },
 	Result: { [Player]: string }?,
+	Court: any?, -- the Kaiju Arena's court it's on (Shared.KaijuPit)
+	Pot: any?, -- { Stake, Held }: what each put in (Server.KaijuPitServer)
+	Spoils: any?, -- the gem the winner took, if any
 }
+
+-- The Kaiju Arena's hooks (Server.KaijuPitServer sets them).
+KaijuBattles.findCourt = nil :: ((Player, Player) -> any)?
+KaijuBattles.onOver = nil :: ((any, string) -> ())?
+KaijuBattles.inPit = nil :: ((Player) -> boolean)?
 
 local battleOf: { [Player]: Battle } = {}
 local nextId = 0
@@ -155,8 +175,14 @@ local function stateFor(battle: Battle, player: Player)
 		end
 	end
 	local result = battle.Result and battle.Result[player]
+	local stake = battle.Pot and battle.Pot.Stake
 	return {
 		Id = battle.Id,
+		Court = if battle.Court then battle.Court.Id else nil,
+		Stake = stake,
+		Pot = if battle.Pot then KaijuPit.pot(stake, stake) else nil,
+		Healed = result == "Win",
+		Spoils = if result == "Win" then battle.Spoils else nil,
 		Phase = battle.Phase,
 		EndsAt = serverNow() + (battle.EndsAt - KaijuBattles.clock()),
 		Side = sideOf(battle, player),
@@ -225,9 +251,9 @@ local function dropAsks(player: Player)
 	end
 end
 
--- Both agreed: the field between them, their kaiju up and out brought,
--- each in its default place.
-local function begin(a: Player, b: Player): Battle?
+-- Both agreed: the field (a court's, or between them), their kaiju up and
+-- out brought, each in its default place (on a court, put there at once).
+local function begin(a: Player, b: Player, court: any?, pot: any?): Battle?
 	local ra, rb = rootOf(a), rootOf(b)
 	if not ra or not rb then
 		return nil
@@ -237,10 +263,14 @@ local function begin(a: Player, b: Player): Battle?
 		Id = "KB" .. nextId,
 		A = a,
 		B = b,
-		Field = KaijuBattle.field(
-			ra.Position - Vector3.new(0, ra.Size.Y / 2 + 1.5, 0),
-			rb.Position - Vector3.new(0, rb.Size.Y / 2 + 1.5, 0)
-		),
+		Court = court,
+		Pot = pot,
+		Field = if court
+			then KaijuPit.field(court)
+			else KaijuBattle.field(
+				ra.Position - Vector3.new(0, ra.Size.Y / 2 + 1.5, 0),
+				rb.Position - Vector3.new(0, rb.Size.Y / 2 + 1.5, 0)
+			),
 		Phase = "Formation",
 		EndsAt = KaijuBattles.clock() + KaijuBattle.FormationSeconds,
 		Formation = {},
@@ -263,9 +293,40 @@ local function begin(a: Player, b: Player): Battle?
 		battleOf[player] = battle
 		player:SetAttribute("KaijuBattle", battle.Id)
 		dropAsks(player)
+		if court then
+			local side = sideOf(battle, player)
+			local look = KaijuBattle.facing(battle.Field, side)
+			for _, pet in upOf(player) do
+				local spot = KaijuServer.ground(
+					KaijuBattle.cellSpot(battle.Field, side, battle.Formation[player][pet.Record.Id])
+				)
+				KaijuServer.place(pet.Model, spot, spot + look)
+			end
+		end
 	end
 	tell(battle)
 	return battle
+end
+
+-- Two agreed on the card: down to a court of the Kaiju Arena if there's
+-- one, else (no arena) the field between them.
+local function agreed(a: Player, b: Player): (Battle?, string?)
+	if KaijuBattles.findCourt then
+		local court = KaijuBattles.findCourt(a, b)
+		if not court then
+			return nil, "Every court in the Kaiju Arena is taken. Try again in a moment."
+		end
+		return begin(a, b, court), nil
+	end
+	return begin(a, b), nil
+end
+
+-- A battle on a court of the Kaiju Arena, its pot in (Server.KaijuPitServer).
+function KaijuBattles.beginOn(a: Player, b: Player, court: any, pot: any?): Battle?
+	if battleOf[a] or battleOf[b] or #upOf(a) == 0 or #upOf(b) == 0 then
+		return nil
+	end
+	return begin(a, b, court, pot)
 end
 
 local function ask(player: Player, userId: any)
@@ -284,8 +345,9 @@ local function ask(player: Player, userId: any)
 	lastAsk[player] = now
 	local to = target :: Player
 	if answering then
-		if not begin(to, player) then
-			return reply(false, "Couldn't start the battle.")
+		local battle, why = agreed(to, player)
+		if not battle then
+			return reply(false, why or "Couldn't start the battle.")
 		end
 		Remotes.Notify:FireClient(to, player.DisplayName .. " accepted. Place your kaiju!")
 		return reply(true, "")
@@ -316,8 +378,9 @@ local function respond(player: Player, userId: any, accept: any)
 	if problem then
 		return reply(false, problem)
 	end
-	if not begin(from, player) then
-		return reply(false, "Couldn't start the battle.")
+	local battle, why = agreed(from, player)
+	if not battle then
+		return reply(false, why or "Couldn't start the battle.")
 	end
 	Remotes.Notify:FireClient(from, player.DisplayName .. " accepted. Place your kaiju!")
 	return reply(true, "")
@@ -384,6 +447,7 @@ local function orders(pet, now: number)
 		Foes = petsIn(battle, foeOf(battle, player)),
 		Spot = spot,
 		Look = look,
+		Bounds = battle.Court,
 	}
 end
 
@@ -401,13 +465,25 @@ local function standing(battle: Battle, player: Player)
 	return { Up = #up, Share = if most > 0 then left / most else 0 }
 end
 
--- Over: the result to both, EXP to every kaiju of theirs still out.
+-- Each side's kaiju's health left, 0 to 1 (the arena's boards).
+function KaijuBattles.shares(battle: Battle)
+	return { A = standing(battle, battle.A).Share, B = standing(battle, battle.B).Share }
+end
+
+-- Over: the result to both, EXP to every kaiju of theirs still out, the
+-- winner's healed, the stakes paid out (the arena's).
 local function finish(battle: Battle, winner: string, reason: string?)
 	if battle.Phase == "Over" then
 		return
 	end
 	battle.Phase = "Over"
 	battle.EndsAt = KaijuBattles.clock() + KaijuBattle.OverSeconds
+	if KaijuBattles.onOver then
+		local ok, err = pcall(KaijuBattles.onOver, battle, winner)
+		if not ok then
+			warn("[KaijuBattles] onOver:", err)
+		end
+	end
 	battle.Result = {}
 	for _, player in { battle.A, battle.B } do
 		local side = sideOf(battle, player)
@@ -422,6 +498,11 @@ local function finish(battle: Battle, winner: string, reason: string?)
 				else string.format("A draw with %s's kaiju.", foe.DisplayName)
 			if reason == "Left" and result == "Win" then
 				line = string.format("%s left the battle: you win!", foe.DisplayName)
+			end
+			if result == "Win" then
+				-- (The winner's kaiju, every one, back to full: the knocked out
+				-- too. The result card says so: Client.KaijuBattleUI.)
+				KaijuServer.restoreAll(player)
 			end
 			Remotes.Notify:FireClient(player, line)
 		end
@@ -442,9 +523,13 @@ local function close(battle: Battle)
 	end
 end
 
--- Still fit to battle: here, in the Outpost, on their feet, near the field.
+-- Still fit to battle: here, in the Outpost (downstairs, for a court),
+-- on their feet, near the field.
 local function present(battle: Battle, player: Player): boolean
 	if not player.Parent or player:GetAttribute("Outpost") ~= true then
+		return false
+	end
+	if battle.Court and KaijuBattles.inPit and not KaijuBattles.inPit(player) then
 		return false
 	end
 	local root = rootOf(player)

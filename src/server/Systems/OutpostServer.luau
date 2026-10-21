@@ -1200,6 +1200,7 @@ function OutpostServer.start()
 						and not player:GetAttribute("MatchId")
 						and not player:GetAttribute("DungeonId")
 						and not player:GetAttribute("RiftRun") -- (away in the Rift: Server.RiftServer)
+						and not player:GetAttribute("KaijuPit") -- (downstairs: Server.KaijuPitServer)
 					then
 						local offset = root.Position - centre
 						local far = Vector3.new(offset.X, 0, offset.Z).Magnitude > Rules.Radius + 60

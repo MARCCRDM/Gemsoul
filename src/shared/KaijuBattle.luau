@@ -23,9 +23,9 @@
 	waits out its revive (Shared.Kaiju.Revive). Only kaiju that are up can
 	fight: at least one each.
 
-	The field lies between the two players: its middle halfway between
-	them, its axis from the asker's side (A) to the other's (B). Its studs
-	are a pet kaiju's (they're knee high).
+	Off a court, the field lies between the two players: its middle halfway
+	between them, its axis from the asker's side (A) to the other's (B).
+	Its studs are a pet kaiju's (they're knee high).
 
 	  KaijuBattle.cells(): { Cell }             the six cells of a side
 	  KaijuBattle.cellSpot(field, side, cellId) -> Vector3   where a cell is
@@ -42,7 +42,7 @@ KaijuBattle.AskSeconds = 20 -- an ask stands this long
 KaijuBattle.AskGap = 1.5 -- seconds between your asks
 KaijuBattle.AskAgain = 20 -- after a no, before you can ask them again
 KaijuBattle.Range = 40 -- studs: how near you must be to ask
-KaijuBattle.FormationSeconds = 15
+KaijuBattle.FormationSeconds = 25
 KaijuBattle.BattleSeconds = 90
 KaijuBattle.OverSeconds = 4 -- the result stays up this long
 KaijuBattle.Leash = 70 -- studs from the field's middle: walk off further and you forfeit

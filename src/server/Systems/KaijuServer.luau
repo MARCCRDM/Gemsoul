@@ -78,7 +78,10 @@
 	the formation, or { Foe, Flank, Foes } to fight the other side's kaiju
 	(a blow or a move on another's pet lands through KaijuServer.hurt); nil
 	for one not in a battle. KaijuServer.battling(player) says when a
-	player's in one: their team can't be changed or recalled meanwhile.
+	player's in one: their team can't be changed or recalled meanwhile. On
+	a court of the Kaiju Arena the orders carry its Bounds (Shared.KaijuPit):
+	a kaiju that strays past its rails is walked back in, or put back if
+	it's well out.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -90,6 +93,7 @@ local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
+local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local Squad = require(ReplicatedStorage.Shared.Squad)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
@@ -1051,6 +1055,16 @@ local function think(pet: Pet, now: number, _dt: number)
 			pet.LastFight = now
 			fighter.Flank, fighter.Apart = battle.Flank, spacing(pet)
 			KaijuFighter.step(fighter, { Root = battle.Foe.Root, Pet = battle.Foe }, now)
+			-- (On a court: kept inside its rails.)
+			local court = battle.Bounds
+			if court and not KaijuPit.inCourt(court, pet.Root.Position, -KaijuPit.Court.Inset) then
+				local inside = KaijuPit.clamp(court, pet.Root.Position)
+				if KaijuPit.inCourt(court, pet.Root.Position, 3) then
+					h:MoveTo(inside)
+				else
+					KaijuServer.place(pet.Model, inside, inside + (battle.Look or Vector3.new(0, 0, -1)))
+				end
+			end
 			return
 		end
 		KaijuFighter.calm(fighter)

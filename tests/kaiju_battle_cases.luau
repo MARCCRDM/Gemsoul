@@ -2,7 +2,11 @@
 -- Kaiju battles' rules (Shared.KaijuBattle): the field between the two,
 -- each side's six places (left and right as that side sees them), the
 -- default formation (the sturdy kinds in front, a Razorback behind), a
--- formation checked, who wins, and why one can't ask.
+-- formation checked, who wins, and why one can't ask. And the Kaiju Arena
+-- downstairs (Shared.KaijuPit): its courts in their rows, inside the hall
+-- and the core, clear of each other and the stairs, every place inside
+-- its court, the pads, kaiju kept in, and the stakes. And the yellow
+-- arrows on the ground that lead you there (Client GroundGuide).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -28,6 +32,7 @@ end
 env = setmetatable({
 	Color3 = roblox.Color3,
 	Vector3 = Vector3,
+	CFrame = roblox.CFrame,
 	script = { Parent = setmetatable({}, {
 		__index = function(_, k)
 			return k
@@ -210,9 +215,222 @@ check(with({ Asked = true }) ~= nil, "Asked twice")
 local wait = with({ Wait = 4.2 })
 check(wait ~= nil and string.find(wait, "5", 1, true) ~= nil, "A wait isn't said in whole seconds")
 
+-- The Kaiju Arena: two rows of four courts in the hall under the Shelter.
+local Pit = shared("KaijuPit")
+local Frontier = shared("Frontier")
+local CFrame = roblox.CFrame
+local location = CFrame.new(0, 0, 7000)
+local origin = Pit.origin(location)
+check(math.abs(origin.Position.Y + Pit.Depth) < 1e-6, "The hall isn't under the quarry")
+local courts = Pit.courts(origin)
+check(#courts == #Pit.Rows * #Pit.Columns and #courts == 8, "Not eight courts")
+local spec, hall = Pit.Court, Pit.Hall
+for i, court in courts do
+	check(court.Id == i, "The courts aren't numbered in order")
+	-- In the hall, and every bit of it inside the core (no rifts, no critters).
+	for _, corner in { court.PadA, court.PadB, court.Center + court.Right * (spec.HalfWidth + 10) } do
+		check(Pit.inHall(origin, corner), "Court " .. i .. " reaches out of the hall")
+		local off = corner - origin.Position
+		check(Vector3.new(off.X, 0, off.Z).Magnitude < Frontier.Core - 8, "Court " .. i .. " is out past the core")
+	end
+	-- Each side's six places inside the court, its pad outside it, behind its
+	-- own kaiju; the field is the court's.
+	local field = Pit.field(court)
+	check(near(field.Center, court.Center) and near(field.Axis, court.Axis), "The field isn't the court's")
+	for _, side in { "A", "B" } do
+		local pad = if side == "A" then court.PadA else court.PadB
+		check(not Pit.inCourt(court, pad), "A pad inside its court")
+		check(Pit.padSide(court, pad) == side, "Standing on a pad isn't on it")
+		check(Pit.padSide(court, pad + Vector3.new(0, 3, 0)) == side, "Stood on a pad (up a body's height) isn't on it")
+		check(Pit.padSide(court, pad + court.Right * (spec.PadRadius + 0.5)) == nil, "Beside a pad is on it")
+		check(Pit.padSide(court, pad + Vector3.new(0, hall.Balcony + 3, 0)) == nil, "Over a pad counts as on it")
+		for _, cell in cells do
+			local at = Battle.cellSpot(field, side, cell.Id)
+			check(Pit.inCourt(court, at, -spec.Inset - 1), "A place on court " .. i .. " is at its rails")
+			check(
+				(at - pad).Magnitude < (at - (if side == "A" then court.PadB else court.PadA)).Magnitude,
+				"A side's places by the other's pad"
+			)
+		end
+	end
+	check(Pit.padSide(court, court.Center) == nil, "The middle of a court is a pad")
+	-- Clear of every other court (pads and all) and of the stairs off the balcony.
+	for j, other in courts do
+		if j ~= i then
+			local a1, b1 = Pit.offset(court, other.Center)
+			check(
+				math.abs(a1) >= spec.HalfWidth * 2 + 20 or math.abs(b1) >= (spec.Pad + spec.PadRadius) * 2 + 4,
+				"Courts " .. i .. " and " .. j .. " overlap"
+			)
+		end
+	end
+	local foot = origin * Vector3.new(0, 0, -hall.HalfZ + hall.BalconyDepth + hall.StairsRun)
+	local across, along = Pit.offset(court, foot)
+	check(
+		math.abs(across) > spec.HalfWidth + hall.StairsHalf or math.abs(along) > spec.Pad + spec.PadRadius + 2,
+		"Court " .. i .. " is in the stairs' way"
+	)
+end
+-- You arrive on the balcony, clear of the way back up.
+local arrive = origin * Pit.Arrive
+check(Pit.inHall(origin, arrive), "You arrive outside the hall")
+local leave = Pit.Leave
+check(math.abs((Pit.Arrive - leave.Center).Z) > leave.Half.Z + 4, "You arrive in the doorway back up")
+-- Kept in: a kaiju past the rails is brought back inside them, at its height.
+local court = courts[3]
+local out = court.Center
+	+ court.Right * (spec.HalfWidth + 6)
+	+ court.Axis * (spec.HalfLength + 9)
+	+ Vector3.new(0, 2, 0)
+check(not Pit.inCourt(court, out), "Out past the rails is in")
+local back = Pit.clamp(court, out)
+check(
+	Pit.inCourt(court, back, -spec.Inset + 1e-4) and math.abs(back.Y - out.Y) < 1e-6,
+	"Not brought back inside the rails"
+)
+check(
+	near(Pit.clamp(court, court.Center + court.Right * 2), court.Center + court.Right * 2),
+	"Moved a kaiju already inside"
+)
+-- The nearest pad that's wanted.
+local found, side = Pit.nearest(courts, court.PadB + Vector3.new(1, 0, 1), function()
+	return true
+end)
+check(found == court and side == "B", "The nearest pad isn't the one beside you")
+found = Pit.nearest(courts, court.PadB, function(c)
+	return c ~= court
+end)
+check(found ~= nil and found ~= court, "An unwanted court was picked")
+
+-- Stakes: coins from the list, that you have; a gem loose in your pouch.
+local have = {
+	Coins = 300,
+	Gems = {
+		g1 = { Id = "g1", Tier = "Rare" },
+		g2 = { Id = "g2", Tier = "Common" },
+		g3 = { Id = "g3", Tier = "Legendary" },
+	},
+}
+check(Pit.stakeProblem(nil, have) == nil, "No stake refused")
+check(Pit.stakeProblem({ Kind = "Coins", Coins = 250 }, have) == nil, "A stake you can cover refused")
+check(Pit.stakeProblem({ Kind = "Coins", Coins = 500 }, have) ~= nil, "A stake you can't cover taken")
+check(Pit.stakeProblem({ Kind = "Coins", Coins = 77 }, have) ~= nil, "A stake that isn't on the list taken")
+check(
+	Pit.stakeProblem({ Kind = "Gem", Tier = "Rare", Gem = { Id = "g1" } }, have) == nil,
+	"A loose gem refused as a stake"
+)
+check(
+	Pit.stakeProblem({ Kind = "Gem", Tier = "Rare", Gem = { Id = "nope" } }, have) ~= nil,
+	"A gem you don't have taken"
+)
+check(
+	Pit.stakeProblem({ Kind = "Moon" }, have) ~= nil and Pit.stakeProblem("x", have) ~= nil,
+	"Nonsense taken as a stake"
+)
+-- Matching: as many coins; a gem as rare or rarer.
+local gemStake = { Kind = "Gem", Tier = "Rare", Gem = { Id = "x" } }
+check(Pit.matchProblem({ Kind = "Coins", Coins = 250 }, nil, have) == nil, "Couldn't match coins you have")
+check(Pit.matchProblem({ Kind = "Coins", Coins = 1000 }, nil, have) ~= nil, "Matched coins you don't have")
+check(
+	Pit.matchProblem(gemStake, "g1", have) == nil and Pit.matchProblem(gemStake, "g3", have) == nil,
+	"A gem as good or better refused"
+)
+check(Pit.matchProblem(gemStake, "g2", have) ~= nil, "Matched a Rare with a Common")
+check(Pit.matchProblem(gemStake, nil, have) ~= nil, "Matched a gem without picking one")
+check(
+	Pit.matchProblem(gemStake, nil, { Coins = 0, Gems = { g2 = have.Gems.g2 } }) ~= nil,
+	"No gem good enough, and no word"
+)
+local matches = Pit.matches(gemStake, have)
+check(#matches == 2 and matches[1].Id == "g1" and matches[2].Id == "g3", "The gems that match, weakest first")
+check(#Pit.matches({ Kind = "Coins", Coins = 50 }, have) == 0, "Gems offered for a coin stake")
+-- What it says.
+check(
+	Pit.stakeText(nil) ~= "" and Pit.stakeText({ Kind = "Coins", Coins = 250 }) == "250 coins each",
+	"The stake isn't said"
+)
+check(Pit.stakeText({ Kind = "Gem", Tier = "Rare" }) == "a Rare gem each", "A gem stake isn't said")
+check(Pit.stakeText({ Kind = "Gem", Tier = "Uncommon" }) == "an Uncommon gem each", '"a Uncommon gem"')
+check(
+	Pit.matchProblem({ Kind = "Gem", Tier = "UltraRare" }, nil, { Gems = {} })
+		== "You need an Ultra Rare gem or better to match the stake.",
+	'"a Ultra Rare gem"'
+)
+check(
+	Pit.pot({ Kind = "Coins", Coins = 250 }, { Kind = "Coins", Coins = 250 }) == "500 coins",
+	"The pot isn't both stakes"
+)
+check(Pit.pot(gemStake, gemStake) == "Both gems", "A gem pot isn't both gems")
+
+-- The yellow arrows on the ground (Client GroundGuide): spaced along the
+-- way from just ahead of you, facing along it, never past its end, round a
+-- corner, lying flat on a slope; and quiet.
+do
+	local guideEnv = setmetatable({
+		game = {
+			GetService = function(_, name)
+				return { Name = name }
+			end,
+		},
+		RaycastParams = {
+			new = function()
+				return {}
+			end,
+		},
+		Enum = roblox.Enum,
+		Color3 = roblox.Color3,
+		Vector3 = Vector3,
+		-- (Lune's lookAt turns the wrong way along Z: where it stands and faces is what counts.)
+		CFrame = setmetatable({
+			lookAt = function(at, target)
+				return { Position = at, LookVector = (target - at).Unit }
+			end,
+		}, { __index = roblox.CFrame }),
+	}, { __index = _G })
+	local source = fs.readFile(ROOT .. "/src/client/Modules/GroundGuide.luau")
+	local Guide = luau.load(source, { debugName = "GroundGuide", environment = guideEnv })()
+	local from, to = Vector3.new(0, 3, 0), Vector3.new(0, 3, -20)
+	local spots = Guide.trail(from, to, 7, 3.4)
+	check(#spots == 6, "The arrows don't stop at the end of the way (" .. #spots .. ")")
+	for i, cf in spots do
+		check(near(cf.Position, from + Vector3.new(0, 0, -3.4 * (i - 1)), 1e-3), "An arrow's off the way")
+		check(cf.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.999, "An arrow doesn't point the way to go")
+	end
+	-- Round a corner: the ones past the bend turn with it.
+	local bend = Guide.along({ Vector3.new(0, 0, 0), Vector3.new(10, 0, 0), Vector3.new(10, 0, -10) }, 7, 3, 1)
+	check(#bend == 7, "Not every arrow round the corner")
+	check(bend[1].CFrame.LookVector:Dot(Vector3.new(1, 0, 0)) > 0.999, "The first leg's arrows don't face along it")
+	check(near(bend[5].CFrame.Position, Vector3.new(10, 0, -3), 1e-3), "An arrow past the bend isn't on the second leg")
+	check(bend[5].CFrame.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.999, "The arrows don't turn the corner")
+	for i = 2, #bend do
+		check(bend[i].Share > bend[i - 1].Share and bend[i].Share <= 1, "How far along isn't in order")
+	end
+	-- Up a slope they still lie flat.
+	local slope = Guide.along({ Vector3.new(0, 0, 0), Vector3.new(0, 6, -8) }, 3, 2, 0)
+	check(#slope == 3 and math.abs(slope[2].CFrame.LookVector.Y) < 1e-3, "An arrow tips up off the floor on a slope")
+	check(#Guide.along({ from, from }, 7, 3.4, 0) == 0, "Arrows on a way that goes nowhere")
+	-- Each chevron points the way: its two arms meet in front, one each side.
+	local arms = Guide.arms(roblox.CFrame.new(0, 0, 0)) -- (facing -Z)
+	check(#arms == 2, "A chevron isn't two arms")
+	local tips = {}
+	for _, arm in arms do
+		local a, b = arm * Vector3.new(0, 0, -0.75), arm * Vector3.new(0, 0, 0.75)
+		local inner, outer =
+			if math.abs(a.X) < math.abs(b.X) then a else b, if math.abs(a.X) < math.abs(b.X) then b else a
+		check(inner.Z < outer.Z - 0.5, "A chevron points back the way you came")
+		check(math.abs(inner.X) < 0.2, "A chevron's arms don't meet")
+		table.insert(tips, outer.X)
+	end
+	check(tips[1] < -0.5 and tips[2] > 0.5, "A chevron's arms aren't one each side")
+	-- Subtle: see-through, a short trail, and gone once you're there.
+	check(Guide.Transparency >= 0.3 and Guide.Transparency < 0.8, "The arrows aren't subtle (or can't be seen)")
+	check(Guide.Count * Guide.Spacing <= 30, "The trail's too long to be subtle")
+	check(Guide.Arrive > Guide.Ahead, "The arrows stay once you're there")
+end
+
 print(
 	string.format(
-		"PASS: %d kaiju battle checks (the field, places, default formation, formations, winners, asks)",
+		"PASS: %d kaiju battle checks (the field, places, default formation, formations, winners, asks; the arena's courts, pads, kept in, stakes; the ground arrows)",
 		checks
 	)
 )

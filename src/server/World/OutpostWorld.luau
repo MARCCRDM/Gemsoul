@@ -1794,6 +1794,10 @@ local SHELTER = {
 	FrontRamp = { Landing = 27, Ramp = 19 }, -- the main door's (half widths)
 	LaneRamp = 12, -- each garage door's (half width: the lane and a little)
 	Keel = 12, -- how far in from the walls the keel under it is set
+	-- The well in the hall's floor for the stairs down to the Kaiju Arena
+	-- (Shared.KaijuPit), on the west side between the Market and the stage:
+	-- its edges (x, z), and the landing at the foot of its steps (x long).
+	Well = { MinX = -52, MaxX = -26, MinZ = 30, MaxZ = 40, Landing = 7 },
 }
 local ARMOR = Color3.fromRGB(96, 100, 110) -- the Shelter's plate: dark gunmetal
 local RUST = Color3.fromRGB(128, 76, 50) -- its armour inserts, weathered brown
@@ -1832,11 +1836,34 @@ local function shelter(parent, at: CFrame, rules)
 			color, Enum.Material.Metal)
 	end
 
+	-- A box from (x0, y0, z0) to (x1, y1, z1), with the stairs' well cut out
+	-- of it where it crosses (up to four boxes round the hole).
+	local well = SHELTER.Well
+	local function holed(x0, x1, y0, y1, z0, z1, color, material, isSolid: boolean?)
+		local function box(a0, a1, b0, b1)
+			if a1 - a0 > 0.01 and b1 - b0 > 0.01 then
+				local p = part(m, at3((a0 + a1) / 2, (y0 + y1) / 2, (b0 + b1) / 2), Vector3.new(a1 - a0, y1 - y0, b1 - b0), color, material)
+				if isSolid then
+					solid(p)
+				end
+			end
+		end
+		local wx0, wx1 = math.max(x0, well.MinX), math.min(x1, well.MaxX)
+		local wz0, wz1 = math.max(z0, well.MinZ), math.min(z1, well.MaxZ)
+		if wx0 >= wx1 or wz0 >= wz1 then
+			box(x0, x1, z0, z1)
+			return
+		end
+		box(x0, x1, z0, wz0)
+		box(x0, x1, wz1, z1)
+		box(x0, wx0, wz0, wz1)
+		box(wx1, x1, wz0, wz1)
+	end
+
 	-- The floor: one slab under it all, matte concrete (the hall's a shade
 	-- paler), the garage lane dark.
-	solid(part(m, at3(0, 0.4, 0), Vector3.new(W * 2 + 4, 0.8, D * 2 + 4), CONCRETE, Enum.Material.Concrete))
-	part(m, at3(0, 0.83, (SHELTER.Barrier + D) / 2), Vector3.new(W * 2, 0.06, D - SHELTER.Barrier),
-		Color3.fromRGB(104, 106, 112), Enum.Material.Concrete)
+	holed(-(W + 2), W + 2, 0, 0.8, -(D + 2), D + 2, CONCRETE, Enum.Material.Concrete, true)
+	holed(-W, W, 0.8, 0.86, SHELTER.Barrier, D, Color3.fromRGB(104, 106, 112), Enum.Material.Concrete)
 	-- Where you arrive: a compass rose painted on the floor.
 	local paint = Color3.fromRGB(196, 150, 78)
 	local rose = at3(0, 0.86, D - 10)
@@ -1857,7 +1884,72 @@ local function shelter(parent, at: CFrame, rules)
 	-- the quarry floor, so the space under the edges is open (the legs
 	-- stand clear in it) and nobody walks in under the hall.
 	local keel = SHELTER.Keel
-	solid(part(m, at3(0, -lift / 2, 0), Vector3.new((W + 2 - keel) * 2, lift, (D + 2 - keel) * 2), HULL_DARK, Enum.Material.Metal))
+	holed(-(W + 2 - keel), W + 2 - keel, -lift, 0, -(D + 2 - keel), D + 2 - keel, HULL_DARK, Enum.Material.Metal, true)
+
+	-- The stairs down to the Kaiju Arena, in the well: steps from the hall's
+	-- floor at its east end down to a landing at its west end, before a
+	-- lit doorway. Walk onto the landing and you're downstairs
+	-- (Server.KaijuPitServer). A rail round its other three sides, and its
+	-- sign over the far end, facing the way in.
+	local stairs = {}
+	do
+		local top, bottom = 0.86, -lift + 0.4
+		local midZ, wide = (well.MinZ + well.MaxZ) / 2, well.MaxZ - well.MinZ
+		local count = 13
+		local rise, tread = (top - bottom) / count, (well.MaxX - well.MinX - well.Landing) / count
+		solid(part(m, at3((well.MinX + well.MaxX) / 2, bottom - 0.2, midZ), Vector3.new(well.MaxX - well.MinX, 0.4, wide),
+			CONCRETE, Enum.Material.Concrete))
+		for i = 1, count do
+			local x = well.MaxX - (i - 0.5) * tread
+			local h = top - i * rise
+			solid(part(m, at3(x, (bottom + h) / 2, midZ), Vector3.new(tread, math.max(h - bottom, 0.05), wide), CONCRETE,
+				Enum.Material.Concrete))
+			part(m, at3(x + tread / 2 - 0.15, h + 0.01, midZ), Vector3.new(0.3, 0.04, wide), HAZARD, Enum.Material.SmoothPlastic)
+		end
+		-- (hazard paint round the well's lip)
+		for _, edge in { { (well.MinX + well.MaxX) / 2, well.MinZ + 0.1, well.MaxX - well.MinX, 0.2 },
+			{ (well.MinX + well.MaxX) / 2, well.MaxZ - 0.1, well.MaxX - well.MinX, 0.2 },
+			{ well.MinX + 0.1, midZ, 0.2, wide } } do
+			part(m, at3(edge[1], 0.5, edge[2]), Vector3.new(edge[3], 0.6, edge[4]), HAZARD, Enum.Material.SmoothPlastic)
+		end
+		-- The doorway at the foot, glowing the arena's red.
+		local door = part(m, at3(well.MinX + 0.15, bottom + 3.4, midZ), Vector3.new(0.2, 6.4, 6), STATION.Arena, Enum.Material.Neon)
+		door.Name = "ArenaDoor"
+		light(door, STATION.Arena, 16, 1.2)
+		for _, dz in { -3.6, 3.6 } do
+			part(m, at3(well.MinX + 0.4, bottom + 3.5, midZ + dz), Vector3.new(0.8, 7, 1.2), HAZARD, Enum.Material.Metal)
+		end
+		-- The rail: north, south and west, posts and two bars.
+		for _, run in {
+			{ well.MinX - 0.3, well.MaxX, well.MinZ - 0.3, well.MinZ - 0.3 },
+			{ well.MinX - 0.3, well.MaxX, well.MaxZ + 0.3, well.MaxZ + 0.3 },
+			{ well.MinX - 0.3, well.MinX - 0.3, well.MinZ - 0.3, well.MaxZ + 0.3 },
+		} do
+			local a, b = Vector3.new(run[1], 0, run[3]), Vector3.new(run[2], 0, run[4])
+			local length = (b - a).Magnitude
+			local along = (b - a).Unit
+			for k = 0, math.floor(length / 3.25) do
+				local q = a + along * math.min(k * 3.25, length)
+				solid(part(m, at3(q.X, 2.1, q.Z), Vector3.new(0.3, 2.5, 0.3), STEEL, Enum.Material.Metal))
+			end
+			local mid = (a + b) / 2
+			local size = Vector3.new(math.abs(b.X - a.X) + 0.3, 0.2, math.abs(b.Z - a.Z) + 0.3)
+			solid(part(m, at3(mid.X, 3.4, mid.Z), size, HAZARD, Enum.Material.Metal))
+			part(m, at3(mid.X, 2.2, mid.Z), size, STEEL, Enum.Material.Metal)
+		end
+		for _, dz in { -4.6, 4.6 } do
+			part(m, at3(well.MinX - 1.6, 3.6, midZ + dz), Vector3.new(0.5, 7.2, 0.5), HULL_DARK, Enum.Material.Metal)
+		end
+		signPanel(m, facing(well.MinX - 1.6, 6.4, midZ, 1, 0), Vector3.new(11, 3.2, 0.4), "KAIJU ARENA",
+			"DOWNSTAIRS: KAIJU BATTLES", STATION.Arena)
+		signPanel(m, facing((well.MinX + well.MaxX) / 2, 4.6, well.MaxZ + 0.5, 0, 1), Vector3.new(8, 1.8, 0.3), "KAIJU ARENA",
+			"STAIRS DOWN", STATION.Arena)
+		-- Its landing (walk onto it and you're downstairs), and where you come
+		-- back up: at the top of the steps, facing the hall.
+		stairs.Landing = at3(well.MinX + well.Landing / 2, bottom + 3, midZ)
+		stairs.Size = Vector3.new(well.Landing, 6, wide)
+		stairs.Top = facing(well.MaxX + 5, 3.5, midZ, 1, 0)
+	end
 
 	-- The walls, round the doors: each length, its centre, and whether it's
 	-- a lintel over a door (no plinth on those).
@@ -2143,7 +2235,7 @@ local function shelter(parent, at: CFrame, rules)
 		part(m, arena * CFrame.new(s * 7, 8.5, 19.5), Vector3.new(0.8, 17, 0.8), HULL_DARK, Enum.Material.Metal)
 	end
 	signPanel(m, facing(0, 18.4, 18 + 19.5, 0, 1), Vector3.new(16, 3.4, 0.4), "KAIJU ARENA",
-		"CHALLENGE FROM ANY MINER'S CARD", STATION.Arena)
+		"DOWNSTAIRS: TAKE THE WEST STAIRS", STATION.Arena)
 
 	-- The Store and the player Market: two shopfronts in the west wall, built
 	-- alike. Each is an alcove, the Shelter's wall at its back and a ceiling
@@ -2427,6 +2519,7 @@ local function shelter(parent, at: CFrame, rules)
 		Box = Vector2.new(W + 4, D + 4),
 		Ramps = ramps,
 		Feet = feet,
+		Stairs = stairs,
 	}
 end
 
@@ -3059,6 +3152,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Stations = { Store = home.Store, Market = home.Market },
 		Crew = home.Crew,
 		Shelter = { Box = home.Box, Lift = lift, Ramps = home.Ramps, Feet = home.Feet },
+		-- The stairs down to the Kaiju Arena: { Landing (CFrame), Size, Top (CFrame) }.
+		Stairs = home.Stairs,
 		Probe = probeScreen,
 		Board = face,
 		Gate = gatePad,

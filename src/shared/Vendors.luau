@@ -363,7 +363,8 @@ Vendors.Tips = {
 	"A knocked-out kaiju comes back on its own after a cooldown. The higher its level, the longer it takes.",
 	"To catch a wild kaiju, wear it down below half health without knocking it out. It glows gold when it's ready.",
 	"A catch breaks if you take a hit or move away. Clear the area first.",
-	"To start a kaiju battle, tap KAIJU on another miner's card. You both get 15 seconds to set your formation.",
+	"Kaiju battles are in the Kaiju Arena, down the Shelter's west stairs. Stand on a pad and wait for a challenger: you both get 25 seconds to place your kaiju.",
+	"The winner of a kaiju battle gets their kaiju healed, and takes both stakes if you played for something.",
 	"Bulwarks and Carapaces take hits well: put them in the front row of a battle formation.",
 	"Razorbacks fight at range: keep them in the back row of a battle formation.",
 	-- Combat

@@ -155,6 +155,9 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			local RiftServer = require(script.Parent.Systems.RiftServer)
 			RiftServer.gateAt = OutpostServer.veinGate
 			RiftServer.start(OutpostServer.site())
+			-- The Kaiju Arena, down the Shelter's stairs: rows of courts, a pad
+			-- at each end to wait on, stakes, and every kaiju battle fought there.
+			require(script.Parent.Systems.KaijuPitServer).start(OutpostServer.site())
 		end
 	end
 	-- The garage's machines, for driving round the quarry (Config.Features:

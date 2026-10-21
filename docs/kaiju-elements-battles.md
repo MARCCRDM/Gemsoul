@@ -172,6 +172,14 @@ dodges them.
 
 ## Kaiju battles
 
+> **Since then:** battles are fought on the courts of the
+> [Kaiju Arena](kaiju-arena.md), downstairs from the Shelter. You stand on a
+> pad to wait for a challenger, can play for coins or a gem, get 25 seconds
+> to drag your kaiju into place on a rebuilt board, and the winner's kaiju
+> are healed. Asking from a player card brings you both down to a free
+> court. What follows is the battle as it first shipped. The pictures show
+> the old board.
+
 ![Asking, placing, the battle and the result](kaiju-elements-battles/battle.jpg)
 
 ![On a phone](kaiju-elements-battles/battle-phone.jpg)
