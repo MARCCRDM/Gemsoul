@@ -36,6 +36,10 @@ Warrior and every Warden to Ranged, and the kits still work.
 
 ## The roster
 
+![Wave 1 concepts: Emberjaw, Stormwing, Ironhide, Sickleclaw, Moonmoth](kaiju-concepts/wave1-lineup.png)
+
+(AI concept renders in the style of `kaiju/species.png`, one element each; every kind comes in all four. Individual renders in `kaiju-concepts/`.)
+
 Stats: **HP / Damage / Rate (s per blow) / Speed / Guard**. Fight: the quick
 blow combo, the heavy (its multiplier and sweep), and the guard pose with the
 share of a blow it still takes. Moves: E (surge) / Q (strike) / R (defense).
