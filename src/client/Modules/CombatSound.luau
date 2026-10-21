@@ -85,6 +85,7 @@ CombatSound.Ids = {
 	RoarBulwark = 0, -- roar_bulwark.mp3
 	RoarRazorback = 0, -- roar_razorback.mp3
 	RoarCarapace = 0, -- roar_carapace.mp3
+	RoarScythe = 0, -- roar_scythe.mp3
 	-- A rift critter's evil giggles and its cackle (tools/make_critter_sounds.py).
 	Giggle1 = 0, -- critter_giggle_1.mp3
 	Giggle2 = 0, -- critter_giggle_2.mp3
@@ -123,6 +124,7 @@ local LEVEL = {
 	RoarBulwark = 0.95,
 	RoarRazorback = 0.9,
 	RoarCarapace = 0.9,
+	RoarScythe = 0.85,
 	Giggle = 0.85,
 	Cackle = 0.95,
 	LevelUp = 1,
@@ -197,6 +199,7 @@ local FALLBACK = {
 		{ S .. "swordlunge.wav", 0.3, 0.6 },
 		{ S .. "clickfast.wav", 0.5, 0.25, 0.2 },
 	},
+	RoarScythe = { { S .. "swordslash.wav", 0.7, 0.5 }, { S .. "clickfast.wav", 1.3, 0.4, 0.05 } },
 	-- A critter's giggle: the old "uuhhh" sped up into squeaky little
 	-- "hee"s, falling; its cackle lower and longer.
 	Giggle = {

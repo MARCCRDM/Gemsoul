@@ -62,7 +62,7 @@ local GemTraits = shared("GemTraits")
 local ElementMatchup = shared("ElementMatchup")
 
 -- Species and stats ------------------------------------------------------------------------
-check(#Kaiju.Order == 3 and #Kaiju.Elements == 4, "Three species in four elements")
+check(#Kaiju.Order == 4 and #Kaiju.Elements == 4, "Four species in four elements")
 local seen = {}
 for _, id in Kaiju.Order do
 	local s = Kaiju.Species[id]
@@ -78,6 +78,17 @@ for _, id in Kaiju.Order do
 end
 check(Kaiju.Species.Razorback.Speed > Kaiju.Species.Bulwark.Speed, "The runner isn't the quick one")
 check(Kaiju.Species.Carapace.Guard > Kaiju.Species.Bulwark.Guard, "The shell isn't the hardest")
+-- The assassin: the least health of all, and quicker blows and feet than
+-- the front liners'.
+local scythe = Kaiju.Species.Scythe
+for _, id in Kaiju.Order do
+	local s = Kaiju.Species[id]
+	check(id == "Scythe" or s.Health > scythe.Health, "The assassin isn't the frailest")
+	check(
+		id == "Scythe" or id == "Razorback" or (s.Rate > scythe.Rate and s.Speed < scythe.Speed),
+		"The assassin is slower than a front liner"
+	)
+end
 
 -- EXP --------------------------------------------------------------------------------------
 for level = 1, Kaiju.MaxLevel - 2 do

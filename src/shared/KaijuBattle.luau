@@ -9,12 +9,13 @@
 	  Formation  FormationSeconds to place your kaiju: each on one of your
 	             side's six cells, three across the front row and three
 	             across the back (defaultFormation puts the sturdy ones in
-	             front and a Razorback, a shooter, behind). You can't see
+	             front, FrontKinds, and the rest behind: a Razorback shoots
+	             from there, a Scythe leaps from there). You can't see
 	             where your foe puts theirs till it starts. READY from both
 	             starts it early.
-	  Battle     the kaiju fight by themselves (auto battle), each side's
-	             shared out over the other's (Shared.Squad), for up to
-	             BattleSeconds.
+	  Battle     the kaiju fight by themselves (auto battle), each by its
+	             role (Shared.KaijuRoles, Server.KaijuBattleBrain), for up
+	             to BattleSeconds.
 	  Over       the side with kaiju still up wins; out of time, the side
 	             with more of its health left (winner). Every kaiju in it
 	             gains EXP (Exp: more for the winners').
@@ -119,8 +120,8 @@ end
 local FRONT_ORDER = { "FrontCentre", "FrontLeft", "FrontRight" }
 local BACK_ORDER = { "BackCentre", "BackLeft", "BackRight" }
 
--- Where your kaiju start: the sturdy kinds in front (FrontKinds), a
--- Razorback behind; a row full, the other.
+-- Where your kaiju start: the sturdy kinds in front (FrontKinds), the
+-- rest (a Razorback, a Scythe) behind; a row full, the other.
 function KaijuBattle.defaultFormation(records: { any }): { [string]: string }
 	local formation, used = {}, {}
 	local function take(order: { string }, fallback: { string }): string?

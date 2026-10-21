@@ -148,14 +148,15 @@ for _, d in life.Model:GetDescendants() do
 		check(not d.CanCollide or d.Name == "ProjectorConsole", d.Name .. " is in the way")
 	end
 end
--- (The species not on the stage are set aside, built but not drawn.)
+-- (The species not on the stage are set aside, built but not drawn: four
+-- kinds, one shown.)
 local built = count
 for _, holo in life.Holograms do
 	if holo.Model.Parent == nil then
 		built += #holo.Group.Parts
 	end
 end
-check(count <= 200 and built <= 320, "Too many parts: " .. count .. " drawn, " .. built .. " built")
+check(count <= 200 and built <= 380, "Too many parts: " .. count .. " drawn, " .. built .. " built")
 
 -- The hologram: every kaiju, species and element both changing each time.
 local seen = {}
@@ -168,18 +169,18 @@ local combos = 0
 for _ in seen do
 	combos += 1
 end
-check(combos == 12 and #Life.Kaiju == 12, "Not every species in every element")
+check(combos == 16 and #Life.Kaiju == 16, "Not every species in every element")
 local index, flicker = Life.kaijuAt(Life.Hold * 5)
 check(index == 6 and flicker == 0, "The sixth kaiju doesn't start flickering in on time")
 index, flicker = Life.kaijuAt(Life.Hold * 5 + Life.Flicker + 0.01)
 check(index == 6 and flicker == 1, "It's still flickering")
-check(Life.kaijuAt(Life.Hold * 12 + 1) == 1, "The hologram doesn't loop")
+check(Life.kaijuAt(Life.Hold * 16 + 1) == 1, "The hologram doesn't loop")
 
 -- It stands on the stage (the arena's middle, from the server's build),
 -- inside it and under the arena's sign, the one shown and no other.
 local stage = Life.Stage
 local signBottom = 18.4 - 1.7
-for t = 0, Life.Hold * 12, 1.7 do
+for t = 0, Life.Hold * 16, 1.7 do
 	Life.pose(life, t)
 	local entry = Life.Kaiju[(Life.kaijuAt(t))]
 	local shownCount = 0

@@ -27,7 +27,7 @@ end
 local KaijuModels = load("KaijuModels")
 local Motion = load("CreatureMotion")
 
-local SPECIES = { "Bulwark", "Razorback", "Carapace" }
+local SPECIES = { "Bulwark", "Razorback", "Carapace", "Scythe" }
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 local KINDS = { Body = true, Stride = true, Arm = true, Jaw = true, Tail = true }
 local BUDGET = 90 -- parts in one kaiju (up to 3 per player, plus the wild ones)
@@ -221,7 +221,7 @@ check(math.abs(Motion.fight("Razorback", { Mood = "Nope", MoodAt = 100 }, 102).L
 
 print(
 	string.format(
-		"PASS: %d kaiju model checks (3 species x 4 elements, joints, ground, budget, motions, fight poses, moods)",
+		"PASS: %d kaiju model checks (4 species x 4 elements, joints, ground, budget, motions, fight poses, moods)",
 		checks
 	)
 )

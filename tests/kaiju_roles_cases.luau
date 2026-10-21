@@ -202,9 +202,6 @@ end
 
 -- Whole battles ---------------------------------------------------------------------------------------------
 
--- An assassin species of the tests' own (until one joins the roster).
-KaijuRoles.Species.Testclaw = "Assassin"
-
 local fxs = {}
 Brain.fx = function(kind, ...)
 	table.insert(fxs, { kind, ... })
@@ -587,7 +584,7 @@ check(turned, "The roar didn't turn a foe on the tank")
 -- 4. An assassin's on their shooter the moment it starts.
 now = 0
 A = { body("Bulwark", "A", "FrontCentre"), body("Razorback", "A", "BackLeft") }
-B = { body("Carapace", "B", "FrontCentre"), body("Testclaw", "B", "BackRight") }
+B = { body("Carapace", "B", "FrontCentre"), body("Scythe", "B", "BackRight") }
 local onShooter = nil
 battle(A, B, 3, function()
 	local killer, mark = B[2], A[2]
@@ -602,7 +599,7 @@ check(B[2].Brain.Target == A[2] or not A[2].Model.Parent, "The assassin left the
 -- shooting.
 now = 0
 A = { body("Razorback", "A", "BackCentre") }
-B = { body("Testclaw", "B", "BackCentre") }
+B = { body("Scythe", "B", "BackCentre") }
 local gapAfter = 0
 stats = battle(A, B, 4, function(t)
 	if t == 20 and A[1].Model.Parent and B[2] == nil then
@@ -623,7 +620,7 @@ A = {
 B = {
 	body("Carapace", "B", "FrontLeft", 10),
 	body("Bulwark", "B", "FrontRight", 10),
-	body("Testclaw", "B", "BackCentre", 10),
+	body("Scythe", "B", "BackCentre", 10),
 }
 table.clear(fxs)
 local named = {}
@@ -644,8 +641,87 @@ end
 check(seen >= 8, "Too few of the kits' moves were cast at level 10: " .. seen)
 print(string.format("  level 10: %d of the kits' 12 moves cast", seen))
 
+-- 7. The balance: every team of three (kinds may repeat) against every
+-- other, in their default places, at levels 1, 5 and 10. No kind's teams
+-- win much more or much less than half (KaijuRoles' Power and the kinds'
+-- stats, tuned on this).
+do
+	local power = KaijuRoles.power
+	check(power("Ranged", 1) == 1.4 and power("Ranged", 5) == 1.6 and power("Ranged", 10) == 1.9, "A shooter's power")
+	check(math.abs(power("Ranged", 3) - 1.5) < 1e-9 and power("Ranged", 30) == 1.9, "A shooter's power between levels")
+	check(
+		power("Tank", 10) < power("Warrior", 10) and power("Warrior", 10) < power("Ranged", 10),
+		"The roles' power out of order"
+	)
+	local kinds = Kaiju.Order
+	local teams = {}
+	for a = 1, #kinds do
+		for b = a, #kinds do
+			for c = b, #kinds do
+				table.insert(teams, { kinds[a], kinds[b], kinds[c] })
+			end
+		end
+	end
+	local function squad(team, side, level)
+		local records = {}
+		for i, species in team do
+			table.insert(records, { Id = side .. i, Species = species })
+		end
+		local places = KaijuBattle.defaultFormation(records)
+		local out = {}
+		for i, species in team do
+			table.insert(out, body(species, side, places[side .. i], level))
+		end
+		return out
+	end
+	for _, level in { 1, 5, 10 } do
+		local won, played = {}, {}
+		for i, teamA in teams do
+			for j, teamB in teams do
+				if i ~= j then
+					now = 0
+					table.clear(queued)
+					local sideA, sideB = squad(teamA, "A", level), squad(teamB, "B", level)
+					local _, leftA, leftB = battle(sideA, sideB, 90)
+					local shareA, shareB = 0, 0
+					for _, pet in leftA do
+						shareA += pet.Humanoid.Health / pet.Humanoid.MaxHealth
+					end
+					for _, pet in leftB do
+						shareB += pet.Humanoid.Health / pet.Humanoid.MaxHealth
+					end
+					local aWon = if #leftB == 0
+						then 1
+						elseif #leftA == 0 then 0
+						elseif shareA > shareB then 1
+						elseif shareB > shareA then 0
+						else 0.5
+					for _, species in teamA do
+						won[species] = (won[species] or 0) + aWon
+						played[species] = (played[species] or 0) + 1
+					end
+					for _, species in teamB do
+						won[species] = (won[species] or 0) + 1 - aWon
+						played[species] = (played[species] or 0) + 1
+					end
+				end
+			end
+		end
+		local line = {}
+		for _, species in kinds do
+			local share = won[species] / played[species]
+			check(
+				share > 0.4 and share < 0.6,
+				string.format("Level %d: %s's teams win %.0f%%", level, species, share * 100)
+			)
+			table.insert(line, string.format("%s %.0f%%", species, share * 100))
+		end
+		print(string.format("  level %d, %d battles: %s", level, #teams * (#teams - 1), table.concat(line, ", ")))
+	end
+end
+
 print(
 	"PASS: "
 		.. checks
-		.. " kaiju role checks (roles and kits, who it picks and where it stands, whole battles: no standing about, onto the next after a kill, 3 on 1, the shooter at the back, the tank's roar, the assassin's leap, inside the court)"
+		.. " kaiju role checks (roles and kits, who it picks and where it stands, whole battles: no standing about, onto the next after a kill, 3 on 1, the shooter at the back, the tank's roar, the assassin's leap, inside the court; the balance at levels 1, 5 and 10)"
 )

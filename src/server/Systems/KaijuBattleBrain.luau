@@ -193,7 +193,9 @@ local function strike(pet, brain, foe, now: number, host)
 	local d = flat(foe.Root.Position - pet.Root.Position).Magnitude
 	local reach = if role.Range then role.Range + 2 else role.Reach + 1.5
 	local color = GemConfig.ElementColors[pet.Element] or Color3.new(1, 1, 1)
-	local damage = pet.Stats.Damage * (if now < (pet.RallyUntil or 0) then pet.RallyDamage or 1 else 1)
+	local damage = pet.Stats.Damage
+		* KaijuRoles.power(unit.Role, pet.Record and pet.Record.Level)
+		* (if now < (pet.RallyUntil or 0) then pet.RallyDamage or 1 else 1)
 	if role.Range then
 		local root = pet.Root
 		local from = root.Position + root.CFrame.LookVector * root.Size.Z * 0.5

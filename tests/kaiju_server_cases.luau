@@ -3723,7 +3723,7 @@ teamFights()
 
 -- Kaiju battles ---------------------------------------------------------------------------------------------
 -- Asked and accepted; each side's kaiju in their default places (the
--- sturdy ones in front, a Razorback behind), moved about, both ready; then
+-- sturdy ones in front, a Razorback or a Scythe behind), moved about, both ready; then
 -- they fight it out by themselves, each side's shared out over the other's,
 -- till one side's down: the result to both, EXP, and every kaiju back as
 -- it was before (the losers' too: fought at full health, knocked out only
@@ -3818,7 +3818,7 @@ do
 			local cell = KaijuBattle.cell(cellId)
 			check(cell ~= nil, "A kaiju of yours has no place")
 			check(
-				cell and (cell.Row == "Back") == (pet.Record.Species == "Razorback"),
+				cell and (cell.Row == "Back") == not KaijuBattle.FrontKinds[pet.Record.Species],
 				pet.Record.Species .. " isn't in its default row: " .. tostring(cellId)
 			)
 			local orders = KaijuServer.battle(pet, now)

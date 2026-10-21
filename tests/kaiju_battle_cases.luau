@@ -153,9 +153,10 @@ check(Battle.defaultFormation(team("Bulwark")).k1 == "FrontCentre", "One alone i
 check(Battle.defaultFormation(team("Razorback")).k1 == "BackCentre", "A Razorback alone isn't in the middle behind")
 -- Every kind has a row it goes in.
 for _, id in Kaiju.Order do
-	check(Battle.FrontKinds[id] ~= nil or id == "Razorback", id .. " has no row")
+	check(Battle.FrontKinds[id] ~= nil or id == "Razorback" or id == "Scythe", id .. " has no row")
 end
 check(not Battle.FrontKinds.Razorback, "A Razorback goes in front")
+check(not Battle.FrontKinds.Scythe, "A Scythe goes in front (it leaps from the back)")
 
 -- A formation asked for: every kaiju placed, each on a place of its own,
 -- only yours, only places on the field.

@@ -368,6 +368,7 @@ Vendors.Tips = {
 	"Every kaiju fights a kaiju battle at full health, and goes back to its health from before once it's over, win or lose. The winner takes both stakes.",
 	"Bulwarks and Carapaces take hits well: put them in the front row of a battle formation.",
 	"Razorbacks fight at range: keep them in the back row of a battle formation.",
+	"Scythes are assassins: at the start of a battle they leap over the front line onto the other side's ranged kaiju.",
 	-- Combat
 	"Raise your guard just before a melee hit lands to parry: you take far less damage, spend no stamina and stun your rival.",
 	"Hold your swing and release it on gold for a perfect hit.",
@@ -430,7 +431,7 @@ Vendors.ArenaGuide = {
 			Options = {
 				{
 					Text = "Front row or back row?",
-					Reply = "The front row takes the blows: put your tanks (Carapaces) and warriors (Bulwarks) there. A Razorback is ranged: it shoots from the back row, so keep it behind them.",
+					Reply = "The front row takes the blows: put your tanks (Carapaces) and warriors (Bulwarks) there. Keep a Razorback behind them: it shoots from the back row. A Scythe starts at the back too, then leaps over their front line.",
 				},
 				{
 					Text = "How do I place them?",
@@ -438,7 +439,7 @@ Vendors.ArenaGuide = {
 				},
 				{
 					Text = "Which kaiju is which?",
-					Reply = "Carapace, the TANK: it shrugs off a quarter of every hit, and its roar makes foes attack it. Bulwark, the WARRIOR: heavy blows up close; it shrugs off a tenth. Razorback, RANGED: it shoots from the back and backs off anyone who closes in, but it's fragile.",
+					Reply = "Carapace, TANK: shrugs off a quarter of every hit; its roar makes foes attack it. Bulwark, WARRIOR: heavy blows up close. Razorback, RANGED: shoots from the back, but it's fragile. Scythe, ASSASSIN: leaps onto their ranged kaiju and cuts fast, but falls fast.",
 				},
 				{
 					Text = "Which element beats which?",
@@ -478,6 +479,7 @@ Vendors.ArenaTips = {
 	"A kaiju takes 125% damage from the element that beats its own, and only 75% from its own.",
 	"Carapaces shrug off a quarter of every blow and Bulwarks a tenth. They hold the front row.",
 	"A Razorback shoots from the back row. In front, it takes blows it can't survive.",
+	"A Scythe leaps over the front line onto your ranged kaiju as the battle starts. It has the least health of any kaiju, so hit it back hard.",
 	"If time runs out, the side with more health left wins. A sturdy front row wins long battles.",
 	"Press READY once you're placed. If your foe is ready too, the fight starts at once.",
 	"Both press REMATCH in the 12 seconds after a battle to go again on the same court, for the same stake.",

@@ -61,10 +61,12 @@ ShelterLife.Reach = 320 -- studs from the Shelter's middle: past this it's put a
 -- The hologram: every kaiju, species and element both changing each time.
 ShelterLife.Kaiju = {}
 do
-	local species = { "Bulwark", "Razorback", "Carapace" }
+	local species = { "Bulwark", "Razorback", "Carapace", "Scythe" }
 	local elements = { "Fire", "Frost", "Shock", "Poison" }
-	for i = 0, 11 do
-		table.insert(ShelterLife.Kaiju, { Species = species[i % 3 + 1], Element = elements[i % 4 + 1] })
+	for i = 0, 15 do
+		local kind = i % 4
+		local element = (kind + math.floor(i / 4)) % 4
+		table.insert(ShelterLife.Kaiju, { Species = species[kind + 1], Element = elements[element + 1] })
 	end
 end
 ShelterLife.Hold = 12 -- seconds each kaiju shows

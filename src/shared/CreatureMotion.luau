@@ -105,6 +105,27 @@ Motion.Fight = {
 		-- Into its shell: it sinks down over its legs.
 		Guard = { Lift = -0.45, Pitch = -0.05 },
 	},
+	Scythe = {
+		-- Blade Slash: one blade drawn high, then cut down and across.
+		Light = {
+			Wind = { Yaw = 0.3, Arm = 1.1, Pitch = 0.12 },
+			Hit = { Yaw = -0.45, Arm = -0.4, Pitch = -0.2, Push = 0.35 },
+			OneArm = true,
+		},
+		-- Scissor Strike: rears up, both blades high, then snaps them shut.
+		Heavy = {
+			Wind = { Pitch = 0.35, Lift = 0.12, Arm = 1.6, Jaw = 0.4 },
+			Hit = { Pitch = -0.25, Lift = -0.08, Arm = -0.5, Jaw = 0.6, Push = 0.3 },
+		},
+		-- Mantis Leap: a low crouch, then a spring, blades out.
+		Lunge = {
+			Wind = { Pitch = 0.1, Lift = -0.2, Arm = 0.8 },
+			Hit = { Pitch = -0.25, Lift = 0.35, Push = 0.6, Arm = 0.2 },
+		},
+		Cast = { Wind = { Pitch = 0.3, Jaw = 0.7, Arm = 1.3 }, Hit = { Pitch = -0.1, Jaw = 0.8, Arm = 0.5 } },
+		-- Blades crossed in front of it.
+		Guard = { Pitch = 0.08, Lift = -0.1, Arm = 1.2 },
+	},
 }
 -- (A counter swings as a quick blow; an E, aimed or round itself, is its cast.)
 local ALIASES = { Punish = "Light", Bolt = "Cast", Nova = "Cast" }

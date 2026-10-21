@@ -8,24 +8,30 @@ for keeps.
 
 They replace the critter pets in [pet-system-proposal.md](pet-system-proposal.md).
 
-![The three kaiju in the four elements](kaiju/species.png)
+![The four kaiju in the four elements](kaiju/species.png)
 
-## The three kinds
+(An offline render of the game's kaiju models, `Shared.KaijuModels`, not a
+Roblox screenshot.)
 
-Each kind comes in Thermal, Cryo, Ion and Corrosive: twelve in all.
+## The four kinds
+
+Each kind comes in Thermal, Cryo, Ion and Corrosive: sixteen in all.
 
 | Kind | Role | Looks | Plays | Health | Damage | Speed |
 | --- | --- | --- | --- | --- | --- | --- |
 | **Bulwark** | Warrior | Stands upright: plated chest, fins down its back, a long tail | Slow, heavy blows up close, shrugs off 10% | 240 | 20 a blow; attacks about every 1.6 s | 12 |
-| **Razorback** | Ranged | Runs low: long toothed snout, spines, long legs | Shoots spines from the back; fragile | 160 | 11 a spine; about every 0.8 s | 20 |
+| **Razorback** | Ranged | Runs low: long toothed snout, spines, long legs | Shoots spines from the back; fragile | 190 | 11 a spine; about every 0.8 s | 20 |
 | **Carapace** | Tank | Four stubby legs under a wide shell, a spiked club tail | The hardest to wear down: shrugs off 25%, and draws foes onto itself | 300 | 13 a blow; attacks about every 1.3 s | 10 |
-
-The role decides how it fights in a kaiju battle, and its three moves (see
-[kaiju-arena.md](kaiju-arena.md#roles-an-auto-battler), `Shared.KaijuRoles`).
-An assassin, the fourth role, is coming as a fourth kind.
+| **Scythe** | Assassin | A mantis on four thin splayed legs: big glowing eyes, feelers, two blade arms held up in front, wing cases over a long abdomen | Leaps over the front line onto their shooter; quick cuts, the least health (shrugs off 5%) | 170 | 15 a cut; about every 0.9 s | 18 |
 
 Those are level 1. Each level adds 8% of them, up to level 30. A finer
 Gemsoul (below) adds up to 20% more.
+
+The role decides how it fights in a kaiju battle, and its three moves (see
+[kaiju-arena.md](kaiju-arena.md#roles-an-auto-battler), `Shared.KaijuRoles`).
+In a battle each role's blows carry their own share of that Damage
+(`KaijuRoles.power`), tuned so that no kind's teams win much more than half
+their battles at any level.
 
 ## The Gemsoul, and a kaiju's own moves
 
@@ -36,7 +42,7 @@ stronger the finer it is.
 **A kaiju's own moves are its role's** (`Kaiju.kitMoves`,
 `KaijuRoles.Kits`): a tank's Taunting Roar, Shell Slam and Fortress, a
 warrior's Cleave, War Cry and Earthshaker, a ranged one's Spine Volley,
-Piercing Spine and Vault. Each was copied from a gem surge and renamed for
+Piercing Spine and Vault, an assassin's Shadow Leap, Rend and Vanish. Each was copied from a gem surge and renamed for
 kaiju. It casts them everywhere it fights, and they're what its card and
 panel show. They wake as it levels (`Kaiju.MoveLevels`): E from the start, Q
 at level 5, R at level 10. In a kaiju battle its E goes off when its mana
@@ -92,6 +98,7 @@ heavy, a cast, a raised guard, an opening after a blow, a foe standing idle.
 | **Bulwark** | Claw Swipe, up to 2 in a row | Ground Stomp: 2× | arms up, takes 30% |
 | **Razorback** | Bite, up to 3 in a row | Tail Lash: 1.6× | a low crouch, takes 40% |
 | **Carapace** | Shell Snap, up to 2 in a row | Shell Slam: 1.8× | into its shell, takes 15% |
+| **Scythe** | Blade Slash, up to 3 in a row | Scissor Strike: 1.8× | blades crossed, takes 45% |
 
 - **Wind-ups.** Every blow winds up first (the brute slowest, the runner
   quickest). A heavy marks the ground at its feet in its element's look
@@ -352,7 +359,8 @@ They go about their day:
   minutes and you'll meet it somewhere new.
 - Come within 22 studs and it stops to look you over, turning to face you.
   Now and then (at most every 25 seconds) it roars at you, each kind in its
-  own voice: a deep bellow, a raspy snarl, a rumble under a hiss. Either way
+  own voice: a deep bellow, a raspy snarl, a rumble under a hiss, a
+  chittering screech. Either way
   it leaves you be.
 - It doesn't wander into the core, and it only sets off where the way is
   clear (nothing solid in a line to where it's going), so it doesn't push

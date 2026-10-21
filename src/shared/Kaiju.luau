@@ -2,19 +2,23 @@
 	Mini kaiju: small creatures that roam the Outpost, fight beside you,
 	and can be tamed. See docs/kaiju.md.
 
-	Three species, each in four elements (Fire, Frost, Shock and Poison in
+	Four species, each in four elements (Fire, Frost, Shock and Poison in
 	the data; Thermal, Cryo, Ion and Corrosive on screen):
 	  Bulwark    a warrior: an armoured brute on two legs, slow, heavy blows
 	  Razorback  ranged: a spined runner that shoots, quick, light, fragile
 	  Carapace   a tank: a low shell on four legs, the hardest to wear down
+	  Scythe     an assassin: a lean mantis with blade arms, the quickest
+	             blows and the least health
 	(Their roles in a battle, and each role's own moves: Shared.KaijuRoles.)
 
 	Every kaiju carries its Gemsoul: a gem of its element, rolled like any
-	gem (rarity, Size, Clarity, Cut), and all three of its moves come from
-	that one stone: its E from the start, its Q from level 5, its R from
-	level 10 (MoveLevels). The kaiju casts them in a fight. A kaiju killed
-	(or lost in the arena) leaves its Gemsoul behind as a gem anyone can
-	socket, its Q, E and R working in a sword, a chest and a shield.
+	gem (rarity, Size, Clarity, Cut). It gives the kaiju its element, and a
+	finer one makes it stronger (SoulBonus). Its moves are its role's own
+	(kitMoves): its E from the start, its Q from level 5, its R from level
+	10 (MoveLevels), cast in a fight. The Gemsoul's own three moves (move,
+	moves) are the gem's: a kaiju killed (or lost in the arena) leaves its
+	Gemsoul behind as a gem anyone can socket, its Q, E and R working in a
+	sword, a chest and a shield.
 
 	Taming: bring a wild kaiju to half health or less WITHOUT killing it (it
 	glows gold when it's ready), then cast your tame (Tame.Cast seconds of
@@ -47,7 +51,7 @@ local KaijuRoles = require(script.Parent.KaijuRoles)
 local Kaiju = {}
 
 Kaiju.Elements = { "Fire", "Frost", "Shock", "Poison" }
-Kaiju.Order = { "Bulwark", "Razorback", "Carapace" }
+Kaiju.Order = { "Bulwark", "Razorback", "Carapace", "Scythe" }
 
 -- Level 1 stats (at a Common Gemsoul). Guard: the share of each blow it shrugs off.
 Kaiju.Species = {
@@ -68,7 +72,7 @@ Kaiju.Species = {
 		Name = "Razorback",
 		Role = "Ranged",
 		Blurb = "Ranged: a spined runner that shoots its spines from the back. It can't take a beating.",
-		Health = 160,
+		Health = 190,
 		Damage = 11,
 		Rate = 0.8,
 		Speed = 20,
@@ -86,6 +90,18 @@ Kaiju.Species = {
 		Speed = 10,
 		Reach = 5.5,
 		Guard = 0.25,
+	},
+	Scythe = {
+		Id = "Scythe",
+		Name = "Scythe",
+		Role = "Assassin",
+		Blurb = "An assassin: a lean mantis with blades for arms. It leaps over the front line onto their ranged kaiju. It can't take a beating.",
+		Health = 170,
+		Damage = 15,
+		Rate = 0.9,
+		Speed = 18,
+		Reach = 5,
+		Guard = 0.05,
 	},
 }
 

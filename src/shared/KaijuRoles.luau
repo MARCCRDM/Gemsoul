@@ -8,7 +8,7 @@
 	  Ranged    Razorback  stays back and shoots from range, and backs off
 	                       from anyone who closes in. It never walks into
 	                       the front line.
-	  Assassin  (to come)  leaps over the front line at the start, onto
+	  Assassin  Scythe     leaps over the front line at the start, onto
 	                       their back row (a shooter first).
 
 	Each role has its own three moves (Kits), copied from the gem surges and
@@ -43,7 +43,9 @@ local KaijuRoles = {}
 -- Studs are a pet kaiju's (knee high). Reach: how near a melee one gets
 -- to strike. Range and Keep: a shooter fires from up to Range, and backs
 -- off from a foe nearer than Keep (if it has room). Windup: a blow's or a
--- shot's wind-up. Mana: gained per attack, and per 1% of its health lost.
+-- shot's wind-up. Power: a blow's or a spine's share of its Damage, at
+-- levels 1, 5 and 10 (KaijuRoles.power). Mana: gained per attack, and per
+-- 1% of its health lost.
 KaijuRoles.Roles = {
 	Tank = {
 		Id = "Tank",
@@ -51,6 +53,7 @@ KaijuRoles.Roles = {
 		Blurb = "Holds the front and takes the hits. Its roar makes foes attack it.",
 		Reach = 3.2,
 		Windup = 0.4,
+		Power = { 0.9, 0.7, 0.65 },
 		Mana = { Attack = 10, Hurt = 1.2 },
 		Front = true,
 	},
@@ -60,6 +63,7 @@ KaijuRoles.Roles = {
 		Blurb = "Fights up close and hits hardest there.",
 		Reach = 3.2,
 		Windup = 0.35,
+		Power = { 1.05, 0.95, 0.85 },
 		Mana = { Attack = 14, Hurt = 0.6 },
 		Front = true,
 	},
@@ -70,6 +74,7 @@ KaijuRoles.Roles = {
 		Range = 15,
 		Keep = 6,
 		Windup = 0.4,
+		Power = { 1.4, 1.6, 1.9 },
 		Mana = { Attack = 12, Hurt = 0.5 },
 		Front = false,
 	},
@@ -79,13 +84,14 @@ KaijuRoles.Roles = {
 		Blurb = "Leaps over the front line onto their back row, a shooter first.",
 		Reach = 2.8,
 		Windup = 0.3,
+		Power = { 0.8, 1.0, 1.1 },
 		Mana = { Attack = 16, Hurt = 0.5 },
 		Front = false,
 		Opens = true, -- leaps at the start of a battle
 	},
 }
 
-KaijuRoles.Species = { Carapace = "Tank", Bulwark = "Warrior", Razorback = "Ranged" }
+KaijuRoles.Species = { Carapace = "Tank", Bulwark = "Warrior", Razorback = "Ranged", Scythe = "Assassin" }
 KaijuRoles.Order = { "Tank", "Warrior", "Ranged", "Assassin" }
 
 KaijuRoles.ManaMax = 100
@@ -268,6 +274,28 @@ end
 function KaijuRoles.mana(role: string, attacked: boolean, lost: number): number
 	local spec = KaijuRoles.Roles[role] or KaijuRoles.Roles.Warrior
 	return (if attacked then spec.Mana.Attack else 0) + math.max(0, lost) * 100 * spec.Mana.Hurt
+end
+
+-- A blow's (or a spine's) share of its Damage in a battle: its role's
+-- Power at level 1, at level 5 (its Q awake) and at level 10 (its R),
+-- in between from one to the next. (A tank's and a warrior's Q and R
+-- carry more of their fight than a shooter's or an assassin's, so their
+-- blows' share falls as those wake and the others' rises.)
+function KaijuRoles.power(role: string, level: number?): number
+	local spec = KaijuRoles.Roles[role] or KaijuRoles.Roles.Warrior
+	local power = spec.Power
+	if type(power) ~= "table" then
+		return power or 1
+	end
+	local at = { 1, KaijuRoles.MoveLevels.Q, KaijuRoles.MoveLevels.R }
+	level = level or 1
+	for i = 2, #at do
+		if level <= at[i] then
+			local t = math.clamp((level - at[i - 1]) / (at[i] - at[i - 1]), 0, 1)
+			return power[i - 1] + (power[i] - power[i - 1]) * t
+		end
+	end
+	return power[#at]
 end
 
 local function flat(v: Vector3): Vector3

@@ -10,6 +10,10 @@
 	             swept-back spines, long hind legs and a whip of a tail
 	  Carapace   crouches on four stubby legs under a wide stepped shell
 	             tiled in plates, a horned head and a spiked club tail
+	  Scythe     a mantis on four thin splayed legs: a raised thorax, a
+	             small head with big glowing eyes, feelers and mandibles,
+	             two blade arms held up in front, wing cases over a long
+	             abdomen
 
 	Every model has an invisible HumanoidRootPart (its KaijuHipHeight
 	attribute is the Humanoid's HipHeight), and faces -Z. Its trunk (the
@@ -372,7 +376,78 @@ local function carapace(model: Model, pal)
 	end
 end
 
-local BUILDERS = { Bulwark = bulwark, Razorback = razorback, Carapace = carapace }
+-- Scythe ---------------------------------------------------------------------------------------
+local function scythe(model: Model, pal)
+	local r = root(model, V(1.4, 1.4, 1.8), 1.9)
+	local body = limb(model, r, "Body", V(1.0, 0.75, 1.5), CF(0, 1.7, 0.15), V(0, 1.6, 0.3), "Body", 1, BODY)
+	plate(model, body, "Back", V(0.8, 0.12, 1.1), CF(0, 2.1, 0.2), pal)
+	-- The thorax raised and leaning forward, a core of light in its chest.
+	local lean = CF(0, 2.5, -0.5) * A(rad(-25), 0, 0)
+	local thorax = make(model, body, "Thorax", V(0.75, 1.45, 0.7), lean, BODY2)
+	plate(model, thorax, "Chest", V(0.6, 0.9, 0.12), lean * CF(0, 0, -0.37), pal)
+	glow(model, thorax, "Core", V(0.24, 0.24, 0.08), lean * CF(0, 0.2, -0.44), pal)
+	-- A small head on a thin neck: big glowing eyes, feelers, mandibles.
+	make(model, thorax, "Neck", V(0.3, 0.35, 0.3), CF(0, 3.25, -0.9), BODY)
+	local head = make(model, thorax, "Head", V(0.95, 0.6, 0.6), CF(0, 3.5, -1.05), BODY2)
+	make(model, head, "Snout", V(0.4, 0.3, 0.35), CF(0, 3.22, -1.18), BODY2)
+	for _, x in { -1, 1 } do
+		glow(model, head, "Eye", V(0.34, 0.38, 0.38), CF(x * 0.5, 3.55, -1.1), pal)
+		plate(model, head, "Feeler", V(0.06, 0.06, 1.0), CF(x * 0.2, 4.1, -1.53) * A(rad(40), 0, 0), pal)
+	end
+	local jaw = limb(model, head, "Jaw", V(0.5, 0.18, 0.35), CF(0, 3.05, -1.25), V(0, 3.15, -1.05), "Jaw", 1, BODY)
+	for _, x in { -1, 1 } do
+		make(model, jaw, "Tooth", V(0.1, 0.12, 0.25), CF(x * 0.18, 3.0, -1.45), CLAW)
+	end
+	-- Blade arms: down and forward from the shoulder, up again from the
+	-- elbow, and a long blade hanging from its end, edged in light.
+	for _, x in { -1, 1 } do
+		plate(model, thorax, "Pauldron", V(0.4, 0.3, 0.5), CF(x * 0.36, 2.98, -0.85) * A(0, 0, rad(-x * 20)), pal)
+		local upper = CF(x * 0.46, 2.68, -1.15) * A(rad(42), 0, 0)
+		local arm = limb(model, thorax, "Arm", V(0.22, 0.75, 0.22), upper, V(x * 0.38, 2.95, -0.85), "Arm", x, BODY)
+		plate(model, arm, "Femur", V(0.26, 0.5, 0.14), upper * CF(0, 0, -0.15), pal)
+		make(model, arm, "Forearm", V(0.2, 0.8, 0.22), CF(x * 0.48, 2.78, -1.57) * A(rad(-26), 0, 0), BODY)
+		local blade = CF(x * 0.5, 2.72, -2.17) * A(rad(45), 0, 0)
+		plate(model, arm, "Blade", V(0.08, 1.3, 0.34), blade, pal)
+		glow(model, arm, "Edge", V(0.04, 1.2, 0.05), blade * CF(0, 0, -0.18), pal)
+	end
+	-- Four thin legs splayed out to the sides (front-left with back-right,
+	-- front-right with back-left), up to the knee and down to the ground.
+	for _, spot in { { 1, -1 }, { -1, -1 }, { 1, 1 }, { -1, 1 } } do
+		local x, z = spot[1], if spot[2] < 0 then -0.15 else 0.55
+		local side = spot[1] * spot[2] * -1
+		local leg = limb(
+			model,
+			body,
+			"Leg",
+			V(0.16, 0.77, 0.16),
+			CF(x * 0.735, 1.775, z) * A(0, 0, rad(-x * 54.5)),
+			V(x * 0.42, 1.55, z),
+			"Stride",
+			side,
+			BODY
+		)
+		plate(model, leg, "Knee", V(0.22, 0.22, 0.22), CF(x * 1.05, 2.0, z), pal)
+		make(model, leg, "Shin", V(0.12, 1.93, 0.12), CF(x * 1.275, 1.06, z) * A(0, 0, rad(x * 13.5)), BODY)
+		make(model, leg, "Foot", V(0.26, 0.12, 0.36), CF(x * 1.5, 0.06, z - 0.05), BODY2)
+	end
+	-- A long abdomen behind, drooping a little, banded in its element's colour.
+	local parent, top = body, V(0, 1.75, 0.85)
+	for _, s in { V(0.8, 0.6, 0.85), V(0.9, 0.62, 0.85), V(0.75, 0.52, 0.8), V(0.5, 0.38, 0.7) } do
+		local tilt = A(rad(12), 0, 0)
+		local centre = top + tilt:VectorToWorldSpace(V(0, 0, s.Z / 2))
+		local seg = limb(model, parent, "Tail", s, CF(centre) * tilt, top, "Tail", 1, BODY)
+		plate(model, seg, "Stripe", V(s.X * 0.8, 0.1, s.Z * 0.5), CF(centre) * tilt * CF(0, s.Y / 2, 0), pal)
+		parent, top = seg, top + tilt:VectorToWorldSpace(V(0, 0, s.Z - 0.08))
+	end
+	-- Wing cases folded over its back, a vein of light down each.
+	for _, x in { -1, 1 } do
+		local wing = CF(x * 0.24, 2.18, 1.1) * A(rad(10), rad(x * 6), 0)
+		plate(model, body, "Wing", V(0.45, 0.08, 2.0), wing, pal)
+		glow(model, body, "Vein", V(0.05, 0.04, 1.7), wing * CF(0, 0.05, 0), pal)
+	end
+end
+
+local BUILDERS = { Bulwark = bulwark, Razorback = razorback, Carapace = carapace, Scythe = scythe }
 
 -- A kaiju of a species and element, at scale 1, standing at the origin.
 function KaijuModels.build(species: string, element: string): Model

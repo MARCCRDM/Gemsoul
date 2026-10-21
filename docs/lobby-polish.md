@@ -141,6 +141,6 @@ from a Rojo build, set **Lighting > Technology** to **Future** there too.
 
 | Suite | What it covers |
 | --- | --- |
-| `tests/run_shelter_life.py` (new) | The hologram: on the arena's stage, inside it and under its sign; one kaiju at a time; all 12; none alike in a row; its name facing the door; the console's prompt. The gallery: a gem in each of the server's cases, staying in it; the odds on each plinth add up to every gem mined and face the hall; the Legendary sparkles. The garden: four benches round the fireflies. The drones: in the hall, under the bunting, clear of the tree, the sign, the lamps and each other, never jumping. Nothing clickable or shadowed; the part budget. |
+| `tests/run_shelter_life.py` (new) | The hologram: on the arena's stage, inside it and under its sign; one kaiju at a time; every kind in every element; none alike in a row; its name facing the door; the console's prompt. The gallery: a gem in each of the server's cases, staying in it; the odds on each plinth add up to every gem mined and face the hall; the Legendary sparkles. The garden: four benches round the fireflies. The drones: in the hall, under the bunting, clear of the tree, the sign, the lamps and each other, never jumping. Nothing clickable or shadowed; the part budget. |
 | `tests/run_moon_quarry_scene.py` | The scenery budget (3,944 of 4,000); the finish made on a fresh entry and not overdone; the daytime grade, haze and rays reset on the way in |
 | `tests/run_lang.py` | The console's prompt in Spanish |

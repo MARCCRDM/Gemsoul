@@ -5,12 +5,13 @@ with the same building blocks as tools/make_combat_sounds.py:
     roar_bulwark.mp3     a deep, chesty bellow that swells and falls
     roar_razorback.mp3   a raspy, rattling snarl, higher and quicker
     roar_carapace.mp3    a low rumble under a rising hiss, clicking
+    roar_scythe.mp3      a thin chittering screech, mandibles clicking fast
 
     pip install numpy scipy soundfile
-    python tools/make_kaiju_sounds.py
+    python tools/make_kaiju_sounds.py [roar_scythe ...]   (default: all)
 
 Upload them like the combat set (tools/upload_audio.py fills in the
-RoarBulwark, RoarRazorback and RoarCarapace ids in
+RoarBulwark, RoarRazorback, RoarCarapace and RoarScythe ids in
 src/client/Modules/CombatSound.luau); until then built-in Roblox sounds
 stand in.
 """
@@ -105,16 +106,35 @@ def roar_carapace():
     return room(mix((0, rumble), (0, hiss), (0, clicks)), 0.45, 0.3)
 
 
+def roar_scythe():
+    secs = 0.95
+    f0 = contour(secs, [(0, 380), (0.1, 620), (0.35, 700), (0.7, 560), (1, 420)])
+    throat = voice(f0, secs, rasp=0.85, breath=0.15)
+    mouth = formants(throat, [(900, 1900, 1.0), (2200, 3600, 0.5), (4200, 6000, 0.12)])
+    screech = filt(drive(mouth * 1.6, 2.6), "low", 7000) * swell(secs, 0.04, 0.3)
+    clicks = np.zeros(n_of(secs))
+    starts = np.arange(0.03, secs - 0.05, 0.045)
+    for start in starts + RNG.uniform(-0.008, 0.008, len(starts)):
+        i = n_of(start)
+        tick = filt(noise(0.008), "high", 2500) * np.exp(-t_of(0.008) / 0.002)
+        clicks[i : i + len(tick)] += tick * 0.22
+    return room(mix((0, screech * 0.8), (0, clicks)), 0.3, 0.2)
+
+
 ROARS = {
     "roar_bulwark": (roar_bulwark, 0.8),
     "roar_razorback": (roar_razorback, 0.78),
     "roar_carapace": (roar_carapace, 0.8),
+    "roar_scythe": (roar_scythe, 0.76),
 }
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+    wanted = set(sys.argv[1:]) or set(ROARS)
     for name, (fn, peak) in ROARS.items():
+        if name not in wanted:
+            continue
         x = finish(np.asarray(fn(), dtype=np.float64), peak * 0.88)
         loud = np.nonzero(np.abs(x) > peak * 0.002)[0]
         end = min(len(x), (loud[-1] if len(loud) else len(x)) + n_of(0.02))

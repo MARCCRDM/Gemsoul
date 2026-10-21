@@ -8,6 +8,7 @@
 	  Bulwark    Claw Swipe       Ground Stomp             arms up
 	  Razorback  Bite             Tail Lash                a low crouch
 	  Carapace   Shell Snap       Shell Slam               tucked in its shell
+	  Scythe     Blade Slash      Scissor Strike           blades crossed
 
 	besides a quick counter after a blocked blow or into an opening (Punish,
 	Riposte), a pounce from mid range (Lunge), a hop aside (Dodge), circling
@@ -103,6 +104,16 @@ KaijuFight.Styles = {
 		ComboGap = 0.5,
 		GuardMult = 0.15,
 		Hop = 0.8,
+	},
+	Scythe = {
+		Names = { Light = "Blade Slash", Heavy = "Scissor Strike", Punish = "Quick Cut", Lunge = "Mantis Leap" },
+		Windup = 0.75,
+		Heavy = 1.8,
+		Combo = 3,
+		ComboChance = 0.7,
+		ComboGap = 0.3,
+		GuardMult = 0.45,
+		Hop = 1.4,
 	},
 }
 
