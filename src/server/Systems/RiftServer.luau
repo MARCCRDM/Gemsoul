@@ -27,9 +27,14 @@
 	              found in here). Through the floor somehow, back in the
 	              last cave you reached (RiftRun.Fall).
 	  Falling     knocked out on the way (SparServer's knock-down, or
-	              killed outright): the critters rob you (RiftRun.robCount
-	              of the gems you found in here, out of your pouch) and
-	              you're thrown back to base. Knocked out at the boss: you
+	              killed outright): the critters rob you (Server.Robbery):
+	              you stay down while the cave's critters come for you, and
+	              more tear through round you if too few are near; each
+	              grabs one of the gems you found in here (RiftRun.robCount
+	              at most, out of your pouch) and runs for a tear with it
+	              (bonked or knocked out first, it drops it back). Then
+	              you're back at base, shown what they took (the "Robbed"
+	              report: Client.RobReport). Knocked out at the boss: you
 	              stay down (RiftFallen: SparServer leaves you there) and
 	              choose ("RiftChoice"): "Restore" (RiftRun.restoreCost
 	              coins: your health and your kaiju's, all of them back:
@@ -53,6 +58,12 @@
 	              or the throne cave's once it's open), keeping what you found.
 	  The gate    "RiftPeek": what going in looks like (the gate's card):
 	              { Party, Joining, Solo }.
+	  Healing     each cave and the throne cave have healing crystals
+	              (RiftRun.Heal, World.RiftWorld.healRock): "RiftMine", id
+	              is a swing of your pick at one (1 swaps your kit for it:
+	              SparServer's Hunt): health back, never gems; the swing
+	              that breaks it heals more, and your kaiju out
+	              (KaijuServer.mend). It grows back a while later.
 
 	A runner carries RiftRun (the trip's id), RiftRoom (the cave they're on
 	the way to: 1..Rooms, Rooms + 1 the throne cave), RiftLeft (foes left
@@ -67,12 +78,15 @@
 	  RiftServer.start(site)          site: the Outpost's (OutpostServer.site())
 	  RiftServer.runOf(player) -> run?
 ]]
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
 local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
+local Frontier = require(ReplicatedStorage.Shared.Frontier)
+local Outpost = require(ReplicatedStorage.Shared.Outpost)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
@@ -90,6 +104,7 @@ local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Restores = require(script.Parent.Restores)
+local Robbery = require(script.Parent.Robbery)
 local Shop = require(script.Parent.Shop)
 local SparServer = require(script.Parent.SparServer)
 
@@ -283,6 +298,11 @@ local function spawnFoe(run, at: Vector3, opts)
 	opts.Stay = true
 	opts.Wander = opts.Wander or { Home = at, Roam = 9, Notice = 26 }
 	opts.Facing = opts.Facing or run.World.Start.Position
+	opts.Hell = true
+	-- (Off through a tear with someone's gem: gone from the cave's pack.)
+	opts.OnGone = function(e)
+		foeDied(run, e)
+	end
 	local enemy = KaijuWilds.spawnBug(at, opts)
 	if not enemy then
 		return nil
@@ -370,6 +390,7 @@ local function hopIn(life): number
 end
 
 local checkClear
+local spawnHeals -- (below, with the healing crystals)
 
 -- One foe through a tear of its own at `at`: the tear opens `after` seconds
 -- from now (`height` tall; the Outpost's size when nil) in the critters'
@@ -733,45 +754,191 @@ checkClear = function(run)
 	end
 end
 
--- Knocked out on the path: robbed, and back to base.
-local function robbed(run, player: Player)
-	run.Handled[player] = true
-	local found = run.Found[player] or {}
-	local count = RiftRun.robCount(#found)
+-- Robbed while down ------------------------------------------------------------------------------------
+
+-- The cave `position` is in (the landing, one on the way, or the throne
+-- cave), or the nearest.
+local function areaAt(run, position: Vector3)
+	local world = run.World
+	local best, bestDistance = world.Landing, math.huge
+	local areas = { world.Landing, world.Boss }
+	for _, cave in world.Rooms do
+		table.insert(areas, cave)
+	end
+	for _, area in areas do
+		local offset = position - area.Center
+		local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+		if distance < bestDistance then
+			best, bestDistance = area, distance
+		end
+	end
+	return best
+end
+
+-- `spot` brought onto `area`'s floor, `margin` studs in from its walls.
+local function onFloor(area, spot: Vector3, margin: number): Vector3
+	local half = area.Size / 2 - margin
+	local c = area.Center
+	return Vector3.new(
+		math.clamp(spot.X, c.X - half, c.X + half),
+		c.Y + 0.5,
+		math.clamp(spot.Z, c.Z - half, c.Z + half)
+	)
+end
+
+-- The gems `player` found in here still loose in their pouch, newest last.
+local function looseFound(run, player: Player): { string }
 	local profile = PlayerData.get(player)
 	local loose = {}
 	for _, gem in (profile and GemInventory.available(profile)) or {} do
 		loose[gem.Id] = true
 	end
-	local taken = 0
-	for i = #found, 1, -1 do
-		if taken >= count then
-			break
+	local list = {}
+	for _, id in run.Found[player] or {} do
+		if loose[id] then
+			table.insert(list, id)
 		end
-		local id = found[i]
-		if loose[id] and PlayerData.removeGem(player, id) then
-			taken += 1
-			table.remove(found, i)
-		end
+	end
+	return list
+end
+
+-- A robber's grab: the newest gem `player` found in here, out of their pouch.
+local function riftSteal(run, player: Player)
+	local found = run.Found[player]
+	local ids = looseFound(run, player)
+	local id = ids[#ids]
+	local gem = id and PlayerData.removeGem(player, id)
+	if not gem or not found then
+		return nil
+	end
+	local i = table.find(found, id)
+	if i then
+		table.remove(found, i)
+	end
+	show(run)
+	notify(player, string.format("A critter grabbed your %s!", GemConfig.displayName(gem)))
+	return gem
+end
+
+-- A robber bonked or knocked out first: the gem's back in their pouch (and
+-- among what they found, still in here).
+local function riftRecover(run, player: Player?, gem, at: Vector3)
+	if not player or not player.Parent or type(gem) ~= "table" then
+		return
+	end
+	PlayerData.returnGem(player, gem)
+	if runOf[player] == run and run.Found[player] then
+		table.insert(run.Found[player], gem.Id)
+		show(run)
 	end
 	local root = rootOf(player)
-	if root then
-		fx("CritterGiggle", root.Position + Vector3.new(0, 3, 0), "Cackle")
-	end
-	notify(
-		player,
-		if taken > 0
-			then string.format(
-				"You went down. The critters robbed you: %d of the gems you found in the Rift, gone.",
-				taken
-			)
-			else "You went down. The critters found nothing on you to take."
+	fx(
+		"GemRecovered",
+		at,
+		if root then root.Position else at,
+		GemConfig.ElementColors[gem.Element] or GemConfig.TierColors[gem.Tier],
+		{ Id = gem.Id, Element = gem.Element, Tier = gem.Tier, Size = gem.Size, Clarity = gem.Clarity, Cut = gem.Cut }
 	)
-	task.delay(2.5, function()
-		if runOf[player] == run then
-			home(player, "Thrown back to base.")
+	notify(player, string.format("Recovered. Your %s is back in your pouch.", GemConfig.displayName(gem)))
+end
+
+-- Robbers through for `player` (`count`, to `robbery`): tears of the Rift's
+-- own round them, on their cave's floor, a moment apart.
+local function riftRobbers(run, player: Player, count: number, robbery)
+	local root = rootOf(player)
+	if not root then
+		return
+	end
+	local here = root.Position
+	local area = areaAt(run, here)
+	local level = RiftRun.level(levelsOf(run), math.clamp(run.Room, 1, RiftRun.Rooms))
+	local band = if run.Room >= 3 then "Edge" else "Fringe"
+	for i, spot in Frontier.robSpots(here, count, run.Rng) do
+		local at = onFloor(area, spot, 6)
+		task.delay((i - 1) * Frontier.Rob.Every, function()
+			if robbery.Over or run.Done or runOf[player] ~= run then
+				return
+			end
+			local life = KaijuWilds.rift(at, here, { Hell = true })
+			task.delay(hopIn(life), function()
+				if robbery.Over or run.Done or runOf[player] ~= run then
+					return -- (it's over: the tear seals empty)
+				end
+				local target = rootOf(player)
+				local facing = if target then target.Position else here
+				local enemy = KaijuWilds.spawnBug(at, {
+					Prey = player,
+					Critter = KaijuWilds.pickCritter(run.Rng),
+					Level = level,
+					Band = band,
+					Facing = facing,
+					Hop = leap(at, facing),
+					Robbery = robbery,
+					Hell = true,
+				})
+				if enemy then
+					enemy.Model:SetAttribute("RiftRun", run.Id)
+				end
+			end)
+		end)
+	end
+end
+
+-- Knocked out on the path: robbed (Server.Robbery). The cave's critters come
+-- for you, and more through tears of their own if too few are near; each
+-- grabs one of the gems you found in here (RiftRun.robCount of them at
+-- most) and runs for a tear. Then you're back at base, shown what they took.
+local function robbed(run, player: Player)
+	run.Handled[player] = true
+	local found = run.Found[player] or {}
+	local count = RiftRun.robCount(#found)
+	local humanoid, root = humanoidOf(player), rootOf(player)
+	if not humanoid or humanoid.Health <= 0 or not root then
+		-- (Killed outright, nobody there to rob: they take it all the same.)
+		local items = {}
+		for _ = 1, count do
+			local gem = riftSteal(run, player)
+			if not gem then
+				break
+			end
+			table.insert(items, Robbery.summary(gem))
 		end
-	end)
+		task.delay(2.5, function()
+			if runOf[player] == run then
+				home(player, nil)
+				Remotes.CombatFx:FireClient(player, "Robbed", { Where = "Rift", Items = items, Empty = #items == 0 })
+			end
+		end)
+		return
+	end
+	fx("CritterGiggle", root.Position + Vector3.new(0, 3, 0), "Cackle")
+	notify(player, "You're down... the critters are coming for what you found!")
+	Robbery.start(player, {
+		Where = "Rift",
+		Max = count,
+		Takeable = math.min(count, #looseFound(run, player)),
+		Steal = function(who)
+			return riftSteal(run, who)
+		end,
+		Recover = function(who, gem, at)
+			riftRecover(run, who, gem, at)
+		end,
+		-- (Off with it to a tear on the same cave's floor.)
+		Away = function(from: Vector3, at: Vector3)
+			local away = Vector3.new(from.X - at.X, 0, from.Z - at.Z)
+			away = if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)
+			local carry = Frontier.Raid.Carry.Away
+			return onFloor(areaAt(run, from), from + away * run.Rng:NextNumber(carry[1], carry[2]), 6)
+		end,
+		Spawn = function(more, robbery)
+			riftRobbers(run, player, more, robbery)
+		end,
+		Done = function(who)
+			if runOf[who] == run then
+				home(who, nil)
+			end
+		end,
+	})
 end
 
 -- Knocked out at the boss: down until they choose (or the time runs out).
@@ -888,8 +1055,10 @@ local function join(run, player: Player)
 	if root then
 		root.AssemblyLinearVelocity = Vector3.zero
 	end
-	-- (In there you fight: your combat kit comes out, and stays out.)
+	-- (In there you fight: your combat kit comes out, till you swap it for
+	-- your pick for the healing crystals.)
 	SparServer.riftKit(player, true)
+	notify(player, "Green crystals by the cave walls heal you: swap to your pick (1, or the kit button) and mine them.")
 	show(run)
 	for _, other in run.Members do
 		if other ~= player then
@@ -938,6 +1107,119 @@ local function problem(player: Player): string?
 	return nil
 end
 
+-- Healing crystals ----------------------------------------------------------------------------------------
+
+-- Crystal `n` of `run`, at `at`: a rock the client mines like the Outpost's
+-- (OutpostNode, with NodeId, Size, Hp, MaxHp; HealRock marks it, so the
+-- client asks "RiftMine": RiftRun.Heal).
+local function growHeal(run, n: number, at: Vector3)
+	local rules = RiftRun.Heal
+	local model = RiftWorld.healRock(run.World.Folder, at, run.Rng)
+	local id = string.format("%s:heal:%d", run.Id, n)
+	model:SetAttribute("NodeId", id)
+	model:SetAttribute("HealRock", true)
+	model:SetAttribute("Size", "Boulder")
+	model:SetAttribute("Hp", rules.Hp)
+	model:SetAttribute("MaxHp", rules.Hp)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Mine to heal"
+	prompt.ObjectText = ""
+	prompt.Style = Enum.ProximityPromptStyle.Custom
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = rules.Reach
+	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("PromptKind", "Mine")
+	prompt:SetAttribute("NodeId", id)
+	prompt.Parent = model.PrimaryPart
+	CollectionService:AddTag(model, "OutpostNode")
+	run.Heals[id] = { Id = id, N = n, At = at, Model = model, Hp = rules.Hp }
+end
+
+-- Each cave's crystals, and the throne cave's (RiftRun.healSpots).
+function spawnHeals(run)
+	local world = run.World
+	local areas = table.clone(world.Rooms)
+	table.insert(areas, world.Boss)
+	local n = 0
+	for _, area in areas do
+		for _, at in RiftRun.healSpots(area.Center, area.Size, RiftRun.Heal.PerCave, run.Rng) do
+			n += 1
+			growHeal(run, n, at)
+		end
+	end
+end
+
+-- "RiftMine", id: a swing of your pick at a healing crystal (your kit away:
+-- 1). Each heals you a little; the one that breaks it open heals you more
+-- and your kaiju out too, and it grows back a while later.
+local function healMine(player: Player, id: any)
+	local run = runOf[player]
+	local rock = if run and type(id) == "string" then run.Heals[id] else nil
+	if not run or not rock then
+		return reply(false, "That crystal's spent. It grows back in a while.")
+	end
+	if Spar.sparring(player) then
+		return reply(false, "Press 1 for your pick to mine.")
+	end
+	if Spar.isDown(player) or run.Fallen[player] or run.Handled[player] then
+		return reply(false, "")
+	end
+	local now = os.clock()
+	if now - (run.Swung[player] or 0) < Outpost.SwingCooldown then
+		return reply(false, "")
+	end
+	local rules = RiftRun.Heal
+	local root, humanoid = rootOf(player), humanoidOf(player)
+	local body = rock.Model.PrimaryPart
+	if not root or not humanoid or not body or (root.Position - body.Position).Magnitude > rules.Reach + 2 then
+		return reply(false, "Get closer to the crystal.")
+	end
+	run.Swung[player] = now
+	rock.Hp -= 1
+	local broke = rock.Hp <= 0
+	local before = humanoid.Health
+	local share = rules.Swing + (if broke then rules.Pop else 0)
+	humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * share)
+	local model = rock.Model
+	model:SetAttribute("LastHitBy", player.UserId)
+	model:SetAttribute("LastCrit", false)
+	model:SetAttribute("Hp", rock.Hp)
+	-- (The pick's chop, for everyone to see: RivalPose "Mine".)
+	local character = player.Character
+	if character then
+		local t = serverNow()
+		character:SetAttribute("ActionKind", "Mine")
+		character:SetAttribute("ActionStart", t - 0.12)
+		character:SetAttribute("ActionAt", t + 0.05)
+	end
+	local mended = 0
+	if broke then
+		run.Heals[id] = nil
+		mended = KaijuServer.mend(player, rules.Kaiju)
+		model:SetAttribute("Popped", player.UserId)
+		local prompt = body:FindFirstChildOfClass("ProximityPrompt")
+		if prompt then
+			prompt:Destroy()
+		end
+		task.delay(0.9, function()
+			model:Destroy()
+		end)
+		task.delay(rules.Regrow, function()
+			if not run.Done then
+				growHeal(run, rock.N, rock.At)
+			end
+		end)
+	end
+	return reply(true, "", {
+		Healed = math.floor(humanoid.Health - before + 0.5),
+		Broke = broke,
+		Kaiju = mended,
+		Hp = math.max(0, rock.Hp),
+		MaxHp = rules.Hp,
+	})
+end
+
 local function enter(player: Player, vein: any)
 	local why = problem(player)
 	if why then
@@ -982,11 +1264,17 @@ local function enter(player: Player, vein: any)
 			Handled = {},
 			Reached = {},
 			Spawned = {},
+			Heals = {}, -- [id] = a healing crystal standing: { Id, N, At, Model, Hp }
+			Swung = {}, -- [player] = their last swing at one (os.clock)
 			Loot = nil,
 			Started = os.clock(),
 		}
 		runs[id] = run
 		slots[slot] = run
+		local grown, why = pcall(spawnHeals, run)
+		if not grown then
+			warn("[Rift] healing crystals:", why)
+		end
 		join(run, player)
 	else
 		join(run, player)
@@ -1079,6 +1367,7 @@ function RiftServer.start(outpost)
 	Shop.register("RiftChoice", choose)
 	Shop.register("RiftPeek", peek)
 	Shop.register("RiftLootChoice", lootChoice)
+	Shop.register("RiftMine", healMine)
 	Players.PlayerRemoving:Connect(function(player)
 		if runOf[player] then
 			home(player, nil)

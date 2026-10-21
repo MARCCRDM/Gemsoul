@@ -70,6 +70,14 @@
 	and the gem's yours again; let it hop in and it's gone. Back in the
 	core your haul is safe (it starts again on your next trip out).
 
+	Robbed while you're down (Rob): knocked out out there (your health run
+	out, by a critter or a wild kaiju; never a friendly spar's) or in the
+	Rift, you stay down while the critters rob you: those about come for
+	you, and if too few are near, more tear through round you (robCrew,
+	robSpots). Each grabs one of your trip's gems and runs for a tear with
+	it, as a snatcher does; then you're back at base with a report of what
+	they took (robOver: when it's over).
+
 	  Frontier.distance(position, center) -> studs across the ground
 	  Frontier.band(distance) -> "Core" | "Fringe" | "Edge"
 	  Frontier.zoneOf(distance, vein?) -> a Shared.Outpost.Zones id
@@ -94,6 +102,9 @@
 	  Frontier.raidSize(stir?) -> critters through for a gem raid
 	  Frontier.haulPick(haul, loose, max) -> { gem id }   what snatchers can take, newest first
 	  Frontier.escapeSpot(from, player, center, rng) -> Vector3   where a snatcher's rift opens
+	  Frontier.robCrew(takeable, near) -> critters to bring through for a robbery
+	  Frontier.robSpots(at, count, rng) -> { Vector3 }   where their tears open
+	  Frontier.robOver(robbery, now) -> boolean   whether a robbery's over
 	  Frontier.wanderSpot(position, center, rng) -> Vector3   where a wandering rift opens
 	  Frontier.timeline(at, linger?) -> { OpenAt, HopAt, CloseAt, EndAt }
 	  Frontier.openness(timeline, now) -> 0..1   how wide a tear is
@@ -404,6 +415,14 @@ Frontier.Raid = {
 	Haul = { Keep = 12 },
 	Carry = { Speed = 13, Away = { 26, 38 }, Wait = 6, Giggle = { 1.3, 2.4 } },
 }
+-- Robbed while you're down: knocked out (your health run out; not a
+-- friendly spar's) out past the core or in the Rift, you stay down Hold
+-- seconds at most while the critters rob you. Those within Near come for
+-- you; fewer than there's to take (Crew at most, one at least), more tear
+-- through Out studs round you, Every seconds apart. Each grabs one gem
+-- (Max at most); Settle seconds after the last grab (or the last one
+-- finding nothing), you're back at base with a report of what they took.
+Frontier.Rob = { Hold = 8, Near = 70, Crew = 3, Max = 3, Out = { 9, 14 }, Every = 0.35, Settle = 1.5 }
 
 function Frontier.distance(position: Vector3, center: Vector3): number
 	return Vector3.new(position.X - center.X, 0, position.Z - center.Z).Magnitude
@@ -1058,6 +1077,41 @@ function Frontier.escapeSpot(from: Vector3, player: Vector3, center: Vector3, rn
 	dir = if dir.Magnitude > 0.01 then dir.Unit else away
 	local reach = rng:NextNumber(Frontier.Raid.Carry.Away[1], Frontier.Raid.Carry.Away[2])
 	return Frontier.inFrontier(from + dir * reach, center, from.Y)
+end
+
+-- Robbed while you're down ------------------------------------------------------------------------------
+
+-- How many more critters to bring through for a robbery: one for each gem
+-- there's to take (`takeable`; Rob.Crew at most, one at least, to find
+-- nothing), less the `near` ones already coming.
+function Frontier.robCrew(takeable: number, near: number): number
+	local rob = Frontier.Rob
+	return math.max(0, math.clamp(math.min(takeable, rob.Max), 1, rob.Crew) - near)
+end
+
+-- Where a robbery's `count` tears open round `at`: Rob.Out studs off, spread
+-- round evenly (from a random start, each a little off its share).
+function Frontier.robSpots(at: Vector3, count: number, rng): { Vector3 }
+	local out = Frontier.Rob.Out
+	local start = rng:NextNumber(0, math.pi * 2)
+	local spots = {}
+	for i = 1, count do
+		local angle = start + (i - 1) * math.pi * 2 / count + rng:NextNumber(-0.35, 0.35)
+		local reach = rng:NextNumber(out[1], out[2])
+		table.insert(spots, at + Vector3.new(math.cos(angle) * reach, 0, math.sin(angle) * reach))
+	end
+	return spots
+end
+
+-- Whether a robbery's over at `now` (os.clock): its Hold run out, or
+-- everything it could take taken (or nothing found) Settle seconds ago.
+-- `robbery`: { EndAt, Taken, Max, Empty?, LastAt? }.
+function Frontier.robOver(robbery, now: number): boolean
+	if now >= robbery.EndAt then
+		return true
+	end
+	local done = robbery.Taken >= robbery.Max or robbery.Empty == true
+	return done and robbery.LastAt ~= nil and now - robbery.LastAt >= Frontier.Rob.Settle
 end
 
 local function ease(t: number): number

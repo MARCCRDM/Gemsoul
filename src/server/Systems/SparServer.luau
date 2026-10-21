@@ -30,8 +30,11 @@
 	hunter or be hit by one; a creature's finishing blow knocks them down
 	as in a spar. So it does anyone else in the Outpost (a miner a rift's
 	critter catches out past the core: FrontierServer): down, then up again
-	whole. "Hunt", true / false takes the kit out or puts it away
-	("Spar", false and the 1 key put it away too).
+	whole, unless the critters come to rob them (SparServer.onKnockedOut:
+	FrontierServer, Server.Robbery; then they're up when that's over).
+	"Hunt", true / false takes the kit out or puts it away: the 1 key's
+	(and the phone's kit button, Client.SparKit), in the Outpost and in the
+	Rift alike, never while down.
 ]]
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -295,23 +298,13 @@ local function hunt(player: Player, on: any)
 	if type(on) ~= "boolean" then
 		return reply(false, "")
 	end
+	-- (Down, you get up first: swapping would stand you up.)
+	if Spar.isDown(player) or player:GetAttribute("Robbed") ~= nil then
+		return reply(false, "Get back on your feet first.")
+	end
 	if not on then
 		if not Spar.hunting(player) then
 			return reply(true, "")
-		end
-		if player:GetAttribute("RiftRun") ~= nil then
-			return reply(false, "Your kit stays out in the Rift.")
-		end
-		local wait = Spar.stopWait({
-			Down = player:GetAttribute("SparDown"),
-			Hurt = player:GetAttribute("SparHurt"),
-		}, workspace:GetServerTimeNow())
-		if wait > 0 then
-			return reply(
-				false,
-				string.format("Still in the fight: you can stop in %ds.", math.ceil(wait)),
-				{ Wait = wait }
-			)
 		end
 		stop(player)
 		return reply(true, "")
@@ -342,8 +335,13 @@ end
 -- so their health is what it was.)
 local function getUp(player: Player, humanoid: Humanoid, miner: boolean?, tripped: boolean?)
 	-- (Gone, or a new body since: nothing to do. Down at a Rift boss, they
-	-- stay down till they choose: Server.RiftServer gets them up.)
-	if humanoidOf(player) ~= humanoid or player:GetAttribute("RiftFallen") ~= nil then
+	-- stay down till they choose: Server.RiftServer gets them up; being
+	-- robbed, till it's over: Server.Robbery.)
+	if
+		humanoidOf(player) ~= humanoid
+		or player:GetAttribute("RiftFallen") ~= nil
+		or player:GetAttribute("Robbed") ~= nil
+	then
 		return
 	end
 	player:SetAttribute("SparDown", nil)
@@ -383,8 +381,16 @@ local function knockOut(player: Player, humanoid: Humanoid, source: Player?, tri
 		if trip then trip.By else nil
 	)
 	task.delay(seconds, getUp, player, humanoid, not Spar.sparring(player), trip ~= nil)
+	-- Knocked out by a creature (not tripped, not in a spar with someone):
+	-- the critters may come to rob them (FrontierServer: Server.Robbery).
+	if not trip and player:GetAttribute("SparWith") == nil then
+		task.spawn(SparServer.onKnockedOut, player)
+	end
 	return true
 end
+
+-- Someone knocked out by a creature (Main sets it: FrontierServer.knockedOut).
+SparServer.onKnockedOut = function(_player: Player) end
 
 -- The Rift's (Server.RiftServer): going in, your combat kit comes out to
 -- hunt (a spar ended first); coming home, it's put away. In there it can't

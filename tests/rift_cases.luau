@@ -146,6 +146,31 @@ do
 	end
 	local crowded = RiftRun.portalSpots(center, 6, 9, { center }, spotRng)
 	check(#crowded == 9, "A crowded cave lost a tear")
+	-- Healing crystals: toward the corners, inset from the walls, clear of
+	-- the braziers in the corners (6 in) and of the passages in each wall's
+	-- middle (24 wide), never two in one corner. (The caves' and the throne
+	-- cave's: the landing has none.)
+	local heal = RiftRun.Heal
+	for _, size in { 76, 96 } do
+		for _ = 1, 40 do
+			local spots = RiftRun.healSpots(center, size, heal.PerCave, spotRng)
+			check(#spots == heal.PerCave, "Not a cave's crystals")
+			for i, spot in spots do
+				local off = spot - center
+				check(
+					math.abs(off.X) <= size / 2 - heal.Inset + 1e-6 and math.abs(off.Z) <= size / 2 - heal.Inset + 1e-6,
+					"A crystal in a wall"
+				)
+				check(math.abs(off.X) > 12 and math.abs(off.Z) > 12, "A crystal in a passage's way")
+				local brazier = Vector3.new(math.sign(off.X), 0, math.sign(off.Z)) * (size / 2 - 6)
+				check((off - brazier).Magnitude > 8, "A crystal on a brazier")
+				for j = i + 1, #spots do
+					check((spot - spots[j]).Magnitude > 10, "Two crystals in one corner")
+				end
+			end
+		end
+	end
+	check(#RiftRun.healSpots(center, 76, 9, spotRng) == 4, "More crystals than corners")
 end
 check(RiftRun.fighterCount(1, 3) > RiftRun.fighterCount(1, 1), "No more fighters for more runners")
 local rng = Random.new(5)
@@ -522,7 +547,7 @@ end
 
 print(
 	string.format(
-		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire, ways home, the sky; %d parts a trip)",
+		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire, ways home, the sky, healing crystals; %d parts a trip)",
 		checks,
 		#parts
 	)

@@ -25,13 +25,13 @@ end
 -- Landscape phones (points), less Roblox's top bar (about 58 on a notched
 -- phone, 36 otherwise), and a small tablet.
 local SCREENS = {
-	{ 667, 375 - 36 },
-	{ 736, 414 - 36 },
-	{ 812, 375 - 58 },
-	{ 844, 390 - 58 },
-	{ 896, 414 - 58 },
-	{ 932, 430 - 58 },
-	{ 1024, 768 - 36 },
+	{ 667, 375 - 36, 375 },
+	{ 736, 414 - 36, 414 },
+	{ 812, 375 - 58, 375 },
+	{ 844, 390 - 58, 390 },
+	{ 896, 414 - 58, 414 },
+	{ 932, 430 - 58, 430 },
+	{ 1024, 768 - 36, 768 },
 }
 local TILES = 7 -- INVENTORY, TASKS, MARKET, STORE, RANKS, SOCIAL, INVITE
 for _, s in SCREENS do
@@ -156,6 +156,49 @@ for _, s in SCREENS do
 			check(not MobileLayout.overlaps(k, closed), what .. ": the kaiju card overlaps the CHAT button")
 		end
 	end
+	-- The kit switch (pick or combat kit): big enough to tap, on the screen,
+	-- clear of the fight's ring (ATTACK, the surges, GUARD, DODGE) and of
+	-- everything there when you mine (the jump button, the dock, the top
+	-- right, the cards on the left), with or without the CHAT button.
+	local ring = MobileLayout.ring(s[3])
+	local buttons = {
+		ATTACK = MobileLayout.onRing(screen, ring, ring.Attack, 0, 0),
+		GUARD = MobileLayout.onRing(screen, ring, ring.Guard, ring.Outer, MobileLayout.Ring.Guard),
+		DODGE = MobileLayout.onRing(screen, ring, ring.Dodge, ring.Outer, MobileLayout.Ring.Dodge),
+	}
+	for i, degrees in MobileLayout.Ring.Surges do
+		buttons["surge " .. i] = MobileLayout.onRing(screen, ring, ring.Surge, ring.Inner, degrees)
+	end
+	for name, r in buttons do
+		check(inside(r), label .. ": the fight's " .. name .. " runs off the screen")
+	end
+	for _, chat in { false, true } do
+		local switch = MobileLayout.kitSwitch(chat)
+		local what = label .. (if chat then " (with CHAT)" else "")
+		check(inside(switch) and switch.W >= 44, what .. ": the kit switch runs off the screen, or is too small")
+		local k = MobileLayout.kaiju(chat)
+		local others = {
+			jump = jump,
+			dock = dock,
+			toast = toast,
+			["loot card"] = loot,
+			["teammates' cards"] = party,
+			["pick card"] = card,
+			coins = wallet,
+			health = MobileLayout.health(),
+			["kaiju card"] = k,
+			CATCH = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.H },
+		}
+		if chat then
+			others.CHAT = closed
+		end
+		for name, r in buttons do
+			others[name] = r
+		end
+		for name, r in others do
+			check(not MobileLayout.overlaps(switch, r), what .. ": the kit switch overlaps the " .. name)
+		end
+	end
 end
 -- The top middle: claimed and given back, each owner on its own; a listener
 -- hears each change (and not a repeat).
@@ -179,5 +222,5 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, at 7 screen sizes)"
+		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch clear of the fight's ring, at 7 screen sizes)"
 )

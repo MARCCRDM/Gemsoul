@@ -317,6 +317,33 @@ your gems (`Frontier.Raid`; `FrontierServer.raid`, from
   your pouch even if it's full again. Let it hop in and the gem's gone:
   "A critter got away with your ...".
 
+### Knocked out: robbed, then home
+
+A trip (above) knocks you down for a moment and you can chase. A real
+knockout out past the core (beaten down to nothing with your kit out, by a
+critter or a wild kaiju; not in a spar) is worse: you stay down and the
+critters rob you (`Robbery`, `Frontier.Rob`; `FrontierServer.knockedOut`,
+from `SparServer.onKnockedOut`):
+
+- the critters within 70 studs of you come for you; if fewer are near
+  than there's to take (up to 3 of your haul), more leap out of rifts that
+  tear open round you (`Frontier.robCrew`, `Frontier.robSpots`);
+- each grabs one gem of your haul, newest first, holds it up and runs for
+  a rift with it, as a snatcher does. Knock it out first (a friend, or your
+  kaiju) and the gem's back ("GOT IT BACK!");
+- your screen says **KNOCKED OUT · The critters are going through your
+  pouch! · Back to base in 8**;
+- after 8 seconds, or a moment after there's nothing left to take, you're
+  back at base on your feet at full health (a few seconds' shield), your
+  haul cleared, and a card tells you what they took:
+
+![What the critters took: the card. Offline render of the game's UI code, gems drawn as stand-ins, not a Roblox screenshot](rift/robbed.png)
+
+**ROBBED!** and each gem in 3D, **GONE** or **SAVED**; **NOTHING TAKEN**
+if your haul was empty. The robbers turn back into plain critters once it's
+over: they don't follow you home. Not in the core, the Rift (it has its
+own), spars, kaiju battles, matches, dungeons or expeditions.
+
 The giggles are synthesized by `tools/make_critter_sounds.py`
 (`critter_giggle_1..3.mp3`, `critter_cackle.mp3`); until they're uploaded,
 the old "uuhhh" sped up into squeaky "hee"s stands in.

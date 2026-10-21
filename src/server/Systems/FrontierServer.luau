@@ -42,6 +42,16 @@
 	                 waits for it (Raid.Carry.Wait); bonk or knock it out
 	                 first and the gem's back in your pouch.
 
+	Robbed         knocked out out past the core (your health run out, by a
+	                 critter or a wild kaiju: SparServer.onKnockedOut; not
+	                 in a spar with someone, nor in the Rift, which robs its
+	                 own), the critters rob you (Server.Robbery,
+	                 Frontier.Rob): those near come for you, and if too few
+	                 are, more tear through round you (Frontier.robSpots),
+	                 robbers all. Each grabs one gem of your haul and runs
+	                 for a tear with it. Then you're back at base (the
+	                 Outpost's spawn), whole, and shown what they took.
+
 	Nobody gets more critters than their band's cap or a fair share of the
 	Outpost's (Frontier.share); critters still on their way through count.
 	Nobody gets one in the core, in a fight elsewhere, in a spar, or down.
@@ -63,12 +73,14 @@
 	  FrontierServer.swing(player, swings)   a swing out there (OutpostServer)
 	  FrontierServer.mined(player, gem)      a gem mined (OutpostServer): this trip's haul
 	  FrontierServer.raid(player) -> boolean   a gem raid on them (their team's all down)
+	  FrontierServer.knockedOut(player) -> robbery?   knocked out out there: robbed
 	  FrontierServer.open(at, facing, opts?) -> anchor, timeline   a rift on the ground at `at`
 	      (opts: Critter, Prey, Linger, Hop; Height its size; Hell, burning
 	      the critters' world's colours: the Rift's own)
 	  FrontierServer.scar(at) -> anchor   a dormant rift (a vein's)
 	  FrontierServer.moveScar(index, at)  vein `index`'s dormant rift moves with it
 ]]
+local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -83,10 +95,12 @@ local KaijuServer = require(script.Parent.KaijuServer)
 local KaijuWilds = require(script.Parent.KaijuWilds)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
+local Robbery = require(script.Parent.Robbery)
 
 local FrontierServer = {}
 
 local folder: Folder
+local base = nil -- the Outpost's site (its Spawn: back at base)
 local rng = Random.new()
 local nextSeed = 0
 -- [player] = { Noise, LastEncounter (os.clock), Shown (the FrontierNoise last
@@ -545,6 +559,126 @@ local function lost(player: Player?, gem)
 	end
 end
 
+-- Robbed while down -------------------------------------------------------------------------------------
+
+-- How many gems of `player`'s haul there are to take (Frontier.Rob.Max at most).
+local function takeable(player: Player): number
+	local haul, profile = hauls[player], PlayerData.get(player)
+	if not haul or not profile then
+		return 0
+	end
+	local loose = {}
+	for _, gem in GemInventory.available(profile) do
+		loose[gem.Id] = true
+	end
+	return #Frontier.haulPick(haul, loose, Frontier.Rob.Max)
+end
+
+-- Robbers through for a knocked-out `player` (`count`, to `robbery`): tears
+-- round them a moment apart, each a critter that hops out at them.
+local function robbers(player: Player, count: number, robbery)
+	local root = rootOf(player)
+	if not root then
+		return
+	end
+	local here = root.Position
+	local level = KaijuServer.ground(here).Y
+	local band = Frontier.band(Frontier.distance(here, center()))
+	local home = homeAt(here)
+	for i, spot in Frontier.robSpots(here, count, rng) do
+		task.delay((i - 1) * Frontier.Rob.Every, function()
+			if robbery.Over or not player.Parent then
+				return
+			end
+			local floor = KaijuServer.ground(spot)
+			if math.abs(floor.Y - level) > 3 then
+				-- (On top of something: somewhere else round them.)
+				floor = openGround(root, function()
+					return Frontier.robSpots(here, 1, rng)[1]
+				end)
+			end
+			local critter = KaijuWilds.pickCritter(rng, home)
+			local _, life = FrontierServer.open(floor, here, { Critter = critter, Prey = player })
+			task.delay(math.max(0, life.HopAt - serverNow()), function()
+				if robbery.Over or not player.Parent then
+					return -- (it's over: the tear seals empty)
+				end
+				local target = rootOf(player)
+				local at = if target then target.Position else here
+				local toward = flat(at - floor)
+				toward = if toward.Magnitude > 0.1 then toward.Unit else Vector3.new(0, 0, -1)
+				local enemy = KaijuWilds.spawnBug(floor, {
+					Prey = player,
+					Band = band,
+					Critter = critter,
+					Level = Frontier.critterLevel(band, rng, stateOf(player).Stir),
+					Facing = at,
+					Hop = toward * 18 + Vector3.new(0, 24, 0),
+					Robbery = robbery,
+				})
+				if enemy then
+					keep(player, enemy)
+				end
+			end)
+		end)
+	end
+end
+
+-- Back at base after a robbery: on your feet at the Outpost's spawn, whole,
+-- with a moment's guard (and this trip's haul is over).
+local function sentHome(player: Player)
+	player:SetAttribute("SparDown", nil)
+	hauls[player], raiding[player] = nil, nil
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not character or not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	humanoid.Health = humanoid.MaxHealth
+	if base and base.Spawn then
+		character:PivotTo(base.Spawn)
+		local root = rootOf(player)
+		if root then
+			root.AssemblyLinearVelocity = Vector3.zero
+		end
+	end
+	local guard = Instance.new("ForceField")
+	guard.Name = "SparGuard"
+	guard.Visible = false
+	guard.Parent = character
+	Debris:AddItem(guard, Spar.GuardSeconds)
+end
+
+-- Knocked out out there (SparServer.onKnockedOut): the critters rob them.
+-- Not in the core, nor away in the Rift (it robs its own: RiftServer), nor
+-- in a fight elsewhere. Returns the robbery.
+function FrontierServer.knockedOut(player: Player)
+	local root = rootOf(player)
+	if not root or player:GetAttribute("Outpost") ~= true or player:GetAttribute("RiftRun") ~= nil then
+		return nil
+	end
+	for _, name in { "CombatSession", "MatchId", "DungeonId", "Expedition", "SparWith", "KaijuBattle" } do
+		if player:GetAttribute(name) ~= nil then
+			return nil
+		end
+	end
+	if Frontier.band(Frontier.distance(root.Position, center())) == "Core" then
+		return nil
+	end
+	Remotes.Notify:FireClient(player, "You're down... the critters are coming for your gems!")
+	Remotes.CombatFx:FireAllClients("CritterGiggle", root.Position + Vector3.new(0, 3, 0), "Cackle")
+	return Robbery.start(player, {
+		Where = "Outpost",
+		Steal = steal,
+		Takeable = takeable(player),
+		Recover = recover,
+		Spawn = function(count, robbery)
+			robbers(player, count, robbery)
+		end,
+		Done = sentHome,
+	})
+end
+
 -- Wandering rifts --------------------------------------------------------------------------------------
 
 local function wandering(): number
@@ -807,6 +941,7 @@ function FrontierServer.scar(at: CFrame): BasePart
 end
 
 function FrontierServer.start(site)
+	base = site
 	folder = Instance.new("Folder")
 	folder.Name = "Rifts"
 	folder.Parent = workspace
@@ -824,8 +959,8 @@ function FrontierServer.start(site)
 	-- drop it back, or get away with it through a rift that waits for them.
 	KaijuServer.onTeamDown = FrontierServer.raid
 	KaijuWilds.steal, KaijuWilds.recover, KaijuWilds.lost = steal, recover, lost
-	KaijuWilds.escape = function(at: Vector3, facing: Vector3, wait: number)
-		local _, life = FrontierServer.open(KaijuServer.ground(at), facing, { Hop = wait, Linger = 1.5 })
+	KaijuWilds.escape = function(at: Vector3, facing: Vector3, wait: number, hell: boolean?)
+		local _, life = FrontierServer.open(KaijuServer.ground(at), facing, { Hop = wait, Linger = 1.5, Hell = hell })
 		return life
 	end
 	Players.PlayerRemoving:Connect(function(player)
@@ -853,6 +988,7 @@ FrontierServer._pending, FrontierServer._wanders, FrontierServer._wander = pendi
 FrontierServer._critterDone = critterDone
 FrontierServer._hauls, FrontierServer._raids = hauls, raids
 FrontierServer._steal, FrontierServer._recover, FrontierServer._lost = steal, recover, lost
+FrontierServer._takeable, FrontierServer._sentHome = takeable, sentHome
 FrontierServer._setWanderAt = function(at: number)
 	nextWander = at
 end

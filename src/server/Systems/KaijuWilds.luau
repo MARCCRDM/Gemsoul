@@ -87,6 +87,16 @@
 	              gem drops back to you (KaijuWilds.recover); let it hop in
 	              and it's gone (KaijuWilds.lost). Nothing left to take, it
 	              blows a raspberry and slips away.
+	  Robbers     a knocked-out player robbed (Server.Robbery: out past the
+	              core, or in the Rift): the critters near turn robbers
+	              (KaijuWilds.rob), and the ones brought through for it come
+	              as robbers (spawnBug's Robbery). A robber snatches and
+	              runs as a snatcher does, but from what the robbery gives
+	              (its Steal, Recover, Lost and Away), and never trips
+	              anyone. Once it's over they're critters again
+	              (KaijuWilds.unrob). A critter of the Rift's world (Hell)
+	              tears through in its colours; one that goes without dying
+	              tells its OnGone (a Rift cave's pack counts it gone).
 
 	Both are ordinary Enemies (so every attack, status and nameplate works on
 	them) with their own brains, marked OutpostCreature for the kaiju out.
@@ -116,6 +126,8 @@
 	  KaijuWilds.veinSwing(index, player)       a swing at vein `index`'s rocks
 	  KaijuWilds.veinMoved(index, scar)         vein `index` surfaced at `scar`
 	  KaijuWilds.raid(enemy)                    a critter out turns snatcher
+	  KaijuWilds.rob(player, robbery, near) -> count   the critters near rob a knocked-out player
+	  KaijuWilds.unrob(robbery)                 that robbery's over
 	  KaijuWilds.knockDown, steal, recover, lost, escape   a gem raid's hooks
 	                                            (Main and FrontierServer set them)
 ]]
@@ -190,6 +202,9 @@ type Wild = {
 	Carry: any?, -- where it's running to: { Spot, Life (its rift's timeline), GiggleAt, Gem (the stone over its head) }
 	Stay: boolean?, -- a Rift's: never slips back, roams its patch till someone comes
 	Size: number?, -- how big it stands next to you, if not a critter's (Kaiju.Bug.Size)
+	Robbery: any?, -- robbing a knocked-out player (Server.Robbery): it snatches, never trips
+	Hell: boolean?, -- in the critters' own world (the Rift): its tears burn its colours
+	OnGone: ((any) -> ())?, -- told when it goes without dying (through a tear, or slipped back)
 }
 
 -- A pack of roaming wild kaiju: its den out in the frontier (they wander
@@ -665,12 +680,19 @@ local function slipBack(wild: Wild)
 	KaijuWilds.done(enemy, false, nil)
 	local root = enemy.Root
 	enemy.Humanoid:MoveTo(root.Position)
-	local life = KaijuWilds.rift(root.Position, root.Position + root.CFrame.LookVector * 10)
+	local life = KaijuWilds.rift(
+		root.Position,
+		root.Position + root.CFrame.LookVector * 10,
+		if wild.Hell then { Hell = true } else nil
+	)
 	local wait = if life then life.HopAt - workspace:GetServerTimeNow() else 0
 	task.delay(math.max(0, wait), function()
 		if enemy.Alive then
 			wilds[enemy] = nil
 			Enemies.remove(enemy)
+			if wild.OnGone then
+				wild.OnGone(enemy)
+			end
 		end
 	end)
 end
@@ -1287,7 +1309,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 	end
 	-- A snatcher's trip at its player's legs, wound up on its cast bar (TRIP:
 	-- step out of reach, or bonk it): landed, they're down for the snatching.
-	if wild.Raider and victim.Player and not ranged then
+	if wild.Raider and not wild.Robbery and victim.Player and not ranged then
 		e.NextTrip = e.NextTrip or now + rng:NextNumber(1, 2.5)
 		if distance <= RAID.Trip.Range and now >= e.NextTrip and trippable(victim.Player, now) then
 			e.NextTrip = now + rng:NextNumber(RAID.Trip.Every[1], RAID.Trip.Every[2])
@@ -1367,8 +1389,9 @@ end
 KaijuWilds.recover = function(_player: Player?, _gem, _at: Vector3) end
 -- A snatcher got away with `player`'s gem (FrontierServer sets it).
 KaijuWilds.lost = function(_player: Player?, _gem) end
--- A rift at `at` that waits `wait` seconds for a snatcher: its timeline (FrontierServer sets it).
-KaijuWilds.escape = function(_at: Vector3, _facing: Vector3, _wait: number): any
+-- A rift at `at` that waits `wait` seconds for a snatcher: its timeline
+-- (FrontierServer sets it; `hell`: in the critters' own world's colours).
+KaijuWilds.escape = function(_at: Vector3, _facing: Vector3, _wait: number, _hell: boolean?): any
 	return nil
 end
 
@@ -1391,13 +1414,55 @@ function KaijuWilds.raid(enemy)
 	end
 end
 
+-- A knocked-out `player` robbed (Server.Robbery: `robbery`): every critter
+-- out within `near` studs of them (not already running off with something,
+-- held by a tame or on its way out) comes for them, to grab what
+-- robbery.Steal gives. It never trips anyone. Returns how many came.
+function KaijuWilds.rob(player: Player, robbery, near: number): number
+	local root = rootOf(player)
+	if not root then
+		return 0
+	end
+	local came = 0
+	for enemy, wild in wilds do
+		if not wild.Bug or not enemy.Alive or wild.Leaving or wild.Loot or wild.Taming then
+			continue
+		end
+		if flat(enemy.Root.Position - root.Position).Magnitude > near then
+			continue
+		end
+		if wild.Robbery and wild.Robbery ~= robbery then
+			continue -- (robbing someone else)
+		end
+		wild.Raider, wild.Robbery, wild.Prey = true, robbery, player
+		enemy.Model:SetAttribute("Raider", true)
+		came += 1
+	end
+	return came
+end
+
+-- `robbery`'s over: its robbers that aren't running off with something are
+-- critters again (one that is still runs for its tear).
+function KaijuWilds.unrob(robbery)
+	for enemy, wild in wilds do
+		if wild.Robbery == robbery and not wild.Loot then
+			wild.Robbery, wild.Raider = nil, nil
+			enemy.Model:SetAttribute("Raider", nil)
+		end
+	end
+end
+
 -- Whether `player` can be tripped now: not down, and not too soon after the last.
 function trippable(player: Player, now: number): boolean
 	return now - (tripped[player] or -math.huge) >= RAID.Trip.Gap and not Spar.isDown(player)
 end
 
--- How many more gems snatchers may take from `player` this knock-down.
-local function snatchesLeft(player: Player): number
+-- How many more gems snatchers may take from `player` this knock-down (a
+-- robbery's own count, robbing them: Server.Robbery).
+local function snatchesLeft(player: Player, robbery: any?): number
+	if robbery then
+		return if robbery.Empty then 0 else robbery.Max - robbery.Taken
+	end
 	local down = player:GetAttribute("SparDown")
 	if type(down) ~= "number" then
 		return 0
@@ -1452,7 +1517,8 @@ local function letGo(enemy, wild: Wild)
 	enemy.Model:SetAttribute("ActionHold", nil)
 end
 
--- A snatcher drops what it's carrying (bonked, or knocked out): back to its player.
+-- A snatcher drops what it's carrying (bonked, or knocked out): back to its
+-- player (a robbery's own way, if it was robbing them).
 local function drop(enemy, wild: Wild)
 	local gem = wild.Loot
 	if not gem then
@@ -1460,7 +1526,12 @@ local function drop(enemy, wild: Wild)
 	end
 	local at = enemy.Root.Position
 	letGo(enemy, wild)
-	KaijuWilds.recover(wild.Prey, gem, at)
+	local robbery = wild.Robbery
+	if robbery then
+		robbery.Recover(wild.Prey, gem, at)
+	else
+		KaijuWilds.recover(wild.Prey, gem, at)
+	end
 end
 
 -- Into its rift with the gem: gone for good.
@@ -1471,10 +1542,17 @@ local function getAway(enemy, wild: Wild)
 	wild.Leaving = true
 	KaijuWilds.done(enemy, false, nil)
 	if gem then
-		KaijuWilds.lost(wild.Prey, gem)
+		if wild.Robbery then
+			wild.Robbery.Lost(wild.Prey, gem)
+		else
+			KaijuWilds.lost(wild.Prey, gem)
+		end
 	end
 	wilds[enemy] = nil
 	Enemies.remove(enemy)
+	if wild.OnGone then
+		wild.OnGone(enemy)
+	end
 end
 
 -- Running off with a gem to the rift waiting for it, giggling all the way.
@@ -1490,7 +1568,8 @@ local function carry(enemy, wild: Wild, now: number)
 	-- (Its rift sealing before it got through: a fresh one where it is.)
 	if not c.Life or t >= c.Life.CloseAt - 0.3 then
 		c.Spot = root.Position
-		c.Life = KaijuWilds.escape(root.Position, root.Position + root.CFrame.LookVector * 10, Frontier.Rift.Hop)
+		c.Life =
+			KaijuWilds.escape(root.Position, root.Position + root.CFrame.LookVector * 10, Frontier.Rift.Hop, wild.Hell)
 	end
 	if flat(c.Spot - root.Position).Magnitude > 3 then
 		humanoid:MoveTo(c.Spot)
@@ -1502,14 +1581,16 @@ local function carry(enemy, wild: Wild, now: number)
 	end
 end
 
--- Its player down: in for a grab, and off with the newest gem of their haul.
--- Returns whether it's busy at it.
+-- Its player down: in for a grab, and off with the newest gem of their haul
+-- (robbing them, whatever the robbery gives: Server.Robbery). Returns
+-- whether it's busy at it.
 local function snatch(enemy, wild: Wild, now: number): boolean
 	local player = wild.Prey :: Player
 	local target = rootOf(player)
 	if not target then
 		return false
 	end
+	local robbery = wild.Robbery
 	local e = enemy :: any
 	local humanoid, root = enemy.Humanoid, enemy.Root
 	local offset = flat(target.Position - root.Position)
@@ -1521,30 +1602,37 @@ local function snatch(enemy, wild: Wild, now: number): boolean
 			return true
 		end
 		e.Action, e.Windup = nil, nil
-		if offset.Magnitude > RAID.Snatch.Reach + 1.5 or snatchesLeft(player) <= 0 then
+		if offset.Magnitude > RAID.Snatch.Reach + 1.5 or snatchesLeft(player, robbery) <= 0 then
 			return true
 		end
-		local gem = KaijuWilds.steal(player)
+		local gem = if robbery then robbery.Steal(player) else KaijuWilds.steal(player)
 		if not gem then
-			-- Nothing worth taking: a raspberry, and off it goes.
+			-- Nothing worth taking: a raspberry, and off it goes (a Rift
+			-- cave's own stays, hopping round them: Stay).
 			giggle(enemy, "Giggle")
-			slipBack(wild)
+			if not wild.Stay then
+				slipBack(wild)
+			end
 			return true
 		end
-		snatched[player].Count += 1
+		if not robbery then
+			snatched[player].Count += 1
+		end
 		wild.Loot = gem
-		local spot =
-			KaijuServer.ground(Frontier.escapeSpot(root.Position, target.Position, Outpost.Location.Position, rng))
+		local spot = if robbery and robbery.Away
+			then robbery.Away(root.Position, target.Position)
+			else Frontier.escapeSpot(root.Position, target.Position, Outpost.Location.Position, rng)
+		spot = KaijuServer.ground(spot)
 		wild.Carry = {
 			Spot = spot,
 			GiggleAt = now + 0.9,
 			Gem = holdUp(enemy, gem),
-			Life = KaijuWilds.escape(spot, root.Position, RAID.Carry.Wait),
+			Life = KaijuWilds.escape(spot, root.Position, RAID.Carry.Wait, wild.Hell),
 		}
 		giggle(enemy, "Cackle")
 		return true
 	end
-	if offset.Magnitude > RAID.Snatch.Rush or snatchesLeft(player) <= 0 then
+	if offset.Magnitude > RAID.Snatch.Rush or snatchesLeft(player, robbery) <= 0 then
 		return false
 	end
 	e.Action, e.Windup = nil, nil
@@ -2551,12 +2639,15 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Wander = opts.Wander,
 			Life = opts.Life,
 			Serial = serial + 1,
-			Raider = opts.Raider == true or nil,
+			Raider = (opts.Raider == true or opts.Robbery ~= nil) or nil,
 			Stay = opts.Stay == true or nil,
 			Size = if scale ~= Kaiju.Bug.Scale then size else nil,
+			Robbery = opts.Robbery,
+			Hell = opts.Hell == true or nil,
+			OnGone = opts.OnGone,
 		}
 		serial += 1
-		if opts.Raider then
+		if opts.Raider or opts.Robbery then
 			rig:SetAttribute("Raider", true)
 		end
 		if opts.Boss then

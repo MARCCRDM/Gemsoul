@@ -437,17 +437,29 @@ gap()
 check(Ask(c, a.UserId).Message == "P1 is out hunting.", "Asked a hunter to spar")
 gap()
 check(Ask(a, c.UserId).Message == "Put your kit away first (1).", "A hunter asked to spar")
--- A creature's finishing blow knocks a hunter down, as in a spar.
+-- A creature's finishing blow knocks a hunter down, as in a spar, and the
+-- critters may come to rob them (SparServer.onKnockedOut: FrontierServer).
+local knockedOut = {}
+SparServer.onKnockedOut = function(player)
+	table.insert(knockedOut, player)
+end
 local bug = { Root = { Position = ra.Position }, Kind = { Name = "Moon Bug" }, Element = "Fire", Model = nil }
 ha.Health = 5
 pcall(Enemies.hitPlayer, a, 500, "Fire", bug)
 check(ha.Health >= 1 and Spar.isDown(a), "A creature's blow killed a hunter (or didn't land)")
--- Can't put the kit away mid-fight; can a moment later.
-check(not Hunt(a, false).Ok, "Put the kit away while down")
-now += Spar.DownSeconds + Spar.SheatheLock + 0.1
+check(#knockedOut == 1 and knockedOut[1] == a, "Not told a hunter was knocked out")
+-- Being robbed, they stay down (Server.Robbery gets them up).
+a:SetAttribute("Robbed", now + 5)
+SparServer._getUp(a, ha)
+check(Spar.isDown(a), "Up again in the middle of being robbed")
+a:SetAttribute("Robbed", nil)
+-- Down, the kit can't be swapped (it would stand them up); up, it can, at once.
+check(not Hunt(a, false).Ok and not Hunt(a, true).Ok, "Swapped the kit while down")
+now += Spar.DownSeconds + 0.1
 SparServer._getUp(a, ha)
 check(ha.Health == ha.MaxHealth, "Not back up, whole")
-check(Hunt(a, false).Ok and a:GetAttribute("Hunt") == nil and a:GetAttribute("Spar") == nil, "Couldn't put it away")
+a:SetAttribute("SparHurt", now)
+check(Hunt(a, false).Ok and a:GetAttribute("Hunt") == nil and a:GetAttribute("Spar") == nil, "Couldn't put it away just after a hit")
 -- A rift's critter catching a miner (kit away) out in the Outpost: down,
 -- then up again whole, with a moment's guard.
 now += Spar.SheatheLock + 1
@@ -491,8 +503,9 @@ do
 	check(not Spar.sparring(b) and noted(b, "P1 went into the Rift."), "The spar didn't end, or nobody said why")
 	tick()
 	check(Spar.hunting(a), "The Rift ended the hunt")
-	now += Spar.SheatheLock + 1
-	check(Hunt(a, false).Message == "Your kit stays out in the Rift.", "Put the kit away in the Rift")
+	-- (1 swaps it for the pick in there too: the healing rocks.)
+	check(Hunt(a, false).Ok and not Spar.sparring(a), "Couldn't put the kit away in the Rift")
+	check(Hunt(a, true).Ok and Spar.hunting(a), "Couldn't take the kit out again in the Rift")
 	gap()
 	check(Ask(b, a.UserId).Message == "P1 is in the Rift.", "Asked a runner to spar")
 	gap()
@@ -515,8 +528,10 @@ do
 		guard:Destroy()
 	end
 	hb.Health = 60
+	local told = #knockedOut
 	check(SparServer.knockDown(b, 4, "Snatcher"), "A snatcher's trip didn't knock a miner down")
 	check(Spar.isDown(b) and hb.Health == 60, "Tripped: not down, or hurt by it")
+	check(#knockedOut == told, "A trip counted as a knock-out (robbed for a trip)")
 	check(math.abs(b:GetAttribute("SparDown") - now - 4) < 0.01, "Down for the wrong time")
 	check(not SparServer.knockDown(b, 4, "Snatcher"), "Tripped again while down")
 	SparServer._getUp(b, hb, true, true)
@@ -533,5 +548,5 @@ end
 print(
 	"PASS: "
 		.. checks
-		.. " spar checks (asking, answering, partners only, knock-downs, getting up, ending it for both, hunting, the Rift's kit, a snatcher's trip)"
+		.. " spar checks (asking, answering, partners only, knock-downs, getting up, ending it for both, hunting, the kit swapped any time you're up (the Rift too), knocked out (the robbers told), a snatcher's trip)"
 )

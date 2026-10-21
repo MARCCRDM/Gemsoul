@@ -37,8 +37,11 @@ if GemClient.Profile then
 end
 GemClient.Changed:Connect(LoadingFlow.progress)
 
--- Friendly sparring: ask someone (Z, or 1 for the nearest); 1 ends it (SparKit).
+-- Friendly sparring (Z asks someone) and the kit switch: 1, or the phone's
+-- button, swaps the pick for your combat kit and back (SparKit).
 SparKit.start()
+-- Robbed while down: what the critters took (RobReport).
+require(script.Parent.Modules.RobReport).start()
 
 -- Your mini kaiju: its card, RECALL, HUNT and TAME, and the kaiju panel.
 if Config.Features == nil or Config.Features.Kaiju ~= false then
@@ -48,7 +51,9 @@ if Config.Features == nil or Config.Features.Kaiju ~= false then
 end
 
 -- The lobby HUD: in the Outpost, not fighting (or sparring), not inside a
--- menu. Checked a few times a second, and only applied when it changes.
+-- menu, and not away in the Rift (even with the pick out there, for its
+-- healing rocks). Checked a few times a second, and only applied when it
+-- changes.
 local shown = nil
 local nextCheck = 0
 RunService.Heartbeat:Connect(function()
@@ -59,6 +64,7 @@ RunService.Heartbeat:Connect(function()
 	nextCheck = now + 0.2
 	local on = OutpostScene.isActive()
 		and not Spar.fighting(player)
+		and player:GetAttribute("RiftRun") == nil
 		and not playerGui:FindFirstChild("Intro")
 	if on ~= shown then
 		shown = on

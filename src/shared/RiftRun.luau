@@ -33,9 +33,19 @@
 	             average of their leads), Level.Base over it in the first
 	             cave and PerRoom more each cave; the boss's critters
 	             Level.Boss over the last cave's.
+	  Healing    each cave (the throne cave too) has Heal.PerCave healing
+	             crystals by its walls: green rocks you mine with your pick
+	             (1 swaps your kit for it) for health, never gems. Each
+	             swing heals you Heal.Swing of your health; broken open
+	             (Heal.Hp swings), Heal.Pop more, and your kaiju out
+	             Heal.Kaiju of theirs. It grows back Heal.Regrow seconds
+	             later (healSpots: where they stand).
 	  Falling    knocked out on the way, the critters rob you (Rob.Share of
-	             the gems you've found in here, at least one) and you're
-	             thrown back to base. Knocked out at the boss, you choose:
+	             the gems you've found in here, at least one): the cave's
+	             come for you, more through tears if too few are near,
+	             each grabbing one and running; then you're thrown back to
+	             base with a report of what they took (Shared.Frontier.Rob,
+	             Server.Robbery). Knocked out at the boss, you choose:
 	             invite a friend, RESTORE (your health and your kaiju's
 	             team, for Restore.Coins, Grow times more each time in a
 	             trip) or back to base with what you found. Nothing chosen
@@ -70,6 +80,7 @@ RiftRun.Cache = { Luck = 0.12, PerRoom = 0.06 }
 RiftRun.Reward = { Coins = 300, PerRoom = 40, Luck = 0.6, Exp = 120 }
 RiftRun.Loot = { Seconds = 30 }
 RiftRun.Rob = { Share = 0.5 }
+RiftRun.Heal = { PerCave = 2, Hp = 5, Swing = 0.07, Pop = 0.25, Kaiju = 0.35, Regrow = 40, Reach = 10, Inset = 15 }
 RiftRun.Restore = { Coins = 150, Grow = 2 }
 RiftRun.Fallen = 60
 RiftRun.Fall = { Below = 20 }
@@ -134,6 +145,29 @@ end
 -- spread out (Portal.Apart) and clear of the runners standing at `avoid`
 -- (Portal.Clear), the best of a few tries when the cave's crowded. `rng` has
 -- NextNumber.
+-- Where a cave's healing crystals stand: toward `count` of its four corners
+-- (a `size`-wide square round `center`), Heal.Inset studs in from its walls:
+-- clear of the braziers in the corners and the passages in the middle of
+-- each wall. `rng` has NextInteger.
+function RiftRun.healSpots(center: Vector3, size: number, count: number, rng): { Vector3 }
+	local half = size / 2 - RiftRun.Heal.Inset
+	local corners = {
+		Vector3.new(half, 0, half),
+		Vector3.new(-half, 0, half),
+		Vector3.new(half, 0, -half),
+		Vector3.new(-half, 0, -half),
+	}
+	for i = #corners, 2, -1 do
+		local j = rng:NextInteger(1, i)
+		corners[i], corners[j] = corners[j], corners[i]
+	end
+	local spots = {}
+	for i = 1, math.min(count, #corners) do
+		table.insert(spots, center + corners[i])
+	end
+	return spots
+end
+
 function RiftRun.portalSpots(center: Vector3, radius: number, count: number, avoid: { Vector3 }, rng): { Vector3 }
 	local rule = RiftRun.Portal
 	local function apart(p: Vector3, q: Vector3): number

@@ -5,10 +5,13 @@ There are two ways to ask:
 
 - **Press Z** ("Ask to spar") over the player. On a gamepad it's Y; on a
   phone, tap the prompt.
-- **Press 1** to ask the nearest free player within about 15 studs. On a
-  gamepad it's D-pad up.
 
-If nobody is close enough, 1 tells you how to ask.
+**1** is your kit switch: it takes your combat kit out to fight critters and
+wild kaiju beside your kaiju (**KIT OUT**: only creatures can hit you), and
+puts it away again for your pick (**MINE**). On a gamepad it's D-pad up; on a
+phone, the round **FIGHT / MINE** button under your kaiju card. It works the
+same in the Outpost and in the Rift, but not while you're down. In a spar, 1
+ends the spar.
 
 The other player gets a card with Accept and Decline. It stays up for 20
 seconds:

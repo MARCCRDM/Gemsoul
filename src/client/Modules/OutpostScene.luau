@@ -418,7 +418,11 @@ local function labelRock(model: Model)
 		)
 		tag.TextStrokeTransparency = 0.3
 	end
-	local name = text(gui, spec.Name, 13, sizeColor(size), IronUi.Bold, 0, top, 150, 16, Enum.TextXAlignment.Center)
+	-- (A Rift's healing crystal: mined for health, never gems.)
+	local heal = model:GetAttribute("HealRock") == true
+	local tint = if heal then Color3.fromRGB(70, 240, 95) else sizeColor(size)
+	local name =
+		text(gui, if heal then "HEALING CRYSTAL" else spec.Name, 13, tint, IronUi.Bold, 0, top, 150, 16, Enum.TextXAlignment.Center)
 	name.TextStrokeTransparency = 0.3
 	local bar = new("Frame", {
 		Position = UDim2.fromOffset(25, 18 + top),
@@ -427,7 +431,7 @@ local function labelRock(model: Model)
 		BackgroundTransparency = 0.2,
 	}, gui)
 	UiKit.round(bar, 3)
-	local barFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = sizeColor(size) }, bar)
+	local barFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = tint }, bar)
 	UiKit.round(barFill, 3)
 	local claim =
 		text(gui, "", 11, Color3.fromRGB(255, 220, 140), IronUi.Bold, 0, 26 + top, 150, 14, Enum.TextXAlignment.Center)
@@ -848,6 +852,31 @@ function OutpostScene.swing(nodeId: number?)
 	end
 	local id = model:GetAttribute("NodeId")
 	local at = body and body.Position
+	if model:GetAttribute("HealRock") then
+		-- A Rift's healing crystal: health back, never gems (RiftServer).
+		task.spawn(function()
+			local result = GemClient.request("RiftMine", id)
+			if not result.Ok then
+				if result.Message and result.Message ~= "" then
+					UiKit.toast(result.Message, P.Bad)
+				end
+				return
+			end
+			local green = Color3.fromRGB(70, 240, 95)
+			if at and (result.Healed or 0) > 0 then
+				floatText(at + Vector3.new(0, 4, 0), "+" .. result.Healed, green, if result.Broke then 30 else 22)
+			end
+			if result.Broke then
+				UiKit.toast(
+					if (result.Kaiju or 0) > 0
+						then "The crystal breaks open: you and your kaiju feel stronger."
+						else "The crystal breaks open: you feel stronger.",
+					green
+				)
+			end
+		end)
+		return
+	end
 	task.spawn(function()
 		local result = GemClient.request("OutpostHit", id)
 		if result.State then
@@ -1543,9 +1572,11 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 		Enabled = hud.Enabled and next(openScreens) == nil,
 	}, player.PlayerGui)
 	miningPrompts[prompt] = promptGui
-	local instruction = if inputType == Enum.ProximityPromptInputType.Touch then "Tap to mine"
-		elseif inputType == Enum.ProximityPromptInputType.Gamepad then "X to mine"
-		else "Click to mine"
+	local rock = prompt.Parent and prompt.Parent.Parent
+	local verb = if rock and rock:GetAttribute("HealRock") then "heal" else "mine"
+	local instruction = if inputType == Enum.ProximityPromptInputType.Touch then "Tap to " .. verb
+		elseif inputType == Enum.ProximityPromptInputType.Gamepad then "X to " .. verb
+		else "Click to " .. verb
 	local button = new("TextButton", {
 		Text = instruction, Font = IronUi.Bold, TextSize = 14, TextColor3 = Color3.fromRGB(230, 248, 255), Active = true,
 		Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(9, 25, 34), BackgroundTransparency = 0.12,

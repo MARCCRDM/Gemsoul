@@ -249,6 +249,11 @@ local Remotes = {
 		FireAllClients = function(_, kind, ...)
 			table.insert(fxs, { kind, ... })
 		end,
+		-- (One player's own: a robbery's report.)
+		ToClient = {},
+		FireClient = function(self, player, kind, ...)
+			table.insert(self.ToClient, { player, kind, ... })
+		end,
 	},
 	Social = {
 		FireClient = function(_, player, kind, ...)
@@ -458,7 +463,12 @@ local DuelistStub = {
 -- Loading -------------------------------------------------------------------------------------------------
 
 local RunService = { Heartbeat = signal() }
-local services = { Players = Players, RunService = RunService }
+local services = {
+	Players = Players,
+	RunService = RunService,
+	Debris = { AddItem = function() end },
+	CollectionService = { AddTag = function() end },
+}
 local loaded = {}
 local env
 local server = {
@@ -1806,7 +1816,10 @@ local Frontier = shared("Frontier")
 local FrontierServer = serverModule("FrontierServer")
 local riftsFolder
 local center = outpost * Vector3.new(1, 0, 1)
-FrontierServer.start({ Scars = { CFrame.new(center + Vector3.new(Frontier.Rim + 2, 0, 0)) } })
+FrontierServer.start({
+	Scars = { CFrame.new(center + Vector3.new(Frontier.Rim + 2, 0, 0)) },
+	Spawn = CFrame.new(center + Vector3.new(0, 3, 0)),
+})
 FrontierServer._setWanderAt(math.huge) -- (wandering rifts have their own checks, below)
 riftsFolder = workspaceObject:FindFirstChild("Rifts")
 check(riftsFolder ~= nil, "No Rifts folder")
@@ -4127,6 +4140,129 @@ end
 	FrontierServer._raids[b] = nil
 end)()
 
+-- Robbed while down out there: knocked out (not in the core, not in a spar
+-- with someone, not in the Rift), the critters near come for you and more
+-- tear through for what there's to take; each grabs one gem of your haul
+-- and runs (knocked out first, it drops it back); then you're back at base,
+-- whole, and shown what they took. Nothing to take, one comes and finds
+-- nothing, and it's soon over.
+;(function()
+	clearCritters()
+	table.clear(notes)
+	local Robbery = serverModule("Robbery")
+	local Rob = Frontier.Rob
+	local profile = profiles[b]
+	profile.Gems = {}
+	for _, key in { "SparDown", "SparWith", "Robbed", "RiftRun" } do
+		b:SetAttribute(key, nil)
+	end
+	b.Character.PrimaryPart = rootB
+	local hB = b.Character:FindFirstChildOfClass("Humanoid")
+	hB.MaxHealth, hB.Health = 100, 1
+	stand(center + Vector3.new(60, 5, 0))
+	check(FrontierServer.knockedOut(b) == nil and b:GetAttribute("Robbed") == nil, "Robbed in the core")
+	stand(center + Vector3.new(220, 5, 0))
+	for i = 1, 2 do
+		local gem = { Id = "rob-" .. i, Tier = "Common", Element = "Frost" }
+		table.insert(profile.Gems, gem)
+		FrontierServer.mined(b, gem)
+	end
+	check(FrontierServer._takeable(b) == 2, "Not two gems of the haul to take")
+	b:SetAttribute("SparWith", a.UserId)
+	check(FrontierServer.knockedOut(b) == nil, "Robbed knocked down in a spar")
+	b:SetAttribute("SparWith", nil)
+	b:SetAttribute("RiftRun", "trip")
+	check(FrontierServer.knockedOut(b) == nil, "Robbed by the Outpost's critters in the Rift")
+	b:SetAttribute("RiftRun", nil)
+	local close = KaijuWilds.spawnBug(rootB.Position + Vector3.new(20, 0, 0), { Prey = b, Band = "Fringe" })
+	local far = KaijuWilds.spawnBug(rootB.Position + Vector3.new(Rob.Near + 30, 0, 0), { Prey = b, Band = "Fringe" })
+	b:SetAttribute("SparDown", now + 3)
+	local robbery = FrontierServer.knockedOut(b)
+	check(robbery ~= nil and Robbery.of(b) == robbery and b:GetAttribute("Robbed") ~= nil, "Not robbed knocked out out there")
+	check(b:GetAttribute("SparDown") > b:GetAttribute("Robbed"), "Up before the robbery's over")
+	check(KaijuWilds._wilds[close].Robbery == robbery, "The critter near didn't come for them")
+	check(KaijuWilds._wilds[far].Robbery == nil, "One far off came for them")
+	check(noted(b, "coming for your gems"), "Not told the critters are coming")
+	for _ = 1, 20 do
+		now += 0.25
+		runDelayed()
+	end
+	local robbers = {}
+	for enemy, entry in KaijuWilds._wilds do
+		if entry.Robbery == robbery and enemy.Alive then
+			table.insert(robbers, enemy)
+		end
+	end
+	check(#robbers == 2, "Not one more through for two gems, one near: " .. #robbers)
+	for _, enemy in robbers do
+		check(enemy.Model:GetAttribute("Raider") == true, "A robber not marked")
+		if enemy ~= close then
+			local d = ((enemy.Home - rootB.Position) * Vector3.new(1, 0, 1)).Magnitude
+			check(d >= Rob.Out[1] - 0.5 and d <= Rob.Out[2] + 0.5, "A robber came through off its ring: " .. d)
+		end
+	end
+	local function closeIn()
+		for _, enemy in robbers do
+			enemy.Root.CFrame = CFrame.new(rootB.Position + Vector3.new(3, 0, 0))
+			KaijuWilds._brain(enemy, now)
+		end
+	end
+	closeIn()
+	now += Frontier.Raid.Snatch.Windup + 0.05
+	closeIn()
+	check(#profile.Gems == 0 and robbery.Taken == 2, "The robbers didn't take a gem each")
+	check(b:GetAttribute("SparDown") ~= nil, "Up again mid-robbery")
+	-- One knocked out first: it drops its gem back.
+	local first = robbers[1]
+	Enemies.damage(first, first.Humanoid.MaxHealth * 10, a)
+	check(#profile.Gems == 1, "A robber knocked out kept the gem")
+	now += Rob.Settle + 0.05
+	Robbery._step()
+	check(Robbery.of(b) == nil and b:GetAttribute("Robbed") == nil and b:GetAttribute("SparDown") == nil, "Still down after the robbery")
+	check((rootB.Position - (center + Vector3.new(0, 3, 0))).Magnitude < 1, "Not back at base")
+	check(hB.Health == hB.MaxHealth, "Not back at base whole")
+	check(FrontierServer._hauls[b] == nil, "The trip's haul isn't over back at base")
+	local sent = Remotes.CombatFx.ToClient[#Remotes.CombatFx.ToClient]
+	check(sent[1] == b and sent[2] == "Robbed" and sent[3].Where == "Outpost", "Not shown what was taken")
+	check(#sent[3].Items == 2, "The report doesn't list both gems")
+	local back = 0
+	for _, item in sent[3].Items do
+		if item.Back then
+			back += 1
+		end
+	end
+	check(back == 1, "The report doesn't show the one that came back")
+	local other = robbers[2]
+	check(KaijuWilds._wilds[other] and KaijuWilds._wilds[other].Loot ~= nil, "The one running off let go of its gem")
+	-- Nothing to take: one comes through, finds nothing, and it's over.
+	clearCritters()
+	FrontierServer._hauls[b] = nil
+	stand(center + Vector3.new(220, 5, 0))
+	b:SetAttribute("SparDown", now + 3)
+	local empty = FrontierServer.knockedOut(b)
+	for _ = 1, 20 do
+		now += 0.25
+		runDelayed()
+	end
+	local lone = {}
+	for enemy, entry in KaijuWilds._wilds do
+		if entry.Robbery == empty and enemy.Alive then
+			table.insert(lone, enemy)
+		end
+	end
+	check(#lone == 1, "Not one robber through to find nothing: " .. #lone)
+	robbers = lone
+	closeIn()
+	now += Frontier.Raid.Snatch.Windup + 0.05
+	closeIn()
+	check(empty.Empty == true and empty.Taken == 0, "The robber found something to take")
+	now += Rob.Settle + 0.05
+	Robbery._step()
+	local told = Remotes.CombatFx.ToClient[#Remotes.CombatFx.ToClient]
+	check(Robbery.of(b) == nil and told[3].Empty == true, "Not over (or not told) with nothing to take")
+	clearCritters()
+end)()
+
 -- The Rift (Server.RiftServer) -----------------------------------------------------------------------------
 -- Through a vein's gate: alone you're warned, your party joins you, and
 -- your combat kit's out till you're home; each cave's pack (critters and
@@ -4156,7 +4292,7 @@ end)()
 			folder.Parent = workspaceObject
 			local rooms, gates = {}, {}
 			for i = 1, RiftRun.Rooms do
-				rooms[i] = { Center = base + Vector3.new(0, 0, -116 * i), Radius = 42 }
+				rooms[i] = { Center = base + Vector3.new(0, 0, -116 * i), Radius = 42, Size = 84 }
 				gates[i] = make("Model", { Name = "FireGate" })
 			end
 			local home = make("Model", { Name = "WayHome" })
@@ -4165,9 +4301,9 @@ end)()
 				Folder = folder,
 				Origin = origin,
 				Start = CFrame.new(base + Vector3.new(0, 3, 4)),
-				Landing = { Center = base, Radius = 26 },
+				Landing = { Center = base, Radius = 26, Size = 52 },
 				Rooms = rooms,
-				Boss = { Center = base + Vector3.new(0, 0, -116 * (RiftRun.Rooms + 1)), Radius = 52 },
+				Boss = { Center = base + Vector3.new(0, 0, -116 * (RiftRun.Rooms + 1)), Radius = 52, Size = 104 },
 				Gates = gates,
 				Exit = make("Part", { CFrame = CFrame.new(base + Vector3.new(0, 7, 12)) }),
 				Home = home,
@@ -4176,6 +4312,14 @@ end)()
 			return world
 		end,
 		inside = inside,
+		healRock = function(parent, at)
+			local model = make("Model", { Name = "HealCrystal" })
+			local body = make("Part", { Name = "Body", CFrame = CFrame.new(at + Vector3.new(0, 1.6, 0)) })
+			body.Parent = model
+			model.PrimaryPart = body
+			model.Parent = parent
+			return model
+		end,
 		openGate = function(gate)
 			opened[gate] = true
 		end,
@@ -4448,15 +4592,115 @@ end)()
 	tick()
 	check(inside(world.Rooms[2], rootA.Position) and (rootA.Position - world.Rooms[2].Center).Magnitude < 6, "Not put back in the cave")
 	check(hA.Health == hA.MaxHealth, "Hurt for falling through the floor")
-	-- Knocked out on the way: robbed, and thrown home, kit away.
-	b:SetAttribute("SparDown", now + 3)
-	tick()
-	check(#profiles[b].Gems == 0 and noted(b, "The critters robbed you"), "Not robbed going down on the way")
-	check(b:GetAttribute("RiftRun") ~= nil, "Thrown home before the critters had their giggle")
-	now += 3
-	runDelayed()
-	check(b:GetAttribute("RiftRun") == nil and RiftServer.runOf(b) == nil, "Not thrown home")
-	check((rootB.Position - site.Spawn.Position).Magnitude < 1 and b:GetAttribute("SparDown") == nil, "Not back at base, whole")
+	-- Knocked out on the way: robbed. They stay down while the critters come
+	-- for them: none of the caves' is near, so robbers tear through round
+	-- them, in the Rift's colours, on the landing's floor. One grabs the gem
+	-- they found in here and runs for a tear on the same floor; then
+	-- they're thrown home, kit away, and shown what was taken.
+	;(function()
+		local Robbery = serverModule("Robbery")
+		local Frontier = shared("Frontier")
+		local found = #run.Found[b]
+		check(found == 1 and #profiles[b].Gems == 1, "No gem found in here to be robbed of")
+		local tornBefore = #tears
+		b:SetAttribute("SparDown", now + 3)
+		tick()
+		local robbery = Robbery.of(b)
+		check(robbery ~= nil and robbery.Where == "Rift" and b:GetAttribute("Robbed") ~= nil, "Not robbed going down on the way")
+		check(b:GetAttribute("SparDown") > b:GetAttribute("Robbed"), "Up again before the robbery's over")
+		check(noted(b, "coming for what you found"), "Not told the critters are coming")
+		for _ = 1, 10 do
+			tick()
+		end
+		local robbers = {}
+		for enemy, entry in KaijuWilds._wilds do
+			if entry.Robbery == robbery and enemy.Alive then
+				table.insert(robbers, enemy)
+			end
+		end
+		check(#robbers == Frontier.robCrew(RiftRun.robCount(found), 0), "Robbers through for them: " .. #robbers)
+		check(#tears - tornBefore == #robbers and tears[#tears].Opts.Hell == true, "The robbers didn't tear through in the Rift's colours")
+		for _, enemy in robbers do
+			check(inside(world.Landing, enemy.Home), "A robber came through off the landing's floor")
+			check(enemy.Model:GetAttribute("Raider") == true and run.Foes[enemy] == nil, "A robber isn't one, or counts in a cave's pack")
+			check(KaijuWilds._wilds[enemy].Hell == true, "A robber not of the Rift's world")
+		end
+		local thief = robbers[1]
+		local function closeIn()
+			thief.Root.CFrame = CFrame.new(rootB.Position + Vector3.new(3, 0, 0))
+			KaijuWilds._brain(thief, now)
+		end
+		closeIn()
+		check(thief.Model:GetAttribute("ActionName") == "Snatch", "The robber didn't go for a grab")
+		now += 0.55
+		closeIn()
+		local grabbed = KaijuWilds._wilds[thief]
+		check(#profiles[b].Gems == 0 and robbery.Taken == 1 and #run.Found[b] == 0, "The robber didn't take what they found")
+		check(grabbed.Loot ~= nil and inside(world.Landing, grabbed.Carry.Spot), "It isn't off for a tear on the landing's floor")
+		check(noted(b, "A critter grabbed your"), "Not told it was grabbed")
+		check(b:GetAttribute("RiftRun") ~= nil and b:GetAttribute("SparDown") ~= nil, "Thrown home before the critters were done")
+		-- (Settled: home, whole, and the report.)
+		now += Frontier.Rob.Settle + 0.05
+		Robbery._step()
+		check(b:GetAttribute("RiftRun") == nil and RiftServer.runOf(b) == nil, "Not thrown home")
+		check((rootB.Position - site.Spawn.Position).Magnitude < 1 and b:GetAttribute("SparDown") == nil, "Not back at base, whole")
+		check(b:GetAttribute("Robbed") == nil and Robbery.of(b) == nil, "Still being robbed back at base")
+		local report = Remotes.CombatFx.ToClient[#Remotes.CombatFx.ToClient]
+		check(report and report[1] == b and report[2] == "Robbed" and report[3].Where == "Rift", "Not shown what was taken")
+		check(#report[3].Items == 1 and report[3].Items[1].Name ~= nil and not report[3].Empty, "The report doesn't list the gem")
+		check(KaijuWilds._wilds[thief] ~= nil and grabbed.Robbery == robbery, "The thief stopped running off with it")
+	end)()
+	-- Healing crystals by the walls of every cave and the throne cave: mined
+	-- with the pick (not the kit), each swing heals, the one that breaks it
+	-- open heals more (and your kaiju); never a gem; it grows back.
+	;(function()
+		local rules = RiftRun.Heal
+		local count = 0
+		for _ in run.Heals do
+			count += 1
+		end
+		check(count == rules.PerCave * (RiftRun.Rooms + 1), "Not every cave's healing crystals: " .. count)
+		local rock = nil
+		for _, r in run.Heals do
+			if inside(world.Rooms[2], r.At) then
+				rock = r
+			end
+		end
+		check(rock ~= nil, "No healing crystal in the second cave")
+		local model = rock.Model
+		check(model:GetAttribute("HealRock") == true and model:GetAttribute("Hp") == rules.Hp, "A crystal not marked as one")
+		check(model.PrimaryPart:FindFirstChildOfClass("ProximityPrompt") ~= nil, "A crystal with no prompt")
+		local hA = a.Character:FindFirstChildOfClass("Humanoid")
+		rootA.CFrame = CFrame.new(rock.At + Vector3.new(3, 0, 0))
+		a:SetAttribute("Spar", true)
+		a:SetAttribute("Hunt", true)
+		check(registered.RiftMine(a, rock.Id).Message == "Press 1 for your pick to mine.", "Mined a crystal with the kit out")
+		a:SetAttribute("Spar", nil)
+		a:SetAttribute("Hunt", nil)
+		local gems = #profiles[a].Gems
+		hA.MaxHealth, hA.Health = 100, 10
+		local result
+		for _ = 1, rules.Hp do
+			now += shared("Outpost").SwingCooldown + 0.01
+			result = registered.RiftMine(a, rock.Id)
+			check(result.Ok, "A swing at a crystal failed: " .. tostring(result.Message))
+		end
+		local healed = 10 + 100 * (rules.Swing * rules.Hp + rules.Pop)
+		check(result.Broke and math.abs(hA.Health - healed) < 0.01, "The crystal didn't heal as it should: " .. hA.Health)
+		check(type(result.Kaiju) == "number", "Breaking it didn't mend the kaiju")
+		check(run.Heals[rock.Id] == nil and model:GetAttribute("Popped") == a.UserId, "The crystal didn't break open")
+		check(not registered.RiftMine(a, rock.Id).Ok, "Mined a broken crystal")
+		check(#profiles[a].Gems == gems, "A healing crystal paid a gem")
+		now += rules.Regrow + 0.1
+		runDelayed()
+		local grown = run.Heals[rock.Id]
+		check(grown ~= nil and grown.Hp == rules.Hp and grown.At == rock.At, "The crystal didn't grow back")
+		now += 1
+		rootA.CFrame = CFrame.new(rock.At + Vector3.new(rules.Reach + 12, 0, 0))
+		check(registered.RiftMine(a, rock.Id).Message == "Get closer to the crystal.", "Mined a crystal from afar")
+		a:SetAttribute("Spar", true)
+		a:SetAttribute("Hunt", true)
+	end)()
 	check(kit[b] == false and b:GetAttribute("Hunt") == nil, "Still in their kit back at base")
 	check(a:GetAttribute("RiftRunners") == 1, "The trip still counts them")
 	-- The rest of the way, then the throne cave: the boss comes through.
@@ -4629,7 +4873,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, gem raids, the Rift)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, gem raids, robbed while down, the Rift and its healing crystals)",
 		checks
 	)
 )

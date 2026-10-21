@@ -916,9 +916,45 @@ check(FrontierHud.nearest({}, Vector3.zero, 100) == nil, "A sighting with none a
 	check(Frontier.timeline(100).HopAt - 100 == Frontier.Rift.Hop, "A rift's usual wait changed")
 end)()
 
+-- Robbed while down: one robber for each gem there's to take (Crew at
+-- most, one at least, less those already coming); their tears round you,
+-- spread out; over once it's all taken (or nothing found), Settle later,
+-- or when Hold runs out.
+;(function()
+	local Rob = Frontier.Rob
+	check(Frontier.robCrew(0, 0) == 1, "Nobody comes to find nothing")
+	check(Frontier.robCrew(2, 0) == 2 and Frontier.robCrew(2, 1) == 1 and Frontier.robCrew(2, 3) == 0, "Robbers for two gems")
+	check(Frontier.robCrew(10, 0) == Rob.Crew, "More robbers than a crew")
+	local rng = Random.new(8)
+	for count = 1, Rob.Crew do
+		for _ = 1, 30 do
+			local at = Vector3.new(200, 3, -40)
+			local spots = Frontier.robSpots(at, count, rng)
+			check(#spots == count, "Not a tear for each robber")
+			for i, spot in spots do
+				local d = Vector3.new(spot.X - at.X, 0, spot.Z - at.Z).Magnitude
+				check(d >= Rob.Out[1] - 1e-6 and d <= Rob.Out[2] + 1e-6, "A robber's tear off its ring: " .. d)
+				check(spot.Y == at.Y, "A robber's tear off the floor")
+				for j = i + 1, #spots do
+					check((spot - spots[j]).Magnitude > 4, "Two robbers' tears on top of each other")
+				end
+			end
+		end
+	end
+	local robbery = { EndAt = 100, Taken = 0, Max = 2 }
+	check(not Frontier.robOver(robbery, 10), "Over before anything happened")
+	robbery.Taken, robbery.LastAt = 1, 10
+	check(not Frontier.robOver(robbery, 30), "Over with a gem still to take")
+	robbery.Taken, robbery.LastAt = 2, 40
+	check(not Frontier.robOver(robbery, 40 + Rob.Settle - 0.1), "Over the moment the last was taken")
+	check(Frontier.robOver(robbery, 40 + Rob.Settle), "Not over once it settled")
+	check(Frontier.robOver({ EndAt = 100, Taken = 0, Max = 3, Empty = true, LastAt = 5 }, 5 + Rob.Settle), "Not over with nothing found")
+	check(Frontier.robOver({ EndAt = 100, Taken = 0, Max = 3 }, 100), "Not over when its time ran out")
+end)()
+
 print(
 	string.format(
-		"PASS: %d frontier checks (bands, the biomes, their swaying borders and their ground, the spokes, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids)",
+		"PASS: %d frontier checks (bands, the biomes, their swaying borders and their ground, the spokes, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids, robbed while down)",
 		checks
 	)
 )

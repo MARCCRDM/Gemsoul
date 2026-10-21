@@ -46,6 +46,10 @@
 	                                       PLAY's place on a phone (PLAY hides
 	                                       while you pilot): its size and how
 	                                       far up it sits
+	  MobileLayout.ring(height)            the fight's ring of buttons (Combat.client)
+	  MobileLayout.onRing(screen, ring, size, radius, degrees)   a button on it
+	  MobileLayout.kitSwitch(chat)         the pick/kit switch (SparKit): down
+	                                       the left, under your kaiju's card
 	  MobileLayout.stick(screen)           a mech's drive stick on a touch
 	                                       screen (VehicleDrive): bottom left,
 	                                       where Roblox's thumbstick sits,
@@ -181,6 +185,52 @@ function MobileLayout.kaiju(chat: boolean?)
 	end
 	local x, y = 12, health.Y + health.H + 6
 	return { X = x, Y = y, W = w, H = 50, TameX = x + w + 8, TameY = y, TameW = 86 }
+end
+
+-- The fight's ring of buttons on a touch screen (Client.Combat): ATTACK in
+-- the bottom-right corner, the three surges round it (at Ring.Surges
+-- degrees), GUARD and DODGE on an outer arc (Ring.Guard, Ring.Dodge); sized
+-- to the screen's height (`height`: the camera's viewport's). Cx, Cy: its
+-- centre, from the bottom-right corner.
+MobileLayout.Ring = { Surges = { 180, 135, 90 }, Guard = 184, Dodge = 100 }
+function MobileLayout.ring(height: number)
+	local k = math.clamp(height / 380, 0.8, 1.3)
+	local A, S, M, G = math.floor(86 * k), math.floor(58 * k), math.floor(50 * k), math.floor(56 * k)
+	local margin = math.floor(12 * k)
+	local inner = A / 2 + S / 2 + 8 * k
+	return {
+		K = k,
+		Attack = A,
+		Surge = S,
+		Dodge = M,
+		Guard = G,
+		Margin = margin,
+		Cx = margin + A / 2,
+		Cy = margin + A / 2,
+		Inner = inner,
+		Outer = inner + S / 2 + G / 2 + 8 * k,
+	}
+end
+
+-- A button `size` across at `degrees` and `radius` round the ring's centre,
+-- as a rect on `screen` (as Client.Combat places it).
+function MobileLayout.onRing(screen: Vector2, ring, size: number, radius: number, degrees: number)
+	local a = math.rad(degrees)
+	local x = screen.X - ring.Cx + math.floor(radius * math.cos(a))
+	local y = screen.Y - ring.Cy - math.floor(radius * math.sin(a))
+	return { X = x - size / 2, Y = y - size / 2, W = size, H = size }
+end
+
+-- The kit switch (Client.SparKit: your pick or your combat kit), round,
+-- down the left under your kaiju's card (and CATCH, when that's under the
+-- CHAT button): the same place whether you mine or fight, clear of the
+-- fight's ring and the jump button on the right, and of the dock.
+MobileLayout.KitSwitch = { Size = 52, Gap = 10 }
+function MobileLayout.kitSwitch(chat: boolean?)
+	local k = MobileLayout.kaiju(chat)
+	local bottom = math.max(k.Y + k.H, if chat then k.TameY + k.H else 0)
+	local size = MobileLayout.KitSwitch.Size
+	return { X = 12, Y = bottom + MobileLayout.KitSwitch.Gap, W = size, H = size }
 end
 
 function MobileLayout.overlaps(a, b): boolean

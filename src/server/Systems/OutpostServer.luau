@@ -596,7 +596,10 @@ local function hit(player: Player, nodeId: any)
 		return reply(false, "Head to the Outpost to mine.")
 	end
 	if Spar.sparring(player) then
-		return reply(false, "Press 1 to end the spar and mine.")
+		return reply(
+			false,
+			if Spar.hunting(player) then "Press 1 for your pick to mine." else "Press 1 to end the spar and mine."
+		)
 	end
 	-- On foot with your pick, or from a mech's cockpit (Outpost.Machines,
 	-- Mine): bigger strikes, sooner, each spending its swings.

@@ -132,10 +132,25 @@ Down in the Rift works like down in the Outpost: with your kit out, a
 finishing blow knocks you down (`SparDown`), it doesn't kill you. The
 fighters leave you be while you're down; with everyone down, they wait.
 
-- **On the way**: the critters rob you. Half the gems you've found in
-  there (at least one), the newest first, are taken out of your pouch, and
-  you're thrown back to base. "You went down. The critters robbed you: 2
-  of the gems you found in the Rift, gone."
+- **On the way**: you stay down and the critters rob you (`Robbery`,
+  `Frontier.Rob`):
+  - the cave's critters within 70 studs come for you; if fewer are near
+    than there's to take (up to 3), more leap out of Rift tears round you;
+  - each grabs one of the gems you found in there, newest first ("A critter
+    grabbed your Thermal Gem!"), holds it up and runs for a tear with it.
+    Knock it out before it gets there and it drops the gem back to you
+    ("Recovered."); the ones that get away are gone, and count as down for
+    the cave;
+  - your screen says **KNOCKED OUT · The critters are going through your
+    pouch! · Back to base in 8**;
+  - after 8 seconds (sooner once there's nothing left to take), you're back
+    at base on your feet, and a card tells you what they took.
+
+![What the critters took: the card. Offline render of the game's UI code, gems drawn as stand-ins, not a Roblox screenshot](rift/robbed.png)
+
+  The card (`RobReport`): **ROBBED!**, each gem they grabbed in 3D with its
+  name in its rarity's colour and **GONE**, or **SAVED** if you knocked it
+  loose again. With nothing on you to take: **NOTHING TAKEN**.
 - **At the boss**: you stay down and choose.
 
 ![Down at the boss](rift/down.png)
@@ -148,6 +163,28 @@ fighters leave you be while you're down; with everyone down, they wait.
   - nothing chosen in 60 seconds: back to base.
 
   Your kaiju fight on without you while you're down.
+
+## Healing crystals
+
+Green crystals grow in the corners of every cave and the throne cave, 2 a
+cave (`RiftRun.Heal`, `RiftRun.healSpots`, `RiftWorld.healRock`). They're
+for healing, not gems:
+
+![A healing crystal in a cave corner. Offline render of the game's parts, not a Roblox screenshot](rift/heal.png)
+
+- Their label reads **HEALING CRYSTAL**, their prompt **Click to heal**.
+- Swap to your pick (**1**, or the kit button on phones) and mine one:
+  each swing heals you 7%; the swing that breaks it (5 swings) heals you
+  25% more and your kaiju that are up 35% ("The crystal breaks open: you
+  and your kaiju feel stronger."). It grows back in 40 seconds.
+- Not while you're down, and only from 10 studs.
+
+## Your kit and your pick
+
+Your combat kit is out when you go in, but you can put it away: **1** on a
+keyboard, or the round **FIGHT / MINE** button on phones (under your kaiju
+card), swaps between your kit and your pick, here and in the Outpost alike
+(`SparKit.toggle`, the server's `Hunt`). Not while you're down.
 
 ## Together
 

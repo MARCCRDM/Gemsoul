@@ -1,14 +1,25 @@
 --[[
-	Friendly sparring in the lobby (Shared.Spar has the rules, the server's
-	SparServer runs them). A spar is asked for and agreed to: press Z over
-	another player ("Ask to spar", OutpostServer's prompt), or 1 to ask the
-	nearest one. They get a card to accept (SocialUI). Once they do, both
-	kits come out; 1 ends the spar, for both.
+	Your pick or your combat kit, and friendly sparring (Shared.Spar has the
+	rules, the server's SparServer runs them).
 
-	  The spar bar  top centre, only while you spar: who you're fighting,
-	                and END (the 1 key; tap or click it too). The kit coming
-	                out or going away gets a quick flash, a word and the
-	                sound of a blade.
+	  The kit       1 swaps your pick for your combat kit and back (the
+	                server's "Hunt"), in the Outpost and in the Rift alike:
+	                the kit out, you fight beside your kaiju (and only
+	                creatures can hit you); the pick out, you mine (in the
+	                Rift, its healing rocks). On a touch screen the kit
+	                switch does the same (MobileLayout.kitSwitch: round, down
+	                the left), showing what a tap swaps to: FIGHT with the
+	                pick out, MINE with the kit out. Never while you're down.
+	  A spar        is asked for and agreed to: press Z over another player
+	                ("Ask to spar", OutpostServer's prompt). They get a card to
+	                accept (SocialUI). Once they do, both kits come out; 1
+	                ends the spar, for both.
+
+	  The spar bar  top centre, while your kit is out: who you're fighting
+	                (or HUNTING), and END for a spar or MINE for your pick
+	                (the 1 key; tap or click it too). The kit coming out or
+	                going away gets a quick flash, a word and the sound of a
+	                blade.
 	  A spar        with the kit out the fight view takes over (Combat.client,
 	                first person, every move); only your partner can hit you,
 	                or be hit.
@@ -20,7 +31,7 @@
 
 	  SparKit.start()     once, from Lobby.client
 	  SparKit.available() whether 1 does anything right now
-	  SparKit.toggle()    ask the nearest player to spar, or end your spar
+	  SparKit.toggle()    swap the pick for the kit (or back), or end your spar
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -34,6 +45,7 @@ local Spar = require(ReplicatedStorage.Shared.Spar)
 local CombatSound = require(script.Parent.CombatSound)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local MobileLayout = require(script.Parent.MobileLayout)
 local OutpostScene = require(script.Parent.OutpostScene)
 local UiKit = require(script.Parent.UiKit)
 
@@ -274,9 +286,10 @@ local function refreshBar()
 	end
 	-- (Hunting: the kit out alone, against the Outpost's creatures.)
 	local hunting = Spar.hunting(player)
-	versus.Text = if hunting then "HUNTING" else "SPAR vs " .. string.upper(partnerName())
+	versus.Text = if hunting then "KIT OUT" else "SPAR vs " .. string.upper(partnerName())
+	endLabel.Text = if hunting then "MINE" else "END"
 	caption.Text = if hunting
-		then "HUNTING  ·  only creatures can hit you  ·  wear a wild kaiju down to catch it"
+		then "KIT OUT  ·  only creatures can hit you  ·  1 for your pick"
 		else "FRIENDLY SPAR  ·  only you two can hit each other"
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	-- (Touch: no key to show; the chip itself is the button.)
@@ -297,27 +310,7 @@ local function refreshBar()
 	end
 end
 
--- Asking and ending -------------------------------------------------------------------------------------
-
--- The nearest other player close enough to ask (in the Outpost, and not
--- sparring or in any other fight), or nil.
-local function nearest(): Player?
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then
-		return nil
-	end
-	local best, bestDistance = nil, Spar.AskRange / 2
-	for _, other in Players:GetPlayers() do
-		local theirs = other.Character and other.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if other ~= player and theirs and other:GetAttribute("Outpost") == true and not Spar.fighting(other) then
-			local distance = (theirs.Position - root.Position).Magnitude
-			if distance < bestDistance then
-				best, bestDistance = other, distance
-			end
-		end
-	end
-	return best
-end
+-- Swapping, and ending a spar ---------------------------------------------------------------------------
 
 local function send(action: string, ...: any)
 	busy = true
@@ -332,29 +325,20 @@ local function send(action: string, ...: any)
 	end)
 end
 
+-- 1 (or the kit switch): in a spar, end it; otherwise swap the pick for the
+-- combat kit, or back. (Down, nothing: the server says so too.)
 function SparKit.toggle()
 	if busy then
 		return
 	end
-	if Spar.sparring(player) then
+	if Spar.partner(player) then
 		send("Spar", false)
 		return
 	end
-	if not SparKit.available() then
+	if not SparKit.available() or Spar.isDown(player) then
 		return
 	end
-	local other = nearest()
-	if other then
-		send("SparAsk", other.UserId)
-	else
-		local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-		UiKit.toast(
-			if touch
-				then "Walk up to a player and tap Ask to spar."
-				else "Walk up to a player and press Z (or 1) to ask them to spar.",
-			P.Text
-		)
-	end
+	send("Hunt", not Spar.hunting(player))
 end
 
 -- The kit comes out when both agree, and goes away when either ends it
@@ -369,15 +353,81 @@ local function sparChanged()
 	if sparring then
 		wasHunting = Spar.hunting(player)
 		if wasHunting then
-			flash("HUNT", "your kit is out  ·  fight beside your kaiju  ·  1 to stop", FIGHT)
+			flash("FIGHT", "your kit is out  ·  fight beside your kaiju  ·  1 for your pick", FIGHT)
 		else
 			flash("SPAR", "vs " .. partnerName() .. "  ·  only you two can hit each other  ·  1 to stop", FIGHT)
 		end
 		CombatSound.play("Draw")
 	else
-		flash("PICKAXE", if wasHunting then "Hunt over  ·  back to mining" else "Spar over  ·  back to mining", PICK)
+		flash(
+			"PICKAXE",
+			if wasHunting then "back to mining  ·  1 for your kit" else "Spar over  ·  back to mining",
+			PICK
+		)
 		CombatSound.play("Sheathe")
 	end
+end
+
+-- The kit switch on a touch screen ------------------------------------------------------------------------
+-- Round, down the left (MobileLayout.kitSwitch), wherever 1 would swap:
+-- what a tap swaps to, ⚔ FIGHT with the pick out, ⛏ MINE with the kit out.
+
+local switchGui = UiKit.gui("KitSwitch", 8)
+switchGui.IgnoreGuiInset = false
+local switch = new("TextButton", {
+	Name = "KitSwitch",
+	AutoButtonColor = false,
+	Text = "",
+	BackgroundColor3 = FIGHT:Lerp(GLASS, 0.82),
+	BackgroundTransparency = 0.1,
+	Visible = false,
+}, switchGui)
+new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, switch)
+local switchStroke = new("UIStroke", { Color = FIGHT, Thickness = 2, Transparency = 0.1 }, switch)
+local switchIcon = new("TextLabel", {
+	Name = "Icon",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromScale(0, 0.08),
+	Size = UDim2.fromScale(1, 0.52),
+	Font = Enum.Font.GothamBold,
+	Text = "⚔",
+	TextScaled = true,
+	TextColor3 = FIGHT,
+}, switch)
+local switchLabel = new("TextLabel", {
+	Name = "Label",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromScale(0, 0.6),
+	Size = UDim2.fromScale(1, 0.26),
+	Font = IronUi.Bold,
+	Text = "FIGHT",
+	TextScaled = true,
+	TextColor3 = P.Text,
+}, switch)
+local switchScale = new("UIScale", { Scale = 1 }, switch)
+local switchArmed: boolean? = nil
+local function refreshSwitch()
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local want = touch and Spar.partner(player) == nil and SparKit.available() and not Spar.isDown(player)
+	switch.Visible = want
+	if not want then
+		return
+	end
+	local rect = MobileLayout.kitSwitch(false)
+	switch.Position, switch.Size = UDim2.fromOffset(rect.X, rect.Y), UDim2.fromOffset(rect.W, rect.H)
+	local armed = Spar.hunting(player)
+	if armed == switchArmed then
+		return
+	end
+	switchArmed = armed
+	local color = if armed then PICK else FIGHT
+	switchIcon.Text = if armed then "⛏" else "⚔"
+	switchLabel.Text = if armed then "MINE" else "FIGHT"
+	switchIcon.TextColor3, switchStroke.Color = color, color
+	switch.BackgroundColor3 = color:Lerp(GLASS, 0.82)
+	-- (A little pop as it turns over.)
+	switchScale.Scale = 1.18
+	tween(switchScale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
 end
 
 -- Knocked down -------------------------------------------------------------------------------------------
@@ -483,8 +533,18 @@ local function refreshDown()
 		downBy.Text = ""
 	end
 	if down then
-		local left = (player:GetAttribute("SparDown") or 0) - workspace:GetServerTimeNow()
-		downCount.Text = string.format("Back up in %d", math.max(1, math.ceil(left)))
+		-- Being robbed (Server.Robbery): down till it's over, then back at base.
+		local robbed = player:GetAttribute("Robbed")
+		if type(robbed) == "number" then
+			downTitle.Text = "KNOCKED OUT"
+			downBy.Text = "The critters are going through your pouch!"
+			local left = robbed - workspace:GetServerTimeNow()
+			downCount.Text = string.format("Back to base in %d", math.max(1, math.ceil(left)))
+		else
+			downTitle.Text = "KNOCKED DOWN"
+			local left = (player:GetAttribute("SparDown") or 0) - workspace:GetServerTimeNow()
+			downCount.Text = string.format("Back up in %d", math.max(1, math.ceil(left)))
+		end
 	end
 end
 
@@ -600,11 +660,13 @@ function SparKit.start()
 		return Enum.ContextActionResult.Sink
 	end, false, Enum.ContextActionPriority.High.Value + 20, KEY, Enum.KeyCode.DPadUp)
 	bar.Activated:Connect(SparKit.toggle)
-	for _, name in { "Spar", "SparDown", "Outpost", "CombatSession", "MatchId", "ChatOpen" } do
+	switch.Activated:Connect(SparKit.toggle)
+	for _, name in { "Spar", "Hunt", "SparDown", "Outpost", "CombatSession", "MatchId", "ChatOpen" } do
 		player:GetAttributeChangedSignal(name):Connect(function()
 			refreshBar()
 			refreshDown()
 			refreshMarks()
+			refreshSwitch()
 		end)
 	end
 	-- Mid-spar, E is a fight key: no world prompts (rocks, PROBE-7, the
@@ -657,6 +719,7 @@ function SparKit.start()
 		nextCheck = now + 0.2
 		refreshBar()
 		refreshDown()
+		refreshSwitch()
 	end)
 	refreshBar()
 end

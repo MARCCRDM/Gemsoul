@@ -1457,6 +1457,21 @@ function KaijuServer.reviveAll(player: Player): number
 	return count
 end
 
+-- Your kaiju out healed `share` of their health (not the knocked out: a
+-- Rift's healing crystal, Server.RiftServer). Returns how many it touched.
+function KaijuServer.mend(player: Player, share: number): number
+	local count = 0
+	for _, pet in teams[player] or {} do
+		local humanoid = pet.Humanoid
+		if humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth then
+			humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * share)
+			keepHealth(pet)
+			count += 1
+		end
+	end
+	return count
+end
+
 -- Every one of yours back to full health, the knocked out ones too (a
 -- Rift's RESTORE: Server.RiftServer). Returns how many it touched.
 function KaijuServer.restoreAll(player: Player): number

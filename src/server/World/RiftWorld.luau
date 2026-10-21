@@ -23,6 +23,7 @@
 	      Home (Model: the way home in the throne cave, shut till it's beaten),
 	  }
 	  RiftWorld.inside(area, position, margin?)   on that cave's floor
+	  RiftWorld.healRock(parent, at, rng) -> Model   a healing crystal (RiftRun.Heal)
 	  RiftWorld.openGate(gate)     the fire dies down and the way's open
 	  RiftWorld.openHome(world)    the way home in the throne cave opens
 	  RiftWorld.Spacing, Landing, Cave, Throne, Passage, Wall, Thick: its
@@ -658,6 +659,55 @@ function RiftWorld.build(id: string, origin: CFrame, rng)
 		Exit = exit,
 		Home = home,
 	}
+end
+
+-- A healing crystal (RiftRun.Heal: mined with the pick for health, never
+-- gems): a squat dark rock at `at` (on the floor), green crystals growing
+-- out of it, glowing softly. Its body is its PrimaryPart ("Body"), its
+-- crystals "Crystal" (the client chips them in their colour).
+RiftWorld.HealGreen = Color3.fromRGB(70, 240, 95)
+function RiftWorld.healRock(parent: Instance, at: Vector3, rng): Model
+	local model = Instance.new("Model")
+	model.Name = "HealCrystal"
+	local spin = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+	local base = CFrame.new(at) * spin
+	local body =
+		part(model, base * CFrame.new(0, 1.6, 0), Vector3.new(5.2, 3.2, 4.6), OBSIDIAN, Enum.Material.Basalt, nil, true)
+	body.Name = "Body"
+	model.PrimaryPart = body
+	local cap = part(
+		model,
+		base * CFrame.new(0.6, 3.2, -0.3) * CFrame.Angles(0.2, 0.5, 0.15),
+		Vector3.new(3.4, 1.6, 3),
+		ROCK,
+		Enum.Material.Basalt,
+		nil,
+		true
+	)
+	cap.Name = "Cap"
+	for i = 1, 5 do
+		local tall = rng:NextNumber(2.2, 4.4)
+		local lean = CFrame.Angles(rng:NextNumber(-0.45, 0.45), 0, rng:NextNumber(-0.45, 0.45))
+		local spot = Vector3.new(rng:NextNumber(-1.8, 1.8), 2.6 + tall / 2, rng:NextNumber(-1.6, 1.6))
+		local crystal = glow(
+			part(
+				model,
+				base * CFrame.new(spot) * lean * CFrame.Angles(0, i, 0),
+				Vector3.new(rng:NextNumber(0.6, 1.1), tall, rng:NextNumber(0.6, 1.1)),
+				RiftWorld.HealGreen
+			)
+		)
+		crystal.Name = "Crystal"
+		crystal.Transparency = 0.12
+	end
+	local light = Instance.new("PointLight")
+	light.Color = RiftWorld.HealGreen
+	light.Range = 12
+	light.Brightness = 0.9
+	light.Shadows = false
+	light.Parent = body
+	model.Parent = parent
+	return model
 end
 
 -- On `area`'s floor (a cave: { Center, Size }), `margin` studs of slack.

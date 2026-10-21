@@ -1264,12 +1264,15 @@ local function layoutThumb(viewport: Vector2): (number, number)
 	for _, icon in maneuverIcons do
 		roundAll(icon.Button)
 	end
-	local k = math.clamp(viewport.Y / 380, 0.8, 1.3)
-	local A, S, M, G = math.floor(86 * k), math.floor(58 * k), math.floor(50 * k), math.floor(56 * k)
-	local margin = math.floor(12 * k)
+	-- (Its measures are MobileLayout's, so the kit switch keeps clear of it.)
+	local MobileLayout = require(script.Parent.Modules.MobileLayout)
+	local ring = MobileLayout.ring(viewport.Y)
+	local k = ring.K
+	local A, S, M, G = ring.Attack, ring.Surge, ring.Dodge, ring.Guard
+	local margin = ring.Margin
 	-- The ring's centre, measured from the bottom-right corner: ATTACK close
 	-- to the edge, where the right thumb lands.
-	local cx, cy = margin + A / 2, margin + A / 2
+	local cx, cy = ring.Cx, ring.Cy
 	local function at(button: GuiObject, size: number, radius: number, degrees: number)
 		local a = math.rad(degrees)
 		button.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1279,17 +1282,17 @@ local function layoutThumb(viewport: Vector2): (number, number)
 	end
 	at(slots.Basic.Button, A, 0, 0)
 	-- Surges, closest.
-	local inner = A / 2 + S / 2 + 8 * k
+	local inner = ring.Inner
 	for i, icon in surgeIcons do
 		icon.Button.Visible = true
-		at(icon.Button, S, inner, ({ 180, 135, 90 })[i])
+		at(icon.Button, S, inner, MobileLayout.Ring.Surges[i])
 		icon.Glyph.TextSize = math.floor(S * 0.38)
 		icon.Badge.TextSize = math.floor(9 * k)
 	end
 	-- The outer arc: guard low by the thumb, dodge on top.
-	local outer = inner + S / 2 + G / 2 + 8 * k
-	at(slots.Block.Button, G, outer, 184)
-	at(slots.Dodge.Button, M, outer, 100)
+	local outer = ring.Outer
+	at(slots.Block.Button, G, outer, MobileLayout.Ring.Guard)
+	at(slots.Dodge.Button, M, outer, MobileLayout.Ring.Dodge)
 	-- The round buttons: name centred, cooldown above it, no key hint.
 	for id, slot in slots do
 		local size = if id == "Basic" then A elseif id == "Block" then G else M
