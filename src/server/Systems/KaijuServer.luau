@@ -82,6 +82,19 @@
 	a court of the Kaiju Arena the orders carry its Bounds (Shared.KaijuPit):
 	a kaiju that strays past its rails is walked back in, or put back if
 	it's well out.
+
+	A battle is fought at full health and leaves every kaiju as it was:
+	  KaijuServer.battleStart(player)        each of the team's health kept on
+	                                         its record (BattleKeep, saved), then
+	                                         all of them full, the knocked out
+	                                         back out for it
+	  KaijuServer.battleEnd(player)          each put back as it was (a rejoin or
+	                                         a restart does it too: upkeep)
+	  KaijuServer.battleable(player) -> n    how many could battle: the team,
+	                                         down or not, if it can be out
+	A kaiju knocked out in a battle is out of it quietly: no notice, no
+	critter raid, no revive timer running (and a revive bought meanwhile
+	applies to how it was).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -502,11 +515,27 @@ end
 -- One knocked out back on its feet: its revive time up, weak (at
 -- Kaiju.Revive.Health of its health, to be healed with gems), or bought
 -- (at Revive.Bought).
-local function wake(record, bought: boolean?)
+local function wake(record, bought: boolean?, into: any?)
 	local _, most = Kaiju.health({ Species = record.Species, Level = record.Level, Soul = record.Soul })
-	record.Down, record.DownUntil = nil, nil
+	local target = into or record
+	target.Down, target.DownUntil = nil, nil
 	local share = if bought then Kaiju.Revive.Bought else Kaiju.Revive.Health
-	record.Health = math.max(1, math.floor(most * share + 0.5))
+	target.Health = math.max(1, math.floor(most * share + 0.5))
+end
+
+-- A battle's keep put back on every record that has one (Server.KaijuBattles:
+-- battleEnd, or a rejoin / restart through upkeep). Returns the ids.
+local function putBack(roster): { string }
+	local ids = {}
+	for _, record in (roster and roster.List) or {} do
+		local keep = record.BattleKeep
+		if keep then
+			record.BattleKeep = nil
+			record.Health, record.Down, record.DownUntil = keep.Health, keep.Down, keep.DownUntil
+			table.insert(ids, record.Id)
+		end
+	end
+	return ids
 end
 
 -- Puts the right kaiju out (or away) for `player`.
@@ -523,10 +552,22 @@ local function upkeep(player: Player, now: number)
 		end
 	end
 	local roster = profile.Kaiju
-	-- Knocked out and its time is up: back by itself (at home too).
+	-- A battle's keep left behind (they left mid-battle, or the server
+	-- restarted): each kaiju back as it was before it (battleEnd comes back
+	-- here once it has).
+	if player:GetAttribute("KaijuBattle") == nil then
+		for _, record in (roster and roster.List) or {} do
+			if record.BattleKeep then
+				KaijuServer.battleEnd(player)
+				return
+			end
+		end
+	end
+	-- Knocked out and its time is up: back by itself (at home too). (Not one
+	-- knocked out in a battle: that's put back after it.)
 	local woke = nil
 	for _, record in (roster and roster.List) or {} do
-		if record.Down and Kaiju.reviveIn(record, os.time()) <= 0 then
+		if record.Down and not record.BattleKeep and Kaiju.reviveIn(record, os.time()) <= 0 then
 			wake(record)
 			woke = woke or {}
 			table.insert(woke, Kaiju.title(record))
@@ -735,6 +776,10 @@ local function knockOut(pet: Pet)
 	local wait = Kaiju.reviveSeconds(record)
 	record.Down, record.Health, record.DownUntil = true, 0, os.time() + wait
 	PlayerData.sync(player)
+	-- Out of a battle quietly: it's back as it was once the battle's over.
+	if record.BattleKeep then
+		return
+	end
 	-- The last of the team down: the critters smell your gems.
 	if profile and profile.Kaiju then
 		local ids, standing = Kaiju.teamIds(profile.Kaiju), 0
@@ -1459,7 +1504,13 @@ function KaijuServer.reviveAll(player: Player): number
 	local roster = profile and profile.Kaiju
 	local count = 0
 	for _, record in (roster and roster.List) or {} do
-		if record.Down then
+		if record.BattleKeep then
+			-- (In a battle: it's how it was before that's revived.)
+			if record.BattleKeep.Down then
+				wake(record, true, record.BattleKeep)
+				count += 1
+			end
+		elseif record.Down then
 			wake(record, true)
 			count += 1
 		end
@@ -1469,6 +1520,84 @@ function KaijuServer.reviveAll(player: Player): number
 		upkeep(player, os.clock())
 	end
 	return count
+end
+
+-- A kaiju battle (Server.KaijuBattles) starts: what each of the team has
+-- kept on its record, then every one full, the knocked out back out.
+function KaijuServer.battleStart(player: Player): number
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	if not roster then
+		return 0
+	end
+	for _, pet in teams[player] or {} do
+		if pet.Humanoid.Health > 0 then
+			keepHealth(pet)
+		end
+	end
+	local count = 0
+	for _, id in Kaiju.teamIds(roster) do
+		local record = roster.List[id]
+		if record then
+			if not record.BattleKeep then
+				record.BattleKeep = { Health = record.Health, Down = record.Down, DownUntil = record.DownUntil }
+			end
+			local _, most = Kaiju.health({ Species = record.Species, Level = record.Level, Soul = record.Soul })
+			record.Down, record.DownUntil, record.Health = nil, nil, most
+			count += 1
+		end
+	end
+	for _, pet in teams[player] or {} do
+		pet.Humanoid.Health = pet.Humanoid.MaxHealth
+		keepHealth(pet)
+	end
+	PlayerData.sync(player)
+	upkeep(player, os.clock())
+	return count
+end
+
+-- The battle's over: every kaiju of theirs back as it was before it (one
+-- that was down, down again with the same wait).
+function KaijuServer.battleEnd(player: Player): number
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	if not roster then
+		return 0
+	end
+	-- (Those out that were down before go away first, so their health isn't
+	-- kept off the body on the way.)
+	for _, record in roster.List do
+		local keep = record.BattleKeep
+		if keep and keep.Down and teams[player] and teams[player][record.Id] then
+			despawn(player, record.Id)
+		end
+	end
+	local ids = putBack(roster)
+	for _, id in ids do
+		local pet = teams[player] and teams[player][id]
+		local record = roster.List[id]
+		if pet and record and pet.Model.Parent then
+			local health = Kaiju.health(record)
+			pet.Humanoid.Health = math.clamp(health, 1, pet.Humanoid.MaxHealth)
+			keepHealth(pet)
+		end
+	end
+	if #ids > 0 then
+		PlayerData.sync(player)
+		upkeep(player, os.clock())
+	end
+	return #ids
+end
+
+-- How many of `player`'s kaiju could fight a battle: the whole team, down
+-- or not (a battle brings them back for itself), if their kaiju can be out.
+function KaijuServer.battleable(player: Player): number
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	if not roster or not canBeOut(player) or Kaiju.away(roster) then
+		return 0
+	end
+	return #Kaiju.teamIds(roster)
 end
 
 -- Your kaiju out healed `share` of their health (not the knocked out: a

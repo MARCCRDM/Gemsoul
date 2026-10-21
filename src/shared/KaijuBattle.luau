@@ -19,9 +19,14 @@
 	             with more of its health left (winner). Every kaiju in it
 	             gains EXP (Exp: more for the winners').
 
-	A battle is real: what your kaiju lose stays lost, and one knocked out
-	waits out its revive (Shared.Kaiju.Revive). Only kaiju that are up can
-	fight: at least one each.
+	A battle is fought at full health and leaves every kaiju as it was:
+	each side's whole team comes to it full (the knocked out too), and once
+	it's over each goes back to the health it had before, win or lose
+	(Server.KaijuServer.battleStart / battleEnd). Your kaiju need to be out
+	(not put away): at least one each.
+
+	The two sides are told apart by colour everywhere (Sides): A is BLUE
+	(the court's blue half and pad), B is RED.
 
 	Off a court, the field lies between the two players: its middle halfway
 	between them, its axis from the asker's side (A) to the other's (B).
@@ -35,8 +40,14 @@
 	  KaijuBattle.field(posA, posB) -> field     the field between them
 	  KaijuBattle.winner(a, b, timedOut) -> "A" | "B" | "Draw"
 	  KaijuBattle.askProblem(state) -> string?   why one can't ask (nil: can)
+	  KaijuBattle.Sides[side] -> { Name, Color }  BLUE (A) or RED (B)
 ]]
 local KaijuBattle = {}
+
+KaijuBattle.Sides = {
+	A = { Name = "BLUE", Color = Color3.fromRGB(70, 160, 255) },
+	B = { Name = "RED", Color = Color3.fromRGB(255, 84, 72) },
+}
 
 KaijuBattle.AskSeconds = 20 -- an ask stands this long
 KaijuBattle.AskGap = 1.5 -- seconds between your asks
@@ -44,7 +55,7 @@ KaijuBattle.AskAgain = 20 -- after a no, before you can ask them again
 KaijuBattle.Range = 40 -- studs: how near you must be to ask
 KaijuBattle.FormationSeconds = 25
 KaijuBattle.BattleSeconds = 90
-KaijuBattle.OverSeconds = 4 -- the result stays up this long
+KaijuBattle.OverSeconds = 12 -- the result stays up this long (time to ask for a rematch)
 KaijuBattle.Leash = 70 -- studs from the field's middle: walk off further and you forfeit
 KaijuBattle.Exp = { Win = 40, Lose = 14, Draw = 24 }
 
@@ -188,7 +199,8 @@ function KaijuBattle.winner(a, b, timedOut: boolean?): string
 end
 
 -- Why you can't ask someone (nil: you can). state = { Here (they're in
--- the Outpost), Name, Distance, Mine / Theirs (kaiju up and out: a count),
+-- the Outpost), Name, Distance, Mine / Theirs (how many could battle: the
+-- team, down ones too, Server.KaijuServer.battleable),
 -- MyBattle / TheirBattle (in one), Busy / TheirBusy (a fight, a spar),
 -- Asked (already asked them), Wait (seconds before you can again) }.
 function KaijuBattle.askProblem(state): string?
@@ -204,7 +216,7 @@ function KaijuBattle.askProblem(state): string?
 	elseif state.TheirBusy then
 		return state.Name .. " is busy."
 	elseif (state.Mine or 0) <= 0 then
-		return "You need a kaiju out and up to battle."
+		return "You need your kaiju out to battle."
 	elseif (state.Theirs or 0) <= 0 then
 		return state.Name .. " has no kaiju out to battle."
 	elseif (state.Distance or math.huge) > KaijuBattle.Range then

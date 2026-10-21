@@ -16,6 +16,8 @@
 	  KaijuPitWorld.build(origin, parent) -> {
 	      Folder, Origin (the hall's frame: Shared.KaijuPit.origin),
 	      Arrive (CFrame: on the balcony, facing the courts),
+	      Guide (CFrame: where COACH-4, the arena's guide, stands, by its
+	          kiosk beside where you arrive: Shared.Vendors.ArenaGuide),
 	      Courts ({ Shared.KaijuPit court, with Model: its model, holding
 	          PadA, PadB, Board and Pedestal }),
 	  }
@@ -430,7 +432,14 @@ function KaijuPitWorld.build(origin: CFrame, parent: Instance)
 	-- The arena's names: over the balcony on the north wall, and on the
 	-- south wall facing you as you arrive.
 	sign(shell, at(-40, 26, -Z + 0.3) * south, Vector3.new(34, 7, 0.4), "KAIJU ARENA", "STAND ON A PAD TO BATTLE", RED)
-	sign(shell, at(40, 26, -Z + 0.3) * south, Vector3.new(34, 7, 0.4), "KAIJU ARENA", "WINNERS' KAIJU ARE HEALED", BLUE)
+	sign(
+		shell,
+		at(40, 26, -Z + 0.3) * south,
+		Vector3.new(34, 7, 0.4),
+		"KAIJU ARENA",
+		"EVERY KAIJU FIGHTS AT FULL HEALTH",
+		BLUE
+	)
 	sign(
 		shell,
 		at(0, 24, Z - 0.3),
@@ -449,6 +458,15 @@ function KaijuPitWorld.build(origin: CFrame, parent: Instance)
 		HAZARD
 	).Name =
 		"Rules"
+	-- COACH-4's kiosk on the balcony, beside where you arrive: a post with
+	-- a screen on top, like INFO-9's upstairs. The guide stands by it,
+	-- facing the way you come in (Server.KaijuPitServer builds it).
+	local kiosk = CFrame.lookAt(at(15.5, hall.Balcony, -Z + 9).Position, at(0, hall.Balcony, -Z + 6).Position)
+	solid(part(shell, kiosk * CFrame.new(0, 2.2, 0), Vector3.new(1.6, 4.4, 1.2), HULL_DARK, Enum.Material.Metal))
+	sign(shell, kiosk * CFrame.new(0, 5.7, 0), Vector3.new(5, 2.6, 0.3), "ARENA GUIDE", "COACH-4", HAZARD, true).Name =
+		"GuideSign"
+	local guide =
+		CFrame.lookAt(at(11, hall.Balcony + 0.1, -Z + 9.5).Position, at(0, hall.Balcony + 0.1, -Z + 8).Position)
 	-- Warm work lights along the walls.
 	for x = -X + 18, X - 18, 36 do
 		for _, s in { -1, 1 } do
@@ -471,6 +489,7 @@ function KaijuPitWorld.build(origin: CFrame, parent: Instance)
 		Origin = origin,
 		-- (Turned round: the courts lie south, +z.)
 		Arrive = origin * CFrame.new(KaijuPit.Arrive + Vector3.new(0, 3, 0)) * CFrame.Angles(0, math.pi, 0),
+		Guide = guide,
 		Courts = courts,
 	}
 end

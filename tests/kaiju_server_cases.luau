@@ -3720,8 +3720,9 @@ teamFights()
 -- Asked and accepted; each side's kaiju in their default places (the
 -- sturdy ones in front, a Razorback behind), moved about, both ready; then
 -- they fight it out by themselves, each side's shared out over the other's,
--- till one side's down: the result to both, EXP, the losers knocked out
--- for real. Walking off forfeits.
+-- till one side's down: the result to both, EXP, and every kaiju back as
+-- it was before (the losers' too: fought at full health, knocked out only
+-- for the battle). Walking off forfeits.
 do
 	-- (In a function of its own: this file is at its limit of locals.)
 	local run = function()
@@ -3732,7 +3733,14 @@ do
 		end
 		KaijuBattles.start()
 		for _, name in
-			{ "KaijuBattleAsk", "KaijuBattleRespond", "KaijuBattleFormation", "KaijuBattleReady", "KaijuBattleLeave" }
+			{
+				"KaijuBattleAsk",
+				"KaijuBattleRespond",
+				"KaijuBattleFormation",
+				"KaijuBattleReady",
+				"KaijuBattleLeave",
+				"KaijuBattleRematch",
+			}
 		do
 			check(registered[name] ~= nil, name .. " isn't a request")
 		end
@@ -3756,8 +3764,12 @@ do
 		for _, pet in teamA do
 			pet.Humanoid.MaxHealth, pet.Humanoid.Health = 1e5, 1e5
 		end
+		-- (Theirs come in nearly down: full for the battle, nearly down again
+		-- after it.)
+		local cameIn = {}
 		for _, pet in teamB do
 			pet.Humanoid.Health = math.max(1, math.floor(pet.Humanoid.MaxHealth * 0.05))
+			cameIn[pet.Record] = math.floor(pet.Humanoid.Health + 0.5)
 		end
 		for _, pet in table.move(teamB, 1, 3, 4, table.clone(teamA)) do
 			pet.RecallUntil, pet.StunUntil, pet.Target, pet.Plan = 0, 0, nil, nil
@@ -3841,6 +3853,13 @@ do
 		check(registered.KaijuBattleReady(a).Ok and battle.Phase == "Formation", "One ready started it")
 		check(registered.KaijuBattleReady(b).Ok and battle.Phase == "Battle", "Both ready didn't start it")
 		local started = now
+		for _, pet in teamB do
+			check(
+				pet.Humanoid.Health >= pet.Humanoid.MaxHealth - 1e-6,
+				"Theirs didn't come to the battle at full health"
+			)
+			pet.Humanoid.Health = math.max(1, math.floor(pet.Humanoid.MaxHealth * 0.05))
+		end
 		check(not registered.KaijuBattleFormation(a, wanted).Ok, "Placed after it started")
 		for _, pet in teamA do
 			local at = KaijuBattle.cellSpot(battle.Field, "A", battle.Formation[a][pet.Record.Id])
@@ -3902,13 +3921,13 @@ do
 		check(battle.Phase == "Over", "The battle never ended")
 		check(battle.Result and battle.Result[a] == "Win" and battle.Result[b] == "Lose", "The wrong side won")
 		check(noted(a, "Your kaiju beat") and noted(b, "kaiju won the battle"), "Not told who won")
-		local downs = 0
-		for _, record in profiles[b].Kaiju.List do
-			if record.Down and record.DownUntil then
-				downs += 1
-			end
+		for record, health in cameIn do
+			check(
+				not record.Down and not record.BattleKeep and math.abs(record.Health - health) <= 1,
+				"A loser's kaiju isn't back as it was: " .. tostring(record.Health) .. ", not " .. health
+			)
 		end
-		check(downs >= 3, "The losers' kaiju weren't knocked out for real: " .. downs)
+		check(#KaijuServer.team(b) == 3, "The losers' kaiju aren't back out beside them")
 		check(now - started < KaijuBattle.BattleSeconds - 1, "It ran out of time instead of being won")
 		local gained = false
 		for _, pet in teamA do
@@ -3953,16 +3972,25 @@ end
 -- doorway back up; stand on a pad and you're waiting, with a stake if you
 -- like; a challenger on the other pad matches it and says FIGHT: both
 -- stakes in, the battle on that court (every kaiju at its place inside
--- it, kept inside its rails), 25 seconds to place them, the winner's kaiju
--- healed and both stakes theirs. A gem stake's matched by one as rare;
--- walking up the stairs mid-battle forfeits it. A card's battle is brought
--- down onto a free court. (In a function of its own: this file is at its
--- limit of locals.)
+-- it, kept inside its rails), 25 seconds to place them, every kaiju at
+-- full health for it (the knocked out too) and back as it was after, win
+-- or lose, both stakes the winner's. A gem stake's matched by one as rare;
+-- walking up the stairs mid-battle forfeits it. A health kept from a
+-- battle someone never came back from is put back by itself. A card's
+-- battle is brought down onto a free court. (In a function of its own:
+-- this file is at its limit of locals.)
 ;(function()
 	local KaijuPit = shared("KaijuPit")
 	local KaijuBattle = shared("KaijuBattle")
 	local KaijuBattles = serverModule("KaijuBattles")
 	server.KaijuPitWorld = load("/src/server/World/KaijuPitWorld.luau", "KaijuPitWorld")
+	-- (The guide's robot: who's built where.)
+	local guides = {}
+	server.Builder = {
+		vendor = function(parent, frame, id, info)
+			table.insert(guides, { Parent = parent, Frame = frame, Id = id, Info = info })
+		end,
+	}
 	local KaijuPitServer = serverModule("KaijuPitServer")
 	KaijuPitServer.clock = function()
 		return now
@@ -3982,6 +4010,29 @@ end
 	check(registered.KaijuPitStake ~= nil and registered.KaijuPitFight ~= nil, "The arena's requests aren't there")
 	local pit = KaijuPitServer.pit()
 	check(pit and #pit.Courts == 8, "No courts downstairs")
+	-- COACH-4, the arena's guide: on the balcony beside where you arrive,
+	-- off the stairs and the way back up, facing the way you come in.
+	check(
+		#guides == 1 and guides[1].Id == "ArenaGuide" and guides[1].Info == shared("Vendors").ArenaGuide,
+		"No guide in the arena"
+	)
+	do
+		local spot = pit.Origin:PointToObjectSpace(guides[1].Frame.Position)
+		local hall = KaijuPit.Hall
+		check(math.abs(spot.Y - hall.Balcony) < 0.5, "The guide isn't on the balcony")
+		check(
+			spot.Z > -hall.HalfZ + 2 and spot.Z < -hall.HalfZ + hall.BalconyDepth - 2,
+			"The guide isn't on the balcony's deck"
+		)
+		check(math.abs(spot.X) > hall.StairsHalf + 1, "The guide stands in the way of the stairs")
+		check(
+			(spot - KaijuPit.Arrive).Magnitude > 6 and (spot - KaijuPit.Leave.Center).Magnitude > 8,
+			"The guide stands where you arrive or leave"
+		)
+		local look = pit.Origin:VectorToObjectSpace(guides[1].Frame.LookVector)
+		local toArrive = Vector3.new(KaijuPit.Arrive.X - spot.X, 0, KaijuPit.Arrive.Z - spot.Z).Unit
+		check(look:Dot(toArrive) > 0.6, "The guide doesn't face the way you come in")
+	end
 	for _, court in pit.Courts do
 		check(court.Model and court.Model:GetAttribute("State") == "Open", "A court isn't open to begin with")
 	end
@@ -4061,8 +4112,53 @@ end
 	profiles[b].Coins = 600
 	step()
 	check(told(b, "KaijuPitPad")[3].Problem == nil, "Covering it now, still told no")
+	-- Before it: one of yours hurt, one of theirs knocked out (its wait
+	-- running), what each had kept. Once it's on, all of them full, the
+	-- knocked out one out for it.
+	local rosterA, rosterB = profiles[a].Kaiju, profiles[b].Kaiju
+	local hurt = KaijuServer.team(a)[1]
+	hurt.Humanoid.Health = math.floor(hurt.Humanoid.MaxHealth * 0.3)
+	local downId = Kaiju.teamIds(rosterB)[2]
+	local downUntil = os.time() + 600
+	rosterB.List[downId].Down, rosterB.List[downId].Health, rosterB.List[downId].DownUntil = true, 0, downUntil
+	KaijuServer._upkeep(b, now)
+	check(#KaijuServer.team(b) == #Kaiju.teamIds(rosterB) - 1, "The knocked out one is still out")
+	local before = {}
+	for _, pet in KaijuServer.team(a) do
+		pet.Record.Health = math.floor(pet.Humanoid.Health + 0.5)
+	end
+	for _, roster in { rosterA, rosterB } do
+		for _, id in Kaiju.teamIds(roster) do
+			local record = roster.List[id]
+			before[record] = { Health = record.Health, Down = record.Down, DownUntil = record.DownUntil }
+		end
+	end
+	local raided = {}
+	local teamDown = KaijuServer.onTeamDown
+	KaijuServer.onTeamDown = function(player)
+		table.insert(raided, player)
+	end
 	-- FIGHT: both stakes in, the battle on that court.
 	check(registered.KaijuPitFight(b).Ok, "FIGHT didn't start the battle")
+	for _, player in { a, b } do
+		local roster = profiles[player].Kaiju
+		check(#KaijuServer.team(player) == #Kaiju.teamIds(roster), "Not all of the team is out for the battle")
+		for _, pet in KaijuServer.team(player) do
+			check(
+				pet.Humanoid.Health >= pet.Humanoid.MaxHealth - 1e-6,
+				"A kaiju doesn't start the battle at full health"
+			)
+			check(pet.Record.BattleKeep ~= nil and not pet.Record.Down, "A kaiju's health from before wasn't kept")
+		end
+	end
+	check(hurt.Humanoid.Health >= hurt.Humanoid.MaxHealth - 1e-6, "Your hurt kaiju isn't full for the battle")
+	-- Each kaiju marked with its side, for its ring: the one waiting BLUE (A), the challenger RED (B).
+	for _, pet in KaijuServer.team(a) do
+		check(pet.Model:GetAttribute("KaijuTeam") == "A", "A kaiju of the blue side isn't marked blue")
+	end
+	for _, pet in KaijuServer.team(b) do
+		check(pet.Model:GetAttribute("KaijuTeam") == "B", "A kaiju of the red side isn't marked red")
+	end
 	check(profiles[a].Coins == 750 and profiles[b].Coins == 350, "The stakes weren't taken")
 	local battle = KaijuBattles.of(a)
 	check(battle and battle.Court == court and KaijuBattles.of(b) == battle and battle.A == a, "Not a battle on that court")
@@ -4097,8 +4193,8 @@ end
 	stray.Root.CFrame = CFrame.new(court.Center + court.Right * (court.HalfWidth + 12) + Vector3.new(0, 2, 0))
 	KaijuServer._think(stray, now, 0.15)
 	check(KaijuPit.inCourt(court, stray.Root.Position), "A kaiju well out past the rails wasn't put back")
-	-- They fight it out (yours hurt, to see them healed after); walk where
-	-- they're told, a step's worth.
+	-- They fight it out (yours hurt, to see them back as they were after);
+	-- walk where they're told, a step's worth.
 	for _, pet in teamA do
 		pet.Humanoid.Health = pet.Humanoid.MaxHealth * 0.6
 	end
@@ -4129,20 +4225,114 @@ end
 		end
 	end
 	check(battle.Phase == "Over" and battle.Result[a] == "Win", "The battle on the court wasn't won")
-	-- The winner's kaiju healed, both stakes theirs; told so.
-	for _, pet in KaijuServer.team(a) do
-		check(pet.Humanoid.Health >= pet.Humanoid.MaxHealth - 1e-6, "The winner's kaiju weren't healed")
+	-- Win or lose, every kaiju back as it was before: yours hurt, theirs
+	-- (all knocked out in it) up again, the one knocked out before down
+	-- again with the same wait; quietly (no raid for a team down in a
+	-- battle). Both stakes the winner's; told so.
+	KaijuServer.onTeamDown = teamDown
+	check(#raided == 0, "A team knocked out in a battle brought a raid")
+	for record, was in before do
+		check(record.BattleKeep == nil, "A kaiju's kept health is still there after the battle")
+		check(
+			record.Down == was.Down
+				and record.DownUntil == was.DownUntil
+				and math.abs((record.Health or 0) - (was.Health or 0)) <= 1,
+			string.format("A kaiju isn't back as it was: %s, not %s", tostring(record.Health), tostring(was.Health))
+		)
 	end
+	check(
+		rosterB.List[downId].Down and rosterB.List[downId].DownUntil == downUntil,
+		"The one knocked out before isn't down again"
+	)
+	check(
+		math.abs(hurt.Record.Health - math.floor(hurt.Humanoid.MaxHealth * 0.3)) <= 1 or not hurt.Model.Parent,
+		"Your hurt kaiju was healed by the battle"
+	)
+	for _, player in { a, b } do
+		for _, pet in KaijuServer.team(player) do
+			check(
+				math.abs(pet.Humanoid.Health - Kaiju.health(pet.Record)) <= 1,
+				"A kaiju out isn't at the health it had before"
+			)
+		end
+	end
+	check(
+		#KaijuServer.team(b) == #Kaiju.teamIds(rosterB) - 1,
+		"The loser's kaiju aren't back, or the one down before is out"
+	)
 	check(profiles[a].Coins == 1250 and profiles[b].Coins == 350, "The winner didn't take both stakes: " .. profiles[a].Coins)
 	check(noted(a, "You won 500 coins") and noted(b, "You lost your 250 coins"), "Not told what was won and lost")
 	local result = told(a, "KaijuBattle")[3]
-	check(result.Result == "Win" and result.Healed == true, "The result doesn't say your kaiju were healed")
+	check(result.Result == "Win" and result.Restored == true, "The result doesn't say your kaiju are back as they were")
+	check(told(b, "KaijuBattle")[3].Restored == true, "The loser isn't told their kaiju are back as they were")
 	check(court.Model:GetAttribute("Winner") == a.DisplayName, "The board doesn't show the winner")
+	-- REMATCH: one asks (the other's told, and both see what it'd take);
+	-- both, and it's on again on the same court, the same sides, the stake
+	-- taken again, every kaiju full again for it.
+	check(
+		result.Rematch and result.Rematch.A == false and result.Rematch.Cost == "250 COINS",
+		"The result doesn't offer a rematch for the same stake"
+	)
+	check(registered.KaijuBattleRematch(a).Ok, "Couldn't ask for a rematch")
+	check(noted(b, "wants a rematch"), "The other wasn't told a rematch was asked for")
+	check(told(b, "KaijuBattle")[3].Rematch.A == true, "The other's result doesn't show the rematch asked for")
+	check(KaijuBattles.of(a) == battle, "One asking started the rematch")
+	check(registered.KaijuBattleRematch(b).Ok, "Both asking didn't start the rematch")
+	local second = KaijuBattles.of(a)
+	check(second and second ~= battle and KaijuBattles.of(b) == second, "No rematch")
+	check(
+		second.Court == court and second.A == a and second.Phase == "Formation",
+		"The rematch isn't the same court and sides"
+	)
+	check(
+		profiles[a].Coins == 1000 and profiles[b].Coins == 100,
+		"The rematch's stakes weren't taken: " .. profiles[a].Coins .. "/" .. profiles[b].Coins
+	)
+	check(
+		told(a, "KaijuBattle")[3].Id == second.Id and told(a, "KaijuBattle")[3].Phase == "Formation",
+		"Not told the rematch is on"
+	)
+	step()
+	check(
+		state.Battle == second and court.Model:GetAttribute("Stake") == "250 coins each",
+		"The court's board doesn't show the rematch"
+	)
+	for _, player in { a, b } do
+		for _, pet in KaijuServer.team(player) do
+			check(
+				pet.Humanoid.Health >= pet.Humanoid.MaxHealth - 1e-6 and pet.Record.BattleKeep,
+				"A kaiju isn't full for the rematch"
+			)
+		end
+	end
+	-- The other walks out of it: theirs to the winner; then they're short
+	-- of the stake, and there's no rematch (the asker's coins back).
+	registered.KaijuBattleLeave(b)
+	check(second.Phase == "Over" and second.Result[a] == "Win", "Leaving the rematch didn't forfeit it")
+	check(profiles[a].Coins == 1500 and profiles[b].Coins == 100, "The rematch's stakes weren't paid out")
+	check(registered.KaijuBattleRematch(a).Ok, "Couldn't ask for another rematch")
+	check(not registered.KaijuBattleRematch(b).Ok, "A rematch went ahead with a stake one couldn't cover")
+	check(profiles[a].Coins == 1500 and KaijuBattles.of(a) == second, "Refused, the asker's stake wasn't given back")
+	local off = told(a, "KaijuBattle")[3].Rematch
+	check(off and off.Off == b.DisplayName .. " can't cover the stake.", "Not told why there's no rematch")
+	check(not registered.KaijuBattleRematch(a).Ok, "Asked for a rematch there can't be")
+	-- Closing it: the other's told there's no rematch.
+	registered.KaijuBattleLeave(b)
+	check(
+		KaijuBattles.of(b) == nil and told(a, "KaijuBattle")[3].Rematch.Off ~= nil,
+		"Closing it didn't end the rematch"
+	)
+	battle = second
 	-- It closes; standing on the pads still, nobody's waiting till they step off and back on.
 	now += KaijuBattle.OverSeconds + 0.1
 	KaijuBattles.step(battle, now)
 	step()
 	check(state.Battle == nil and court.Model:GetAttribute("State") == "Open", "The court wasn't freed")
+	for _, player in { a, b } do
+		for _, pet in KaijuServer.team(player) do
+			check(pet.Model:GetAttribute("KaijuTeam") == nil, "A kaiju's still marked for a side after the battle")
+		end
+	end
 	check(state.Pads.A == nil, "Still on the pad after a battle counts as waiting")
 	rootA.CFrame = CFrame.new(court.PadA + court.Axis * -8 + Vector3.new(0, 3, 0))
 	rootB.CFrame = CFrame.new(court.PadB + court.Axis * 8 + Vector3.new(0, 3, 0))
@@ -4186,6 +4376,17 @@ end
 	check(noted(a, "You won P2's"), "Not told which gem was won")
 	now += KaijuBattle.OverSeconds + 0.1
 	KaijuBattles.step(battle, now)
+	-- A health kept from a battle that never got to put it back (they left
+	-- the game, or the server shut): put back by itself, once they aren't
+	-- in a battle.
+	local kept = rosterA.List[Kaiju.teamIds(rosterA)[1]]
+	kept.BattleKeep = { Health = 7 }
+	a:SetAttribute("KaijuBattle", "elsewhere")
+	KaijuServer._upkeep(a, now)
+	check(kept.BattleKeep ~= nil, "A kept health was put back in the middle of a battle")
+	a:SetAttribute("KaijuBattle", nil)
+	KaijuServer._upkeep(a, now)
+	check(kept.BattleKeep == nil and kept.Health == 7 and not kept.Down, "A kept health wasn't put back by itself")
 
 	-- A battle asked for from the card: both brought down onto a free court.
 	for _, p in { a, b } do
@@ -5146,7 +5347,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts), gem raids, robbed while down, the Rift and its healing crystals)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals)",
 		checks
 	)
 )

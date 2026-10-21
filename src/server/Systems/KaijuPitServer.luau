@@ -22,6 +22,11 @@
 	The winner takes both stakes; a draw gives each back their own. Leaving
 	or walking off is a loss (KaijuBattles).
 
+	REMATCH, once it's over (KaijuBattles): both asking for one starts the
+	battle again on the same court, for the same stake, taken again: the
+	same coins each, or a gem each as rare as the first (your weakest loose
+	one that is). Short of it, there's no rematch, and you're told why.
+
 	Clients are told, on the Social remote:
 	  "KaijuPitPad", state | nil   your pad: { Court, Side, Host (you were
 	      there first), Foe, FoeId, Stake, Problem (why you can't fight
@@ -36,6 +41,10 @@
 	  KaijuPitServer.start(site)
 	  KaijuPitServer.down(player) / up(player)   take the stairs
 	  KaijuPitServer.pit() -> the hall (KaijuPitWorld.build's)
+
+	COACH-4, the arena's guide, stands on the balcony by where you arrive:
+	talk to it (E) for how battles, placing, elements and stakes work, and
+	a battle tip (Shared.Vendors.ArenaGuide, Client.Dialogue).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -51,6 +60,8 @@ local KaijuServer = require(script.Parent.KaijuServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
+local Vendors = require(ReplicatedStorage.Shared.Vendors)
+local Builder = require(script.Parent.Parent.World.Builder)
 local KaijuPitWorld = require(script.Parent.Parent.World.KaijuPitWorld)
 
 local reply = Shop.reply
@@ -99,16 +110,6 @@ local function busy(player: Player): boolean
 		or player:GetAttribute("KaijuBattle") ~= nil
 		or player:GetAttribute("SparDown") ~= nil
 		or Spar.sparring(player)
-end
-
-local function kaijuUp(player: Player): number
-	local count = 0
-	for _, pet in KaijuServer.team(player) do
-		if pet.Model.Parent and pet.Humanoid.Health > 0 then
-			count += 1
-		end
-	end
-	return count
 end
 
 -- What they have to stake: coins, and their loose gems by id.
@@ -265,8 +266,9 @@ end
 local function problemOf(player: Player): string?
 	if busy(player) then
 		return "Finish what you're doing first."
-	elseif kaijuUp(player) <= 0 then
-		return "You need a kaiju out and up to battle."
+	elseif KaijuServer.battleable(player) <= 0 then
+		-- (Down ones count: a battle brings the whole team back for itself.)
+		return "You need your kaiju out to battle."
 	end
 	return nil
 end
@@ -392,7 +394,8 @@ end
 local function stepBattle(state: CourtState)
 	local battle = state.Battle
 	if KaijuBattles.of(battle.A) ~= battle and KaijuBattles.of(battle.B) ~= battle then
-		state.Battle = nil
+		-- (Its stake goes with it: the next to wait sets their own.)
+		state.Battle, state.Stake = nil, nil
 		return
 	end
 	local values = stakeAttributes(state.Stake)
@@ -617,6 +620,76 @@ local function payOut(battle, winner: string)
 	battle.Spoils = if spoils and spoils.Kind == "Gem" then gemSummary(spoils.Gem) else nil
 end
 
+-- What a rematch would take of `player`'s, for the result card: the same
+-- coins, or the gem of theirs that would go in (nil: nothing staked).
+local function rematchPick(stake, player: Player)
+	if not stake then
+		return nil
+	elseif stake.Kind == "Coins" then
+		return { Kind = "Coins", Coins = stake.Coins }
+	end
+	local gem = KaijuPit.matches(stake, holdings(player))[1]
+	return if gem then { Kind = "Gem", Gem = gem } else false
+end
+
+local function rematchCost(battle, player: Player): string?
+	local stake = battle.Pot and battle.Pot.Stake
+	local pick = rematchPick(stake, player)
+	if pick == nil then
+		return nil
+	elseif pick == false then
+		-- ("NO RARE GEM LEFT")
+		return "NO " .. string.upper((string.gsub(KaijuPit.stakeText(stake), "^an? ", ""))) .. " LEFT"
+	elseif pick.Kind == "Coins" then
+		return string.format("%d COINS", pick.Coins)
+	end
+	return string.upper(GemConfig.displayName(pick.Gem))
+end
+
+-- Both asked for a rematch: the stake taken again from each, then the
+-- battle again on the same court (KaijuBattles.again).
+local function rematchOn(battle)
+	local state = battle.Court and states[battle.Court.Id]
+	if not state then
+		return nil, "The court's gone."
+	end
+	local stake = battle.Pot and battle.Pot.Stake
+	local a, b = battle.A, battle.B
+	local held = {}
+	for _, player in { a, b } do
+		local pick = rematchPick(stake, player)
+		local taken = nil
+		if pick == nil then
+			taken = { Kind = "None" }
+		elseif pick then
+			taken = take(player, stake, if pick.Kind == "Gem" then tostring(pick.Gem.Id) else nil)
+		end
+		if not taken then
+			for who, back in held do
+				give(who, back)
+			end
+			return nil, player.DisplayName .. " can't cover the stake."
+		end
+		held[player] = taken
+	end
+	-- (A gem stake shows the blue side's gem on the board, as the first did the host's.)
+	local shown = stake
+	if stake and stake.Kind == "Gem" and held[a].Gem then
+		shown = { Kind = "Gem", Tier = stake.Tier, Gem = gemSummary(held[a].Gem) }
+	end
+	local new = KaijuBattles.again(battle, { Stake = shown, Held = held })
+	if not new then
+		for who, back in held do
+			give(who, back)
+		end
+		return nil, "The rematch couldn't start."
+	end
+	state.Battle = new
+	state.Stake = shown
+	stepBattle(state)
+	return new, nil
+end
+
 -- A free court for a battle asked for from a player's card: both brought
 -- down onto its pads (nil: every court's taken).
 local function courtFor(a: Player, b: Player)
@@ -647,6 +720,9 @@ function KaijuPitServer.start(site, world)
 	stairs = site and site.Stairs
 	local origin = KaijuPit.origin(Outpost.Location)
 	pit = (world or KaijuPitWorld).build(origin, workspace)
+	if pit.Guide and pit.Folder then
+		Builder.vendor(pit.Folder, pit.Guide, "ArenaGuide", Vendors.ArenaGuide)
+	end
 	table.clear(states)
 	for _, court in pit.Courts do
 		states[court.Id] = { Court = court, Pads = {}, Rest = {}, Told = {} }
@@ -654,6 +730,8 @@ function KaijuPitServer.start(site, world)
 	end
 	KaijuBattles.findCourt = courtFor
 	KaijuBattles.onOver = payOut
+	KaijuBattles.rematchOn = rematchOn
+	KaijuBattles.rematchCost = rematchCost
 	KaijuBattles.inPit = function(player: Player): boolean
 		return below[player] == true
 	end

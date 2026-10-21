@@ -404,6 +404,13 @@ function actions.Tip()
 	say(Vendors.Tips[tipAt])
 end
 
+-- COACH-4's battle tips downstairs, the same way.
+local arenaTipAt = math.random(1, #Vendors.ArenaTips) - 1
+function actions.ArenaTip()
+	arenaTipAt = arenaTipAt % #Vendors.ArenaTips + 1
+	say(Vendors.ArenaTips[arenaTipAt])
+end
+
 function actions.Duels()
 	close()
 	require(script.Parent.Modules.SocialUI).open("Arena")

@@ -650,6 +650,39 @@ do
 	for _, tip in Vendors.Tips do
 		spanish(tip)
 	end
+	-- COACH-4, the Kaiju Arena's guide downstairs (Server.KaijuPitServer
+	-- builds it): the same shape of dialogue, its tips, all in Spanish.
+	local coach = Vendors.ArenaGuide
+	check(coach and coach.Name == "COACH-4", "No guide for the Kaiju Arena")
+	check(#coach.Options <= 4, "COACH-4 offers too many options for the dialogue's five rows")
+	local function walkCoach(options, topic)
+		for _, option in options do
+			local kinds = (if option.Reply then 1 else 0)
+				+ (if option.Action then 1 else 0)
+				+ (if option.Options then 1 else 0)
+			check(kinds == 1, "COACH-4's option needs a reply, an action or a topic: " .. option.Text)
+			check(not (topic and option.Options), "COACH-4's topic has a topic in it: " .. option.Text)
+			if option.Action then
+				check(
+					string.find(dialogue, "function actions." .. option.Action .. "()", 1, true) ~= nil,
+					"The dialogue can't do COACH-4's " .. option.Action
+				)
+			end
+			if option.Options then
+				check(#option.Options >= 1 and #option.Options <= 4, "COACH-4's topic is too long: " .. option.Text)
+				walkCoach(option.Options, true)
+			end
+		end
+	end
+	walkCoach(coach.Options, false)
+	spanish(coach.Greeting)
+	spanish(string.upper(coach.Name .. " // " .. coach.Role))
+	spanish(coach.Name .. ", " .. coach.Role)
+	lines(coach.Options)
+	check(#Vendors.ArenaTips >= 10, "COACH-4 is short of tips")
+	for _, tip in Vendors.ArenaTips do
+		spanish(tip)
+	end
 end
 -- Players arrive inside the Shelter, its mechs parked in the garage.
 do

@@ -5,7 +5,8 @@
 -- handles in code: "Quota", "BuyStone", "Pouch", "HandCut", "AutoCut",
 -- "Enchant", "Forge", "Materials", "SellGems", "MarketSell" or "RigManeuvers";
 -- for the Saga Shelter's crew, "Appraise", "Store", "Market", "Duels" or
--- "Tip" (INFO-9's next one, from Vendors.Tips) - or Options of its own: a
+-- "Tip" (INFO-9's next one, from Vendors.Tips); downstairs, "ArenaTip"
+-- (COACH-4's next one, from Vendors.ArenaTips) - or Options of its own: a
 -- topic, its questions shown in place of the menu (with a way back).
 
 export type Option = { Text: string, Reply: string?, Action: string?, Options: { Option }? }
@@ -364,7 +365,7 @@ Vendors.Tips = {
 	"To catch a wild kaiju, wear it down below half health without knocking it out. It glows gold when it's ready.",
 	"A catch breaks if you take a hit or move away. Clear the area first.",
 	"Kaiju battles are in the Kaiju Arena, down the Shelter's west stairs. Stand on a pad and wait for a challenger: you both get 25 seconds to place your kaiju.",
-	"The winner of a kaiju battle gets their kaiju healed, and takes both stakes if you played for something.",
+	"Every kaiju fights a kaiju battle at full health, and goes back to its health from before once it's over, win or lose. The winner takes both stakes.",
 	"Bulwarks and Carapaces take hits well: put them in the front row of a battle formation.",
 	"Razorbacks fight at range: keep them in the back row of a battle formation.",
 	-- Combat
@@ -383,6 +384,110 @@ Vendors.Tips = {
 	"Mechs are for getting around. They can't mine or fight.",
 	"Invite a friend: when they join, you get a swing restore, a kaiju revive and a double XP coupon.",
 	"Daily challenges change every day. Finish all three for a bonus.",
+}
+
+-- COACH-4, the Kaiju Arena's guide: a robot on the hall's balcony, by
+-- where you arrive downstairs, with answers on battles, placing, the
+-- kinds of kaiju, elements and stakes, and a battle tip whenever you want
+-- one ("ArenaTip", from Vendors.ArenaTips). Like INFO-9's, its answers
+-- keep to the rules as they are (Shared.KaijuBattle's seconds, EXP and
+-- sides, Shared.Kaiju's species and Shared.ElementMatchup's matchups,
+-- Shared.KaijuPit's stakes, Server.KaijuServer's full health and back):
+-- change those and change these.
+Vendors.ArenaGuide = {
+	Name = "COACH-4",
+	Role = "Kaiju Arena Guide",
+	Color = Color3.fromRGB(240, 178, 48),
+	Tunic = UNIFORM,
+	Face = "",
+	Visor = true,
+	Greeting = "COACH-4, Kaiju Arena. Ask me how battles work, or take a tip before your next one.",
+	Options = {
+		{ Text = "Give me a battle tip", Action = "ArenaTip" },
+		{
+			Text = "How battles work",
+			Options = {
+				{
+					Text = "How do I start a battle?",
+					Reply = "Stand on a pad at either end of a court and wait. When someone steps onto the other pad, they press FIGHT. Or press KAIJU on someone's player card upstairs: you're both brought down to a free court.",
+				},
+				{
+					Text = "What happens in a battle?",
+					Reply = "You both get 25 seconds to place your kaiju on your half of the court. Then they fight on their own for up to 90 seconds. A side whose kaiju are all down loses. If time runs out, the side with more health left wins.",
+				},
+				{
+					Text = "What happens to my kaiju's health?",
+					Reply = "Every kaiju fights at full health, even ones that were knocked out. When the battle ends, each goes back to the health it had before, win or lose.",
+				},
+				{
+					Text = "Can we go again?",
+					Reply = "When a battle ends, both press REMATCH within 12 seconds. You go again on the same court, on the same sides, for the same stake, taken again.",
+				},
+			},
+		},
+		{
+			Text = "Placing and elements",
+			Options = {
+				{
+					Text = "Front row or back row?",
+					Reply = "The front row takes the blows: put your Bulwarks and Carapaces there. A Razorback shoots from the back row, so keep it behind them.",
+				},
+				{
+					Text = "How do I place them?",
+					Reply = "Drag a kaiju onto a spot, or tap it and then tap a spot. Drop it on another kaiju to swap them. AUTO puts them back where they start. When you both press READY, the fight starts early.",
+				},
+				{
+					Text = "Which kaiju is which?",
+					Reply = "Bulwark: an armoured brute, slow, with heavy blows; it shrugs off a tenth of every hit. Carapace: a low shell, the hardest to wear down; it shrugs off a quarter. Razorback: quick and fragile, best at range.",
+				},
+				{
+					Text = "Which element beats which?",
+					Reply = "Thermal beats Cryo, Cryo beats Ion, Ion beats Corrosive, and Corrosive beats Thermal. A kaiju takes 125% damage from the element that beats its own and 75% from its own. Then its kind's guard comes off.",
+				},
+			},
+		},
+		{
+			Text = "Sides, stakes and rewards",
+			Options = {
+				{
+					Text = "Which side am I?",
+					Reply = "The BLUE pad is the blue side, the RED pad the red side, and each kaiju stands on a ring in its side's colour. Once the fight starts, the camera rises over your end of the court: drag to look around, scroll or pinch to zoom.",
+				},
+				{
+					Text = "What can we play for?",
+					Reply = "Nothing, 50 to 1000 coins each, or one of your loose gems. The one waiting on the pad sets it. A gem stake is matched by a gem of the same rarity or better.",
+				},
+				{
+					Text = "Who gets the stake?",
+					Reply = "The winner takes both stakes. In a draw, each gets their own back. Going back up the stairs mid-battle counts as a loss. Only loose gems can be staked, never the gems in your gear.",
+				},
+				{
+					Text = "What do I get for a battle?",
+					Reply = "Experience for every kaiju of yours: 40 for a win, 24 for a draw, 14 for a loss. If you played for a stake, the winner takes both.",
+				},
+			},
+		},
+	},
+}
+
+-- COACH-4's battle tips, given in turn from a random start ("ArenaTip").
+-- Each one fact, stated plainly; they keep to the rules, like its answers.
+Vendors.ArenaTips = {
+	"Every kaiju fights at full health, even knocked-out ones, and goes back to its health from before once the battle's over.",
+	"Thermal beats Cryo, Cryo beats Ion, Ion beats Corrosive and Corrosive beats Thermal.",
+	"A kaiju takes 125% damage from the element that beats its own, and only 75% from its own.",
+	"Carapaces shrug off a quarter of every blow and Bulwarks a tenth. They hold the front row.",
+	"A Razorback shoots from the back row. In front, it takes blows it can't survive.",
+	"If time runs out, the side with more health left wins. A sturdy front row wins long battles.",
+	"Press READY once you're placed. If your foe is ready too, the fight starts at once.",
+	"Both press REMATCH in the 12 seconds after a battle to go again on the same court, for the same stake.",
+	"During a battle, drag to look around the court, and scroll or pinch to zoom.",
+	"Every kaiju of yours earns experience from a battle: 40 for a win, 24 for a draw, 14 for a loss.",
+	"Going back up the stairs mid-battle counts as a loss, and your stake goes to your foe.",
+	"A kaiju's Q wakes at level 5 and its R at level 10. Higher-level kaiju bring more moves to a battle.",
+	"Your foe's places stay hidden until the fight starts, and so do yours.",
+	"A team of mixed elements is hard to counter. In a rematch you've seen your foe's team: put the kaiju whose element beats theirs in front.",
+	"Anyone down here can watch a battle from the aisles and the balcony. The board over each court shows both sides' health.",
 }
 
 return Vendors

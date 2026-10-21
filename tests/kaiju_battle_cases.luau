@@ -428,9 +428,122 @@ do
 	check(Guide.Arrive > Guide.Ahead, "The arrows stay once you're there")
 end
 
+-- The sides' colours: A blue (the court's blue half), B red; and the ring
+-- each kaiju stands on in its side's colour (Client KaijuTeamRings), a
+-- little wider than it is.
+do
+	local blue, red = Battle.Sides.A.Color, Battle.Sides.B.Color
+	check(Battle.Sides.A.Name == "BLUE" and Battle.Sides.B.Name == "RED", "The sides aren't BLUE and RED")
+	check(blue.B > blue.R + 0.3 and red.R > red.B + 0.3, "Blue isn't blue or red isn't red")
+	-- (Services that hand back whatever's asked of them: only the rules are used.)
+	local function anything()
+		return setmetatable({}, {
+			__index = function()
+				return anything()
+			end,
+		})
+	end
+	local ringEnv = setmetatable({
+		game = {
+			GetService = function()
+				return anything()
+			end,
+		},
+		RaycastParams = {
+			new = function()
+				return {}
+			end,
+		},
+		Enum = roblox.Enum,
+		script = { Parent = {} },
+		require = function()
+			return Battle
+		end,
+	}, { __index = _G })
+	local source = fs.readFile(ROOT .. "/src/client/Modules/KaijuTeamRings.luau")
+	local Rings = luau.load(source, { debugName = "KaijuTeamRings", environment = ringEnv })()
+	check(Rings.size(5) > 5 and Rings.size(5) < 7, "A ring isn't a little wider than its kaiju")
+	check(Rings.size(0.5) >= 4 and Rings.size(40) <= 10, "A ring's too small to see or too big for the court")
+end
+
+-- The battle's camera (Client KaijuBattleCam): over your end of the court,
+-- high enough to look down on it, past the floodlights, both sides' every
+-- place in view; inside the hall downstairs whichever court, side, swing or
+-- zoom.
+do
+	local camEnv = setmetatable({
+		game = {
+			GetService = function(_, name)
+				return { Name = name }
+			end,
+		},
+		Enum = roblox.Enum,
+		Vector3 = Vector3,
+		-- (Lune's lookAt turns the wrong way along Z: where it stands and faces is what counts.)
+		CFrame = setmetatable({
+			lookAt = function(at, target)
+				return { Position = at, LookVector = (target - at).Unit }
+			end,
+		}, { __index = roblox.CFrame }),
+	}, { __index = _G })
+	local source = fs.readFile(ROOT .. "/src/client/Modules/KaijuBattleCam.luau")
+	local Cam = luau.load(source, { debugName = "KaijuBattleCam", environment = camEnv })()
+	local hall = Pit.Hall
+	-- (On a screen 16:10 or wider, clear of the battle bar along its top.)
+	local tall = math.tan(math.rad(Cam.Fov / 2))
+	local wide = tall * 1.6
+	local function sees(view, spot)
+		local look = view.LookVector
+		local right = look:Cross(Vector3.new(0, 1, 0)).Unit
+		local up = right:Cross(look)
+		local to = spot - view.Position
+		local ahead = to:Dot(look)
+		return ahead > 0 and math.abs(to:Dot(right)) / ahead < wide * 0.95 and math.abs(to:Dot(up)) / ahead < tall * 0.8
+	end
+	for _, court in Pit.courts(roblox.CFrame.new()) do
+		local field = Pit.field(court)
+		for _, side in { "A", "B" } do
+			local home = if side == "A" then -court.Axis else court.Axis
+			for _, yaw in { -Cam.Yaw, 0, Cam.Yaw } do
+				for _, zoom in { Cam.Zoom[1], 1, Cam.Zoom[2] } do
+					local view = Cam.view(court.Center, court.Axis, side, nil, yaw, zoom)
+					local eye = view.Position
+					check(
+						math.abs(eye.X) < hall.HalfX - 3
+							and math.abs(eye.Z) < hall.HalfZ - 3
+							and eye.Y < hall.Height - 3,
+						string.format(
+							"The battle camera's outside the hall (court %d, %s): %s",
+							court.Id,
+							side,
+							tostring(eye)
+						)
+					)
+					local flat = Vector3.new(eye.X - court.Center.X, 0, eye.Z - court.Center.Z)
+					check(flat.Magnitude > court.HalfLength - 2, "The battle camera's under the floodlights")
+					check(eye.Y > 10 and view.LookVector.Y < -0.3, "The battle camera doesn't look down on the court")
+					if yaw == 0 then
+						check(flat.Unit:Dot(home) > 0.99, "The battle camera isn't over your end")
+					end
+					for _, who in { "A", "B" } do
+						for _, cell in Battle.cells() do
+							local spot = Battle.cellSpot(field, who, cell.Id)
+							check(
+								sees(view, spot) and sees(view, spot + Vector3.new(0, 3, 0)),
+								string.format("A kaiju at %s %s is out of the battle camera's view", who, cell.Id)
+							)
+						end
+					end
+				end
+			end
+		end
+	end
+	check(Cam.Reach > Pit.Court.Pad + 10, "The battle camera lets go of you on your pad")
+end
+
 print(
 	string.format(
-		"PASS: %d kaiju battle checks (the field, places, default formation, formations, winners, asks; the arena's courts, pads, kept in, stakes; the ground arrows)",
+		"PASS: %d kaiju battle checks (the field, places, default formation, formations, winners, asks; the arena's courts, pads, kept in, stakes; the ground arrows; the sides' colours and rings; the battle camera)",
 		checks
 	)
 )

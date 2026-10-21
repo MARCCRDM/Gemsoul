@@ -48,16 +48,18 @@ if Config.Features == nil or Config.Features.Kaiju ~= false then
 	require(script.Parent.Modules.KaijuHud).start()
 	-- Kaiju battles: the formation board, the battle bar and the result.
 	require(script.Parent.Modules.KaijuBattleUI).start()
+	-- Each kaiju in a battle on a ring in its side's colour (BLUE or RED).
+	require(script.Parent.Modules.KaijuTeamRings).start()
 	-- The Kaiju Arena downstairs: its boards, the stake on show, your pad's card.
 	require(script.Parent.Modules.KaijuPitClient).start()
 	-- Yellow arrows on the ground, to a pad, the stairs down, the Rift's way on.
 	require(script.Parent.Modules.GroundGuide).start()
 end
 
--- The lobby HUD: in the Outpost, not fighting (or sparring), not inside a
--- menu, and not away in the Rift (even with the pick out there, for its
--- healing rocks). Checked a few times a second, and only applied when it
--- changes.
+-- The lobby HUD: in the Outpost, not fighting (or sparring), not in a kaiju
+-- battle, not inside a menu, and not away in the Rift (even with the pick
+-- out there, for its healing rocks). Checked a few times a second, and only
+-- applied when it changes.
 local shown = nil
 local nextCheck = 0
 RunService.Heartbeat:Connect(function()
@@ -66,9 +68,12 @@ RunService.Heartbeat:Connect(function()
 		return
 	end
 	nextCheck = now + 0.2
+	-- (In a kaiju battle the court's overview and the battle's own bar and
+	-- result have the screen: KaijuBattleUI.)
 	local on = OutpostScene.isActive()
 		and not Spar.fighting(player)
 		and player:GetAttribute("RiftRun") == nil
+		and player:GetAttribute("KaijuBattle") == nil
 		and not playerGui:FindFirstChild("Intro")
 	if on ~= shown then
 		shown = on

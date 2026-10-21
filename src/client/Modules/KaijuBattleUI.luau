@@ -17,9 +17,12 @@
 	             sits under the title. On the ground, both sides' places are
 	             marked, yours lit where a kaiju stands.
 	  Battle     a bar at the top: your kaiju's faces and health on the left,
-	             your foe's on the right, the clock in the middle, LEAVE.
-	  Over       VICTORY, DEFEAT or DRAW; the EXP your kaiju earned; YOUR
-	             KAIJU ARE HEALED for the winner; what the stake came to.
+	             your foe's on the right, the clock in the middle, LEAVE. The
+	             camera goes up over your end of the court to watch, till
+	             it's over (Client.KaijuBattleCam).
+	  Over       VICTORY, DEFEAT or DRAW; the EXP your kaiju earned; that
+	             every kaiju's back to its health from before; what the
+	             stake came to.
 
 	  KaijuBattleUI.start()       once (Lobby.client, with KaijuHud)
 	  KaijuBattleUI.state()       the battle you're in, as last told (nil: none)
@@ -38,6 +41,7 @@ local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local KaijuBattleCam = require(script.Parent.KaijuBattleCam)
 local UiKit = require(script.Parent.UiKit)
 
 local P = IronUi.Colors
@@ -47,8 +51,16 @@ local KaijuBattleUI = {}
 
 local ORANGE = Color3.fromRGB(255, 132, 64)
 local HAZARD = Color3.fromRGB(240, 178, 48)
-local MINE = Color3.fromRGB(70, 160, 255) -- your side, the court's blue
-local THEIRS = Color3.fromRGB(255, 84, 72) -- theirs, red
+-- Each side's colour, wherever it shows: A is BLUE (the court's blue half
+-- and pad), B is RED (Shared.KaijuBattle.Sides).
+local BLUE = KaijuBattle.Sides.A.Color
+local function sideColor(side: string?): Color3
+	local spec = KaijuBattle.Sides[side or ""]
+	return if spec then spec.Color else BLUE
+end
+local function otherSide(side: string?): string
+	return if side == "B" then "A" else "B"
+end
 -- What each kind does in a formation (Shared.KaijuBattle.FrontKinds).
 local ROLES = { Bulwark = "FRONT LINE", Razorback = "SHOOTER", Carapace = "FRONT LINE" }
 local CELL_NAMES = {
@@ -164,6 +176,18 @@ UiKit.round(board, 12)
 new("UIStroke", { Color = ORANGE, Thickness = 1.5 }, board)
 new("UIGradient", { Rotation = 90, Color = ColorSequence.new(ORANGE:Lerp(P.Frame, 0.86), P.Frame) }, board)
 local title = line(board, "PLACE YOUR KAIJU", 18, P.Text, IronUi.Heading)
+-- (Which side you are: a pill in your colour.)
+local teamTag = new("TextLabel", {
+	Name = "Team",
+	BackgroundColor3 = BLUE,
+	BackgroundTransparency = 0.1,
+	Font = IronUi.Heading,
+	Text = "",
+	TextColor3 = Color3.new(1, 1, 1),
+	TextStrokeTransparency = 0.6,
+	TextSize = 11,
+}, board)
+UiKit.round(teamTag, 8)
 local versus = line(board, "", 12, P.Dim, IronUi.Body)
 versus:SetAttribute("NoTranslate", true)
 local stakeChip =
@@ -190,17 +214,17 @@ UiKit.round(timeFill, 2)
 local court = new("Frame", { Name = "Court", BackgroundColor3 = Color3.fromRGB(28, 34, 44) }, board)
 UiKit.round(court, 10)
 new("UIStroke", { Color = HAZARD, Thickness = 1.5, Transparency = 0.2 }, court)
-local foeHalf = new("Frame", { Name = "FoeHalf", BackgroundColor3 = THEIRS:Lerp(P.Frame, 0.8) }, court)
+local foeHalf = new("Frame", { Name = "FoeHalf", BackgroundColor3 = sideColor("B"):Lerp(P.Frame, 0.8) }, court)
 UiKit.round(foeHalf, 8)
-local foeText = line(foeHalf, "YOUR FOE'S SIDE: HIDDEN TILL THE FIGHT", 10, THEIRS:Lerp(P.Text, 0.35))
+local foeText = line(foeHalf, "YOUR FOE'S SIDE: HIDDEN TILL THE FIGHT", 10, sideColor("B"):Lerp(P.Text, 0.35))
 foeText.TextWrapped = true
 foeText.Size = UDim2.new(1, -8, 1, 0)
 foeText.Position = UDim2.fromOffset(4, 0)
 foeText.TextXAlignment = Enum.TextXAlignment.Center
 local middle = new("Frame", { Name = "Middle", BackgroundColor3 = HAZARD, BorderSizePixel = 0 }, court)
-local mineHalf = new("Frame", { Name = "MineHalf", BackgroundColor3 = MINE:Lerp(P.Frame, 0.84) }, court)
+local mineHalf = new("Frame", { Name = "MineHalf", BackgroundColor3 = BLUE:Lerp(P.Frame, 0.84) }, court)
 UiKit.round(mineHalf, 8)
-local youText = line(court, "YOUR SIDE", 9, MINE:Lerp(P.Text, 0.3))
+local youText = line(court, "YOUR SIDE", 9, BLUE:Lerp(P.Text, 0.3))
 youText.TextXAlignment = Enum.TextXAlignment.Center
 
 type CellUi = { Button: TextButton, Stroke: UIStroke, Row: TextLabel, View: ViewportFrame, Name: TextLabel }
@@ -268,7 +292,7 @@ for i = 1, 3 do
 	UiKit.round(track, 3)
 	local fill = new("Frame", { BackgroundColor3 = P.Good, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) }, track)
 	UiKit.round(fill, 3)
-	local spot = line(frame, "", 9, MINE:Lerp(P.Text, 0.4), IronUi.Heading)
+	local spot = line(frame, "", 9, BLUE:Lerp(P.Text, 0.4), IronUi.Heading)
 	spot.TextXAlignment = Enum.TextXAlignment.Center
 	frame:SetAttribute("UiSound", "Click")
 	cards[i] = {
@@ -294,6 +318,7 @@ local readyButton = button(board, "READY", P.Good, function()
 	task.spawn(GemClient.request, "KaijuBattleReady")
 end)
 readyButton.TextSize = 17
+UiKit.fit(readyButton) -- ("WAITING FOR FOE" fits too)
 
 -- The battle bar -------------------------------------------------------------------------------------------
 
@@ -316,12 +341,12 @@ barStake.TextXAlignment = Enum.TextXAlignment.Center
 local barLeave = button(bar, "LEAVE", P.Bad, function()
 	task.spawn(GemClient.request, "KaijuBattleLeave")
 end)
-type Gauge = { Frame: Frame, Track: Frame, Fill: Frame, Name: TextLabel, View: ViewportFrame }
+type Gauge = { Frame: Frame, Stroke: UIStroke, Track: Frame, Fill: Frame, Name: TextLabel, View: ViewportFrame }
 local gauges: { Gauge } = {}
 for i = 1, 6 do
 	local frame = new("Frame", { Name = "Gauge" .. i, BackgroundColor3 = P.Slot }, bar)
 	UiKit.round(frame, 6)
-	new("UIStroke", { Color = P.Edge, Transparency = 0.4, Thickness = 1 }, frame)
+	local stroke = new("UIStroke", { Color = P.Edge, Transparency = 0.2, Thickness = 1.5 }, frame)
 	local view = viewport(frame, { Name = "Face", BackgroundColor3 = P.Inset, BackgroundTransparency = 0 })
 	UiKit.round(view, 6)
 	local track = new("Frame", { Name = "Track", BackgroundColor3 = P.Frame, BorderSizePixel = 0 }, frame)
@@ -336,7 +361,7 @@ for i = 1, 6 do
 	name.TextStrokeTransparency = 0.4
 	name:SetAttribute("NoTranslate", true)
 	UiKit.fit(name)
-	gauges[i] = { Frame = frame, Track = track, Fill = fill, Name = name, View = view }
+	gauges[i] = { Frame = frame, Stroke = stroke, Track = track, Fill = fill, Name = name, View = view }
 end
 
 -- The result -----------------------------------------------------------------------------------------------
@@ -359,18 +384,56 @@ result.Size = UDim2.new(1, 0, 0, 52)
 result.TextXAlignment = Enum.TextXAlignment.Center
 result.TextStrokeTransparency = 0.3
 result.LayoutOrder = 1
+-- (Which side won, in its colour: BLUE WINS, RED WINS.)
+local resultTeam = line(resultCard, "", 14, P.Text, IronUi.Heading)
+resultTeam.Size = UDim2.new(1, 0, 0, 18)
+resultTeam.TextXAlignment = Enum.TextXAlignment.Center
+resultTeam.LayoutOrder = 2
 local resultExp = line(resultCard, "", 15, P.Text, IronUi.Heading)
 resultExp.Size = UDim2.new(1, 0, 0, 20)
 resultExp.TextXAlignment = Enum.TextXAlignment.Center
-resultExp.LayoutOrder = 2
-local resultHealed = line(resultCard, "YOUR KAIJU ARE HEALED", 13, P.Good, IronUi.Heading)
+resultExp.LayoutOrder = 3
+local resultHealed = line(resultCard, "KAIJU HEALTH BACK TO BEFORE THE MATCH", 13, P.Good, IronUi.Heading)
 resultHealed.Size = UDim2.new(1, 0, 0, 18)
 resultHealed.TextXAlignment = Enum.TextXAlignment.Center
-resultHealed.LayoutOrder = 3
+resultHealed.LayoutOrder = 4
 local resultStake = line(resultCard, "", 13, P.Gold, IronUi.Heading)
 resultStake.Size = UDim2.new(1, 0, 0, 18)
 resultStake.TextXAlignment = Enum.TextXAlignment.Center
-resultStake.LayoutOrder = 4
+resultStake.LayoutOrder = 5
+-- REMATCH (KaijuBattleRematch): the battle again, if both ask before it
+-- closes; under it, who's asked, what it'd take of yours, or why there
+-- can't be one.
+local rematchRow = new("Frame", {
+	Name = "Rematch",
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, 0, 0, 44),
+	LayoutOrder = 6,
+}, resultCard)
+local rematchNote: TextLabel
+local rematchButton = button(rematchRow, "REMATCH", P.Good, function()
+	task.spawn(function()
+		local reply = GemClient.request("KaijuBattleRematch")
+		if reply and not reply.Ok and reply.Message and reply.Message ~= "" then
+			rematchNote.Text = reply.Message
+			rematchNote.TextColor3 = P.Bad
+		end
+	end)
+end)
+rematchButton.AnchorPoint = Vector2.new(0.5, 0)
+rematchButton.Position = UDim2.new(0.5, 0, 0, 6)
+rematchButton.Size = UDim2.fromOffset(220, 36)
+rematchButton.TextSize = 16
+UiKit.fit(rematchButton) -- (WAITING FOR a long name)
+rematchNote = line(resultCard, "", 11, P.Dim, IronUi.Body)
+rematchNote.Size = UDim2.new(1, 0, 0, 28)
+rematchNote.TextXAlignment = Enum.TextXAlignment.Center
+rematchNote.TextWrapped = true
+rematchNote.LayoutOrder = 7
+local rematchCost = line(resultCard, "", 11, P.Gold, IronUi.Heading)
+rematchCost.Size = UDim2.new(1, 0, 0, 14)
+rematchCost.TextXAlignment = Enum.TextXAlignment.Center
+rematchCost.LayoutOrder = 8
 
 -- Layout ---------------------------------------------------------------------------------------------------
 
@@ -386,6 +449,11 @@ local function layout()
 	title.Position, title.Size =
 		UDim2.fromOffset(edge, top - 2), UDim2.fromOffset(width * 0.5, if short then 18 else 22)
 	title.TextSize = if short then 15 else 19
+	-- (Your side's pill: to the left of the clock, clear of the title.)
+	local tagW = if short then 84 else 104
+	teamTag.Position = UDim2.new(1, -edge - 110 - tagW - 8, 0, top + (if short then 1 else 2))
+	teamTag.Size = UDim2.fromOffset(tagW, if short then 16 else 20)
+	teamTag.TextSize = if short then 9 else 11
 	versus.Position = UDim2.fromOffset(edge, top + (if short then 17 else 21))
 	versus.Size = UDim2.fromOffset(width * 0.26, 16)
 	stakeChip.Position = UDim2.fromOffset(edge + width * 0.26 + 4, top + (if short then 16 else 20))
@@ -488,7 +556,26 @@ local function layout()
 		g.Name.Position, g.Name.Size = UDim2.fromOffset(gh, 3), UDim2.new(1, -gh - 4, 0, 13)
 		g.Track.Position, g.Track.Size = UDim2.new(0, gh, 1, -11), UDim2.new(1, -gh - 6, 0, 6)
 	end
+	-- The result: on a phone it sits under the battle bar, smaller, so the
+	-- rematch fits above the dock.
 	resultCard.Size = UDim2.fromOffset(math.min(420, screen.X - 40), 0)
+	if short then
+		resultCard.AnchorPoint = Vector2.new(0.5, 0)
+		resultCard.Position = UDim2.new(0.5, 0, 0, bar.Position.Y.Offset + barH + 6)
+	else
+		resultCard.AnchorPoint = Vector2.new(0.5, 0.5)
+		resultCard.Position = UDim2.fromScale(0.5, 0.42)
+	end
+	result.TextSize, result.Size = if short then 30 else 46, UDim2.new(1, 0, 0, if short then 32 else 52)
+	for _, entry in { { resultTeam, 14, 12 }, { resultExp, 15, 12 }, { resultHealed, 13, 11 }, { resultStake, 13, 11 } } do
+		entry[1].TextSize = if short then entry[3] else entry[2]
+		entry[1].Size = UDim2.new(1, 0, 0, if short then 14 else 18)
+	end
+	rematchRow.Size = UDim2.new(1, 0, 0, if short then 34 else 44)
+	rematchButton.Size = UDim2.fromOffset(if short then 200 else 220, if short then 30 else 36)
+	rematchButton.Position = UDim2.new(0.5, 0, 0, if short then 2 else 6)
+	rematchNote.Size = UDim2.new(1, 0, 0, if short then 14 else 28)
+	rematchNote.TextSize = if short then 10 else 11
 end
 
 -- The ground: both sides' places ---------------------------------------------------------------------------
@@ -551,10 +638,9 @@ local function drawField(state)
 	field = folder
 	local shape = { Center = state.Center, Axis = state.Axis }
 	for _, side in { "A", "B" } do
-		local mine = side == state.Side
 		for _, cell in KaijuBattle.cells() do
 			local at = groundAt(KaijuBattle.cellSpot(shape, side, cell.Id))
-			marks[side .. cell.Id] = disc(at, 2.6, if mine then MINE else THEIRS, 0.7)
+			marks[side .. cell.Id] = disc(at, 2.6, sideColor(side), 0.7)
 		end
 	end
 	-- (Off a court, a middle line across the field: a court has its own.)
@@ -652,7 +738,7 @@ local function drawBoard(state)
 		end
 		local mark = marks[state.Side .. cell.Id]
 		if mark then
-			mark.Color = if unit then elementColor(unit.Element) else MINE
+			mark.Color = if unit then elementColor(unit.Element) else sideColor(state.Side)
 			mark.Transparency = if unit then 0.35 else 0.75
 		end
 	end
@@ -680,6 +766,18 @@ local function drawBoard(state)
 		end
 	end
 	versus.Text = "vs " .. (state.Foe or "")
+	-- Your side's colour, and theirs.
+	local mineColor, foeColor = sideColor(state.Side), sideColor(otherSide(state.Side))
+	teamTag.Text = if state.Side == "B" then "YOU'RE RED" else "YOU'RE BLUE"
+	teamTag.BackgroundColor3 = mineColor:Lerp(Color3.new(0, 0, 0), 0.15)
+	foeHalf.BackgroundColor3 = foeColor:Lerp(P.Frame, 0.8)
+	foeText.TextColor3 = foeColor:Lerp(P.Text, 0.35)
+	mineHalf.BackgroundColor3 = mineColor:Lerp(P.Frame, 0.84)
+	youText.Text = if state.Side == "B" then "YOUR SIDE: RED" else "YOUR SIDE: BLUE"
+	youText.TextColor3 = mineColor:Lerp(P.Text, 0.3)
+	for _, card in cards do
+		card.Spot.TextColor3 = mineColor:Lerp(P.Text, 0.4)
+	end
 	local stake = state.Stake
 	stakeChip.Visible = stake ~= nil
 	if stake then
@@ -931,16 +1029,23 @@ local function drawBar(state)
 		g.Frame.Visible = unit ~= false
 		if unit then
 			g.Name.Text = unit.Name
-			g.Fill.BackgroundColor3 = if i <= 3 then MINE else THEIRS
+			local color = sideColor(if i <= 3 then state.Side else otherSide(state.Side))
+			g.Fill.BackgroundColor3 = color
+			g.Stroke.Color = color
 			g.View.BackgroundColor3 = elementColor(unit.Element):Lerp(P.Frame, 0.6)
 			portrait(g.View, modelFor("gauge" .. i, unit), 0.85)
 		end
 	end
 	barStake.Text = if state.Stake then "FOR " .. string.upper(state.Pot or "") else ""
+	-- (Your side, in its colour: your three on the left are it.)
+	barTitle.Text = if state.Side == "B" then "YOU'RE RED" else "YOU'RE BLUE"
+	barTitle.TextColor3 = sideColor(state.Side)
 end
 
 local function show(state)
 	current = state
+	-- (Once it's on, the court from over your end: Client.KaijuBattleCam.)
+	KaijuBattleCam.follow(state)
 	if not state then
 		gui.Enabled = false
 		picked = nil
@@ -962,8 +1067,11 @@ local function show(state)
 		result.Text = if won then "VICTORY" elseif lost then "DEFEAT" else "DRAW"
 		result.TextColor3 = if won then P.Gold elseif lost then P.Bad else P.Text
 		resultStroke.Color = result.TextColor3
+		local winner = if won then state.Side elseif lost then otherSide(state.Side) else nil
+		resultTeam.Text = if winner == "A" then "BLUE WINS" elseif winner == "B" then "RED WINS" else "NEITHER SIDE WINS"
+		resultTeam.TextColor3 = if winner then sideColor(winner) else P.Dim
 		resultExp.Text = string.format("+%d EXP for each of your kaiju", state.Exp or 0)
-		resultHealed.Visible = state.Healed == true
+		resultHealed.Visible = state.Restored == true
 		local stake = state.Stake
 		resultStake.Visible = stake ~= nil
 		if stake then
@@ -974,6 +1082,31 @@ local function show(state)
 				elseif lost then "YOUR STAKE IS THEIRS"
 				else "STAKES RETURNED"
 		end
+		-- The rematch: who's asked, what it takes, or why not.
+		local again = state.Rematch or {}
+		local foeSide = otherSide(state.Side)
+		local mineAsked, foeAsked = again[state.Side] == true, again[foeSide] == true
+		local foeName = string.upper(state.Foe or "YOUR FOE")
+		rematchRow.Visible = again.Off == nil
+		rematchButton.AutoButtonColor = not mineAsked
+		rematchButton.Text = if mineAsked then "WAITING FOR " .. foeName else "REMATCH"
+		rematchButton.BackgroundColor3 = (if mineAsked then P.Dim elseif foeAsked then P.Gold else P.Good):Lerp(
+			P.Frame,
+			0.55
+		)
+		if again.Off then
+			rematchNote.Text, rematchNote.TextColor3 = "No rematch: " .. again.Off, P.Bad
+		elseif foeAsked and not mineAsked then
+			rematchNote.Text, rematchNote.TextColor3 = foeName .. " WANTS A REMATCH!", P.Gold
+		elseif mineAsked then
+			rematchNote.Text, rematchNote.TextColor3 = "", P.Dim
+		else
+			rematchNote.Text, rematchNote.TextColor3 = "BOTH PRESS REMATCH TO GO AGAIN", P.Dim
+		end
+		rematchNote.Visible = rematchNote.Text ~= ""
+		-- (Played for something: the same again, taken again.)
+		rematchCost.Visible = again.Off == nil and again.Cost ~= nil
+		rematchCost.Text = if again.Cost then "FOR " .. again.Cost else ""
 		if won then
 			local scale = resultCard:FindFirstChildOfClass("UIScale") or new("UIScale", {}, resultCard)
 			scale.Scale = 0.8
@@ -995,7 +1128,7 @@ local function show(state)
 		for id, cellId in state.Theirs or {} do
 			local mark = marks[(if state.Side == "A" then "B" else "A") .. cellId]
 			if mark then
-				local color = THEIRS
+				local color = sideColor(otherSide(state.Side))
 				for _, unit in state.Units or {} do
 					if unit.Id == id then
 						color = elementColor(unit.Element)
@@ -1027,7 +1160,8 @@ function KaijuBattleUI.tick()
 	countdown.Text = clock(left)
 	countdown.TextColor3 = if state.Phase == "Formation" and left <= 5 then P.Bad else P.Text
 	timeFill.Size = UDim2.fromScale(math.clamp(left / KaijuBattle.FormationSeconds, 0, 1), 1)
-	barClock.Text = if state.Phase == "Over" then "" else clock(left)
+	-- (Once it's over, how long the result's up: time to ask for a rematch.)
+	barClock.Text = clock(left)
 	if state.Phase == "Formation" then
 		local list = yours(state)
 		for i, card in cards do

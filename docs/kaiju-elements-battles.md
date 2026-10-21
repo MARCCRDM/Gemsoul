@@ -174,11 +174,12 @@ dodges them.
 
 > **Since then:** battles are fought on the courts of the
 > [Kaiju Arena](kaiju-arena.md), downstairs from the Shelter. You stand on a
-> pad to wait for a challenger, can play for coins or a gem, get 25 seconds
-> to drag your kaiju into place on a rebuilt board, and the winner's kaiju
-> are healed. Asking from a player card brings you both down to a free
-> court. What follows is the battle as it first shipped. The pictures show
-> the old board.
+> pad to wait for a challenger, can play for coins or a gem, and get 25
+> seconds to drag your kaiju into place on a rebuilt board. Every kaiju
+> fights at full health and goes back to how it was afterwards, win or
+> lose, and you can ask for a rematch. Asking from a player card brings you
+> both down to a free court. What follows is the battle as it first
+> shipped. The pictures show the old board.
 
 ![Asking, placing, the battle and the result](kaiju-elements-battles/battle.jpg)
 
@@ -193,7 +194,8 @@ dodges them.
 
 You can ask when:
 
-- both of you have a kaiju out and up;
+- both of you have your kaiju out (knocked-out ones count: a battle brings
+  the whole team back at full health for itself);
 - you're within 40 studs of each other;
 - neither of you is in a fight, a match, a spar, a hunt or another battle.
 
