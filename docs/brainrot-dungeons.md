@@ -3,7 +3,7 @@
 ## Entering a run
 Form a party of three or four in Social. Every member marks Ready; the leader selects **DUNGEON**. Queueing is server-validated. Living characters must be out of mining expeditions, duels and existing combat sessions. The roster is locked at deployment; there is no mid-run join.
 
-Five connected rooms are generated per run. Layout turns, room themes, pillar counts and fighter composition change. Each of the first four rooms has two or three fighters. Defeat them to open the next gate. Surviving players recover health and combat resources at each checkpoint. The fifth room has one Colossus: one of the ten bosses (`DungeonRules.Bosses`, most of them two- or three-headed), at 1.8×; see [bosses-and-swarms.md](bosses-and-swarms.md). An open expedition's middle camp is one of them too.
+Five connected rooms are generated per run. Layout turns, room themes, pillar counts and fighter composition change. Each of the first four rooms has two or three fighters. Defeat them to open the next gate. Surviving players recover health and combat resources at each checkpoint. The fifth room has one Colossus: one of the ten bosses (`DungeonRules.Bosses`, most of them two- or three-headed), at 1.8×; see [bosses-and-swarms.md](bosses-and-swarms.md) and, for their bodies now, [boss-titans.md](boss-titans.md). An open expedition's middle camp is one of them too.
 
 At least three survivors must reach the boss encounter. Losing a member after the boss has engaged does not reset the boss. Leaving the party, leaving combat, respawning, a full squad wipe, or the 15-minute limit removes the appropriate participants and cleans up empty runs. Up to eight isolated squads can run concurrently.
 

@@ -72,7 +72,7 @@ local HEADS = {
 	Frigo = 2,
 	Cappuccino = 1,
 }
-local BUDGET = 120 -- parts in one boss, its invisible skeleton included
+local BUDGET = 200 -- parts in one boss, its invisible skeleton included
 local REACH = 4.6 -- studs out from its root (before it's scaled up)
 
 -- The list -------------------------------------------------------------------------------------------

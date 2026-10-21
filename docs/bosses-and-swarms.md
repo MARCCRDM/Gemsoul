@@ -42,6 +42,10 @@ end.
 
 ## The dungeon bosses
 
+They have since been rebuilt as rift titans, with the same names, elements
+and moves: see [boss-titans.md](boss-titans.md). The pictures and the
+"What it is" column here are their first bodies.
+
 ![The ten bosses, ready](bosses-and-swarms/bosses.png)
 
 The last room of a dungeon, and an open expedition's middle camp, is always
@@ -91,8 +95,8 @@ bat poses. On top of that, their parts move (`CreatureMotion`):
 Since then, they breathe while standing and swing their arms as they walk.
 Each has its own gait. See [brainrot-polish.md](brainrot-polish.md).
 
-They're light: 63 to 116 parts each, skeleton included. None of them
-collides with or blocks anything. The owner's "TUNG TUNG" dungeon test
+They were light: 63 to 116 parts each, skeleton included (now 101 to 185,
+budget 200). None of them collides with or blocks anything. The owner's "TUNG TUNG" dungeon test
 (F8) now meets the three-headed Sahur.
 
 ## Critters come as swarms
