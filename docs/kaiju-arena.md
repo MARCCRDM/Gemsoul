@@ -174,6 +174,59 @@ bar draining toward the fight.
   ready first, the hint says so.
 - **LEAVE** forfeits.
 
+## Roles: an auto battler
+
+Every kind has a role, and on the court it fights by it, like a piece in an
+auto battler (`Shared/KaijuRoles`, `Server/KaijuBattleBrain`):
+
+| Role | Kind | On the court |
+| --- | --- | --- |
+| **TANK** | Carapace | Holds the front and takes the hits (it shrugs off a quarter of each). Its roar makes the foes round it attack it. |
+| **WARRIOR** | Bulwark | Closes in and hits hardest up close. |
+| **RANGED** | Razorback | Stays at the back and shoots spines from up to 15 studs. It backs off from a foe that gets within 6, at most every 2.5 s, and otherwise stands and shoots. It never walks into the front line. |
+| **ASSASSIN** | (a fourth kind, coming) | Leaps over the front line the moment the battle starts, onto their ranged kaiju first, else their weakest. |
+
+**Who it fights.** Every think (0.15 s) it looks again:
+
+- One foe down, it goes straight for the next. A blow it was winding up at
+  the one that fell is dropped, and a move's wait is given back.
+- A melee kaiju takes the nearest foe, and keeps the one it's on unless
+  another is 5 studs nearer. Two or three on one foe spread round it.
+- A ranged one picks off the weakest foe in range, else the nearest.
+- An assassin sees its mark through.
+- A taunted kaiju goes for the tank that roared, for as long as the roar
+  lasts.
+- 2 on 1, 3 on 1: everyone left goes for the last foe.
+
+**Where it stands.** A melee kaiju closes to its reach. A ranged one holds
+its ground while its foe is in range, and closes only to range when it
+isn't. Every spot it walks to is inside the court's rails. That's why
+nothing gets stuck against the rails any more: before, a Razorback's hop
+back and a kaiju circling to its flank kept aiming past the edge and got
+pulled back in every step. One that's somehow well out (a shove) is put
+back in.
+
+**Positions matter.** They start at their places. The front row meets
+first, the back row shoots over it, and an assassin goes for whoever's at
+your back. Put tanks and warriors in front and ranged ones behind.
+
+**Moves.** Each role has its own three moves, copied from the gem surges and
+renamed (`KaijuRoles.Moves`, and they're the kaiju's moves everywhere, not
+just in the arena):
+
+| Role | E (when its mana is full) | Q (level 5, every 8 s) | R (level 10, when its moment comes) |
+| --- | --- | --- | --- |
+| Tank | **Taunting Roar** (from Resonance Echo): the foes round it attack it for 3.5 s, and it takes 35% less meanwhile | **Shell Slam** (from Hydraulic Slam): 110% to the foes round it, stunning | **Fortress** (from Cryo Shield), at half health: a shell soaking 35% of its health for 5 s, then a burst that slows |
+| Warrior | **Cleave** (from Circuit Cleave): a wide sweep through its foe and those beside it, 160% | **War Cry** (from Overload): 5 s of 30% harder, 35% faster blows, and 8% health back | **Earthshaker** (from Tremor Slam), hard pressed or with two foes on it: the ground breaks under its foe, 150%, stunning |
+| Ranged | **Spine Volley** (from Railstorm): five spines rain on its foe and those near, 130% in all, with its element's effect | **Piercing Spine** (from Armor Piercer): one spine through a line of them, 140%, leaving them Vulnerable | **Vault** (from Stim Dodge), a foe too close: it vaults back and leaves a patch that slows and hurts |
+| Assassin | **Shadow Leap** (from Thruster Leap): behind its mark, 200%, leaving it Vulnerable | **Rend** (from Servo Flurry): three quick rakes, 140% in all | **Vanish** (from Null Prism), low on health: untouchable for 1.5 s, then behind their weakest |
+
+**Mana** fills as a kaiju hits (10 a blow for a tank, 14 for a warrior, 12
+for ranged, 16 for an assassin) and as it's hit. A tank fills fastest from
+the hits it takes, so the harder it's pushed, the sooner it roars. Its E
+goes off at 100. "Its element's effect" is Thermal's burn, Cryo's slow,
+Ion's stun or Corrosive's poison.
+
 ## The battle
 
 ![The battle camera's view of a court: BLUE's half nearest, each kaiju on its side's ring](kaiju-arena/overview.jpg)
@@ -199,13 +252,13 @@ code's size and colours. It isn't a Roblox screenshot.)
   buttons hide, so the court and the battle's own bar and result have the
   screen.
 - **On the court.** Every kaiju starts at its place, facing the other side,
-  and fights by itself as before (`KaijuFighter`).
+  and fights by itself by its role (above).
 - **Rings.** Each kaiju in a battle stands on a ring in its side's colour:
   a bright rim round a darker fill, a little wider than the kaiju
   (`Client/KaijuTeamRings`). Everyone sees them, players and onlookers
   alike.
-- **Kept in.** A kaiju that strays past the court's edge walks back in. One
-  more than 3 studs out is put straight back.
+- **Kept in.** Every spot a kaiju walks to is inside the rails. One more
+  than 3 studs out (a shove) is put straight back.
 - **The bar at the top:**
   - a face and health gauge for each of the six kaiju, yours on the left,
     each outlined and filled in its side's colour;
@@ -338,8 +391,11 @@ Where they lead, the first of these that wants you somewhere:
 | `src/server/World/KaijuPitWorld.luau` (new) | Builds the hall under the Shelter: walls, roof, balcony and stairs, the way up, signs, lights, COACH-4's kiosk and spot (`Guide`), and each court (mat, places, rails and keep walls, pads, board, pedestal, bleachers, floodlights) |
 | `src/server/Systems/KaijuPitServer.luau` (new) | The stairs both ways, the pads, waiting and challenging, stakes in and paid out, the boards' attributes, bringing a card's battle down to a court, refunds on shutdown; a rematch's stakes taken again; COACH-4 built on the balcony |
 | `src/server/Systems/KaijuBattles.luau` | Battles on a court (its field, `Bounds`), `findCourt`, `onOver` (the payout), `inPit`, full health and back for both sides (`KaijuServer.battleStart` / `battleEnd`), each kaiju marked with its side (`KaijuTeam`), the rematch (`KaijuBattleRematch`, `KaijuBattles.again`, `rematchOn` / `rematchCost`), the stake in what the client is sent |
-| `src/server/Systems/KaijuServer.luau` | A battling kaiju kept inside its court; `battleStart`, `battleEnd` and `battleable`; the kept health (`BattleKeep`) put back after a rejoin; quiet knockouts in a battle |
+| `src/server/Systems/KaijuServer.luau` | A battling kaiju run by `KaijuBattleBrain` and kept inside its court; every kaiju's moves are its role's (`Kaiju.kitMoves`); the caster's taunt, war cry, leap, vault and pick; `battleStart`, `battleEnd` and `battleable`; the kept health (`BattleKeep`) put back after a rejoin; quiet knockouts in a battle |
 | `src/shared/KaijuBattle.luau` | 25 seconds to place, 12 for the result (and a rematch), the sides' names and colours (`Sides`) |
+| `src/shared/KaijuRoles.luau` (new) | The roles (tank, warrior, ranged, assassin) and each kind's, the roles' own moves (`Kits`, `Moves`: copied from the gem surges and renamed), mana, who a kaiju fights (`target`), where it stands (`spot`, inside the court: `clamp`), when its R goes off (`wantsR`) |
+| `src/server/Systems/KaijuBattleBrain.luau` (new) | A kaiju in a battle, fighting by its role: picking its foe every think, walking to its spot, blows and spines, its E on full mana, its Q and R, a wind-up dropped when its foe falls, an assassin's opening leap |
+| `src/server/Systems/KaijuAbilities.luau` | The roles' new shapes: a taunt, a war cry, a leap, a vault, rakes and a vanish |
 | `src/client/Modules/KaijuBattleCam.luau` (new) | The overview camera: where it looks from (`view`), easing in, leaning after the fight, dragging and zooming, handing your camera back |
 | `src/client/Modules/KaijuTeamRings.luau` (new) | The ring under each kaiju in a battle, in its side's colour |
 | `src/client/Lobby.client.luau` | Starts the rings; the lobby HUD hides during a kaiju battle |
@@ -378,6 +434,7 @@ names.
 | --- | --- |
 | `run_kaiju_battle` (`kaiju_battle_cases`) | The arena's rules: eight courts in two rows, inside the hall and the Core, clear of each other and of the stairs, every place inside its court; the pads; arriving on the balcony facing the courts; a stray kaiju clamped back in; the nearest pad; what can be staked; matching coins and gems (same rarity or better, weakest first); what's said ("an Uncommon gem each"). The arrows: spaced along the way from just ahead of you, facing along it, never past its end, round a corner, flat on a slope; each chevron points the way it leads; subtle. The sides: BLUE and RED, a ring a little wider than its kaiju. The camera: for every court and side, swung either way and zoomed in or out, it stays inside the hall, over your end, past the floodlights and looking down, with all twelve places in view on a 16:10 screen below the battle bar |
 | `run_kaiju` (`kaiju_server_cases`) | The arena on the server: down the stairs and back up; COACH-4 on the balcony, off the stairs, facing you; pads, the stake and the board; a challenger who can't cover it, then FIGHT; every kaiju of both teams at full health (one knocked out brought back), each marked with its side; 25 seconds to place, every kaiju placed inside its court, a stray one put back; the fight on the court; afterwards every kaiju back as it was (the hurt one hurt, the one down before down again with the same wait), no raid for a team knocked out in it, both told; the coins paid out (1250 and 350); the board's winner; a rematch (asked, told, both, the same court and sides, the stakes taken again, everyone full again), forfeited, then refused when one can't cover the stake (the asker's coins back) and ended when one closes; the court freed and the sides unmarked; stepping off and back on; a gem stake; walking upstairs forfeits; the winner gets both gems; a kept health put back by itself out of a battle; a card's battle brought down to a court. The older open-field battle: the losers' kaiju back as they were |
+| `run_kaiju_roles` (`kaiju_roles_cases`, new) | The roles and their moves (each kind's role, each move its role's and key's, waking at 1, 5 and 10, castable, with an icon and what it's from); who a kaiju picks (the nearest; an assassin their shooter; a shooter the weakest in range; onto the next after a kill; not swapping for one barely nearer; its taunter while taunted) and where it stands (to its reach; a shooter holding in range, closing only to range, backing off one too close, slipping along the rails when cornered; never out of the court). Then whole battles with the real brain and moves on stand-in bodies: 3 on 3 (it ends; nobody stands about over 1.5 s with a foe up; the shooter shoots, from range, and isn't ahead of its front line), 3 on 1 (everyone on the last foe within a beat of each kill), the tank's roar turning a foe, an assassin on their shooter at once, a shooter against an assassin, and every role's move cast at level 10. No kaiju ever leaves the court |
 | `run_outpost` (`outpost_cases`) | COACH-4's dialogue fits the dialogue's rows, its tip action exists, and all of its lines and tips are in Spanish |
 | `run_moon_quarry_scene`, `run_shelter_life` | The Shelter with its stairwell: spawn, stations, the stage and its hologram, the part budget |
 | `run_lang` | Every new Spanish entry follows the rules |
@@ -388,5 +445,8 @@ battle on a court with two players, on a desktop and a phone, and check:
 - the camera takes over when the fight starts, drags and zooms, and hands
   back cleanly after the result, after CLOSE and after walking upstairs;
 - the rings follow the kaiju on the court's floor;
+- the roles: the Razorback stays back and shoots, a kaiju moves straight on
+  to the next foe after a kill, the tank's roar pulls foes onto it, and
+  nobody sticks to the rails;
 - the health comes back right after a win, a loss, a forfeit and a rejoin;
 - a coin rematch and a gem rematch.

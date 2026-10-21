@@ -349,7 +349,26 @@ for element, lanes in Kaiju.Moves do
 end
 check(lanesOf.Offense == 12 and lanesOf.Defense == 12, "Not three Q and three R moves per element")
 -- Q and R plans: the shapes KaijuAbilities knows, and an R's numbers.
-local shapes = { Bolt = 1, Blast = 1, Nova = 1, Line = 1, Field = 1, Chain = 1, Storm = 1, Pylon = 1, Shell = 1, Ward = 1, Mend = 1 }
+-- (Taunt, Rally, Leap, Vault, Flurry and Vanish: the roles' own moves, Shared.KaijuRoles.)
+local shapes = {
+	Bolt = 1,
+	Blast = 1,
+	Nova = 1,
+	Line = 1,
+	Field = 1,
+	Chain = 1,
+	Storm = 1,
+	Pylon = 1,
+	Shell = 1,
+	Ward = 1,
+	Mend = 1,
+	Taunt = 1,
+	Rally = 1,
+	Leap = 1,
+	Vault = 1,
+	Flurry = 1,
+	Vanish = 1,
+}
 for id, plan in Kaiju.AbilityPlans do
 	check(shapes[plan.Shape], id .. ": an unknown shape " .. tostring(plan.Shape))
 	if plan.Shape == "Shell" then

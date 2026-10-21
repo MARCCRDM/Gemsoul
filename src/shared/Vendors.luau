@@ -430,7 +430,7 @@ Vendors.ArenaGuide = {
 			Options = {
 				{
 					Text = "Front row or back row?",
-					Reply = "The front row takes the blows: put your Bulwarks and Carapaces there. A Razorback shoots from the back row, so keep it behind them.",
+					Reply = "The front row takes the blows: put your tanks (Carapaces) and warriors (Bulwarks) there. A Razorback is ranged: it shoots from the back row, so keep it behind them.",
 				},
 				{
 					Text = "How do I place them?",
@@ -438,7 +438,7 @@ Vendors.ArenaGuide = {
 				},
 				{
 					Text = "Which kaiju is which?",
-					Reply = "Bulwark: an armoured brute, slow, with heavy blows; it shrugs off a tenth of every hit. Carapace: a low shell, the hardest to wear down; it shrugs off a quarter. Razorback: quick and fragile, best at range.",
+					Reply = "Carapace, the TANK: it shrugs off a quarter of every hit, and its roar makes foes attack it. Bulwark, the WARRIOR: heavy blows up close; it shrugs off a tenth. Razorback, RANGED: it shoots from the back and backs off anyone who closes in, but it's fragile.",
 				},
 				{
 					Text = "Which element beats which?",
@@ -485,6 +485,8 @@ Vendors.ArenaTips = {
 	"Every kaiju of yours earns experience from a battle: 40 for a win, 24 for a draw, 14 for a loss.",
 	"Going back up the stairs mid-battle counts as a loss, and your stake goes to your foe.",
 	"A kaiju's Q wakes at level 5 and its R at level 10. Higher-level kaiju bring more moves to a battle.",
+	"Each kaiju casts its E when its mana is full. Mana fills as it hits and as it's hit, so a tank roars sooner the harder it's pushed.",
+	"One foe down, a kaiju goes straight for the next one near it. Ranged kaiju pick off the weakest one in range.",
 	"Your foe's places stay hidden until the fight starts, and so do yours.",
 	"A team of mixed elements is hard to counter. In a rematch you've seen your foe's team: put the kaiju whose element beats theirs in front.",
 	"Anyone down here can watch a battle from the aisles and the balcony. The board over each court shows both sides' health.",

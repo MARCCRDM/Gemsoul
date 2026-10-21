@@ -14,20 +14,36 @@ They replace the critter pets in [pet-system-proposal.md](pet-system-proposal.md
 
 Each kind comes in Thermal, Cryo, Ion and Corrosive: twelve in all.
 
-| Kind | Looks | Plays | Health | Damage | Speed |
-| --- | --- | --- | --- | --- | --- |
-| **Bulwark** | Stands upright: plated chest, fins down its back, a long tail | Slow, heavy blows, shrugs off 10% | 240 | 20 a blow; attacks about every 1.6 s | 12 |
-| **Razorback** | Runs low: long toothed snout, spines, long legs | Quick light bites, fragile | 160 | 11 a bite; attacks about every 0.8 s | 20 |
-| **Carapace** | Four stubby legs under a wide shell, a spiked club tail | The hardest to wear down: shrugs off 25% | 300 | 13 a blow; attacks about every 1.3 s | 10 |
+| Kind | Role | Looks | Plays | Health | Damage | Speed |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Bulwark** | Warrior | Stands upright: plated chest, fins down its back, a long tail | Slow, heavy blows up close, shrugs off 10% | 240 | 20 a blow; attacks about every 1.6 s | 12 |
+| **Razorback** | Ranged | Runs low: long toothed snout, spines, long legs | Shoots spines from the back; fragile | 160 | 11 a spine; about every 0.8 s | 20 |
+| **Carapace** | Tank | Four stubby legs under a wide shell, a spiked club tail | The hardest to wear down: shrugs off 25%, and draws foes onto itself | 300 | 13 a blow; attacks about every 1.3 s | 10 |
+
+The role decides how it fights in a kaiju battle, and its three moves (see
+[kaiju-arena.md](kaiju-arena.md#roles-an-auto-battler), `Shared.KaijuRoles`).
+An assassin, the fourth role, is coming as a fourth kind.
 
 Those are level 1. Each level adds 8% of them, up to level 30. A finer
 Gemsoul (below) adds up to 20% more.
 
-## The Gemsoul: one stone, three moves
+## The Gemsoul, and a kaiju's own moves
 
 Every kaiju carries a Gemsoul: a gem of its element, rolled like any gem
-(rarity, Size, Clarity, Cut). All three of the kaiju's moves come from that
-one stone, and they wake as it levels (`Kaiju.MoveLevels`):
+(rarity, Size, Clarity, Cut). The Gemsoul gives it its element and makes it
+stronger the finer it is.
+
+**A kaiju's own moves are its role's** (`Kaiju.kitMoves`,
+`KaijuRoles.Kits`): a tank's Taunting Roar, Shell Slam and Fortress, a
+warrior's Cleave, War Cry and Earthshaker, a ranged one's Spine Volley,
+Piercing Spine and Vault. Each was copied from a gem surge and renamed for
+kaiju. It casts them everywhere it fights, and they're what its card and
+panel show. They wake as it levels (`Kaiju.MoveLevels`): E from the start, Q
+at level 5, R at level 10. In a kaiju battle its E goes off when its mana
+is full. Out in the Outpost it keeps the timing below.
+
+**The Gemsoul's own three moves are the gem's.** They work for whoever
+sockets it (below), and they wake on the same levels:
 
 | Key | Wakes at | What the kaiju does with it |
 | --- | --- | --- |
@@ -35,9 +51,8 @@ one stone, and they wake as it levels (`Kaiju.MoveLevels`):
 | **Q** | level 5 | Its strike: in place of a blow, every 7 seconds, named on its cast bar (1.6 of its blows, against the E's 2.6) |
 | **R** | level 10 | Its defense: raised quickly when it's down to 60% health or a heavy blow or a cast is coming, at most every 14 seconds |
 
-The moves are the player's own moves, and the ones a kaiju can cast: you
-can see them land, never a dash or a "while ready" bonus
-(`GemTraits.SoulMoves`):
+A Gemsoul's moves are the player's own moves that you can see land, never a
+dash or a "while ready" bonus (`GemTraits.SoulMoves`):
 
 | Element | Q (strike) | E (surge) | R (defense) |
 | --- | --- | --- | --- |
@@ -46,7 +61,7 @@ can see them land, never a dash or a "while ready" bonus
 | Ion | Circuit Cleave, Thunder Dash, Skybreaker | Ion Spark, Chain Lightning, Thunder Pylon, Storm Call, Ion Cannon | Ion Shield, Capacitor, Tesla Fence |
 | Corrosive | Caustic Dart, Vitriol Sweep, Toxic Flask | Acid Spray, Toxic Cloud, Armor Melt, Toxic Tide, Maneater | Rad Shield, Bio Regrowth, Toxic Mantle |
 
-A kaiju's R is one of these (`Kaiju.AbilityPlans`):
+A Gemsoul's R is one of these (`Kaiju.AbilityPlans`):
 
 - **A shell** (Heat Shield, Glacial Bulwark, Ice Pillar, Ion Shield,
   Capacitor, Rad Shield) soaks a share of its health in blows for a few
@@ -670,12 +685,13 @@ Proposed guardrails:
 
 | Where | What |
 | --- | --- |
-| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), healing (`Infuse`, `infusePower`, `infusePlan`, `healPick`, `AutoHeal`, `autoHealOn`, `Danger`), knocked out (`Revive`, `reviveSeconds`, `reviveIn`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
+| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), healing (`Infuse`, `infusePower`, `infusePlan`, `healPick`, `AutoHeal`, `autoHealOn`, `Danger`), knocked out (`Revive`, `reviveSeconds`, `reviveIn`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), a kaiju's own moves, its role's (`kitMove`, `kitMoves`, `role`, `moveInfo`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
 | `Shared.Squad` | Fighting as a side: sharing out foes (`assign`, `cost`), places round a shared foe (`slots`, `toward`), keeping clear (`apart`) |
 | `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
 | `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint |
 | `Shared.CreatureMotion` | Their walk (`Stride`), arms (`Arm`), jaw and tail, and every fight pose (`fight`, `apply`) |
 | `Shared.GemTraits` | The moves a Gemsoul rolls (`SoulMoves`); an old one's seeded into them (`traitsOf`) |
+| `Shared.KaijuRoles` | Each kind's role and the roles' own moves; how a kaiju fights by its role in a battle (see [kaiju-arena.md](kaiju-arena.md#roles-an-auto-battler)) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe (a critter's wind-up too), asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow and its R when hard pressed (`setMoves` after a level), on its side of a shared foe and clear of its own (`Flank`, `Apart`); the attributes clients pose it by |
 | `KaijuBattles` | Kaiju battles between two players (see [Kaiju battles](kaiju-elements-battles.md#kaiju-battles)), fought on the courts of the [Kaiju Arena](kaiju-arena.md) |

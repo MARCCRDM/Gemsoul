@@ -4,9 +4,10 @@
 
 	Three species, each in four elements (Fire, Frost, Shock and Poison in
 	the data; Thermal, Cryo, Ion and Corrosive on screen):
-	  Bulwark    an armoured brute on two legs: slow, heavy blows
-	  Razorback  a spined runner: quick, light, fragile
-	  Carapace   a low shell on four legs: the hardest to wear down
+	  Bulwark    a warrior: an armoured brute on two legs, slow, heavy blows
+	  Razorback  ranged: a spined runner that shoots, quick, light, fragile
+	  Carapace   a tank: a low shell on four legs, the hardest to wear down
+	(Their roles in a battle, and each role's own moves: Shared.KaijuRoles.)
 
 	Every kaiju carries its Gemsoul: a gem of its element, rolled like any
 	gem (rarity, Size, Clarity, Cut), and all three of its moves come from
@@ -41,6 +42,7 @@ local GemConfig = require(script.Parent.GemConfig)
 local GemRoller = require(script.Parent.GemRoller)
 local GemTraits = require(script.Parent.GemTraits)
 local ElementMatchup = require(script.Parent.ElementMatchup)
+local KaijuRoles = require(script.Parent.KaijuRoles)
 
 local Kaiju = {}
 
@@ -52,8 +54,8 @@ Kaiju.Species = {
 	Bulwark = {
 		Id = "Bulwark",
 		Name = "Bulwark",
-		Role = "Brute",
-		Blurb = "An armoured brute on two legs. Slow, and every blow lands heavy.",
+		Role = "Warrior", -- (its role in a battle: Shared.KaijuRoles)
+		Blurb = "A warrior: an armoured brute on two legs. It fights up close, and every blow lands heavy.",
 		Health = 240,
 		Damage = 20,
 		Rate = 1.6,
@@ -64,8 +66,8 @@ Kaiju.Species = {
 	Razorback = {
 		Id = "Razorback",
 		Name = "Razorback",
-		Role = "Runner",
-		Blurb = "A spined runner. Quick light bites, but it can't take a beating.",
+		Role = "Ranged",
+		Blurb = "Ranged: a spined runner that shoots its spines from the back. It can't take a beating.",
 		Health = 160,
 		Damage = 11,
 		Rate = 0.8,
@@ -76,8 +78,8 @@ Kaiju.Species = {
 	Carapace = {
 		Id = "Carapace",
 		Name = "Carapace",
-		Role = "Shell",
-		Blurb = "A low shell on four legs. The hardest of the three to wear down.",
+		Role = "Tank",
+		Blurb = "A tank: a low shell on four legs. It holds the front and takes the hits.",
 		Health = 300,
 		Damage = 13,
 		Rate = 1.3,
@@ -182,6 +184,11 @@ Kaiju.AbilityPlans = {
 	R_BioRegrowth = { Shape = "Mend", Heal = 0.3, Duration = 6 },
 	R_ToxicMantle = { Shape = "Ward", Reduce = 0.1, Duration = 5, Aura = { Radius = 5, Mult = 0.2, Status = "Poison" } },
 }
+-- The roles' own moves (Shared.KaijuRoles: a tank's, a warrior's, a
+-- shooter's, an assassin's), cast the same way.
+for id, move in KaijuRoles.Moves do
+	Kaiju.AbilityPlans[id] = move.Plan
+end
 
 -- How big they stand in the world (KaijuModels are about four studs tall at
 -- 1): yours at your knee, a wild one near your height, the vein guardian
@@ -986,7 +993,11 @@ function Kaiju.abilityDamage(damage: number, gem, abilityId: string?): number
 	local plan = abilityId and Kaiju.AbilityPlans[abilityId]
 	local size = (math.clamp((gem and gem.Size) or 1, 1, 10) - 1) / 9
 	local key = abilityId and string.sub(abilityId, 1, 2)
-	local power = if key == "Q_" then Kaiju.QPower elseif key == "R_" then Kaiju.RPower else Kaiju.AbilityPower
+	local power = if plan and plan.Power
+		then plan.Power
+		elseif key == "Q_" then Kaiju.QPower
+		elseif key == "R_" then Kaiju.RPower
+		else Kaiju.AbilityPower
 	return damage * power * GemTraits.output(gem) * (1 + 0.2 * size) * (plan and plan.Mult or 1)
 end
 
@@ -1031,6 +1042,40 @@ end
 function Kaiju.move(gem, key: string, level: number?): (string?, boolean)
 	local id = if Kaiju.isSoul(gem) then GemTraits.traitFor(gem, key) else nil
 	return id, id ~= nil and (level or 1) >= (Kaiju.MoveLevels[key] or math.huge)
+end
+
+-- A move's name, description and icon: a role's own (Shared.KaijuRoles)
+-- or a gem's (GemTraits.Moves).
+function Kaiju.moveInfo(id: string?)
+	if not id then
+		return nil
+	end
+	return KaijuRoles.Moves[id] or GemTraits.Moves[id]
+end
+
+-- A kaiju's own moves: its role's (Shared.KaijuRoles: a tank's, a
+-- warrior's, a shooter's, an assassin's), E from the start, Q from level 5,
+-- R from level 10. (Its Gemsoul's moves, Kaiju.move, are the gem's: for
+-- whoever sockets it.)
+function Kaiju.kitMove(speciesId: string?, key: string, level: number?): (string?, boolean)
+	return KaijuRoles.move(speciesId, key, level)
+end
+
+-- Its own moves awake at `level`: { Q, E, R } (nil while asleep).
+function Kaiju.kitMoves(speciesId: string?, level: number?): { [string]: string }
+	local out = {}
+	for _, key in { "Q", "E", "R" } do
+		local id, awake = KaijuRoles.move(speciesId, key, level)
+		if awake then
+			out[key] = id
+		end
+	end
+	return out
+end
+
+-- Its role (Shared.KaijuRoles.Roles: Name, Blurb).
+function Kaiju.role(speciesId: string?)
+	return KaijuRoles.Roles[KaijuRoles.of(speciesId)]
 end
 
 -- Its moves awake at `level`: { Q, E, R } (nil while asleep).

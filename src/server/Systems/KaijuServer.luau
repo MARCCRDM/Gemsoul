@@ -75,13 +75,14 @@
 
 	A kaiju battle (KaijuBattles) sets KaijuServer.battle(pet, now) -> what
 	a pet of one in a battle does: { Spot, Look } to stand at its place in
-	the formation, or { Foe, Flank, Foes } to fight the other side's kaiju
-	(a blow or a move on another's pet lands through KaijuServer.hurt); nil
-	for one not in a battle. KaijuServer.battling(player) says when a
-	player's in one: their team can't be changed or recalled meanwhile. On
-	a court of the Kaiju Arena the orders carry its Bounds (Shared.KaijuPit):
-	a kaiju that strays past its rails is walked back in, or put back if
-	it's well out.
+	the formation, or { Fighting, Foes, Allies, Bounds } to fight the other
+	side's kaiju by its role (Server.KaijuBattleBrain: a blow or a move on
+	another's pet lands through KaijuServer.hurt); nil for one not in a
+	battle. KaijuServer.battling(player) says when a player's in one: their
+	team can't be changed or recalled meanwhile. The Bounds (a court of the
+	Kaiju Arena, Shared.KaijuPit, or a court's size round the field) keep
+	it in: it never walks past them, and one that's well out (a shove) is
+	put back.
 
 	A battle is fought at full health and leaves every kaiju as it was:
 	  KaijuServer.battleStart(player)        each of the team's health kept on
@@ -105,13 +106,13 @@ local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
-local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
-local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local Squad = require(ReplicatedStorage.Shared.Squad)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
 local KaijuAbilities = require(script.Parent.KaijuAbilities)
+local KaijuBattleBrain = require(script.Parent.KaijuBattleBrain)
 local KaijuFighter = require(script.Parent.KaijuFighter)
+local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
@@ -294,8 +295,8 @@ local function refresh(pet: Pet)
 	h.Health = math.max(1, math.floor(stats.Health * share + 0.5))
 	keepHealth(pet)
 	local model = pet.Model
-	-- Its Q and R wake as it levels (Kaiju.MoveLevels).
-	local moves = Kaiju.moves(record.Soul, record.Level)
+	-- Its Q and R wake as it levels (its role's moves: Kaiju.kitMoves).
+	local moves = Kaiju.kitMoves(record.Species, record.Level)
 	KaijuFighter.setMoves(pet.Fighter, moves)
 	model:SetAttribute("KaijuQ", moves.Q)
 	model:SetAttribute("KaijuR", moves.R)
@@ -356,7 +357,7 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 	model:SetAttribute("KaijuId", record.Id)
 	model:SetAttribute("KaijuSlot", slot)
 	model:SetAttribute("KaijuName", Kaiju.title(record))
-	local ability = Kaiju.ability(record.Soul)
+	local ability = Kaiju.kitMoves(record.Species, record.Level).E
 	model:SetAttribute("KaijuAbility", ability)
 	local pet: Pet = {
 		Owner = player,
@@ -392,7 +393,7 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		Body = pet,
 		Stats = pet.Stats,
 		Ability = ability,
-		Moves = Kaiju.moves(record.Soul, record.Level),
+		Moves = Kaiju.kitMoves(record.Species, record.Level),
 		Strike = function(foe, amount: number, heavy: boolean, _name: string): string
 			if foe.Enemy then
 				return KaijuServer.strike(pet, foe.Enemy, amount, nil, heavy)
@@ -753,6 +754,43 @@ function KaijuServer.caster(pet: Pet)
 		Alive = function(): boolean
 			return pet.Model.Parent ~= nil and pet.Humanoid.Health > 0
 		end,
+		-- A role's moves (Shared.KaijuRoles).
+		Taunt = function(victim, seconds: number)
+			if victim.Pet then
+				victim.Pet.TauntBy, victim.Pet.TauntUntil = pet, os.clock() + seconds
+			end
+		end,
+		Rally = function(plan)
+			pet.RallyUntil = os.clock() + (plan.Duration or 5)
+			pet.RallyDamage, pet.RallyHaste = plan.Damage or 1, plan.Haste or 1
+		end,
+		Pick = function(kind: string)
+			-- (Their weakest, in a battle.)
+			local battle = KaijuServer.battle(pet, os.clock())
+			local best, least = nil, math.huge
+			for _, other in (battle and battle.Foes) or {} do
+				if kind == "Weakest" and other.Humanoid.Health < least then
+					best, least = other, other.Humanoid.Health
+				end
+			end
+			return if best then { Root = best.Root, Pet = best } else nil
+		end,
+		Leap = function(victim): Vector3?
+			-- Behind its foe (the far side from where it leapt), inside the court.
+			local at = victim.Root.Position
+			local away = flat(at - pet.Root.Position)
+			away = if away.Magnitude > 0.1 then away.Unit else Vector3.new(0, 0, 1)
+			local battle = KaijuServer.battle(pet, os.clock())
+			local spot = KaijuRoles.clamp(battle and battle.Bounds, at + away * 2.2)
+			KaijuServer.place(pet.Model, spot, at)
+			return spot
+		end,
+		Hop = function(direction: Vector3, studs: number): Vector3?
+			local battle = KaijuServer.battle(pet, os.clock())
+			local spot = KaijuRoles.clamp(battle and battle.Bounds, pet.Root.Position + direction * studs)
+			KaijuServer.place(pet.Model, spot, spot + direction)
+			return spot
+		end,
 	}
 end
 
@@ -1096,17 +1134,17 @@ local function think(pet: Pet, now: number, _dt: number)
 		settle(pet)
 		pet.IdleSpot = nil
 		local fighter = pet.Fighter
-		if battle.Foe then
+		if battle.Fighting then
+			-- By its role, as an auto battler's piece (KaijuBattleBrain).
 			pet.LastFight = now
-			fighter.Flank, fighter.Apart = battle.Flank, spacing(pet)
-			KaijuFighter.step(fighter, { Root = battle.Foe.Root, Pet = battle.Foe }, now)
-			-- (On a court: kept inside its rails.)
-			local court = battle.Bounds
-			if court and not KaijuPit.inCourt(court, pet.Root.Position, -KaijuPit.Court.Inset) then
-				local inside = KaijuPit.clamp(court, pet.Root.Position)
-				if KaijuPit.inCourt(court, pet.Root.Position, 3) then
-					h:MoveTo(inside)
-				else
+			KaijuFighter.calm(fighter)
+			KaijuBattleBrain.step(pet, battle, now, KaijuServer)
+			-- (Well out of bounds somehow, a shove or a fall: put back in.)
+			local bounds = battle.Bounds
+			if bounds and pet.Model.Parent then
+				local at = pet.Root.Position
+				local inside = KaijuRoles.clamp(bounds, at)
+				if flat(inside - at).Magnitude > 3 then
 					KaijuServer.place(pet.Model, inside, inside + (battle.Look or Vector3.new(0, 0, -1)))
 				end
 			end
@@ -1125,6 +1163,9 @@ local function think(pet: Pet, now: number, _dt: number)
 			end
 		end
 		return
+	end
+	if pet.Brain then
+		KaijuBattleBrain.reset(pet) -- (just out of a battle)
 	end
 	local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
 	-- In a fight it sees it through, however far you've walked off to mine
@@ -1238,10 +1279,10 @@ end
 -- Tidal Crush, awakens."), or more health and damage.
 local function awoken(record, gained: number): string
 	for _, key in { "Q", "E", "R" } do
-		local move, awake = Kaiju.move(record.Soul, key, record.Level)
-		local _, before = Kaiju.move(record.Soul, key, record.Level - gained)
+		local move, awake = Kaiju.kitMove(record.Species, key, record.Level)
+		local _, before = Kaiju.kitMove(record.Species, key, record.Level - gained)
 		if awake and not before and move then
-			local info = GemTraits.Moves[move]
+			local info = Kaiju.moveInfo(move)
 			return string.format("Its %s move, %s, awakens.", key, if info and info.Name then info.Name else move)
 		end
 	end

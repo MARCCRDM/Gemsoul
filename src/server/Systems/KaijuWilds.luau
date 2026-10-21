@@ -1999,8 +1999,9 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 	e.Soak = function(amount: number): number
 		return KaijuAbilities.soak(enemy, amount)
 	end
-	local ability = Kaiju.ability(soul)
-	local moves = Kaiju.moves(soul, level)
+	-- (Its own moves: its role's, Kaiju.kitMoves.)
+	local moves = Kaiju.kitMoves(species, level)
+	local ability = moves.E
 	model:SetAttribute("KaijuWild", true)
 	model:SetAttribute("KaijuLevel", level)
 	model:SetAttribute("KaijuAbility", ability)

@@ -672,8 +672,9 @@ for id, plan in Kaiju.AbilityPlans do
 	check(KaijuAbilities.cast(caster, foe), id .. " didn't cast")
 	flush()
 	check(#fxs > 0, id .. " drew nothing")
-	-- An R that guards it: a shell or a ward on it, or its health back.
-	local guards = plan.Shape == "Shell" or plan.Shape == "Ward" or plan.Shape == "Mend"
+	-- An R that guards it: a shell or a ward on it, or its health back. (A
+	-- warrior's War Cry, Rally, lifts it instead: it hits nothing.)
+	local guards = plan.Shape == "Shell" or plan.Shape == "Ward" or plan.Shape == "Mend" or plan.Shape == "Rally"
 	if plan.Shape == "Mend" then
 		check(math.abs(humanoid.Health - (50 + 200 * plan.Heal)) < 1e-6, id .. " didn't heal its share")
 	elseif guards then
@@ -693,8 +694,10 @@ for id, plan in Kaiju.AbilityPlans do
 	if plan.Shape == "Blast" or plan.Shape == "Nova" or plan.Shape == "Line" or plan.Shape == "Field" then
 		check((dealt.beside or 0) > 0, id .. " (an area) missed the foe beside")
 	end
-	if plan.Status and plan.Shape ~= "Storm" then
-		check(statuses[plan.Status], id .. " didn't leave " .. plan.Status)
+	-- ("Element": its element's own, a Fire caster's Burn.)
+	local leaves = if plan.Status == "Element" then "Burn" else plan.Status
+	if leaves and plan.Shape ~= "Storm" then
+		check(statuses[leaves], id .. " didn't leave " .. leaves)
 	end
 	local extra = plan.Aura or plan.Burst
 	if extra and extra.Status then
@@ -707,7 +710,10 @@ for id, plan in Kaiju.AbilityPlans do
 		end
 		check(shown, id .. " didn't draw its own look")
 	end
-	local at = ({ Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" })[string.sub(id, 1, 1)]
+	local roleMove = shared("KaijuRoles").Moves[id]
+	local at = ({ Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" })[if roleMove
+		then roleMove.Key
+		else string.sub(id, 1, 1)]
 	check(caster.Model:GetAttribute(at) == now, id .. ": no cast time for the HUD")
 end
 check(
@@ -1529,7 +1535,7 @@ KaijuFighter.step(fighter, wildFoe, now)
 local plan = Kaiju.AbilityPlans[pet.Ability]
 check(fighter.Action and fighter.Action.Kind == "Surge", "No E from range: " .. tostring(fighter.Choice))
 check(pet.Model:GetAttribute("ActionKind") == KaijuFight.surgeKind(plan), "Its E's wind-up")
-check(pet.Model:GetAttribute("ActionName") == shared("GemTraits").Moves[pet.Ability].Name, "Its E isn't named")
+check(pet.Model:GetAttribute("ActionName") == Kaiju.moveInfo(pet.Ability).Name, "Its E isn't named")
 check(pet.Model:GetAttribute("ActionElement") == pet.Element, "Its E's cast bar isn't its element")
 now += 1.2
 KaijuFighter.step(fighter, wildFoe, now)
@@ -1537,15 +1543,14 @@ flush()
 check(pet.Model:GetAttribute("KaijuAbilityAt") == now and fighter.NextSurge == now + Kaiju.AbilityEvery, "No E")
 fightRoll = nil
 
--- Its Q and R, from the same Gemsoul: asleep while it's young (Q wakes at
--- level 5, R at 10), on the model for every client when awake.
-local Traits = shared("GemTraits")
-local soulQ, soulR = Kaiju.move(pet.Record.Soul, "Q"), Kaiju.move(pet.Record.Soul, "R")
-local young = Kaiju.moves(pet.Record.Soul, pet.Record.Level)
+-- Its Q and R, its role's own (Shared.KaijuRoles): asleep while it's young
+-- (Q wakes at level 5, R at 10), on the model for every client when awake.
+local soulQ, soulR = Kaiju.kitMove(pet.Record.Species, "Q"), Kaiju.kitMove(pet.Record.Species, "R")
+local young = Kaiju.kitMoves(pet.Record.Species, pet.Record.Level)
 check(fighter.Moves.Q == young.Q and fighter.Moves.R == young.R, "Its moves don't follow its level")
 check(pet.Model:GetAttribute("KaijuQ") == young.Q and pet.Model:GetAttribute("KaijuR") == young.R, "Its moves aren't on the model")
-check(wf.Moves.Q == Kaiju.moves(wild.Soul, wild.Level).Q, "A wild one's moves don't follow its level")
-KaijuFighter.setMoves(fighter, Kaiju.moves(pet.Record.Soul, 10))
+check(wf.Moves.Q == Kaiju.kitMoves(wild.Species, wild.Level).Q, "A wild one's moves don't follow its level")
+KaijuFighter.setMoves(fighter, Kaiju.kitMoves(pet.Record.Species, 10))
 check(fighter.Moves.Q == soulQ and fighter.Moves.R == soulR, "Level 10 didn't wake Q and R")
 -- Q: in place of a blow when it's ready, named on its cast bar.
 now += 5
@@ -1560,7 +1565,7 @@ check(
 	fighter.Choice == "Q" and fighter.Action and fighter.Action.Kind == "Move" and fighter.Action.Id == soulQ,
 	"No Q in place of a blow: " .. tostring(fighter.Choice)
 )
-check(pet.Model:GetAttribute("ActionName") == Traits.Moves[soulQ].Name, "Its Q isn't named on the cast bar")
+check(pet.Model:GetAttribute("ActionName") == Kaiju.moveInfo(soulQ).Name, "Its Q isn't named on the cast bar")
 check(fighter.NextQ == now + Kaiju.QEvery, "Its Q's wait didn't start")
 now += 1
 KaijuFighter.step(fighter, wildFoe, now)

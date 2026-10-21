@@ -59,7 +59,6 @@ local Brain = require(ReplicatedStorage.Shared.DuelistBrain)
 local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
-local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local Squad = require(ReplicatedStorage.Shared.Squad)
 local KaijuAbilities = require(script.Parent.KaijuAbilities)
 
@@ -473,7 +472,7 @@ local function move(f, key: string, id: string, foe, now: number)
 	local plan = Kaiju.AbilityPlans[id]
 	local kind = KaijuFight.surgeKind(plan)
 	local seconds = if key == "R" then R_WINDUP else Brain.Windup[kind] * 0.7
-	local named = GemTraits.Moves[id]
+	local named = Kaiju.moveInfo(id)
 	lower(f, now)
 	if key == "Q" then
 		f.LastOffense = now
@@ -626,7 +625,7 @@ function KaijuFighter.step(f, foe, now: number)
 			local plan = Kaiju.AbilityPlans[f.Ability]
 			local kind = KaijuFight.surgeKind(plan)
 			local seconds = Brain.Windup[kind]
-			local move = GemTraits.Moves[f.Ability]
+			local move = Kaiju.moveInfo(f.Ability)
 			lower(f, now)
 			f.LastOffense = now
 			f.Action = { Kind = "Surge", At = now + seconds }

@@ -36,8 +36,9 @@
 
 	Players in one carry the KaijuBattle attribute (its Id). Their kaiju
 	do as KaijuServer.battle says: stand at their places through the
-	formation phase, then fight the other side's (each side's shared out
-	over the other's, Shared.Squad). A battle ends when one side's kaiju
+	formation phase, then fight the other side's by their roles, as an
+	auto battler's pieces (Server.KaijuBattleBrain, Shared.KaijuRoles). A
+	battle ends when one side's kaiju
 	are all down, when time's up, or when one of the two leaves the
 	Outpost, walks off past KaijuBattle.Leash, or leaves the game (the
 	other wins). It's fought at full health and leaves every kaiju as it
@@ -66,8 +67,8 @@ local RunService = game:GetService("RunService")
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuBattle = require(ReplicatedStorage.Shared.KaijuBattle)
 local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
+local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
 local Spar = require(ReplicatedStorage.Shared.Spar)
-local Squad = require(ReplicatedStorage.Shared.Squad)
 local KaijuServer = require(script.Parent.KaijuServer)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
@@ -90,9 +91,7 @@ type Battle = {
 	Ready: { [Player]: boolean },
 	Brought: { [Player]: { [string]: number } }, -- kaiju id -> its MaxHealth
 	Names: { [Player]: { [string]: string } },
-	PlanAt: number?,
-	Plan: { [any]: any },
-	Flanks: { [any]: Vector3 },
+	Bounds: any, -- what its kaiju keep inside (Shared.KaijuRoles.clamp)
 	Result: { [Player]: string }?,
 	Court: any?, -- the Kaiju Arena's court it's on (Shared.KaijuPit)
 	Pot: any?, -- { Stake, Held }: what each put in (Server.KaijuPitServer)
@@ -310,10 +309,10 @@ local function begin(a: Player, b: Player, court: any?, pot: any?): Battle?
 		Ready = {},
 		Brought = {},
 		Names = {},
-		Plan = {},
-		Flanks = {},
 		Rematch = {},
 	}
+	-- What its kaiju keep inside: the court, or a court's size round the field.
+	battle.Bounds = court or KaijuRoles.fieldBounds(battle.Field, KaijuPit.Court.HalfLength, KaijuPit.Court.HalfWidth)
 	for _, player in { a, b } do
 		battleOf[player] = battle
 		player:SetAttribute("KaijuBattle", battle.Id)
@@ -427,43 +426,11 @@ end
 
 -- The battle --------------------------------------------------------------------------------------------
 
--- Each side's kaiju shared out over the other's (Shared.Squad): the one
--- it's on kept unless another's well nearer; where two share one, the side
--- of it each fights from.
-local function plan(battle: Battle, now: number)
-	battle.PlanAt = now
-	table.clear(battle.Plan)
-	table.clear(battle.Flanks)
-	for _, player in { battle.A, battle.B } do
-		local fighters, foes = petsIn(battle, player), petsIn(battle, foeOf(battle, player))
-		local targets = Squad.assign(fighters, foes, function(pet, foe)
-			local before = battle.Plan[pet]
-			return Squad.cost((foe.Root.Position - pet.Root.Position).Magnitude, before == foe, false)
-		end)
-		local groups = {}
-		for _, pet in fighters do
-			local foe = targets[pet]
-			battle.Plan[pet] = foe
-			if foe then
-				groups[foe] = groups[foe] or {}
-				table.insert(groups[foe], pet)
-			end
-		end
-		for foe, group in groups do
-			if #group > 1 then
-				local spots = {}
-				for i, pet in group do
-					spots[i] = pet.Root.Position
-				end
-				for i, dir in Squad.slots(foe.Root.Position, spots) do
-					battle.Flanks[group[i]] = dir
-				end
-			end
-		end
-	end
-end
-
--- What a pet in a battle does (KaijuServer.battle).
+-- What a pet in a battle does (KaijuServer.battle): in the formation
+-- phase, stand at its place; then fight by its role (Server.
+-- KaijuBattleBrain): its side's and the other side's kaiju still up, and
+-- the court (or a court's size round the field) to keep inside. Foe: the
+-- one it's on (or, before it's picked one, the nearest).
 local function orders(pet, now: number)
 	local battle = battleOf[pet.Owner]
 	if not battle or battle.Phase == "Over" or not battle.Brought[pet.Owner][pet.Record.Id] then
@@ -477,16 +444,26 @@ local function orders(pet, now: number)
 	if battle.Phase == "Formation" then
 		return { Spot = spot, Look = look }
 	end
-	if battle.PlanAt ~= now then
-		plan(battle, now)
+	local foes = petsIn(battle, foeOf(battle, player))
+	local foe = pet.Brain and pet.Brain.Target
+	if not foe or not table.find(foes, foe) then
+		local best = math.huge
+		foe = nil
+		for _, other in foes do
+			local d = (other.Root.Position - pet.Root.Position).Magnitude
+			if d < best then
+				foe, best = other, d
+			end
+		end
 	end
 	return {
-		Foe = battle.Plan[pet],
-		Flank = battle.Flanks[pet],
-		Foes = petsIn(battle, foeOf(battle, player)),
+		Fighting = true,
+		Foe = foe,
+		Foes = foes,
+		Allies = petsIn(battle, player),
 		Spot = spot,
 		Look = look,
-		Bounds = battle.Court,
+		Bounds = battle.Bounds,
 	}
 end
 

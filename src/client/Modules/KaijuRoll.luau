@@ -28,7 +28,6 @@ local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
-local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local CardFX = require(script.Parent.ElementCardFX)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -189,7 +188,7 @@ local function pose(staged, angle: number, lift: number?)
 end
 
 local function moveName(id: string?): string
-	local move = id and GemTraits.Moves[id]
+	local move = Kaiju.moveInfo(id)
 	return if move then move.Name else "?"
 end
 
@@ -549,7 +548,7 @@ function KaijuRoll.play(after: (() -> ())?)
 		UiKit.round(flash, ROUND)
 
 		-- Its E move's badge, rising out of it once it's down.
-		local eMove = GemTraits.Moves[Kaiju.move(soul, "E", Kaiju.StarterLevel) or ""]
+		local eMove = Kaiju.moveInfo((Kaiju.kitMove(entry.Species, "E", Kaiju.StarterLevel)))
 		local badge = frame(card, {
 			Name = "MoveBadge",
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -627,7 +626,7 @@ function KaijuRoll.play(after: (() -> ())?)
 			word.Position, word.Size, word.ZIndex = UDim2.fromOffset(38, 0), UDim2.new(1, -96, 1, 0), 46
 		end
 		for order, key in { "E", "Q", "R" } do
-			local id, awake = Kaiju.move(soul, key, Kaiju.StarterLevel)
+			local id, awake = Kaiju.kitMove(entry.Species, key, Kaiju.StarterLevel)
 			local row = frame(moves, {
 				Name = "Move" .. key,
 				LayoutOrder = order,
@@ -644,7 +643,7 @@ function KaijuRoll.play(after: (() -> ())?)
 				ZIndex = 46,
 			})
 			UiKit.round(chip, 4)
-			local move = id and GemTraits.Moves[id]
+			local move = Kaiju.moveInfo(id)
 			local fine, iconed = pcall(SurgeIcons.apply, chip, move, color)
 			if fine and iconed then
 				pcall(SurgeIcons.dim, chip, not awake)

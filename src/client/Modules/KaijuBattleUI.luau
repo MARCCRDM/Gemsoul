@@ -39,6 +39,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local KaijuBattle = require(ReplicatedStorage.Shared.KaijuBattle)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
+local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local KaijuBattleCam = require(script.Parent.KaijuBattleCam)
@@ -61,8 +62,12 @@ end
 local function otherSide(side: string?): string
 	return if side == "B" then "A" else "B"
 end
--- What each kind does in a formation (Shared.KaijuBattle.FrontKinds).
-local ROLES = { Bulwark = "FRONT LINE", Razorback = "SHOOTER", Carapace = "FRONT LINE" }
+-- What each kind is in a battle (Shared.KaijuRoles: TANK, WARRIOR, RANGED,
+-- ASSASSIN).
+local function roleName(species: string?): string
+	local role = KaijuRoles.Roles[KaijuRoles.of(species)]
+	return if role then role.Name else ""
+end
 local CELL_NAMES = {
 	FrontLeft = "FRONT LEFT",
 	FrontCentre = "FRONT MIDDLE",
@@ -756,7 +761,7 @@ local function drawBoard(state)
 			card.Stroke.Thickness = if picked == unit.Id then 3 else 1.2
 			card.Name.Text = unit.Name
 			local level = levelOf(unit)
-			card.Info.Text = (if level then "Lv " .. level .. "  ·  " else "") .. (ROLES[unit.Species] or "")
+			card.Info.Text = (if level then "Lv " .. level .. "  ·  " else "") .. roleName(unit.Species)
 			local share = healthOf(unit)
 			card.Fill.Size = UDim2.fromScale(share, 1)
 			card.Fill.BackgroundColor3 = if share > 0.5 then P.Good elseif share > 0.25 then P.Gold else P.Bad
@@ -793,7 +798,7 @@ local function drawBoard(state)
 	hint.Text = if theirsReady and not mineReady
 		then "Your foe is ready. Press READY to start now."
 		elseif picked then "Now tap a spot for it."
-		else "Drag a kaiju onto a spot, or tap it, then a spot. The front row takes the blows; a Razorback shoots from the back."
+		else "Drag a kaiju onto a spot, or tap it, then a spot. Tanks and warriors in front take the blows; ranged ones shoot from the back."
 end
 
 -- Moving one: `id` to `cellId` (onto another, they swap); the server told.

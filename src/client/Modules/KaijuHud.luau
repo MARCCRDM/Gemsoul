@@ -71,7 +71,6 @@ local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
-local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local Store = require(ReplicatedStorage.Shared.Store)
 local GemArt = require(script.Parent.GemArt)
@@ -572,7 +571,7 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 	-- Q, E and R: lit when ready, faint while recharging, hollow asleep.
 	local now = workspace:GetServerTimeNow()
 	for key, dot in tile.Dots do
-		local _, awake = Kaiju.move(record.Soul, key, level)
+		local _, awake = Kaiju.kitMove(record.Species, key, level)
 		local at = model and model:GetAttribute(CAST_AT[key])
 		local ready = awake and model ~= nil and (type(at) ~= "number" or now - at >= KEY_EVERY[key])
 		dot.Frame.BackgroundColor3, dot.Stroke.Color = color, color
@@ -909,7 +908,7 @@ for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" } } do
 end
 
 local function moveName(id: string?): string
-	local move = id and GemTraits.Moves[id]
+	local move = Kaiju.moveInfo(id)
 	return if move then move.Name else "?"
 end
 
@@ -1291,8 +1290,9 @@ local function drawDetail(data, record, team: { string })
 		else string.format("EXP %d / %d", record.Exp or 0, need)
 	expFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
 	for key, row in moveRows do
-		local id, awake = Kaiju.move(soul, key, record.Level)
-		local move = id and GemTraits.Moves[id]
+		-- (Its own moves: its role's, Kaiju.kitMove.)
+		local id, awake = Kaiju.kitMove(record.Species, key, record.Level)
+		local move = Kaiju.moveInfo(id)
 		row.Name.Text = moveName(id)
 		row.Name.TextColor3 = if awake then P.Text else P.Dim
 		row.About.Text = move and move.Description or ""

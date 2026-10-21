@@ -23,6 +23,13 @@
 	    Foes(center, radius)  its foes inside a circle -> { victim }
 	    Hit(victim, amount, status?)   a hit landing on one of them
 	    Alive()               still able to finish a delayed cast
+	    (A role's moves, Shared.KaijuRoles; each optional, the move doing
+	    what it can without:)
+	    Taunt(victim, seconds)   makes a foe attack it
+	    Rally(plan)           its War Cry: harder, faster blows for a while
+	    Pick(kind)            a foe to leap on ("Weakest") -> victim?
+	    Leap(victim)          puts it behind a foe -> where it landed
+	    Hop(direction, studs) a vault back -> where it landed
 	  }
 	  victim = { Root: BasePart, ... } (anything the caster's Hit understands)
 	  aim = its foe's victim (where Bolts, Blasts and Lines go)
@@ -39,6 +46,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 
 local KaijuAbilities = {}
@@ -250,8 +258,13 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 	local at = aim.Root.Position
 	local damage = if caster.DamageOf then caster.DamageOf(id) else caster.Damage
 	local status = plan.Status
+	if status == "Element" then
+		status = KaijuRoles.ElementStatus[caster.Element]
+	end
 	local model = caster.Model
-	local key = string.sub(id :: string, 1, 1)
+	-- (A role's move says its key; a gem's starts with it.)
+	local role = KaijuRoles.Moves[id :: string]
+	local key = if role then role.Key else string.sub(id :: string, 1, 1)
 	caster.Model:SetAttribute(CAST_AT[key] or CAST_AT.E, workspace:GetServerTimeNow())
 
 	if plan.Shape == "Shell" or plan.Shape == "Ward" or plan.Shape == "Mend" then
@@ -394,6 +407,96 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 				if nearest then
 					fx("Arc", center + Vector3.new(0, 4 * size, 0), nearest.Root.Position, color)
 					caster.Hit(nearest, damage / ticks, nil)
+				end
+			end)
+		end
+	elseif plan.Shape == "Taunt" then
+		-- A tank's roar: the foes round it turn on it, and it braces.
+		local radius, seconds = (plan.Radius or 9) * size, plan.Duration or 3
+		fx("TriadRing", caster.Root, radius, 0.6, caster.Element)
+		each(caster, from, radius, function(victim)
+			if caster.Taunt then
+				caster.Taunt(victim, seconds)
+			end
+			caster.Hit(victim, damage, status)
+		end)
+		local body = caster.Body
+		if body and plan.Reduce then
+			local d = { Until = KaijuAbilities.clock() + seconds, Reduce = plan.Reduce, Break = function() end }
+			body.Defense = d
+			fx("TriadAura", caster.Root, id, caster.Element, "Armor", seconds)
+			KaijuAbilities.after(seconds, function()
+				if body.Defense == d then
+					body.Defense = nil
+				end
+			end)
+		end
+	elseif plan.Shape == "Rally" then
+		-- A warrior's cry: harder, faster blows for a while, and a little health.
+		local h = caster.Humanoid
+		if caster.Rally then
+			caster.Rally(plan)
+		end
+		if h and plan.Heal then
+			h.Health = math.min(h.MaxHealth, h.Health + h.MaxHealth * plan.Heal)
+		end
+		fx("Nova", from, 5 * size, color, 0)
+		fx("TriadAura", caster.Root, id, caster.Element, "Heal", plan.Duration or 5)
+	elseif plan.Shape == "Leap" or plan.Shape == "Vanish" then
+		-- An assassin's leap behind a foe (its weakest, given a Pick), then a
+		-- strike; vanishing first, it can't be hurt for a moment.
+		local victim = (plan.Pick and caster.Pick and caster.Pick(plan.Pick)) or aim
+		if plan.Shape == "Vanish" and caster.Body then
+			local seconds = plan.Duration or 1.5
+			local d = { Until = KaijuAbilities.clock() + seconds, Reduce = 1, Break = function() end }
+			caster.Body.Defense = d
+			fx("TriadBreak", from, 3 * size, caster.Element)
+			KaijuAbilities.after(seconds, function()
+				if caster.Body.Defense == d then
+					caster.Body.Defense = nil
+				end
+			end)
+		end
+		local landed = if caster.Leap then caster.Leap(victim) else nil
+		if landed then
+			fx("DodgeRoll", nil, from, flat(landed - from).Unit, flat(landed - from).Magnitude, false)
+		end
+		KaijuAbilities.after(0.15, function()
+			if caster.Alive() and victim.Root.Parent then
+				local here = caster.Root.Position
+				fx("Swing", nil, here, flat(victim.Root.Position - here).Unit, 4 * size, 140, color, true)
+				caster.Hit(victim, damage, status)
+			end
+		end)
+	elseif plan.Shape == "Flurry" then
+		-- Quick rakes on its foe, the last leaving its mark.
+		local hits = plan.Hits or 3
+		for i = 1, hits do
+			KaijuAbilities.after(0.15 * (i - 1), function()
+				if caster.Alive() and aim.Root.Parent then
+					local here = caster.Root.Position
+					fx("Swing", nil, here, flat(aim.Root.Position - here).Unit, 3.5 * size, 90, color, i == hits)
+					caster.Hit(aim, damage / hits, if i == hits then status else nil)
+				end
+			end)
+		end
+	elseif plan.Shape == "Vault" then
+		-- A shooter's vault back from its foe, a slowing patch left where it stood.
+		local away = flat(from - at)
+		away = if away.Magnitude > 0.1 then away.Unit else -flat(caster.Root.CFrame.LookVector).Unit
+		local landed = if caster.Hop then caster.Hop(away, (plan.Distance or 8) * size) else nil
+		if landed then
+			fx("DodgeRoll", nil, from, away, flat(landed - from).Magnitude, true)
+		end
+		local radius, duration = (plan.Radius or 5) * size, plan.Duration or 3
+		fx("Zone", from, radius, duration, color)
+		local ticks = math.max(1, math.floor(duration / 0.5))
+		for i = 1, ticks do
+			KaijuAbilities.after(i * 0.5, function()
+				if caster.Alive() then
+					each(caster, from, radius, function(victim)
+						caster.Hit(victim, damage / ticks, status)
+					end)
 				end
 			end)
 		end
