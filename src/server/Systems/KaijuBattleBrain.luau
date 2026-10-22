@@ -183,7 +183,7 @@ local function windupMove(pet, brain, key: string, id: string, foe, now: number)
 	local plan = Kaiju.AbilityPlans[id]
 	local seconds = MOVE_WINDUP[key] or 0.4
 	brain.Action = { Kind = "Move", Key = key, Id = id, Foe = foe, At = now + seconds }
-	animate(pet, POSE[plan and plan.Shape or ""] or "Bolt", seconds, if move then move.Name else key)
+	animate(pet, (plan and plan.Pose) or POSE[plan and plan.Shape or ""] or "Bolt", seconds, if move then move.Name else key)
 	walk(pet, brain, nil)
 	if foe then
 		face(pet, foe.Root.Position)

@@ -99,10 +99,11 @@ check(Fight.blow(bulwark, "Lunge") > 1, "A pounce lands no harder")
 
 -- Reach: its kind's, at its size.
 check(math.abs(Fight.reach(6, 0.55) - 3.3) < 1e-9, "Reach isn't scaled to its size")
--- E wind-ups: a ring round itself is a Nova (time to get out), anything else a Bolt.
+-- Anatomical poses override the default ring/bolt cast without losing a valid wind-up.
 for id, plan in Kaiju.AbilityPlans do
 	local kind = Fight.surgeKind(plan)
-	check(kind == (if plan.Shape == "Nova" then "Nova" else "Bolt"), id .. " winds up as " .. kind)
+	check(kind == (plan.Pose or (if plan.Shape == "Nova" then "Nova" else "Bolt")), id .. " winds up as " .. kind)
+	check(Brain.Windup[kind] ~= nil, id .. " has no wind-up timing")
 end
 
 -- Guard and parry ------------------------------------------------------------------------------------

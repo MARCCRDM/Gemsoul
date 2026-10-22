@@ -20,8 +20,12 @@
 	  Voice                      the first-four kind whose roar it borrows
 	                             (CombatSound)
 
+	Move IDs remain stable when a name or plan changes (saved Gemsouls use them).
 	Moves: as KaijuRoles.Moves has them (Name, Key, From, IconSource,
 	Description and Plan, Server.KaijuAbilities' shapes; an R's When).
+	Origin names the model part a visual starts from; Projectiles makes a Storm
+	fire from its body instead of the sky. Reach bounds each melee hit; Pose
+	chooses the anatomical wind-up.
 	Two flags those shapes take for these kinds: Heal (any shape: it heals
 	this share of its own health as it casts) and Team (a Ward or a Mend:
 	on every ally near it too, Radius studs).
@@ -209,7 +213,7 @@ Roster.Kinds = {
 	Emberjaw = {
 		Name = "Emberjaw",
 		Role = "Warrior",
-		Blurb = "A warrior: an upright reptile king with fins down its back. Its breath burns down a line.",
+		Blurb = "A warrior: a heavy reptile with dorsal fins and a sweeping tail. Its breath carries its gem element.",
 		Health = 250,
 		Damage = 21,
 		Rate = 1.6,
@@ -307,7 +311,7 @@ Roster.Kinds = {
 	Drillhorn = {
 		Name = "Drillhorn",
 		Role = "Warrior",
-		Blurb = "A warrior: a beetle on two legs with drills for arms. It dives point first onto its foe.",
+		Blurb = "A warrior: an armored beetle with drill arms and a horn. It dives in, cracks defenses with paired drill strikes and braces its chitin.",
 		Health = 245,
 		Damage = 22,
 		Rate = 1.6,
@@ -380,7 +384,7 @@ Roster.Kinds = {
 	Stormwing = {
 		Name = "Stormwing",
 		Role = "Ranged",
-		Blurb = "Ranged: a crested pterosaur that fights from the air and wheels away after every dive.",
+		Blurb = "Ranged: a crested flyer that sends cutting gusts down a lane and uses its wings to retreat.",
 		Health = 180,
 		Damage = 12,
 		Rate = 0.8,
@@ -430,7 +434,7 @@ Roster.Kinds = {
 	Starspine = {
 		Name = "Starspine",
 		Role = "Ranged",
-		Blurb = "Ranged: a reptile with two great crystal shards on its back. It fires a beam that bends to its foe.",
+		Blurb = "Ranged: a reptile with two great crystal shards on its back. Its shards focus an elemental beam down a straight line.",
 		Health = 175,
 		Damage = 11,
 		Rate = 1,
@@ -531,7 +535,7 @@ Roster.Kinds = {
 	Sickleclaw = {
 		Name = "Sickleclaw",
 		Role = "Assassin",
-		Blurb = "An assassin: hooks for hands and a buzzsaw down its belly. It rushes their back row first.",
+		Blurb = "An assassin: curved hooks, a serrated thorax and spring-loaded legs. It pounces on the back row and crosses its hooks to defend.",
 		Health = 175,
 		Damage = 16,
 		Rate = 0.9,
@@ -542,7 +546,7 @@ Roster.Kinds = {
 		Kit = { E = "K_BuzzsawRush", Q = "K_HookSlash", R = "K_RocketHop" },
 		Voice = "Scythe",
 		Fight = {
-			Names = { Light = "Hook", Heavy = "Buzzsaw Rush", Punish = "Quick Hook", Lunge = "Buzzsaw Rush" },
+			Names = { Light = "Hook", Heavy = "Sickle Ambush", Punish = "Quick Hook", Lunge = "Hook Pounce" },
 			Windup = 0.75,
 			Heavy = 1.9,
 			Combo = 3,
@@ -688,7 +692,7 @@ Roster.Kinds = {
 		Kit = { E = "K_GravityStorm", Q = "K_TripleBite", R = "K_Regrow" },
 		Voice = "Bulwark",
 		Fight = {
-			Names = { Light = "Triple Snap", Heavy = "Gravity Bolt", Punish = "Head Butt", Lunge = "Wing Rush" },
+			Names = { Light = "Triple Snap", Heavy = "Triple Bite", Punish = "Head Butt", Lunge = "Wing Rush" },
 			Windup = 1,
 			Heavy = 1.9,
 			Combo = 3,
@@ -701,7 +705,7 @@ Roster.Kinds = {
 	Brightsteel = {
 		Name = "Brightsteel",
 		Role = "Breaker",
-		Blurb = "A breaker: a chrome machine kaiju with piston limbs and glowing vents. Its missiles go for the toughest guard.",
+		Blurb = "A breaker: a mechanical kaiju with reactor vents and piston limbs. Its vent-fired salvo weakens guards before its piston strikes.",
 		Health = 250,
 		Damage = 17,
 		Rate = 1.3,
@@ -712,7 +716,7 @@ Roster.Kinds = {
 		Kit = { E = "K_MissileSalvo", Q = "K_Overclock", R = "K_Reboot" },
 		Voice = "Bulwark",
 		Fight = {
-			Names = { Light = "Piston Punch", Heavy = "Finger Missiles", Punish = "Jab", Lunge = "Thruster Rush" },
+			Names = { Light = "Piston Punch", Heavy = "Reactor Slam", Punish = "Jab", Lunge = "Thruster Rush" },
 			Windup = 1.05,
 			Heavy = 1.6,
 			Combo = 2,
@@ -725,7 +729,7 @@ Roster.Kinds = {
 	Dreadcrown = {
 		Name = "Dreadcrown",
 		Role = "Breaker",
-		Blurb = "A breaker: a crab demon with a horned crown and a glowing chest. Its breath strips a guard bare.",
+		Blurb = "A breaker: a crowned demon with pincers and a radiant chest core. Its core blast weakens defenses; its crown protects it.",
 		Health = 235,
 		Damage = 18,
 		Rate = 1.3,
@@ -736,7 +740,7 @@ Roster.Kinds = {
 		Kit = { E = "K_MicroOxygen", Q = "K_HornKatana", R = "K_Split" },
 		Voice = "Carapace",
 		Fight = {
-			Names = { Light = "Pincer", Heavy = "Oxygen Crush", Punish = "Pincer Snap", Lunge = "Crab Rush" },
+			Names = { Light = "Pincer", Heavy = "Crown Crush", Punish = "Pincer Snap", Lunge = "Crab Rush" },
 			Windup = 1.05,
 			Heavy = 1.9,
 			Combo = 2,
@@ -841,8 +845,8 @@ Roster.Moves = {
 		Key = "E",
 		From = "Resonance Echo",
 		IconSource = "LeechBloom",
-		Description = "Roots burst round it: foes near it take 40% damage, are held fast (stunned) and turn on it for 3s.",
-		Plan = { Shape = "Taunt", Radius = 18, Duration = 3, Reduce = 0.25, Mult = 0.4, Status = "Stun", Power = 1 },
+		Description = "Drives its vines into the ground: nearby foes take 40% damage, are briefly stunned and attack it for 3s. It takes 25% less damage for those 3s.",
+		Plan = { Shape = "Taunt", Radius = 18, Duration = 3, Reduce = 0.25, Mult = 0.4, Status = "Stun", Power = 1, Pose = "Heavy" },
 	},
 	K_SapDrain = {
 		Name = "Sap Drain",
@@ -850,7 +854,7 @@ Roster.Moves = {
 		From = "Leech Bloom",
 		IconSource = "LeechBloom",
 		Description = "Its vines lash round it: 100% damage to the foes near it, and it heals 8% of its health.",
-		Plan = { Shape = "Nova", Radius = 12, Mult = 1, Heal = 0.08, Power = 1.3 },
+		Plan = { Shape = "Nova", Radius = 12, Mult = 1, Heal = 0.08, Power = 1.3, Pose = "Light" },
 	},
 	K_Overgrowth = {
 		Name = "Overgrowth",
@@ -895,12 +899,12 @@ Roster.Moves = {
 	},
 	-- Hulkshell
 	K_Nullpulse = {
-		Name = "Nullpulse",
+		Name = "Quake Challenge",
 		Key = "E",
 		From = "Resonance Echo",
 		IconSource = "StaticField",
-		Description = "A pulse from its fists: foes round it take 50% damage, are slowed and turn on it for 3s, while it takes 30% less.",
-		Plan = { Shape = "Taunt", Radius = 18, Duration = 3, Reduce = 0.3, Mult = 0.5, Status = "Slow", Power = 1 },
+		Description = "Pounds the ground with both fists: nearby foes take 50% damage, are slowed and attack it for 3s. It takes 30% less damage during the challenge.",
+		Plan = { Shape = "Taunt", Radius = 18, Duration = 3, Reduce = 0.3, Mult = 0.5, Status = "Slow", Power = 1, Pose = "Heavy" },
 	},
 	K_Haymaker = {
 		Name = "Haymaker",
@@ -908,7 +912,7 @@ Roster.Moves = {
 		From = "Hydraulic Slam",
 		IconSource = "HydraulicSlam",
 		Description = "One huge blow: 160% damage, stunning its foe.",
-		Plan = { Shape = "Flurry", Hits = 1, Mult = 1.6, Status = "Stun", Power = 1.4 },
+		Plan = { Shape = "Flurry", Hits = 1, Mult = 1.6, Status = "Stun", Power = 1.4, Reach = 12, Pose = "Heavy" },
 	},
 	K_Brace = {
 		Name = "Brace",
@@ -926,7 +930,7 @@ Roster.Moves = {
 		From = "Flame Tornado",
 		IconSource = "FlameTornado",
 		Description = "Breathes its element down a line: 160% damage to everyone in it, with its element's effect.",
-		Plan = { Shape = "Line", Length = 20, Width = 7, Mult = 1.6, Status = "Element", Power = 1.6 },
+		Plan = { Shape = "Line", Length = 20, Width = 7, Mult = 1.6, Status = "Element", Power = 1.6, Origin = "Snout", Pose = "Bolt" },
 	},
 	K_TailSweep = {
 		Name = "Tail Sweep",
@@ -934,14 +938,14 @@ Roster.Moves = {
 		From = "Seismic Breaker",
 		IconSource = "SeismicBreaker",
 		Description = "Sweeps its tail round it: 110% damage to the foes near it, stunning them.",
-		Plan = { Shape = "Nova", Radius = 11, Mult = 1.1, Status = "Stun", Power = 1.4 },
+		Plan = { Shape = "Nova", Radius = 11, Mult = 1.1, Status = "Stun", Power = 1.4, Pose = "Heavy" },
 	},
 	K_DorsalGlow = {
 		Name = "Dorsal Glow",
 		Key = "R",
 		From = "Cauterize",
 		IconSource = "SolarFlare",
-		Description = "Hard pressed or crowded: its fins light up and it heals 25% of its health over 4s.",
+		Description = "Hard pressed or crowded: channels energy through its dorsal fins, healing 25% of its health over 4s and clearing burns, poisons, slows and blinds.",
 		Plan = { Shape = "Mend", Heal = 0.25, Duration = 4, Cleanse = true, Power = 0 },
 		When = "Crowd",
 	},
@@ -1036,22 +1040,22 @@ Roster.Moves = {
 		From = "Meteor Leap",
 		IconSource = "MeteorLeap",
 		Description = "Leaps onto its foe point first: 180% damage with its element's effect.",
-		Plan = { Shape = "Leap", Mult = 1.8, Status = "Element", Power = 1.5 },
+		Plan = { Shape = "Leap", Mult = 1.8, Status = "Element", Power = 1.5, Reach = 12, Pose = "Heavy" },
 	},
 	K_SoulBomb = {
-		Name = "Soul Bomb",
+		Name = "Twin Drill",
 		Key = "Q",
-		From = "Toxic Flask",
-		IconSource = "ToxicFlask",
-		Description = "Lobs a bomb of its element at its foe: 110% damage round where it lands, with its element's effect.",
-		Plan = { Shape = "Blast", Radius = 8, Delay = 0.5, Mult = 1.1, Status = "Element", Power = 1.4 },
+		From = "Armor Piercer",
+		IconSource = "CinderDrill",
+		Description = "Drives both drills into a nearby foe: two hits totaling 140% damage; the second leaves it Vulnerable.",
+		Plan = { Shape = "Flurry", Hits = 2, Mult = 1.4, Status = "Vulnerable", Power = 1.4, Reach = 12, Pose = "Light" },
 	},
 	K_ChitinLock = {
 		Name = "Chitin Lock",
 		Key = "R",
 		From = "Cryo Shield",
 		IconSource = "CryoShield",
-		Description = "Hard pressed or crowded: its wing cases snap shut, a shell of 30% of its health for 5s.",
+		Description = "Hard pressed or crowded: braces its chitin plates, gaining a shell equal to 30% of its health for 5s.",
 		Plan = { Shape = "Shell", Absorb = 0.3, Duration = 5, Power = 1 },
 		When = "Crowd",
 	},
@@ -1087,8 +1091,8 @@ Roster.Moves = {
 		Key = "E",
 		From = "Armor Piercer",
 		IconSource = "ArmorPiercer",
-		Description = "Lunges blade of a head first: 190% damage down a short line, leaving them Vulnerable.",
-		Plan = { Shape = "Line", Length = 11, Width = 5, Mult = 1.9, Status = "Vulnerable", Power = 1.6 },
+		Description = "Drives its brow blade through a short path in front of it: 190% damage, leaving foes hit Vulnerable.",
+		Plan = { Shape = "Line", Length = 11, Width = 5, Mult = 1.9, Status = "Vulnerable", Power = 1.6, Origin = "BrowBlade", Pose = "Heavy" },
 	},
 	K_FourArmFlurry = {
 		Name = "Four-Arm Flurry",
@@ -1096,7 +1100,7 @@ Roster.Moves = {
 		From = "Servo Flurry",
 		IconSource = "ServoFlurry",
 		Description = "Four quick blows: 150% damage in all.",
-		Plan = { Shape = "Flurry", Hits = 4, Mult = 1.5, Power = 1.4 },
+		Plan = { Shape = "Flurry", Hits = 4, Mult = 1.5, Power = 1.4, Reach = 12, Pose = "Light" },
 	},
 	K_Hunker = {
 		Name = "Hunker",
@@ -1113,16 +1117,16 @@ Roster.Moves = {
 		Key = "E",
 		From = "Glacier Fan",
 		IconSource = "GlacierFan",
-		Description = "A sonic boom down a wide cone: 130% damage to everyone in it, slowing them.",
-		Plan = { Shape = "Line", Length = 22, Width = 11, Mult = 1.3, Status = "Slow", Power = 1.8 },
+		Description = "Beats its wings to send a wide sonic wave down a straight path: 130% damage, slowing everyone hit.",
+		Plan = { Shape = "Line", Length = 22, Width = 11, Mult = 1.3, Status = "Slow", Power = 1.8, Pose = "Bolt" },
 	},
 	K_DiveStrike = {
-		Name = "Dive Strike",
+		Name = "Wing Lance",
 		Key = "Q",
 		From = "Thunder Dash",
 		IconSource = "ThunderDash",
-		Description = "A strafing dive down a line: 140% damage to everyone in it.",
-		Plan = { Shape = "Line", Length = 30, Width = 5, Mult = 1.4, Power = 1.4 },
+		Description = "Flicks a focused gust from its wings down a narrow lane: 140% damage. It stays at range.",
+		Plan = { Shape = "Line", Length = 36, Width = 5, Mult = 1.4, Power = 1.4, Origin = "Wing", Pose = "Bolt" },
 	},
 	K_Updraft = {
 		Name = "Updraft",
@@ -1166,7 +1170,7 @@ Roster.Moves = {
 		From = "Ion Cannon",
 		IconSource = "IonCannon",
 		Description = "A beam from its shards through everyone in a line: 140% damage, with its element's effect.",
-		Plan = { Shape = "Line", Length = 45, Width = 5, Mult = 1.4, Status = "Element", Power = 1.8, Show = "IonCannon" },
+		Plan = { Shape = "Line", Length = 45, Width = 5, Mult = 1.4, Status = "Element", Power = 1.8, Show = "IonCannon", Origin = "CrystalPrism", Pose = "Bolt" },
 	},
 	K_CrystalSpire = {
 		Name = "Crystal Spire",
@@ -1279,12 +1283,12 @@ Roster.Moves = {
 	},
 	-- Sickleclaw
 	K_BuzzsawRush = {
-		Name = "Buzzsaw Rush",
+		Name = "Sickle Ambush",
 		Key = "E",
 		From = "Thruster Leap",
 		IconSource = "CinderDrill",
-		Description = "Rushes onto its mark (their shooter first, else their weakest), buzzsaw first: 200% damage, leaving it Vulnerable.",
-		Plan = { Shape = "Leap", Mult = 2, Status = "Vulnerable", Power = 1.4 },
+		Description = "Pounces behind its mark, hooks first: 200% damage, leaving it Vulnerable.",
+		Plan = { Shape = "Leap", Mult = 2, Status = "Vulnerable", Power = 1.4, Reach = 12, Pose = "Lunge" },
 	},
 	K_HookSlash = {
 		Name = "Hook Slash",
@@ -1292,15 +1296,15 @@ Roster.Moves = {
 		From = "Servo Flurry",
 		IconSource = "FurnaceCrescent",
 		Description = "Three hooked cuts: 140% damage in all, the last with its element's effect.",
-		Plan = { Shape = "Flurry", Hits = 3, Mult = 1.4, Status = "Element", Power = 1.4 },
+		Plan = { Shape = "Flurry", Hits = 3, Mult = 1.4, Status = "Element", Power = 1.4, Reach = 12, Pose = "Light" },
 	},
 	K_RocketHop = {
-		Name = "Rocket Hop",
+		Name = "Hook Guard",
 		Key = "R",
-		From = "Null Prism",
-		IconSource = "ThrusterLeap",
-		Description = "Low on health: it fires its heels, can't be hurt for 1.5s, and lands behind their weakest.",
-		Plan = { Shape = "Vanish", Duration = 1.5, Pick = "Weakest", Mult = 0.8, Power = 1 },
+		From = "Riposte Stance",
+		IconSource = "RiposteStance",
+		Description = "Low on health: crosses its hooks over its thorax, taking 35% less damage for 3s.",
+		Plan = { Shape = "Ward", Reduce = 0.35, Duration = 3, Power = 1 },
 		When = "Low",
 	},
 	-- Nightwing
@@ -1435,12 +1439,12 @@ Roster.Moves = {
 	},
 	-- Triskull
 	K_GravityStorm = {
-		Name = "Gravity Storm",
+		Name = "Triune Breath",
 		Key = "E",
 		From = "Storm Call",
 		IconSource = "StormCall",
-		Description = "Gravity bolts from all three heads, each at the nearest foe: 160% damage in all, stunning with the last.",
-		Plan = { Shape = "Storm", Radius = 14, Hits = 3, Mult = 1.6, Status = "Stun", Show = "StormCall", Power = 1.6 },
+		Description = "Each head fires one elemental bolt into the target area: three hits totaling 160% damage. The last applies its gem element effect.",
+		Plan = { Shape = "Storm", Radius = 14, Hits = 3, Mult = 1.6, Status = "Element", Power = 1.6, Origin = "Head", Projectiles = true, Pose = "Bolt" },
 	},
 	K_TripleBite = {
 		Name = "Triple Bite",
@@ -1448,7 +1452,7 @@ Roster.Moves = {
 		From = "Servo Flurry",
 		IconSource = "ServoFlurry",
 		Description = "A bite from each head: 150% damage in all, the last leaving its foe Vulnerable.",
-		Plan = { Shape = "Flurry", Hits = 3, Mult = 1.5, Status = "Vulnerable", Power = 1.4 },
+		Plan = { Shape = "Flurry", Hits = 3, Mult = 1.5, Status = "Vulnerable", Power = 1.4, Reach = 12, Pose = "Light" },
 	},
 	K_Regrow = {
 		Name = "Regrow",
@@ -1461,20 +1465,20 @@ Roster.Moves = {
 	},
 	-- Brightsteel
 	K_MissileSalvo = {
-		Name = "Missile Salvo",
+		Name = "Reactor Salvo",
 		Key = "E",
 		From = "Railstorm",
 		IconSource = "Railstorm",
-		Description = "Six missiles rain on its foe and those near it: 150% damage in all, leaving the last one hit Vulnerable.",
-		Plan = { Shape = "Storm", Radius = 12, Hits = 6, Mult = 1.5, Status = "Vulnerable", Show = "StormCall", Power = 1.6 },
+		Description = "Fires six energy shots from its reactor vents into the target area: 150% damage in all. The final shot leaves its target Vulnerable.",
+		Plan = { Shape = "Storm", Radius = 12, Hits = 6, Mult = 1.5, Status = "Vulnerable", Power = 1.6, Origin = "ReactorWindow", Projectiles = true, Pose = "Bolt" },
 	},
 	K_Overclock = {
-		Name = "Overclock",
+		Name = "Piston Barrage",
 		Key = "Q",
-		From = "Overload",
-		IconSource = "Overload",
-		Description = "For 5s its pistons run hot: it hits 20% harder and 40% faster.",
-		Plan = { Shape = "Rally", Duration = 5, Damage = 1.2, Haste = 1.4, Power = 0 },
+		From = "Servo Flurry",
+		IconSource = "ServoFlurry",
+		Description = "Alternates its piston fists against a nearby foe: two hits totaling 140% damage, the last carrying its gem element effect.",
+		Plan = { Shape = "Flurry", Hits = 2, Mult = 1.4, Status = "Element", Power = 1.4, Reach = 12, Pose = "Light" },
 	},
 	K_Reboot = {
 		Name = "Reboot",
@@ -1487,28 +1491,28 @@ Roster.Moves = {
 	},
 	-- Dreadcrown
 	K_MicroOxygen = {
-		Name = "Micro-Oxygen",
+		Name = "Core Rupture",
 		Key = "E",
 		From = "Armor Melt",
 		IconSource = "ArmorMelt",
-		Description = "Breathes a cone that strips guards bare: 160% damage to everyone in it, leaving them Vulnerable.",
-		Plan = { Shape = "Line", Length = 18, Width = 11, Mult = 1.6, Status = "Vulnerable", Power = 1.6 },
+		Description = "Releases energy from its chest core down a wide path: 160% damage, leaving everyone hit Vulnerable.",
+		Plan = { Shape = "Line", Length = 18, Width = 11, Mult = 1.6, Status = "Vulnerable", Power = 1.6, Origin = "StarCore", Pose = "Bolt" },
 	},
 	K_HornKatana = {
-		Name = "Horn Katana",
+		Name = "Pincer Crush",
 		Key = "Q",
-		From = "Furnace Crescent",
-		IconSource = "FurnaceCrescent",
-		Description = "Its horn blazes and cuts a short line: 140% damage with its element's effect.",
-		Plan = { Shape = "Line", Length = 11, Width = 5, Mult = 1.4, Status = "Element", Power = 1.4 },
+		From = "Servo Flurry",
+		IconSource = "ServoFlurry",
+		Description = "Clamps both pincers onto a nearby foe: two hits totaling 140% damage, the last carrying its gem element effect.",
+		Plan = { Shape = "Flurry", Hits = 2, Mult = 1.4, Status = "Element", Power = 1.4, Reach = 12, Pose = "Light" },
 	},
 	K_Split = {
-		Name = "Split",
+		Name = "Crown Aegis",
 		Key = "R",
-		From = "Null Prism",
-		IconSource = "NullPrism",
-		Description = "Hard pressed or crowded: it splits into crablings (it can't be hurt for 1.5s) and re-forms behind their weakest.",
-		Plan = { Shape = "Vanish", Duration = 1.5, Pick = "Weakest", Mult = 0.9, Power = 1 },
+		From = "Ice Armor",
+		IconSource = "HeatShield",
+		Description = "Hard pressed or crowded: channels its crown into a ward, taking 35% less damage for 4s.",
+		Plan = { Shape = "Ward", Reduce = 0.35, Duration = 4, Power = 1 },
 		When = "Crowd",
 	},
 	-- Moonmoth

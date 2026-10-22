@@ -89,6 +89,42 @@ local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
 end
 
+local function elementStatus(caster, status: string?): string?
+	return if status == "Element" then KaijuRoles.ElementStatus[caster.Element] else status
+end
+
+-- Read actual anatomy, so a three-headed volley uses three mouths and a
+-- reactor salvo uses the vent windows. Older rigs safely use their root.
+local function origins(caster, name: string?)
+	local parts = {}
+	if name and caster.Model.GetDescendants then
+		for _, part in caster.Model:GetDescendants() do
+			if part.Name == name and part:IsA("BasePart") then
+				table.insert(parts, part)
+			end
+		end
+	end
+	table.sort(parts, function(a, b)
+		local left = caster.Root.CFrame:PointToObjectSpace(a.Position)
+		local right = caster.Root.CFrame:PointToObjectSpace(b.Position)
+		return if math.abs(left.X - right.X) > 0.01 then left.X < right.X else left.Y < right.Y
+	end)
+	return function(index: number?): Vector3
+		if #parts == 0 then
+			return caster.Root.Position
+		end
+		if index then
+			local part = parts[(index - 1) % #parts + 1]
+			return part.Position + part.CFrame.LookVector * part.Size.Z / 2
+		end
+		local center = Vector3.zero
+		for _, part in parts do
+			center += part.Position + part.CFrame.LookVector * part.Size.Z / 2
+		end
+		return center / #parts
+	end
+end
+
 -- Is `point` within `width` of the segment a-b (on the ground plane)?
 local function onLine(point: Vector3, a: Vector3, b: Vector3, width: number): boolean
 	local ab, ap = flat(b - a), flat(point - a)
@@ -146,7 +182,7 @@ local function aura(caster, plan, damage: number, seconds: number)
 	for i = 1, math.max(1, math.floor(seconds)) do
 		KaijuAbilities.after(i, function()
 			if caster.Alive() then
-				ring(caster, radius, damage * (a.Mult or 0.2), a.Status)
+				ring(caster, radius, damage * (a.Mult or 0.2), elementStatus(caster, a.Status))
 			end
 		end)
 	end
@@ -273,7 +309,7 @@ local function defend(caster, id: string, plan, damage: number): boolean
 			local color = GemConfig.ElementColors[caster.Element] or Color3.new(1, 1, 1)
 			local radius = burst.Radius * (caster.Size or 1)
 			fx("Nova", caster.Root.Position, radius, color, 0)
-			ring(caster, radius, damage * (burst.Mult or 0.3), burst.Status)
+			ring(caster, radius, damage * (burst.Mult or 0.3), elementStatus(caster, burst.Status))
 		end
 	end
 	body.Defense = d
@@ -310,9 +346,10 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 	local from = caster.Root.Position
 	local at = aim.Root.Position
 	local damage = if caster.DamageOf then caster.DamageOf(id) else caster.Damage
-	local status = plan.Status
-	if status == "Element" then
-		status = KaijuRoles.ElementStatus[caster.Element]
+	local status = elementStatus(caster, plan.Status)
+	local originAt = origins(caster, plan.Origin)
+	local function inReach(victim): boolean
+		return not plan.Reach or flat(victim.Root.Position - caster.Root.Position).Magnitude <= plan.Reach * size
 	end
 	local model = caster.Model
 	-- (A role's move says its key; a gem's starts with it, and a gem's E is
@@ -366,17 +403,18 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 		end)
 	elseif plan.Shape == "Line" then
 		local length, width = (plan.Length or 20) * size, (plan.Width or 4) * size
-		local direction = flat(at - from)
+		local visualFrom = originAt()
+		local direction = flat(at - visualFrom)
 		direction = if direction.Magnitude > 0.1 then direction.Unit else flat(caster.Root.CFrame.LookVector).Unit
-		local finish = from + direction * length
+		local visualEnd = visualFrom + direction * length
 		if plan.Show == "IonCannon" then
-			fx("TriadShow", model, plan.Show, from, finish, width, caster.Element)
+			fx("TriadShow", model, plan.Show, visualFrom, visualEnd, width, caster.Element)
 		elseif plan.Show then
-			fx("TriadShow", model, plan.Show, from, finish, 1, width, caster.Element)
+			fx("TriadShow", model, plan.Show, visualFrom, visualEnd, 1, width, caster.Element)
 		else
-			fx("TriadTrail", from, finish, width, 1, caster.Element)
+			fx("TriadTrail", visualFrom, visualEnd, width, 1, caster.Element)
 		end
-		sweep(caster, from, finish, width, damage, status)
+		sweep(caster, visualFrom, visualEnd, width, damage, status)
 	elseif plan.Shape == "Field" then
 		local radius, duration = (plan.Radius or 8) * size, plan.Duration or 3
 		if plan.Show then
@@ -426,7 +464,9 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 		end
 	elseif plan.Shape == "Storm" then
 		local radius, hits = (plan.Radius or 9) * size, plan.Hits or 5
-		fx("TriadShow", model, plan.Show or "StormCall", at, radius, hits * 0.5 + 0.5, caster.Element)
+		if not plan.Projectiles then
+			fx("TriadShow", model, plan.Show or "StormCall", at, radius, hits * 0.5 + 0.5, caster.Element)
+		end
 		for i = 1, hits do
 			KaijuAbilities.after(i * 0.5, function()
 				if not caster.Alive() then
@@ -441,7 +481,11 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 					end
 				end
 				local point = if nearest then nearest.Root.Position else at
-				fx("TriadShow", model, "StormBolt", point, 3 * size, if i == hits then 1 else 0, caster.Element)
+				if plan.Projectiles then
+					fx("Shot", nil, originAt(i), point, color, nil)
+				else
+					fx("TriadShow", model, "StormBolt", point, 3 * size, if i == hits then 1 else 0, caster.Element)
+				end
 				if nearest then
 					caster.Hit(nearest, damage / hits, if i == hits then status else nil)
 				end
@@ -519,7 +563,7 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 			fx("DodgeRoll", nil, from, flat(landed - from).Unit, flat(landed - from).Magnitude, false)
 		end
 		KaijuAbilities.after(0.15, function()
-			if caster.Alive() and victim.Root.Parent then
+			if caster.Alive() and victim.Root.Parent and inReach(victim) then
 				local here = caster.Root.Position
 				fx("Swing", nil, here, flat(victim.Root.Position - here).Unit, 4 * size, 140, color, true)
 				caster.Hit(victim, damage, status)
@@ -530,7 +574,7 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 		local hits = plan.Hits or 3
 		for i = 1, hits do
 			KaijuAbilities.after(0.15 * (i - 1), function()
-				if caster.Alive() and aim.Root.Parent then
+				if caster.Alive() and aim.Root.Parent and inReach(aim) then
 					local here = caster.Root.Position
 					fx("Swing", nil, here, flat(aim.Root.Position - here).Unit, 3.5 * size, 90, color, i == hits)
 					caster.Hit(aim, damage / hits, if i == hits then status else nil)

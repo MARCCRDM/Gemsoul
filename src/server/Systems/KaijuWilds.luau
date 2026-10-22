@@ -788,6 +788,22 @@ end
 
 -- Somewhere to amble to: round its den (a packmate keeps near its leader),
 -- with a clear way there.
+local function abilityStep(wild: Wild?, point: Vector3, facing: Vector3): Vector3?
+	if not wild or not wild.Enemy.Alive then
+		return nil
+	end
+	local enemy = wild.Enemy
+	if flat(point - enemy.Home).Magnitude > Kaiju.Wild.Leash
+		or not roomy(point, wild.Guard)
+		or not wayAround(enemy.Root.Position, point)
+		or not clearPath(wild, enemy.Root.Position, point)
+	then
+		return nil
+	end
+	KaijuServer.place(enemy.Model, point, facing)
+	return enemy.Root.Position
+end
+
 local function walkTarget(wild: Wild, range: number): Vector3?
 	local enemy = wild.Enemy
 	local pack = wild.Pack
@@ -2062,6 +2078,19 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 				end,
 				Body = enemy,
 				Humanoid = enemy.Humanoid,
+				-- Wild variants use the same physical pounce/retreat as pets,
+				-- bounded by their home, obstacles and the lobby keep-out zones.
+				Leap = function(victim): Vector3?
+					local toward = flat(victim.Root.Position - enemy.Root.Position)
+					local direction = if toward.Magnitude > 0.01 then toward.Unit else enemy.Root.CFrame.LookVector
+					local size = Kaiju.size(scale)
+					local distance = math.min(toward.Magnitude + 2.2 * size, 12 * size)
+					return abilityStep(wilds[enemy], enemy.Root.Position + direction * distance, victim.Root.Position)
+				end,
+				Hop = function(direction: Vector3, studs: number): Vector3?
+					local point = enemy.Root.Position + direction * math.min(studs, 20 * Kaiju.size(scale))
+					return abilityStep(wilds[enemy], point, point + direction)
+				end,
 				Foes = function(center: Vector3, radius: number)
 					local wild = wilds[enemy]
 					return if wild then foesOf(wild)(center, radius) else {}

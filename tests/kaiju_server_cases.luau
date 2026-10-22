@@ -703,7 +703,8 @@ for id, plan in Kaiju.AbilityPlans do
 	end
 	local extra = plan.Aura or plan.Burst
 	if extra and extra.Status then
-		check(statuses[extra.Status], id .. " didn't leave " .. extra.Status)
+		local expected = if extra.Status == "Element" then "Burn" else extra.Status
+		check(statuses[expected], id .. " didn't leave " .. expected)
 	end
 	if plan.Show then
 		local shown = false

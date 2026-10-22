@@ -174,6 +174,9 @@ end
 -- How its E winds up: a ring round itself (time to get out of it), or
 -- anything else aimed at its foe.
 function KaijuFight.surgeKind(plan): string
+	if plan and plan.Pose and Brain.Windup[plan.Pose] then
+		return plan.Pose
+	end
 	return if plan and plan.Shape == "Nova" then "Nova" else "Bolt"
 end
 
