@@ -11,8 +11,8 @@
 	Foes come from TargetLock.foes() (empty outside fights), so nothing shows
 	in the Outpost or the lobby. The Outpost's creatures (wild kaiju, moon
 	bugs, kaiju) get no overhead bar even then: their bodies show their
-	health (BodyHealth); they're still in the list. Runs on its own once
-	required.
+	health (BodyHealth), and a wild kaiju has its own plate (WildBars);
+	they're still in the list. Runs on its own once required.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

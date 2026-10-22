@@ -53,7 +53,9 @@
 	                 are, more tear through round you (Frontier.robSpots),
 	                 robbers all. Each grabs one gem of your haul and runs
 	                 for a tear with it. Then you're back at base (the
-	                 Outpost's spawn), whole, and shown what they took.
+	                 Outpost's spawn), whole, your pick out (the kit put
+	                 away: FrontierServer.kitAway), and shown what they
+	                 took.
 
 	Nobody gets more critters than their band's cap or a fair share of the
 	Outpost's (Frontier.share); critters still on their way through count.
@@ -70,7 +72,10 @@
 	in, Shared.Frontier.Biomes: nil in the core), FrontierNoise and
 	FrontierStir (how stirred up: both 0..1, in twentieths) for their HUD,
 	and FrontierAlone (true out past the core with no kaiju of theirs out:
-	the frontier comes for them harder, Frontier.Alone). Anyone in the
+	the frontier comes for them harder, Frontier.Alone) and FrontierEngaged
+	(true out there in a fight with a wild kaiju, or taming one:
+	KaijuWilds.engagedWith; it holds back, Frontier.Engaged: quieter, longer
+	between encounters, no wandering rift by them). Anyone in the
 	Outpost carries AtBase (back in the Shelter, or the hall under it:
 	Frontier.atBase), the only place they heal out of a fight
 	(HealthRegen).
@@ -82,6 +87,7 @@
 	  FrontierServer.mined(player, gem)      a gem mined (OutpostServer): this trip's haul
 	  FrontierServer.raid(player) -> boolean   a gem raid on them (their team's all down)
 	  FrontierServer.knockedOut(player) -> robbery?   killed: robbed out there, then home
+	  FrontierServer.kitAway(player)      back home: the kit away (Main: SparServer.unpair)
 	  FrontierServer.open(at, facing, opts?) -> anchor, timeline   a rift on the ground at `at`
 	      (opts: Critter, Prey, Linger, Hop; Height its size; Hell, burning
 	      the critters' world's colours: the Rift's own)
@@ -157,6 +163,12 @@ end
 -- step): critters come sooner, more of them, higher and harder.
 local function alone(player: Player): boolean
 	return player:GetAttribute("FrontierAlone") == true
+end
+
+-- In a fight with a wild kaiju, or taming one (FrontierEngaged, set each
+-- step): the frontier holds back (Frontier.Engaged).
+local function engaged(player: Player): boolean
+	return player:GetAttribute("FrontierEngaged") == true
 end
 
 -- The Shelter's footprint (half sizes, x and z), as the site built it.
@@ -426,7 +438,7 @@ end
 -- Their noise is full: an encounter, if they have room (else it waits, full).
 local function consider(player: Player, state, band: string)
 	local now = os.clock()
-	if band == "Core" or state.Noise < 1 or now - state.LastEncounter < Frontier.gap(alone(player)) then
+	if band == "Core" or state.Noise < 1 or now - state.LastEncounter < Frontier.gap(alone(player), engaged(player)) then
 		return
 	end
 	local room = roomFor(player, band)
@@ -451,7 +463,7 @@ function FrontierServer.swing(player: Player, swings: number?)
 		return
 	end
 	local state = stateOf(player)
-	state.Noise = Frontier.noise(state.Noise, band, swings or 1, 0, rng:NextNumber(), state.Stir, alone(player))
+	state.Noise = Frontier.noise(state.Noise, band, swings or 1, 0, rng:NextNumber(), state.Stir, alone(player), engaged(player))
 	state.Stir = Frontier.stir(state.Stir, band, swings or 1)
 	state.LastSwing = os.clock()
 	-- (Told as it gets to each stage, once till it's well settled again.)
@@ -645,10 +657,18 @@ local function robbers(player: Player, count: number, robbery)
 	end
 end
 
+-- Puts their combat kit away, their pick out: what you're back at base
+-- with (Main sets it to SparServer.unpair, which ends a spar too).
+function FrontierServer.kitAway(player: Player)
+	player:SetAttribute("Hunt", nil)
+	player:SetAttribute("Spar", nil)
+end
+
 -- Back at base after you were killed (and robbed, out past the core): on
--- your feet at the Outpost's spawn, whole, with a moment's guard (and this
--- trip's haul is over).
+-- your feet at the Outpost's spawn, whole, your pick out (miner mode, the
+-- kit away), with a moment's guard (and this trip's haul is over).
 local function sentHome(player: Player)
+	FrontierServer.kitAway(player)
 	player:SetAttribute("Killed", nil)
 	player:SetAttribute("SparDown", nil)
 	hauls[player], raiding[player] = nil, nil
@@ -900,6 +920,9 @@ local function step(dt: number)
 			if player:GetAttribute("FrontierAlone") ~= nil then
 				player:SetAttribute("FrontierAlone", nil)
 			end
+			if player:GetAttribute("FrontierEngaged") ~= nil then
+				player:SetAttribute("FrontierEngaged", nil)
+			end
 			-- (Away in the Rift counts as gone from the Outpost.)
 			local away = player:GetAttribute("Outpost") ~= true or player:GetAttribute("RiftRun") ~= nil
 			if away and player:GetAttribute("FrontierBand") ~= nil then
@@ -934,6 +957,11 @@ local function step(dt: number)
 				Remotes.Notify:FireClient(player, Frontier.Alone.Note)
 			end
 		end
+		-- In a fight with a wild kaiju: the frontier holds back.
+		local fighting = if band ~= "Core" and KaijuWilds.engagedWith(player, Frontier.Engaged.For) then true else nil
+		if player:GetAttribute("FrontierEngaged") ~= fighting then
+			player:SetAttribute("FrontierEngaged", fighting)
+		end
 		state.Stir = Frontier.settle(state.Stir, band, dt, now - state.LastSwing)
 		state.Told = math.min(state.Told, (Frontier.stage(state.Stir + 0.1)))
 		if band == "Core" then
@@ -943,7 +971,7 @@ local function step(dt: number)
 			hauls[player], raiding[player] = nil, nil
 		else
 			table.insert(out, { Player = player, Root = root, Band = band })
-			state.Noise = Frontier.noise(state.Noise, band, 0, dt, nil, nil, lone)
+			state.Noise = Frontier.noise(state.Noise, band, 0, dt, nil, nil, lone, fighting)
 		end
 	end
 	playersOut = #out
@@ -958,7 +986,8 @@ local function step(dt: number)
 		nextWander = now + rng:NextNumber(every[1], every[2])
 		local candidates = {}
 		for _, entry in out do
-			if roomFor(entry.Player, entry.Band) > 0 then
+			-- (Nor by anyone in a fight with a wild kaiju.)
+			if roomFor(entry.Player, entry.Band) > 0 and not engaged(entry.Player) then
 				table.insert(candidates, entry)
 			end
 		end

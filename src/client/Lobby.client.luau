@@ -42,6 +42,8 @@ GemClient.Changed:Connect(LoadingFlow.progress)
 SparKit.start()
 -- Robbed while down: what the critters took (RobReport).
 require(script.Parent.Modules.RobReport).start()
+-- The quarry's edge, for now: a dome that says the expansion's coming.
+require(script.Parent.Modules.EdgeDome).start()
 
 -- Your mini kaiju: its card, RECALL, HUNT and TAME, and the kaiju panel.
 if Config.Features == nil or Config.Features.Kaiju ~= false then

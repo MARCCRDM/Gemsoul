@@ -63,11 +63,12 @@
 	                  KaijuDanger: Shared.Kaiju.Danger): IN A FIGHT then.
 	  The roll        a player still owed starter kaiju (from before the
 	                  roll, say) gets the roll here, once (KaijuRoll).
-	  No nameplates  nothing over a creature's head (yours, others', wild
-	                  kaiju, moon bugs): its body shows its health, an
-	                  outline in its health's colour, a wild kaiju's always
-	                  and through rocks (BodyHealth, handed every creature
-	                  this finds).
+	  No nameplates  nothing over a creature's head (yours, others', moon
+	                  bugs): its body shows its health, an outline in its
+	                  health's colour, a wild kaiju's always and through
+	                  rocks (BodyHealth, handed every creature this finds).
+	                  A wild kaiju has a slim plate over it too: its name,
+	                  level and a health bar (WildBars).
 
 	  KaijuHud.start()     once, from Lobby.client
 	  KaijuHud.open(id?, tab?)   the panel, on kaiju `id` (else your lead),
@@ -96,6 +97,7 @@ local ChatFeed = require(script.Parent.ChatFeed)
 local LoadingFlow = require(script.Parent.LoadingFlow)
 local MobileLayout = require(script.Parent.MobileLayout)
 local BodyHealth = require(script.Parent.BodyHealth)
+local WildBars = require(script.Parent.WildBars)
 local OutpostScene = require(script.Parent.OutpostScene)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
@@ -1717,6 +1719,12 @@ local function stackCard(key: string)
 	return entry
 end
 
+-- A heal's share as the HEAL tab shows it: 7.5%, 15%, 30% (to the half).
+local function percent(value: number): string
+	local half = math.floor(value * 2 + 0.5) / 2
+	return if half % 1 == 0 then string.format("%d%%", half) else string.format("%.1f%%", half)
+end
+
 local function drawHeal(record)
 	record = liveRecord(record)
 	local down = record.Down == true
@@ -1760,10 +1768,10 @@ local function drawHeal(record)
 			pcall(GemArt.viewport, c.Art, shown, false)
 		end
 		c.Have.Text = "×" .. #stack.Gems
-		local base = (Kaiju.Infuse.Power[stack.Tier] or Kaiju.Infuse.Power.Common) * Kaiju.healShare(record)
+		local base = Kaiju.Infuse.Power[stack.Tier] or Kaiju.Infuse.Power.Common
 		c.Gain.Text = if down
 			then string.format("+%g", stack.Power)
-			else string.format("+%d%%", math.floor(stack.Power * Kaiju.Infuse.Mend * 100 + 0.5))
+			else "+" .. percent(stack.Power * Kaiju.Infuse.Mend * 100)
 		c.Gain.TextColor3 = if stack.Power > base then P.Gold elseif stack.Power < base then P.Dim else HEALTH
 		c.Each.Text = if down then "POWER EACH" else "EACH"
 		c.Kind.Text = string.upper(
@@ -1819,20 +1827,18 @@ local function drawHeal(record)
 		healBarText.Text = ""
 	end
 	local on = Kaiju.autoHealOn(roster())
-	local weak = not down and not full and record.Weak == true
 	healHint.Text = if down
 		then "Gems and AUTO HEAL don't bring back one that's knocked out."
-		elseif weak then "Weak from a knockout: gems heal it at a third till it's full again."
 		elseif on then "AUTO HEAL is on: your spare Commons, then Uncommons, heal your team between fights."
 		else "Switch on AUTO HEAL by your team and your spare Commons, then Uncommons, heal them by themselves."
-	healHint.TextColor3 = if weak then P.Bad:Lerp(P.Text, 0.35) elseif on and not down then P.Good else P.Dim
+	healHint.TextColor3 = if on and not down then P.Good else P.Dim
 	if down then
 		-- Knocked out: back by itself, or REVIVE (Robux) or COUPON now.
 		local coupons = Coupons.count(GemClient.Profile, "Revive")
 		local onSale = (Store.RobuxProducts.KaijuRevive or 0) ~= 0 or Store.testPrice("KaijuRevive") ~= nil
 		reviveTime.Text = reviveClock(record)
 		reviveLine.Text = string.format(
-			"It comes back weak, at %d%% health, and gems heal it at a third till it's full.",
+			"It comes back weak, at %d%% health: heal it with gems.",
 			math.floor(Kaiju.Revive.Health * 100 + 0.5)
 		)
 		reviveCoupon.Text = if coupons > 0
@@ -2401,12 +2407,15 @@ end
 
 -- Creatures show their health on their bodies (BodyHealth): wild kaiju
 -- and moon bugs (the server's HealthBar over them stays off), and every
--- kaiju out.
+-- kaiju out. A wild kaiju has its plate over it too (WildBars).
 local function bodies()
 	local enemies = workspace:FindFirstChild("Enemies")
 	for _, model in if enemies then enemies:GetChildren() else {} do
 		if model:IsA("Model") and (model:GetAttribute("KaijuWild") or model:GetAttribute("MoonBug")) then
 			BodyHealth.watch(model)
+			if model:GetAttribute("KaijuWild") then
+				WildBars.watch(model)
+			end
 		end
 	end
 	local kaiju = workspace:FindFirstChild("Kaiju")
@@ -2488,6 +2497,7 @@ function KaijuHud.start()
 	started = true
 	KaijuTaming.start()
 	BodyHealth.start()
+	WildBars.start()
 	layout()
 	local ok, err = pcall(refresh)
 	if not ok then

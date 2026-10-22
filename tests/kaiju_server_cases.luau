@@ -1036,7 +1036,6 @@ local function healthAndInfusing()
 	check(not record.Down and record.DownUntil == nil, "Not back once its revive time was up")
 	check(record.Health == math.floor(starterMost * Kaiju.Revive.Health + 0.5), "Not back weak, at Revive.Health")
 	check(Kaiju.Revive.Health <= 0.2, "Back by itself, it isn't weak enough to need healing")
-	check(record.Weak == true, "Back by itself, it isn't weak (gems at a third)")
 	check(pet and pet.Record == record and pet.Humanoid.Health == record.Health, "Back, it didn't come out as it was")
 	check(noted(a, "back on its feet") and record.Level == levelBefore and record.Exp == expBefore, "Not told it's back, or given EXP")
 	-- Robux or a Revive coupon (reviveAll): every one that's down, back now.
@@ -1048,7 +1047,6 @@ local function healthAndInfusing()
 		"Bought back, it isn't at Revive.Bought"
 	)
 	check(Kaiju.Revive.Bought > Kaiju.Revive.Health, "Buying it back isn't better than waiting")
-	check(record.Weak == nil, "Bought back, it's still weak")
 	pet = KaijuServer.pets()[a]
 	check(pet and pet.Record == record, "Revived, it didn't come out")
 	check(KaijuServer.reviveAll(a) == 0, "reviveAll counted one that wasn't down")
@@ -1067,46 +1065,31 @@ local function healthAndInfusing()
 	end
 	local mended = registered.KaijuInfuse(a, mendIds, record.Id)
 	check(
-		mended.Ok and not mended.Revived and mended.Used == 2,
-		"Mending 20% didn't take two commons: " .. tostring(mended.Used)
+		mended.Ok and not mended.Revived and mended.Used == 3,
+		"Mending 20% didn't take three commons (7.5% each): " .. tostring(mended.Used)
 	)
 	check(pet.Humanoid.Health == pet.Humanoid.MaxHealth and record.Health == pet.Humanoid.MaxHealth, "Not mended whole")
-	check(#profiles[a].Gems == 3, "Stones it didn't need were eaten")
-	check(not registered.KaijuInfuse(a, { "m3" }, record.Id).Ok, "Infused one already whole")
-	-- Weak (back by itself): the same 20% takes three times the gems, and
-	-- once it's full it isn't weak any more.
-	record.Weak = true
-	pet.Humanoid.Health = pet.Humanoid.MaxHealth * 0.8
-	local weakIds = {}
-	for i = 1, 8 do
-		stone("w" .. i, "Common", other)
-		table.insert(weakIds, "w" .. i)
-	end
-	local weakMend = registered.KaijuInfuse(a, weakIds, record.Id)
-	check(weakMend.Ok and weakMend.Used == 6, "Mending 20% weak didn't take six commons: " .. tostring(weakMend.Used))
-	check(record.Health == pet.Humanoid.MaxHealth and record.Weak == nil, "Healed to full, it's still weak")
-	for i = 7, 8 do
-		PlayerData.removeGem(a, "w" .. i)
-	end
+	check(#profiles[a].Gems == 2, "Stones it didn't need were eaten")
+	check(not registered.KaijuInfuse(a, { "m4" }, record.Id).Ok, "Infused one already whole")
 	-- Only out of danger: not while one of the team out has just fought.
 	pet.Humanoid.Health = math.floor(pet.Humanoid.MaxHealth * 0.5)
 	pet.LastFight = now - 1
 	check(KaijuServer.inDanger(a, now), "A fight just now isn't danger")
-	local blocked = registered.KaijuInfuse(a, { "m3" }, record.Id)
-	check(not blocked.Ok and blocked.Danger and #profiles[a].Gems == 3, "Healed in the middle of a fight")
+	local blocked = registered.KaijuInfuse(a, { "m4" }, record.Id)
+	check(not blocked.Ok and blocked.Danger and #profiles[a].Gems == 2, "Healed in the middle of a fight")
 	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
 	check(not KaijuServer.inDanger(a, now), "Still in danger once it's calm")
-	check(registered.KaijuInfuse(a, { "m3" }, record.Id).Ok, "Couldn't heal out of danger")
+	check(registered.KaijuInfuse(a, { "m4" }, record.Id).Ok, "Couldn't heal out of danger")
 	pet.Humanoid.Health = pet.Humanoid.MaxHealth
 	pet.Humanoid.Health = 1
 	check(not registered.KaijuInfuse(a, { "nope" }).Ok, "Infused stones they don't have")
-	check(not registered.KaijuInfuse(a, {}).Ok and not registered.KaijuInfuse(a, "m3").Ok, "Infused nothing")
+	check(not registered.KaijuInfuse(a, {}).Ok and not registered.KaijuInfuse(a, "m4").Ok, "Infused nothing")
 	local many = {}
 	for i = 1, Kaiju.Infuse.Batch + 1 do
 		many[i] = "x" .. i
 	end
 	check(not registered.KaijuInfuse(a, many).Ok, "Infused more than the limit at once")
-	check(not registered.KaijuInfuse(b, { "m3" }).Ok, "Infused with no kaiju")
+	check(not registered.KaijuInfuse(b, { "m4" }).Ok, "Infused with no kaiju")
 	table.insert(
 		profiles[a].Gems,
 		Kaiju.rollSoul(Random.new(9), record.Element, { Id = "soulgem", Time = 1, Species = "Bulwark" })
@@ -1176,25 +1159,25 @@ local function autoHealing()
 	pet.LastFight = now - 1
 	KaijuServer._autoHeal(a, now)
 	check(#profiles[a].Gems == 7, "Auto healed mid-fight")
-	-- Calm: 35% short, a Common mends 10%: three, none wasted, never the Rare.
+	-- Calm: 35% short, a Common mends 7.5%: four, none wasted, never the Rare.
 	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
 	local before = pet.Humanoid.Health
 	KaijuServer._autoHeal(a, now)
-	check(#profiles[a].Gems == 4 and has("rare"), "Auto heal didn't take three Commons alone: " .. #profiles[a].Gems .. " left")
+	check(#profiles[a].Gems == 3 and has("rare"), "Auto heal didn't take four Commons alone: " .. #profiles[a].Gems .. " left")
 	check(
 		math.abs(pet.Humanoid.Health - (before + most * 0.3)) <= 1 and record.Health == pet.Humanoid.Health,
-		"Three Commons didn't heal 30%"
+		"Four Commons didn't heal 30%"
 	)
 	-- Not again straight away.
 	pet.Humanoid.Health = math.floor(most * 0.5)
 	KaijuServer._autoHeal(a, now + 0.5)
-	check(#profiles[a].Gems == 4, "Auto healed again straight away")
+	check(#profiles[a].Gems == 3, "Auto healed again straight away")
 	-- A gem a saved loadout names stays put.
 	now += Kaiju.AutoHeal.Every + 0.1
 	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
-	profiles[a].Presets = { Armor = { { Surges = { "ah4" } } } }
+	profiles[a].Presets = { Armor = { { Surges = { "ah5" } } } }
 	KaijuServer._autoHeal(a, now)
-	check(has("ah4") and not has("ah5") and not has("ah6") and has("rare"), "Auto heal took a gem a loadout names")
+	check(has("ah5") and not has("ah6") and has("rare"), "Auto heal took a gem a loadout names")
 	-- Out of spare Commons: said once.
 	now += Kaiju.AutoHeal.Every + 0.1
 	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
@@ -1202,14 +1185,14 @@ local function autoHealing()
 	KaijuServer._autoHeal(a, now)
 	KaijuServer._autoHeal(a, now + 5)
 	check(said("out of spare Commons") == 1, "Running out of Commons wasn't said once")
-	check(has("ah4") and has("rare"), "Out of Commons, it took another gem")
+	check(has("ah5") and has("rare"), "Out of Commons, it took another gem")
 	-- Out of Commons, a spare Uncommon heals (never the Rare).
 	gem("un1", "Uncommon")
 	now += Kaiju.AutoHeal.Every + 0.1
 	pet.LastFight = now - Kaiju.Danger.Calm - 0.1
 	before = pet.Humanoid.Health
 	KaijuServer._autoHeal(a, now)
-	check(not has("un1") and has("ah4") and has("rare"), "Out of Commons, auto heal didn't take the Uncommon")
+	check(not has("un1") and has("ah5") and has("rare"), "Out of Commons, auto heal didn't take the Uncommon")
 	check(pet.Humanoid.Health > before, "The Uncommon didn't heal")
 	profiles[a].Presets = nil
 	for _, g in table.clone(profiles[a].Gems) do
@@ -2524,6 +2507,69 @@ now += Frontier.Rift.Hop + 0.1
 runDelayed()
 check(#critterFor(b) == 0 and #FrontierServer._wanders == 0, "A wandering rift let critters out with nobody near")
 check(not FrontierServer._pending[b], "Its critters are still on their way")
+
+-- In a fight with a wild kaiju out there (or taming one), the frontier
+-- holds back (Frontier.Engaged): quieter swings, a longer lull between
+-- encounters, no wandering rift by them. A fight gone quiet for
+-- Engaged.For seconds is over for this.
+;(function()
+	clearCritters()
+	local E = Frontier.Engaged
+	stand(center + Vector3.new(250, 5, 0))
+	local fake = { Alive = true }
+	local wild = { Bug = false, Engaged = {} }
+	KaijuWilds._wilds[fake] = wild
+	now += 0.5
+	FrontierServer._step(0.5)
+	check(b:GetAttribute("FrontierEngaged") == nil, "In a fight with a wild kaiju nobody started on")
+	wild.Engaged[b] = now
+	FrontierServer._step(0.5)
+	check(b:GetAttribute("FrontierEngaged") == true, "In a fight with a wild kaiju, the frontier doesn't know")
+	local state = FrontierServer._states[b]
+	local band = b:GetAttribute("FrontierBand")
+	check(band == "Fringe" or band == "Edge", "Not out past the core for the fight")
+	for _ = 1, 20 do
+		state.Noise = 0
+		local stir = state.Stir
+		FrontierServer.swing(b)
+		local least, most = Frontier.noise(0, band, 1, 0, 0, stir, true, true), Frontier.noise(0, band, 1, 0, 1, stir, true, true)
+		check(state.Noise >= least - 1e-9 and state.Noise <= most + 1e-9, "In a fight, a swing as loud as ever: " .. state.Noise)
+		check(most < Frontier.noise(0, band, 1, 0, 0, stir, true), "In a fight, the quietest swing no quieter")
+	end
+	-- Full, and past the usual gap: still no encounter in the fight.
+	state.Noise = 2
+	state.LastEncounter = now - Frontier.Noise.Gap - 1
+	local before = state.LastEncounter
+	FrontierServer.swing(b)
+	FrontierServer._step(0.5)
+	check(state.LastEncounter == before and #critterFor(b) == 0, "An encounter came as soon in a fight with a wild kaiju")
+	-- No wandering rift by them.
+	FrontierServer._setWanderAt(0)
+	FrontierServer._step(0.5)
+	FrontierServer._setWanderAt(math.huge)
+	check(#FrontierServer._wanders == 0, "A wandering rift opened by someone fighting a wild kaiju")
+	-- Taming one counts too.
+	wild.Engaged[b] = nil
+	wild.Taming = { Player = b, Ends = now + 5 }
+	FrontierServer._step(0.5)
+	check(b:GetAttribute("FrontierEngaged") == true, "Taming a wild kaiju, the frontier doesn't hold back")
+	wild.Taming = nil
+	-- The fight gone quiet: it's back as it was, and the encounter comes.
+	wild.Engaged[b] = now
+	now += E.For + 1
+	FrontierServer._step(0.5)
+	check(b:GetAttribute("FrontierEngaged") == nil, "A fight gone quiet still holds the rifts back")
+	check(state.LastEncounter == now, "No encounter once the fight's over")
+	-- (A wild kaiju knocked out isn't a fight.)
+	wild.Engaged[b] = now
+	fake.Alive = false
+	FrontierServer._step(0.5)
+	check(b:GetAttribute("FrontierEngaged") == nil, "A knocked-out wild kaiju still holds the rifts back")
+	KaijuWilds._wilds[fake] = nil
+	now += 10
+	runDelayed()
+	clearCritters()
+end)()
 
 -- Moon bugs pay: EXP to every kaiju that fought one (by its level and
 -- band, a quarter after the day's first 60), coins by band to whoever did
@@ -5011,6 +5057,9 @@ end)()
 	-- Killed in the core all the same: dead a moment, nothing taken, then
 	-- back at base, whole.
 	check(b:GetAttribute("Killed") == true and b:GetAttribute("SparDown") ~= nil, "Not killed in the core")
+	-- (Killed with the kit out: back at base, it's the pick that's out.)
+	b:SetAttribute("Hunt", true)
+	b:SetAttribute("Spar", true)
 	for _ = 1, math.ceil(shared("Spar").DeadSeconds / 0.25) + 2 do
 		now += 0.25
 		runDelayed()
@@ -5018,6 +5067,7 @@ end)()
 	check(b:GetAttribute("Killed") == nil and b:GetAttribute("SparDown") == nil, "Still dead in the core")
 	check((rootB.Position - (center + Vector3.new(0, 3, 0))).Magnitude < 1, "Killed in the core, not back at base")
 	check(hB.Health == hB.MaxHealth, "Killed in the core, not back at base whole")
+	check(b:GetAttribute("Hunt") == nil and b:GetAttribute("Spar") == nil, "Killed in the core, back at base with the kit still out")
 	hB.Health = 1
 	stand(center + Vector3.new(220, 5, 0))
 	for i = 1, 2 do
@@ -5075,9 +5125,12 @@ end)()
 	local first = robbers[1]
 	Enemies.damage(first, first.Humanoid.MaxHealth * 10, a)
 	check(#profile.Gems == 1, "A robber knocked out kept the gem")
+	b:SetAttribute("Hunt", true)
+	b:SetAttribute("Spar", true)
 	now += Rob.Settle + 0.05
 	Robbery._step()
 	check(Robbery.of(b) == nil and b:GetAttribute("Robbed") == nil and b:GetAttribute("SparDown") == nil, "Still down after the robbery")
+	check(b:GetAttribute("Hunt") == nil and b:GetAttribute("Spar") == nil, "Robbed, back at base with the kit still out")
 	check(b:GetAttribute("Killed") == nil, "Still dead back at base")
 	check((rootB.Position - (center + Vector3.new(0, 3, 0))).Magnitude < 1, "Not back at base")
 	check(hB.Health == hB.MaxHealth, "Not back at base whole")

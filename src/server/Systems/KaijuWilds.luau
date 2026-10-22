@@ -117,6 +117,8 @@
 	                                            element, leans it)
 	  KaijuWilds.pickCritter(rng, home?) -> roster id  one on its own (never ranged)
 	  KaijuWilds.isCritter(enemy) -> boolean    a rift's critter (not a wild kaiju)
+	  KaijuWilds.engagedWith(player, within) -> boolean   in a fight with a wild
+	                                            kaiju (or taming one): fewer rifts
 	  KaijuWilds.critterOf(model) -> enemy?     the rift's critter a model is
 	  KaijuWilds.bonk(enemy, player, from) -> boolean   a pickaxe's bonk on a critter
 	  KaijuWilds.rift(at, facing, opts?) -> timeline?  opens a rift (FrontierServer
@@ -410,6 +412,22 @@ local function engage(wild: Wild, player: Player?, now: number)
 end
 local function engaged(wild: Wild, player: Player?): boolean
 	return player ~= nil and player.Parent ~= nil and wild.Engaged[player] ~= nil
+end
+
+-- Whether `player` is in a fight with a wild kaiju (started on one, and
+-- did something in it in the last `within` seconds) or casting a tame on
+-- one: FrontierServer holds its rifts back for them (Frontier.Engaged).
+function KaijuWilds.engagedWith(player: Player, within: number): boolean
+	local now = os.clock()
+	for enemy, wild in wilds do
+		if not wild.Bug and enemy.Alive then
+			local at = wild.Engaged[player]
+			if (at and now - at <= within) or (wild.Taming and wild.Taming.Player == player) then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 -- Its foes near a point (for its E): only those who started on it (a

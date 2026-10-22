@@ -38,7 +38,11 @@ check(
 	"Killed in the core, not sent home after a moment"
 )
 check(has(frontier, "Done = sentHome"), "Robbed out there, not sent home after")
-check(has(frontier, 'local function sentHome(player: Player)\n\tplayer:SetAttribute("Killed", nil)'), "Still killed back at base")
+check(
+	has(frontier, 'local function sentHome(player: Player)\n\tFrontierServer.kitAway(player)\n\tplayer:SetAttribute("Killed", nil)'),
+	"Still killed back at base, or the kit still out"
+)
+check(has(source("src/server/Main.server.luau"), "FrontierServer.kitAway = SparServer.unpair"), "Back at base, a spar not ended")
 check(has(frontier, '"You were killed... the critters are coming for your gems!"'), "Not told they were killed")
 -- (Not in a spar with another player, nor the Rift: still before the kill.)
 do

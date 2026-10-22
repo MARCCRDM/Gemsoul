@@ -76,7 +76,8 @@ local function markOf(model: Model, root: BasePart): Mark
 		OutlineTransparency = 0,
 		DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
 	}, model)
-	-- (In PlayerGui, so its words are translated: Translate.)
+	-- (In PlayerGui, so its words are translated: Translate. Just over its
+	-- plate, WildBars: the same spot, a plate's height and a bit higher.)
 	local height = model:GetExtentsSize().Y
 	local board = new("BillboardGui", {
 		Name = "TameReadyBoard",
@@ -85,7 +86,8 @@ local function markOf(model: Model, root: BasePart): Mark
 		LightInfluence = 0,
 		MaxDistance = SHOW,
 		Size = UDim2.fromOffset(200, 30),
-		StudsOffsetWorldSpace = Vector3.new(0, height * 0.5 + 3.6, 0),
+		StudsOffsetWorldSpace = Vector3.new(0, height * 0.5 + 1.4, 0),
+		SizeOffset = Vector2.new(0, 1.3),
 	}, player:WaitForChild("PlayerGui"))
 	local text = new("TextLabel", {
 		BackgroundTransparency = 1,

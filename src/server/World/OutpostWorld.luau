@@ -2197,12 +2197,15 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	end
 	local benchRamps = benches(ground, at)
 	craterRim(ground, at)
+	-- (The edge, for now: Shared.Outpost.Edge. Each player's client draws
+	-- the dome over it as they come near: Client.EdgeDome.)
+	local edge = if OutpostWorld.Rules and OutpostWorld.Rules.Edge then OutpostWorld.Rules.Edge else 474
 	for i = 0, 71 do
 		local a = i / 72 * math.pi * 2
 		local w = solid(
 			part(
 				ground,
-				at * CFrame.new(math.cos(a) * 474, 40, math.sin(a) * 474) * CFrame.Angles(0, -a, 0),
+				at * CFrame.new(math.cos(a) * edge, 40, math.sin(a) * edge) * CFrame.Angles(0, -a, 0),
 				Vector3.new(4, 80, 44),
 				RIM,
 				nil,

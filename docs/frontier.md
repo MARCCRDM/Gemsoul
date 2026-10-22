@@ -246,6 +246,23 @@ YOU** tag sits at the right of the screen while you are. The server sets
 
 ![Out alone and hurt: the ALONE and HEAL AT THE SHELTER tags on the right (HUD rendered from the game's code; the world is a stand-in)](frontier/alone-tags.png)
 
+### Fighting a wild kaiju: fewer rifts
+
+While you're in a fight with a wild kaiju out past the core (you started on
+it and did something in the fight in the last 15 seconds, or you're
+casting a catch on it), the frontier holds back so the fight stays yours
+(`Frontier.Engaged`, `KaijuWilds.engagedWith`):
+
+| | Usually | In a fight with a wild kaiju |
+| --- | --- | --- |
+| Noise (swings and seconds out there) | as above (alone: twice) | a quarter of that |
+| Gap after an encounter | 8 seconds (alone: 4) | 30 seconds |
+| Wandering rifts | may open by you | never by you |
+
+Going quiet for 15 seconds (or the kaiju knocked out) ends it. The server
+sets `FrontierEngaged` on you each half second. See
+[wild-bars-and-edge.md](wild-bars-and-edge.md).
+
 ### Wandering rifts
 
 Every 40 to 80 seconds the frontier tears open by itself, 35 to 70 studs from
@@ -375,7 +392,8 @@ first (`Robbery`, `Frontier.Rob`):
   through your pouch! · Back to base in 8**;
 - after 8 seconds, or a moment after there's nothing left to take, you're
   back at base on your feet at full health (a few seconds' shield, **BACK
-  AT BASE**), your haul cleared, and a card tells you what they took ("You
+  AT BASE**) with your pick out, not your kit (miner mode:
+  `FrontierServer.kitAway`), your haul cleared, and a card tells you what they took ("You
   were killed out in the quarry and the critters went through your
   pouch."):
 

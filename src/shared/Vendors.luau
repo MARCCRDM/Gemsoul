@@ -304,7 +304,7 @@ Vendors.InfoBot = {
 				},
 				{
 					Text = "One got knocked out",
-					Reply = "It recovers on its own after a cooldown, longer at higher levels, and comes back weak, at 10% health: until it's full again, gems heal it at a third of their power. Or revive it now for Robux, at half health and not weak.",
+					Reply = "It recovers on its own after a cooldown, longer at higher levels, and comes back at 15% health: heal it with gems. Or revive it now for Robux, at half health.",
 				},
 				{
 					Text = "How do I catch a wild kaiju?",

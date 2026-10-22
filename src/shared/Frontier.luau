@@ -46,6 +46,9 @@
 	                 critters climb out of it one by one and roam that patch
 	                 for about a minute, going for whoever comes close. Go
 	                 round it, or bring your kaiju.
+	In a fight with a wild kaiju (Engaged), the frontier holds back: your
+	noise comes slower (Engaged.Noise), encounters wait longer apart
+	(Engaged.Gap), and no wandering rift opens by you.
 	Stirred up: the longer you mine out there, the harder the frontier
 	pushes back (Disturbance): every swing stirs it, and it settles again
 	once you stop or head back to the core. Stirred up, your swings draw
@@ -341,6 +344,17 @@ Frontier.Alone = {
 	Levels = 2,
 	Damage = 1.6,
 	Note = "No kaiju out with you: critters come sooner, more of them, and they hit harder.",
+}
+-- In a fight with a wild kaiju (you started on one and did something in
+-- it in the last For seconds, or you're casting a tame on one: Server.
+-- KaijuWilds.engagedWith), the frontier holds back so the fight stays
+-- yours: your swings and seconds out there make Noise times the noise
+-- (alone or not), the next encounter waits Gap seconds after one, and no
+-- wandering rift opens by you.
+Frontier.Engaged = {
+	Noise = 0.25,
+	Gap = 30,
+	For = 15,
 }
 -- Back at base: in the Shelter's footprint (its half size, x and z, round
 -- the Outpost's middle: OutpostWorld's Shelter.Box), or more than Below
@@ -848,7 +862,8 @@ end
 -- A player's mining noise after `swings` swings and `seconds` seconds out
 -- in `band` (the core adds nothing). `roll` (0..1) sets each swing's share
 -- within Noise.Spread; `stir` (0..1) makes each swing louder; `alone` (no
--- kaiju out) makes it all Alone.Noise times as loud.
+-- kaiju out) makes it all Alone.Noise times as loud, `engaged` (in a fight
+-- with a wild kaiju) Engaged.Noise times.
 function Frontier.noise(
 	noise: number,
 	band: string,
@@ -856,7 +871,8 @@ function Frontier.noise(
 	seconds: number,
 	roll: number?,
 	stir: number?,
-	alone: boolean?
+	alone: boolean?,
+	engaged: boolean?
 ): number
 	local swing, idle = Frontier.Noise.Swing[band], Frontier.Noise.Idle[band]
 	if not swing then
@@ -866,11 +882,15 @@ function Frontier.noise(
 	local share = spread[1] + (spread[2] - spread[1]) * (roll or 0.5)
 	local louder = 1 + Frontier.Disturbance.Noise * math.clamp(stir or 0, 0, 1)
 	local made = swing * swings * share * louder + idle * seconds
-	return noise + made * (if alone then Frontier.Alone.Noise else 1)
+	return noise + made * (if alone then Frontier.Alone.Noise else 1) * (if engaged then Frontier.Engaged.Noise else 1)
 end
 
--- Seconds after an encounter before the next can come: sooner alone.
-function Frontier.gap(alone: boolean?): number
+-- Seconds after an encounter before the next can come: sooner alone,
+-- later in a fight with a wild kaiju (`engaged`, alone or not).
+function Frontier.gap(alone: boolean?, engaged: boolean?): number
+	if engaged then
+		return Frontier.Engaged.Gap
+	end
 	return if alone then Frontier.Alone.Gap else Frontier.Noise.Gap
 end
 

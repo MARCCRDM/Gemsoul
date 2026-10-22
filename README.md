@@ -192,6 +192,8 @@ Buying opens Roblox's purchase prompt (coins while `Config.TestCosmeticPrice` is
 
 **Top Players.** Global leaderboards (best gem ever owned, Wilds kills, Season level), or the current server when data stores aren't available. In the Shelter they're drawn as the **Hall of Fame**: PvP (1v1 duels, 1v1 + Kaiju, Kaiju battles) and PvE (bosses slain, gems mined); see [docs/hall-of-fame.md](docs/hall-of-fame.md).
 
+**The quarry's edge.** For now the Outpost ends at a force-field dome over the crater's rim that lights up as you come near and reads **EXPANSION COMING SOON**. Wild kaiju show their name, level and health over their heads, rifts hold back while you fight one, and you're back at base with your pick out after you're killed; see [docs/wild-bars-and-edge.md](docs/wild-bars-and-edge.md).
+
 ## Coins, Marks and getting started
 
 - **Two currencies.** *Coins* buy rough stones from Garrick and laser cuts from Ilsa. You get them from a **daily reward** (75 coins, plus 25 more for each day of your streak, up to a week) and by selling stones to **Tamsin** at the Market (50% of value). *Guild Marks* are only for the Crafting Hall and come from selling stones to Hilde (60% of value).

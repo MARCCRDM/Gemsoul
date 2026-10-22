@@ -247,6 +247,12 @@ since the fighting counts as danger.
 
 ## Weak revives, and auto heal with Uncommons
 
+> **Changed since.** The third-power heal for a weak kaiju was taken out
+> again: one back by itself is at 15% health and gems heal it like any hurt
+> kaiju. Every gem heals a quarter less than it used to (7.5% a point of
+> power instead of 10%). See [kaiju.md](kaiju.md#knocked-out) and
+> [wild-bars-and-edge.md](wild-bars-and-edge.md).
+
 **A kaiju back by itself.** Once its wait is up, a knocked-out kaiju comes
 back **weak, at 10% of its health** (`Kaiju.Revive.Health`), and gems heal
 it at a third till it's full again (`record.Weak`, `Kaiju.Revive.Weak`), so

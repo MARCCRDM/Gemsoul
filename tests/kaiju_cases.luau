@@ -260,27 +260,6 @@ check(Kaiju.reviveIn(fireKaiju, 1000) == wait, "The time left to its revive")
 check(Kaiju.reviveIn(fireKaiju, 1000 + wait + 5) == 0, "Past its revive time, still waiting")
 check(Kaiju.reviveIn({ Level = 3 }, 1000) == 0, "One that's up has a revive wait")
 fireKaiju.DownUntil = nil
--- Back by itself it's weak (record.Weak): gems heal it at Revive.Weak of
--- their power till it's full, so a knockout costs about three times the
--- gems; bought back, it isn't.
-check(Kaiju.Revive.Weak > 0 and Kaiju.Revive.Weak <= 0.4, "A weak kaiju heals as fast as a well one")
-fireKaiju.Down, fireKaiju.Health = nil, math.floor(most * Kaiju.Revive.Health + 0.5)
-local wellPlan = Kaiju.infusePlan(fireKaiju, manyStones)
-fireKaiju.Weak = true
-check(Kaiju.healShare(fireKaiju) == Kaiju.Revive.Weak, "A weak kaiju's gems count for all their power")
-check(
-	Kaiju.infusePower(gem("Rare", neutral), fireKaiju) == Infuse.Power.Rare * Kaiju.Revive.Weak,
-	"A gem isn't worth less in a weak kaiju"
-)
-local weakPlan = Kaiju.infusePlan(fireKaiju, manyStones)
-check(weakPlan.Health >= most - 1e-6 and wellPlan.Health >= most - 1e-6, "200 Commons didn't heal it to full")
-check(#weakPlan.Used >= #wellPlan.Used * 2.5, "Weak, it doesn't take far more gems to heal")
-check(#Kaiju.healPick(fireKaiju, manyStones, true) >= #Kaiju.healPick({
-	Species = fireKaiju.Species, Level = fireKaiju.Level, Element = fireKaiju.Element, Health = fireKaiju.Health,
-}, manyStones, true), "healPick picks fewer gems for a weak one")
-fireKaiju.Down = true
-check(Kaiju.healShare(fireKaiju) == 1, "One that's down counts as weak")
-fireKaiju.Down, fireKaiju.Weak, fireKaiju.Health = true, nil, 0
 -- Danger: no healing in a fight (hit or hitting lately, or critters near).
 check(Kaiju.Danger.Calm > 0 and Kaiju.Danger.Radius > 0, "The danger rules")
 local function batch(element, count)

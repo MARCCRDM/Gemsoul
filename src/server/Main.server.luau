@@ -141,6 +141,8 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			KaijuWilds.knockDown = SparServer.knockDown
 			-- Knocked out out there, the critters come to rob you (Server.Robbery).
 			SparServer.onKnockedOut = FrontierServer.knockedOut
+			-- ...and back at base, it's your pick that's out (miner mode).
+			FrontierServer.kitAway = SparServer.unpair
 			-- A Rift Vein surfacing somewhere new takes its dormant rift (and its
 			-- guardian) along; a swing at a vein's rocks wakes its guardian.
 			OutpostServer.onVeinMoved = function(index, scar)

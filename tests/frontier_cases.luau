@@ -453,6 +453,23 @@ do
 	check(type(A.Note) == "string" and #A.Note > 0, "Nothing said when you go out alone")
 end
 
+-- In a fight with a wild kaiju: the frontier holds back ---------------------------------------------------
+do
+	local E, A = Frontier.Engaged, Frontier.Alone
+	check(E.Noise > 0 and E.Noise <= 0.5, "In a fight with a wild kaiju, rifts not much rarer")
+	check(E.Noise * A.Noise < 1, "Alone in a fight with a wild kaiju, rifts no rarer than usual")
+	check(E.Gap >= Frontier.Noise.Gap * 2 and E.For >= 5 and E.For <= 30, "The fight's lull between encounters")
+	for _, band in { "Fringe", "Edge" } do
+		local quiet = Frontier.noise(0, band, 10, 30, 0.5, 0.4)
+		local fighting = Frontier.noise(0, band, 10, 30, 0.5, 0.4, nil, true)
+		check(math.abs(fighting - quiet * E.Noise) < 1e-9, "In a fight, " .. band .. " swings aren't quieter")
+		local lone = Frontier.noise(0, band, 10, 30, 0.5, 0.4, true, true)
+		check(math.abs(lone - quiet * A.Noise * E.Noise) < 1e-9, "Alone in a fight, " .. band .. " swings aren't quieter")
+	end
+	check(Frontier.noise(0.3, "Core", 10, 60, 0.5, 1, nil, true) == 0.3, "In a fight in the core, noise")
+	check(Frontier.gap(nil, true) == E.Gap and Frontier.gap(true, true) == E.Gap, "In a fight, the next encounter comes as soon")
+end
+
 -- Back at base: the Shelter's footprint, or the hall under it ----------------------------------------------
 do
 	local box = Vector2.new(88, 64)
@@ -918,7 +935,9 @@ do
 	local server = fs.readFile(ROOT .. "/src/server/Systems/FrontierServer.luau")
 	check(server:find('SetAttribute("AtBase"', 1, true) ~= nil, "Nobody's told they're back at base")
 	check(server:find("#KaijuServer.team(player) == 0", 1, true) ~= nil, "Alone isn't 'no kaiju out'")
-	check(server:find("Frontier.gap(alone(player))", 1, true) ~= nil, "Encounters don't come sooner alone")
+	check(server:find("Frontier.gap(alone(player), engaged(player))", 1, true) ~= nil, "Encounters don't come sooner alone")
+	check(server:find("KaijuWilds.engagedWith(player, Frontier.Engaged.For)", 1, true) ~= nil, "A wild kaiju's fight doesn't hold the rifts back")
+	check(server:find("and not engaged(entry.Player)", 1, true) ~= nil, "A wandering rift opens by someone fighting a wild kaiju")
 	local regen = fs.readFile(ROOT .. "/src/server/Systems/HealthRegen.luau")
 	check(regen:find('GetAttribute("AtBase") == true', 1, true) ~= nil, "Lobby healing doesn't need the base")
 	local wilds = fs.readFile(ROOT .. "/src/server/Systems/KaijuWilds.luau")
