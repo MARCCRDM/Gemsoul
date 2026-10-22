@@ -1940,10 +1940,16 @@ local function wildDied(enemy)
 end
 
 -- A wild kaiju at `at` (on the ground there), its `level`, turned to
--- `facing` (any way, if not given), of `species` (any, if not given);
--- `guard`, the guarded vein's (bigger).
+-- `facing` (any way, if not given), of `species` (any that roams there, if
+-- not given: Kaiju.wildKinds); `guard`, the guarded vein's (bigger, one of
+-- the Vein's own kinds).
 local function newWild(at: Vector3, level: number, guard: boolean, facing: Vector3?, species: string?): Wild
-	species = species or Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
+	if not species then
+		local band = if guard then "Vein" else Frontier.band(Frontier.distance(at, Outpost.Location.Position))
+		local kinds = Kaiju.wildKinds(band)
+		kinds = if #kinds > 0 then kinds else Kaiju.Starters
+		species = kinds[rng:NextInteger(1, #kinds)]
+	end
 	-- (Out in one of the biomes, mostly of its element: Frontier.Biome.)
 	local biome = Frontier.biomeAt(at - Outpost.Location.Position)
 	local element = Frontier.pickElement(biome and biome.Element, rng)
@@ -2110,9 +2116,11 @@ local function packFor(): Pack?
 			end
 		end
 		if apart then
-			-- (A kind no other pack is, if there's one.)
+			-- (A kind that roams that far out, Kaiju.wildKinds, and no other
+			-- pack is, if there's one.)
+			local roams = Kaiju.wildKinds(Frontier.band(r))
 			local kinds = {}
-			for _, species in Kaiju.Order do
+			for _, species in roams do
 				local taken = false
 				for _, other in packs do
 					taken = taken or other.Species == species
@@ -2121,7 +2129,7 @@ local function packFor(): Pack?
 					table.insert(kinds, species)
 				end
 			end
-			kinds = if #kinds > 0 then kinds else Kaiju.Order
+			kinds = if #kinds > 0 then kinds else roams
 			local roam = Kaiju.Roam
 			local pack: Pack = {
 				Den = den,

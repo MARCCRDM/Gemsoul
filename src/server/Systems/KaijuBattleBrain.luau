@@ -33,6 +33,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
+local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local KaijuAbilities = require(script.Parent.KaijuAbilities)
 
@@ -90,6 +91,9 @@ local function unitOf(pet)
 		pet.Unit = unit
 	end
 	unit.Role = KaijuRoles.of(pet.Record.Species)
+	-- (Its kind's Guard: a breaker goes for the toughest.)
+	local species = Kaiju.Species[pet.Record.Species]
+	unit.Guard = species and species.Guard or 0
 	unit.Pos = pet.Root.Position
 	unit.Health = pet.Humanoid.Health
 	unit.MaxHealth = pet.Humanoid.MaxHealth
@@ -199,7 +203,9 @@ local function strike(pet, brain, foe, now: number, host)
 	if role.Range then
 		local root = pet.Root
 		local from = root.Position + root.CFrame.LookVector * root.Size.Z * 0.5
-		sized("Shot", nil, from, foe.Root.Position, color, "Spine")
+		-- (Its kind's shot: a Razorback's spine, else a bolt in its element.)
+		local ranged = KaijuFight.style(pet.Record.Species).Ranged
+		sized("Shot", nil, from, foe.Root.Position, color, ranged and ranged.Shot)
 	end
 	if d > reach then
 		return -- (it got away)

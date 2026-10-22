@@ -1,5 +1,10 @@
 # Kaiju roster expansion: 90 new kinds
 
+> **In the game (Oct 22):** 28 of the first thirty below (all but Prisma and
+> Clawtide), with the Breaker and Warden roles, their own kits and models.
+> What shipped, and where it differs from this proposal, is in
+> [kaiju-roster.md](kaiju-roster.md). Kinds 31 to 90 are still a proposal.
+
 A proposal (Oct 21, draft, not signed off). The game has four kinds of mini
 kaiju, each in four elements (`Shared.Kaiju.Species`, `Shared.KaijuRoles`;
 see [kaiju.md](kaiju.md)). This adds **90 more kinds** (in three sets of thirty), drawn from the

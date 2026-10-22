@@ -791,6 +791,19 @@ function KaijuServer.caster(pet: Pet)
 			KaijuServer.place(pet.Model, spot, spot + direction)
 			return spot
 		end,
+		Allies = function(center: Vector3, radius: number)
+			-- (Its side in a battle; else the rest of its team out.)
+			local battle = KaijuServer.battle(pet, os.clock())
+			local pool = if battle and battle.Allies then battle.Allies else teams[pet.Owner] or {}
+			local list = {}
+			for _, other in pool do
+				local up = other.Model.Parent ~= nil and other.Humanoid.Health > 0
+				if up and flat(other.Root.Position - center).Magnitude <= radius then
+					table.insert(list, { Root = other.Root, Body = other, Humanoid = other.Humanoid })
+				end
+			end
+			return list
+		end,
 	}
 end
 

@@ -96,14 +96,11 @@ local Brain = load("KaijuBattleBrain")
 check(KaijuRoles.of("Carapace") == "Tank", "A Carapace isn't a tank")
 check(KaijuRoles.of("Bulwark") == "Warrior", "A Bulwark isn't a warrior")
 check(KaijuRoles.of("Razorback") == "Ranged", "A Razorback isn't ranged")
-for _, role in KaijuRoles.Order do
-	local spec = KaijuRoles.Roles[role]
-	check(spec and spec.Name and spec.Blurb, role .. " has no name or blurb")
-	local kit = KaijuRoles.Kits[role]
+local function wholeKit(kit, owner: string, role: string)
 	for _, key in { "Q", "E", "R" } do
 		local id = kit[key]
 		local move = KaijuRoles.Moves[id]
-		check(move and move.Key == key and move.Role == role, role .. "'s " .. key .. " isn't its own")
+		check(move and move.Key == key and move.Role == role, owner .. "'s " .. key .. " isn't its own")
 		check(
 			move.Name and move.Description and move.IconSource and move.From,
 			id .. " is missing a name, words, an icon or what it's from"
@@ -111,6 +108,58 @@ for _, role in KaijuRoles.Order do
 		check(Kaiju.AbilityPlans[id] == move.Plan, id .. " can't be cast")
 		check(Kaiju.moveInfo(id) == move, id .. " isn't found by its id")
 	end
+end
+for _, role in KaijuRoles.Order do
+	local spec = KaijuRoles.Roles[role]
+	check(spec and spec.Name and spec.Blurb, role .. " has no name or blurb")
+	-- (A breaker's and a warden's moves are only ever their own kind's.)
+	if KaijuRoles.Kits[role] then
+		wholeKit(KaijuRoles.Kits[role], role, role)
+	end
+end
+-- The roster's kinds: three moves of their own each, in their role, no
+-- other kind's; an assassin's E is how it gets in (a leap or a vanish).
+do
+	local Roster = load("KaijuRoster")
+	local owner = {}
+	for _, kind in Roster.Order do
+		local role = KaijuRoles.of(kind)
+		check(role == Roster.Kinds[kind].Role, kind .. " isn't its role")
+		local kit = KaijuRoles.kit(kind)
+		check(kit == Roster.Kinds[kind].Kit, kind .. " hasn't its own kit")
+		wholeKit(kit, kind, role)
+		for _, key in { "Q", "E", "R" } do
+			local id = kit[key]
+			check(owner[id] == nil, id .. " is two kinds' move")
+			owner[id] = kind
+			check(KaijuRoles.Moves[id].Kind == kind, id .. " doesn't name its kind")
+		end
+		if role == "Assassin" then
+			local shape = KaijuRoles.Moves[kit.E].Plan.Shape
+			check(shape == "Leap" or shape == "Vanish", kind .. "'s E doesn't get it in")
+		elseif role == "Tank" then
+			check(KaijuRoles.Moves[kit.E].Plan.Shape == "Taunt", kind .. "'s E doesn't draw them")
+		end
+		check(KaijuRoles.Moves[kit.R].When, kind .. "'s R has no moment")
+		local woke = KaijuRoles.move(kind, "E", 1)
+		local _, early = KaijuRoles.move(kind, "R", 9)
+		check(woke == kit.E and not early, kind .. "'s moves don't wake as a kit's do")
+	end
+	local count = 0
+	for _ in owner do
+		count += 1
+	end
+	check(count == 84, "Not 84 moves of their own")
+	-- The warden's team moves land on its friends too.
+	local team = 0
+	for _, key in { "Q", "E", "R" } do
+		local plan = KaijuRoles.Moves[KaijuRoles.kit("Moonmoth")[key]].Plan
+		if plan.Team then
+			team += 1
+			check(plan.Shape == "Ward" or plan.Shape == "Mend", "A team move that isn't a ward or a mend")
+		end
+	end
+	check(team >= 2, "The warden doesn't look after its team")
 end
 local roar = KaijuRoles.move("Carapace", "E", 1)
 local _, slamAwake = KaijuRoles.move("Carapace", "Q", 4)
@@ -641,10 +690,13 @@ end
 check(seen >= 8, "Too few of the kits' moves were cast at level 10: " .. seen)
 print(string.format("  level 10: %d of the kits' 12 moves cast", seen))
 
--- 7. The balance: every team of three (kinds may repeat) against every
--- other, in their default places, at levels 1, 5 and 10. No kind's teams
--- win much more or much less than half (KaijuRoles' Power and the kinds'
--- stats, tuned on this).
+-- 7. The balance. The first four: every team of three (kinds may repeat)
+-- against every other, in their default places, at levels 1, 5 and 10; no
+-- kind's teams win much more or much less than half (KaijuRoles' Power and
+-- the kinds' stats, tuned on this). All 32: too many teams for that, so
+-- each kind leads its share of seeded random three-on-threes against teams
+-- drawn from all 32, and no kind's teams may win far more or far less
+-- than half.
 do
 	local power = KaijuRoles.power
 	check(power("Ranged", 1) == 1.4 and power("Ranged", 5) == 1.6 and power("Ranged", 10) == 1.9, "A shooter's power")
@@ -653,15 +705,6 @@ do
 		power("Tank", 10) < power("Warrior", 10) and power("Warrior", 10) < power("Ranged", 10),
 		"The roles' power out of order"
 	)
-	local kinds = Kaiju.Order
-	local teams = {}
-	for a = 1, #kinds do
-		for b = a, #kinds do
-			for c = b, #kinds do
-				table.insert(teams, { kinds[a], kinds[b], kinds[c] })
-			end
-		end
-	end
 	local function squad(team, side, level)
 		local records = {}
 		for i, species in team do
@@ -674,54 +717,118 @@ do
 		end
 		return out
 	end
-	for _, level in { 1, 5, 10 } do
+	-- Plays each pairing in `games`; returns each kind's share of wins.
+	local function play(games, level)
 		local won, played = {}, {}
-		for i, teamA in teams do
-			for j, teamB in teams do
-				if i ~= j then
-					now = 0
-					table.clear(queued)
-					local sideA, sideB = squad(teamA, "A", level), squad(teamB, "B", level)
-					local _, leftA, leftB = battle(sideA, sideB, 90)
-					local shareA, shareB = 0, 0
-					for _, pet in leftA do
-						shareA += pet.Humanoid.Health / pet.Humanoid.MaxHealth
-					end
-					for _, pet in leftB do
-						shareB += pet.Humanoid.Health / pet.Humanoid.MaxHealth
-					end
-					local aWon = if #leftB == 0
-						then 1
-						elseif #leftA == 0 then 0
-						elseif shareA > shareB then 1
-						elseif shareB > shareA then 0
-						else 0.5
-					for _, species in teamA do
-						won[species] = (won[species] or 0) + aWon
-						played[species] = (played[species] or 0) + 1
-					end
-					for _, species in teamB do
-						won[species] = (won[species] or 0) + 1 - aWon
-						played[species] = (played[species] or 0) + 1
-					end
-				end
+		for _, game in games do
+			local teamA, teamB = game[1], game[2]
+			now = 0
+			table.clear(queued)
+			local sideA, sideB = squad(teamA, "A", level), squad(teamB, "B", level)
+			local _, leftA, leftB = battle(sideA, sideB, 90)
+			local shareA, shareB = 0, 0
+			for _, pet in leftA do
+				shareA += pet.Humanoid.Health / pet.Humanoid.MaxHealth
+			end
+			for _, pet in leftB do
+				shareB += pet.Humanoid.Health / pet.Humanoid.MaxHealth
+			end
+			local aWon = if #leftB == 0
+				then 1
+				elseif #leftA == 0 then 0
+				elseif shareA > shareB then 1
+				elseif shareB > shareA then 0
+				else 0.5
+			for _, species in teamA do
+				won[species] = (won[species] or 0) + aWon
+				played[species] = (played[species] or 0) + 1
+			end
+			for _, species in teamB do
+				won[species] = (won[species] or 0) + 1 - aWon
+				played[species] = (played[species] or 0) + 1
 			end
 		end
+		local share = {}
+		for species, n in played do
+			share[species] = won[species] / n
+		end
+		return share
+	end
+
+	local kinds = Kaiju.Starters
+	local teams = {}
+	for a = 1, #kinds do
+		for b = a, #kinds do
+			for c = b, #kinds do
+				table.insert(teams, { kinds[a], kinds[b], kinds[c] })
+			end
+		end
+	end
+	local games = {}
+	for i, teamA in teams do
+		for j, teamB in teams do
+			if i ~= j then
+				table.insert(games, { teamA, teamB })
+			end
+		end
+	end
+	for _, level in { 1, 5, 10 } do
+		local share = play(games, level)
 		local line = {}
 		for _, species in kinds do
-			local share = won[species] / played[species]
 			check(
-				share > 0.4 and share < 0.6,
-				string.format("Level %d: %s's teams win %.0f%%", level, species, share * 100)
+				share[species] > 0.4 and share[species] < 0.6,
+				string.format("Level %d: %s's teams win %.0f%%", level, species, share[species] * 100)
 			)
-			table.insert(line, string.format("%s %.0f%%", species, share * 100))
+			table.insert(line, string.format("%s %.0f%%", species, share[species] * 100))
 		end
-		print(string.format("  level %d, %d battles: %s", level, #teams * (#teams - 1), table.concat(line, ", ")))
+		print(string.format("  level %d, %d battles: %s", level, #games, table.concat(line, ", ")))
+	end
+
+	-- All 32, sampled (a fixed seed: the same battles every run).
+	local seed = 20261021
+	local function roll(n: number): number
+		seed = (seed * 16807) % 2147483647
+		return seed % n + 1
+	end
+	local all = Kaiju.Order
+	local LEAD = 24 -- battles each kind leads (half on each side)
+	local BAND = { 0.28, 0.72 }
+	for _, level in { 1, 5, 10 } do
+		local sampled = {}
+		for _, lead in all do
+			for i = 1, LEAD do
+				local mine = { lead, all[roll(#all)], all[roll(#all)] }
+				local theirs = { all[roll(#all)], all[roll(#all)], all[roll(#all)] }
+				table.insert(sampled, if i % 2 == 0 then { mine, theirs } else { theirs, mine })
+			end
+		end
+		local share = play(sampled, level)
+		local line, low, high = {}, 1, 0
+		for _, species in all do
+			local s = share[species]
+			check(
+				s > BAND[1] and s < BAND[2],
+				string.format("Level %d (all 32): %s's teams win %.0f%%", level, species, s * 100)
+			)
+			low, high = math.min(low, s), math.max(high, s)
+			table.insert(line, string.format("%s %.0f", species, s * 100))
+		end
+		print(
+			string.format(
+				"  level %d, all 32, %d battles (%.0f%% to %.0f%%): %s",
+				level,
+				#sampled,
+				low * 100,
+				high * 100,
+				table.concat(line, ", ")
+			)
+		)
 	end
 end
 
 print(
 	"PASS: "
 		.. checks
-		.. " kaiju role checks (roles and kits, who it picks and where it stands, whole battles: no standing about, onto the next after a kill, 3 on 1, the shooter at the back, the tank's roar, the assassin's leap, inside the court; the balance at levels 1, 5 and 10)"
+		.. " kaiju role checks (roles and kits, who it picks and where it stands, whole battles: no standing about, onto the next after a kill, 3 on 1, the shooter at the back, the tank's roar, the assassin's leap, inside the court; the roster's own kits; the balance at levels 1, 5 and 10, the first four and all 32)"
 )

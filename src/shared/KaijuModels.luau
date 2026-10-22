@@ -15,17 +15,25 @@
 	             two blade arms held up in front, wing cases over a long
 	             abdomen
 
+	The roster's 28 other kinds (Shared.KaijuRoster) are built in
+	Shared.KaijuShapes, from the same helpers, each in its own hide.
+
 	Every model has an invisible HumanoidRootPart (its KaijuHipHeight
 	attribute is the Humanoid's HipHeight), and faces -Z. Its trunk (the
 	part everything else hangs from) sits on a Body joint at its hips, so it
 	can lean, rear up, lunge and crouch in a fight; its legs, arms, jaw and
 	tail hang from the trunk on joints of their own. Every joint is a
 	Motor6D marked for the client's CreatureAnimation (CreatureMotion kinds
-	Body, Stride, Arm, Jaw and Tail, from Shared.CreatureMotion).
+	Body, Stride, Arm, Jaw and Tail, from Shared.CreatureMotion; a flyer's
+	wings flap on Wing joints, and a many-headed kind's heads look about on
+	Head joints). A flyer hovers: its KaijuHover attribute (studs at scale
+	1) is added to its hip height.
 
 	  KaijuModels.build(species, element) -> Model
 	  KaijuModels.scale(model, scale)     resize, keeping the joints' rest poses
 ]]
+local KaijuShapes = require(script.Parent.KaijuShapes)
+
 local KaijuModels = {}
 
 local V, C = Vector3.new, Color3.fromRGB
@@ -448,6 +456,13 @@ local function scythe(model: Model, pal)
 end
 
 local BUILDERS = { Bulwark = bulwark, Razorback = razorback, Carapace = carapace, Scythe = scythe }
+local kit = { make = make, limb = limb, glow = glow, plate = plate, wedge = wedge, claws = claws, root = root, Claw = CLAW }
+for kind, builder in KaijuShapes.install(kit) do
+	local hide = KaijuShapes.Hides[kind]
+	BUILDERS[kind] = function(model, palette)
+		builder(model, palette, hide[1], hide[2])
+	end
+end
 
 -- A kaiju of a species and element, at scale 1, standing at the origin.
 function KaijuModels.build(species: string, element: string): Model
@@ -456,6 +471,11 @@ function KaijuModels.build(species: string, element: string): Model
 	local palette = KaijuModels.Palettes[element] or KaijuModels.Palettes.Fire
 	local builder = BUILDERS[species] or bulwark
 	builder(model, palette)
+	local hover = KaijuShapes.Hover[species]
+	if hover and BUILDERS[species] then
+		model:SetAttribute("KaijuHover", hover)
+		model:SetAttribute("KaijuHipHeight", model:GetAttribute("KaijuHipHeight") + hover)
+	end
 	model:SetAttribute("KaijuSpecies", species)
 	model:SetAttribute("KaijuElement", element)
 	model:SetAttribute("CreatureShape", "Kaiju")
@@ -466,7 +486,9 @@ end
 -- ViewportFrame has no sky and no sun bouncing off the ground, so the slate
 -- hide that reads fine in the world sat near black there: portraits light
 -- it brighter, from the camera's side, and lift the hide Lift of the way
--- toward Hide. The plates, claws and glows keep their colours.
+-- toward Hide. The plates, claws and glows keep their colours. A kind in
+-- a hide of its own (KaijuShapes.Hides) has a dark hide lifted the same
+-- way, the darker the more; a pale one stays as it is.
 KaijuModels.Portrait = {
 	Ambient = C(196, 198, 210),
 	LightColor = C(222, 216, 204),
@@ -477,11 +499,21 @@ KaijuModels.Portrait = {
 local function sameColor(a: Color3, b: Color3): boolean
 	return math.abs(a.R - b.R) + math.abs(a.G - b.G) + math.abs(a.B - b.B) < 1.5 / 255
 end
+local function darkness(color: Color3): number
+	local light = 0.3 * color.R + 0.59 * color.G + 0.11 * color.B
+	return math.clamp((0.5 - light) / 0.3, 0, 1)
+end
 function KaijuModels.forPortrait(model: Model): Model
 	local look = KaijuModels.Portrait
+	local hide = KaijuShapes.Hides[model:GetAttribute("KaijuSpecies") or ""]
 	for _, part in model:GetDescendants() do
-		if part:IsA("BasePart") and (sameColor(part.Color, BODY) or sameColor(part.Color, BODY2)) then
+		if not part:IsA("BasePart") then
+			continue
+		end
+		if sameColor(part.Color, BODY) or sameColor(part.Color, BODY2) then
 			part.Color = part.Color:Lerp(look.Hide, look.Lift)
+		elseif hide and (sameColor(part.Color, hide[1]) or sameColor(part.Color, hide[2])) then
+			part.Color = part.Color:Lerp(look.Hide, look.Lift * darkness(part.Color))
 		end
 	end
 	return model
@@ -499,9 +531,11 @@ function KaijuModels.scale(model: Model, scale: number)
 			joint:SetAttribute("CreatureRest", joint.C0)
 		end
 	end
-	local hip = model:GetAttribute("KaijuHipHeight")
-	if hip then
-		model:SetAttribute("KaijuHipHeight", hip * scale / before)
+	for _, key in { "KaijuHipHeight", "KaijuHover" } do
+		local studs = model:GetAttribute(key)
+		if studs then
+			model:SetAttribute(key, studs * scale / before)
+		end
 	end
 end
 

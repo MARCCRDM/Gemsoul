@@ -471,7 +471,7 @@ function KaijuRoll.play(after: (() -> ())?)
 			if #decoys >= 3 then
 				break
 			end
-			local s = Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
+			local s = Kaiju.Starters[rng:NextInteger(1, #Kaiju.Starters)]
 			local e = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
 			if not used[s .. "/" .. e] then
 				used[s .. "/" .. e] = true

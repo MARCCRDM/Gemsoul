@@ -724,6 +724,69 @@ check(KaijuAbilities._onLine(Vector3.new(0, 0, -5), Vector3.zero, Vector3.new(0,
 check(not KaijuAbilities._onLine(Vector3.new(3, 0, -5), Vector3.zero, Vector3.new(0, 0, -10), 1), "Off the line, hit")
 check(not KaijuAbilities._onLine(Vector3.new(0, 0, 5), Vector3.zero, Vector3.new(0, 0, -10), 1), "Behind it, hit")
 
+-- The roster's own flags: a Team mend or ward lands on every ally near it
+-- (not one far off), and a move that Heals mends its caster as it lands.
+do
+	local function teamCaster(id)
+		local near = { Root = root(Vector3.new(6, 0, 0)), Body = {}, Humanoid = { Health = 100, MaxHealth = 300 } }
+		local far = { Root = root(Vector3.new(90, 0, 0)), Body = {}, Humanoid = { Health = 100, MaxHealth = 300 } }
+		local caster = {
+			Model = make("Model"),
+			Root = root(Vector3.zero),
+			Element = "Frost",
+			Ability = id,
+			Damage = 100,
+			Body = {},
+			Humanoid = { Health = 50, MaxHealth = 200 },
+			Foes = function()
+				return {}
+			end,
+			Hit = function() end,
+			Alive = function()
+				return true
+			end,
+			Allies = function(center, radius)
+				local list = {}
+				for _, ally in { near, far } do
+					if (ally.Root.Position - center).Magnitude <= radius then
+						table.insert(list, ally)
+					end
+				end
+				return list
+			end,
+		}
+		return caster, near, far
+	end
+	local cocoon = Kaiju.AbilityPlans.K_SilkCocoon
+	check(cocoon.Team and cocoon.Shape == "Mend", "Silk Cocoon isn't a team mend")
+	local caster, near, far = teamCaster("K_SilkCocoon")
+	check(KaijuAbilities.cast(caster, { Root = root(Vector3.new(0, 0, -5)) }, "K_SilkCocoon"), "No Silk Cocoon")
+	flush()
+	check(math.abs(near.Humanoid.Health - (100 + 300 * cocoon.Heal)) < 1e-6, "A team mend didn't mend the ally near it")
+	check(far.Humanoid.Health == 100, "A team mend reached an ally far off")
+	check(math.abs(caster.Humanoid.Health - (50 + 200 * cocoon.Heal)) < 1e-6, "A team mend didn't mend its caster")
+	local storm = Kaiju.AbilityPlans.K_ScaleStorm
+	caster, near, far = teamCaster("K_ScaleStorm")
+	check(KaijuAbilities.cast(caster, { Root = root(Vector3.new(0, 0, -5)) }, "K_ScaleStorm"), "No Scale Storm")
+	check(near.Body.Defense and near.Body.Defense.Reduce == storm.Reduce, "A team ward didn't ward the ally near it")
+	check(far.Body.Defense == nil, "A team ward reached an ally far off")
+	check(caster.Body.Defense ~= nil, "A team ward didn't ward its caster")
+	flush()
+	check(near.Body.Defense == nil, "A team ward on an ally outlasted it")
+	for _, id in { "K_SapDrain", "K_Devour" } do
+		local plan = Kaiju.AbilityPlans[id]
+		check(plan and plan.Heal and plan.Heal > 0, id .. " doesn't heal")
+		local healer = teamCaster(id)
+		healer.Foes = function(center, radius)
+			local foe = { Root = root(Vector3.new(0, 0, -5)), Name = "foe" }
+			return if (foe.Root.Position - center).Magnitude <= radius then { foe } else {}
+		end
+		check(KaijuAbilities.cast(healer, { Root = root(Vector3.new(0, 0, -5)), Name = "foe" }, id), id .. " didn't cast")
+		flush()
+		check(math.abs(healer.Humanoid.Health - (50 + 200 * plan.Heal)) < 1e-6, id .. " didn't heal its caster")
+	end
+end
+
 -- A kaiju's moves are its size (AbilityPlans are a player's): a half-size
 -- caster's Supernova lands, and is drawn, half as wide, every effect of it
 -- "Sized" for the client; a full-size one's reaches the foe further out.
@@ -2363,6 +2426,12 @@ local guard = KaijuWilds._guardian()
 check(guard ~= nil and guard.Guard == true and not guard.Bug, "No vein guardian")
 local keeper = guard.Enemy
 check(guard.Level >= 16 and guard.Level <= 20, "A guardian at level " .. guard.Level)
+check(Kaiju.Species[guard.Species].Habitat == "Vein", "The guardian isn't one of the Vein's own kinds")
+-- (And every pack roams where its kind lives: Kaiju.wildKinds of its den's band.)
+for _, pack in KaijuWilds._packs do
+	local band = Frontier.band(Frontier.distance(pack.Den, shared("Outpost").Location.Position))
+	check(table.find(Kaiju.wildKinds(band), pack.Species), pack.Species .. " roams outside its habitat")
+end
 check(keeper.Model:GetAttribute("KaijuGuardian") == true, "The guardian isn't marked")
 check(keeper.Model:GetAttribute("KaijuWild") == true, "The guardian can't be tamed")
 local guardHealth = Kaiju.stats(guard.Species, guard.Level, guard.Soul.Tier).Health * Kaiju.Wild.Health
@@ -3507,7 +3576,12 @@ local function teamFights()
 	KaijuServer._think(prey, now, 0.15)
 	check(front.Humanoid.Health < front.Humanoid.MaxHealth, "The heavy missed its foe")
 	check(beside.Humanoid.Health < beside.Humanoid.MaxHealth, "The heavy didn't sweep through the one beside")
-	check(behind.Humanoid.Health == behind.Humanoid.MaxHealth, "The heavy hit one behind it")
+	-- (A kind whose heavy goes all the way round, an Ironhide's roll, hits it too.)
+	if (prey.Fighter.Style.Arc or 150) < 300 then
+		check(behind.Humanoid.Health == behind.Humanoid.MaxHealth, "The heavy hit one behind it")
+	else
+		check(behind.Humanoid.Health < behind.Humanoid.MaxHealth, "A sweep all the way round missed one behind it")
+	end
 	local swept = beside.Humanoid.MaxHealth - beside.Humanoid.Health
 	local struck = front.Humanoid.MaxHealth - front.Humanoid.Health
 	check(swept < struck, "The sweep hit as hard as the blow")

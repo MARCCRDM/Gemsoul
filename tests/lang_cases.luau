@@ -170,5 +170,33 @@ same(
 	"BOTÍN DE LA GRIETA: Sam gana la gema (Térmico). Sam 57 · Bo 33",
 	"Who won the Rift boss's gem"
 )
+-- The roster's 28 kinds: every blurb, move (its name and its words, numbers
+-- and all) and blow comes out in Spanish.
+do
+	local untranslated = {}
+	local function spanish(text: string)
+		if Lang.translate(text) == text then
+			table.insert(untranslated, text)
+		end
+	end
+	for _, id in KaijuRoster.Order do
+		local kind = KaijuRoster.Kinds[id]
+		spanish(kind.Blurb)
+		for _, key in { "E", "Q", "R" } do
+			local move = KaijuRoster.Moves[kind.Kit[key]]
+			spanish(move.Name)
+			spanish(move.Description)
+		end
+		for _, blow in kind.Fight.Names do
+			spanish(blow)
+		end
+		if kind.Fight.Ranged then
+			spanish(kind.Fight.Ranged.Name)
+		end
+	end
+	check(#untranslated == 0, "Not in Spanish: " .. table.concat(untranslated, " | "))
+	same(Lang.translate("BREAKER"), "ROMPEDOR", "The breaker's role")
+	same(Lang.translate("WARDEN"), "GUARDIÁN", "The warden's role")
+end
 Lang.setLocale("en")
-print("PASS: the frontier's and the Rift's text in Spanish")
+print("PASS: the frontier's, the Rift's and the kaiju roster's text in Spanish")

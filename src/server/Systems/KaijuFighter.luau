@@ -281,7 +281,7 @@ local function spine(f, foe, now: number, distance: number)
 	local root = f.Root
 	local color = GemConfig.ElementColors[f.Element] or Color3.new(1, 1, 1)
 	local from = root.Position + root.CFrame.LookVector * root.Size.Z * 0.5 + Vector3.new(0, root.Size.Y * 0.2, 0)
-	fx(f, "Shot", nil, from, foe.Root.Position, color, "Spine")
+	fx(f, "Shot", nil, from, foe.Root.Position, color, ranged.Shot)
 	if distance * Brain.Reach / f.Reach > ranged.Reach + KaijuFight.HitRange then
 		return
 	end
@@ -351,9 +351,9 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 	local heavy = action.Kind == "Heavy"
 	local color = GemConfig.ElementColors[f.Element] or Color3.new(1, 1, 1)
 	local cleave = KaijuFight.Cleave
-	local arc = if heavy then (if f.Species == "Razorback" then cleave.RazorArc else cleave.Arc) else 100
+	local arc = if heavy then f.Style.Arc or cleave.Arc else 100
 	fx(f, "Swing", nil, f.Root.Position, dir, f.Reach + 1, arc, color, heavy)
-	if heavy and f.Species ~= "Razorback" then
+	if heavy and not f.Style.Ranged then
 		-- A stomp or a slam: a shockwave at its feet.
 		local feet = f.Root.Position - Vector3.new(0, f.Root.Size.Y / 2 + f.Humanoid.HipHeight, 0)
 		fx(f, "Nova", feet, f.Reach + 0.5, color, 0)

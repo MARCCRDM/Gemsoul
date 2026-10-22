@@ -151,9 +151,12 @@ end
 -- One alone stands in the middle of its row.
 check(Battle.defaultFormation(team("Bulwark")).k1 == "FrontCentre", "One alone isn't in the middle")
 check(Battle.defaultFormation(team("Razorback")).k1 == "BackCentre", "A Razorback alone isn't in the middle behind")
--- Every kind has a row it goes in.
+-- Every kind goes in its role's row: tanks, warriors and breakers in front,
+-- shooters, assassins and wardens behind.
+local FRONT_ROLES = { Tank = true, Warrior = true, Breaker = true }
 for _, id in Kaiju.Order do
-	check(Battle.FrontKinds[id] ~= nil or id == "Razorback" or id == "Scythe", id .. " has no row")
+	local role = Kaiju.Species[id].Role
+	check((Battle.FrontKinds[id] == true) == (FRONT_ROLES[role] == true), id .. " isn't in its role's row")
 end
 check(not Battle.FrontKinds.Razorback, "A Razorback goes in front")
 check(not Battle.FrontKinds.Scythe, "A Scythe goes in front (it leaps from the back)")

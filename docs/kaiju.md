@@ -33,6 +33,16 @@ In a battle each role's blows carry their own share of that Damage
 (`KaijuRoles.power`), tuned so that no kind's teams win much more than half
 their battles at any level.
 
+### 28 more kinds
+
+Twenty-eight more kinds from the roster's concept sheet are in the game too
+(32 kinds, 128 kaiju): two new roles (Breaker and Warden), three moves of
+each kind's own, and models after their concepts. The starter roll still
+deals only the four above; the others are caught in the frontier, by where
+they roam. See [kaiju-roster.md](kaiju-roster.md).
+
+![The 28 new kaiju](kaiju/roster-28.jpg)
+
 ## The Gemsoul, and a kaiju's own moves
 
 Every kaiju carries a Gemsoul: a gem of its element, rolled like any gem
@@ -697,8 +707,10 @@ Proposed guardrails:
 | `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), healing (`Infuse`, `infusePower`, `infusePlan`, `healPick`, `AutoHeal`, `autoHealOn`, `Danger`), knocked out (`Revive`, `reviveSeconds`, `reviveIn`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), a kaiju's own moves, its role's (`kitMove`, `kitMoves`, `role`, `moveInfo`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
 | `Shared.Squad` | Fighting as a side: sharing out foes (`assign`, `cost`), places round a shared foe (`slots`, `toward`), keeping clear (`apart`) |
 | `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
-| `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint |
-| `Shared.CreatureMotion` | Their walk (`Stride`), arms (`Arm`), jaw and tail, and every fight pose (`fight`, `apply`) |
+| `Shared.KaijuRoster` | The 28 kinds beyond the first four: stats, where they roam (`Habitat`), their own kits and moves, fight styles and voices ([kaiju-roster.md](kaiju-roster.md)) |
+| `Shared.KaijuModels` | The models: `build(kind, element)`, `scale(model, s)`; the trunk on a `Body` joint; a flyer's hover (`KaijuHover`) |
+| `Shared.KaijuShapes` | The roster's 28 models, their hides (`Hides`) and hovers (`Hover`) |
+| `Shared.CreatureMotion` | Their walk (`Stride`), arms (`Arm`), jaw and tail, wings (`Wing`) and heads (`Head`), and every kind's fight poses (`Fight`, `fight`, `apply`) |
 | `Shared.GemTraits` | The moves a Gemsoul rolls (`SoulMoves`); an old one's seeded into them (`traitsOf`) |
 | `Shared.KaijuRoles` | Each kind's role and the roles' own moves; how a kaiju fights by its role in a battle (see [kaiju-arena.md](kaiju-arena.md#roles-an-auto-battler)) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |

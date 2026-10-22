@@ -9,7 +9,8 @@ source += read('tests/kaiju_taming_services.luau')
 for name, path in [('ExpeditionEconomy', 'src/shared/ExpeditionEconomy.luau'), ('GemConfig', 'src/shared/GemConfig.luau'),
                    ('GemTraits', 'src/shared/GemTraits.luau'), ('GemRoller', 'src/shared/GemRoller.luau'),
                    ('ArmorSignatures', 'src/shared/ArmorSignatures.luau'), ('ElementMatchup', 'src/shared/ElementMatchup.luau'),
-                   ('KaijuRoles', 'src/shared/KaijuRoles.luau'), ('Kaiju', 'src/shared/Kaiju.luau'),
+                   ('KaijuRoster', 'src/shared/KaijuRoster.luau'), ('KaijuRoles', 'src/shared/KaijuRoles.luau'),
+                   ('Kaiju', 'src/shared/Kaiju.luau'),
                    ('Taming', 'src/client/Modules/KaijuTaming.luau')]:
     code = re.sub(r'^local \w+ = (require\([^\n]+\)|game:GetService\([^\n]+\))\n', '', read(path), flags=re.M)
     source += f'\nlocal {name} = (function()\n{code}\nend)()\n'

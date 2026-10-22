@@ -42,17 +42,40 @@ local Brain = shared("DuelistBrain")
 local Kaiju = shared("Kaiju")
 
 -- Styles -----------------------------------------------------------------------------------------
+-- Every kind has a style of its own: named blows (the first four's names
+-- all different; a roster kind's light, heavy and counter different, its
+-- lunge may be its heavy), combos and a guard. A shooter (a Ranged block)
+-- has volleys like the Razorback's; a heavy's arc is a sweep's or wider.
 local names = {}
 for _, id in Kaiju.Order do
 	local style = Fight.style(id)
 	check(style == Fight.Styles[id], id .. " has no style")
+	local own = {}
 	for _, kind in { "Light", "Heavy", "Punish", "Lunge" } do
 		local name = style.Names[kind]
-		check(type(name) == "string" and not names[name], id .. ": " .. kind .. " has no name of its own")
-		names[name] = true
+		check(type(name) == "string" and #name > 0, id .. ": " .. kind .. " has no name")
+		if table.find(Kaiju.Starters, id) then
+			check(not names[name], id .. ": " .. kind .. " has no name of its own")
+			names[name] = true
+		end
+		if kind ~= "Lunge" then
+			check(not own[name], id .. ": " .. kind .. " is named as another of its blows")
+			own[name] = true
+		end
 	end
 	check(style.Combo >= 2 and style.ComboChance > 0 and style.ComboGap > 0.2, id .. ": no combos")
 	check(style.GuardMult > 0 and style.GuardMult < 1, id .. ": an odd guard")
+	check(style.Arc == nil or (style.Arc >= Fight.Cleave.Arc and style.Arc <= 360), id .. ": an odd sweep")
+	if style.Ranged then
+		local volley, razor = style.Ranged, Fight.Styles.Razorback.Ranged
+		check(type(volley.Name) == "string" and volley.Shots >= 2 and volley.Reach == razor.Reach, id .. ": an odd volley")
+	end
+end
+-- The roster's shooters (and its warden) shoot; nobody else does.
+for _, id in Kaiju.Order do
+	local role = Kaiju.Species[id].Role
+	local shoots = role == "Ranged" or role == "Warden"
+	check((Fight.style(id).Ranged ~= nil) == shoots, id .. (if shoots then " doesn't shoot" else " shoots"))
 end
 local bulwark, razorback, carapace = Fight.Styles.Bulwark, Fight.Styles.Razorback, Fight.Styles.Carapace
 check(Fight.style("Nobody") == bulwark, "An unknown kind fights as nothing")
@@ -232,7 +255,7 @@ do
 	check(Fight.inArc(ahead, roblox.Vector3.new(0.5, 0, -1), Fight.Cleave.Arc), "A foe ahead isn't in the arc")
 	check(not Fight.inArc(ahead, roblox.Vector3.new(0, 0, 1), Fight.Cleave.Arc), "A foe behind is in the arc")
 	check(not Fight.inArc(ahead, roblox.Vector3.new(1, 0, 0.3), Fight.Cleave.Arc), "A foe well to the side is in a stomp's arc")
-	check(Fight.inArc(ahead, roblox.Vector3.new(1, 0, 0.3), Fight.Cleave.RazorArc), "A tail lash doesn't reach round the side")
+	check(Fight.inArc(ahead, roblox.Vector3.new(1, 0, 0.3), Fight.Styles.Razorback.Arc), "A tail lash doesn't reach round the side")
 	check(Fight.Cleave.Share > 0 and Fight.Cleave.Share < 1, "A sweep's share")
 end
 

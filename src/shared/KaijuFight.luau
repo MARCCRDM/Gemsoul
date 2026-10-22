@@ -46,6 +46,7 @@
 	os.clock().
 ]]
 local Brain = require(script.Parent.DuelistBrain)
+local KaijuRoster = require(script.Parent.KaijuRoster)
 
 local KaijuFight = {}
 
@@ -54,6 +55,9 @@ local KaijuFight = {}
 -- Damage. Combo: up to this many light blows in a row, each after the last
 -- with ComboChance, ComboGap seconds apart. GuardMult: the share of a blow
 -- that gets through its guard. Hop: how far it dodges (times a duellist's).
+-- Arc: a heavy's sweep, degrees (else Cleave.Arc). Ranged: it fights from
+-- range between combos (Shot: its volleys' look, "Spine"; else a bolt in
+-- its element). The roster's kinds' styles are theirs (Shared.KaijuRoster).
 KaijuFight.Styles = {
 	Bulwark = {
 		Names = { Light = "Claw Swipe", Heavy = "Ground Stomp", Punish = "Counter Claw", Lunge = "Shoulder Ram" },
@@ -69,6 +73,7 @@ KaijuFight.Styles = {
 		Names = { Light = "Bite", Heavy = "Tail Lash", Punish = "Snap Back", Lunge = "Pounce" },
 		Windup = 0.8,
 		Heavy = 1.6,
+		Arc = 220,
 		Combo = 3,
 		ComboChance = 0.75,
 		ComboGap = 0.35,
@@ -82,6 +87,7 @@ KaijuFight.Styles = {
 		-- again (at most every HopEvery seconds), or bites.
 		Ranged = {
 			Name = "Spine Volley",
+			Shot = "Spine",
 			Combo = 2,
 			HopBack = 12,
 			HopEvery = 2.5,
@@ -117,6 +123,10 @@ KaijuFight.Styles = {
 	},
 }
 
+for id, kind in KaijuRoster.Kinds do
+	KaijuFight.Styles[id] = kind.Fight
+end
+
 -- A blow's share of its Damage (a heavy's is its style's); the third blow
 -- of a combo lands harder.
 KaijuFight.Blows = { Light = 1, Punish = 1, Lunge = 1.2 }
@@ -132,10 +142,10 @@ KaijuFight.Recover = 0.35 -- open to a counter this long after its last blow
 KaijuFight.HitRange = 1.5 -- a blow lands up to this far past its reach (the brain's studs)
 KaijuFight.FirstSurge = 3 -- its E, this long into a fight
 -- Against a swarm: a heavy sweeps through every foe in reach inside its
--- arc (Arc degrees, a Razorback's tail lash RazorArc), each of the others
+-- arc (Arc degrees, or its style's own: a Razorback's tail lash), each of the others
 -- taking Share of the blow; with Crowd or more foes in reach it swings a
 -- heavy for a light Heavy of the time.
-KaijuFight.Cleave = { Share = 0.6, Arc = 150, RazorArc = 220, Crowd = 3, Heavy = 0.6 }
+KaijuFight.Cleave = { Share = 0.6, Arc = 150, Crowd = 3, Heavy = 0.6 }
 
 local BLOWS = { Light = true, Heavy = true, Punish = true, Lunge = true }
 

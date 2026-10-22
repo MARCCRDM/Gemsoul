@@ -30,6 +30,9 @@
 	    Pick(kind)            a foe to leap on ("Weakest") -> victim?
 	    Leap(victim)          puts it behind a foe -> where it landed
 	    Hop(direction, studs) a vault back -> where it landed
+	    Allies(center, radius) its allies inside a circle -> { ally } (a
+	                          Team ward or mend goes on them too; ally =
+	                          { Root, Body, Humanoid })
 	  }
 	  victim = { Root: BasePart, ... } (anything the caster's Hit understands)
 	  aim = its foe's victim (where Bolts, Blasts and Lines go)
@@ -176,31 +179,80 @@ function KaijuAbilities.soak(body, amount: number): number
 	return amount
 end
 
--- Its R's shell or ward, its mend, or (a ring) nothing here: false.
+-- A mend on `target` ({ Root, Body, Humanoid }: the caster or, for a
+-- Team mend, an ally): Heal of its health over the mend's Duration.
+local function mend(caster, target, id: string, plan): boolean
+	local h = target.Humanoid
+	if not h then
+		return false
+	end
+	local seconds = plan.Duration or 4
+	cleanse(if plan.Cleanse then target.Body else nil)
+	sender(caster)("TriadAura", target.Root, id, caster.Element, "Heal", seconds)
+	local ticks = math.max(1, math.floor(seconds / 0.5))
+	for i = 1, ticks do
+		KaijuAbilities.after(i * 0.5, function()
+			if caster.Alive() and h.Health > 0 then
+				h.Health = math.min(h.MaxHealth, h.Health + h.MaxHealth * plan.Heal / ticks)
+			end
+		end)
+	end
+	return true
+end
+
+-- A Team ward's or mend's allies near it (not itself).
+local function teammates(caster, plan)
+	local list = {}
+	if plan.Team and caster.Allies then
+		for _, ally in caster.Allies(caster.Root.Position, (plan.Radius or 14) * (caster.Size or 1)) do
+			if ally.Root ~= caster.Root then
+				table.insert(list, ally)
+			end
+		end
+	end
+	return list
+end
+
+-- A ward on an ally (a Team ward: Moonmoth's Scale Storm): it takes Reduce
+-- less for the ward's Duration.
+local function wardAlly(caster, ally, id: string, plan)
+	local body = ally.Body
+	if not body or not plan.Reduce then
+		return
+	end
+	local seconds = plan.Duration or 4
+	local d = { Until = KaijuAbilities.clock() + seconds, Reduce = plan.Reduce, Break = function() end }
+	body.Defense = d
+	sender(caster)("TriadAura", ally.Root, id, caster.Element, "Armor", seconds)
+	KaijuAbilities.after(seconds, function()
+		if body.Defense == d then
+			body.Defense = nil
+		end
+	end)
+end
+
+-- Its R's shell or ward, its mend, or (a ring) nothing here: false. A
+-- Team one goes on its allies near it too (Allies).
 local function defend(caster, id: string, plan, damage: number): boolean
 	local fx = sender(caster)
 	local shape = plan.Shape
 	local h = caster.Humanoid
 	local seconds = plan.Duration or 4
 	if shape == "Mend" then
-		if not h then
-			return false
+		local ok = mend(caster, { Root = caster.Root, Body = caster.Body, Humanoid = h }, id, plan)
+		for _, ally in teammates(caster, plan) do
+			mend(caster, ally, id, plan)
 		end
-		cleanse(if plan.Cleanse then caster.Body else nil)
-		fx("TriadAura", caster.Root, id, caster.Element, "Heal", seconds)
-		local ticks = math.max(1, math.floor(seconds / 0.5))
-		for i = 1, ticks do
-			KaijuAbilities.after(i * 0.5, function()
-				if caster.Alive() then
-					h.Health = math.min(h.MaxHealth, h.Health + h.MaxHealth * plan.Heal / ticks)
-				end
-			end)
-		end
-		return true
+		return ok
 	end
 	local body = caster.Body
 	if not body then
 		return false
+	end
+	if shape == "Ward" then
+		for _, ally in teammates(caster, plan) do
+			wardAlly(caster, ally, id, plan)
+		end
 	end
 	local d = { Until = KaijuAbilities.clock() + seconds }
 	if shape == "Shell" then
@@ -502,6 +554,11 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 		end
 	else
 		return false
+	end
+	-- (A move that heals it as it lands: Devour, Sap Drain.)
+	local h = caster.Humanoid
+	if plan.Heal and plan.Shape ~= "Rally" and h then
+		h.Health = math.min(h.MaxHealth, h.Health + h.MaxHealth * plan.Heal)
 	end
 	return true
 end

@@ -10,6 +10,10 @@
 	  Scythe     an assassin: a lean mantis with blade arms, the quickest
 	             blows and the least health
 	(Their roles in a battle, and each role's own moves: Shared.KaijuRoles.)
+	And the roster's 28 more (Shared.KaijuRoster: Emberjaw, Stormwing,
+	Ironhide... each with its own role and moves, two of them new: Breaker
+	and Warden). A new player's starter roll is of the first four only
+	(Starters); the rest are caught out in the frontier (Habitat, wildKinds).
 
 	Every kaiju carries its Gemsoul: a gem of its element, rolled like any
 	gem (rarity, Size, Clarity, Cut). It gives the kaiju its element, and a
@@ -47,11 +51,18 @@ local GemRoller = require(script.Parent.GemRoller)
 local GemTraits = require(script.Parent.GemTraits)
 local ElementMatchup = require(script.Parent.ElementMatchup)
 local KaijuRoles = require(script.Parent.KaijuRoles)
+local KaijuRoster = require(script.Parent.KaijuRoster)
 
 local Kaiju = {}
 
 Kaiju.Elements = { "Fire", "Frost", "Shock", "Poison" }
-Kaiju.Order = { "Bulwark", "Razorback", "Carapace", "Scythe" }
+-- The first four: a new player's starter roll is of these (starterPicks).
+Kaiju.Starters = { "Bulwark", "Razorback", "Carapace", "Scythe" }
+-- Every kind, the first four first, then the roster's (Shared.KaijuRoster).
+Kaiju.Order = table.clone(Kaiju.Starters)
+for _, id in KaijuRoster.Order do
+	table.insert(Kaiju.Order, id)
+end
 
 -- Level 1 stats (at a Common Gemsoul). Guard: the share of each blow it shrugs off.
 Kaiju.Species = {
@@ -104,6 +115,41 @@ Kaiju.Species = {
 		Guard = 0.05,
 	},
 }
+-- The roster's kinds (each in all four elements, as the first four).
+for id, kind in KaijuRoster.Kinds do
+	Kaiju.Species[id] = {
+		Id = id,
+		Name = kind.Name,
+		Role = kind.Role,
+		Blurb = kind.Blurb,
+		Health = kind.Health,
+		Damage = kind.Damage,
+		Rate = kind.Rate,
+		Speed = kind.Speed,
+		Reach = kind.Reach,
+		Guard = kind.Guard,
+		Habitat = kind.Habitat,
+		Voice = kind.Voice,
+	}
+end
+
+-- The wild kinds out in the frontier's `band` ("Fringe" or "Edge"; "Vein":
+-- the guarded Rift Vein's guardian): the first four and the roster's of
+-- Fringe anywhere out there, the roster's of Edge only at the Edge, the
+-- roster's of Vein only as the guardian (Shared.KaijuRoster's Habitat).
+function Kaiju.wildKinds(band: string?): { string }
+	local out = {}
+	for _, id in Kaiju.Order do
+		local habitat = Kaiju.Species[id].Habitat or "Fringe"
+		local fits = if band == "Vein"
+			then habitat == "Vein"
+			else habitat == "Fringe" or (habitat == "Edge" and band == "Edge")
+		if fits then
+			table.insert(out, id)
+		end
+	end
+	return out
+end
 
 Kaiju.MaxLevel = 30
 Kaiju.Growth = 0.08 -- each level adds this share of the level-1 stats
@@ -1244,8 +1290,9 @@ function Kaiju.rollsOwed(profile): number
 	return math.max(0, math.min(Kaiju.StarterTeam, Kaiju.MaxOwned - Kaiju.count(profile.Kaiju)))
 end
 
--- Kinds and elements for `count` starter rolls: none the same as another or
--- as one of `taken` (records already owned).
+-- Kinds (of the first four, Starters) and elements for `count` starter
+-- rolls: none the same as another or as one of `taken` (records already
+-- owned).
 function Kaiju.starterPicks(rng, count: number, taken: { any }?): { { Species: string, Element: string } }
 	local used = {}
 	for _, record in taken or {} do
@@ -1255,7 +1302,7 @@ function Kaiju.starterPicks(rng, count: number, taken: { any }?): { { Species: s
 	for _ = 1, count do
 		local species, element
 		for _ = 1, 30 do
-			species = Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
+			species = Kaiju.Starters[rng:NextInteger(1, #Kaiju.Starters)]
 			element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
 			if not used[species .. element] then
 				break

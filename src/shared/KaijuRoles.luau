@@ -10,6 +10,14 @@
 	                       the front line.
 	  Assassin  Scythe     leaps over the front line at the start, onto
 	                       their back row (a shooter first).
+	  Breaker              (Shared.KaijuRoster: Triskull, Brightsteel,
+	                       Dreadcrown) mid-line: goes for the foe with the
+	                       toughest guard.
+	  Warden               (Moonmoth) stays back with the shooters; its E
+	                       and R shield and mend its team.
+
+	The roster's kinds (Shared.KaijuRoster) each have three moves of their
+	own; the first four share their role's.
 
 	Each role has its own three moves (Kits), copied from the gem surges and
 	renamed for kaiju (From): E when its mana is full (it fills as it hits
@@ -38,6 +46,8 @@
 	Bounds: { Center, Axis, Right, HalfLength, HalfWidth } (a court, Shared.
 	KaijuPit, or the field between two players).
 ]]
+local KaijuRoster = require(script.Parent.KaijuRoster)
+
 local KaijuRoles = {}
 
 -- Studs are a pet kaiju's (knee high). Reach: how near a melee one gets
@@ -89,10 +99,35 @@ KaijuRoles.Roles = {
 		Front = false,
 		Opens = true, -- leaps at the start of a battle
 	},
+	Breaker = {
+		Id = "Breaker",
+		Name = "BREAKER",
+		Blurb = "Goes for the foe with the toughest guard and breaks it.",
+		Reach = 3.2,
+		Windup = 0.35,
+		Power = { 1.1, 1.0, 0.95 },
+		Mana = { Attack = 14, Hurt = 0.6 },
+		Front = true,
+		Breaks = true, -- picks the toughest guard (KaijuRoles.target)
+	},
+	Warden = {
+		Id = "Warden",
+		Name = "WARDEN",
+		Blurb = "Stays at the back and shields and mends its team.",
+		Range = 14,
+		Keep = 6,
+		Windup = 0.4,
+		Power = { 1.3, 1.5, 1.7 },
+		Mana = { Attack = 12, Hurt = 1 },
+		Front = false,
+	},
 }
 
 KaijuRoles.Species = { Carapace = "Tank", Bulwark = "Warrior", Razorback = "Ranged", Scythe = "Assassin" }
-KaijuRoles.Order = { "Tank", "Warrior", "Ranged", "Assassin" }
+for id, kind in KaijuRoster.Kinds do
+	KaijuRoles.Species[id] = kind.Role
+end
+KaijuRoles.Order = { "Tank", "Warrior", "Ranged", "Assassin", "Breaker", "Warden" }
 
 KaijuRoles.ManaMax = 100
 KaijuRoles.MoveLevels = { Q = 5, E = 1, R = 10 }
@@ -248,6 +283,14 @@ KaijuRoles.Moves = {
 		When = "Low",
 	},
 }
+-- The roster's kinds' own moves, each its kind's role's.
+for id, kind in KaijuRoster.Kinds do
+	for _, moveId in kind.Kit do
+		local move = KaijuRoster.Moves[moveId]
+		move.Role, move.Kind = kind.Role, id
+		KaijuRoles.Moves[moveId] = move
+	end
+end
 for id, move in KaijuRoles.Moves do
 	move.Id = id
 end
@@ -259,8 +302,10 @@ function KaijuRoles.of(species: string?): string
 	return KaijuRoles.Species[species or ""] or "Warrior"
 end
 
+-- Its moves: a roster kind's own, else its role's.
 function KaijuRoles.kit(species: string?): { [string]: string }
-	return KaijuRoles.Kits[KaijuRoles.of(species)]
+	local kind = KaijuRoster.Kinds[species or ""]
+	return if kind then kind.Kit else KaijuRoles.Kits[KaijuRoles.of(species)]
 end
 
 -- Its move on `key` (Q, E or R) and whether one of `level` has it yet.
@@ -326,7 +371,8 @@ end
 -- assassin sees its mark through, a shooter keeps one in range, a melee
 -- one keeps it unless another's well nearer); else, for an assassin, a
 -- shooter of theirs (the nearest), then the weakest; for a shooter, the
--- weakest in range, then the nearest; for the rest the nearest.
+-- weakest in range, then the nearest; for a breaker the toughest guard
+-- (Guard: its kind's), the nearest of those; for the rest the nearest.
 function KaijuRoles.target(unit, foes, now: number)
 	if #foes == 0 then
 		return nil
@@ -369,6 +415,18 @@ function KaijuRoles.target(unit, foes, now: number)
 			end
 		end
 		return weakest or close
+	elseif role.Breaks then
+		if current and distance(unit, current) <= closeDistance + KaijuRoles.Stick * 2 then
+			return current
+		end
+		local best, bestGuard, bestDistance = nil, -1, math.huge
+		for _, foe in foes do
+			local guard, d = foe.Guard or 0, distance(unit, foe)
+			if guard > bestGuard + 1e-6 or (math.abs(guard - bestGuard) <= 1e-6 and d < bestDistance) then
+				best, bestGuard, bestDistance = foe, guard, d
+			end
+		end
+		return best
 	end
 	if current and distance(unit, current) <= closeDistance + KaijuRoles.Stick then
 		return current
@@ -469,14 +527,15 @@ function KaijuRoles.spot(unit, foe, allies, foes, bounds): (Vector3, boolean, bo
 	return KaijuRoles.clamp(bounds, foe.Pos + from * reach * 0.8), false
 end
 
--- Its R's moment: a tank at half health, a warrior hard pressed or with
--- two foes on it, a shooter with a foe too close, an assassin low.
+-- Its R's moment: a tank or a warden at half health, a warrior or a
+-- breaker hard pressed or with two foes on it, a shooter with a foe too
+-- close, an assassin low.
 function KaijuRoles.wantsR(unit, foes, now: number): boolean
 	local share = unit.Health / math.max(1, unit.MaxHealth)
 	local role = unit.Role
-	if role == "Tank" then
+	if role == "Tank" or role == "Warden" then
 		return share <= 0.5
-	elseif role == "Warrior" then
+	elseif role == "Warrior" or role == "Breaker" then
 		local near = 0
 		for _, foe in foes do
 			if distance(unit, foe) <= 8 then

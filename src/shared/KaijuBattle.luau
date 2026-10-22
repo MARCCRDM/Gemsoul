@@ -43,6 +43,8 @@
 	  KaijuBattle.askProblem(state) -> string?   why one can't ask (nil: can)
 	  KaijuBattle.Sides[side] -> { Name, Color }  BLUE (A) or RED (B)
 ]]
+local KaijuRoles = require(script.Parent.KaijuRoles)
+
 local KaijuBattle = {}
 
 KaijuBattle.Sides = {
@@ -87,8 +89,14 @@ function KaijuBattle.cell(id: any): Cell?
 	return if type(id) == "string" then BY_ID[id] else nil
 end
 
--- Kinds that go in front by default (they take hits); the rest behind.
-KaijuBattle.FrontKinds = { Bulwark = true, Carapace = true }
+-- Kinds that go in front by default (they take hits: a tank, a warrior,
+-- a breaker; Shared.KaijuRoles' Front); the rest behind.
+KaijuBattle.FrontKinds = {}
+for species, role in KaijuRoles.Species do
+	if KaijuRoles.Roles[role].Front then
+		KaijuBattle.FrontKinds[species] = true
+	end
+end
 
 export type Field = { Center: Vector3, Axis: Vector3 }
 

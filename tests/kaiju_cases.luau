@@ -62,12 +62,16 @@ local GemTraits = shared("GemTraits")
 local ElementMatchup = shared("ElementMatchup")
 
 -- Species and stats ------------------------------------------------------------------------
-check(#Kaiju.Order == 4 and #Kaiju.Elements == 4, "Four species in four elements")
+check(#Kaiju.Order == 32 and #Kaiju.Elements == 4, "Thirty-two species in four elements")
+check(#Kaiju.Starters == 4, "Not four starters")
+for i, id in { "Bulwark", "Razorback", "Carapace", "Scythe" } do
+	check(Kaiju.Starters[i] == id and Kaiju.Order[i] == id, "The starters aren't the first four")
+end
 local seen = {}
 for _, id in Kaiju.Order do
 	local s = Kaiju.Species[id]
 	check(s and s.Id == id and s.Name and s.Blurb, id .. " isn't described")
-	local key = s.Health .. "/" .. s.Speed
+	local key = s.Health .. "/" .. s.Speed .. "/" .. s.Damage .. "/" .. s.Rate
 	check(not seen[key], id .. " plays like another species")
 	seen[key] = true
 	local one, ten = Kaiju.stats(id, 1, "Common"), Kaiju.stats(id, 10, "Common")
@@ -78,16 +82,79 @@ for _, id in Kaiju.Order do
 end
 check(Kaiju.Species.Razorback.Speed > Kaiju.Species.Bulwark.Speed, "The runner isn't the quick one")
 check(Kaiju.Species.Carapace.Guard > Kaiju.Species.Bulwark.Guard, "The shell isn't the hardest")
--- The assassin: the least health of all, and quicker blows and feet than
--- the front liners'.
+-- The assassin: the least health of the first four, and quicker blows and
+-- feet than the front liners'.
 local scythe = Kaiju.Species.Scythe
-for _, id in Kaiju.Order do
+for _, id in Kaiju.Starters do
 	local s = Kaiju.Species[id]
 	check(id == "Scythe" or s.Health > scythe.Health, "The assassin isn't the frailest")
 	check(
 		id == "Scythe" or id == "Razorback" or (s.Rate > scythe.Rate and s.Speed < scythe.Speed),
 		"The assassin is slower than a front liner"
 	)
+end
+-- Over all 32, each role keeps its shape: every tank outlasts every
+-- warrior, every warrior every assassin; every assassin outruns every tank
+-- and warrior; a tank is the hardest to hurt, a warrior hits hardest.
+local byRole = {}
+for _, id in Kaiju.Order do
+	local s = Kaiju.Species[id]
+	byRole[s.Role] = byRole[s.Role] or {}
+	table.insert(byRole[s.Role], s)
+end
+for _, role in { "Tank", "Warrior", "Ranged", "Assassin", "Breaker", "Warden" } do
+	check(byRole[role] and #byRole[role] >= 1, "No " .. role)
+end
+local function every(a, b, test)
+	for _, x in byRole[a] do
+		for _, y in byRole[b] do
+			if not test(x, y) then
+				return false, x.Id .. " / " .. y.Id
+			end
+		end
+	end
+	return true
+end
+local function ok(a, b, test, message)
+	local fine, who = every(a, b, test)
+	check(fine, message .. " (" .. tostring(who) .. ")")
+end
+ok("Tank", "Warrior", function(x, y) return x.Health > y.Health end, "A warrior outlasts a tank")
+ok("Warrior", "Assassin", function(x, y) return x.Health > y.Health end, "An assassin outlasts a warrior")
+ok("Assassin", "Tank", function(x, y) return x.Speed > y.Speed end, "A tank outruns an assassin")
+ok("Assassin", "Warrior", function(x, y) return x.Speed > y.Speed end, "A warrior outruns an assassin")
+ok("Tank", "Ranged", function(x, y) return x.Guard > y.Guard end, "A ranged kaiju is harder to hurt than a tank")
+ok("Warrior", "Ranged", function(x, y) return x.Damage > y.Damage end, "A ranged kaiju hits as hard as a warrior")
+ok("Breaker", "Assassin", function(x, y) return x.Health > y.Health end, "A breaker is as frail as an assassin")
+
+-- Wild kinds by habitat: the first four and the roster's Fringe kinds out
+-- anywhere past the core, its Edge kinds only at the Edge, its Vein kinds
+-- only as the guarded vein's guardian.
+do
+	local Roster = shared("KaijuRoster")
+	local fringe, edge, vein = {}, {}, {}
+	for _, id in Kaiju.wildKinds("Fringe") do
+		fringe[id] = true
+	end
+	for _, id in Kaiju.wildKinds("Edge") do
+		edge[id] = true
+	end
+	for _, id in Kaiju.wildKinds("Vein") do
+		vein[id] = true
+	end
+	for _, id in Kaiju.Starters do
+		check(fringe[id] and edge[id] and not vein[id], id .. " doesn't roam the frontier")
+	end
+	local counts = { Fringe = 0, Edge = 0, Vein = 0 }
+	for _, id in Roster.Order do
+		local habitat = Roster.Kinds[id].Habitat
+		check(counts[habitat], id .. ": no habitat")
+		counts[habitat] += 1
+		check(fringe[id] == (habitat == "Fringe" or nil), id .. ": wrong in the Fringe")
+		check(edge[id] == (habitat ~= "Vein" or nil), id .. ": wrong at the Edge")
+		check(vein[id] == (habitat == "Vein" or nil), id .. ": wrong as the guardian")
+	end
+	check(counts.Fringe >= 4 and counts.Edge >= 10 and counts.Vein >= 2, "The habitats are lopsided")
 end
 
 -- EXP --------------------------------------------------------------------------------------

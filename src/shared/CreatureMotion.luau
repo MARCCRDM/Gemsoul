@@ -127,6 +127,220 @@ Motion.Fight = {
 		Guard = { Pitch = 0.08, Lift = -0.1, Arm = 1.2 },
 	},
 }
+
+-- The roster's kinds (Shared.KaijuRoster): each moves like the first-four
+-- kind its body is nearest to (`like`), with blows of its own where they
+-- differ, after its blows' names (KaijuRoster's Fight.Names). A flyer's
+-- wings beat with its Arm (Motion.apply), so a flyer's blows use Arm for
+-- a wingbeat.
+local function like(base: string, own)
+	local keys = table.clone(Motion.Fight[base])
+	for name, key in own or {} do
+		keys[name] = key
+	end
+	return keys
+end
+local FLYER = {
+	-- A peck: up on its wings, then down beak first.
+	Light = {
+		Wind = { Pitch = 0.2, Lift = 0.2, Jaw = 0.5, Arm = 0.6 },
+		Hit = { Pitch = -0.35, Lift = -0.15, Push = 0.5, Jaw = -0.1 },
+	},
+	-- A dive: high on beating wings, then down onto it.
+	Heavy = {
+		Wind = { Pitch = 0.3, Lift = 0.45, Arm = 1.0, Jaw = 0.4 },
+		Hit = { Pitch = -0.45, Lift = -0.2, Push = 0.6, Jaw = 0.6 },
+	},
+	Lunge = { Wind = { Pitch = 0.15, Lift = 0.25, Arm = 0.8 }, Hit = { Pitch = -0.3, Push = 0.7 } },
+	Cast = { Wind = { Pitch = 0.35, Lift = 0.3, Jaw = 0.7, Arm = 1.2 }, Hit = { Pitch = -0.05, Jaw = 0.9, Arm = 0.4 } },
+	-- Wings wrapped round it.
+	Guard = { Pitch = 0.15, Lift = 0.1, Arm = 1.1 },
+}
+-- Two arms up, then brought down together (a slam, a pound, a crush).
+local SLAM = {
+	Wind = { Pitch = 0.3, Lift = 0.1, Arm = 1.8, Jaw = 0.3 },
+	Hit = { Pitch = -0.25, Lift = -0.18, Arm = 0.3, Jaw = 0.5 },
+}
+-- Dropped low, then bursting up at it (from a burrow, from an ambush).
+local BURST = {
+	Wind = { Lift = -0.4, Pitch = -0.1, Jaw = 0.2 },
+	Hit = { Lift = 0.35, Pitch = 0.3, Jaw = 0.8, Arm = 1.0, Push = 0.3 },
+}
+-- Coiled one way, then a whole-body spin (a tail sweep, a spin).
+local SPIN = like("Razorback").Heavy
+local ROAR = { Wind = { Pitch = 0.35, Jaw = 0.9, Arm = 0.6 }, Hit = { Pitch = -0.1, Jaw = 1.0, Arm = 0.3 } }
+
+local F = Motion.Fight
+-- Tanks
+F.Ironhide = like("Carapace", {
+	-- Spine Roll: tucked in, then rolled through it.
+	Heavy = { Wind = { Lift = -0.3, Pitch = -0.2 }, Hit = { Roll = 0.9, Yaw = -0.6, Push = 0.6, Lift = -0.1 } },
+	-- Curled into its spikes.
+	Guard = { Lift = -0.4, Pitch = -0.2 },
+})
+F.Shellfire = like("Carapace", {
+	-- Spin Dive: up on its jets, then spinning down.
+	Heavy = { Wind = { Lift = 0.35, Pitch = 0.2 }, Hit = { Yaw = -1.5, Lift = -0.15, Push = 0.3 } },
+})
+F.Mossback = like("Bulwark", {
+	-- Vine Lash: a long arm drawn back and whipped across.
+	Light = {
+		Wind = { Yaw = 0.35, Arm = -0.7, Pitch = 0.08 },
+		Hit = { Yaw = -0.45, Arm = 1.6, Pitch = -0.1, Push = 0.2 },
+		OneArm = true,
+	},
+	-- Root Burst: both vines up, then driven into the ground.
+	Heavy = SLAM,
+})
+F.Bastion = like("Razorback", {
+	-- Paw Strike: up on its haunches and down with a paw.
+	Light = { Wind = { Pitch = 0.2, Lift = 0.05 }, Hit = { Pitch = -0.2, Push = 0.4, Jaw = 0.3 } },
+	-- Guardian Slam: rears right up, then crashes down.
+	Heavy = { Wind = { Pitch = 0.42, Lift = 0.22, Jaw = 0.5 }, Hit = { Pitch = -0.25, Lift = -0.2, Jaw = 0.7 } },
+	Cast = ROAR,
+	-- Crouched, mane forward.
+	Guard = { Pitch = -0.15, Lift = -0.2, Jaw = 0.2 },
+})
+F.Hulkshell = like("Bulwark", {
+	-- Ground Pound: both fists up, then down.
+	Heavy = SLAM,
+	-- Knuckle Charge: head down, knuckles first.
+	Lunge = { Wind = { Pitch = -0.3, Lift = -0.1, Arm = -0.3 }, Hit = { Pitch = -0.4, Push = 0.6, Arm = 0.8 } },
+	-- Down under its shell.
+	Guard = { Lift = -0.3, Pitch = -0.2, Arm = 0.6 },
+})
+-- Warriors
+F.Emberjaw = like("Bulwark", { Heavy = SPIN, Cast = ROAR })
+F.Dreadmaw = like("Razorback", {
+	-- Snap: that great jaw flung wide and slammed shut.
+	Light = { Wind = { Pitch = 0.15, Push = -0.25, Jaw = 0.9 }, Hit = { Pitch = -0.2, Push = 0.5, Jaw = -0.1 } },
+	-- Lunge Bite: reared back, jaws wide, then a long lunge.
+	Heavy = { Wind = { Pitch = 0.3, Push = -0.3, Jaw = 1.1 }, Hit = { Pitch = -0.3, Push = 0.8, Jaw = -0.1 } },
+	Lunge = { Wind = { Pitch = 0.2, Lift = -0.15, Jaw = 1.0 }, Hit = { Pitch = -0.25, Push = 0.8, Jaw = 0 } },
+	Cast = ROAR,
+})
+F.Hornblade = like("Bulwark", {
+	-- Horn Gore: head down, then tossed up.
+	Light = { Wind = { Pitch = -0.25, Push = -0.1 }, Hit = { Pitch = 0.2, Push = 0.4, Jaw = 0.3 } },
+	Heavy = BURST,
+	Lunge = { Wind = { Pitch = -0.3, Lift = -0.15 }, Hit = { Pitch = -0.35, Push = 0.7 } },
+	Guard = { Pitch = -0.2, Lift = -0.25, Arm = 0.8 },
+})
+F.Titanfin = like("Bulwark", { Heavy = SPIN })
+F.Drillhorn = like("Bulwark", {
+	-- Drill Jab: one drill driven straight in.
+	Light = { Wind = { Yaw = 0.2, Arm = 0.2, Push = -0.15 }, Hit = { Yaw = -0.2, Arm = 1.4, Push = 0.4 }, OneArm = true },
+	-- Drill Dive: reared up, both drills high, then dived in.
+	Heavy = { Wind = { Pitch = 0.35, Lift = 0.15, Arm = 1.8 }, Hit = { Pitch = -0.4, Push = 0.6, Arm = 1.2 } },
+})
+F.Grandape = like("Bulwark", {
+	-- Chest-Beat Slam: arms beating its chest, then slammed down.
+	Heavy = {
+		Wind = { Pitch = 0.3, Lift = 0.08, Arm = 1.2, Jaw = 0.6 },
+		Hit = { Pitch = -0.28, Lift = -0.18, Arm = 0.3, Jaw = 0.5 },
+	},
+	Lunge = F.Hulkshell.Lunge,
+	Cast = ROAR,
+})
+F.Bladebrow = like("Bulwark", {
+	-- Twin Fist: both fists at once.
+	Light = { Wind = { Pitch = 0.08, Arm = -0.4, Push = -0.1 }, Hit = { Pitch = -0.12, Arm = 1.3, Push = 0.35 } },
+	-- Head Spear: drawn back, then the brow blade driven through.
+	Heavy = { Wind = { Pitch = 0.3, Push = -0.25, Arm = -0.3 }, Hit = { Pitch = -0.4, Push = 0.7, Arm = 0.5 } },
+	Lunge = { Wind = { Pitch = 0.2, Push = -0.2 }, Hit = { Pitch = -0.38, Push = 0.75 } },
+})
+-- Ranged
+F.Stormwing = FLYER
+F.Thornlob = like("Razorback", {
+	-- Web Shot: reared up, then spat.
+	Heavy = { Wind = { Pitch = 0.3, Lift = 0.1, Jaw = 0.6 }, Hit = { Pitch = -0.1, Push = -0.1, Jaw = 0.8 } },
+	-- Skitter: low and quick.
+	Lunge = { Wind = { Lift = -0.15, Pitch = -0.05 }, Hit = { Lift = -0.05, Push = 0.5 } },
+	Guard = { Lift = -0.3, Pitch = 0.1, Jaw = 0.3 },
+})
+F.Starspine = like("Bulwark", {
+	-- Crystal Spire: reared up, then stamping a spire up out of the ground.
+	Heavy = { Wind = { Pitch = 0.35, Lift = 0.1, Arm = 1.2, Jaw = 0.5 }, Hit = { Pitch = -0.2, Lift = -0.15, Arm = 0.4 } },
+	Cast = ROAR,
+})
+F.Nulltalon = like("Scythe", {
+	-- Barrier Shot: both talons thrust out.
+	Heavy = { Wind = { Pitch = 0.2, Arm = 0.4, Push = -0.15 }, Hit = { Pitch = -0.1, Arm = 1.5, Push = 0.2 } },
+	-- Blink Strike: a low crouch, then gone at it.
+	Lunge = { Wind = { Lift = -0.3, Pitch = -0.15 }, Hit = { Lift = 0.1, Push = 0.8, Arm = 0.8 } },
+})
+F.Sporeback = like("Carapace", {
+	-- Sludge Slap: lurching forward.
+	Light = { Wind = { Pitch = 0.15, Push = -0.15 }, Hit = { Pitch = -0.2, Push = 0.4, Jaw = 0.4 } },
+	-- Smog Wave: swelling up, then bursting.
+	Heavy = { Wind = { Lift = 0.25, Pitch = 0.2, Jaw = 0.4 }, Hit = { Lift = -0.2, Pitch = -0.1, Jaw = 0.9 } },
+	Lunge = { Wind = { Lift = -0.2 }, Hit = { Lift = -0.1, Push = 0.5 } },
+	-- Squashed flat.
+	Guard = { Lift = -0.35 },
+})
+F.Voltfin = like("Razorback", {
+	Lunge = { Wind = { Lift = -0.15, Yaw = 0.3 }, Hit = { Lift = -0.05, Push = 0.5, Yaw = -0.3 } },
+})
+-- Assassins
+F.Sickleclaw = like("Scythe", {
+	-- Buzzsaw Rush: spinning through it, saw first.
+	Heavy = { Wind = { Pitch = -0.15, Lift = -0.1, Arm = 0.8 }, Hit = { Yaw = -1.4, Push = 0.6, Arm = 1.0 } },
+})
+F.Sickleclaw.Lunge = F.Sickleclaw.Heavy
+F.Nightwing = like("Razorback", FLYER)
+F.Nightwing.Heavy = {
+	-- Horn Impale: high, then plunged head first.
+	Wind = { Pitch = 0.35, Lift = 0.4, Arm = 1.0 },
+	Hit = { Pitch = -0.55, Lift = -0.15, Push = 0.6, Jaw = 0.3 },
+}
+F.Longcoil = like("Razorback", {
+	-- Constrict: the neck thrown round it and squeezed.
+	Heavy = { Wind = { Yaw = 0.6, Tail = -0.8, Jaw = 0.4 }, Hit = { Yaw = -1.0, Tail = 1.2, Roll = 0.2, Jaw = 0.6 } },
+	-- Serpent Strike: reared back, then a long strike.
+	Lunge = { Wind = { Pitch = 0.25, Push = -0.3, Jaw = 0.8 }, Hit = { Pitch = -0.3, Push = 0.8, Jaw = 0 } },
+})
+F.Glassjaw = like("Razorback", { Heavy = BURST })
+F.Razorclaw = like("Razorback", {
+	-- Claw: up and down on its forelegs.
+	Light = { Wind = { Pitch = 0.2, Lift = 0.05, Jaw = 0.4 }, Hit = { Pitch = -0.2, Push = 0.45, Jaw = 0.2 } },
+	-- Tail Pincer: the tail swung over and snapped.
+	Heavy = { Wind = { Yaw = 0.5, Tail = -0.8, Pitch = 0.1 }, Hit = { Yaw = -0.9, Tail = 1.3, Pitch = -0.1 } },
+	-- Swoop: up on its wings, then down on it.
+	Lunge = FLYER.Lunge,
+})
+F.Lankshade = like("Scythe", {
+	-- Stomp Down: up on those long legs, then dropped on it.
+	Heavy = { Wind = { Lift = 0.25, Pitch = 0.2, Arm = 0.8 }, Hit = { Lift = -0.25, Pitch = -0.3, Arm = 0.2, Jaw = 0.6 } },
+	-- Long Stride: one long step in.
+	Lunge = { Wind = { Pitch = 0.1, Lift = 0.1 }, Hit = { Pitch = -0.25, Push = 0.8, Arm = 0.6 } },
+})
+-- Breakers
+F.Triskull = like("Bulwark", {
+	-- Triple Snap: all three heads at once (Motion.apply: heads snap with the jaw).
+	Light = { Wind = { Pitch = 0.12, Push = -0.2, Jaw = 0.8 }, Hit = { Pitch = -0.2, Push = 0.45, Jaw = -0.1 } },
+	-- Gravity Bolt: reared up, all jaws wide, then loosed.
+	Heavy = { Wind = { Pitch = 0.35, Jaw = 0.9, Lift = 0.1 }, Hit = { Pitch = -0.15, Jaw = 1.0, Push = 0.2 } },
+	Lunge = FLYER.Lunge,
+	Cast = ROAR,
+})
+F.Brightsteel = like("Bulwark", {
+	-- Piston Punch: one fist, pistoned straight out.
+	Light = { Wind = { Yaw = 0.2, Arm = -0.3, Push = -0.15 }, Hit = { Yaw = -0.25, Arm = 1.5, Push = 0.45 }, OneArm = true },
+	-- Finger Missiles: both arms up, then the recoil.
+	Heavy = { Wind = { Pitch = 0.15, Arm = 1.4 }, Hit = { Pitch = 0.05, Arm = 1.2, Push = -0.25 } },
+	-- Thruster Rush: up on its thrusters and in.
+	Lunge = { Wind = { Pitch = -0.1, Lift = 0.15 }, Hit = { Pitch = -0.3, Lift = 0.2, Push = 0.7 } },
+})
+F.Dreadcrown = like("Bulwark", {
+	-- Oxygen Crush: both pincers high, then crushed together.
+	Heavy = SLAM,
+	-- Crab Rush: side-on, then in.
+	Lunge = { Wind = { Roll = 0.3, Lift = -0.1 }, Hit = { Roll = -0.2, Push = 0.6, Arm = 0.8 } },
+	Cast = ROAR,
+})
+-- Warden
+F.Moonmoth = FLYER
+
 -- (A counter swings as a quick blow; an E, aimed or round itself, is its cast.)
 local ALIASES = { Punish = "Light", Bolt = "Cast", Nova = "Cast" }
 local SIDED = { Yaw = true, Roll = true, Tail = true }
@@ -288,7 +502,9 @@ end
 
 -- One joint of a kaiju in a fight pose: its walk's angles with the pose
 -- added. The trunk (Body) also moves (lift, push: studs at scale 1); its
--- legs keep upright as it rears or leans. Returns x, y, z, lift, push.
+-- legs keep upright as it rears or leans; a flyer's wings beat with its
+-- arms, and a many-headed kind's heads snap in with its jaw. Returns x, y,
+-- z, lift, push.
 function Motion.apply(pose, kind: string, side: number, x: number, y: number, z: number)
 	if kind == "Body" then
 		return x + pose.Pitch, y + pose.Yaw, z + pose.Roll, pose.Lift, pose.Push
@@ -301,6 +517,10 @@ function Motion.apply(pose, kind: string, side: number, x: number, y: number, z:
 		return x + pose.Arm * share, y, z, 0, 0
 	elseif kind == "Tail" then
 		return x, y + pose.Tail * 0.3, z, 0, 0 -- (each segment: the tail curls)
+	elseif kind == "Wing" then
+		return x, y, z + side * pose.Arm * 0.45, 0, 0 -- (a wingbeat)
+	elseif kind == "Head" then
+		return x - pose.Jaw * 0.3, y + pose.Yaw * 0.3, z, 0, 0 -- (a head snaps in on a bite)
 	end
 	return x, y, z, 0, 0
 end
