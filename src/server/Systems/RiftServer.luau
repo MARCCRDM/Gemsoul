@@ -4,14 +4,18 @@
 	critters' own world, built for it (World.RiftWorld: walled caves) and
 	gone with it.
 
-	  Going in    "RiftEnter", vein, bossId: through a gate you're standing
-	              at. You join your party's trip if one of them is still on
+	  Going in    "RiftEnter", vein, bossId, together: through a gate you're
+	              standing at. You join your party's trip if one of them is still on
 	              the way (up to RiftRun.Party), whatever boss they chose;
 	              or start one against `bossId`, from the gate's biome's
 	              ladder (RiftRun.Ladders, by the element of the biome the
 	              gate stands in: its fighters and boss are of it), if
 	              you've beaten the one before it (profile RiftBosses:
-	              { [bossId] = times beaten }; RiftRun.canFight). A group
+	              { [bossId] = times beaten }; RiftRun.canFight). Your party's
+	              leader starting one `together` (the gate's lobby) brings
+	              every member who's ready (Party's ready check) in with
+	              them, from anywhere in the Outpost; the others are told
+	              they can follow. A group
 	              boss alone is allowed; the gate warns you first. Your combat kit
 	              comes out and stays out till you're home
 	              (SparServer.riftKit: hunting, so a finishing blow knocks
@@ -1213,7 +1217,7 @@ local function gateBiome(vein: any)
 	return Frontier.biomeAt(offset) or Frontier.biomeOf(math.atan2(offset.Z, offset.X))
 end
 
-local function enter(player: Player, vein: any, bossId: any)
+local function enter(player: Player, vein: any, bossId: any, together: any)
 	local why = problem(player)
 	if why then
 		return reply(false, why)
@@ -1285,6 +1289,21 @@ local function enter(player: Player, vein: any, bossId: any)
 			warn("[Rift] healing crystals:", why)
 		end
 		join(run, player)
+		-- Going in together (the party's leader, from the gate's lobby):
+		-- everyone in the party who's ready comes too, from wherever they
+		-- are in the Outpost; the rest are told they can follow.
+		local party = Party.of(player)
+		if together == true and party and party.Leader == player then
+			for _, member in table.clone(party.Members) do
+				if member ~= player then
+					if party.Ready[member] and problem(member) == nil and #run.Members < RiftRun.Party then
+						join(run, member)
+					elseif not runOf[member] then
+						notify(member, player.DisplayName .. " went through a Rift Gate: walk up to any gate to follow.")
+					end
+				end
+			end
+		end
 	else
 		join(run, player)
 	end

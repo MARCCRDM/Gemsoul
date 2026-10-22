@@ -1646,7 +1646,11 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 	elseif kind == "Market" then
 		require(script.Parent.MarketBoardUI).open()
 	elseif kind == "Rift" then
-		require(script.Parent.RiftClient).openGate(prompt:GetAttribute("Vein"))
+		local gate = prompt.Parent
+		require(script.Parent.RiftClient).openGate(
+			prompt:GetAttribute("Vein"),
+			if gate and gate:IsA("BasePart") then gate.Position else nil
+		)
 	elseif kind == "RiftExit" then
 		require(script.Parent.RiftClient).leave()
 	elseif kind == "Secret" then

@@ -5606,6 +5606,46 @@ end)()
 	world = built[#built]
 	rootA.CFrame = CFrame.new(world.Exit.Position)
 	check(registered.RiftLeave(a).Ok and a:GetAttribute("RiftRun") == nil, "Couldn't leave by the way home")
+	-- Going in together (the gate's lobby): the party's leader brings
+	-- everyone who's ready, from anywhere in the Outpost; one who isn't is
+	-- told they can follow. A member going in together brings nobody.
+	for _, p in { a, b } do
+		p:SetAttribute("SparDown", nil)
+		local h = p.Character:FindFirstChildOfClass("Humanoid")
+		h.MaxHealth, h.Health = 100, 100
+	end
+	local function homeBoth()
+		local trip = built[#built]
+		for _, p in { a, b } do
+			if RiftServer.runOf(p) then
+				local root = if p == a then rootA else rootB
+				root.CFrame = CFrame.new(trip.Exit.Position)
+				registered.RiftLeave(p)
+			end
+		end
+		now += 1
+	end
+	parties[a] = { Leader = a, Members = { a, b }, Ready = { [b] = true } }
+	parties[b] = parties[a]
+	now += 1
+	rootA.CFrame = CFrame.new(gate.Position)
+	rootB.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
+	local together = registered.RiftEnter(a, 2, nil, true)
+	check(together.Ok and RiftServer.runOf(b) ~= nil and RiftServer.runOf(b) == RiftServer.runOf(a), "A ready party member wasn't brought in together")
+	check(a:GetAttribute("RiftRunners") == 2 and (rootB.Position - built[#built].Start.Position).Magnitude < 12, "The one brought in isn't on the landing")
+	homeBoth()
+	parties[a].Ready = {}
+	rootA.CFrame = CFrame.new(gate.Position)
+	rootB.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
+	check(registered.RiftEnter(a, 2, nil, true).Ok and RiftServer.runOf(b) == nil, "One who wasn't ready was brought in")
+	check(noted(b, "walk up to any gate to follow"), "One who wasn't ready wasn't told they could follow")
+	homeBoth()
+	parties[a].Ready = { [a] = true }
+	rootB.CFrame = CFrame.new(gate.Position + Vector3.new(-4, 0, 0))
+	rootA.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
+	check(registered.RiftEnter(b, 2, nil, true).Ok and RiftServer.runOf(a) == nil, "A member going in together brought their leader")
+	homeBoth()
+	parties[a], parties[b] = nil, nil
 	-- (Pouches, coins and the kit back as they were for what follows.)
 	PlayerData.addGem = smallPouch
 	for _, p in { a, b } do
@@ -5631,7 +5671,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together)",
 		checks
 	)
 )

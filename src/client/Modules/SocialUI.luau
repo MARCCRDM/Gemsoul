@@ -269,6 +269,7 @@ local TAB_NAMES = { Miners = "MINERS", Party = "PARTY", Arena = "ARENA", Friends
 -- Your Roblox friends who are online (Player:GetFriendsOnline), fetched when
 -- the window opens and kept for half a minute; nil until the first answer.
 local friends: { any }? = nil
+SocialUI.FriendsChanged = Instance.new("BindableEvent")
 local friendIds: { [number]: boolean } = {}
 local friendsAt = -math.huge
 local fetchingFriends = false
@@ -290,6 +291,7 @@ local function fetchFriends(force: boolean?)
 				friendIds[friend.VisitorId] = true
 			end
 		end
+		SocialUI.FriendsChanged:Fire(friends)
 		if gui.Enabled then
 			SocialUI.refresh()
 		end
@@ -1151,6 +1153,19 @@ end
 SocialUI.PartyChanged = Instance.new("BindableEvent")
 function SocialUI.party()
 	return party
+end
+
+-- Your Roblox friends online (Player:GetFriendsOnline), nil till the first
+-- answer; asked again once they're half a minute old. FriendsChanged fires
+-- with each answer. (Client.RiftClient's gate lobby lists them.)
+function SocialUI.friends(): { any }?
+	fetchFriends()
+	return friends
+end
+
+-- Roblox's invite prompt: everyone, or the friend `userId`.
+function SocialUI.inviteFriends(userId: number?)
+	inviteFriends(userId)
 end
 
 -- The leader starts a Party Raid (three or more against a raid boss).

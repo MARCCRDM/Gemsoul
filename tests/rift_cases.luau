@@ -764,9 +764,81 @@ do
 	)
 end
 
+-- The gate's lobby (Shared.RiftLobby): your party's places, the miners in
+-- the Outpost and your friends online, and who you can invite.
+do
+	local Lobby = load("RiftLobby")
+	local others = {
+		{ UserId = 35, Name = "Kadey", Level = 14, Outpost = true, Near = true },
+		{ UserId = 49, Name = "Mirabel", Level = 9, Outpost = true, Party = "Other" },
+		{ UserId = 42, Name = "Orrinn", Level = 22, Outpost = true, InRift = true },
+		{ UserId = 56, Name = "Junipers", Level = 30, Outpost = false },
+		{ UserId = 63, Name = "Abel", Level = 3, Outpost = true },
+	}
+	local friends = {
+		{ VisitorId = 902, DisplayName = "Theo", PlaceId = 555 },
+		{ VisitorId = 901, DisplayName = "Sasha", PlaceId = 7 },
+		{ VisitorId = 35, DisplayName = "Kadey", PlaceId = 7 },
+	}
+	local function rowOf(list, id)
+		for _, row in list do
+			if row.UserId == id then
+				return row
+			end
+		end
+		return nil
+	end
+	-- On your own: you in the first place, ready, no leader; the rest open.
+	local solo = Lobby.lobby({ Me = 1, MeName = "Marc", Players = others, Friends = friends, Invited = {}, PlaceId = 7 })
+	check(solo.Lead and solo.Size == 1 and solo.Ready == 0 and not solo.Trip and solo.Known, "On your own, the lobby's wrong")
+	check(solo.Slots[1] and solo.Slots[1].You and solo.Slots[1].Name == "Marc" and solo.Slots[1].Ready and not solo.Slots[1].Leader, "Your place on your own")
+	check(#solo.Slots == RiftRun.Party and solo.Slots[2] == false and solo.Slots[RiftRun.Party] == false, "The open places")
+	-- The Outpost: at the gate first, your friends next, then by name; not
+	-- whoever's out of the Outpost; who's in a party or the Rift can't be asked.
+	check(#solo.Outpost == 4 and rowOf(solo.Outpost, 56) == nil, "Someone out of the Outpost is listed, or someone's missing")
+	check(solo.Outpost[1].UserId == 35 and solo.Outpost[1].Where == "At the gate" and solo.Outpost[1].Friend, "Who's at the gate isn't first")
+	check(rowOf(solo.Outpost, 35).Invite == "Party" and rowOf(solo.Outpost, 63).Invite == "Party", "You can't ask a miner into your party")
+	check(rowOf(solo.Outpost, 49).Invite == "Busy" and rowOf(solo.Outpost, 42).Invite == "Busy", "You can ask someone in a party or the Rift")
+	check(rowOf(solo.Outpost, 42).Where == "In the Rift" and rowOf(solo.Outpost, 63).Where == "In the Outpost", "Where they are")
+	-- Friends: here first (into your party), then in this game elsewhere,
+	-- then online (Roblox's invite); asked a moment ago, "Invited".
+	check(#solo.Friends == 3 and solo.Friends[1].UserId == 35 and solo.Friends[2].UserId == 901 and solo.Friends[3].UserId == 902, "Your friends' order")
+	check(solo.Friends[1].Invite == "Party" and solo.Friends[2].Invite == "Game" and solo.Friends[3].Invite == "Game", "Your friends' invites")
+	check(solo.Friends[2].Where == "Playing, another server" and solo.Friends[3].Where == "Online", "Where your friends are")
+	local asked = Lobby.lobby({ Me = 1, MeName = "Marc", Players = others, Friends = friends, Invited = { [35] = true, [902] = true }, PlaceId = 7 })
+	check(rowOf(asked.Outpost, 35).Invite == "Invited" and rowOf(asked.Friends, 902).Invite == "Invited", "Asked a moment ago, not shown as invited")
+	check(not Lobby.lobby({ Me = 1, Players = others, Invited = {} }).Known, "Your friends known before they're fetched")
+	-- In someone's party: you first, the leader next; only the leader asks.
+	local party = {
+		Leader = 21,
+		Members = {
+			{ UserId = 28, Name = "Bram", Ready = false },
+			{ UserId = 21, Name = "Ivy", Ready = true },
+			{ UserId = 1, Name = "Marc", Ready = true },
+		},
+	}
+	local mates = table.clone(others)
+	table.insert(mates, { UserId = 21, Name = "Ivy", Outpost = true, Party = "Mine", Near = true })
+	table.insert(mates, { UserId = 28, Name = "Bram", Outpost = true, Party = "Mine" })
+	local member = Lobby.lobby({ Me = 1, Party = party, Players = mates, Friends = friends, Invited = {}, PlaceId = 7 })
+	check(not member.Lead and member.Size == 3 and member.Ready == 1, "In someone's party, the lobby's wrong")
+	check(member.Slots[1].UserId == 1 and member.Slots[2].UserId == 21 and member.Slots[2].Leader and member.Slots[3].UserId == 28, "You, then the leader, then the rest")
+	check(member.Slots[2].Where == "At the gate" and member.Slots[3].Where == "In the Outpost" and member.Slots[4] == false, "Where your party is")
+	check(rowOf(member.Outpost, 21) == nil and rowOf(member.Outpost, 35).Invite == nil, "Your party's listed again, or you can invite without leading")
+	-- Leading a full party: nobody else to ask in.
+	party.Leader = 1
+	table.insert(party.Members, { UserId = 63, Name = "Abel", Ready = true })
+	local full = Lobby.lobby({ Me = 1, Party = party, Players = mates, Friends = friends, Invited = {}, PlaceId = 7 })
+	check(full.Lead and full.Size == RiftRun.Party and rowOf(full.Outpost, 35).Invite == nil, "A full party can still invite")
+	check(full.Slots[1].Leader and full.Slots[1].You and full.Ready == 2, "Leading: you lead, two of the others ready")
+	-- One of your party in the Rift already: going in, you join them.
+	mates[#mates].InRift = true
+	check(Lobby.lobby({ Me = 1, Party = party, Players = mates, Invited = {} }).Trip, "One of your party in the Rift isn't a trip to join")
+end
+
 print(
 	string.format(
-		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen; the KIT OUT bar under the strip; %d parts a trip)",
+		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen; the KIT OUT bar under the strip; the gate's lobby; %d parts a trip)",
 		checks,
 		#parts
 	)
