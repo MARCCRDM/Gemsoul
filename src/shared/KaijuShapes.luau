@@ -668,32 +668,49 @@ function Shapes.install(kit)
 		local lean = CF(0, 2.75, 0.15) * A(rad(-8), 0, 0)
 		local torso = limb(model, r, "Torso", V(1.7, 2.2, 1.4), lean, V(0, 1.7, 0.2), "Body", 1, H)
 		make(model, torso, "Belly", V(1.1, 1.5, 0.18), lean * CF(0, -0.1, -0.72), H2)
+		-- Solid faceted crystals with a narrow luminous vein; the surface stays readable.
+		local function crystal(attach, frame, width, height)
+			local color = pal.Plate:Lerp(pal.Glow, 0.6)
+			make(model, attach, "CrystalPrism", V(width, height * 0.7, width), frame * CF(0, height * 0.35, 0), color, Enum.Material.Glass)
+			for _, side in { -1, 1 } do
+				wedge(model, attach, "CrystalFacet", V(width, height * 0.3, width / 2), frame * CF(0, height * 0.85, side * width / 4) * A(0, if side == 1 then math.pi else 0, 0), color:Lerp(pal.Glow, if side == 1 then 0.35 else 0.1))
+			end
+			glow(model, attach, "CrystalVein", V(width * 0.12, height * 0.62, 0.025), frame * CF(0, height * 0.36, -width / 2 - 0.015), pal)
+		end
 		for _, side in { -1, 1 } do
-			local shard = CF(side * 0.72, 4.05, 0.55) * A(rad(15), 0, rad(-side * 28))
-			plate(model, torso, "Socket", V(0.72, 0.4, 0.72), shard * CF(0, -0.15, 0), pal)
-			glow(model, torso, "Crystal", V(0.6, 1.3, 0.6), shard * CF(0, 0.65, 0) * A(0, rad(45), 0), pal)
-			glow(model, torso, "Crystal", V(0.4, 0.6, 0.4), shard * CF(0, 1.5, 0) * A(0, rad(45), 0), pal)
-			glow(model, torso, "Crystal", V(0.2, 0.4, 0.2), shard * CF(0, 1.92, 0) * A(0, rad(45), 0), pal)
-			glow(model, torso, "Crystal", V(0.3, 0.8, 0.3), shard * CF(side * 0.35, 0.5, 0.1) * A(0, rad(45), rad(-side * 25)), pal)
+			local shard = CF(side * 0.82, 3.8, 0.5) * A(rad(12), rad(25), rad(-side * 28))
+			make(model, torso, "CrystalRoot", V(0.82, 0.5, 0.85), shard * CF(0, 0.05, 0), H2)
+			crystal(torso, shard, 0.62, 2.15)
+			wedge(model, torso, "ShoulderRidge", V(0.38, 0.65, 0.8), CF(side * 1.0, 3.55, -0.12) * A(0, 0, rad(-side * 25)), H)
+			wedge(model, torso, "ShoulderScale", V(0.32, 0.45, 0.65), CF(side * 1.25, 3.35, -0.1) * A(0, 0, rad(-side * 35)), H2)
+		end
+		for i = 0, 2 do
+			make(model, torso, "BellyScale", V(1.18 - i * 0.1, 0.36, 0.12), lean * CF(0, 0.4 - i * 0.45, -0.84), H2:Lerp(H, i * 0.12))
 		end
 		for i = 0, 2 do
 			glow(model, torso, "Shard", V(0.16, 0.34, 0.34), lean * CF(0, 0.2 - i * 0.5, 0.75) * A(rad(45), 0, 0), pal)
 		end
 		local head = make(model, torso, "Head", V(1.0, 0.85, 1.05), CF(0, 4.05, -0.45), H)
 		make(model, head, "Snout", V(0.8, 0.5, 0.6), CF(0, 3.95, -1.1), H)
-		glow(model, head, "Crystal", V(0.25, 0.5, 0.25), CF(0, 4.65, -0.55), pal)
+		crystal(head, CF(0, 4.45, -0.35) * A(0, rad(45), 0), 0.3, 0.65)
+		for _, side in { -1, 1 } do
+			make(model, head, "Brow", V(0.42, 0.13, 0.2), CF(side * 0.29, 4.3, -0.97) * A(0, 0, rad(side * 14)), H2)
+			make(model, head, "Nostril", V(0.09, 0.08, 0.025), CF(side * 0.23, 4.02, -1.41), H:Lerp(C(12, 15, 25), 0.7))
+		end
 		eyes(model, head, 0.3, 4.2, -0.99, V(0.18, 0.1, 0.08), pal)
 		limb(model, head, "Jaw", V(0.75, 0.25, 0.85), CF(0, 3.57, -0.9), V(0, 3.7, -0.5), "Jaw", 1, H2)
 		for _, side in { -1, 1 } do
 			local p, hand = arm(model, torso, V(side * 0.98, 3.35, -0.35), V(0.42, 0.95, 0.45), 30, 10, side, H)
+			make(model, p, "Palm", V(0.44, 0.28, 0.42), hand * CF(0, -0.02, -0.08), H2)
 			claws(model, p, hand.Position.X, hand.Position.Y - 0.05, hand.Position.Z - 0.1, 3, 0.13, V(0.1, 0.2, 0.14))
 			local l = leg(model, torso, side * 0.55, 0.3, 1.7, 0.7, V(0.85, 0.35, 1.15), side, H, H2, 3)
+			make(model, l, "KneeScale", V(0.64, 0.32, 0.16), CF(side * 0.55, 0.9, -0.09), H2)
 			make(model, l, "Thigh", V(0.85, 0.8, 0.95), CF(side * 0.58, 1.45, 0.3), H)
 		end
 		local sizes = { V(0.85, 0.75, 1.0), V(0.7, 0.6, 1.0), V(0.55, 0.45, 0.95), V(0.4, 0.32, 0.9), V(0.26, 0.22, 0.8) }
 		tail(model, torso, V(0, 1.9, 0.85), sizes, { 30, 18, 6, -4, -10 }, H, function(seg, frame, i, s)
 			if i <= 4 then
-				spike(model, seg, 0.6 - i * 0.08, frame * CF(0, s.Y / 2, 0), pal)
+				wedge(model, seg, "TailRidge", V(s.X * 0.7, 0.4 - i * 0.045, s.Z * 0.65), frame * CF(0, s.Y / 2 + 0.1, 0), pal.Plate)
 			end
 		end)
 	end
