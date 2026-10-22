@@ -80,6 +80,9 @@ local HEAD = if SHORT then 48 else 64
 local PAGE_X = if SHORT then 12 else 24
 local PAGE_Y = HEAD + (if SHORT then 6 else 16)
 local PAGE_W, PAGE_H = W - 2 * PAGE_X, H - PAGE_Y - (if SHORT then 8 else 20)
+-- (A phone's small print a size up: it's read at arm's length on a small
+-- screen.)
+local UP = if SHORT then 1 else 0
 local KIND_NAMES = {
 	Skin = "Weapon skin",
 	Suit = "Suit",
@@ -1018,23 +1021,23 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 	end
 	local pic = well(card, color, 6, 6, CARD_W - 12, CARD.Pic)
 	art(pic, "Cosmetic", id, CARD.Art)
-	local rarity = pill(card, string.upper(RARITY_NAMES[cosmetic.Rarity] or ""), color, false, 9)
+	local rarity = pill(card, string.upper(RARITY_NAMES[cosmetic.Rarity] or ""), color, false, 9 + UP)
 	rarity.Position = UDim2.fromOffset(12, 12)
 	if isWorn or mine then
-		local tag = pill(card, if isWorn then "WEARING" else "OWNED", if isWorn then C.Gold else C.Good, true, 9)
+		local tag = pill(card, if isWorn then "WEARING" else "OWNED", if isWorn then C.Gold else C.Good, true, 9 + UP)
 		tag.AnchorPoint = Vector2.new(1, 0)
 		tag.Position = UDim2.new(1, -12, 0, 12)
 	end
-	local name = text(card, cosmetic.Name, 14, C.Text, BOLD, 12, CARD.Name, CARD_W - 24, 18)
+	local name = text(card, cosmetic.Name, 14 + UP, C.Text, BOLD, 12, CARD.Name, CARD_W - 24, 18)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
-	text(card, KIND_NAMES[cosmetic.Kind] or "", 11, C.Faint, MEDIUM, 12, CARD.Kind, CARD_W - 24, 14)
+	text(card, KIND_NAMES[cosmetic.Kind] or "", 11 + UP, C.Dim, MEDIUM, 12, CARD.Kind, CARD_W - 24, 14)
 	if cosmetic.Robux and not mine then
-		text(card, robux(cosmetic.Robux), 17, C.Text, BLACK, 12, CARD.Price, CARD_W - 24, 26)
+		text(card, robux(cosmetic.Robux), 17 + UP, C.Text, BLACK, 12, CARD.Price, CARD_W - 24, 26)
 	elseif mine then
 		text(
 			card,
 			if isWorn then "✓  Wearing" else "✓  In your collection",
-			12,
+			12 + UP,
 			C.Good,
 			BOLD,
 			12,
@@ -1044,7 +1047,7 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 		)
 	else
 		local how =
-			wrap(text(card, "Earn  ·  " .. Cosmetics.source(cosmetic), 11, C.Gold, BOLD, 12, CARD.Price, CARD_W - 24, 30))
+			wrap(text(card, "Earn  ·  " .. Cosmetics.source(cosmetic), 11 + UP, C.Gold, BOLD, 12, CARD.Price, CARD_W - 24, 30))
 		how.TextTruncate = Enum.TextTruncate.AtEnd
 	end
 	card:SetAttribute("UiSound", "Click")
@@ -1069,7 +1072,7 @@ local function segmented(parent: Instance, order: number, options: { { string } 
 			Text = option[2],
 			AutoButtonColor = false,
 			Font = BOLD,
-			TextSize = 12,
+			TextSize = 12 + UP,
 			TextColor3 = if active then C.Ink else C.Dim,
 			BackgroundColor3 = C.Text,
 			BackgroundTransparency = if active then 0 else 1,
@@ -1137,11 +1140,12 @@ local function productPage(id: string, x: number)
 	IronUi.animate(hero, function(t)
 		hero.Position = UDim2.new(0.5, 0, 0.5, math.sin(t * 1.6) * 4)
 	end)
-	pill(pic, string.upper(RARITY_NAMES[cosmetic.Rarity] or ""), color, true, 10).Position = UDim2.fromOffset(12, 12)
-	local kindTag = pill(pic, string.upper(KIND_NAMES[cosmetic.Kind] or ""), C.Text, false, 10)
+	pill(pic, string.upper(RARITY_NAMES[cosmetic.Rarity] or ""), color, true, 10 + UP).Position = UDim2.fromOffset(12, 12)
+	local kindTag = pill(pic, string.upper(KIND_NAMES[cosmetic.Kind] or ""), C.Text, false, 10 + UP)
 	kindTag.AnchorPoint = Vector2.new(1, 0)
 	kindTag.Position = UDim2.new(1, -12, 0, 12)
 	text(side, cosmetic.Name, Y.NameSize, C.Text, BLACK, 18, Y.Name, inner, 30).Name = "ProductName"
+	-- (Not a size up on a phone: the longest are two lines there as it is.)
 	wrap(text(side, cosmetic.Description or "", 12, C.Dim, MEDIUM, 18, Y.Desc, inner, Y.DescH)).TextTruncate =
 		Enum.TextTruncate.AtEnd
 	local mine, isWorn = owned(id), worn(cosmetic.Kind) == id
@@ -1256,7 +1260,7 @@ local function productPage(id: string, x: number)
 		if MinerRoster.Enabled
 			then "✓ Looks only, never stats     ✓ Any of your miners can wear it"
 			else "✓ Looks only, never stats",
-		10,
+		10 + UP,
 		C.Faint,
 		BOLD,
 		18,
@@ -1322,7 +1326,7 @@ local function drawCatalog(tab: string)
 		if #ids == 0 then
 			return
 		end
-		local head = text(list, title, 11, C.Dim, BOLD, 0, 0, GRID_W, 16)
+		local head = text(list, title, 11 + UP, C.Dim, BOLD, 0, 0, GRID_W, 16)
 		head.LayoutOrder = order
 		local rows = math.ceil(#ids / COLS)
 		local grid = new("Frame", {

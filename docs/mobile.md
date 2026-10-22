@@ -13,9 +13,32 @@ of the previous version).
 
 ## What counts as a phone
 
-`UiKit.short()` is true when the screen is under 500 points tall: a phone on
-its side. Before the camera knows the screen size, a touch screen without a
-keyboard counts as one. Windows read it once, when they're built.
+`UiKit.short()` is true when the screen's **shorter side** is under 500
+points (`UiKit.PhoneSide`): a phone, either way up. Before the camera knows
+the screen size, a touch screen without a keyboard counts as one. Windows
+read it once, when they're built.
+
+It used to be the screen's height. The game turns phones sideways as it
+opens (`first/Orientation`), but the screens built as it starts (the Store,
+the Market, the Season Path, Social, the Surge Array and the kaiju panel)
+could see the phone still upright for a moment, 391 x 847: not short. So
+they laid out for a computer and then shrank that to fit the phone, and the
+Store came out a third of its size, its text too small to read. Judged by
+its shorter side, an upright phone is a phone too, and a tablet either way
+up (744 points or more on its short side) never is. `tests/run_phone_layout.py` checks it on
+phones, tablets and computers, either way up.
+
+| The Store on a phone, before (a computer's layout, shrunk) | After (its phone layout) |
+| --- | --- |
+| ![The Store on a phone, before](mobile/store-phone-before.png) | ![The Store on a phone, after](mobile/store-phone-after.png) |
+
+On a phone the Store's small print is also a size up (`UP` in `ShopUI`):
+the rarity and owned tags, each card's name, kind and price, the sorting,
+the section heads and the product page's tags and note. The product's
+description stays at 12, since the longest are already two lines there.
+
+These are offline renders of the game's UI code over a stand-in
+background, not Roblox screenshots.
 
 ## The lobby and fights
 

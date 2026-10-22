@@ -19,8 +19,12 @@ UiKit.Colors = {
 local K = UiKit.Colors
 
 -- A short screen: a phone on its side. Windows lay out shorter for it.
--- (Before the camera knows the screen, a touch screen without a keyboard
--- counts as one.)
+-- Judged by the screen's shorter side, so a phone counts either way up:
+-- the game turns phones sideways (first.Orientation), but screens built as
+-- it starts can see it still upright for a moment, tall and narrow, and
+-- would lay out for a computer, shrunk to a third. (Before the camera
+-- knows the screen, a touch screen without a keyboard counts as one.)
+UiKit.PhoneSide = 500
 function UiKit.short(): boolean
 	local camera = workspace.CurrentCamera
 	-- (pcall: a stand-in camera in tests may have no screen size)
@@ -34,7 +38,7 @@ function UiKit.short(): boolean
 		end)
 		return found and touch
 	end
-	return size.Y < 500
+	return math.min(size.X, size.Y) < UiKit.PhoneSide
 end
 
 -- Roblox's own buttons along the top of the screen: the Roblox button, then
