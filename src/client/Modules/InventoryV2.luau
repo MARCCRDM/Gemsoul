@@ -2733,10 +2733,25 @@ do
 		local gem = loadout[slot .. "Gem"]
 		local signature = perkOf(loadout, slot, nil, gem)
 		if signature then
+			-- The trait in plain words: what it does with its number in it,
+			-- its stamina cost, what Charge is for, and what it rolls between.
+			-- (Each wrapped line sized by a rough characters-per-line.)
+			local function para(value: string, size: number, color3: Color3, font: Enum.Font)
+				local perLine = math.floor((TIP_W - 32) / (size * 0.56))
+				local lines = math.max(1, math.ceil(#value / perLine))
+				line(value, size, color3, font, lines * (size + 3), true)
+			end
+			local plain = ArmorSignatures.explain(signature)
 			y += 4
 			line(string.upper(signature.Definition.Name), 10, C.Gold, HEADING, 12)
-			line(signature.Definition.Trigger, 11, C.Dim, MEDIUM, 28, true)
-			line(perkValue(signature), 14, C.Good, HEAVY, 18)
+			para(plain.Effect, 12, C.Good, HEADING)
+			if plain.Cost then
+				para(plain.Cost, 11, C.Bad, MEDIUM)
+			end
+			if plain.Note then
+				para(plain.Note, 10, C.Dim, MEDIUM)
+			end
+			para(plain.Range, 10, C.Faint, MEDIUM)
 		end
 		y += 4
 		if gem then

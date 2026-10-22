@@ -11,9 +11,17 @@ ArmorSignatures.Pools = {
 	Shield = { "GuardEfficiency" },
 }
 ArmorSignatures.Definitions = {
- Conductor={Name="Conductor",Slot="Helmet",Base=.20,Max=.40,Cooldown=0,Percent=true,Trigger="Bonus weapon-hit Charge; your stamina regenerates 15% slower"},
- Momentum={Name="Momentum",Slot="Helmet",Base=4,Max=8,Cooldown=0,Unit="Charge",Trigger="Every third damaging sword hit within 5s grants bonus Charge; your stamina regenerates 10% slower"},
- Recycler={Name="Recycler",Slot="Helmet",Base=1,Max=2,Cooldown=0,Unit="Charge/s",Trigger="Damaging sword hits activate 3s of Charge regeneration; refreshes without stacking; your stamina regenerates 15% slower"},
+ -- (StaminaCost: how much slower the wearer's stamina refills, the price of
+ -- the strongest Charge traits.)
+ Conductor={Name="Conductor",Slot="Helmet",Base=.20,Max=.40,Cooldown=0,Percent=true,StaminaCost=.15,
+  Trigger="More Charge from every weapon hit you land. Cost: stamina refills 15% slower",
+  Effect="+%s Charge from every hit you land: a light hit gives %s, a heavy %s (normally %s and %s)"},
+ Momentum={Name="Momentum",Slot="Helmet",Base=4,Max=8,Cooldown=0,Unit="Charge",StaminaCost=.10,
+  Trigger="Bonus Charge on every third damaging sword hit within 5 s. Cost: stamina refills 10% slower",
+  Effect="+%s bonus Charge on every third damaging sword hit within 5 s"},
+ Recycler={Name="Recycler",Slot="Helmet",Base=1,Max=2,Cooldown=0,Unit="Charge/s",StaminaCost=.15,
+  Trigger="Charge every second for 3 s after a damaging sword hit. Cost: stamina refills 15% slower",
+  Effect="+%s Charge a second for 3 s after a damaging sword hit (the next hit restarts it)"},
 	ChargeGain = {
 		Name = "Charge Gain",
 		Slot = "Helmet",
@@ -21,7 +29,8 @@ ArmorSignatures.Definitions = {
 		Max = 3,
 		Cooldown = 1,
 		Unit = "Charge",
-		Trigger = "A sword hit deals health damage",
+		Trigger = "Extra Charge when a sword hit does damage; once a second",
+		Effect = "+%s Charge when a sword hit does damage (once a second)",
 	},
 	Countercharge = {
 		Name = "Countercharge",
@@ -30,7 +39,8 @@ ArmorSignatures.Definitions = {
 		Max = 10,
 		Cooldown = 4,
 		Unit = "Charge",
-		Trigger = "Successfully time a block",
+		Trigger = "Charge when you time a block; once every 4 s",
+		Effect = "+%s Charge when you time a block (once every 4 s)",
 	},
 	LifeSteal = {
 		Name = "Life Steal",
@@ -39,7 +49,8 @@ ArmorSignatures.Definitions = {
 		Max = 0.05,
 		Cooldown = 0,
 		Percent = true,
-		Trigger = "Heal from actual sword damage; anti-heal applies",
+		Trigger = "Heal a share of the sword damage you deal; anti-heal cuts it",
+		Effect = "Heal %s of the sword damage you deal (anti-heal cuts it)",
 	},
 	Barrier = {
 		Name = "Barrier",
@@ -48,7 +59,8 @@ ArmorSignatures.Definitions = {
 		Max = 15,
 		Cooldown = 6,
 		Unit = "absorption",
-		Trigger = "Timed block grants a non-stacking barrier for 3s",
+		Trigger = "A timed block gives you a damage shield for 3 s; once every 6 s",
+		Effect = "A timed block gives you a shield that soaks %s damage for 3 s (once every 6 s)",
 	},
 	Riposte = {
 		Name = "Riposte",
@@ -57,7 +69,8 @@ ArmorSignatures.Definitions = {
 		Max = 0.25,
 		Cooldown = 4,
 		Percent = true,
-		Trigger = "Timed block empowers your next sword hit within 1.5s",
+		Trigger = "After a timed block, your next sword hit within 1.5 s deals more damage; once every 4 s",
+		Effect = "After a timed block, your next sword hit within 1.5 s deals +%s damage (once every 4 s)",
 	},
 	StaminaRefund = {
 		Name = "Stamina Refund",
@@ -66,7 +79,8 @@ ArmorSignatures.Definitions = {
 		Max = 0.30,
 		Cooldown = 3,
 		Percent = true,
-		Trigger = "Avoid an incoming attack: refund this share of your dodge cost",
+		Trigger = "Dodge an attack and get some of the dodge's stamina back; once every 3 s",
+		Effect = "Dodge an attack and get %s of the dodge's stamina back (once every 3 s)",
 	},
 	Pursuit = {
 		Name = "Pursuit",
@@ -75,7 +89,8 @@ ArmorSignatures.Definitions = {
 		Max = 0.18,
 		Cooldown = 6,
 		Percent = true,
-		Trigger = "A heavy sword hit grants movement speed for 2s",
+		Trigger = "A heavy sword hit makes you faster for 2 s; once every 6 s",
+		Effect = "A heavy sword hit makes you %s faster for 2 s (once every 6 s)",
 	},
 	GuardEfficiency = {
 		Name = "Guard Efficiency",
@@ -84,9 +99,14 @@ ArmorSignatures.Definitions = {
 		Max = 0.35,
 		Cooldown = 0,
 		Percent = true,
-		Trigger = "Reduce stamina spent absorbing a blocked hit",
+		Trigger = "Blocked hits drain less of your stamina",
+		Effect = "Blocked hits drain %s less of your stamina",
 	},
 }
+-- Charge a landed weapon hit pays without perks, light and heavy (the same as
+-- CombatTechnology.Resources.Charge.OnHit / OnHeavy: tested to match), for
+-- the traits' wording.
+ArmorSignatures.HitCharge = { Light = 5, Heavy = 10 }
 function ArmorSignatures.isSword(weapon)
  return weapon ~= nil and (weapon.WeaponType == "Sword" or weapon.Look == "SwordShield")
 end
@@ -138,26 +158,54 @@ function ArmorSignatures.loadout(loadout, ranked)
 	end
 	return result
 end
+-- A number as the traits show it: one decimal at most, "%" for shares.
+local function shown(def, v: number): string
+	local n = if def.Percent then v * 100 else v
+	local text = string.format("%.1f", n):gsub("%.0$", "")
+	return if def.Percent then text .. "%" else text
+end
+-- A resolved trait in plain words: Effect (what it does, its value in it),
+-- Cost (its stamina trade-off, if it has one), Range (what it rolls
+-- between) and Note (what Charge is for, on the Charge traits).
+function ArmorSignatures.explain(sig)
+	local d = sig.Definition
+	local effect
+	if sig.Id == "Conductor" then
+		local light, heavy = ArmorSignatures.HitCharge.Light, ArmorSignatures.HitCharge.Heavy
+		effect = string.format(
+			d.Effect,
+			shown(d, sig.Value),
+			shown({}, light * (1 + sig.Value)),
+			shown({}, heavy * (1 + sig.Value)),
+			shown({}, light),
+			shown({}, heavy)
+		)
+	else
+		effect = string.format(d.Effect or d.Trigger, shown(d, sig.Value))
+	end
+	local charge = sig.Id == "Conductor" or (d.Unit and string.find(d.Unit, "Charge", 1, true) ~= nil)
+	return {
+		Effect = effect,
+		Cost = if d.StaminaCost
+			then string.format("Cost: your stamina refills %d%% slower", math.floor(d.StaminaCost * 100 + 0.5))
+			else nil,
+		Range = string.format("Rolls %s to %s; rarer gear and a better gem raise it", shown(d, d.Base), shown(d, d.Max)),
+		Note = if charge then "Charge fills your Q, E and R surges" else nil,
+	}
+end
 function ArmorSignatures.describe(roll, gem)
 	local sig = ArmorSignatures.resolve(roll, gem)
 	if not sig then
 		return "", ""
 	end
-	local d = sig.Definition
-	local function fmt(v)
-		return if d.Percent then string.format("%.1f%%", v * 100) else string.format("%.1f %s", v, d.Unit or "")
-	end
-	return d.Name,
-		string.format(
-			"%s. %s -> %s%s%s",
-			d.Trigger,
-			fmt(sig.Base),
-			fmt(sig.Value),
-			if d.Cooldown > 0 then string.format("; %gs cooldown", d.Cooldown) else "",
-			if sig.Affinity > 0
-				then string.format("; matching affinity +%g%% to enchantment (capped)", sig.Affinity * 100)
-				else ""
-		)
+	local plain = ArmorSignatures.explain(sig)
+	return sig.Definition.Name,
+		plain.Effect
+			.. "."
+			.. (if plain.Cost then " " .. plain.Cost .. "." else "")
+			.. (if sig.Affinity > 0
+				then string.format(" Matching affinity +%g%% (capped).", sig.Affinity * 100)
+				else "")
 end
 local function runtime(st)
 	st.ArmorBuffs = st.ArmorBuffs or { Ready = {}, Windows = {} }
@@ -254,8 +302,12 @@ function ArmorSignatures.chargeMultiplier(perks)
  return 1+(perks and perks.Conductor and perks.Conductor.Value or 0)
 end
 function ArmorSignatures.staminaMultiplier(perks)
- if perks and (perks.Conductor or perks.Recycler) then return .85 end
- return if perks and perks.Momentum then .9 else 1
+ local slower = 0
+ for id in perks or {} do
+  local def = ArmorSignatures.Definitions[id]
+  slower = math.max(slower, def and def.StaminaCost or 0)
+ end
+ return 1 - slower
 end
 function ArmorSignatures.recycler(st,perks,now,elapsed)
  local untilAt=runtime(st).RecyclerUntil or 0

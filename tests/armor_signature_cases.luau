@@ -165,3 +165,30 @@ do
  check(ArmorSignatures.recycler(st,recycler,16,1)==0,"Recycler did not expire")
  print("PASS: Charge armor triggers, non-stacking regeneration and personal stamina tradeoffs")
 end
+
+do
+ -- The traits in plain words: each value said with what it applies to,
+ -- its stamina cost, and the hit Charge it quotes the same as the rules'.
+ check(
+  ArmorSignatures.HitCharge.Light == Tech.Resources.Charge.OnHit and ArmorSignatures.HitCharge.Heavy == Tech.Resources.Charge.OnHeavy,
+  "The traits' wording quotes hit Charge the rules don't pay"
+ )
+ for id, def in ArmorSignatures.Definitions do
+  local plain = ArmorSignatures.explain({ Id = id, Definition = def, Value = def.Max })
+  check(type(def.Effect) == "string" and not string.find(plain.Effect, "%s", 1, true), id .. " has no plain wording")
+  check((plain.Cost ~= nil) == (def.StaminaCost ~= nil), id .. "'s stamina cost isn't said")
+  check(string.find(plain.Range, "Rolls ", 1, true) == 1, id .. " doesn't say what it rolls")
+ end
+ local conductor = ArmorSignatures.explain({ Id = "Conductor", Definition = ArmorSignatures.Definitions.Conductor, Value = 0.4 })
+ check(string.find(conductor.Effect, "+40% Charge from every hit you land: a light hit gives 7, a heavy 14", 1, true) == 1, "Conductor's numbers")
+ check(conductor.Cost == "Cost: your stamina refills 15% slower" and conductor.Note ~= nil, "Conductor's cost or Charge note")
+ check(
+  near(ArmorSignatures.staminaMultiplier({ Momentum = true }), 0.9)
+   and near(ArmorSignatures.staminaMultiplier({ Recycler = true }), 0.85)
+   and ArmorSignatures.staminaMultiplier({ LifeSteal = true }) == 1,
+  "A trait's stamina cost isn't the one it says"
+ )
+ local name, text = ArmorSignatures.describe({ Signature = "Conductor", SignatureVersion = 1, Rarity = 1, Affixes = {} }, nil)
+ check(name == "Conductor" and string.find(text, "Cost: your stamina refills 15% slower.", 1, true), "describe() lost the cost")
+ print("PASS: armor traits in plain words (numbers, costs, ranges)")
+end

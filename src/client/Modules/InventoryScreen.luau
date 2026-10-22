@@ -1686,12 +1686,14 @@ local function tipGear(slot: string, id: string?, worn: boolean)
 	local signature = ArmorSignatures.resolve(roll, gem)
 	if signature then
 		local d = signature.Definition
-		local function fmt(v: number): string
-			return if d.Percent then string.format("%.1f%%", v * 100) else string.format("%.1f %s", v, d.Unit or "")
-		end
+		local plain = ArmorSignatures.explain(signature)
 		tipRule()
 		tipLine(d.Name, 13, P.Gold, BOLD, 2)
-		tipLine(d.Trigger .. "  <b>" .. fmt(signature.Value) .. "</b>", 12, C.Text)
+		tipLine(plain.Effect, 12, C.Text)
+		if plain.Cost then
+			tipLine(plain.Cost, 11, C.Bad)
+		end
+		tipLine(plain.Range, 10, C.Dim)
 	elseif gear.Passive and gear.Passive.Text then
 		tipRule()
 		tipLine(gear.Passive.Name or "Perk", 13, P.Gold, BOLD, 2)
