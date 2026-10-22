@@ -45,9 +45,10 @@ they roam. See [kaiju-roster.md](kaiju-roster.md).
 
 ## A kaiju's moves: its own, and its gem surge
 
-Every kaiju carries a Gemsoul: a gem of its element, rolled like any gem
-(rarity, Size, Clarity, Cut). The Gemsoul gives it its element and makes it
-stronger the finer it is. A kaiju fights with two sets of moves:
+Every kaiju carries an **enchant** (in the code its `Soul`, the gem it
+lives in): a gem of its element, rolled like any gem (rarity, Size, Clarity,
+Cut). The enchant gives it its element and makes it stronger the finer it
+is. A kaiju fights with two sets of moves:
 
 **Its own moves are its kind's** (`Kaiju.kitMoves`; the first four's are
 their role's, `KaijuRoles.Kits`, the roster's are their own,
@@ -61,32 +62,30 @@ most every 9 seconds, its Q in place of a blow every 7 seconds, and its R
 when it's down to 60% health or a heavy blow or a cast is coming (at most
 every 14 seconds).
 
-**Its gem surge is its Gemsoul's E** (`Kaiju.gemSurge`), cast beside its
+**Its gem surge is its enchant's E** (`Kaiju.gemSurge`), cast beside its
 own moves from level 1, everywhere it fights:
 
-- **Only when it's attuned.** A Gemsoul is rolled in its kaiju's element,
-  so a kaiju starts attuned: a Thermal kaiju's gem surge is a Thermal move,
-  a Cryo one's a Cryo move. Socket a gem of another element as its Gemsoul
-  (the GEMSOUL tab, below) and it keeps the stats but loses the surge till
-  it has one of its own element again. Two kaiju of one kind and element
-  can still differ by their Gemsoul.
+- **Its own element.** An enchant is rolled in its kaiju's element, and only
+  a gem of its own element can enchant it (below), so a Thermal kaiju's gem
+  surge is a Thermal move, a Cryo one's a Cryo move. Two kaiju of one kind
+  and element can still differ by their enchant.
 - **When:** 6 seconds into a fight, then every 14 seconds
   (`Kaiju.GemSurge`), after a wind-up its foe can see on its cast bar. Not
   while it's stunned or silenced, or with a heavy blow coming at it (it
   guards that). A ring round itself (Solar Flare, Acid Spray) only with its
   foe inside it; the rest reach a foe up to 30 studs off.
-- **How hard:** 2.6 of its blows, times its Gemsoul's output (a Common's
+- **How hard:** 2.6 of its blows, times its enchant's output (a Common's
   0.6 to a Legendary's 1.0) and a little more for a bigger stone, times the
   move's own share (`Kaiju.abilityDamage`). In a kaiju battle, times its
   role's power too, as its blows are, so the surge adds the same share for
-  every role. A Legendary Gemsoul's surge hits two thirds harder than a
+  every role. A Legendary enchant's surge hits two thirds harder than a
   Common's.
 - **On screen:** a fourth row on its card in the starter roll and in the
-  kaiju panel, GEM SURGE (in the Gemsoul's rarity), with the move's icon and
+  kaiju panel, GEM SURGE (in the enchant's rarity), with the move's icon and
   what it does; and a diamond under the Q, E and R dots on its tile in the
   strip, lit when it's ready (`KaijuGemAt`, its own cast time).
 
-The Gemsoul's E is one of these (`GemTraits.SoulMoves`: the ones you can see
+The enchant's E is one of these (`GemTraits.SoulMoves`: the ones you can see
 land, never a dash or a "while ready" bonus); its Q and R, the gem's other
 two moves, are for whoever sockets it:
 
@@ -97,43 +96,102 @@ two moves, are for whoever sockets it:
 | Ion | Ion Spark, Chain Lightning, Thunder Pylon, Storm Call, Ion Cannon | Circuit Cleave, Thunder Dash, Skybreaker | Ion Shield, Capacitor, Tesla Fence |
 | Corrosive | Acid Spray, Toxic Cloud, Armor Melt, Toxic Tide, Maneater | Caustic Dart, Vitriol Sweep, Toxic Flask | Rad Shield, Bio Regrowth, Toxic Mantle |
 
-### The GEMSOUL tab: any gem, its own element attuned
+### ENCHANT: its own element only
 
-A kaiju's own element never changes (it's its record's `Element`, not its
-Gemsoul's). Its Gemsoul can: **any loose gem in your pouch can be socketed
-as its Gemsoul** (`KaijuSocket`, `KaijuServer.socketSoul`), and the old one
-goes back to your pouch as a gem.
+A kaiju's element never changes (it's its record's `Element`). Its enchant
+can: **a gem of its own element from your pouch can enchant it**
+(`KaijuSocket`, `KaijuServer.socketSoul`), and the old one goes back to
+your pouch as a gem. **Only its own element:** a Cryo kaiju takes Cryo
+gems, never Thermal, Ion or Corrosive ones (`Kaiju.canSocket`: "Only a Cryo
+gem can enchant a Cryo kaiju.", "Only an Ion gem can enchant an Ion
+kaiju.").
 
-- **Rarity makes it stronger, whatever the element** (`Kaiju.SoulBonus`):
-  +0% for a Common, +5% Uncommon, +10% Rare, +15% Ultra-Rare, +20%
-  Legendary, on health, damage and speed (`Kaiju.recordStats`).
-- **Its own element is attuned** (`Kaiju.attuned`: the Gemsoul's element is
-  the kaiju's): **+15% damage** (`Kaiju.Attuned.Power`) and its **gem
-  surge**, the Gemsoul's E (`Kaiju.recordSurge`; a gem whose E isn't a move
-  a kaiju can cast lands its element's first one).
-- **Another element:** the rarity's stats only, no surge. The kaiju panel's
-  gem surge row says *No gem surge* and how to get it back.
+- **Rarity makes it stronger** (`Kaiju.SoulBonus`): +0% for a Common, +5%
+  Uncommon, +10% Rare, +15% Ultra-Rare, +20% Legendary, on health, damage
+  and speed (`Kaiju.recordStats`).
+- **Always attuned** (`Kaiju.attuned`: the enchant's element is the
+  kaiju's): **+15% damage** (`Kaiju.Attuned.Power`) and its **gem surge**,
+  the enchant's E (`Kaiju.recordSurge`; a gem whose E isn't a move a kaiju
+  can cast lands its element's first one).
+- **An old enchant of another element** (socketed before enchants had to
+  match) stays where it is: its rarity's stats, no surge. The panel says so
+  in gold and offers its own element's gems, each marked **+ ITS SURGE**.
 - **Not mid-fight** (the same `KaijuDanger` as healing), and not the gem
-  that's its Gemsoul already. The server checks the gem is yours and loose
-  (`GemInventory.available`, `Kaiju.canSocket`). Health is kept, clamped to
-  the new top.
+  that's its enchant already. The server checks the gem is yours, loose
+  (`GemInventory.available`) and of its element. Health is kept, clamped to
+  the new top. It says what happened: "Frosty is enchanted with a Legendary
+  Cryo gem. Gem surge: Hailstorm."
+- `Kaiju.enchanted(record, gem)` is how it would stand with another gem
+  (stats, surge), for the panel's preview.
 
-The tab, beside DETAILS and HEAL:
+The ENCHANT tab, beside DETAILS and HEAL:
 
-1. **At the top**, its Gemsoul now: the gem, `RARE GEMSOUL · THERMAL`, and
-   `ATTUNED · +15% damage · gem surge: Ember Lance` (green) or
-   `NOT ITS ELEMENT · no gem surge` (gold).
-2. **Your gems**, a card for each rarity and element (the finest of each):
-   how many, `+10% STATS`, and ATTUNED (its own element, first) or NO SURGE.
-3. **At the bottom**, what you picked and what socketing it does, and
-   **SOCKET** (**IN A FIGHT** while you're in one).
+1. **At the top**, its enchant now: the gem, `COMMON CORROSIVE ENCHANT`,
+   `+0% stats · +15% damage · Gem surge: Toxic Cloud` (green; gold with
+   what to do for an old one of another element), and its health, damage
+   and speed.
+2. **The rule**, in its element's colour: "Only Corrosive gems can enchant a
+   Corrosive kaiju."
+3. **A row for each rarity of its element**, rarest first: the finest of
+   yours of that rarity (its gem, `×2`, `+15% stats`, the surge it would
+   cast) and how it compares with now: **15% STRONGER**, **5% WEAKER** or
+   **SAME AS NOW**. A rarity you have none of is dimmed, *None in your
+   pouch*. The best upgrade you have is picked when you open it.
+4. **At the foot**, the one picked and what it does to its stats ("Health
+   324 to 373 · Damage 16 to 19. Its enchant now goes back to your pouch."),
+   and **ENCHANT** (**IN A FIGHT** while you're in one). With none of its
+   element at all: where they turn up most (Cryo gems in the snow fields,
+   Thermal on the burnt ground, Ion on the salt flats, Corrosive on the mud
+   flats: each biome's own element, `Shared.Frontier.Biomes`).
 
-The detail view's pill says `RARE GEMSOUL · ATTUNED` when it is.
+A green dot on the ENCHANT tab, and on a kaiju's row in the list, says you
+have a better gem of its element for it.
 
-![The GEMSOUL tab](kaiju/gemsoul-tab.png)
+![The ENCHANT tab: a Corrosive kaiju's rows, rarest first](kaiju/enchant-tab.png)
 
-A Gemsoul you win is a gem like any other: socket it in your gear, enchant
-it, sell it. In your gear all three of its moves work, like any gem's: its
+![An old enchant of another element](kaiju/enchant-old-element.png)
+
+On a phone the rows scroll, and in Spanish the tab is ENCANTAR:
+
+![The ENCHANT tab on a phone](kaiju/enchant-phone.png)
+
+![The ENCHANT tab in Spanish](kaiju/enchant-es.png)
+
+Before, the tab was GEMSOUL and took any gem:
+[the old tab](kaiju/gemsoul-tab-before.png).
+
+### Names
+
+**RENAME** beside its name in DETAILS: type a name and **SAVE** (or Enter);
+**CANCEL** leaves it. Empty, it's back to its kind's title.
+
+- **The rules** (`Kaiju.cleanName`): up to 16 letters (`Kaiju.NameMax`;
+  accented ones too: á, ñ), numbers, spaces, `-`, `'` and `.`, with at
+  least one letter. Spaces at the ends go, and runs of them become one.
+- **Roblox's filter** (`KaijuServer.filterName`: `TextService`, for
+  everyone to see): what comes back must be the name as typed, or it's
+  refused ("That name isn't allowed: try another."). If the filter can't be
+  reached, it's refused too. One rename every 2 seconds (`Kaiju.NameEvery`).
+- **Where it shows** (`Kaiju.nameOf`: its name, or its title): the panel's
+  list and DETAILS (its kind then goes on the line under it: `CORROSIVE
+  CARAPACE · TANK · LV 2 · OUT`), HEAL, the server's messages (healed,
+  knocked out, levelled up, enchanted), its body out (`KaijuName`) and kaiju
+  battles.
+- **Kept as typed** in Spanish: the panel's name labels are marked
+  `NoTranslate`, so a kaiju named "Ready" isn't turned into "Listo".
+
+![A named kaiju: its kind under its name, what it's strong and weak against](kaiju/named.png)
+
+![Renaming](kaiju/rename.png)
+
+### Strong and weak
+
+DETAILS shows what it's strong and weak against, a pill each in that
+element's colour (`Shared.ElementMatchup.Beats`): a Corrosive kaiju is
+**STRONG VS THERMAL** and **WEAK TO ION**.
+
+An enchant gem you win (a wild kaiju's, killed) is a gem like any other:
+socket it in your gear, enchant a kaiju of its element with it, sell it. In your gear all three of its moves work, like any gem's: its
 Q in a sword, its E in a chest, its R in a shield. A Gemsoul saved before
 this, its Q and R rolled from the whole lane, gets a kaiju's Q and R seeded
 from its id (the same on every server and client); its E is kept.
@@ -351,11 +409,12 @@ On a computer the strip sits at the bottom left, CATCH above it:
 - **The kaiju panel:** on the left every kaiju you have: YOUR TEAM (numbered,
   1 leads; health, EXP, and DOWN: REVIVE IT on one knocked out) and AT HOME
   (their health too: it doesn't come back at home either). Pick one for it
-  in full on the right: its portrait, with its Gemsoul's gem on the corner
-  (edged in its rarity), kind, level, its Gemsoul's rarity, health, damage
-  and speed, its EXP, and its E, Q and R with what each does (READY, or
-  WAKES AT LV 5 / 10, each with its icon and key), and under them its gem
-  surge (G, GEM SURGE in its Gemsoul's rarity). Under that, what you can
+  in full on the right: its portrait, with its enchant's gem on the corner
+  (edged in its rarity), its name and RENAME, kind, role and level, its
+  enchant's rarity, what it's strong and weak against, health, damage and
+  speed, its EXP, and its E, Q and R with what each does (READY, or WAKES
+  AT LV 5 / 10, each with its icon and key), and under them its gem surge
+  (G, GEM SURGE in its enchant's rarity). Under that, what you can
   do: **LEAD** (one of the team to the front), **SEND OUT** (one from home:
   then pick which of the team it goes out in place of) and **HEAL**
   (**REVIVE** on one that's down), which opens its HEAL tab (see
@@ -865,6 +924,19 @@ seconds every ten minutes), and nothing piling up.
 effect draws, kept through its delays and frame loops, never lent to
 another effect, clamped, a body's size by its height), and
 `tests/run_hit_shake.py` a quarter-size kaiju's shake.
+Enchants and names (`tests/kaiju_cases.luau`, `tests/kaiju_server_cases.luau`):
+a gem of another element never enchants it, whatever its rarity, with the
+right refusal ("an Ion gem", "an Ion kaiju"); one of its own does, any
+rarity; `enchanted` gives a rarer gem's stats and surge and leaves the
+kaiju as it was; an old enchant of another element keeps its rarity's stats
+with no surge; on the server, a Thermal gem refused for a Cryo kaiju, a
+Legendary Cryo one in (its stats, its surge, the old one back in the
+pouch), not mid-fight, not someone else's. Names: `cleanName` on good names
+(spaces tidied, accents, `-`, `'`, `.`) and bad ones (`_`, an emoji, tags,
+only digits, too long), `nameOf`; on the server a name through the filter
+(once), on its body out, someone else's kaiju refused, a filtered name
+refused, the filter down refused, two renames at once refused, "" back to
+its title.
 The rules also check every Gemsoul's three moves (waking at 5 and 10),
 every move's plan, an old Gemsoul's seeded Q and R, and each key's power;
 and the gem surge: always its Gemsoul's E and its element's, with a plan to

@@ -506,13 +506,13 @@ for _, element in Kaiju.Elements do
 end
 check(Kaiju.gemSurge(plain) == nil and Kaiju.gemSurge(nil) == nil, "A plain gem gave a gem surge")
 check(Kaiju.GemSurge.Every > Kaiju.AbilityEvery and Kaiju.GemSurge.First > 0, "The gem surge's timing")
--- Any gem can be its Gemsoul (canSocket); one of its own element is attuned:
--- harder hits (recordStats) and its gem surge (recordSurge, a mined gem's E
--- it can't cast giving way to its element's first). It keeps its element.
+-- Only a gem of its own element can enchant it (canSocket): attuned, harder
+-- hits (recordStats) and its gem surge (recordSurge, a mined gem's E it
+-- can't cast giving way to its element's first). It keeps its element.
 do
 	local born = Kaiju.rollSoul(Random.new(5), "Frost", { Id = "s1", Time = 1, Species = "Bulwark" })
 	local rec = Kaiju.new("k1", "Bulwark", born, 6)
-	check(Kaiju.attuned(rec) and rec.Element == "Frost", "A kaiju isn't attuned to the Gemsoul it was born with")
+	check(Kaiju.attuned(rec) and rec.Element == "Frost", "A kaiju isn't attuned to the enchant it was born with")
 	local plainStats = Kaiju.stats("Bulwark", 6, born.Tier)
 	local attunedStats = Kaiju.recordStats(rec)
 	check(
@@ -520,26 +520,75 @@ do
 			and attunedStats.Health == plainStats.Health,
 		"Attuned: its damage isn't Attuned.Power more (or its health changed)"
 	)
-	check(Kaiju.recordSurge(rec) == Kaiju.gemSurge(born), "Attuned: its gem surge isn't its Gemsoul's E")
-	check(Kaiju.canSocket(rec, { Id = "m1", Element = "Fire", Tier = "Legendary" }), "A gem of another element can't go in")
-	check(not Kaiju.canSocket(rec, born), "Its own Gemsoul went in again")
+	check(Kaiju.recordSurge(rec) == Kaiju.gemSurge(born), "Attuned: its gem surge isn't its enchant's E")
+	-- Another element's gem never goes in, whatever its rarity.
+	for _, element in { "Fire", "Shock", "Poison" } do
+		local ok, why = Kaiju.canSocket(rec, { Id = "m1", Element = element, Tier = "Legendary" })
+		check(not ok and why == "Only a Cryo gem can enchant a Cryo kaiju.", element .. " enchanted a Cryo kaiju: " .. tostring(why))
+	end
+	check(Kaiju.canSocket(rec, { Id = "m3", Element = "Frost", Tier = "Common" }), "A Cryo gem can't enchant a Cryo kaiju")
+	local ion = Kaiju.new("k5", "Razorback", Kaiju.rollSoul(Random.new(6), "Shock", { Id = "s5", Time = 1 }), 2)
+	local _, ionWhy = Kaiju.canSocket(ion, { Id = "m5", Element = "Fire", Tier = "Rare" })
+	check(ionWhy == "Only an Ion gem can enchant an Ion kaiju.", "Ion's refusal: " .. tostring(ionWhy))
+	check(not Kaiju.canSocket(rec, born), "Its own enchant went in again")
 	check(not Kaiju.canSocket(rec, { Id = "x" }) and not Kaiju.canSocket(nil, born), "A gem with no element, or no kaiju")
-	-- Another element: stronger by its rarity, never attuned, no surge.
+	-- How it'd stand with another (enchanted): a rarer gem of its element,
+	-- stronger and still attuned; the record itself untouched.
+	local legendGem = { Id = "m4", Element = "Frost", Tier = "Legendary" }
+	local would = Kaiju.enchanted(rec, legendGem)
+	check(would and would.Attuned and would.Tier == "Legendary", "enchanted: not attuned with its own element")
+	check(would.Stats.Health == Kaiju.stats("Bulwark", 6, "Legendary").Health, "enchanted: not a Legendary's stats")
+	check(would.Surge ~= nil and Kaiju.AbilityPlans[would.Surge] ~= nil, "enchanted: no surge it can cast")
+	check(rec.Soul == born, "enchanted changed the kaiju itself")
+	-- An old enchant of another element (from before they had to match):
+	-- stronger by its rarity, never attuned, no surge, its element kept.
 	rec.Soul = { Id = "m1", Element = "Fire", Tier = "Legendary" }
 	check(not Kaiju.attuned(rec) and rec.Element == "Frost", "Another element's gem attuned it, or changed its element")
 	check(Kaiju.recordSurge(rec) == nil, "Another element's gem gave a gem surge")
 	local legendary = Kaiju.recordStats(rec)
 	check(legendary.Damage == Kaiju.stats("Bulwark", 6, "Legendary").Damage, "Another element's gem: its rarity's stats")
 	check(legendary.Health > plainStats.Health or born.Tier == "Legendary", "A Legendary gem didn't make it stronger")
+	check(Kaiju.canSocket(rec, born), "Its own element couldn't take an old enchant's place")
 	-- A mined gem of its element: attuned, and a surge it can cast.
 	for _, element in Kaiju.Elements do
 		local mined = { Id = "m2", Element = element, Tier = "Rare" }
 		local own = Kaiju.new("k2", "Scythe", Kaiju.rollSoul(Random.new(9), element, { Id = "s2", Time = 1 }), 3)
+		check(Kaiju.canSocket(own, mined), element .. ": a mined gem of its element can't enchant it")
 		own.Soul = mined
 		local id = Kaiju.recordSurge(own)
 		check(Kaiju.attuned(own) and id ~= nil and Kaiju.AbilityPlans[id] ~= nil, element .. ": a mined gem of its element, no surge")
 		check(table.find(Kaiju.Moves[element].Ability, id) ~= nil, element .. ": its surge isn't its element's")
 	end
+end
+-- Names (cleanName, nameOf): letters (accented ones too), numbers, spaces,
+-- - ' and ., up to NameMax, a letter in it; "" is no name.
+do
+	for text, want in {
+		["Frosty"] = "Frosty",
+		["  Big   Al  "] = "Big Al",
+		["Pequeño"] = "Pequeño",
+		["José María"] = "José María",
+		["Zed-2"] = "Zed-2",
+		["O'Malley"] = "O'Malley",
+		["Dr. Bite"] = "Dr. Bite",
+		[""] = "",
+		["    "] = "",
+	} do
+		local got, why = Kaiju.cleanName(text)
+		check(got == want, string.format("cleanName(%q) gave %q (%s)", text, tostring(got), tostring(why)))
+	end
+	for _, text in { "123", "a_b", "Thisnameiswaytoolong", "x😀", "<b>hi</b>", "@@@" } do
+		local got, why = Kaiju.cleanName(text)
+		check(got == nil and type(why) == "string", "cleanName took " .. text)
+	end
+	check(Kaiju.cleanName(nil) == nil and Kaiju.cleanName(7) == nil, "cleanName took a non-string")
+	check(#Kaiju.cleanName(string.rep("a", Kaiju.NameMax)) == Kaiju.NameMax, "A name NameMax long refused")
+	local named = Kaiju.new("k9", "Razorback", Kaiju.rollSoul(Random.new(3), "Frost", { Id = "n", Time = 1 }), 2)
+	check(Kaiju.nameOf(named) == "Cryo Razorback", "No name: not its title")
+	named.Name = "Frosty"
+	check(Kaiju.nameOf(named) == "Frosty" and Kaiju.title(named) == "Cryo Razorback", "Its name isn't used, or replaced its title")
+	named.Name = ""
+	check(Kaiju.nameOf(named) == "Cryo Razorback" and Kaiju.nameOf(nil) == "Kaiju", "An empty name isn't its title")
 end
 -- A finer Gemsoul's surge hits harder (its output), as its stats are.
 local legend = table.clone(oldSoul)
@@ -823,7 +872,7 @@ end
 
 print(
 	string.format(
-		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, Gemsouls, your team, the starter roll, fighting as a team, sizes)",
+		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), names, your team, the starter roll, fighting as a team, sizes)",
 		checks
 	)
 )

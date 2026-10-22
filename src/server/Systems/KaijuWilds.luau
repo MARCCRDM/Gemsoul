@@ -1937,7 +1937,7 @@ local function wildDied(enemy)
 			Remotes.Notify:FireClient(
 				best,
 				string.format(
-					"Defeated %s %s: its Gemsoul is yours (%s, E: %s).",
+					"Defeated %s %s: its enchant gem is yours (%s, E: %s).",
 					if wild.Guard then "the vein's guardian, a" else "a wild",
 					title,
 					GemConfig.displayName(soul),
@@ -1945,7 +1945,7 @@ local function wildDied(enemy)
 				)
 			)
 		else
-			Remotes.Notify:FireClient(best, "Your gem pouch is full: the Gemsoul crumbled to dust.")
+			Remotes.Notify:FireClient(best, "Your gem pouch is full: its enchant gem crumbled to dust.")
 		end
 		PlayerData.milestone(best, "KaijuSlain")
 		if wild.Guard then

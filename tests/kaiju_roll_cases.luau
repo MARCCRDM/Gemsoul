@@ -482,8 +482,8 @@ for i, card in cards do
 	check(words:find(string.upper(Kaiju.title(entry)), 1, true), "Card " .. i .. " doesn't name its kaiju")
 	check(
 		words:find(string.upper(GemConfig.TierLabels[entry.Soul.Tier] or entry.Soul.Tier), 1, true)
-			and words:find("GEMSOUL", 1, true),
-		"Card " .. i .. " doesn't say its Gemsoul's rarity"
+			and words:find("ENCHANT", 1, true),
+		"Card " .. i .. " doesn't say its enchant's rarity"
 	)
 	check(words:find(" HP ", 1, true) and words:find(" DMG ", 1, true), "Card " .. i .. " has no stats")
 	check(words:find(Kaiju.species(entry.Species).Blurb, 1, true), "Card " .. i .. " doesn't say what it's like")

@@ -3,9 +3,9 @@
 	you start with, rolled on the same screen as the intro's gem roll
 	(Intro.client, revealMoves). Each kaiju has a tall card, and the card's
 	window is a reel: kaiju of every kind and element run down past it, each
-	on a glow of a Gemsoul rarity at the real odds (GemRoller), the one going
+	on a glow of an enchant's rarity at the real odds (GemRoller), the one going
 	by named under the window in its rarity's colour, until it stops on
-	yours. It lands with a flash in its Gemsoul's rarity and drops onto its
+	yours. It lands with a flash in its enchant's rarity and drops onto its
 	spot, then its E move rises out of it, ready. Under it go its name, its
 	kind, its health, damage and speed, what it's like, and its three moves
 	with their icons (E now, Q at level 5, R at level 10). The first stops,
@@ -64,7 +64,7 @@ local WIN_Y = 74 -- the window's top, in its card
 local TOP = 84 -- the cards' top, on the board
 local ROUND = 26 -- the window's corners
 local AUTO = 20 -- seconds till START goes on its own
--- Its moves down a card: its kind's E, Q and R, and its gem surge (its Gemsoul's E).
+-- Its moves down a card: its kind's E, Q and R, and its gem surge (its enchant's E).
 local MOVE_KEYS = { "E", "Q", "R", "Gem" }
 local MOVE_ROWS = #MOVE_KEYS
 KaijuRoll.Frame = { Side = 0.92, Up = 0.3, Back = 1.12, Aim = 0.02, Fov = 36 }
@@ -129,7 +129,7 @@ local function keycap(parent: Instance, key: string, color: Color3, size: number
 		end
 end
 
--- A glow of a Gemsoul rarity behind a kaiju on the reel: stronger the rarer.
+-- A glow of an enchant's rarity behind a kaiju on the reel: stronger the rarer.
 local GLOW = { Common = 0.9, Uncommon = 0.86, Rare = 0.8, UltraRare = 0.74, Legendary = 0.66 }
 local GLOW_SIZES = { 0.86, 0.56 }
 local function rarityGlow(parent: Instance, tier: string, size: number): { Frame }
@@ -629,7 +629,7 @@ function KaijuRoll.play(after: (() -> ())?)
 			word.Position, word.Size, word.ZIndex = UDim2.fromOffset(38, 0), UDim2.new(1, -96, 1, 0), 46
 		end
 		for order, key in MOVE_KEYS do
-			-- (Its own moves, and its gem surge: its Gemsoul's E.)
+			-- (Its own moves, and its gem surge: its enchant's E.)
 			local gem = key == "Gem"
 			local id, awake
 			if gem then
@@ -693,7 +693,7 @@ function KaijuRoll.play(after: (() -> ())?)
 			Sparks = sparks,
 			Glows = glows,
 		}
-		-- Beat 1: it stops on yours, with a flash in its Gemsoul's rarity,
+		-- Beat 1: it stops on yours, with a flash in its enchant's rarity,
 		-- and drops onto its spot.
 		function item.open(quick: boolean)
 			if item.Phase ~= "Sealed" then
@@ -725,7 +725,7 @@ function KaijuRoll.play(after: (() -> ())?)
 			punch.Scale = 1.07
 			tween(punch, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
 			caption.Text = string.format(
-				"%s GEMSOUL  ·  %s",
+				"%s ENCHANT  ·  %s",
 				string.upper(GemConfig.elementName(element)),
 				string.upper(GemConfig.TierLabels[tier] or tier)
 			)

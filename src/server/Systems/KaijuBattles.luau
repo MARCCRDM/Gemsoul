@@ -186,7 +186,7 @@ local function stateFor(battle: Battle, player: Player)
 					table.insert(units, {
 						Side = sideOf(battle, who),
 						Id = pet.Record.Id,
-						Name = Kaiju.title(pet.Record),
+						Name = Kaiju.nameOf(pet.Record),
 						Species = pet.Record.Species,
 						Element = pet.Record.Element,
 						Model = pet.Model,
@@ -325,7 +325,7 @@ local function begin(a: Player, b: Player, court: any?, pot: any?): Battle?
 		for _, pet in upOf(player) do
 			table.insert(records, pet.Record)
 			battle.Brought[player][pet.Record.Id] = pet.Humanoid.MaxHealth
-			battle.Names[player][pet.Record.Id] = Kaiju.title(pet.Record)
+			battle.Names[player][pet.Record.Id] = Kaiju.nameOf(pet.Record)
 			pet.Target = nil
 			-- (Its side, for its ring in the side's colour: Client.KaijuTeamRings.)
 			pet.Model:SetAttribute("KaijuTeam", sideOf(battle, player))

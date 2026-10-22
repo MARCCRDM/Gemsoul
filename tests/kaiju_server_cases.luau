@@ -466,6 +466,24 @@ local RunService = { Heartbeat = signal() }
 local services = {
 	Players = Players,
 	RunService = RunService,
+	-- Roblox's text filter: "#######" for a word it hides, an error for
+	-- "Boom". (Calls: how many names it's seen.)
+	TextService = {
+		Calls = 0,
+		FilterStringAsync = function(self, text, userId, context)
+			self.Calls += 1
+			assert(type(userId) == "number" and context ~= nil, "Filtered without a user or a context")
+			if text == "Boom" then
+				error("The filter is down")
+			end
+			local shown = string.gsub(text, "[Bb]adword", "#######")
+			return {
+				GetNonChatStringForBroadcastAsync = function()
+					return shown
+				end,
+			}
+		end,
+	},
 	Debris = { AddItem = function() end },
 	CollectionService = { AddTag = function() end },
 }
@@ -1233,39 +1251,78 @@ pet = KaijuServer.pets()[a]
 check(pet and pet.Record == second, "The new one didn't come out")
 check(not registered.KaijuActive(a, starter.Id).Ok, "Switched again at once")
 
--- A Gemsoul socketed (KaijuSocket): any gem from the pouch, the old one back
--- in the pouch; of its own element it's attuned (harder hits, its surge).
+-- Enchanting (KaijuSocket): only a gem of its own element; the old one
+-- back in the pouch; attuned (harder hits, its surge).
 do
 	assert(registered.KaijuSocket, "No KaijuSocket request")
 	local frostSoul = second.Soul
 	local damageBefore = pet.Stats.Damage
 	check(pet.GemSurge ~= nil and Kaiju.attuned(second), "Born attuned, with a surge")
 	table.insert(profiles[a].Gems, { Id = "fireLegend", Element = "Fire", Tier = "Legendary", Size = 6, Clarity = 6, Cut = 6 })
+	table.insert(profiles[a].Gems, { Id = "frostLegend", Element = "Frost", Tier = "Legendary", Size = 6, Clarity = 6, Cut = 6 })
 	check(not registered.KaijuSocket(a, second.Id, "nope").Ok, "Socketed a gem they don't have")
-	check(not registered.KaijuSocket(b, second.Id, "fireLegend").Ok, "Socketed into someone else's kaiju")
+	check(not registered.KaijuSocket(b, second.Id, "frostLegend").Ok, "Socketed into someone else's kaiju")
+	local wrong = registered.KaijuSocket(a, second.Id, "fireLegend")
+	check(
+		not wrong.Ok and wrong.Message == "Only a Cryo gem can enchant a Cryo kaiju." and second.Soul == frostSoul,
+		"A Thermal gem enchanted a Cryo kaiju: " .. tostring(wrong.Message)
+	)
 	pet.LastFight = now
-	local busy = registered.KaijuSocket(a, second.Id, "fireLegend")
-	check(not busy.Ok and busy.Danger and second.Soul == frostSoul, "Socketed mid-fight")
+	local busy = registered.KaijuSocket(a, second.Id, "frostLegend")
+	check(not busy.Ok and busy.Danger and second.Soul == frostSoul, "Enchanted mid-fight")
 	pet.LastFight = now - 10
-	local done = registered.KaijuSocket(a, second.Id, "fireLegend")
-	check(done.Ok and not done.Attuned and second.Soul.Id == "fireLegend", "Couldn't socket another element's gem")
-	check(second.Element == "Frost" and pet.Element == "Frost", "A Fire gem changed a Frost kaiju's element")
-	check(pet.GemSurge == nil and pet.Fighter.GemSurge == nil and pet.Model:GetAttribute("KaijuGemSurge") == nil, "Not attuned, still a surge")
-	check(pet.Stats.Health == Kaiju.stats("Carapace", second.Level, "Legendary").Health, "A Legendary Gemsoul didn't make it stronger")
+	local done = registered.KaijuSocket(a, second.Id, "frostLegend")
+	check(done.Ok and done.Attuned and second.Soul.Id == "frostLegend", "Couldn't enchant with a Cryo gem")
+	check(done.Message:find("enchanted with a Legendary Cryo gem", 1, true) ~= nil, "The reply: " .. tostring(done.Message))
+	check(second.Element == "Frost" and pet.Element == "Frost", "Enchanting changed its element")
+	check(pet.GemSurge == Kaiju.recordSurge(second) and pet.Fighter.GemSurge == pet.GemSurge, "Enchanted: no surge")
+	check(pet.Stats.Health == Kaiju.stats("Carapace", second.Level, "Legendary").Health, "A Legendary enchant didn't make it stronger")
 	local back = nil
 	for _, gem in profiles[a].Gems do
 		if gem.Id == frostSoul.Id then
 			back = gem
 		end
 	end
-	check(back ~= nil, "Its old Gemsoul didn't go back to the pouch")
-	-- Its old one back in: attuned again, harder hits and its surge.
+	check(back ~= nil, "Its old enchant didn't go back to the pouch")
+	-- Its old one back in: as it was.
 	local again = registered.KaijuSocket(a, second.Id, frostSoul.Id)
-	check(again.Ok and again.Attuned and second.Soul == frostSoul, "Couldn't socket its own back")
-	check(pet.GemSurge == Kaiju.recordSurge(second) and pet.Fighter.GemSurge == pet.GemSurge, "Attuned, no surge")
-	check(math.abs(pet.Stats.Damage - damageBefore) < 1e-9, "Attuned: its damage isn't what it was")
-	check(not registered.KaijuSocket(a, second.Id, frostSoul.Id).Ok, "Socketed what it already has")
+	check(again.Ok and again.Attuned and second.Soul == frostSoul, "Couldn't enchant with its own back")
+	check(math.abs(pet.Stats.Damage - damageBefore) < 1e-9, "Its damage isn't what it was")
+	check(not registered.KaijuSocket(a, second.Id, frostSoul.Id).Ok, "Enchanted with what it already has")
 	PlayerData.removeGem(a, "fireLegend")
+	PlayerData.removeGem(a, "frostLegend")
+end
+
+-- Naming (KaijuName): Kaiju.cleanName's rules, then Roblox's filter; on its
+-- body out (KaijuName) and in what the server says; "" back to its title.
+do
+	assert(registered.KaijuName, "No KaijuName request")
+	local before = now
+	local function name(player, id, text)
+		-- (One every Kaiju.NameEvery seconds: the clock moved on between tries.)
+		now += Kaiju.NameEvery + 1
+		return registered.KaijuName(player, id, text)
+	end
+	local calls = services.TextService.Calls
+	local named = name(a, second.Id, "  Frosty  ")
+	check(named.Ok and second.Name == "Frosty" and named.Name == "Frosty", "Couldn't name it: " .. tostring(named.Message))
+	check(services.TextService.Calls == calls + 1, "The name didn't go through Roblox's filter")
+	check(Kaiju.nameOf(second) == "Frosty" and pet.Model:GetAttribute("KaijuName") == "Frosty", "Its body out doesn't carry its name")
+	check(not name(b, second.Id, "Mine").Ok and second.Name == "Frosty", "Named someone else's kaiju")
+	check(not name(a, second.Id, "a_b").Ok and second.Name == "Frosty", "Took a name with _ in it")
+	local hidden = name(a, second.Id, "Badword")
+	check(not hidden.Ok and hidden.Message == "That name isn't allowed: try another." and second.Name == "Frosty", "Took a filtered name")
+	local down = name(a, second.Id, "Boom")
+	check(not down.Ok and second.Name == "Frosty", "Took a name the filter couldn't check")
+	-- Too soon after the last one.
+	now += 0.5
+	check(not registered.KaijuName(a, second.Id, "Quick").Ok and second.Name == "Frosty", "Renamed twice at once")
+	-- The server says its name.
+	local cleared = name(a, second.Id, "")
+	check(cleared.Ok and second.Name == nil and pet.Model:GetAttribute("KaijuName") == Kaiju.title(second), "\"\" didn't take it back to its title")
+	check(cleared.Message == "Back to " .. Kaiju.title(second) .. ".", "Clearing its name: " .. tostring(cleared.Message))
+	check(name(a, second.Id, "Frosty").Ok, "Couldn't name it again")
+	now = before
 end
 
 -- Wild kaiju --------------------------------------------------------------------------------------------------
@@ -1973,7 +2030,7 @@ Enemies.damage(third, 1e6, nil, false, nil, nil, nil)
 check(not third.Alive, "Didn't die")
 local soulGem = profiles[a].Gems[#profiles[a].Gems]
 check(soulGem and Kaiju.isSoul(soulGem) and soulGem.Id ~= "wild", "The top damager didn't get its Gemsoul")
-check(noted(a, "Gemsoul is yours"), "Not told about the Gemsoul")
+check(noted(a, "enchant gem is yours"), "Not told about its enchant gem")
 local active = Kaiju.active(roster)
 check(active.Level > levelBefore or active.Exp > expBefore, "No EXP for the kill")
 check(#profiles[b].Gems == 0, "The one who did less got the Gemsoul too")
@@ -5671,7 +5728,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together)",
 		checks
 	)
 )

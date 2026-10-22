@@ -46,6 +46,11 @@
 	                        the gems it needs are used, and never a Gemsoul);
 	                        not one that's down, nor one out while you're in
 	                        danger
+	  "KaijuSocket", id, gemId   a gem of its own element from your pouch
+	                        enchants it (Kaiju.canSocket), the old one back
+	                        in the pouch; not in a fight
+	  "KaijuName", id, name   names it (Kaiju.cleanName, then Roblox's filter:
+	                        KaijuServer.filterName); "" for no name
 	  "KaijuAutoHeal", on   auto heal on or off
 	  "KaijuCallBack", away   true: the team put away (Kaiju.away); false:
 	                        deployed again, only out of danger
@@ -57,7 +62,7 @@
 	(UserId), KaijuId, KaijuSlot, KaijuName, KaijuLevel, KaijuExp,
 	KaijuExpNext, KaijuAbility, KaijuAbilityAt (server time of its last E),
 	KaijuQ, KaijuR and their *At, KaijuGemSurge and KaijuGemAt (its gem
-	surge, its Gemsoul's E), KaijuRecallUntil, and its fight
+	surge, its enchant's E), KaijuRecallUntil, and its fight
 	(KaijuFighter's Action* and GuardUntil, HurtAt and BlockedAt, for
 	CreatureAnimation). A record's Health and Down are in the snapshot (the
 	HUD's health for one at home, and DOWN).
@@ -101,6 +106,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
@@ -368,7 +374,7 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 	model:SetAttribute("KaijuOwner", player.UserId)
 	model:SetAttribute("KaijuId", record.Id)
 	model:SetAttribute("KaijuSlot", slot)
-	model:SetAttribute("KaijuName", Kaiju.title(record))
+	model:SetAttribute("KaijuName", Kaiju.nameOf(record))
 	local ability = Kaiju.kitMoves(record.Species, record.Level).E
 	model:SetAttribute("KaijuAbility", ability)
 	-- Beside its own moves, its gem surge (its Gemsoul's E, attuned).
@@ -520,7 +526,7 @@ local function claimRoll(player: Player): { any }
 	if #added > 0 then
 		local names = {}
 		for _, record in added do
-			table.insert(names, Kaiju.title(record))
+			table.insert(names, Kaiju.nameOf(record))
 		end
 		Remotes.Notify:FireClient(
 			player,
@@ -590,7 +596,7 @@ local function upkeep(player: Player, now: number)
 		if record.Down and not record.BattleKeep and Kaiju.reviveIn(record, os.time()) <= 0 then
 			wake(record)
 			woke = woke or {}
-			table.insert(woke, Kaiju.title(record))
+			table.insert(woke, Kaiju.nameOf(record))
 		end
 	end
 	if woke then
@@ -866,7 +872,7 @@ local function knockOut(pet: Pet)
 		player,
 		string.format(
 			"%s was knocked out! It's back by itself in %d:%02d, or revive it now.",
-			Kaiju.title(record),
+			Kaiju.nameOf(record),
 			wait // 60,
 			wait % 60
 		)
@@ -1361,13 +1367,13 @@ function KaijuServer.reward(player: Player, exp: number)
 					record.Level,
 					"Kaiju",
 					pet.Element,
-					Kaiju.title(record),
+					Kaiju.nameOf(record),
 					awoken(record, gained)
 				)
 			else
 				Remotes.Notify:FireClient(
 					player,
-					string.format("%s reached level %d.", Kaiju.title(record), record.Level)
+					string.format("%s reached level %d.", Kaiju.nameOf(record), record.Level)
 				)
 			end
 		end
@@ -1523,7 +1529,7 @@ local function setActive(player: Player, id: any)
 	if not ok then
 		return reply(false, message)
 	end
-	return reply(true, string.format("%s is out.", Kaiju.title(roster.List[id])))
+	return reply(true, string.format("%s is out.", Kaiju.nameOf(roster.List[id])))
 end
 
 -- Stones from your pouch into one of yours (the lead if no id): mended,
@@ -1728,7 +1734,7 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 			false,
 			string.format(
 				"%s is knocked out: it's back by itself in %d:%02d, or revive it now.",
-				Kaiju.title(record),
+				Kaiju.nameOf(record),
 				left // 60,
 				left % 60
 			)
@@ -1746,7 +1752,7 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 	end
 	local health, most = Kaiju.health(record)
 	if health >= most then
-		return reply(false, string.format("%s is already at full health.", Kaiju.title(record)))
+		return reply(false, string.format("%s is already at full health.", Kaiju.nameOf(record)))
 	end
 	local loose = {}
 	for _, gem in GemInventory.available(profile) do
@@ -1771,15 +1777,15 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 	local stones = string.format("%d gem%s", #plan.Used, if #plan.Used == 1 then "" else "s")
 	return reply(
 		true,
-		string.format("%s healed to %d%% (%s).", Kaiju.title(record), share, stones),
+		string.format("%s healed to %d%% (%s).", Kaiju.nameOf(record), share, stones),
 		{ Used = #plan.Used, Health = record.Health, Most = plan.Most }
 	)
 end
 
--- A gem from your pouch socketed as one of yours' Gemsoul (Kaiju.canSocket:
--- any element, any rarity); the one it had back in the pouch. Of its own
--- element it's attuned: harder hits and its gem surge (Kaiju.attuned).
--- Not in the middle of a fight.
+-- A gem from your pouch enchants one of yours (Kaiju.canSocket: its own
+-- element only, any rarity); the one it had back in the pouch. Attuned:
+-- harder hits and its gem surge (Kaiju.attuned). Not in the middle of a
+-- fight.
 local function socketSoul(player: Player, kaijuId: any, gemId: any)
 	local profile = PlayerData.get(player)
 	local roster = profile and profile.Kaiju
@@ -1825,26 +1831,75 @@ local function socketSoul(player: Player, kaijuId: any, gemId: any)
 	end
 	PlayerData.sync(player)
 	local tier = GemConfig.TierLabels[gem.Tier] or gem.Tier
-	local attuned = Kaiju.attuned(record)
+	local surge = Kaiju.recordSurge(record)
+	local move = surge and Kaiju.moveInfo(surge)
 	return reply(
 		true,
-		if attuned
-			then string.format(
-				"%s's Gemsoul is now a %s gem (%s). Attuned: +%d%% damage and its gem surge.",
-				Kaiju.title(record),
-				GemConfig.elementName(gem.Element),
-				tier,
-				math.floor((Kaiju.Attuned.Power - 1) * 100 + 0.5)
-			)
-			else string.format(
-				"%s's Gemsoul is now a %s gem (%s). Not its element: no gem surge.",
-				Kaiju.title(record),
-				GemConfig.elementName(gem.Element),
-				tier
-			),
-		{ Attuned = attuned, Surge = Kaiju.recordSurge(record) }
+		string.format(
+			"%s is enchanted with %s %s %s gem. Gem surge: %s.",
+			Kaiju.nameOf(record),
+			Kaiju.article(tier),
+			tier,
+			GemConfig.elementName(gem.Element),
+			if move then move.Name else "none"
+		),
+		{ Attuned = Kaiju.attuned(record), Surge = surge }
 	)
 end
+
+-- Its name (Kaiju.cleanName's rules), filtered by Roblox for everyone to
+-- see (TextService: what's left after the filter must be what was asked
+-- for, or it's refused). "" takes it back to its kind's title. Once every
+-- Kaiju.NameEvery seconds.
+local lastNamed: { [Player]: number } = {}
+function KaijuServer.filterName(player: Player, text: string): string?
+	local ok, filtered = pcall(function()
+		local result = TextService:FilterStringAsync(text, player.UserId, Enum.TextFilterContext.PublicChat)
+		return result:GetNonChatStringForBroadcastAsync()
+	end)
+	return if ok and type(filtered) == "string" then filtered else nil
+end
+
+local function nameKaiju(player: Player, kaijuId: any, text: any)
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	local record = if type(kaijuId) == "string" and roster and roster.List then roster.List[kaijuId] else nil
+	if not record then
+		return reply(false, "That kaiju isn't yours.")
+	end
+	local name, why = Kaiju.cleanName(text)
+	if not name then
+		return reply(false, why or "That isn't a name.")
+	end
+	local now = os.clock()
+	if lastNamed[player] and now - lastNamed[player] < Kaiju.NameEvery then
+		return reply(false, "One moment: you've just named one.")
+	end
+	lastNamed[player] = now
+	if name ~= "" then
+		local filtered = KaijuServer.filterName(player, name)
+		if filtered == nil then
+			return reply(false, "Couldn't check that name just now: try again.")
+		end
+		if filtered ~= name then
+			return reply(false, "That name isn't allowed: try another.")
+		end
+	end
+	record.Name = if name == "" then nil else name
+	local pet = teams[player] and teams[player][record.Id]
+	if pet and pet.Record == record and pet.Model then
+		pet.Model:SetAttribute("KaijuName", Kaiju.nameOf(record))
+	end
+	PlayerData.sync(player)
+	return reply(
+		true,
+		if name == "" then string.format("Back to %s.", Kaiju.title(record)) else string.format("Named it %s.", name),
+		{ Name = record.Name }
+	)
+end
+Players.PlayerRemoving:Connect(function(player)
+	lastNamed[player] = nil
+end)
 
 -- Auto heal (Kaiju.AutoHeal): your spare Commons heal the team by
 -- themselves, out of danger, each one hurt in one go, then your spare
@@ -1970,6 +2025,7 @@ function KaijuServer.start()
 	Shop.register("KaijuActive", setActive)
 	Shop.register("KaijuInfuse", infuse)
 	Shop.register("KaijuSocket", socketSoul)
+	Shop.register("KaijuName", nameKaiju)
 	Shop.register("KaijuAutoHeal", setAutoHeal)
 	Shop.register("KaijuCallBack", callBack)
 	Shop.register("KaijuRoll", rollRequest)

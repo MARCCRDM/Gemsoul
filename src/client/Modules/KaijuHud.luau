@@ -26,12 +26,26 @@
 	                  and your kaiju alone till you start on it, here or by
 	                  hitting it while you hunt.
 	  The panel       every kaiju you have: your team first (all of them
-	                  fight; the first leads), then the ones at home. The one
-	                  picked in full (stats, its Gemsoul's rarity, its moves
-	                  and when Q and R wake) and what you can do with it:
-	                  LEAD (to the front), SEND OUT (one from home, in place
-	                  of one of the team you pick), HEAL (REVIVE when it's
-	                  down). Its Gemsoul's gem sits on its portrait.
+	                  fight; the first leads), then the ones at home, each by
+	                  its name (Shared.Kaiju.nameOf). The one picked in full:
+	                  its name and RENAME (type a name, SAVE: the server's
+	                  KaijuName, Roblox's filter; empty for no name), its kind,
+	                  role and level, its enchant's rarity, what it's strong
+	                  and weak against, its stats, its moves and when Q and R
+	                  wake; and what you can do with it: LEAD (to the front),
+	                  SEND OUT (one from home, in place of one of the team you
+	                  pick), HEAL (REVIVE when it's down). Its enchant's gem
+	                  sits on its portrait.
+	  ENCHANT         its enchant (Shared.Kaiju.canSocket: a gem of its own
+	                  element only): the one in it at the top (rarity, what it
+	                  gives, its gem surge, its stats), then a row for each
+	                  rarity of its element, rarest first: the finest of yours
+	                  of it, how many you have, what it gives and its surge,
+	                  and how that compares with now (a rarity you have none
+	                  of, dimmed, and where its element's gems turn up). Pick
+	                  one: its stats now and after, then ENCHANT (the old one
+	                  back in your pouch). The best upgrade you have is picked
+	                  already. Not in a fight.
 	  REVIVE          one knocked out: gems don't bring it back. When it's
 	                  back by itself (Shared.Kaiju.reviveIn, at half
 	                  health), and REVIVE for Robux (the KaijuRevive
@@ -57,7 +71,7 @@
 
 	  KaijuHud.start()     once, from Lobby.client
 	  KaijuHud.open(id?, tab?)   the panel, on kaiju `id` (else your lead),
-	                       on "Details" or "Heal"
+	                       on "Details", "Heal" or "Enchant"
 ]]
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -97,7 +111,7 @@ local HEALTH = Color3.fromRGB(96, 214, 120)
 local EXP = Color3.fromRGB(176, 132, 255)
 local TILE_BACK = Color3.fromRGB(20, 24, 38)
 local TAME_RANGE = Kaiju.Tame.Range
--- Its own Q, E and R, and its gem surge (its Gemsoul's E).
+-- Its own Q, E and R, and its gem surge (its enchant's E).
 local KEYS = { "Q", "E", "R", "Gem" }
 local KEY_EVERY = { Q = Kaiju.QEvery, E = Kaiju.AbilityEvery, R = Kaiju.REvery, Gem = Kaiju.GemSurge.Every }
 local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", Gem = "KaijuGemAt" }
@@ -116,6 +130,15 @@ local function label(parent: Instance, text: string, size: number, color: Color3
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	}, parent)
+end
+
+-- A label for a kaiju's name: never translated (Client.Translate skips it),
+-- so one named "Ready" stays Ready.
+local function nameLabel(parent: Instance, text: string, size: number, color: Color3?, font: Enum.Font?): TextLabel
+	local l = label(nil :: any, text, size, color, font)
+	l:SetAttribute("NoTranslate", true)
+	l.Parent = parent
+	return l
 end
 
 local function bar(parent: Instance, color: Color3): (Frame, Frame)
@@ -638,7 +661,7 @@ local right = new("Frame", {
 local tabRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30) }, right)
 UiKit.list(tabRow, 8, true)
 
-local DETAIL_H = 394 -- (on a phone: the height of what scrolls)
+local DETAIL_H = 410 -- (on a phone: the height of what scrolls)
 local detail = new(if SHORT then "ScrollingFrame" else "Frame", {
 	Name = "Detail",
 	BackgroundTransparency = 1,
@@ -650,14 +673,15 @@ if SHORT then
 	detail.ScrollBarThickness = 4
 	detail.ScrollingDirection = Enum.ScrollingDirection.Y
 end
-local heroView = viewport(detail, { Size = UDim2.fromOffset(168, 168) })
+local HERO = 184
+local heroView = viewport(detail, { Size = UDim2.fromOffset(168, HERO) })
 UiKit.round(heroView, 10)
 local heroEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.2 }, heroView)
 local heroGlow = new("UIGradient", { Rotation = 90 }, heroView)
--- Its Gemsoul (the gem it lives in), on the portrait's corner, edged in its rarity.
+-- Its enchant (the gem it lives in), on the portrait's corner, edged in its rarity.
 local soulBadge = new("Frame", {
-	Name = "Gemsoul",
-	Position = UDim2.fromOffset(168 - 58, 168 - 58),
+	Name = "Enchant",
+	Position = UDim2.fromOffset(168 - 58, HERO - 58),
 	Size = UDim2.fromOffset(52, 52),
 	BackgroundColor3 = INK,
 	BackgroundTransparency = 0.15,
@@ -669,30 +693,95 @@ local soulArt: string? = nil
 local info = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(180, 0),
-	Size = UDim2.new(1, -180, 0, 168),
+	Size = UDim2.new(1, -180, 0, HERO),
 }, detail)
-local heroName = label(info, "", 20, P.Text, Enum.Font.GothamBlack)
-heroName.Size = UDim2.new(1, 0, 0, 24)
+-- Its name, and RENAME beside it (the box and SAVE / CANCEL while you
+-- type: heroUi).
+local heroName = nameLabel(info, "", 20, P.Text, Enum.Font.GothamBlack)
+heroName.Size = UDim2.new(1, -96, 0, 24)
 UiKit.fit(heroName)
+local heroUi: { [string]: any } = { Editing = false }
+heroUi.Rename = smallButton(info, "RENAME", P.Teal)
+heroUi.Rename.Name = "Rename"
+heroUi.Rename.AnchorPoint = Vector2.new(1, 0)
+heroUi.Rename.Position, heroUi.Rename.Size = UDim2.new(1, 0, 0, 1), UDim2.fromOffset(88, 22)
+heroUi.Rename.TextSize = 11
+heroUi.Box = new("TextBox", {
+	Name = "NameBox",
+	Visible = false,
+	Text = "",
+	PlaceholderText = string.format("Name it (up to %d letters)", Kaiju.NameMax),
+	PlaceholderColor3 = P.Dim,
+	ClearTextOnFocus = false,
+	TextSize = 15,
+	Font = IronUi.Bold,
+	TextColor3 = P.Text,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	BackgroundColor3 = P.Inset,
+	Size = UDim2.new(1, -142, 0, 24),
+}, info)
+UiKit.round(heroUi.Box, 6)
+new("UIStroke", { Color = P.Teal, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, heroUi.Box)
+new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, heroUi.Box)
+heroUi.Save = smallButton(info, "SAVE", P.Good)
+heroUi.Save.Name = "SaveName"
+heroUi.Save.AnchorPoint, heroUi.Save.Visible = Vector2.new(1, 0), false
+heroUi.Save.Position, heroUi.Save.Size = UDim2.new(1, -68, 0, 1), UDim2.fromOffset(64, 22)
+heroUi.Save.TextSize = 11
+heroUi.Cancel = smallButton(info, "CANCEL", P.Edge)
+heroUi.Cancel.Name = "CancelName"
+heroUi.Cancel.AnchorPoint, heroUi.Cancel.Visible = Vector2.new(1, 0), false
+heroUi.Cancel.Position, heroUi.Cancel.Size = UDim2.new(1, 0, 0, 1), UDim2.fromOffset(64, 22)
+heroUi.Cancel.TextSize = 11
 local heroTag = label(info, "", 11, P.Dim, IronUi.Bold)
-heroTag.Position, heroTag.Size = UDim2.fromOffset(0, 26), UDim2.new(1, 0, 0, 14)
+heroTag.Position, heroTag.Size = UDim2.fromOffset(0, 27), UDim2.new(1, 0, 0, 14)
+-- Its enchant's rarity (as wide as it says).
 local pill = new("Frame", {
 	Position = UDim2.fromOffset(0, 46),
-	Size = UDim2.fromOffset(150, 20),
+	Size = UDim2.fromOffset(0, 20),
+	AutomaticSize = Enum.AutomaticSize.X,
 	BackgroundColor3 = INK,
 }, info)
 UiKit.round(pill, 10)
+new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, pill)
 local pillEdge = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.2 }, pill)
 local pillText = label(pill, "", 10, P.Text, Enum.Font.GothamBlack)
-pillText.Size, pillText.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+pillText.Size, pillText.AutomaticSize = UDim2.new(0, 0, 1, 0), Enum.AutomaticSize.X
+pillText.TextTruncate = Enum.TextTruncate.None
+-- What it's strong and weak against (Shared.ElementMatchup), a pill each
+-- in that element's colour.
+heroUi.Matchup = new("Frame", {
+	Name = "Matchup",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 70),
+	Size = UDim2.new(1, 0, 0, 16),
+}, info)
+UiKit.list(heroUi.Matchup, 6, true)
+heroUi.Beats = require(ReplicatedStorage.Shared.ElementMatchup).Beats
+for order, key in { "Strong", "Weak" } do
+	local chip = new("Frame", {
+		Name = key,
+		LayoutOrder = order,
+		BackgroundColor3 = INK,
+		Size = UDim2.fromOffset(0, 16),
+		AutomaticSize = Enum.AutomaticSize.X,
+	}, heroUi.Matchup)
+	UiKit.round(chip, 8)
+	new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, chip)
+	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.4 }, chip)
+	local text = label(chip, "", 9, P.Text, Enum.Font.GothamBlack)
+	text.Size, text.AutomaticSize = UDim2.new(0, 0, 1, 0), Enum.AutomaticSize.X
+	text.TextTruncate = Enum.TextTruncate.None
+	heroUi[key] = { Chip = chip, Edge = edge, Text = text }
+end
 local heroBlurb = label(info, "", 11, P.Dim, IronUi.Body)
-heroBlurb.Position, heroBlurb.Size = UDim2.fromOffset(0, 70), UDim2.new(1, 0, 0, 28)
+heroBlurb.Position, heroBlurb.Size = UDim2.fromOffset(0, 88), UDim2.new(1, 0, 0, 28)
 heroBlurb.TextWrapped = true
 heroBlurb.TextYAlignment = Enum.TextYAlignment.Top
 -- Health, damage, speed.
 local statRow = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 102),
+	Position = UDim2.fromOffset(0, 120),
 	Size = UDim2.new(1, 0, 0, 40),
 }, info)
 UiKit.list(statRow, 8, true)
@@ -711,16 +800,16 @@ for order, name in { "HEALTH", "DAMAGE", "SPEED" } do
 	statValues[order] = value
 end
 local expText = label(info, "", 11, P.Dim, IronUi.Bold)
-expText.Position, expText.Size = UDim2.fromOffset(0, 148), UDim2.new(1, 0, 0, 12)
+expText.Position, expText.Size = UDim2.fromOffset(0, 164), UDim2.new(1, 0, 0, 12)
 local expBack, expFill = bar(info, EXP)
-expBack.Position, expBack.Size = UDim2.fromOffset(0, 162), UDim2.new(1, 0, 0, 6)
+expBack.Position, expBack.Size = UDim2.fromOffset(0, 178), UDim2.new(1, 0, 0, 6)
 
 -- Its moves: its kind's own (E from the start, Q and R as it levels), and
--- its gem surge, its Gemsoul's E.
-local ROW_H = 34
+-- its gem surge, its enchant's E.
+local ROW_H = 32
 local moveBox = new("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 178),
+	Position = UDim2.fromOffset(0, HERO + 10),
 	Size = UDim2.new(1, 0, 0, 4 * ROW_H + 3 * 4),
 }, detail)
 UiKit.list(moveBox, 4)
@@ -735,7 +824,7 @@ for order, key in { "E", "Q", "R", "Gem" } do
 	UiKit.round(row, 8)
 	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.6 }, row)
 	local chip = new("Frame", {
-		Position = UDim2.fromOffset(6, 5),
+		Position = UDim2.fromOffset(6, 4),
 		Size = UDim2.fromOffset(24, 24),
 		BackgroundColor3 = P.Gold,
 	}, row)
@@ -758,12 +847,13 @@ for order, key in { "E", "Q", "R", "Gem" } do
 	badgeLetter.Size, badgeLetter.TextXAlignment, badgeLetter.ZIndex =
 		UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
 	local name = label(row, "", 13, P.Text, IronUi.Bold)
-	name.Position, name.Size = UDim2.fromOffset(38, 2), UDim2.new(1, -144, 0, 16)
+	name.Position, name.Size = UDim2.fromOffset(38, 2), UDim2.new(1, -170, 0, 16)
 	local about = label(row, "", 10, P.Dim, IronUi.Body)
-	about.Position, about.Size = UDim2.fromOffset(38, 18), UDim2.new(1, -144, 0, 13)
+	about.Position, about.Size = UDim2.fromOffset(38, 18), UDim2.new(1, -170, 0, 13)
+	-- (Wide enough for DESCARGA DE GEMA.)
 	local state = label(row, "", 10, P.Good, Enum.Font.GothamBlack)
 	state.AnchorPoint, state.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
-	state.Position, state.Size = UDim2.new(1, -10, 0, 0), UDim2.new(0, 100, 1, 0)
+	state.Position, state.Size = UDim2.new(1, -10, 0, 0), UDim2.new(0, 126, 1, 0)
 	moveRows[key] = {
 		Frame = row,
 		Edge = edge,
@@ -892,73 +982,73 @@ local reviveTime = centred("", if SHORT then 32 else 46, P.Text, Enum.Font.Gotha
 local reviveLine = centred("", 12, P.Text, IronUi.Bold, if SHORT then 58 else 118, 16)
 local reviveCoupon = centred("", 11, P.Gold, IronUi.Bold, if SHORT then 78 else 144, 16)
 
--- Its Gemsoul (Kaiju.canSocket): the one it carries at the top, attuned or
--- not and what that gives it; your gems below, a card for each rarity and
--- element (the finest of each), its own element first; SOCKET at the foot.
+-- ENCHANT (Kaiju.canSocket: its own element only): the one in it at the top,
+-- a line on the rule, a row for each rarity of its element below, rarest
+-- first (the finest of yours of it, or dimmed when you have none), and
+-- what the one picked does at the foot, with ENCHANT.
 local soulUi: { [string]: any } = {}
+local ENCH_H = if SHORT then 50 else 66
 soulUi.soulPane = new("Frame", {
-	Name = "Gemsoul",
+	Name = "Enchant",
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, 38),
 	Size = UDim2.new(1, 0, 1, -38),
 	Visible = false,
 }, right)
-soulUi.soulHead = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, 0, 0, HEAD_H) }, soulUi.soulPane)
+soulUi.soulHead = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, 0, 0, ENCH_H) }, soulUi.soulPane)
 UiKit.round(soulUi.soulHead, 10)
 soulUi.soulHeadEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.25 }, soulUi.soulHead)
 soulUi.soulHeadArt = new("Frame", {
 	Name = "Gem",
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(8, 4),
-	Size = UDim2.fromOffset(HEAD_H - 8, HEAD_H - 8),
+	Size = UDim2.fromOffset(ENCH_H - 8, ENCH_H - 8),
 }, soulUi.soulHead)
-soulUi.soulHeadName = label(soulUi.soulHead, "", 14, P.Text, IronUi.Bold)
-soulUi.soulHeadName.Position = UDim2.fromOffset(HEAD_H + 4, if SHORT then 5 else 9)
-soulUi.soulHeadName.Size = UDim2.new(1, -HEAD_H - 12, 0, 18)
-soulUi.soulHeadLine = label(soulUi.soulHead, "", 11, P.Dim, IronUi.Bold)
-soulUi.soulHeadLine.Position = UDim2.fromOffset(HEAD_H + 4, if SHORT then 24 else 31)
-soulUi.soulHeadLine.Size = UDim2.new(1, -HEAD_H - 12, 0, 16)
+soulUi.soulHeadTag = label(soulUi.soulHead, "ENCHANT NOW", 9, P.Dim, IronUi.Bold)
+soulUi.soulHeadTag.Position = UDim2.fromOffset(ENCH_H + 4, if SHORT then 3 else 6)
+soulUi.soulHeadTag.Size = UDim2.new(1, -ENCH_H - 12, 0, 11)
+soulUi.soulHeadName = label(soulUi.soulHead, "", if SHORT then 13 else 15, P.Text, Enum.Font.GothamBlack)
+soulUi.soulHeadName.Position = UDim2.fromOffset(ENCH_H + 4, if SHORT then 14 else 18)
+soulUi.soulHeadName.Size = UDim2.new(1, -ENCH_H - 12, 0, 18)
+soulUi.soulHeadLine = label(soulUi.soulHead, "", if SHORT then 10 else 11, P.Good, IronUi.Bold)
+soulUi.soulHeadLine.Position = UDim2.fromOffset(ENCH_H + 4, if SHORT then 32 else 37)
+soulUi.soulHeadLine.Size = UDim2.new(1, -ENCH_H - 12, 0, 14)
+soulUi.soulHeadStats = label(soulUi.soulHead, "", 10, P.Dim, IronUi.Bold)
+soulUi.soulHeadStats.Position = UDim2.fromOffset(ENCH_H + 4, 51)
+soulUi.soulHeadStats.Size = UDim2.new(1, -ENCH_H - 12, 0, 12)
+soulUi.soulHeadStats.Visible = not SHORT
 soulUi.soulHeadArtId = nil
-soulUi.soulHint = label(
-	soulUi.soulPane,
-	string.format(
-		"Any gem can be its Gemsoul. Its own element: +%d%% damage and its gem surge.",
-		math.floor((Kaiju.Attuned.Power - 1) * 100 + 0.5)
-	),
-	10,
-	P.Dim,
-	IronUi.Bold
-)
-soulUi.soulHint.Position, soulUi.soulHint.Size = UDim2.fromOffset(2, HEAD_H + 4), UDim2.new(1, -4, 0, 14)
+-- The rule, in its element's colour.
+soulUi.soulHint = label(soulUi.soulPane, "", if SHORT then 10 else 11, P.Dim, IronUi.Bold)
+soulUi.soulHint.Name = "Rule"
+soulUi.soulHint.RichText = true
+soulUi.soulHint.Position, soulUi.soulHint.Size = UDim2.fromOffset(2, ENCH_H + 5), UDim2.new(1, -4, 0, 14)
+local RULE_Y = ENCH_H + 24
+local ENCH_FOOT = if SHORT then 44 else 50
 soulUi.soulList = new("ScrollingFrame", {
-	Name = "SoulGems",
+	Name = "EnchantGems",
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, stacksY),
-	Size = UDim2.new(1, 0, 1, -stacksY - footH - 4),
+	Position = UDim2.fromOffset(0, RULE_Y),
+	Size = UDim2.new(1, 0, 1, -RULE_Y - ENCH_FOOT - 6),
 	CanvasSize = UDim2.new(),
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	ScrollBarThickness = 4,
 }, soulUi.soulPane)
-new("UIGridLayout", {
-	CellSize = UDim2.fromOffset(CARD_W, CARD_H),
-	CellPadding = UDim2.fromOffset(8, 8),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-}, soulUi.soulList)
-soulUi.soulEmpty = label(soulUi.soulPane, "No loose gems in your pouch: mine some, then come back.", 12, P.Dim, IronUi.Bold)
-soulUi.soulEmpty.Position, soulUi.soulEmpty.Size = UDim2.fromOffset(2, stacksY + 8), UDim2.new(1, -4, 0, 18)
-soulUi.soulEmpty.Visible = false
+UiKit.list(soulUi.soulList, if SHORT then 4 else 5)
 soulUi.soulFoot = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0, 1),
 	Position = UDim2.fromScale(0, 1),
-	Size = UDim2.new(1, 0, 0, footH),
+	Size = UDim2.new(1, 0, 0, ENCH_FOOT),
 }, soulUi.soulPane)
 soulUi.soulSummary = label(soulUi.soulFoot, "", 13, P.Text, IronUi.Bold)
-soulUi.soulSummary.Position, soulUi.soulSummary.Size = UDim2.fromOffset(2, 5), UDim2.new(1, -170, 0, 18)
+soulUi.soulSummary.Position, soulUi.soulSummary.Size = UDim2.fromOffset(2, 4), UDim2.new(1, -170, 0, 18)
 soulUi.soulNote = label(soulUi.soulFoot, "", 10, P.Dim, IronUi.Body)
-soulUi.soulNote.Position, soulUi.soulNote.Size = UDim2.fromOffset(2, 23), UDim2.new(1, -170, 0, 24)
+soulUi.soulNote.RichText = true
+soulUi.soulNote.Position, soulUi.soulNote.Size = UDim2.fromOffset(2, 22), UDim2.new(1, -170, 0, 26)
 soulUi.soulNote.TextWrapped, soulUi.soulNote.TextYAlignment = true, Enum.TextYAlignment.Top
-soulUi.soulButton = smallButton(soulUi.soulFoot, "SOCKET", P.Gold)
+soulUi.soulButton = smallButton(soulUi.soulFoot, "ENCHANT", P.Gold)
+soulUi.soulButton.Name = "EnchantButton"
 soulUi.soulButton.AnchorPoint = Vector2.new(1, 0.5)
 soulUi.soulButton.Position, soulUi.soulButton.Size = UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(150, 40)
 soulUi.soulButton.TextSize = 16
@@ -975,7 +1065,7 @@ local tabButtons = {}
 local rowLive = {} -- [id] = the bits of its row that change while you look
 local drawPanel
 
-for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" }, { "Soul", "GEMSOUL" } } do
+for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" }, { "Soul", "ENCHANT" } } do
 	local b = smallButton(tabRow, entry[2], P.Gold)
 	b.LayoutOrder = order
 	b.Size = UDim2.fromOffset(if SHORT then 104 else 120, 28)
@@ -983,15 +1073,42 @@ for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" }, { "Soul", "G
 		tab = entry[1]
 		swapping = false
 		pickFresh = true
+		if heroUi.Editing then
+			heroUi.setEditing(false)
+		end
 		drawPanel()
 	end)
 	tabButtons[entry[1]] = b
+	if entry[1] == "Soul" then
+		-- (Lit when you've a better gem of its element for it: soulUi.upgrade.)
+		soulUi.TabDot = new("Frame", {
+			Name = "Upgrade",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(1, -3, 0, 3),
+			Size = UDim2.fromOffset(10, 10),
+			BackgroundColor3 = P.Good,
+			Visible = false,
+			ZIndex = 4,
+		}, b)
+		UiKit.round(soulUi.TabDot, 5)
+		new("UIStroke", { Color = INK, Thickness = 1.5 }, soulUi.TabDot)
+	end
 end
 
 local function moveName(id: string?): string
 	local move = Kaiju.moveInfo(id)
 	return if move then move.Name else "?"
 end
+
+-- Its name as the panel shows it: as you typed it, or its kind's title in
+-- capitals.
+function heroUi.shown(record): string
+	if type(record.Name) == "string" and record.Name ~= "" then
+		return record.Name
+	end
+	return string.upper(Kaiju.title(record))
+end
+
 
 -- Your gems for a heal, in stacks: one for each rarity and element (they
 -- heal alike), the cheapest first (Commons, then rarer), its own element
@@ -1092,6 +1209,63 @@ local function say(result)
 	end
 end
 
+-- RENAME: the box in place of its name, SAVE (or Enter) and CANCEL.
+function heroUi.setEditing(on: boolean)
+	heroUi.Editing = on
+	heroUi.Box.Visible, heroUi.Save.Visible, heroUi.Cancel.Visible = on, on, on
+	heroUi.Rename.Visible = not on
+	heroName.Visible = not on
+	if not on then
+		pcall(function()
+			heroUi.Box:ReleaseFocus()
+		end)
+	end
+end
+heroUi.Rename.Activated:Connect(function()
+	local data = roster()
+	local record = selected and data and data.List[selected]
+	if not record then
+		return
+	end
+	heroUi.Box.Text = if type(record.Name) == "string" then record.Name else ""
+	heroUi.EditFor = record.Id
+	heroUi.setEditing(true)
+	pcall(function()
+		heroUi.Box:CaptureFocus()
+	end)
+end)
+heroUi.Cancel.Activated:Connect(function()
+	heroUi.setEditing(false)
+end)
+function heroUi.save()
+	local target = heroUi.EditFor
+	if not heroUi.Editing or not target then
+		return
+	end
+	-- (Its rules here first, the server's filter after: Shared.Kaiju.cleanName.)
+	local name, why = Kaiju.cleanName(heroUi.Box.Text)
+	if not name then
+		UiKit.toast(why or "That isn't a name.", P.Bad)
+		return
+	end
+	act(function()
+		local result = GemClient.request("KaijuName", target, name)
+		say(result)
+		if result and result.Ok then
+			heroUi.setEditing(false)
+			if window.Gui.Enabled then
+				drawPanel()
+			end
+		end
+	end)
+end
+heroUi.Save.Activated:Connect(heroUi.save)
+heroUi.Box.FocusLost:Connect(function(enter: boolean)
+	if enter then
+		heroUi.save()
+	end
+end)
+
 -- The panel's list ------------------------------------------------------------------------------------------------
 
 local function clearList()
@@ -1162,7 +1336,19 @@ local function kaijuRow(order: number, record, slot: number?, models)
 		local n = label(badge, tostring(slot), 10, if slot == 1 then INK else P.Text, Enum.Font.GothamBlack)
 		n.Size, n.TextXAlignment, n.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
 	end
-	local name = label(row, Kaiju.title(record), 13, color:Lerp(P.Text, 0.35), IronUi.Bold)
+	if soulUi.upgrade(record, soulUi.Gems or {}) then
+		-- (A better gem of its element in your pouch: ENCHANT.)
+		local dot = new("Frame", {
+			Name = "Upgrade",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -8, 0, 8),
+			Size = UDim2.fromOffset(8, 8),
+			BackgroundColor3 = P.Good,
+			ZIndex = 3,
+		}, row)
+		UiKit.round(dot, 4)
+	end
+	local name = nameLabel(row, Kaiju.nameOf(record), 13, color:Lerp(P.Text, 0.35), IronUi.Bold)
 	name.Position, name.Size = UDim2.fromOffset(60, 6), UDim2.new(1, -66, 0, 16)
 	local statusText, statusColor = rowStatus(record, slot)
 	local status = label(row, statusText, 10, statusColor, IronUi.Bold)
@@ -1330,19 +1516,48 @@ local function drawDetail(data, record, team: { string })
 	portrait(heroView, modelFor("hero", record))
 	heroEdge.Color = color
 	heroGlow.Color = ColorSequence.new(color:Lerp(INK, 0.55), INK)
-	heroName.Text = string.upper(Kaiju.title(record))
+	if heroUi.Editing and heroUi.EditFor ~= record.Id then
+		heroUi.setEditing(false)
+	end
+	local named = type(record.Name) == "string" and record.Name ~= ""
+	heroName.Text = heroUi.shown(record)
 	heroName.TextColor3 = color:Lerp(P.Text, 0.25)
 	heroTag.Text = string.format(
-		"%s  ·  LEVEL %d  ·  %s",
+		"%s%s  ·  %s %d  ·  %s",
+		if named then string.upper(Kaiju.title(record)) .. "  ·  " else "",
 		string.upper(species and species.Role or ""),
+		if named then "LV" else "LEVEL",
 		record.Level,
 		if record.Down then "DOWN" elseif slot == 1 then "LEADS" elseif slot then "OUT" else "AT HOME"
 	)
+	local attuned = Kaiju.attuned(record)
 	pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier)
-		.. " GEMSOUL"
-		.. (if Kaiju.attuned(record) then "  ·  ATTUNED" else "")
-	pillText.TextColor3, pillEdge.Color = tierColor, tierColor
+		.. " ENCHANT"
+		.. (if attuned then "" else "  ·  NOT ITS ELEMENT")
+	pillText.TextColor3 = if attuned then tierColor else P.Gold
+	pillEdge.Color = if attuned then tierColor else P.Gold
 	pill.BackgroundColor3 = tierColor:Lerp(INK, 0.75)
+	-- Strong against the element it beats, weak to the one that beats it.
+	local beats = heroUi.Beats[record.Element or ""]
+	local beatenBy = nil
+	for attack, victim in heroUi.Beats do
+		if victim == record.Element then
+			beatenBy = attack
+		end
+	end
+	for key, element in { Strong = beats, Weak = beatenBy } do
+		local chip = heroUi[key]
+		chip.Chip.Visible = element ~= nil
+		if element then
+			local c = elementColor(element)
+			chip.Text.Text = string.upper(
+				string.format("%s %s", if key == "Strong" then "Strong vs" else "Weak to", GemConfig.elementName(element))
+			)
+			chip.Text.TextColor3 = c:Lerp(P.Text, 0.2)
+			chip.Edge.Color = c
+			chip.Chip.BackgroundColor3 = c:Lerp(INK, 0.82)
+		end
+	end
 	soulBadge.Visible = soul ~= nil
 	soulEdge.Color = tierColor
 	local soulKey = soul and (soul.Id or record.Id) or nil
@@ -1374,7 +1589,7 @@ local function drawDetail(data, record, team: { string })
 	expFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
 	for key, row in moveRows do
 		-- (Its own moves, its role's: Kaiju.kitMove. And its gem surge, its
-		-- Gemsoul's E, from the start: Kaiju.gemSurge.)
+		-- enchant's E, from the start: Kaiju.gemSurge.)
 		local gem = key == "Gem"
 		local id, awake
 		if gem then
@@ -1387,7 +1602,11 @@ local function drawDetail(data, record, team: { string })
 		row.Name.Text = if gem and not id then "No gem surge" else moveName(id)
 		row.Name.TextColor3 = if awake then P.Text else P.Dim
 		row.About.Text = if gem and not id
-			then "Its Gemsoul isn't its element: socket one that is (GEMSOUL)."
+			then string.format(
+				"Its enchant isn't its element: enchant it with %s %s gem (ENCHANT).",
+				Kaiju.article(GemConfig.elementName(record.Element)),
+				GemConfig.elementName(record.Element)
+			)
 			else move and move.Description or ""
 		row.Chip.BackgroundColor3 = if awake then color else INK
 		row.ChipEdge.Transparency = if awake then 1 else 0
@@ -1410,7 +1629,7 @@ local function drawDetail(data, record, team: { string })
 			elseif awake then "READY"
 			else string.format("WAKES AT LV %d", Kaiju.MoveLevels[key] or 1)
 		row.State.TextSize = if awake then 10 else 9
-		-- (The gem surge in its Gemsoul's rarity.)
+		-- (The gem surge in its enchant's rarity.)
 		row.State.TextColor3 = if gem then tierColor elseif awake then P.Good else P.Dim
 	end
 	drawActions(data, record, team)
@@ -1579,7 +1798,7 @@ local function drawHeal(record)
 	local fighting = not down and player:GetAttribute("KaijuDanger") == true and petModels()[record.Id] ~= nil
 	stackList.Visible, reviveCard.Visible = not down, down
 	-- The head: its name, its health now and (lighter) after.
-	healName.Text = string.format("%s  ·  LV %d", string.upper(Kaiju.title(record)), record.Level)
+	healName.Text = string.format("%s  ·  LV %d", heroUi.shown(record), record.Level)
 	healName.TextColor3 = elementColor(record.Element):Lerp(P.Text, 0.3)
 	if down then
 		local wait = Kaiju.reviveSeconds(record)
@@ -1667,41 +1886,72 @@ local function drawHeal(record)
 	resetButton.Visible = #stacks > 0 and not full and (next(pickCounts) ~= nil or #suggested > 0)
 end
 
--- GEMSOUL's cards (kept between draws: their gems are 3D views), the one
+-- ENCHANT's rows (kept between draws: their gems are 3D views), the one
 -- picked, and for whom.
 soulUi.soulCards = {}
 
--- The finest gem of each rarity and element in your pouch (any loose gem,
--- a Gemsoul too), the kaiju's own element first, then the rarest.
+-- Where each element's gems turn up most: out in its biome, by its look
+-- (Shared.Frontier.Biomes).
+soulUi.Find = {
+	Fire = "the burnt ground",
+	Frost = "the snow fields",
+	Shock = "the salt flats",
+	Poison = "the mud flats",
+}
+
+local function round(n: number): number
+	return math.floor(n + 0.5)
+end
+
+-- A rarity's stat bonus, in whole percent (Kaiju.SoulBonus).
+function soulUi.bonus(tier: string?): number
+	return round(((Kaiju.SoulBonus[tier or "Common"] or 1) - 1) * 100)
+end
+
+-- A row for each rarity of its element, rarest first: the finest of yours
+-- of it (any loose gem, a kaiju's dropped enchant too) and how many you
+-- have, or none.
 function soulUi.soulStacks(record)
-	local stacks, byKey = {}, {}
+	local byTier = {}
 	for _, gem in GemInventory.available(GemClient.Profile) do
-		local key = stackKey(gem)
-		local ok, value = pcall(GemConfig.value, gem)
-		value = if ok and type(value) == "number" then value else 0
-		local stack = byKey[key]
-		if not stack then
-			stack = { Key = key, Tier = gem.Tier or "Common", Element = gem.Element, Gem = gem, Value = value, Count = 0 }
-			byKey[key] = stack
-			table.insert(stacks, stack)
-		end
-		stack.Count += 1
-		if value > stack.Value then
-			stack.Gem, stack.Value = gem, value
+		if gem.Element == record.Element then
+			local tier = gem.Tier or "Common"
+			local ok, value = pcall(GemConfig.value, gem)
+			value = if ok and type(value) == "number" then value else 0
+			local stack = byTier[tier]
+			if not stack then
+				stack = { Key = tier, Tier = tier, Gem = gem, Value = value, Count = 0 }
+				byTier[tier] = stack
+			end
+			stack.Count += 1
+			if value > stack.Value then
+				stack.Gem, stack.Value = gem, value
+			end
 		end
 	end
-	table.sort(stacks, function(a, b)
-		local ma, mb = a.Element == record.Element, b.Element == record.Element
-		if ma ~= mb then
-			return ma
+	local rows = {}
+	for i = #GemConfig.TierOrder, 1, -1 do
+		local tier = GemConfig.TierOrder[i]
+		table.insert(rows, byTier[tier] or { Key = tier, Tier = tier, Count = 0 })
+	end
+	return rows
+end
+
+-- Whether you've a gem that would make `record` stronger: one of its
+-- element rarer than its enchant, or any of its element when its enchant
+-- isn't. (`gems`: your loose gems, GemInventory.available.)
+function soulUi.upgrade(record, gems): boolean
+	if not record then
+		return false
+	end
+	local attuned = Kaiju.attuned(record)
+	local now = soulUi.bonus(record.Soul and record.Soul.Tier)
+	for _, gem in gems do
+		if gem.Element == record.Element and (not attuned or soulUi.bonus(gem.Tier) > now) then
+			return true
 		end
-		local ra, rb = TIER_RANK[a.Tier] or 0, TIER_RANK[b.Tier] or 0
-		if ra ~= rb then
-			return ra > rb
-		end
-		return tostring(a.Element) < tostring(b.Element)
-	end)
-	return stacks
+	end
+	return false
 end
 
 function soulUi.soulCard(key: string)
@@ -1709,50 +1959,55 @@ function soulUi.soulCard(key: string)
 	if entry then
 		return entry
 	end
+	local tall = if SHORT then 40 else 42
 	local b = new("TextButton", {
-		Name = "Soul_" .. key,
+		Name = "Enchant_" .. key,
 		Text = "",
-		AutoButtonColor = true,
+		AutoButtonColor = false,
 		BackgroundColor3 = P.Inset,
+		Size = UDim2.new(1, -6, 0, tall),
 	}, soulUi.soulList)
-	UiKit.round(b, 10)
-	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.25 }, b)
+	UiKit.round(b, 8)
+	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1.2, Transparency = 0.4 }, b)
 	local art = new("Frame", {
 		Name = "Gem",
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(6, 5),
-		Size = UDim2.fromOffset(46, 46),
+		BackgroundColor3 = INK,
+		BackgroundTransparency = 0.35,
+		Position = UDim2.fromOffset(5, 4),
+		Size = UDim2.fromOffset(tall - 8, tall - 8),
 	}, b)
-	local have = label(b, "", 12, P.Text, IronUi.Bold)
-	have.AnchorPoint, have.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
-	have.Position, have.Size = UDim2.new(1, -8, 0, 5), UDim2.fromOffset(60, 15)
-	local gain = label(b, "", 13, P.Good, Enum.Font.GothamBlack)
-	gain.AnchorPoint, gain.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
-	gain.Position, gain.Size = UDim2.new(1, -8, 0, 22), UDim2.fromOffset(84, 16)
-	local kind = label(b, "", 10, P.Dim, IronUi.Bold)
-	kind.Position, kind.Size = UDim2.fromOffset(8, 53), UDim2.new(1, -16, 0, 12)
-	local pill = new("Frame", {
+	UiKit.round(art, 6)
+	local x = tall + 4
+	local title = label(b, "", 13, P.Text, Enum.Font.GothamBlack)
+	title.Position, title.Size = UDim2.fromOffset(x, if SHORT then 3 else 4), UDim2.new(1, -x - 124, 0, 17)
+	local sub = label(b, "", 10, P.Dim, IronUi.Bold)
+	sub.Position, sub.Size = UDim2.fromOffset(x, if SHORT then 21 else 23), UDim2.new(1, -x - 124, 0, 13)
+	local delta = new("Frame", {
+		Name = "Versus",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -8, 0.5, 0),
+		Size = UDim2.fromOffset(108, 22),
 		BackgroundColor3 = P.Good,
-		Position = UDim2.fromOffset(8, 66),
-		Size = UDim2.fromOffset(70, 15),
 	}, b)
-	UiKit.round(pill, 7)
-	local pillLabel = label(pill, "", 9, INK, Enum.Font.GothamBlack)
-	pillLabel.Size, pillLabel.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	UiKit.round(delta, 11)
+	local deltaText = label(delta, "", 10, INK, Enum.Font.GothamBlack)
+	deltaText.Size, deltaText.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
 	entry = {
 		Button = b,
 		Edge = edge,
 		Art = art,
 		ArtId = nil :: string?,
-		Have = have,
-		Gain = gain,
-		Kind = kind,
-		Pill = pill,
-		PillLabel = pillLabel,
+		Title = title,
+		Sub = sub,
+		Delta = delta,
+		DeltaText = deltaText,
+		Have = false,
 	}
 	b.Activated:Connect(function()
-		soulUi.soulPick = key
-		drawPanel()
+		if entry.Have then
+			soulUi.soulPick = key
+			drawPanel()
+		end
 	end)
 	soulUi.soulCards[key] = entry
 	return entry
@@ -1763,21 +2018,30 @@ function soulUi.drawSoul(record)
 	local soul = record.Soul
 	local tier = (soul and soul.Tier) or "Common"
 	local tierColor = GemConfig.TierColors[tier] or P.Text
+	local color = elementColor(record.Element)
+	local own = GemConfig.elementName(record.Element)
 	local attuned = Kaiju.attuned(record)
-	local percent = math.floor((Kaiju.Attuned.Power - 1) * 100 + 0.5)
-	-- Its Gemsoul now.
-	soulUi.soulHeadName.Text = string.format(
-		"%s GEMSOUL  ·  %s",
-		string.upper(GemConfig.TierLabels[tier] or tier),
-		string.upper(GemConfig.elementName(soul and soul.Element or record.Element))
+	local percent = round((Kaiju.Attuned.Power - 1) * 100)
+	-- The one in it now: its rarity, what it gives, its surge, its stats.
+	soulUi.soulHead.BackgroundColor3 = color:Lerp(P.Inset, 0.86)
+	soulUi.soulHeadName.Text = string.upper(
+		string.format(
+			"%s %s enchant",
+			GemConfig.TierLabels[tier] or tier,
+			GemConfig.elementName(soul and soul.Element or record.Element)
+		)
 	)
 	soulUi.soulHeadName.TextColor3 = tierColor
-	soulUi.soulHeadEdge.Color = if attuned then elementColor(record.Element) else P.Edge
+	soulUi.soulHeadEdge.Color = if attuned then color else P.Gold
 	local surge = Kaiju.recordSurge(record)
 	soulUi.soulHeadLine.Text = if attuned
-		then string.format("ATTUNED  ·  +%d%% damage  ·  gem surge: %s", percent, moveName(surge))
-		else "NOT ITS ELEMENT  ·  no gem surge"
+		then string.format("+%d%% stats  ·  +%d%% damage  ·  Gem surge: %s", soulUi.bonus(tier), percent, moveName(surge))
+		else string.format("Not its element: no gem surge. Enchant it with %s %s gem.", Kaiju.article(own), own)
 	soulUi.soulHeadLine.TextColor3 = if attuned then P.Good else P.Gold
+	local stats = Kaiju.recordStats(record)
+	soulUi.soulHeadStats.Text = if stats
+		then string.format("Health %d  ·  Damage %d  ·  Speed %d", round(stats.Health), round(stats.Damage), round(stats.Speed))
+		else ""
 	local soulKey = soul and (soul.Id or record.Id) or nil
 	if soulUi.soulHeadArtId ~= soulKey then
 		soulUi.soulHeadArtId = soulKey
@@ -1788,71 +2052,104 @@ function soulUi.drawSoul(record)
 			pcall(GemArt.viewport, soulUi.soulHeadArt, soul, true)
 		end
 	end
-	-- Your gems.
-	local stacks = soulUi.soulStacks(record)
+	soulUi.soulHint.Text = string.format("Only %s gems can enchant %s %s kaiju.", own, Kaiju.article(own), own)
+	soulUi.soulHint.TextColor3 = color:Lerp(P.Text, 0.3)
+	-- A row for each rarity of its element. (The best upgrade you have is
+	-- picked when you come to it.)
+	local rows = soulUi.soulStacks(record)
 	if soulUi.soulPickFor ~= record.Id then
 		soulUi.soulPickFor, soulUi.soulPick = record.Id, nil
-	end
-	local seen = {}
-	soulUi.soulChosen = nil
-	for order, stack in stacks do
-		seen[stack.Key] = true
-		local c = soulUi.soulCard(stack.Key)
-		c.Button.LayoutOrder = order
-		if c.ArtId ~= stack.Gem.Id then
-			c.ArtId = stack.Gem.Id
-			for _, child in c.Art:GetChildren() do
-				child:Destroy()
+		for _, row in rows do
+			if row.Gem and (not attuned or soulUi.bonus(row.Tier) > soulUi.bonus(tier)) then
+				soulUi.soulPick = row.Key
+				break
 			end
-			pcall(GemArt.viewport, c.Art, stack.Gem, false)
 		end
-		local match = stack.Element == record.Element
-		local bonus = math.floor(((Kaiju.SoulBonus[stack.Tier] or 1) - 1) * 100 + 0.5)
-		c.Have.Text = "×" .. stack.Count
-		c.Gain.Text = string.format("+%d%% STATS", bonus)
-		c.Gain.TextColor3 = if bonus > 0 then P.Good else P.Dim
-		c.Kind.Text = string.upper(
-			string.format("%s  ·  %s", GemConfig.TierLabels[stack.Tier] or stack.Tier, GemConfig.elementName(stack.Element))
-		)
-		c.Kind.TextColor3 = GemConfig.TierColors[stack.Tier] or P.Dim
-		c.Pill.BackgroundColor3 = if match then P.Good else P.Edge
-		c.PillLabel.Text = if match then "ATTUNED" else "NO SURGE"
-		c.PillLabel.TextColor3 = if match then INK else P.Dim
-		local picked = soulUi.soulPick == stack.Key
-		c.Edge.Color = if picked then P.Gold elseif match then elementColor(stack.Element) else P.Edge
-		c.Edge.Thickness = if picked then 2.5 else 1.5
+	end
+	soulUi.soulChosen = nil
+	local have = 0
+	for order, row in rows do
+		local c = soulUi.soulCard(row.Key)
+		c.Button.LayoutOrder = order
+		c.Have = row.Gem ~= nil
+		local rowColor = GemConfig.TierColors[row.Tier] or P.Text
+		c.Title.Text = string.upper(GemConfig.TierLabels[row.Tier] or row.Tier)
+		c.Title.TextColor3 = if row.Gem then rowColor else rowColor:Lerp(INK, 0.55)
+		local artId = row.Gem and row.Gem.Id or nil
+		if c.ArtId ~= artId then
+			c.ArtId = artId
+			for _, child in c.Art:GetChildren() do
+				if not child:IsA("UICorner") then
+					child:Destroy()
+				end
+			end
+			if row.Gem then
+				pcall(GemArt.viewport, c.Art, row.Gem, false)
+			end
+		end
+		c.Delta.Visible = row.Gem ~= nil
+		if row.Gem then
+			have += 1
+			local would = Kaiju.enchanted(record, row.Gem)
+			c.Sub.Text = string.format(
+				"×%d  ·  +%d%% stats  ·  Surge: %s",
+				row.Count,
+				soulUi.bonus(row.Tier),
+				moveName(would and would.Surge)
+			)
+			c.Sub.TextColor3 = P.Dim
+			local diff = soulUi.bonus(row.Tier) - soulUi.bonus(tier)
+			if not attuned then
+				c.DeltaText.Text, c.Delta.BackgroundColor3 = "+ ITS SURGE", P.Good
+			elseif diff > 0 then
+				c.DeltaText.Text, c.Delta.BackgroundColor3 = string.format("%d%% STRONGER", diff), P.Good
+			elseif diff < 0 then
+				c.DeltaText.Text, c.Delta.BackgroundColor3 = string.format("%d%% WEAKER", -diff), P.Bad:Lerp(P.Text, 0.15)
+			else
+				c.DeltaText.Text, c.Delta.BackgroundColor3 = "SAME AS NOW", P.Edge:Lerp(P.Text, 0.25)
+			end
+		else
+			c.Sub.Text = "None in your pouch"
+			c.Sub.TextColor3 = P.Dim:Lerp(INK, 0.35)
+		end
+		local picked = soulUi.soulPick == row.Key and row.Gem ~= nil
+		c.Edge.Color = if picked then P.Gold elseif row.Gem then rowColor:Lerp(P.Edge, 0.45) else P.Edge
+		c.Edge.Thickness = if picked then 2.5 else 1.2
+		c.Edge.Transparency = if picked then 0 elseif row.Gem then 0.25 else 0.7
+		c.Button.BackgroundColor3 = if picked then P.Gold:Lerp(INK, 0.8) else P.Inset
+		c.Button.BackgroundTransparency = if row.Gem then 0 else 0.5
+		c.Button.AutoButtonColor = row.Gem ~= nil
 		if picked then
-			soulUi.soulChosen = stack.Gem
+			soulUi.soulChosen = row.Gem
 		end
 	end
-	for key, c in soulUi.soulCards do
-		if not seen[key] then
-			c.Button:Destroy()
-			soulUi.soulCards[key] = nil
-		end
-	end
-	soulUi.soulEmpty.Visible = #stacks == 0
-	-- What SOCKET would do.
+	-- What ENCHANT would do.
 	local fighting = player:GetAttribute("KaijuDanger") == true
-	if soulUi.soulChosen then
-		local match = soulUi.soulChosen.Element == record.Element
-		soulUi.soulSummary.Text = string.format(
-			"%s gem  ·  %s",
-			GemConfig.elementName(soulUi.soulChosen.Element),
-			GemConfig.TierLabels[soulUi.soulChosen.Tier] or soulUi.soulChosen.Tier
-		)
-		soulUi.soulNote.Text = if match
-			then string.format("Attuned: +%d%% damage and its gem surge. Its Gemsoul now goes back to your pouch.", percent)
-			else "Not its element: no gem surge. Its Gemsoul now goes back to your pouch."
+	local chosen = soulUi.soulChosen
+	if chosen then
+		local after = (Kaiju.enchanted(record, chosen) or {}).Stats
+		soulUi.soulSummary.Text = string.format("%s %s gem", GemConfig.TierLabels[chosen.Tier] or chosen.Tier, own)
+		soulUi.soulNote.Text = if stats and after
+			then string.format(
+				"Health %d to %d  ·  Damage %d to %d. Its enchant now goes back to your pouch.",
+				round(stats.Health),
+				round(after.Health),
+				round(stats.Damage),
+				round(after.Damage)
+			)
+			else "Its enchant now goes back to your pouch."
+	elseif have == 0 then
+		soulUi.soulSummary.Text = string.format("No %s gems yet", own)
+		soulUi.soulNote.Text = string.format("%s gems turn up most out in %s.", own, soulUi.Find[record.Element] or "the quarry")
 	else
 		soulUi.soulSummary.Text = "Pick a gem"
-		soulUi.soulNote.Text = "Its own element is attuned. The rarer the gem, the stronger it is."
+		soulUi.soulNote.Text = "The rarer the gem, the stronger it gets."
 	end
 	if fighting then
-		soulUi.soulNote.Text = "In a fight: get clear of the critters to change its Gemsoul."
+		soulUi.soulNote.Text = "In a fight: get clear of the critters to change its enchant."
 	end
-	local ready = soulUi.soulChosen ~= nil and not fighting
-	soulUi.soulButton.Text = if fighting then "IN A FIGHT" else "SOCKET"
+	local ready = chosen ~= nil and not fighting
+	soulUi.soulButton.Text = if fighting then "IN A FIGHT" else "ENCHANT"
 	soulUi.soulButton.AutoButtonColor = ready
 	soulUi.soulButton.BackgroundColor3 = P.Gold:Lerp(INK, if ready then 0.3 else 0.78)
 	soulUi.soulButton.TextColor3 = if ready then P.Text else P.Dim
@@ -1867,7 +2164,7 @@ soulUi.soulButton.Activated:Connect(function()
 		local result = GemClient.request("KaijuSocket", target, gem.Id)
 		say(result)
 		if result and result.Ok then
-			soulUi.soulPick = nil
+			soulUi.soulPick, soulUi.soulPickFor = nil, nil
 			if window.Gui.Enabled then
 				drawPanel()
 			end
@@ -1883,7 +2180,12 @@ function drawPanel()
 	end
 	local record = selected and data.List[selected]
 	for name, b in tabButtons do
-		b.BackgroundColor3 = if name == tab then P.Gold:Lerp(INK, 0.3) else P.Gold:Lerp(INK, 0.75)
+		b.BackgroundColor3 = if name == tab then P.Gold:Lerp(INK, 0.15) else P.Gold:Lerp(INK, 0.8)
+		b.TextColor3 = if name == tab then INK else P.Text
+	end
+	soulUi.Gems = GemInventory.available(GemClient.Profile)
+	if soulUi.TabDot then
+		soulUi.TabDot.Visible = soulUi.upgrade(record, soulUi.Gems)
 	end
 	drawList(data, team)
 	detail.Visible = tab == "Details" and record ~= nil
@@ -1980,7 +2282,7 @@ end)
 function KaijuHud.open(id: string?, onTab: string?)
 	tab = if onTab == "Heal" or onTab == "Infuse"
 		then "Heal"
-		elseif onTab == "Soul" or onTab == "Gemsoul" then "Soul"
+		elseif onTab == "Soul" or onTab == "Enchant" then "Soul"
 		else "Details"
 	swapping = false
 	pickFresh = true

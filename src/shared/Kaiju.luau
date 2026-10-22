@@ -15,22 +15,27 @@
 	and Warden). A new player's starter roll is of the first four only
 	(Starters); the rest are caught out in the frontier (Habitat, wildKinds).
 
-	Every kaiju carries its Gemsoul: born with one of its element, rolled
-	like any gem (rarity, Size, Clarity, Cut), it gives the kaiju its
-	element, and a finer one makes it stronger (SoulBonus). Any gem from
-	your pouch can take its place (canSocket; the one it had goes back to
-	the pouch); the kaiju keeps its element. A kaiju fights with its kind's
-	own moves (kitMoves): its E from the start, its Q from level 5, its R
-	from level 10 (MoveLevels). Its Gemsoul of its own element is attuned
-	(attuned): its blows and moves hit Attuned.Power harder (recordStats),
-	and beside them it casts its gem surge (recordSurge): its Gemsoul's E,
-	every GemSurge.Every seconds, harder the finer the Gemsoul. A Gemsoul
-	of another element still makes it stronger by its rarity, with no
-	surge. The Gemsoul's
-	three moves (move, moves) are the gem's: a kaiju killed (or lost in the
-	arena) leaves its Gemsoul behind as a gem anyone can socket, its Q, E
+	Every kaiju carries its enchant (record.Soul, the gem it lives in): born
+	with one of its element, rolled like any gem (rarity, Size, Clarity,
+	Cut), it gives the kaiju its element, and a finer one makes it stronger
+	(SoulBonus). Only a gem of its own element can enchant it (canSocket:
+	a Cryo kaiju takes Cryo gems, never Thermal ones); the one it had goes
+	back to the pouch. A kaiju fights with its kind's own moves (kitMoves):
+	its E from the start, its Q from level 5, its R from level 10
+	(MoveLevels). Enchanted with its own element it's attuned (attuned): its
+	blows and moves hit Attuned.Power harder (recordStats), and beside them
+	it casts its gem surge (recordSurge): its enchant's E, every
+	GemSurge.Every seconds, harder the finer the gem. (An enchant of another
+	element, from before enchants had to match, still makes it stronger by
+	its rarity, with no surge, till you change it.) The enchant's three
+	moves (move, moves) are the gem's: a kaiju killed (or lost in the
+	arena) leaves its enchant behind as a gem anyone can socket, its Q, E
 	and R working in a sword, a chest and a shield (its E the surge the
-	kaiju cast).
+	kaiju cast). enchanted(record, gem) is how it would stand with another.
+
+	Names: you can name a kaiju (record.Name, cleanName's rules, filtered by
+	Roblox on the server); nameOf is its name, or its kind's title
+	("Cryo Razorback") when it has none.
 
 	Taming: bring a wild kaiju to half health or less WITHOUT killing it (it
 	glows gold when it's ready), then cast your tame (Tame.Cast seconds of
@@ -1164,8 +1169,8 @@ function Kaiju.recordSurge(record): string?
 	return nil
 end
 
--- Whether `gem` (a gem from the pouch: any element, any rarity) can be
--- socketed as `record`'s Gemsoul, and why not.
+-- Whether `gem` (a gem from the pouch) can enchant `record`, and why not:
+-- only a gem of its own element (any rarity).
 function Kaiju.canSocket(record, gem): (boolean, string?)
 	if not record then
 		return false, "That kaiju isn't yours."
@@ -1174,9 +1179,35 @@ function Kaiju.canSocket(record, gem): (boolean, string?)
 		return false, "That gem isn't in your pouch."
 	end
 	if record.Soul and record.Soul.Id ~= nil and record.Soul.Id == gem.Id then
-		return false, "That's its Gemsoul already."
+		return false, "That's its enchant already."
+	end
+	if gem.Element ~= record.Element then
+		local own = GemConfig.ElementLabels[record.Element or ""] or tostring(record.Element)
+		local a = Kaiju.article(own)
+		return false, string.format("Only %s %s gem can enchant %s %s kaiju.", a, own, a, own)
 	end
 	return true
+end
+
+-- "a" or "an" before a word ("an Ion gem").
+function Kaiju.article(word: string): string
+	return if string.find(word, "^[AEIOUaeiou]") then "an" else "a"
+end
+
+-- How `record` would stand enchanted with `gem`: { Stats, Surge, Tier,
+-- Attuned } (recordStats and recordSurge of it with that gem in).
+function Kaiju.enchanted(record, gem)
+	if not record then
+		return nil
+	end
+	local trial = table.clone(record)
+	trial.Soul = gem
+	return {
+		Stats = Kaiju.recordStats(trial),
+		Surge = Kaiju.recordSurge(trial),
+		Tier = gem and gem.Tier or "Common",
+		Attuned = Kaiju.attuned(trial),
+	}
 end
 
 -- The move its Gemsoul gives `key` (Q, E or R), and whether a kaiju of
@@ -1399,6 +1430,51 @@ function Kaiju.title(record): string
 	local s = Kaiju.Species[record.Species]
 	local element = GemConfig.ElementLabels[record.Element or ""] or record.Element or ""
 	return string.format("%s %s", element, s and s.Name or "Kaiju")
+end
+
+-- Names ---------------------------------------------------------------------------------------------
+
+-- A kaiju's name: up to NameMax letters (accented ones too), numbers,
+-- spaces, - ' and ., with a letter in it. One rename every NameEvery
+-- seconds (each goes through Roblox's filter).
+Kaiju.NameMax = 16
+Kaiju.NameEvery = 2
+
+-- `text` tidied into a name (its spaces trimmed and single), and why not
+-- if it can't be one. "" (or only spaces) is no name: back to its title.
+function Kaiju.cleanName(text: any): (string?, string?)
+	if type(text) ~= "string" then
+		return nil, "That isn't a name."
+	end
+	local name = string.gsub(string.gsub(text, "%s+", " "), "^ ", "")
+	name = string.gsub(name, " $", "")
+	if name == "" then
+		return "", nil
+	end
+	-- (Accented letters, á or ñ, count as letters: UTF-8's Latin-1 ones.)
+	local plain = string.gsub(name, "\195[\128-\191]", "a")
+	if string.find(plain, "[^%w '%-%.]") then
+		return nil, "Letters, numbers, spaces, - ' and . only."
+	end
+	if #plain > Kaiju.NameMax then
+		return nil, string.format("Up to %d letters.", Kaiju.NameMax)
+	end
+	if not string.find(plain, "%a") then
+		return nil, "Put a letter in it."
+	end
+	return name, nil
+end
+
+-- What to call it: its name, or its kind's title ("Cryo Razorback").
+function Kaiju.nameOf(record): string
+	if not record then
+		return "Kaiju"
+	end
+	local name = record.Name
+	if type(name) == "string" and name ~= "" then
+		return name
+	end
+	return Kaiju.title(record)
 end
 
 return Kaiju
