@@ -179,10 +179,10 @@ is the share of every blow it shrugs off.
 
 ## How they move
 
-- **Models** (`Shared.KaijuShapes`): two to five studs tall at scale 1, and
-  at most 90 parts each (Triskull and Ironhide are the most, at 61). They
-  are built from the same helpers as the first four, with the same joints,
-  plus two new kinds of joint:
+- **Models** (`Shared.KaijuShapes` and `Shared.KaijuConceptShapes`): two
+  to six studs tall at scale 1, and at most 90 parts each (Triskull is the
+  most, at 88, then Mossback at 84). They are built from the same helpers as
+  the first four, with the same joints, plus two new kinds of joint:
   - A **Wing** joint for the flyers (Stormwing, Moonmoth, Nightwing) and the
     winged kinds (Razorclaw, Triskull, Dreadcrown). Moonmoth's wings stand
     upright, so they beat forward and back.
@@ -211,6 +211,43 @@ is the share of every blow it shrugs off.
 - **Portraits.** The HUD and the kaiju panel lift a dark hide toward the
   portrait light, so Emberjaw, Nulltalon and Nightwing don't come out
   black. A pale hide is left as it is.
+
+## Closer to their concepts
+
+*2026-10-22.* Every kind was rendered beside its concept, and the ones
+furthest off were rebuilt in `Shared.KaijuConceptShapes` (which installs
+over `KaijuShapes`'s builders):
+
+- **Moonmoth**: a furred thorax, feathered feelers and two pairs of wide
+  wings with pale windows and dark blots, held up and back like the moth on
+  the sheet. The wings still beat on Wing joints.
+- **Shellfire**: a round domed shell of tiered rims and wedge scutes, with
+  the dome's seams in neon ember, a beaked head with tusks, and a jet of
+  light in each leg.
+- **Dreadmaw**: a lean, ribbed body under a big skull with a brow, a crest,
+  sunken eyes and a mouth hanging open on a neon throat and tongue.
+- **Sporeback**: a heap of a body with lumps and a crown, cracks of neon
+  across it, two square lit eyes and spore caps on stalks.
+- **Thornlob**: a round spider body with a face plate of eight lit eyes, a
+  banded abdomen on Tail joints and eight thick jointed legs.
+- **Titanfin**: a fan of seven plated spokes tipped with light on its back,
+  a hooked crest, and finned tail.
+- **Razorclaw**: a hunched body, horned head with a lit sac, two membrane
+  wings of wedge triangles with hooks, talon hands and a lit pincer tail.
+- **Longcoil**: two coil rings of scales with a belly, a neck of four
+  segments that sway on Tail joints, and an antlered, whiskered head on a
+  Head joint.
+- **Nightwing**: three lit eyes, plate horns, three-panel membrane wings
+  with neon veins and a claw, and a spade tail.
+- **Triskull**'s wings are bigger with neon edges; **Stormwing**'s wings
+  carry a neon leading edge and lit tips; **Emberjaw**'s dorsal blades have
+  neon prongs and flames.
+
+The others (Ironhide, Sickleclaw, Mossback, Bastion, Hulkshell, Hornblade,
+Drillhorn, Grandape, Starspine, Nulltalon, Glassjaw, Brightsteel,
+Dreadcrown, Bladebrow, Lankshade, Voltfin) already read close to their
+concepts and were left as they were. The side-by-side sheet is at the end
+of this page.
 
 ## Balance
 
@@ -257,6 +294,7 @@ names are in `Shared.LangEs`, with the two roles (ROMPEDOR, GUARDIÁN).
 | --- | --- |
 | `src/shared/KaijuRoster.luau` (new) | The 28 kinds: stats, habitats, kits, fight styles, voices, and their 84 moves |
 | `src/shared/KaijuShapes.luau` (new) | Their models, hides and hovers |
+| `src/shared/KaijuConceptShapes.luau` | Concept-led rebuilds of the kinds furthest from the sheet, installed over `KaijuShapes` |
 | `src/shared/KaijuModels.luau` | Builds them; hover; portraits lift dark hides |
 | `src/shared/Kaiju.luau` | Merges the roster in; `Starters` (the four the roll deals); `wildKinds(band)` |
 | `src/shared/KaijuRoles.luau` | Breaker and Warden; each kind's own kit; the Breaker's target |
@@ -292,3 +330,6 @@ The models, poses and roars run in Roblox only. They need a playtest:
 - Are the Edge and Vein kinds rare enough to be worth the trip?
 
 ![Concept and model, side by side](kaiju/roster-28-vs-concepts.jpg)
+
+*(Each concept on the left, the game's model on the right, rendered offline
+from the builders in the element the concept shows. Not Roblox screenshots.)*
