@@ -97,7 +97,9 @@ local now=10
 local os={clock=function() return now end}
 local function profileNow() return profile end
 local function loadoutNow() return profile.Character end
-local Traits={active=function() return true end,traitFor=function(g,key) return if g.Cut then key else nil end}
+local Traits={active=function() return true end,traitFor=function(g,key) return if g.Cut then key else nil end,KeyOfSocket={Weapon="Q",Armor="E",Shield="R"}}
+local KEY_COLORS={Q=Color3.new(1,0.5,0.3),E=Color3.new(0.5,0.7,1),R=Color3.new(0.5,0.9,0.6)}
+local HEAVY=Enum.Font.GothamBlack
 local KEYS={"Q","E","R"}
 local requests={}
 local function request(...) table.insert(requests,{...}) end

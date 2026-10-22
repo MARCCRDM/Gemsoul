@@ -1149,9 +1149,41 @@ local function buildRow(parent: Instance, slot: string, y: number)
 	place(well, 8, 6, 60, 60)
 	round(well, 8)
 	local art = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, well)
-	local name = place(text(row, "", 15, C.Text, HEADING), 82, 16, RIGHT_W - 82 - 56, 20)
-	local meta = place(text(row, "", 10, C.Dim, HEADING), 82, 40, RIGHT_W - 82 - 56, 14)
+	-- The sword's, chest's and shield's rows show the surge their gem gives
+	-- Q, E or R (its icon, its key, a line in the gem's colour), left of the
+	-- socket.
+	local key = Traits.KeyOfSocket[slot]
+	local tileW = if key then 54 else 0
+	local name = place(text(row, "", 15, C.Text, HEADING), 82, 16, RIGHT_W - 82 - 56 - tileW, 20)
+	local meta = place(text(row, "", 10, C.Dim, HEADING), 82, 40, RIGHT_W - 82 - 56 - tileW, 14)
 	meta.RichText = true
+	local surgeTile, surgeGlyph, surgeBadge, surgeLine, surgeEdge
+	if key then
+		surgeTile = frame(row, C.Ink, 0.3)
+		surgeTile.Name = "SurgeTile"
+		surgeTile.AnchorPoint = Vector2.new(1, 0.5)
+		place(surgeTile, RIGHT_W - 14 - 36 - 10, 36, 46, 46)
+		surgeTile.Position = UDim2.fromOffset(RIGHT_W - 14 - 36 - 10, 36)
+		round(surgeTile, 8)
+		surgeEdge = stroke(surgeTile, C.Line, 1, 0.4)
+		surgeGlyph = text(surgeTile, "+", 16, C.Faint, HEADING)
+		surgeGlyph.Name = "Glyph"
+		surgeGlyph.Size = UDim2.fromScale(1, 1)
+		surgeGlyph.TextXAlignment = Enum.TextXAlignment.Center
+		surgeBadge = text(surgeTile, key, 10, C.Ink, HEAVY)
+		surgeBadge.Name = "Key"
+		surgeBadge.BackgroundTransparency = 0
+		surgeBadge.BackgroundColor3 = KEY_COLORS[key]
+		surgeBadge.TextXAlignment = Enum.TextXAlignment.Center
+		surgeBadge.ZIndex = 4
+		place(surgeBadge, -5, -5, 16, 16)
+		round(surgeBadge, 4)
+		surgeLine = frame(surgeTile, C.Faint, 0.6)
+		surgeLine.Name = "Line"
+		surgeLine.ZIndex = 4
+		place(surgeLine, 7, 41, 32, 3)
+		round(surgeLine, 2)
+	end
 	local socket = frame(row, C.Ink, 0.4)
 	socket.AnchorPoint = Vector2.new(1, 0.5)
 	place(socket, RIGHT_W - 14, 36, 36, 36)
@@ -1168,8 +1200,11 @@ local function buildRow(parent: Instance, slot: string, y: number)
 	local plus = text(socket, "+", 16, C.Faint, HEADING)
 	plus.Size = UDim2.fromScale(1, 1)
 	plus.TextXAlignment = Enum.TextXAlignment.Center
-	local enchant = place(text(row, "ADD STONE TO ENCHANT  ·  DRAG & DROP", 10, C.Gold, HEADING), 82, 52, RIGHT_W - 96, 14)
+	local enchant = place(text(row, "ADD STONE TO ENCHANT  ·  DRAG & DROP", 10, C.Gold, HEADING), 82, 52, RIGHT_W - 96 - tileW, 14)
 	enchant.Name, enchant.Visible = "EnchantHint", false
+	-- (its surge's name, on a line of its own under the tile's row)
+	local moveLine = place(text(row, "", 10, C.Dim, HEADING), 82, 52, RIGHT_W - 96 - tileW, 14)
+	moveLine.Name, moveLine.RichText, moveLine.Visible = "SurgeName", true, false
 	row:SetAttribute("UiSound", "Click")
 	row.Activated:Connect(function()
 		if os.clock() < suppressClickUntil then
@@ -1180,6 +1215,9 @@ local function buildRow(parent: Instance, slot: string, y: number)
 		end
 	end)
 	local entry = { Row = row, Tint = tint, Edge = edge, Rail = rail, Art = art, Name = name, Meta = meta, Ring = ring, Gem = gemHolder, Plus = plus, Halo = halo, Enchant = enchant }
+	entry.Key, entry.SurgeTile, entry.SurgeGlyph, entry.SurgeBadge, entry.SurgeLine, entry.SurgeEdge =
+		key, surgeTile, surgeGlyph, surgeBadge, surgeLine, surgeEdge
+	entry.MoveLine = moveLine
 	row.MouseEnter:Connect(function()
 		entry.Hovered = true
 		InventoryV2.paintRow(slot)
@@ -2126,21 +2164,26 @@ local function drawRows(loadout)
 			elseif gear and gear.BuffReady and gear.Passive and gear.Passive.Name and gear.Passive.Name ~= "Signature" then "  ·  " .. string.upper(gear.Passive.Name)
 			else ""
 		-- The triad: the sword gives Q its move, the chest E, the shield R.
+		-- (its own line, under the rest: the surge tile shows its icon)
 		local rowKey = if triadOn(loadout) then Traits.KeyOfSocket[slot] else nil
+		local moveText = nil
 		if rowKey and gem then
 			local move = Tech.Catalog[Traits.traitFor(gem, rowKey) or ""]
 			if move then
-				tail = string.format('  ·  <font color="#%s">%s %s</font>', KEY_COLORS[rowKey]:ToHex(), rowKey, string.upper(move.Name))
+				moveText = string.format('<font color="#%s">%s  ·  %s</font>', KEY_COLORS[rowKey]:ToHex(), rowKey, string.upper(move.Name))
 			end
 		end
+		row.MoveLine.Text = moveText or ""
+		row.MoveLine.Visible = moveText ~= nil
 		row.Meta.Text = if gear
 			then string.format('<font color="#%s">%s</font>  ·  %s%s', color:ToHex(), rarityName(rarity), SLOT_NAME[slot], tail)
 			else SLOT_NAME[slot] .. "  ·  NOTHING WORN"
 		row.Color = color
 		row.EmptySocket = gear ~= nil and gem == nil
 		row.Enchant.Visible, row.Halo.Visible = row.EmptySocket, row.EmptySocket
-		row.Name.Position = UDim2.fromOffset(82, if row.EmptySocket then 9 else 16)
-		row.Meta.Position = UDim2.fromOffset(82, if row.EmptySocket then 31 else 40)
+		local third = row.EmptySocket or moveText ~= nil
+		row.Name.Position = UDim2.fromOffset(82, if third then 9 else 16)
+		row.Meta.Position = UDim2.fromOffset(82, if third then 31 else 40)
 		InventoryV2.paintRow(slot)
 		-- Something changed in this slot (a piece or a gem): a gold flash says it took.
 		local shown = tostring(id) .. "|" .. (if gem then gem.Id else "")
@@ -2174,6 +2217,33 @@ local function drawRows(loadout)
 		end
 		row.Plus.Visible = row.EmptySocket
 		row.Plus.TextColor3 = if row.EmptySocket then C.Gold else C.Faint
+		-- Its key's surge (the move the gem gives Q, E or R), as on the key cards.
+		if row.SurgeTile then
+			local triad = triadOn(loadout)
+			row.SurgeTile.Visible = triad
+			local surgeGem = if triad then Tech.surgeGem(loadout, row.Key) else nil
+			local surge = surgeGem and Tech.surgeStats(surgeGem)
+			local tint = if surgeGem then gemColor(surgeGem) else C.Faint
+			local surgeKey = if surge then surgeGem.Id .. tostring(surgeGem.Surge) .. tostring(surge.Id) else ""
+			if row.SurgeKey ~= surgeKey then
+				row.SurgeKey = surgeKey
+				row.SurgeGlyph.Text = if surge then "◆" else "+"
+				row.SurgeGlyph.TextColor3 = if surge then tint else C.Faint
+				if surge then
+					SurgeIcons.apply(row.SurgeGlyph, surge, tint)
+				else
+					local old = row.SurgeGlyph:FindFirstChild("AbilityArt")
+					if old then
+						old:Destroy()
+					end
+				end
+			end
+			row.SurgeLine.BackgroundColor3 = tint
+			row.SurgeLine.BackgroundTransparency = if surge then 0.1 else 0.7
+			row.SurgeEdge.Color = if surge then tint else C.Line
+			row.SurgeEdge.Transparency = if surge then 0.45 else 0.6
+			row.SurgeBadge.BackgroundTransparency = if surge then 0 else 0.35
+		end
 		row.Ring.Color = if gem then gemColor(gem) elseif row.EmptySocket then C.Gold else C.Faint
 		row.Ring.Transparency = if gem then 0.1 elseif row.EmptySocket then 0.25 else 0.5
 	end

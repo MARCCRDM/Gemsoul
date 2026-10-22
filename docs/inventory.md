@@ -15,6 +15,13 @@ armor and spare gear on the right, Q / E / R along the bottom.
 - **WEAPONS**: your sword and your shield, each a row with its gem socket.
   Click one and the right column turns into that piece, as an armor row
   does.
+- **The surge in the row**: the sword's, chest's and shield's rows show the
+  surge their gem gives Q, E or R, left of the socket: its icon (the same
+  art as the Q / E / R cards), its key, a line in the gem's colour, and its
+  name on a line of its own under the piece's rarity (`Q · STATIC BRAND`).
+  With no gem, the tile is empty but for its key.
+
+![The rows' surges on a phone](inventory/surge-rows-phone.png)
 - **GEMS** (the gem window) and **SKINS** (the Wardrobe), side by side.
 - **YOUR GEMS**: every loose gem you have, rarest first. A tab per element
   (`ALL 5 · THERMAL 1 · CRYO 2 · ION 1 · CORROSIVE 1`, each in its colour).
@@ -98,5 +105,5 @@ moves onto it.") and tries the piece on with the slot's gem.
 | `Systems/Forge` | `"AutoEquip"`: checks the mode and `Combat.canChangeBuild`, equips the plan's gear, then its gems (`Enchanting.canEnchant`) |
 | `Systems/PlayerData` | `equipGear`: the slot's gem moves onto the new piece |
 | `Shared.GemRoller` | `levelLabel(gem)`: `"T3 II"` |
-| `Modules/InventoryV2` | `buildWeapons` (left), `buildLeft` + `buildAuto` (the card), `buildBag` (spare gear), `drawPouch`, `drawBag`, `drawAuto` |
+| `Modules/InventoryV2` | `buildRow` (each row; the sword's, chest's and shield's `SurgeTile`, drawn in `drawRows`), `buildWeapons` (left), `buildLeft` + `buildAuto` (the card), `buildBag` (spare gear), `drawPouch`, `drawBag`, `drawAuto` |
 | `tests/auto_equip_cases.luau` | every mode, two hands, other miners, gems, a plan applied leaves nothing to do, and the server request |
