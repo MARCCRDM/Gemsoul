@@ -218,6 +218,34 @@ again): "The frontier is restless: critters come sooner.", "...stirred up:
 more critters, and tougher.", "...swarming! Head back to the core to let it
 settle." A wandering rift opened near you comes stirred up the same way.
 
+### Out alone: no kaiju with you
+
+Mining past the core with none of your kaiju out (none yet, all knocked
+out, or called back) is much more dangerous (`Frontier.Alone`). The
+frontier knows you're alone:
+
+| | With your kaiju | Alone |
+| --- | --- | --- |
+| Noise (swings and seconds out there) | as above | twice as loud |
+| Gap after an encounter | 8 seconds | 4 seconds |
+| Critters per encounter | as above | two more |
+| At once round you (Fringe / Edge, calm) | 5 / 7 | 8 / 10 |
+| Their level | as above | +2 |
+| Their bites on you | as they are | 60% harder |
+
+So alone in the Fringe an encounter comes about every 15 to 20 swings with
+five or six level 3–6 critters, and at the Edge every 8 to 10 swings with
+seven or eight level 11–15s that bite 60% harder. Stirring it up stacks on
+top (still within the Outpost's 22). You're told when you go out alone
+("No kaiju out with you: critters come sooner, more of them, and they hit
+harder.", not more than once a minute), and a red **ALONE · NO KAIJU WITH
+YOU** tag sits at the right of the screen while you are. The server sets
+`FrontierAlone` on you each half second (out past the core with
+`KaijuServer.team` empty); the encounter rules read it, and so does
+`KaijuWilds` for a critter's bite or a snatcher's trip.
+
+![Out alone and hurt: the ALONE and HEAL AT THE SHELTER tags on the right (HUD rendered from the game's code; the world is a stand-in)](frontier/alone-tags.png)
+
 ### Wandering rifts
 
 Every 40 to 80 seconds the frontier tears open by itself, 35 to 70 studs from
@@ -253,9 +281,14 @@ shrunk down. One that came through a rift:
 
 A critter's finishing blow doesn't kill you in the Outpost: it knocks you
 down for a few seconds, as in a spar, and you get up healed. Scraped but on
-your feet, you heal quickly in the Outpost: 6% of your health a second once
-4 seconds have passed without a hit, with a soft green shimmer off you while
-it mends (`HealthRegen.Lobby`; elsewhere it's still 1% after 5 seconds).
+your feet, you only heal **back at base**: out in the quarry nothing
+mends, so a run out costs you until you walk back. Inside the Shelter's
+footprint (or down in the Kaiju Arena's hall under it: `Frontier.atBase`,
+`AtBase` on you), 8% of your health comes back a second once 2 seconds have
+passed without a hit, with a soft green shimmer off you while it mends
+(`HealthRegen.Lobby`; elsewhere it's still 1% after 5 seconds). Hurt away
+from it, a gold **HURT · HEAL AT THE SHELTER** tag at the right of the
+screen says so; mending, it's a green **MENDING AT THE SHELTER**.
 
 Ones from the Edge are tougher: a quarter more health and a fifth more
 damage.
@@ -408,12 +441,13 @@ of creatures on top of that, and the Outpost lagged. What keeps it light:
 | `Shared.Outpost` | The Fringe, Edge, Vein and Guarded zones (the same rock mix, more luck) |
 | `OutpostWorld` | Lays out the vein sites, the outcrops and their seams, and the three Rift Veins before the rest of the field; a vein's scar, cracks and Rift Gate (`veinMarks`, the guarded one's cracks red; `docs/rift.md`); crystals tinted by band (`rock(size, cframe, rng, tint)`) |
 | `OutpostServer` | Grows each rock with its zone, tint and luck; a mined rock grows back in the same spot, except a vein's; moves a vein when it's mined out or its time comes (`moveVein`, `onVeinMoved`, and `VeinNews` on `workspace`); a swing at a vein's rock (`onVeinSwing`); every swing's noise (`onSwing`); the pick's bonk (`OutpostBonk`); Rift Charged luck |
-| `FrontierServer` | Each player's band (`FrontierBand`), noise (`FrontierNoise`) and how stirred up (`FrontierStir`; told as it gets to each stage), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`, and move with their veins: `moveScar`) |
-| `KaijuWilds` | `spawnBug`: a critter out of a rift at its level, at its prey (`prey`), roaming a wandering rift; slipping back (`rift`); its pay; `bonk`; the vein guardian (`veinSwing`, `veinMoved`) |
+| `FrontierServer` | Each player's band (`FrontierBand`), noise (`FrontierNoise`) and how stirred up (`FrontierStir`; told as it gets to each stage), out alone (`FrontierAlone`; told once a minute at most) and back at base (`AtBase`, for anyone in the Outpost), encounters, wandering rifts and Rift Charged (`RiftCharged`), the rifts in `workspace.Rifts` (anchors with `OpenAt`, `HopAt`, `CloseAt`, `EndAt`, `Seed`, `Height`, `Critter`, `Prey`; the scars carry `Dormant`, and move with their veins: `moveScar`) |
+| `KaijuWilds` | `spawnBug`: a critter out of a rift at its level, at its prey (`prey`), roaming a wandering rift; slipping back (`rift`); its pay; `bonk`; the vein guardian (`veinSwing`, `veinMoved`); a critter's bite on someone out alone lands `Alone.Damage` times harder |
+| `HealthRegen` | In the Outpost, healing only back at base (`AtBase`) |
 | `Duelist.creatureBody`, `BrainrotSkins.thin` | A moon bug's body: no armour, nothing too small to see, no lights, few shadows |
 | `SparServer`, `CombatServer` | A critter's finishing blow in the Outpost knocks you down instead |
 | `RiftTear` (client) | Draws each tear from its anchor: the lips, the void, the cracks, light, sparks and sound |
-| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, arrows to rifts off screen and to the nearest wild kaiju (`nearest`), the Rift Charged tag (no noise ring) |
+| `FrontierHud` (client) | The banner as you cross into a band or a vein surfaces, arrows to rifts off screen and to the nearest wild kaiju (`nearest`), the Rift Charged tag (no noise ring), the ALONE and heal-at-the-Shelter tags (`tags`) |
 | `OutpostScene` (client) | The band and luck on a rock's label; the mine button bonks a critter close by |
 
 Tests: `tests/run_frontier.py` checks the rules (bands and zones, the luck
@@ -424,12 +458,16 @@ vein sites and their rocks, picking a vein's next site, the compass, the
 guarded vein's luck and its guardian's numbers, mining noise, stirring
 it up (how fast it builds and settles, the core settling it faster, the
 stages, louder swings, more critters per encounter and allowed at once,
-higher levels, never in the core), fair shares, critter levels and EXP, how many come at once, where rifts open (wandering ones too), the timeline, that tears are ragged and
+higher levels, never in the core), out alone (louder, sooner, more,
+higher, room for more, never in the core), back at base (the Shelter's
+footprint and the hall under it, not the quarry round it), the status
+tags, fair shares, critter levels and EXP, how many come at once, where rifts open (wandering ones too), the timeline, that tears are ragged and
 lopsided, the pieces each tear is drawn from, the banners, that the noise ring stays off the HUD,
 the nearest wild kaiju for its arrow
 and the arrows; a swarm's tears a second or more apart, and each new tear
 16 studs or more from those still open). `tests/run_kaiju.py` runs the
-server side: who rifts open round, swings drawing them, the warning, the
+server side: who rifts open round, back at base or not, out alone (and
+told once), swings drawing them, the warning, the
 caps, edge levels, a swarming encounter trickling in (a tear for each
 critter, opening one after another, never two too close, never more than
 four open at once), a wandering rift's critters climbing out one by one,

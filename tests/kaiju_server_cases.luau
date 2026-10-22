@@ -2119,6 +2119,18 @@ swingFor(60, 0.5)
 check(#rifts() == 0 and #critterFor(b) == 0, "A rift opened in the core")
 check(b:GetAttribute("FrontierBand") == "Core", "No band for the HUD")
 check((b:GetAttribute("FrontierNoise") or 0) <= Frontier.Noise.Restart + 0.05, "Swinging in the core made noise")
+check(b:GetAttribute("FrontierAlone") == nil, "Alone in the core")
+-- Back at base: the Shelter's footprint (AtBase: only there does the
+-- lobby heal), not the quarry round it.
+stand(center + Vector3.new(-40, 11, 30))
+FrontierServer._step(0.5)
+check(b:GetAttribute("AtBase") == true, "In the Shelter, not at base")
+stand(center + Vector3.new(120, 5, 0))
+FrontierServer._step(0.5)
+check(b:GetAttribute("AtBase") == false, "Out in the core's quarry, still at base")
+
+-- (b has no kaiju out: out past the core they're alone, and the frontier
+-- comes for them harder: Frontier.Alone.)
 
 -- Out in the fringe: each swing makes noise (the HUD's ring fills), and
 -- about one in 35 brings a rift, near where they face.
@@ -2129,8 +2141,19 @@ local swings = swingFor(140, 0.4, function()
 	return #rifts() > 0
 end)
 check(b:GetAttribute("FrontierBand") == "Fringe", "Not in the fringe")
+check(b:GetAttribute("FrontierAlone") == true and #KaijuServer.team(b) == 0, "Out with no kaiju, not alone")
+do
+	local told = 0
+	for _, note in notes do
+		if note[1] == b and note[2] == Frontier.Alone.Note then
+			told += 1
+		end
+	end
+	check(told == 1, "Not told once they're out alone: " .. told)
+end
+check(b:GetAttribute("AtBase") == false, "Out in the fringe, at base")
 check(#rifts() > 0, "No rift tore open round a miner swinging in the fringe")
-check(swings >= 15 and swings <= 90, "Not about 1 in 35 swings: " .. swings)
+check(swings >= math.floor(15 / Frontier.Alone.Noise) and swings <= 90 / Frontier.Alone.Noise, "Not about 1 in 35 swings (louder alone): " .. swings)
 check(loudest >= 0.5, "The noise ring never filled")
 local firstRift = rifts()[1]
 local open, hop = firstRift:GetAttribute("OpenAt"), firstRift:GetAttribute("HopAt")
@@ -2158,7 +2181,7 @@ check(
 	entry.Species == firstRift:GetAttribute("Critter") or #critterFor(b) > 1,
 	"Not the critter its rift crackled with"
 )
-check(entry.Level >= 1 and entry.Level <= 4, "A fringe critter's level")
+check(entry.Level >= 1 + Frontier.Alone.Levels and entry.Level <= 4 + Frontier.Alone.Levels, "A fringe critter's level (alone)")
 check(bug.Model:GetAttribute("CritterLevel") == entry.Level, "A critter's level isn't on it")
 check(string.find(bug.Model:GetAttribute("CombatTitle"), "Lv " .. entry.Level, 1, true), "Its nameplate has no level")
 check(bug.Root.AssemblyLinearVelocity.Y > 0, "It didn't hop out")
@@ -2186,7 +2209,7 @@ check(#playerHits > 0 and playerHits[#playerHits][1] == b and not playerHits[#pl
 for _ = 1, 160 do
 	swingFor(1, 0.4)
 	local coming = #critterFor(b) + (FrontierServer._pending[b] or 0)
-	local allowed = Frontier.capFor("Fringe", FrontierServer._states[b].Stir)
+	local allowed = Frontier.capFor("Fringe", FrontierServer._states[b].Stir, true)
 	check(coming <= allowed, "More critters than the fringe allows")
 end
 check(#critterFor(b) >= 2, "Rifts stopped opening round a miner out in the fringe")
@@ -2200,7 +2223,7 @@ for _ = 1, 40 do
 	FrontierServer._step(0.5)
 	runDelayed()
 end
-check(#critterFor(b) <= Frontier.incursion("Fringe", 0.99), "Standing still drew critters like mining")
+check(#critterFor(b) <= Frontier.incursion("Fringe", 0.99, nil, true), "Standing still drew critters like mining")
 
 -- Out at the edge: tougher critters, from level 9 (on a calm frontier:
 -- stirred up, they come higher still, below).
@@ -2225,9 +2248,9 @@ end)
 check(edgeBug ~= nil and b:GetAttribute("FrontierBand") == "Edge", "No critters at the edge")
 local edgeLevel = KaijuWilds._wilds[edgeBug].Level
 local stirred = math.floor(Frontier.Disturbance.Levels * (edgeStir or 0))
-check(edgeLevel >= 9 and edgeLevel <= 13 + stirred, "An edge critter's level: " .. tostring(edgeLevel))
+check(edgeLevel >= 9 + Frontier.Alone.Levels and edgeLevel <= 13 + stirred + Frontier.Alone.Levels, "An edge critter's level: " .. tostring(edgeLevel))
 check(edgeBug.Humanoid.MaxHealth > bug.Humanoid.MaxHealth, "An edge critter isn't tougher")
-check(#critterFor(b) <= Frontier.capFor("Edge", FrontierServer._states[b].Stir), "More critters than the edge allows")
+check(#critterFor(b) <= Frontier.capFor("Edge", FrontierServer._states[b].Stir, true), "More critters than the edge allows")
 
 -- A mech's pilot: their strikes make noise too, and the critters come for them.
 clearCritters()
@@ -2334,7 +2357,7 @@ local function stirringUp()
 	-- the calm edge's cap. (Any swarm still trickling in from before comes
 	-- through first.)
 	local drainUntil = now
-		+ Frontier.Swarm.Every[2] * Frontier.capFor("Edge", 1)
+		+ Frontier.Swarm.Every[2] * Frontier.capFor("Edge", 1, true)
 		+ Frontier.Rift.Hop
 		+ Frontier.Swarm.Last
 	while now < drainUntil do
@@ -2349,7 +2372,7 @@ local function stirringUp()
 	FrontierServer.swing(b)
 	local coming = FrontierServer._pending[b] or 0
 	check(coming > Frontier.Caps.Edge, "Swarming, an encounter brought no more critters: " .. coming)
-	check(coming <= Frontier.capFor("Edge", 1), "Swarming, past its cap: " .. coming)
+	check(coming <= Frontier.capFor("Edge", 1, true), "Swarming, past its cap: " .. coming)
 	-- It trickles in: a tear of its own for each, one after another, a
 	-- second or more apart, each well clear of those still open; never a
 	-- crowd hopping out at once.
@@ -2393,7 +2416,10 @@ local function stirringUp()
 	check(#list == coming, "Not every swarming critter came through: " .. #list .. " of " .. coming)
 	for _, enemy in list do
 		local level = KaijuWilds._wilds[enemy].Level
-		check(level >= 9 + D.Levels and level <= 13 + D.Levels, "A swarming edge critter's level: " .. level)
+		check(
+			level >= 9 + D.Levels + Frontier.Alone.Levels and level <= 13 + D.Levels + Frontier.Alone.Levels,
+			"A swarming edge critter's level: " .. level
+		)
 	end
 	-- Calm again, the edge's own cap and levels (above).
 

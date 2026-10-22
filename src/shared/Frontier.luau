@@ -88,14 +88,16 @@
 	  Frontier.apart(a, b) -> radians between two angles round the middle
 	  Frontier.pickSite(sites, taken, others, rng) -> index?   where a vein goes next
 	  Frontier.compass(angle) -> "north-east" ...   a direction from the middle
-	  Frontier.noise(noise, band, swings, seconds, roll?, stir?) -> noise   (an encounter at 1)
+	  Frontier.noise(noise, band, swings, seconds, roll?, stir?, alone?) -> noise   (an encounter at 1)
+	  Frontier.gap(alone?) -> seconds after an encounter before the next can come
+	  Frontier.atBase(offset, box) -> boolean   back at base (the Shelter, or the hall under it)
 	  Frontier.stir(stir, band, swings) -> stir   (0..1: how stirred up)
 	  Frontier.settle(stir, band, seconds, quiet) -> stir   `quiet` seconds since a swing
 	  Frontier.stage(stir) -> index, { At, Name, Extra, Cap }
-	  Frontier.incursion(band, roll, stir?) -> critters at once
-	  Frontier.capFor(band, stir?) -> critters allowed round one player
+	  Frontier.incursion(band, roll, stir?, alone?) -> critters at once
+	  Frontier.capFor(band, stir?, alone?) -> critters allowed round one player
 	  Frontier.share(cap, playersOut) -> critters at once round one player
-	  Frontier.critterLevel(band, rng, stir?) -> level
+	  Frontier.critterLevel(band, rng, stir?, alone?) -> level
 	  Frontier.critterExp(level, band, today) -> EXP for a kaiju that fought it
 	  Frontier.riftSpot(position, facing, center, rng, others?, past?, usable?) -> Vector3?   where a rift opens
 	  Frontier.trickle(count, rng?) -> { seconds }   when each of an encounter's tears opens
@@ -324,6 +326,27 @@ Frontier.Noise = {
 -- (each one weak: Shared.Kaiju.Bug), but each is a whole brainrot body:
 -- the Outpost's cap keeps them from lagging it.
 Frontier.Caps = { Fringe = 5, Edge = 7, Server = 22 }
+-- Out past the core with no kaiju of yours out you're alone, and the
+-- frontier knows it: your swings and your seconds out there make Noise
+-- times the noise, the next encounter can come Gap seconds after one (not
+-- Noise.Gap), each brings Extra more critters, Cap more may be about you at
+-- once (still within the Outpost's cap), they come Levels levels higher,
+-- and their hits on you do Damage times as much. Note is what you're told
+-- when you go out alone.
+Frontier.Alone = {
+	Noise = 2,
+	Gap = 4,
+	Extra = 2,
+	Cap = 3,
+	Levels = 2,
+	Damage = 1.6,
+	Note = "No kaiju out with you: critters come sooner, more of them, and they hit harder.",
+}
+-- Back at base: in the Shelter's footprint (its half size, x and z, round
+-- the Outpost's middle: OutpostWorld's Shelter.Box), or more than Below
+-- studs under the quarry inside the core (the Kaiju Arena's hall,
+-- Shared.KaijuPit). Out of a fight, only there does a player heal.
+Frontier.Below = 40
 -- A swarm trickles in, never all at once: PerRift critters out of each
 -- tear (Stagger seconds apart), the tears opening one after another, Every
 -- seconds apart (somewhere in that range), each well clear of the others
@@ -824,14 +847,16 @@ end
 
 -- A player's mining noise after `swings` swings and `seconds` seconds out
 -- in `band` (the core adds nothing). `roll` (0..1) sets each swing's share
--- within Noise.Spread; `stir` (0..1) makes each swing louder.
+-- within Noise.Spread; `stir` (0..1) makes each swing louder; `alone` (no
+-- kaiju out) makes it all Alone.Noise times as loud.
 function Frontier.noise(
 	noise: number,
 	band: string,
 	swings: number,
 	seconds: number,
 	roll: number?,
-	stir: number?
+	stir: number?,
+	alone: boolean?
 ): number
 	local swing, idle = Frontier.Noise.Swing[band], Frontier.Noise.Idle[band]
 	if not swing then
@@ -840,7 +865,23 @@ function Frontier.noise(
 	local spread = Frontier.Noise.Spread
 	local share = spread[1] + (spread[2] - spread[1]) * (roll or 0.5)
 	local louder = 1 + Frontier.Disturbance.Noise * math.clamp(stir or 0, 0, 1)
-	return noise + swing * swings * share * louder + idle * seconds
+	local made = swing * swings * share * louder + idle * seconds
+	return noise + made * (if alone then Frontier.Alone.Noise else 1)
+end
+
+-- Seconds after an encounter before the next can come: sooner alone.
+function Frontier.gap(alone: boolean?): number
+	return if alone then Frontier.Alone.Gap else Frontier.Noise.Gap
+end
+
+-- Whether a spot `offset` from the Outpost's middle is back at base: in the
+-- Shelter's footprint (`box`: its half size, x and z), or down in the hall
+-- under it.
+function Frontier.atBase(offset: Vector3, box: Vector2): boolean
+	if offset.Y < -Frontier.Below then
+		return Vector2.new(offset.X, offset.Z).Magnitude < Frontier.Core
+	end
+	return math.abs(offset.X) <= box.X and math.abs(offset.Z) <= box.Y
 end
 
 -- How stirred up the frontier is after `swings` more swings in `band` (the
@@ -882,14 +923,14 @@ function Frontier.stage(stir: number?)
 end
 
 -- Critters allowed round one player out in `band` (before the fair
--- share): the band's cap and its stage's more.
-function Frontier.capFor(band: string, stir: number?): number
+-- share): the band's cap, its stage's more, and Alone.Cap more alone.
+function Frontier.capFor(band: string, stir: number?, alone: boolean?): number
 	local cap = Frontier.Caps[band] or 0
 	if cap <= 0 then
 		return 0
 	end
 	local _, stage = Frontier.stage(stir)
-	return cap + stage.Cap
+	return cap + stage.Cap + (if alone then Frontier.Alone.Cap else 0)
 end
 
 -- Critters at once round one player: their band's cap, or a fair share of
@@ -899,11 +940,12 @@ function Frontier.share(cap: number, playersOut: number): number
 end
 
 -- A critter's level, by where it came through, higher the more stirred up
--- (`stir`) it is.
-function Frontier.critterLevel(band: string, rng, stir: number?): number
+-- (`stir`) it is, and higher still for a player out alone.
+function Frontier.critterLevel(band: string, rng, stir: number?, alone: boolean?): number
 	local range = Frontier.Levels[band] or Frontier.Levels.Fringe
 	local level = if rng then rng:NextInteger(range[1], range[2]) else range[1]
-	return level + math.floor(Frontier.Disturbance.Levels * math.clamp(stir or 0, 0, 1) + 1e-9)
+	level += math.floor(Frontier.Disturbance.Levels * math.clamp(stir or 0, 0, 1) + 1e-9)
+	return level + (if alone then Frontier.Alone.Levels else 0)
 end
 
 -- EXP for a kaiju that fought a critter of `level` from `band`, its owner
@@ -919,13 +961,15 @@ function Frontier.critterExp(level: number, band: string?, today: number?): numb
 end
 
 -- How many critters come through at once (`roll` in [0, 1)), more the
--- more stirred up (`stir`) it is.
-function Frontier.incursion(band: string, roll: number, stir: number?): number
+-- more stirred up (`stir`) it is, and Alone.Extra more for a player out
+-- alone.
+function Frontier.incursion(band: string, roll: number, stir: number?, alone: boolean?): number
 	local _, stage = Frontier.stage(stir)
+	local extra = stage.Extra + (if alone then Frontier.Alone.Extra else 0)
 	if band == "Edge" then
-		return (if roll < 0.6 then 5 else 6) + stage.Extra
+		return (if roll < 0.6 then 5 else 6) + extra
 	elseif band == "Fringe" then
-		return (if roll < 0.6 then 3 else 4) + stage.Extra
+		return (if roll < 0.6 then 3 else 4) + extra
 	end
 	return 0
 end

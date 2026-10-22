@@ -426,6 +426,15 @@ local function foesOf(wild: Wild)
 	end
 end
 
+-- A critter's blow on a player out there alone (no kaiju of theirs out:
+-- FrontierServer's FrontierAlone) lands Frontier.Alone.Damage times harder.
+local function alonePlayer(wild: Wild?, player: Player, amount: number): number
+	if wild and wild.Bug and player:GetAttribute("FrontierAlone") == true then
+		return amount * Frontier.Alone.Damage
+	end
+	return amount
+end
+
 -- A blow (`heavy` true or false; nil for an E) on a kaiju or a hunter, who
 -- may guard, parry or hop clear of it. Returns how it landed.
 local function hitFoe(enemy, victim, amount: number, element: string?, status: string?, heavy: boolean?): string
@@ -434,7 +443,7 @@ local function hitFoe(enemy, victim, amount: number, element: string?, status: s
 	if victim.Pet then
 		return KaijuServer.hurt(victim.Pet, amount, element, status, heavy)
 	elseif player and (hunter(player) or (wild ~= nil and (wild.Bug or wild.Guard) and prey(player))) then
-		local _, guarded = Enemies.hitPlayer(victim.Player, amount, element, enemy, heavy)
+		local _, guarded = Enemies.hitPlayer(player, alonePlayer(wild, player, amount), element, enemy, heavy)
 		return if guarded then "Guarded" else "Hit"
 	end
 	return "Missed"
@@ -1231,7 +1240,7 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 			if not player or distance > reach + 2.5 then
 				return -- (it lunged at nothing)
 			end
-			local amount = kind.Damage * RAID.Trip.Damage * (1 - Enemies.weakness(enemy))
+			local amount = alonePlayer(wild, player, kind.Damage * RAID.Trip.Damage * (1 - Enemies.weakness(enemy)))
 			local dealt, guarded = Enemies.hitPlayer(player, amount, wild.Element, enemy, true)
 			if
 				not guarded

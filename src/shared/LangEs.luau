@@ -2135,6 +2135,11 @@ return {
 	["The frontier is restless: critters come sooner."] = "La frontera está inquieta: las criaturas llegan antes.",
 	["The frontier is stirred up: more critters, and tougher."] = "La frontera está agitada: más criaturas, y más duras.",
 	["The frontier is swarming! Head back to the core to let it settle."] = "¡La frontera está infestada! Vuelve al núcleo para que se calme.",
+	-- Out alone, and healing only back at base (Shared.Frontier.Alone, Client.FrontierHud).
+	["No kaiju out with you: critters come sooner, more of them, and they hit harder."] = "Sin kaiju contigo: los bichos llegan antes, son más y pegan más fuerte.",
+	["ALONE · NO KAIJU WITH YOU"] = "SOLO · SIN KAIJU CONTIGO",
+	["HURT · HEAL AT THE SHELTER"] = "HERIDO · CÚRATE EN EL REFUGIO",
+	["MENDING AT THE SHELTER"] = "SANANDO EN EL REFUGIO",
 	-- Knocked out: back by itself after a wait, or revived now (Robux, a
 	-- coupon); no healing in a fight (KaijuHud, KaijuServer).
 	["BACK BY ITSELF IN"] = "VUELVE SOLO EN",
@@ -2291,11 +2296,11 @@ return {
 	["Challenge one in the quarry and wear it down below half health without knocking it out: it glows gold. Then press CATCH and hold it in your gem's light. Taking a hit or moving off breaks the catch."] = "Desafía a uno en la cantera y bájale la salud por debajo de la mitad sin noquearlo: brillará dorado. Entonces pulsa ATRAPAR y sujétalo con la luz de tu gema. Si recibes un golpe o te alejas, la captura se interrumpe.",
 	["Threats and safety"] = "Amenazas y seguridad",
 	["What are rift critters?"] = "¿Qué son los bichos de la Grieta?",
-	["Hostiles that come through rifts beyond the Core, more often the longer you work out there. Hit them with your pick to drive them back: it costs no swings."] = "Hostiles que cruzan las grietas más allá del Núcleo, más a menudo cuanto más tiempo trabajas ahí fuera. Golpéalos con tu pico para hacerlos retroceder: no gasta golpes.",
+	["Hostiles that come through rifts beyond the Core, more often the longer you work out there. Hit them with your pick to drive them back: it costs no swings. Go out with no kaiju beside you and they come sooner, more of them, tougher, and hit you harder."] = "Hostiles que cruzan las grietas más allá del Núcleo, más a menudo cuanto más tiempo trabajas ahí fuera. Golpéalos con tu pico para hacerlos retroceder: no gasta golpes. Si sales sin kaiju a tu lado, llegan antes, más, más duros y te pegan más fuerte.",
 	["What is a gem raid?"] = "¿Qué es un asalto de gemas?",
 	["If your whole kaiju team is knocked out beyond the Core, critters trip you and steal the newest gems from your trip. Hit a thief before it reaches its rift and the gem comes back. Back in the Core, your gems are safe."] = "Si noquean a todo tu equipo de kaiju más allá del Núcleo, los bichos te ponen la zancadilla y roban las gemas más nuevas de tu salida. Golpea al ladrón antes de que llegue a su grieta y recuperas la gema. De vuelta en el Núcleo, tus gemas están a salvo.",
 	["How do I recover health?"] = "¿Cómo recupero salud?",
-	["In the Outpost you heal on your own: a few seconds after your last hit, your health starts to refill. Sparring and being knocked down pause it."] = "En el Puesto te curas solo: unos segundos después del último golpe, tu salud empieza a llenarse. Un combate amistoso o estar derribado lo detienen.",
+	["Only back at base. Out in the quarry nothing mends: walk back into the Shelter (or down to the Kaiju Arena) and a couple of seconds after your last hit your health refills fast. Sparring and being knocked down pause it."] = "Solo de vuelta en la base. En la cantera nada se cura: vuelve al Refugio (o baja a la Arena Kaiju) y un par de segundos después del último golpe tu salud se llena rápido. Un combate amistoso o estar derribado lo detienen.",
 	["Your free pick gets a swing back every {1} seconds and is full again in two hours. PROBE-{2} sells refills, and ranked 1v1 win streaks restore swings."] = "Tu pico gratis recupera un golpe cada {1} segundos y vuelve a estar lleno en dos horas. La SONDA-{2} vende recargas, y las rachas de victorias en 1v1 clasificatorio devuelven golpes.",
 	-- INFO-9's field tips (Vendors.Tips).
 	["Every rock yields exactly one gem, and broken rocks grow back. A picked-over field fills up again."] = "Cada roca da exactamente una gema, y las rocas rotas vuelven a crecer. Un campo agotado se vuelve a llenar.",

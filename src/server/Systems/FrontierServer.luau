@@ -68,7 +68,12 @@
 	Dormant instead of a timeline, and stay. Each player carries
 	FrontierBand (Core, Fringe or Edge), FrontierBiome (the biome they're
 	in, Shared.Frontier.Biomes: nil in the core), FrontierNoise and
-	FrontierStir (how stirred up: both 0..1, in twentieths) for their HUD.
+	FrontierStir (how stirred up: both 0..1, in twentieths) for their HUD,
+	and FrontierAlone (true out past the core with no kaiju of theirs out:
+	the frontier comes for them harder, Frontier.Alone). Anyone in the
+	Outpost carries AtBase (back in the Shelter, or the hall under it:
+	Frontier.atBase), the only place they heal out of a fight
+	(HealthRegen).
 	What comes through leans to the biome it comes through in (its own
 	kind of critter: KaijuWilds.pickWave).
 
@@ -108,7 +113,8 @@ local rng = Random.new()
 local nextSeed = 0
 -- [player] = { Noise, LastEncounter (os.clock), Shown (the FrontierNoise last
 -- set), Stir, LastSwing (os.clock), ShownStir (the FrontierStir last set),
--- Told (the stage they were last told of) }
+-- Told (the stage they were last told of), ToldAlone (when they were last
+-- told they're out alone, os.clock) }
 local states: { [Player]: any } = {}
 -- [player] = { enemy }: the critters out for them (encounters and wandering rifts)
 local critters: { [Player]: { any } } = {}
@@ -145,6 +151,18 @@ end
 
 local function center(): Vector3
 	return Outpost.Location.Position
+end
+
+-- Out past the core with no kaiju of theirs out (FrontierAlone, set each
+-- step): critters come sooner, more of them, higher and harder.
+local function alone(player: Player): boolean
+	return player:GetAttribute("FrontierAlone") == true
+end
+
+-- The Shelter's footprint (half sizes, x and z), as the site built it.
+local function shelterBox(): Vector2
+	local shelter = base and base.Shelter
+	return if shelter and shelter.Box then shelter.Box else Vector2.new(88, 64)
 end
 
 -- Can rifts open round `player` now? In the Outpost, alive, not down, not
@@ -277,9 +295,9 @@ local function total(): number
 end
 
 -- How many more critters may come for `player` out in `band` (more the
--- more stirred up they have it).
+-- more stirred up they have it, and more alone).
 local function roomFor(player: Player, band: string): number
-	local cap = Frontier.share(Frontier.capFor(band, stateOf(player).Stir), math.max(1, playersOut))
+	local cap = Frontier.share(Frontier.capFor(band, stateOf(player).Stir, alone(player)), math.max(1, playersOut))
 	local mine = living(player) + (pending[player] or 0)
 	return math.max(0, math.min(cap - mine, Frontier.Caps.Server - total()))
 end
@@ -391,7 +409,7 @@ local function incursion(player: Player, band: string, count: number, raider: bo
 						Prey = player,
 						Band = band,
 						Critter = critter,
-						Level = Frontier.critterLevel(band, rng, stateOf(player).Stir),
+						Level = Frontier.critterLevel(band, rng, stateOf(player).Stir, alone(player)),
 						Facing = target.Position,
 						Hop = toward * (if Kaiju.isRanged(critter) then 10 else 24) + side + Vector3.new(0, 26, 0),
 						Raider = raider,
@@ -408,7 +426,7 @@ end
 -- Their noise is full: an encounter, if they have room (else it waits, full).
 local function consider(player: Player, state, band: string)
 	local now = os.clock()
-	if band == "Core" or state.Noise < 1 or now - state.LastEncounter < Frontier.Noise.Gap then
+	if band == "Core" or state.Noise < 1 or now - state.LastEncounter < Frontier.gap(alone(player)) then
 		return
 	end
 	local room = roomFor(player, band)
@@ -418,7 +436,7 @@ local function consider(player: Player, state, band: string)
 	end
 	state.Noise = rng:NextNumber(0, Frontier.Noise.Restart)
 	state.LastEncounter = now
-	incursion(player, band, math.min(room, Frontier.incursion(band, rng:NextNumber(), state.Stir)))
+	incursion(player, band, math.min(room, Frontier.incursion(band, rng:NextNumber(), state.Stir, alone(player))))
 end
 
 -- A swing (or a mech's strike of `swings` swings) by `player`: noise, out
@@ -433,7 +451,7 @@ function FrontierServer.swing(player: Player, swings: number?)
 		return
 	end
 	local state = stateOf(player)
-	state.Noise = Frontier.noise(state.Noise, band, swings or 1, 0, rng:NextNumber(), state.Stir)
+	state.Noise = Frontier.noise(state.Noise, band, swings or 1, 0, rng:NextNumber(), state.Stir, alone(player))
 	state.Stir = Frontier.stir(state.Stir, band, swings or 1)
 	state.LastSwing = os.clock()
 	-- (Told as it gets to each stage, once till it's well settled again.)
@@ -774,7 +792,8 @@ local function wander(candidates: { any })
 	local spot = Frontier.wanderSpot(root.Position, center(), rng)
 	local band = Frontier.band(Frontier.distance(spot, center()))
 	local stir = stateOf(player).Stir
-	local count = math.min(free, roomFor(player, band), math.max(2, Frontier.incursion(band, rng:NextNumber(), stir)))
+	local lone = alone(player)
+	local count = math.min(free, roomFor(player, band), math.max(2, Frontier.incursion(band, rng:NextNumber(), stir, lone)))
 	if count <= 0 then
 		return
 	end
@@ -813,7 +832,7 @@ local function wander(candidates: { any })
 				Prey = player,
 				Band = band,
 				Critter = critter,
-				Level = Frontier.critterLevel(band, rng, stir),
+				Level = Frontier.critterLevel(band, rng, stir, lone),
 				Facing = floor + out * 10,
 				Hop = out * 14 + Vector3.new(0, 22, 0),
 				Wander = { Home = floor, Roam = Frontier.Wander.Roam, Notice = Frontier.Wander.Notice },
@@ -871,7 +890,16 @@ local function step(dt: number)
 	for _, player in Players:GetPlayers() do
 		local state = stateOf(player)
 		local root = rootOf(player)
+		-- (Back at base or not, for anyone in the Outpost: healing needs it.)
+		local here = root and player:GetAttribute("Outpost") == true and player:GetAttribute("RiftRun") == nil
+		local atBase = if here then Frontier.atBase(root.Position - center(), shelterBox()) else nil
+		if player:GetAttribute("AtBase") ~= atBase then
+			player:SetAttribute("AtBase", atBase)
+		end
 		if not root or not eligible(player) then
+			if player:GetAttribute("FrontierAlone") ~= nil then
+				player:SetAttribute("FrontierAlone", nil)
+			end
 			-- (Away in the Rift counts as gone from the Outpost.)
 			local away = player:GetAttribute("Outpost") ~= true or player:GetAttribute("RiftRun") ~= nil
 			if away and player:GetAttribute("FrontierBand") ~= nil then
@@ -896,6 +924,16 @@ local function step(dt: number)
 		if player:GetAttribute("FrontierBiome") ~= biomeId then
 			player:SetAttribute("FrontierBiome", biomeId)
 		end
+		-- Alone out there: no kaiju of theirs out (down, called back, or none
+		-- yet). Told when they go out alone, not more than once a minute.
+		local lone = if band ~= "Core" and #KaijuServer.team(player) == 0 then true else nil
+		if player:GetAttribute("FrontierAlone") ~= lone then
+			player:SetAttribute("FrontierAlone", lone)
+			if lone and now - (state.ToldAlone or -math.huge) >= 60 then
+				state.ToldAlone = now
+				Remotes.Notify:FireClient(player, Frontier.Alone.Note)
+			end
+		end
 		state.Stir = Frontier.settle(state.Stir, band, dt, now - state.LastSwing)
 		state.Told = math.min(state.Told, (Frontier.stage(state.Stir + 0.1)))
 		if band == "Core" then
@@ -905,7 +943,7 @@ local function step(dt: number)
 			hauls[player], raiding[player] = nil, nil
 		else
 			table.insert(out, { Player = player, Root = root, Band = band })
-			state.Noise = Frontier.noise(state.Noise, band, 0, dt)
+			state.Noise = Frontier.noise(state.Noise, band, 0, dt, nil, nil, lone)
 		end
 	end
 	playersOut = #out

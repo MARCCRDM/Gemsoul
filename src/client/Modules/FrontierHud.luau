@@ -14,6 +14,11 @@
 	               it, till its critter is out.
 	  Rift Charged a tag with the seconds left, after you helped clear a
 	               wandering rift (RiftCharged: gems come luckier).
+	  status tags  under it: ALONE (out past the core with no kaiju out:
+	               FrontierAlone, the critters come harder), and while
+	               you're hurt in the Outpost, where you'll mend: HEAL AT
+	               THE SHELTER away from it (AtBase), MENDING while you do
+	               (LobbyMend).
 	  vein news    a banner when a Rift Vein surfaces somewhere new
 	               (workspace's VeinNews, VeinNewsAt), saying which way.
 	  sightings    the nearest wild kaiju within Sighting studs, off
@@ -28,6 +33,8 @@
 	      arrow sits for a point off screen (pure)
 	  FrontierHud.nearest(spots, from, reach) -> index?, studs   the nearest
 	      of `spots` (Vector3s) within `reach` across the ground (pure)
+	  FrontierHud.tags(alone, hurt, here, atBase, mending) -> { id }   which
+	      status tags show (FrontierHud.Tags) (pure)
 ]]
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -229,6 +236,115 @@ local function chargedTag(player: Player, gui: ScreenGui)
 	end)
 end
 
+-- Tags under it, on the right: out there alone (FrontierAlone), and while
+-- hurt in the Outpost, that only the Shelter mends you (AtBase, LobbyMend).
+FrontierHud.Tags = {
+	Alone = { Text = "ALONE · NO KAIJU WITH YOU", Color = Color3.fromRGB(255, 96, 96), Back = Color3.fromRGB(70, 14, 18) },
+	Heal = { Text = "HURT · HEAL AT THE SHELTER", Color = Color3.fromRGB(255, 214, 140), Back = Color3.fromRGB(56, 36, 10) },
+	Mending = { Text = "MENDING AT THE SHELTER", Color = Color3.fromRGB(140, 255, 170), Back = Color3.fromRGB(12, 50, 26) },
+}
+
+-- Which tags show (pure): `alone` out there with no kaiju; `hurt` below
+-- full health; `here` in the Outpost (not away in the Rift); `atBase`,
+-- `mending` as HealthRegen has them.
+function FrontierHud.tags(alone: boolean, hurt: boolean, here: boolean, atBase: boolean, mending: boolean): { string }
+	local list = {}
+	if alone then
+		table.insert(list, "Alone")
+	end
+	if mending then
+		table.insert(list, "Mending")
+	elseif here and hurt and not atBase then
+		table.insert(list, "Heal")
+	end
+	return list
+end
+
+local function statusTags(player: Player, gui: ScreenGui)
+	local column = Instance.new("Frame")
+	column.Name = "FrontierTags"
+	column.BackgroundTransparency = 1
+	column.AnchorPoint = Vector2.new(1, 0)
+	column.Position = UDim2.new(1, -18, 0.5, 42)
+	column.Size = UDim2.fromOffset(200, 60)
+	column.Parent = gui
+	local layout = Instance.new("UIListLayout")
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, 4)
+	layout.Parent = column
+	local labels: { [string]: TextLabel } = {}
+	for i, id in { "Alone", "Heal", "Mending" } do
+		local tag = FrontierHud.Tags[id]
+		local label = Instance.new("TextLabel")
+		label.Name = id
+		label.LayoutOrder = i
+		label.AutomaticSize = Enum.AutomaticSize.X
+		label.Size = UDim2.fromOffset(0, 18)
+		label.BackgroundColor3 = tag.Back
+		label.BackgroundTransparency = 0.15
+		label.Font = Enum.Font.GothamBlack
+		label.TextSize = 11
+		label.TextColor3 = tag.Color
+		label.Text = tag.Text
+		label.Visible = false
+		label.Parent = column
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0, 8)
+		pad.PaddingRight = UDim.new(0, 8)
+		pad.Parent = label
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 5)
+		corner.Parent = label
+		local stroke = Instance.new("UIStroke")
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Color = tag.Color
+		stroke.Transparency = 0.55
+		stroke.Parent = label
+		labels[id] = label
+	end
+
+	local humanoid: Humanoid? = nil
+	local function refresh()
+		local hurt = humanoid ~= nil and humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth - 0.5
+		local here = player:GetAttribute("Outpost") == true and player:GetAttribute("RiftRun") == nil
+		local shown = {}
+		for _, id in
+			FrontierHud.tags(
+				player:GetAttribute("FrontierAlone") == true,
+				hurt,
+				here,
+				player:GetAttribute("AtBase") == true,
+				player:GetAttribute("LobbyMend") == true
+			)
+		do
+			shown[id] = true
+		end
+		for id, label in labels do
+			label.Visible = shown[id] == true
+		end
+	end
+	for _, name in { "FrontierAlone", "AtBase", "LobbyMend", "Outpost", "RiftRun" } do
+		player:GetAttributeChangedSignal(name):Connect(refresh)
+	end
+	local healthWatch: RBXScriptConnection? = nil
+	local function watch(character: Model)
+		if healthWatch then
+			healthWatch:Disconnect()
+		end
+		humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
+		if humanoid then
+			healthWatch = humanoid.HealthChanged:Connect(refresh)
+		end
+		refresh()
+	end
+	player.CharacterAdded:Connect(watch)
+	if player.Character then
+		task.spawn(watch, player.Character)
+	end
+	refresh()
+end
+
 -- Arrows at the screen's edge for rifts coming for you, off screen.
 local function arrows(player: Player, gui: ScreenGui)
 	local watched: { [BasePart]: TextLabel } = {}
@@ -394,6 +510,7 @@ function FrontierHud.start()
 	banner(player, gui)
 	biomeLight(player)
 	chargedTag(player, gui)
+	statusTags(player, gui)
 	arrows(player, gui)
 	sightings(player, gui)
 end

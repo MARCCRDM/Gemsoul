@@ -418,6 +418,53 @@ check(
 check(Frontier.critterLevel("Edge", nil, 0.5) == 9 + math.floor(D.Levels / 2), "Halfway, half the levels")
 check(Frontier.critterLevel("Edge", nil, 7) == 9 + D.Levels, "More than full stirred")
 
+-- Out alone (no kaiju out): much more dangerous ----------------------------------------------------------
+do
+	local A = Frontier.Alone
+	check(A.Noise >= 1.5 and A.Gap < Frontier.Noise.Gap, "Alone, critters don't come sooner")
+	check(A.Extra >= 1 and A.Cap >= A.Extra and A.Levels >= 1 and A.Damage >= 1.3, "Alone isn't much more dangerous")
+	for _, band in { "Fringe", "Edge" } do
+		local quiet = Frontier.noise(0, band, 10, 30, 0.5, 0.4)
+		local lone = Frontier.noise(0, band, 10, 30, 0.5, 0.4, true)
+		check(math.abs(lone - quiet * A.Noise) < 1e-9, "Alone, " .. band .. " swings aren't louder")
+		check(Frontier.noise(0.2, band, 0, 0, 0.5, 0, true) == 0.2, "Alone, nothing done still made noise")
+		for _, stir in { 0, 0.6, 1 } do
+			for _, roll in { 0.1, 0.9 } do
+				check(
+					Frontier.incursion(band, roll, stir, true) == Frontier.incursion(band, roll, stir) + A.Extra,
+					"Alone, the " .. band .. " sends no more critters"
+				)
+				check(
+					Frontier.incursion(band, roll, stir, true) <= Frontier.capFor(band, stir, true),
+					"Alone, an encounter past its cap in the " .. band
+				)
+			end
+			check(Frontier.capFor(band, stir, true) == Frontier.capFor(band, stir) + A.Cap, "Alone, no more room round you")
+			check(
+				Frontier.critterLevel(band, nil, stir, true) == Frontier.critterLevel(band, nil, stir) + A.Levels,
+				"Alone, critters no tougher"
+			)
+		end
+	end
+	check(Frontier.noise(0.3, "Core", 10, 60, 0.5, 1, true) == 0.3, "Alone in the core makes noise")
+	check(Frontier.incursion("Core", 0.5, 1, true) == 0 and Frontier.capFor("Core", 1, true) == 0, "Alone, critters in the core")
+	check(Frontier.gap(true) == A.Gap and Frontier.gap() == Frontier.Noise.Gap, "The gap between encounters")
+	check(Frontier.capFor("Edge", 1, true) <= Frontier.Caps.Server, "Alone, one miner past the Outpost's cap")
+	check(type(A.Note) == "string" and #A.Note > 0, "Nothing said when you go out alone")
+end
+
+-- Back at base: the Shelter's footprint, or the hall under it ----------------------------------------------
+do
+	local box = Vector2.new(88, 64)
+	check(Frontier.atBase(Vector3.new(0, 8, 0), box), "The Shelter's middle isn't at base")
+	check(Frontier.atBase(Vector3.new(-80, 9, 60), box), "A Shelter corner isn't at base")
+	check(not Frontier.atBase(Vector3.new(0, 0, 70), box), "Out the door counted as at base")
+	check(not Frontier.atBase(Vector3.new(120, 0, 0), box), "The core's quarry counted as at base")
+	check(not Frontier.atBase(Vector3.new(300, 0, 0), box), "The fringe counted as at base")
+	check(Frontier.atBase(Vector3.new(100, -150, 70), box), "The Kaiju Arena's hall isn't at base")
+	check(not Frontier.atBase(Vector3.new(220, -150, 0), box), "Deep under the fringe counted as at base")
+end
+
 -- Critters by band: levels, EXP, coins -----------------------------------------------------------------------
 for _ = 1, 100 do
 	local fringe, edge = Frontier.critterLevel("Fringe", rng), Frontier.critterLevel("Edge", rng)
@@ -853,6 +900,30 @@ end
 -- The noise ring and stirred-up meter are off the HUD (the screen stays
 -- the game's); each stage past calm still has its note.
 check(FrontierHud.lit == nil and FrontierHud.stirRow == nil, "The noise ring is back on the HUD")
+-- Status tags: alone out there; hurt, where you'll mend.
+do
+	local function has(list, id)
+		return table.find(list, id) ~= nil
+	end
+	check(#FrontierHud.tags(false, false, true, false, false) == 0, "A tag with nothing to say")
+	check(has(FrontierHud.tags(true, false, true, false, false), "Alone"), "No ALONE tag out there alone")
+	check(has(FrontierHud.tags(false, true, true, false, false), "Heal"), "Hurt away from base, no hint to head back")
+	check(#FrontierHud.tags(false, true, true, true, false) == 0, "Told to head back while at base")
+	check(#FrontierHud.tags(false, true, false, false, false) == 0, "Told to head back from the Rift")
+	local mending = FrontierHud.tags(true, true, true, true, true)
+	check(has(mending, "Mending") and not has(mending, "Heal") and has(mending, "Alone"), "Mending at base, mixed tags")
+	for _, id in { "Alone", "Heal", "Mending" } do
+		check(FrontierHud.Tags[id] and #FrontierHud.Tags[id].Text <= 28, "Tag " .. id .. " too long for the right edge")
+	end
+	local server = fs.readFile(ROOT .. "/src/server/Systems/FrontierServer.luau")
+	check(server:find('SetAttribute("AtBase"', 1, true) ~= nil, "Nobody's told they're back at base")
+	check(server:find("#KaijuServer.team(player) == 0", 1, true) ~= nil, "Alone isn't 'no kaiju out'")
+	check(server:find("Frontier.gap(alone(player))", 1, true) ~= nil, "Encounters don't come sooner alone")
+	local regen = fs.readFile(ROOT .. "/src/server/Systems/HealthRegen.luau")
+	check(regen:find('GetAttribute("AtBase") == true', 1, true) ~= nil, "Lobby healing doesn't need the base")
+	local wilds = fs.readFile(ROOT .. "/src/server/Systems/KaijuWilds.luau")
+	check(wilds:find("Frontier.Alone.Damage", 1, true) ~= nil, "Critters don't hit harder alone")
+end
 do
 	local tint, ambient = roblox.Color3.fromRGB(248, 250, 255), roblox.Color3.fromRGB(150, 156, 176)
 	local function near(a, b)

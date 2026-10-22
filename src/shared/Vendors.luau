@@ -335,7 +335,7 @@ Vendors.InfoBot = {
 			Options = {
 				{
 					Text = "What are rift critters?",
-					Reply = "Hostiles that come through rifts beyond the Core, more often the longer you work out there. Hit them with your pick to drive them back: it costs no swings.",
+					Reply = "Hostiles that come through rifts beyond the Core, more often the longer you work out there. Hit them with your pick to drive them back: it costs no swings. Go out with no kaiju beside you and they come sooner, more of them, tougher, and hit you harder.",
 				},
 				{
 					Text = "What is a gem raid?",
@@ -343,7 +343,7 @@ Vendors.InfoBot = {
 				},
 				{
 					Text = "How do I recover health?",
-					Reply = "In the Outpost you heal on your own: a few seconds after your last hit, your health starts to refill. Sparring and being knocked down pause it.",
+					Reply = "Only back at base. Out in the quarry nothing mends: walk back into the Shelter (or down to the Kaiju Arena) and a couple of seconds after your last hit your health refills fast. Sparring and being knocked down pause it.",
 				},
 				{
 					Text = "My swings ran out",
