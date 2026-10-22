@@ -50,8 +50,10 @@ Dungeon.Roster = {
 -- (Server BrainrotBosses dresses them; most have two or three heads). Each
 -- is weak to what the Roster's fighters of its element are weak to (Fire
 -- to Frost, Frost to Shock, Shock to Poison, Poison to Fire).
--- Threat (1 to 3): how tough it is and how rich the cache it drops
--- (Shared.BossLoot); Loot: the kind of gear its cache favours.
+-- Threat (1 to 3): its step on its biome's Rift ladder (RiftRun.Ladders: I
+-- to beat alone, II alone or with a friend, III built for a group), how
+-- tough it is and how rich the cache it drops (Shared.BossLoot); Loot: the
+-- kind of gear its cache favours.
 Dungeon.Bosses = {
 	{
 		Id = "Gattini",
@@ -70,7 +72,7 @@ Dungeon.Bosses = {
 		Weakness = "Frost",
 		Shape = "DragonCroc",
 		Moves = { "FlameBreath", "TailSweep", "FirebombDive" },
-		Threat = 3,
+		Threat = 1,
 		Loot = "Helmets",
 	},
 	{
@@ -101,7 +103,7 @@ Dungeon.Bosses = {
 		Shape = "Chimpanzini",
 		Moves = { "PeelToss", "JungleRush", "BananaSmash" },
 		Threat = 1,
-		Loot = "Gloves",
+		Loot = "Boots",
 	},
 	{
 		Id = "SahurTrio",
@@ -122,7 +124,7 @@ Dungeon.Bosses = {
 		Shape = "TwinShark",
 		Moves = { "TwinSharkDash", "JawSnap", "TidalCrash" },
 		Threat = 2,
-		Loot = "Boots",
+		Loot = "Shields",
 	},
 	{
 		Id = "PatapimTrio",
@@ -131,7 +133,7 @@ Dungeon.Bosses = {
 		Weakness = "Fire",
 		Shape = "TreeTrio",
 		Moves = { "BranchSweep", "RootSnare", "SporeStorm" },
-		Threat = 2,
+		Threat = 3,
 		Loot = "Helmets",
 	},
 	{
@@ -141,7 +143,7 @@ Dungeon.Bosses = {
 		Weakness = "Shock",
 		Shape = "Frigo",
 		Moves = { "IceSpit", "DoorSlam", "FreezerBlast" },
-		Threat = 2,
+		Threat = 3,
 		Loot = "Armors",
 	},
 	{

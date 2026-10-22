@@ -499,14 +499,16 @@ local function serverModule(name)
 	end
 	return server[name]
 end
+-- (The Rift gate's boss portraits wait in a folder of their own.)
+local riftPortraits = make("Folder", { Name = "RiftPortraits" })
 local ReplicatedStorage = {
 	Shared = setmetatable({}, {
 		__index = function(_, key)
 			return { Shared = key }
 		end,
 	}),
-	FindFirstChild = function()
-		return nil
+	FindFirstChild = function(_, name)
+		return if name == "RiftPortraits" then riftPortraits else nil
 	end,
 }
 services.ReplicatedStorage = ReplicatedStorage
@@ -5073,9 +5075,37 @@ end)()
 	-- Alone: warned, at the gate and in there; the kit comes out.
 	local peeked = registered.RiftPeek(a)
 	check(peeked.Ok and peeked.Solo == true and peeked.Party == 1 and not peeked.Joining, "Going alone isn't flagged")
+	-- The gate's Rift is its biome's: that element's ladder of bosses, the
+	-- first open, each after it once the one before is beaten.
+	local riftGate = {}
+	do
+		local Frontier = shared("Frontier")
+		local offset = gate.Position - Vector3.new(0, 0, 7000)
+		local biome = Frontier.biomeAt(offset) or Frontier.biomeOf(math.atan2(offset.Z, offset.X))
+		riftGate.Element, riftGate.Ladder = biome.Element, RiftRun.ladder(biome.Element)
+		local ladder = riftGate.Ladder
+		local seen = registered.RiftPeek(a, 2)
+		check(seen.Element == biome.Element and seen.Biome == biome.Name, "The gate's Rift isn't its biome's element")
+		check(#seen.Ladder == #ladder and seen.Next == ladder[1].Id, "The gate doesn't offer its biome's ladder")
+		check(seen.Ladder[1].Unlocked and seen.Ladder[#ladder].Group == true and not seen.Ladder[1].Group, "The ladder's group boss")
+		for i, entry in seen.Ladder do
+			local lead = Kaiju.active(profiles[a].Kaiju)
+			check(entry.Level == RiftRun.bossLevel({ lead.Level }, ladder[i]), entry.Id .. "'s level isn't at your kaiju's")
+			check(i == 1 or entry.Level > seen.Ladder[i - 1].Level, "The ladder's levels don't rise")
+			local portrait = riftPortraits:FindFirstChild(entry.Id)
+			check(portrait ~= nil and portrait:FindFirstChildOfClass("Humanoid") == nil, entry.Id .. " has no portrait")
+		end
+		check(not seen.Ladder[2].Unlocked and seen.Ladder[2].Need == ladder[1].Name, "The ladder's next boss isn't locked")
+		local refused = registered.RiftEnter(a, 2, ladder[2].Id)
+		check(not refused.Ok and refused.Message == "Beat " .. ladder[1].Name .. " first.", "A locked boss let them in")
+		check(not registered.RiftEnter(a, 2, "Nope").Ok, "A boss from no ladder let them in")
+		local elsewhere = if biome.Element == "Fire" then "Paperotti" else "Drago"
+		check(not registered.RiftEnter(a, 2, elsewhere).Ok and RiftServer.runOf(a) == nil, "Another biome's boss came through this gate")
+	end
 	local went = enter(a, 2)
 	check(went.Ok and went.Runners == 1, "Couldn't go through the gate: " .. tostring(went.Message))
 	local run = RiftServer.runOf(a)
+	check(run.Boss == riftGate.Ladder[1] and run.Element == riftGate.Element, "Not the gate's first boss, or not its element")
 	check(run and a:GetAttribute("RiftRun") == run.Id, "No trip for them")
 	local world = built[#built]
 	check((rootA.Position - world.Start.Position).Magnitude < 8, "They didn't arrive on the landing")
@@ -5161,13 +5191,14 @@ end)()
 		check(enc.Rift == true and entry.Id == run.Id and table.find(entry.Members, a), "A fighter not of the trip")
 		check(enc.GearTier == RiftRun.fighterTier(1) and enc.Boss == false, "A first cave fighter's gear")
 		check(enc.HealthScale == RiftRun.Fighters.Health and table.find(DungeonRules.Roster, enc.Spec), "A fighter not of the pathway dungeon's")
+		check(enc.Spec.Element == run.Element, "A fighter not of the Rift's element")
 		check(inside(world.Rooms[1], enc.Center), "A fighter out of its cave")
 	end
 	-- One of their party joins them through any gate (it's on the way).
 	parties[a] = { Members = { a, b } }
 	parties[b] = parties[a]
 	local seen = registered.RiftPeek(b)
-	check(seen.Joining == true and seen.Solo == false, "A party member wasn't told they'd join")
+	check(seen.Joining == true and seen.Solo == false and seen.Boss == run.Boss.Name, "A party member wasn't told they'd join, or whom")
 	rootB.CFrame = CFrame.new(gate.Position + Vector3.new(-4, 0, 0))
 	check(enter(b, 2).Ok and RiftServer.runOf(b) == run, "A party member didn't join the trip")
 	check(kit[b] == true, "The one who joined isn't in their kit")
@@ -5440,12 +5471,20 @@ end)()
 	RiftServer._step(now)
 	check(a:GetAttribute("RiftRun") == nil and b:GetAttribute("RiftRun") == nil and run.Done, "Not sent home after the win")
 	check(kit[a] == false and kit[b] == false, "Still in their kit after the win")
+	-- The win's tallied for both, and opens the next boss on the ladder.
+	check(
+		profiles[a].RiftBosses[riftGate.Ladder[1].Id] == 1 and profiles[b].RiftBosses[riftGate.Ladder[1].Id] == 1,
+		"The win wasn't tallied for each"
+	)
+	check(noted(a, "Unlocked: " .. riftGate.Ladder[2].Name), "Not told of the next boss")
+	check(registered.RiftPeek(a, 2).Ladder[2].Unlocked and registered.RiftPeek(a, 2).Next == riftGate.Ladder[2].Id, "The next boss didn't open")
 	-- Alone: a boss cache all the same, then home.
 	parties[a], parties[b] = nil, nil
 	now += 1
 	rootA.CFrame = CFrame.new(gate.Position)
 	check(enter(a, 2).Ok, "Couldn't go in a third time")
 	run = RiftServer.runOf(a)
+	check(run.Boss == riftGate.Ladder[2], "The gate didn't offer the next boss")
 	world = built[#built]
 	throughToBoss()
 	local before = #bossCaches
@@ -5457,7 +5496,9 @@ end)()
 	-- Leaving through the landing's way home.
 	now += 1
 	rootA.CFrame = CFrame.new(gate.Position)
-	check(enter(a, 2).Ok, "Couldn't go in a fourth time")
+	-- A group boss alone: let in, and warned.
+	check(registered.RiftEnter(a, 2, riftGate.Ladder[#riftGate.Ladder].Id).Ok, "A group boss alone wasn't allowed")
+	check(RiftServer.runOf(a).Boss == riftGate.Ladder[#riftGate.Ladder] and noted(a, "built for 2 to 4 of you"), "Alone at a group boss, not warned")
 	world = built[#built]
 	rootA.CFrame = CFrame.new(world.Exit.Position)
 	check(registered.RiftLeave(a).Ok and a:GetAttribute("RiftRun") == nil, "Couldn't leave by the way home")

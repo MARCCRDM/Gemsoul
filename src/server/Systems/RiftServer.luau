@@ -4,9 +4,15 @@
 	critters' own world, built for it (World.RiftWorld: walled caves) and
 	gone with it.
 
-	  Going in    "RiftEnter", vein: through a gate you're standing at. You
-	              join your party's trip if one of them is still on the
-	              way (up to RiftRun.Party), or start one. Your combat kit
+	  Going in    "RiftEnter", vein, bossId: through a gate you're standing
+	              at. You join your party's trip if one of them is still on
+	              the way (up to RiftRun.Party), whatever boss they chose;
+	              or start one against `bossId`, from the gate's biome's
+	              ladder (RiftRun.Ladders, by the element of the biome the
+	              gate stands in: its fighters and boss are of it), if
+	              you've beaten the one before it (profile RiftBosses:
+	              { [bossId] = times beaten }; RiftRun.canFight). A group
+	              boss alone is allowed; the gate warns you first. Your combat kit
 	              comes out and stays out till you're home
 	              (SparServer.riftKit: hunting, so a finishing blow knocks
 	              you down rather than kills you); your kaiju come with you
@@ -41,7 +47,7 @@
 	              KaijuServer.restoreAll), "Home" (back to base, keeping
 	              what you found) or invite a friend (the client's); nothing
 	              chosen in RiftRun.Fallen seconds, home you go.
-	  The boss    one of the ten brainrot bosses at random, as the pathway
+	  The boss    the one picked at the gate, as the pathway
 	              dungeon's Colossus (a Duelist fighter with its every move,
 	              RiftRun.bossHealth times tougher, by its threat too, its
 	              cave's leader): it tears through in the throne cave once
@@ -57,8 +63,13 @@
 	              everyone's home.
 	  Leaving     "RiftLeave": through a way home you're at (the landing's,
 	              or the throne cave's once it's open), keeping what you found.
-	  The gate    "RiftPeek": what going in looks like (the gate's card):
-	              { Party, Joining, Solo }.
+	  The gate    "RiftPeek", vein: what going in looks like (the gate's
+	              card): { Party, Joining, Solo, Biome, Element, Ladder:
+	              { { Id, Name, Element, Threat, Level (bossLevel, at
+	              your party's kaiju), Group, Loot, Unlocked, Beaten,
+	              Need } }, Next (the boss it offers first), Boss (your
+	              party's, joining) }. Each boss's portrait waits in
+	              ReplicatedStorage.RiftPortraits (portraitOf).
 	  Healing     each cave and the throne cave have healing crystals
 	              (RiftRun.Heal, World.RiftWorld.healRock): "RiftMine", id
 	              is a swing of your pick at one (1 swaps your kit for it:
@@ -86,6 +97,7 @@ local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
 local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
+local BossLoot = require(ReplicatedStorage.Shared.BossLoot)
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local Outpost = require(ReplicatedStorage.Shared.Outpost)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
@@ -166,6 +178,7 @@ local function show(run)
 		player:SetAttribute("RiftLeft", left)
 		player:SetAttribute("RiftRunners", #run.Members)
 		player:SetAttribute("RiftBoss", if run.Room > RiftRun.Rooms then run.Boss.Name else nil)
+		player:SetAttribute("RiftBossLevel", if run.Room > RiftRun.Rooms then run.BossLevel else nil)
 		player:SetAttribute("RiftFound", #(run.Found[player] or {}))
 		player:SetAttribute("RiftWon", run.Won or nil)
 		player:SetAttribute("RiftExitAt", run.ExitServer)
@@ -177,6 +190,7 @@ local CLEAR = {
 	"RiftRoom",
 	"RiftLeft",
 	"RiftBoss",
+	"RiftBossLevel",
 	"RiftFound",
 	"RiftRunners",
 	"RiftWon",
@@ -269,10 +283,10 @@ local function home(player: Player, text: string?)
 	end
 end
 
--- The lead kaiju's level of everyone in.
-local function levelsOf(run): { number }
+-- The lead kaiju's level of each of `players`.
+local function leadLevels(players: { Player }): { number }
 	local levels = {}
-	for _, player in run.Members do
+	for _, player in players do
 		local profile = PlayerData.get(player)
 		local lead = profile and Kaiju.active(profile.Kaiju)
 		if lead then
@@ -280,6 +294,41 @@ local function levelsOf(run): { number }
 		end
 	end
 	return levels
+end
+
+-- ... of everyone in.
+local function levelsOf(run): { number }
+	return leadLevels(run.Members)
+end
+
+-- The bosses' portraits for the gate's cards (Client.RiftClient): each
+-- one's body (Duelist.creatureBody) built once, anchored, and kept in
+-- ReplicatedStorage.RiftPortraits by its id.
+local function portraitOf(boss)
+	local folder = ReplicatedStorage:FindFirstChild("RiftPortraits")
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "RiftPortraits"
+		folder.Parent = ReplicatedStorage
+	end
+	if folder:FindFirstChild(boss.Id) then
+		return
+	end
+	local ok, body = pcall(Duelist.creatureBody, boss, GemConfig.ElementColors[boss.Element])
+	if not ok or not body then
+		warn("[Rift] no portrait for", boss.Id, body)
+		return
+	end
+	for _, piece in body:GetDescendants() do
+		if piece:IsA("BasePart") then
+			piece.Anchored = true
+			piece.CanCollide = false
+		elseif piece:IsA("Humanoid") then
+			piece:Destroy()
+		end
+	end
+	body.Name = boss.Id
+	body.Parent = folder
 end
 
 local foeDied, victory
@@ -434,7 +483,7 @@ local function spawnRoom(run, room: number)
 	local level = RiftRun.level(levelsOf(run), room)
 	local band = if room >= 3 then "Edge" else "Fringe"
 	local foes = RiftRun.pickFoes(room, #run.Members, run.Rng)
-	local leaders = RiftRun.pickFighters(room, #run.Members, run.Rng)
+	local leaders = RiftRun.pickFighters(room, #run.Members, run.Rng, run.Element)
 	local spots = RiftRun.portalSpots(cave.Center, cave.Radius, #foes + #leaders, runnersAt(run), run.Rng)
 	local every = RiftRun.Portal.Every
 	for i, foe in foes do
@@ -514,10 +563,10 @@ local function callAdds(run)
 		return
 	end
 	local rule = RiftRun.Boss
-	local level = RiftRun.level(levelsOf(run), RiftRun.Rooms)
+	local level = run.BossLevel or RiftRun.bossLevel(levelsOf(run), run.Boss)
 	local arena = run.World.Boss
 	local wave = Kaiju.wave(rule.AddCount, run.Rng)
-	local fighters = RiftRun.pickFighters(RiftRun.Rooms, 1, run.Rng)
+	local fighters = RiftRun.pickFighters(RiftRun.Rooms, 1, run.Rng, run.Element)
 	local spots = RiftRun.portalSpots(arena.Center, arena.Radius, #wave + rule.AddFighters, runnersAt(run), run.Rng)
 	local every = RiftRun.Portal.Every
 	for i, id in wave do
@@ -566,6 +615,8 @@ local function cleared(run, room: number)
 	if room < RiftRun.Rooms then
 		announce(run, "Cave cleared. The fire's down: on to the next.")
 	else
+		-- (The boss's level, for its adds and the strip: whoever's in now.)
+		run.BossLevel = RiftRun.bossLevel(levelsOf(run), run.Boss)
 		announce(run, "The last cave's clear. Something waits on the throne.")
 	end
 	show(run)
@@ -578,6 +629,36 @@ end
 local function bossLoot(run)
 	for _, player in run.Members do
 		ArenaStreaks.bossCache(player, run.Boss, Dungeons.bossGem(run.Boss.Element, run.BossTier or 4), "Rift")
+	end
+end
+
+-- The bosses `player` has beaten in the Rift: { [bossId] = times }.
+local function beatenBy(player: Player): { [string]: number }
+	local profile = PlayerData.get(player) :: any
+	if not profile then
+		return {}
+	end
+	profile.RiftBosses = profile.RiftBosses or {}
+	return profile.RiftBosses
+end
+
+-- The boss beaten: a tally for each one still in, and word of the next
+-- boss on its ladder when this opens it for them.
+local function recordWin(run)
+	local ladder = RiftRun.ladder(run.Element)
+	local nextUp = nil
+	for i, boss in ladder do
+		if boss == run.Boss then
+			nextUp = ladder[i + 1]
+		end
+	end
+	for _, player in run.Members do
+		local beaten = beatenBy(player)
+		local first = (beaten[run.Boss.Id] or 0) == 0
+		beaten[run.Boss.Id] = (beaten[run.Boss.Id] or 0) + 1
+		if first and nextUp then
+			notify(player, string.format("Unlocked: %s, next on this Rift's ladder.", nextUp.Name))
+		end
 	end
 end
 
@@ -615,6 +696,7 @@ victory = function(run)
 	end
 	RiftWorld.openHome(run.World)
 	bossLoot(run)
+	recordWin(run)
 	run.ExitAt = os.clock() + RiftRun.Exit
 	run.ExitServer = serverNow() + RiftRun.Exit
 	show(run)
@@ -1115,7 +1197,18 @@ local function healMine(player: Player, id: any)
 	})
 end
 
-local function enter(player: Player, vein: any)
+-- The biome vein `vein`'s gate stands in (Shared.Frontier.Biomes: its
+-- element is the Rift's), or nil without a gate.
+local function gateBiome(vein: any)
+	local gate = if type(vein) == "number" then RiftServer.gateAt(vein) else nil
+	if not gate then
+		return nil
+	end
+	local offset = gate.Position - Outpost.Location.Position
+	return Frontier.biomeAt(offset) or Frontier.biomeOf(math.atan2(offset.Z, offset.X))
+end
+
+local function enter(player: Player, vein: any, bossId: any)
 	local why = problem(player)
 	if why then
 		return reply(false, why)
@@ -1127,6 +1220,21 @@ local function enter(player: Player, vein: any)
 		return reply(false, "Walk up to a Rift Gate first.")
 	end
 	local run = partyRun(player)
+	local boss, element = nil, nil
+	if not run then
+		-- The boss: picked from this gate's ladder, and open to them.
+		local biome = gateBiome(vein)
+		element = biome and biome.Element
+		local beaten = beatenBy(player)
+		if bossId == nil then
+			bossId = (RiftRun.nextBoss(element, beaten) or {}).Id
+		end
+		local ok, why = RiftRun.canFight(element, bossId, beaten)
+		if not ok then
+			return reply(false, why or "That boss isn't behind this gate.")
+		end
+		boss = RiftRun.bossById(bossId)
+	end
 	if not run then
 		local slot = 1
 		while slots[slot] do
@@ -1150,7 +1258,8 @@ local function enter(player: Player, vein: any)
 			Room = 1,
 			Foes = {},
 			Coming = 0, -- (foes on their way through their tears)
-			Boss = RiftRun.pickBoss(rng),
+			Boss = boss,
+			Element = element,
 			BossEnemy = nil,
 			Adds = {},
 			Found = {},
@@ -1175,7 +1284,12 @@ local function enter(player: Player, vein: any)
 		join(run, player)
 	end
 	if RiftRun.solo(#run.Members) then
-		notify(player, "You're in the Rift alone. It gets hard fast: bring a friend if you can.")
+		notify(
+			player,
+			if RiftRun.isGroup(run.Boss)
+				then string.format("You're in the Rift alone, against %s: it's built for 2 to 4 of you. Bring friends if you can.", run.Boss.Name)
+				else "You're in the Rift alone. It gets hard fast: bring a friend if you can."
+		)
 	end
 	return reply(true, "", { Runners = #run.Members, Boss = run.Boss.Name })
 end
@@ -1239,11 +1353,42 @@ end
 -- What going in looks like for `player` (the gate's card, Client.RiftClient):
 -- how many in their party, whether they'd join its trip, and whether
 -- they'd be on their own.
-local function peek(player: Player)
+local function peek(player: Player, vein: any)
 	local party = Party.of(player)
 	local size = if party then #party.Members else 1
-	local joining = partyRun(player) ~= nil
-	return reply(true, "", { Party = size, Joining = joining, Solo = not joining and size <= 1 })
+	local theirs = partyRun(player)
+	local biome = gateBiome(vein)
+	local element = biome and biome.Element
+	local beaten = beatenBy(player)
+	local levels = leadLevels(if theirs then theirs.Members elseif party then party.Members else { player })
+	local ladder = {}
+	for _, boss in RiftRun.ladder(element) do
+		local open, _, need = RiftRun.canFight(element, boss.Id, beaten)
+		portraitOf(boss)
+		table.insert(ladder, {
+			Id = boss.Id,
+			Name = boss.Name,
+			Element = boss.Element,
+			Threat = BossLoot.threat(boss),
+			Level = RiftRun.bossLevel(levels, boss),
+			Group = RiftRun.isGroup(boss),
+			Loot = boss.Loot,
+			Unlocked = open,
+			Beaten = beaten[boss.Id] or 0,
+			Need = need and need.Name,
+		})
+	end
+	local nextUp = RiftRun.nextBoss(element, beaten)
+	return reply(true, "", {
+		Party = size,
+		Joining = theirs ~= nil,
+		Solo = theirs == nil and size <= 1,
+		Biome = biome and biome.Name,
+		Element = element,
+		Ladder = ladder,
+		Next = nextUp and nextUp.Id,
+		Boss = theirs and theirs.Boss.Name,
+	})
 end
 
 -- Vein `index`'s gate: where to stand (OutpostServer sets this).

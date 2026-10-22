@@ -275,6 +275,55 @@ do
 	check(BossLoot.numeral(1) == "I" and BossLoot.numeral(3) == "III", "Threat numerals")
 	check(BossLoot.FocusCount >= 1 and BossLoot.FocusCount <= 3, "Its favourite kind's share")
 end
+-- Each biome's ladder (picked at its gate): every boss on exactly one, of
+-- its element, threat I (built for one) first and a group boss last, rising;
+-- each opens once the one before it is beaten; the Rift's fighters of its
+-- element.
+do
+	local onLadder = {}
+	for element, ids in RiftRun.Ladders do
+		local ladder = RiftRun.ladder(element)
+		check(#ladder == #ids and #ladder >= 2, element .. "'s ladder")
+		for i, boss in ladder do
+			check(boss.Element == element, boss.Id .. " on another element's ladder")
+			check(not onLadder[boss.Id], boss.Id .. " on two ladders")
+			onLadder[boss.Id] = true
+			if i > 1 then
+				check(boss.Threat > ladder[i - 1].Threat, element .. "'s ladder doesn't rise")
+			end
+		end
+		check(ladder[1].Threat == 1, element .. "'s first boss isn't built for one")
+		for i, boss in ladder do
+			local level = RiftRun.bossLevel({ 6 }, boss)
+			check(i == 1 or level > RiftRun.bossLevel({ 6 }, ladder[i - 1]), element .. "'s levels don't rise")
+			check(level == RiftRun.level({ 6 }, RiftRun.Rooms) + RiftRun.Level.Threat[boss.Threat], boss.Id .. "'s level")
+			check(RiftRun.bossLevel({ 99 }, boss) == RiftRun.Level.Max, boss.Id .. "'s level past the top")
+		end
+		check(RiftRun.isGroup(ladder[#ladder]) and not RiftRun.isGroup(ladder[1]), element .. "'s last boss isn't a group's")
+		check(RiftRun.canFight(element, ladder[1].Id, {}), element .. "'s first boss is locked")
+		local ok, why, need = RiftRun.canFight(element, ladder[2].Id, {})
+		check(not ok and need == ladder[1] and why == "Beat " .. ladder[1].Name .. " first.", element .. "'s second boss is open")
+		check(RiftRun.canFight(element, ladder[2].Id, { [ladder[1].Id] = 1 }), "Beating the first didn't open the second")
+		check(
+			RiftRun.nextBoss(element, {}) == ladder[1] and RiftRun.nextBoss(element, { [ladder[1].Id] = 2 }) == ladder[2],
+			element .. "'s next boss"
+		)
+		local all = {}
+		for _, boss in ladder do
+			all[boss.Id] = 1
+		end
+		check(RiftRun.nextBoss(element, all) == ladder[#ladder], "All beaten, the gate doesn't offer the top")
+		for _ = 1, 20 do
+			for _, fighter in RiftRun.pickFighters(1, 1, bossRng, element) do
+				check(fighter.Element == element, "A fighter of another element")
+			end
+		end
+	end
+	for _, boss in DungeonRules.Bosses do
+		check(onLadder[boss.Id], boss.Id .. " is on no ladder")
+	end
+	check(not RiftRun.canFight("Fire", "Paperotti", {}), "Another element's boss behind a gate")
+end
 
 -- Falling, restoring, winning ---------------------------------------------------------------------------------
 

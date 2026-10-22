@@ -3,10 +3,16 @@
 	the rules).
 
 	  The gate     a Rift Gate's prompt (PromptKind Rift) opens its card:
-	               what's through it, who's going (your party's trip, if
-	               one of them is on the way), and going alone, a warning
-	               sign: GOING ALONE IS VERY DIFFICULT, with INVITE A FRIEND
-	               right beside it. ENTER (ENTER ALONE) goes in.
+	               which biome's Rift it is (its element), what's through
+	               it, who's going (your party's trip, if one of them is on
+	               the way, and its boss), and CHOOSE YOUR BOSS: the biome's
+	               ladder (RiftRun.Ladders) as cards, each boss's portrait
+	               (its body, from ReplicatedStorage.RiftPortraits), its
+	               threat (pips) and level, its favourite gear and how often
+	               you've beaten it; a locked one's a silhouette with what
+	               opens it. Alone against a boss built for 2 to 4, a
+	               warning sign: BRING FRIENDS, with INVITE A FRIEND right
+	               below it. ENTER (ENTER ALONE) goes in.
 	  Crossing     the screen goes dark while you go through ("THE RIFT",
 	               and the same warning when you're alone), then clears on
 	               the other side.
@@ -15,7 +21,7 @@
 	               violet overhead; Scenes.outpostLighting puts the
 	               Outpost's back), and a strip along the top: which cave
 	               (its pips: the four and the throne), how many foes are
-	               left, the boss, the gems you've found and how many of
+	               left, the boss and its level, the gems you've found and how many of
 	               you are in. Your combat kit is out the whole way (the
 	               server's). Through a way home (PromptKind RiftExit) and
 	               you're out.
@@ -34,7 +40,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
+local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -202,8 +210,9 @@ local function modal(name: string, width: number, accent: Color3, dismiss: boole
 	return panel, holder
 end
 
--- The warning sign and its words (going in alone).
-local function warning(parent: Instance, order: number, compact: boolean?)
+-- The warning sign and its words (going in alone; `head` and `body` for
+-- another warning).
+local function warning(parent: Instance, order: number, compact: boolean?, head: string?, body: string?)
 	local box = new("Frame", {
 		Name = "Warning",
 		BackgroundColor3 = Color3.fromRGB(64, 22, 14),
@@ -222,12 +231,20 @@ local function warning(parent: Instance, order: number, compact: boolean?)
 	}, box)
 	local mark = IronUi.emblem(box, "Warning", WARN, sign)
 	mark.Position = UDim2.new(0, -sign - 10, 0.5, -sign / 2)
-	UiKit.list(box, 2)
-	local head = text(box, "GOING ALONE IS VERY DIFFICULT", if compact then 13 else 15, WARN, BOLD)
-	head.LayoutOrder = 1
+	-- (The words in a list of their own: a list in the box would stack the
+	-- sign above them.)
+	local words = new("Frame", {
+		Name = "Words",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+	}, box)
+	UiKit.list(words, 2)
+	local title = text(words, head or "GOING ALONE IS VERY DIFFICULT", if compact then 13 else 15, WARN, BOLD)
+	title.LayoutOrder = 1
 	local why = text(
-		box,
-		"Invite a friend, or bring your party: up to 4 can go in together.",
+		words,
+		body or "Invite a friend, or bring your party: up to 4 can go in together.",
 		if compact then 11 else 12,
 		P.Text
 	)
@@ -319,68 +336,348 @@ end
 
 -- The gate ----------------------------------------------------------------------------------------------------
 
--- What going through looks like from here: { Party (how many in it),
--- Joining (their trip's on the path), Solo }.
-local function peek(): { [string]: any }
-	local result = GemClient.request("RiftPeek")
+-- What going through `vein`'s gate looks like from here: { Party (how many
+-- in it), Joining (their trip's on the path), Solo, Biome, Element, Ladder
+-- (its bosses), Next (the one to offer), Boss (your party's, joining) }.
+local function peek(vein: any): { [string]: any }
+	local result = GemClient.request("RiftPeek", vein)
 	if type(result) ~= "table" or not result.Ok then
-		return { Party = 1, Joining = false, Solo = true }
+		return { Party = 1, Joining = false, Solo = true, Ladder = {} }
 	end
 	return result
+end
+
+-- Each threat's colour on the gate's cards (its pips).
+local THREAT_COLORS = { Color3.fromRGB(110, 220, 140), WARN, Color3.fromRGB(255, 92, 72) }
+
+-- A boss's portrait in `view`: its body as the server built it
+-- (ReplicatedStorage.RiftPortraits, Server.RiftServer's portraitOf), seen
+-- from the front quarter. (It may still be on its way: it's put in when it
+-- comes.)
+local function portraitInto(view: ViewportFrame, id: string)
+	local function place(source: Instance)
+		if not view.Parent or not source:IsA("Model") then
+			return
+		end
+		local model = source:Clone()
+		model.Parent = view
+		local camera = Instance.new("Camera")
+		local cf, size = model:GetBoundingBox()
+		local reach = math.max(size.X, size.Y, size.Z)
+		camera.FieldOfView = 40
+		camera.CFrame = CFrame.lookAt(
+			cf.Position + Vector3.new(reach * 0.75, reach * 0.3, -reach * 1.45),
+			cf.Position + Vector3.new(0, size.Y * 0.04, 0)
+		)
+		camera.Parent = view
+		view.CurrentCamera = camera
+	end
+	local folder = ReplicatedStorage:FindFirstChild("RiftPortraits")
+	local source = folder and folder:FindFirstChild(id)
+	if source then
+		place(source)
+		return
+	end
+	task.spawn(function()
+		local found = folder or ReplicatedStorage:WaitForChild("RiftPortraits", 8)
+		local model = found and found:WaitForChild(id, 8)
+		if model then
+			place(model)
+		end
+	end)
+end
+
+-- One boss on the gate's ladder, as a card: its portrait over a glow of its
+-- element, its threat as pips and its level, its name, its favourite gear
+-- and how often you've beaten it. Locked, it's a silhouette with what opens
+-- it. Picking it selects it (a locked one just says what opens it).
+local function bossCard(parent: Instance, entry, order: number, compact: boolean, onPick: () -> ())
+	local accent = GemConfig.ElementColors[entry.Element] or EMBER
+	local card = new("TextButton", {
+		Name = "Boss_" .. tostring(entry.Id),
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.fromRGB(20, 16, 20),
+		ClipsDescendants = true,
+		LayoutOrder = order,
+	}, parent)
+	UiKit.round(card, 10)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(accent:Lerp(Color3.new(0, 0, 0), 0.62), Color3.fromRGB(16, 12, 16)),
+	}, card)
+	local edge = new(
+		"UIStroke",
+		{ Color = P.Dim, Thickness = 1, Transparency = 0.55, ApplyStrokeMode = Enum.ApplyStrokeMode.Border },
+		card
+	)
+	local foot = if compact then 34 else 50
+	-- The stage: a glow behind it, then the boss.
+	local glow = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, -foot / 2 + 6),
+		Size = UDim2.fromScale(0.86, 0.86),
+		BackgroundColor3 = accent,
+		BackgroundTransparency = if entry.Unlocked then 0.8 else 0.92,
+	}, card)
+	new("UIAspectRatioConstraint", { AspectRatio = 1 }, glow)
+	UiKit.round(glow, 999)
+	new("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.6, 0.55),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+		Rotation = 90,
+	}, glow)
+	local view = new("ViewportFrame", {
+		Name = "Portrait",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, if compact then 4 else 8),
+		Size = UDim2.new(1, 0, 1, -foot - (if compact then 4 else 8)),
+		Ambient = Color3.fromRGB(150, 140, 150),
+		LightColor = Color3.fromRGB(255, 236, 220),
+		LightDirection = Vector3.new(-0.5, -0.8, 0.6),
+		-- (Locked: a silhouette.)
+		ImageColor3 = if entry.Unlocked then Color3.new(1, 1, 1) else Color3.fromRGB(8, 6, 10),
+		ImageTransparency = if entry.Unlocked then 0 else 0.15,
+	}, card)
+	portraitInto(view, tostring(entry.Id))
+	-- Its threat (pips) and its level, along the top.
+	local color = THREAT_COLORS[entry.Threat] or P.Text
+	local pips = new("Frame", {
+		Name = "Threat",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(if compact then 8 else 10, if compact then 8 else 11),
+		Size = UDim2.fromOffset(60, 10),
+	}, card)
+	for i = 1, 3 do
+		local lit = i <= (entry.Threat or 1)
+		new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(4 + (i - 1) * (if compact then 11 else 13), 5),
+			Size = UDim2.fromOffset(if compact then 7 else 8, if compact then 7 else 8),
+			Rotation = 45,
+			BackgroundColor3 = if lit then color else Color3.fromRGB(60, 54, 60),
+			BackgroundTransparency = if entry.Unlocked or not lit then 0 else 0.5,
+		}, pips)
+	end
+	local level = new("TextLabel", {
+		Name = "Level",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -6, 0, 6),
+		Size = UDim2.fromOffset(if compact then 44 else 54, if compact then 18 else 22),
+		BackgroundColor3 = Color3.fromRGB(12, 10, 14),
+		BackgroundTransparency = 0.15,
+		Text = string.format("LV %d", entry.Level or 1),
+		TextSize = if compact then 11 else 13,
+		Font = BOLD,
+		TextColor3 = if entry.Unlocked then P.Text else P.Dim,
+	}, card)
+	UiKit.round(level, 6)
+	new("UIStroke", {
+		Color = color,
+		Thickness = 1,
+		Transparency = if entry.Unlocked then 0.2 else 0.7,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, level)
+	-- Its name and its line, along the bottom.
+	local shade = new("Frame", {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, foot),
+		BackgroundColor3 = Color3.fromRGB(10, 8, 12),
+		BackgroundTransparency = 0.2,
+	}, card)
+	local name = text(shade, entry.Name, if compact then 12 else 15, if entry.Unlocked then P.Text else P.Dim, BOLD)
+	name.AutomaticSize = Enum.AutomaticSize.None
+	name.TextWrapped = false
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	name.TextXAlignment = Enum.TextXAlignment.Center
+	name.Position = UDim2.fromOffset(6, if compact then 3 else 7)
+	name.Size = UDim2.new(1, -12, 0, if compact then 15 else 19)
+	local parts = {}
+	if entry.Unlocked then
+		local favour = Slots.Definitions[Slots.ByKind[entry.Loot or ""] or ""]
+		if favour then
+			table.insert(parts, "Favours: " .. favour.Label)
+		end
+		if (entry.Beaten or 0) > 0 then
+			table.insert(parts, string.format("Beaten: %d", entry.Beaten))
+		end
+	else
+		table.insert(parts, string.format("Beat %s to unlock", entry.Need or "the one before"))
+	end
+	local sub = text(shade, table.concat(parts, "  ·  "), if compact then 9 else 11, if entry.Unlocked then P.Dim else WARN)
+	sub.AutomaticSize = Enum.AutomaticSize.None
+	sub.TextWrapped = false
+	sub.TextTruncate = Enum.TextTruncate.AtEnd
+	sub.TextXAlignment = Enum.TextXAlignment.Center
+	sub.Position = UDim2.fromOffset(6, if compact then 18 else 28)
+	sub.Size = UDim2.new(1, -12, 0, if compact then 11 else 14)
+	if not entry.Unlocked then
+		local lock = text(card, "LOCKED", if compact then 11 else 13, P.Dim, BOLD)
+		lock.AutomaticSize = Enum.AutomaticSize.None
+		lock.TextXAlignment = Enum.TextXAlignment.Center
+		lock.AnchorPoint = Vector2.new(0.5, 0.5)
+		lock.Position = UDim2.new(0.5, 0, 0.5, -foot / 2)
+		lock.Size = UDim2.new(1, 0, 0, 16)
+	end
+	card.Activated:Connect(onPick)
+	return card, edge
 end
 
 function RiftClient.openGate(vein: any)
 	if gateCard and gateCard.Parent or player:GetAttribute("RiftRun") then
 		return
 	end
-	local info = peek()
+	local info = peek(vein)
 	local alone = info.Solo == true
+	local ladder = info.Ladder or {}
 	local s = screen()
 	local small = narrow(s)
-	local panel = modal("RiftGate", math.min(440, s.AbsoluteSize.X - 32), EMBER, true, small)
+	local width = math.min(if small then 560 else 640, s.AbsoluteSize.X - 32)
+	local panel = modal("RiftGate", width, EMBER, true, small)
 	gateCard = panel
 	local title = text(panel, "RIFT GATE", if small then 20 else 24, EMBER, IronUi.Heading)
 	title.LayoutOrder = 1
+	local cancel = new("TextButton", {
+		Text = "Not now",
+		TextSize = 13,
+		Font = BOLD,
+		TextColor3 = P.Dim,
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.fromScale(1, 0.5),
+		Size = UDim2.fromOffset(80, 24),
+		TextXAlignment = Enum.TextXAlignment.Right,
+	}, title)
+	cancel.Activated:Connect(function()
+		close(gateCard)
+	end)
+	if info.Element then
+		local which = text(
+			panel,
+			string.upper(string.format("%s  ·  %s Rift", info.Biome or "", GemConfig.elementName(info.Element))),
+			if small then 11 else 12,
+			GemConfig.ElementColors[info.Element] or P.Text,
+			BOLD
+		)
+		which.LayoutOrder = 2
+	end
 	-- (A phone's screen is short: the essentials in a line.)
 	local lines = if small
 		then {
-			string.format("%d caves of critters and fighters, then a boss. Fall and they rob you.", RiftRun.Rooms),
+			string.format("%d caves, then the boss you pick. Fall and they rob you.", RiftRun.Rooms),
 		}
 		else {
-			"Through the tear: the critters' own world, caves under a burning sky.",
-			string.format(
-				"%d caves of brainrot critters and fighters, then one of the big ones on its throne.",
-				RiftRun.Rooms
-			),
-			"Go in with your combat kit and your kaiju. Clear a cave and you each find a gem.",
+			string.format("%d caves of brainrot critters and fighters, then the boss you pick, on its throne.", RiftRun.Rooms),
 			"Knocked out on the way, the critters rob you of what you found in there.",
 		}
 	for i, line in lines do
-		local l = text(panel, line, if i == 1 and not small then 13 else 12, if i == 1 then P.Text else P.Dim)
-		l.LayoutOrder = 1 + i
+		local l = text(panel, line, if small then 12 else 13, if i == 1 then P.Text else P.Dim)
+		l.LayoutOrder = 2 + i
+	end
+	-- The boss: theirs when joining your party's trip, else your pick.
+	local picked = info.Next
+	local cards = {}
+	local warnHolder = nil
+	local function entryOf(id)
+		for _, entry in ladder do
+			if entry.Id == id then
+				return entry
+			end
+		end
+		return nil
+	end
+	local function redraw()
+		local chosen = entryOf(picked)
+		for id, c in cards do
+			local on = id == picked
+			c.Edge.Color = if on then EMBER else P.Dim
+			c.Edge.Thickness = if on then 2.5 else 1
+			c.Edge.Transparency = if on then 0 else 0.55
+			c.Card.BackgroundColor3 = if on then Color3.fromRGB(44, 26, 22) else Color3.fromRGB(20, 16, 20)
+		end
+		if warnHolder then
+			warnHolder:ClearAllChildren()
+			new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, warnHolder)
+			if alone and chosen and chosen.Group then
+				warning(
+					warnHolder,
+					1,
+					small,
+					"BRING FRIENDS",
+					string.format(
+						"%s is built for 2 to 4 of you. You can go in alone, but it won't be easy: invite a friend first.",
+						chosen.Name
+					)
+				)
+			end
+		end
 	end
 	if info.Joining then
-		local l = text(panel, "Your party's on the path in there: you'll join them.", 13, P.Good, BOLD)
-		l.LayoutOrder = 7
-	elseif (info.Party or 1) > 1 then
 		local l = text(
 			panel,
-			string.format("Your party: %d. They can follow you through any gate.", info.Party),
+			string.format("Your party's on the path in there, against %s: you'll join them.", info.Boss or "the boss"),
 			13,
-			P.Teal,
+			P.Good,
 			BOLD
 		)
 		l.LayoutOrder = 7
-	end
-	if alone then
-		warning(panel, 8, small)
+	else
+		if (info.Party or 1) > 1 then
+			local l = text(
+				panel,
+				string.format("Your party: %d. They can follow you through any gate.", info.Party),
+				13,
+				P.Teal,
+				BOLD
+			)
+			l.LayoutOrder = 7
+		end
+		if #ladder > 0 then
+			local head = text(panel, "CHOOSE YOUR BOSS", if small then 11 else 12, P.Gold, BOLD)
+			head.LayoutOrder = 8
+			local gap = if small then 6 else 10
+			local list = new("Frame", {
+				Name = "Ladder",
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, if small then 106 else 214),
+				LayoutOrder = 9,
+			}, panel)
+			new("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				Padding = UDim.new(0, gap),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}, list)
+			for i, entry in ladder do
+				local card, edge = bossCard(list, entry, i, small, function()
+					if not entry.Unlocked then
+						UiKit.toast(string.format("Beat %s first.", entry.Need or "the one before"), P.Bad)
+						return
+					end
+					picked = entry.Id
+					redraw()
+				end)
+				card.Size = UDim2.new(1 / #ladder, -gap * (#ladder - 1) / #ladder, 1, 0)
+				cards[entry.Id] = { Card = card, Edge = edge }
+			end
+		end
+		warnHolder = new("Frame", {
+			Name = "Warnings",
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			LayoutOrder = 10,
+		}, panel)
 	end
 	local tall = if small then 38 else 44
 	local row = new("Frame", {
 		Name = "Buttons",
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, tall),
-		LayoutOrder = 9,
+		LayoutOrder = 11,
 	}, panel)
 	new("UIGridLayout", {
 		CellSize = UDim2.new(0.5, -4, 0, tall),
@@ -389,18 +686,7 @@ function RiftClient.openGate(vein: any)
 	}, row)
 	button(row, "INVITE A FRIEND", P.Teal, 1, invite)
 	local go = button(row, if alone then "ENTER ALONE" else "ENTER", HELL, 2, function() end)
-	local cancel = new("TextButton", {
-		Text = "Not now",
-		TextSize = 13,
-		Font = BOLD,
-		TextColor3 = P.Dim,
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, if small then 18 else 22),
-		LayoutOrder = 10,
-	}, panel)
-	cancel.Activated:Connect(function()
-		close(gateCard)
-	end)
+	redraw()
 	local busy = false
 	go.Activated:Connect(function()
 		if busy then
@@ -409,7 +695,7 @@ function RiftClient.openGate(vein: any)
 		busy = true
 		local clear = crossing(alone)
 		task.wait(0.25)
-		local result = GemClient.request("RiftEnter", vein)
+		local result = GemClient.request("RiftEnter", vein, if info.Joining then nil else picked)
 		if result.Ok then
 			close(gateCard)
 		else
@@ -431,8 +717,8 @@ end
 
 -- The strip ---------------------------------------------------------------------------------------------------
 
--- Its two lines from the Rift attributes: { Room, Left, Boss, Found,
--- Runners, Won, ExitIn (seconds till home, once the boss is down) }.
+-- Its two lines from the Rift attributes: { Room, Left, Boss, BossLevel,
+-- Found, Runners, Won, ExitIn (seconds till home, once the boss is down) }.
 function RiftClient.stripText(state): (string, string)
 	local where
 	if state.Won and state.ExitIn == nil then
@@ -441,6 +727,7 @@ function RiftClient.stripText(state): (string, string)
 		where = string.format("BOSS DOWN  ·  HOME IN %d:%02d", state.ExitIn // 60, state.ExitIn % 60)
 	elseif (state.Room or 1) > RiftRun.Rooms then
 		where = string.format("THRONE CAVE  ·  %s", string.upper(state.Boss or "?"))
+			.. (if state.BossLevel then string.format("  ·  LV %d", state.BossLevel) else "")
 	elseif (state.Left or 0) > 0 then
 		where = string.format(
 			"CAVE %d OF %d  ·  %d FOE%s LEFT",
@@ -462,6 +749,7 @@ local function stateOf()
 		Room = player:GetAttribute("RiftRoom") or 1,
 		Left = player:GetAttribute("RiftLeft") or 0,
 		Boss = player:GetAttribute("RiftBoss"),
+		BossLevel = player:GetAttribute("RiftBossLevel"),
 		Found = player:GetAttribute("RiftFound") or 0,
 		Runners = player:GetAttribute("RiftRunners") or 1,
 		Won = player:GetAttribute("RiftWon") == true,

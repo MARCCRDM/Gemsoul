@@ -79,7 +79,8 @@ squadmate already down doesn't.
   ("Rift Vault · <name>'s <boss> cache"), with your 25% cut, priced like
   the Arena Vault's.
 - **Threat also makes the boss tougher** in the Rift: its health times
-  0.85, 1 or 1.2.
+  0.85, 1 or 1.2, and its level (and its adds') 0, 4 or 8 over the last
+  cave's.
 
 | Threat | Free gems (beyond its own) | Gear: Ultra-Rare / Rare | Gear quality | Boss health |
 | --- | --- | --- | --- | --- |
@@ -87,18 +88,22 @@ squadmate already down doesn't.
 | II | 1 Rare | 2 / 4 | 3 | x1 |
 | III | 1 Ultra-Rare | 3 / 3 | 3 | x1.2 |
 
-| Boss | Element | Threat | Favourite gear |
+| Boss | Element | Threat (its step on its Rift's ladder) | Favourite gear |
 | --- | --- | --- | --- |
-| Gattini Gemellini | Ion | II | Gloves |
-| Bombardiro Drago | Thermal | III | Helmets |
-| Paperotti Gemelli | Cryo | I | Boots |
-| Ranocchio Avocadino | Corrosive | I | Shields |
-| Chimpanzini Bananini | Ion | I | Gloves |
+| Bombardiro Drago | Thermal | I | Helmets |
 | Tung Tung Tung Sahur | Thermal | III | Weapons |
-| Tralalero Tralala | Cryo | II | Boots |
-| Brr Brr Patapim | Corrosive | II | Helmets |
-| Frigo Camelo | Cryo | II | Armors |
+| Paperotti Gemelli | Cryo | I | Boots |
+| Tralalero Tralala | Cryo | II | Shields |
+| Frigo Camelo | Cryo | III | Armors |
+| Chimpanzini Bananini | Ion | I | Boots |
+| Gattini Gemellini | Ion | II | Gloves |
 | Cappuccino Assassino | Ion | III | Weapons |
+| Ranocchio Avocadino | Corrosive | I | Shields |
+| Brr Brr Patapim | Corrosive | III | Helmets |
+
+A boss's threat is its step on its biome's Rift ladder (see
+[rift.md](rift.md#the-ladders)): I is built to beat alone, III for 2 to 4
+of you, and each opens once you've beaten the one before.
 
 The screen is headed **RIFT BOSS DEFEATED · THREAT II** (or **DUNGEON BOSS
 DEFEATED**) over **BOSS CACHE · <the boss>**, with a line in the element's

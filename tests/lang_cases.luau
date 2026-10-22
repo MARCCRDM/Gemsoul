@@ -180,6 +180,39 @@ same(
 	"¡Reclamado! Las otras 3 fueron al Mercado desde la Bóveda de la Grieta: te llevas el 25% de cada venta.",
 	"A boss cache claimed"
 )
+-- The gate's boss ladder: which Rift, each row, the group warning and the unlock.
+same(Lang.translate("ASHFALL  ·  THERMAL RIFT"), "CENIZAL  ·  GRIETA TÉRMICA", "A gate's biome and element")
+same(Lang.translate("CHOOSE YOUR BOSS"), "ELIGE TU JEFE", "The ladder's heading")
+same(Lang.translate("Favours: Helmet  ·  Beaten: 2"), "Favorito: Casco  ·  Vencido: 2", "A ladder row's line")
+same(
+	Lang.translate("Beat Bombardiro Drago to unlock"),
+	"Vence antes a Bombardiro Drago",
+	"A locked row's line"
+)
+same(Lang.translate("BRING FRIENDS"), "TRAE AMIGOS", "The warning for a boss built for 2 to 4")
+same(
+	Lang.translate("THRONE CAVE  ·  TUNG TUNG TUNG SAHUR  ·  LV 14"),
+	"CUEVA DEL TRONO  ·  TUNG TUNG TUNG SAHUR  ·  NV 14",
+	"The strip at the throne, with the boss's level"
+)
+same(Lang.translate("LOCKED"), "BLOQUEADO", "A locked row's tag")
+same(
+	Lang.translate(
+		"Tung Tung Tung Sahur is built for 2 to 4 of you. You can go in alone, but it won't be easy: invite a friend first."
+	),
+	"Tung Tung Tung Sahur está pensado para 2 a 4 jugadores. Puedes entrar solo, pero no será fácil: invita antes a un amigo.",
+	"The group boss warning"
+)
+same(
+	Lang.translate("Unlocked: Tralalero Tralala, next on this Rift's ladder."),
+	"Desbloqueado: Tralalero Tralala, el siguiente en la escala de esta Grieta.",
+	"A ladder unlock"
+)
+same(
+	Lang.translate("Your party's on the path in there, against Frigo Camelo: you'll join them."),
+	"Tu grupo ya está en el camino, contra Frigo Camelo: te unirás a ellos.",
+	"Joining the party's trip"
+)
 -- The roster's 28 kinds: every blurb, move (its name and its words, numbers
 -- and all) and blow comes out in Spanish.
 do

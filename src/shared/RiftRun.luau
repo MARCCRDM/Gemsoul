@@ -13,14 +13,19 @@
 	             the back, Kaiju.wave) and, from cave Elite.From, now and
 	             then a big one among them (Elite), led by the pathway
 	             dungeon's regular fighters (Fighters: armed and armoured
-	             to their gear tier). The pack comes through tears in the
+	             to their gear tier, of the Rift's element). The pack comes through tears in the
 	             cave's floor as you walk in, a tear at a time (Portal:
 	             the critters first, then their leaders). Your kaiju take
 	             the critters; you take the leaders. A wall of fire bars
 	             the way on until the cave's cleared; cleared, everyone in
 	             finds a Cache (a gem, luckier further in).
-	  The boss   one of the ten brainrot bosses (DungeonRules.Bosses) at
-	             random, as a Colossus: the pathway dungeon's boss fighter,
+	  Its boss   picked at the gate from its biome's ladder (Ladders: the
+	             gate's biome's element's bosses, threat I first, built to
+	             beat alone, threat III last, built for 2 to Party runners
+	             but open to one who's been warned: isGroup). Each opens
+	             once the one before it is beaten (canFight: profile
+	             RiftBosses). Its level: bossLevel.
+	  The boss   as a Colossus: the pathway dungeon's boss fighter,
 	             with Boss.Health times its health (more with more
 	             runners, and by its threat: Shared.BossLoot). At each of
 	             Boss.Adds (shares of its health left)
@@ -32,8 +37,9 @@
 	             way home opens (Exit seconds, then through it you go).
 	  Levels     the critters come at the runners' kaiju's level (the
 	             average of their leads), Level.Base over it in the first
-	             cave and PerRoom more each cave; the boss's critters
-	             Level.Boss over the last cave's.
+	             cave and PerRoom more each cave; the boss and its adds
+	             at the boss's level (bossLevel: the last cave's, and
+	             Level.Threat more by its threat).
 	  Healing    each cave (the throne cave too) has Heal.PerCave healing
 	             crystals by its walls: green rocks you mine with your pick
 	             (1 swaps your kit for it) for health, never gems. Each
@@ -69,7 +75,7 @@ RiftRun.Foes = { 3, 4, 4, 5 }
 RiftRun.PerRunner = 1
 RiftRun.Elite = { From = 2, Chance = 0.6, Scale = 1, Health = 4, Damage = 1.5, Reach = 1.6 }
 RiftRun.Fighters = { Count = { 1, 1, 2, 2 }, PerRunner = 0.5, Tier = { 1, 2, 2, 3 }, Health = 1.5 }
-RiftRun.Level = { Base = 2, PerRoom = 1, Boss = 3, Max = 30 }
+RiftRun.Level = { Base = 2, PerRoom = 1, Boss = 3, Max = 30, Threat = { 0, 4, 8 } }
 RiftRun.Boss = {
 	Health = 1.8,
 	PerRunner = 0.5,
@@ -132,9 +138,19 @@ function RiftRun.pickFoes(room: number, runners: number, rng): { { Critter: stri
 end
 
 -- Cave `room`'s fighters: one of the pathway dungeon's roster (its element
--- and moves: DungeonRules.Roster) for the whole cave.
-function RiftRun.pickFighters(room: number, runners: number, rng): { any }
-	local spec = DungeonRules.Roster[rng:NextInteger(1, #DungeonRules.Roster)]
+-- and moves: DungeonRules.Roster) for the whole cave; of `element` when
+-- given (the Rift's own).
+function RiftRun.pickFighters(room: number, runners: number, rng, element: string?): { any }
+	local pool = {}
+	for _, entry in DungeonRules.Roster do
+		if element == nil or entry.Element == element then
+			table.insert(pool, entry)
+		end
+	end
+	if #pool == 0 then
+		pool = DungeonRules.Roster
+	end
+	local spec = pool[rng:NextInteger(1, #pool)]
 	local list = {}
 	for _ = 1, RiftRun.fighterCount(room, runners) do
 		table.insert(list, spec)
@@ -220,6 +236,79 @@ end
 -- One of the ten brainrot bosses, at random.
 function RiftRun.pickBoss(rng)
 	return DungeonRules.Bosses[rng:NextInteger(1, #DungeonRules.Bosses)]
+end
+
+-- Each biome's Rift (by its element): its bosses in order, as
+-- DungeonRules.Bosses ids. The first is built to beat alone, the last
+-- (threat III) for a group; each opens once the one before it is beaten.
+RiftRun.Ladders = {
+	Fire = { "Drago", "SahurTrio" },
+	Frost = { "Paperotti", "TralaleroTwin", "Frigo" },
+	Shock = { "Chimpanzini", "Gattini", "Cappuccino" },
+	Poison = { "Ranocchio", "PatapimTrio" },
+}
+-- From this threat on a boss is built for 2 to Party runners.
+RiftRun.GroupThreat = 3
+
+function RiftRun.bossById(id: any)
+	for _, boss in DungeonRules.Bosses do
+		if boss.Id == id then
+			return boss
+		end
+	end
+	return nil
+end
+
+-- `element`'s ladder: its bosses (DungeonRules.Bosses entries), in order.
+function RiftRun.ladder(element: string?): { any }
+	local list = {}
+	for _, id in RiftRun.Ladders[element or ""] or {} do
+		table.insert(list, RiftRun.bossById(id))
+	end
+	return list
+end
+
+-- A group boss: built for 2 to Party runners (GroupThreat and up).
+function RiftRun.isGroup(boss): boolean
+	return BossLoot.threat(boss) >= RiftRun.GroupThreat
+end
+
+-- `boss`'s level (its adds' too) on a trip of runners whose lead kaiju are
+-- at `levels`: the last cave's, and Level.Threat more by its threat.
+function RiftRun.bossLevel(levels: { number }, boss): number
+	local rule = RiftRun.Level
+	local extra = rule.Threat[BossLoot.threat(boss)] or 0
+	return math.clamp(RiftRun.level(levels, RiftRun.Rooms) + extra, 1, rule.Max)
+end
+
+-- Whether boss `id` may be picked at `element`'s gate by someone who's
+-- beaten the bosses in `beaten` ({ [id] = times }): it's on that ladder and
+-- it's the first or the one before it is beaten. Else the reason, and the
+-- boss still to beat.
+function RiftRun.canFight(element: string?, id: any, beaten: { [string]: number }?): (boolean, string?, any?)
+	local ladder = RiftRun.ladder(element)
+	for i, boss in ladder do
+		if boss.Id == id then
+			local before = ladder[i - 1]
+			if before and not (beaten and (beaten[before.Id] or 0) > 0) then
+				return false, string.format("Beat %s first.", before.Name), before
+			end
+			return true
+		end
+	end
+	return false, "That boss isn't behind this gate."
+end
+
+-- The boss a gate offers first: the first on the ladder not yet beaten
+-- that's open, or (all beaten) the last.
+function RiftRun.nextBoss(element: string?, beaten: { [string]: number }?)
+	local ladder = RiftRun.ladder(element)
+	for _, boss in ladder do
+		if not (beaten and (beaten[boss.Id] or 0) > 0) then
+			return boss
+		end
+	end
+	return ladder[#ladder]
 end
 
 -- The boss's health, times a Colossus's, for `runners` runners (and by

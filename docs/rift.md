@@ -6,8 +6,8 @@ and you can go through, into the critters' own world: a walled pathway of
 caves open to a burning sky. You go in with your combat kit out and your
 kaiju beside you, fight your way through cave by cave against brainrot
 critters and the pathway dungeon's fighters that lead them, every one of
-them tearing through the floor at you, then face one of the ten
-brainrot bosses, picked at random, as a Colossus on its throne.
+them tearing through the floor at you, then face the boss you picked
+at the gate, as a Colossus on its throne.
 
 It's built for a party. You can go in alone, but the game warns you first.
 
@@ -33,19 +33,34 @@ shots are the real client code rendered by the UI harness.
   `Heart`, `PromptKind` "Rift", attribute `Vein` = the vein's index).
 - **The card** (`RiftClient`), before you go in:
 
-![The gate's card, alone](rift/gate-card.png)
+![The gate's card, alone: the Rimefrost ladder, its third boss locked](rift/gate-card.png)
 
-  - what's through it (the caves, the boss, your combat kit, robbery if
-    you fall);
-  - when you're alone, a warning box with the warning sign: **GOING ALONE
-    IS VERY DIFFICULT**. "Invite a friend, or bring your party: up to 4
-    can go in together." Then **INVITE A FRIEND** (the invite window) and
-    **ENTER ALONE**;
+  - which Rift it is: the gate's biome and its element (**RIMEFROST · CRYO
+    RIFT**), in the element's colour;
+  - what's through it (the caves, the boss you pick, robbery if you fall);
+  - **CHOOSE YOUR BOSS**: the biome's ladder as a row of cards (see
+    [The ladders](#the-ladders)). Each card has the boss's portrait (its
+    real body, built once by the server into
+    `ReplicatedStorage.RiftPortraits` and shown in a `ViewportFrame` from
+    the front quarter), its threat as pips (green, amber, red), its
+    **level** (`LV 13`), its name, its favourite gear and how often you've
+    beaten it. A locked boss is a dark silhouette marked **LOCKED**, with
+    "Beat Tralalero Tralala to unlock". The card opens on the first boss
+    you haven't beaten (`RiftRun.nextBoss`); click another to pick it. A
+    locked one just says what opens it;
+  - alone against a boss built for 2 to 4 (threat III), a warning box with
+    the warning sign: **BRING FRIENDS**. "Frigo Camelo is built for 2 to 4
+    of you. You can go in alone, but it won't be easy: invite a friend
+    first." You can still go;
   - with a party, how many of you there are and **ENTER**; if your party is
-    already in there on the way, you join them;
-  - **Not now**.
+    already in there on the way, you join them, against their boss (no
+    ladder then);
+  - **INVITE A FRIEND** (the invite window) and **ENTER** (**ENTER ALONE**
+    alone); **Not now** sits by the title.
 
-  On phones it's a compact two-column card:
+  ![Alone, picking the top of the ladder: BRING FRIENDS](rift/gate-card-group.png)
+
+  On phones the cards are shorter and the text is one line:
 
   ![The gate's card on a phone](rift/gate-card-phone.png)
 
@@ -53,6 +68,39 @@ shots are the real client code rendered by the UI harness.
   (and the warning again if you're alone), then the lighting turns hellish
   (`RiftClient.Hell`: a low red evening, thick red haze, no stars). Coming
   home puts the Outpost's lighting back.
+
+## The ladders
+
+Each biome's gate opens on a Rift of its element, and each Rift has its
+own bosses, in order (`RiftRun.Ladders`). The first is built to beat
+alone; the last (threat III) is built for 2 to 4 of you. Each opens once
+you've beaten the one before it.
+
+| Biome | Its Rift | The ladder (threat, favourite gear) |
+|---|---|---|
+| Ashfall | Thermal | Bombardiro Drago (I, Helmets) → Tung Tung Tung Sahur (III, Weapons) |
+| Rimefrost | Cryo | Paperotti Gemelli (I, Boots) → Tralalero Tralala (II, Shields) → Frigo Camelo (III, Chest Suits) |
+| Stormglass | Ion | Chimpanzini Bananini (I, Boots) → Gattini Gemellini (II, Gloves) → Cappuccino Assassino (III, Weapons) |
+| Blightwood | Corrosive | Ranocchio Avocadino (I, Shields) → Brr Brr Patapim (III, Helmets) |
+
+- **The threat** sets the boss's level (+0, +4, +8 over the last cave's),
+  its health (0.85x, 1x, 1.2x) and its cache (see
+  [arena-streaks.md](arena-streaks.md#boss-caches)). With your lead kaiju
+  at level 10 the last cave is level 15, so a ladder reads LV 15, LV 19,
+  LV 23.
+- **Unlocking**: a win counts for everyone still in, joiners too
+  (`profile.RiftBosses`, `{ [bossId] = wins }`, saved with the profile).
+  The first win over a boss tells you what it opened: "Unlocked:
+  Tralalero Tralala, next on this Rift's ladder."
+- **Going in** (`RiftEnter`, vein, boss id): the server checks the pick
+  (`RiftRun.canFight`). A locked boss: "Beat Paperotti Gemelli first." A
+  boss from another biome's ladder: "That boss isn't behind this gate." No
+  pick: the next boss you haven't beaten.
+- **Alone at threat III** you're let in, and told: "You're in the Rift
+  alone, against Frigo Camelo: it's built for 2 to 4 of you. Bring friends
+  if you can."
+- **Its fighters** (the caves' leaders and the boss's adds) are of the
+  Rift's element (`RiftRun.pickFighters`).
 
 ## The way
 
@@ -86,9 +134,9 @@ The rules are `Shared.RiftRun`; the server is `Server.RiftServer`.
 | **Critters** | 3, 4, 4, 5 in caves 1 to 4 (never fewer than a team of three kaiju), plus 1 for each runner past the first. Brainrot critters from the Outpost's roster; a ranged one only at the back |
 | **Big ones** | From cave 2, a 60% chance that one of the critters is a **Rift Brute**: 4x health, 1.5x damage, longer reach |
 | **Fighters** | The pathway dungeon's regular fighters lead each pack (`Duelist.spawnDungeon`; `RiftLeader` on their models): 1, 1, 2, 2 in caves 1 to 4, plus one for every two runners past the first, armed and armoured to gear tier 1, 2, 2, 3, each with 1.5x a room fighter's health. One of the dungeon's roster per cave, with its element and moves. Anyone in the trip can hit them and be hit by them, kaiju too |
-| **Level** | The critters come at your team's level (the average of the runners' lead kaiju), +2 in cave 1, +1 more per cave; the boss's critters +3 over the last cave's. Capped at 30 |
+| **Level** | The critters come at your team's level (the average of the runners' lead kaiju), +2 in cave 1, +1 more per cave. The boss's level is the last cave's, +0, +4 or +8 by its threat (I, II, III: `RiftRun.bossLevel`), and its adds come at it. The gate shows it, worked out from your party's lead kaiju, and so does the strip at the throne (**THRONE CAVE · FRIGO CAMELO · LV 17**). Capped at 30 |
 | **Caches** | Clear a cave (critters and fighters) and everyone in finds a gem (`RiftCache`, "Found in the Rift"), 12% luckier in cave 1 and 6% more each cave |
-| **The boss** | One of the ten brainrot bosses at random, as the pathway dungeon's **Colossus**: its boss fighter with every one of its moves, gear tier 4 alone or 4 to 5 in a party, and 1.8x a Colossus's health (+50% per extra runner), times its threat's (0.85x, 1x, 1.2x for threat I, II, III: `Shared.BossLoot`). It tears through (a 16-stud tear) when the first runner reaches the throne cave; it's its cave's leader. At 66% and 33% health it calls 3 critters and a tier-3 fighter through, each through a tear of its own |
+| **The boss** | The one you picked at the gate, from its biome's ladder, as the pathway dungeon's **Colossus**: its boss fighter with every one of its moves, gear tier 4 alone or 4 to 5 in a party, and 1.8x a Colossus's health (+50% per extra runner), times its threat's (0.85x, 1x, 1.2x for threat I, II, III: `Shared.BossLoot`). It tears through (a 16-stud tear) when the first runner reaches the throne cave; it's its cave's leader. At 66% and 33% health it calls 3 critters and a tier-3 fighter through, each through a tear of its own |
 | **Beaten** | Everyone still in: 300 coins + 40 per cave, a lucky cache, 120 EXP for their kaiju, and swings back on their pick (the dungeon restore). Anyone down gets up. The way home opens and everyone gets a **boss cache** |
 | **Its loot** | A boss cache each, no sharing and no rolling against each other: the Arena Cache's roll and pick (see [arena-streaks.md](arena-streaks.md#boss-caches)), headed **RIFT BOSS DEFEATED · THREAT II** and the boss's name. Inside: the boss's gem, free (its element, Tier 4 / Rank III, Ultra Rare from a tier-4 boss and Legendary from a tier-5 one), its threat's free gems of its element, and six pieces of gear to keep three of, two of them the boss's favourite kind. The other three go up on the Market from the **Rift Vault**, with your 25% cut. It opens a few seconds after the kill; LATER keeps it for whenever you like (the **BOSS CACHE READY** button) |
 | **Home** | 20 seconds after the kill, everyone still in is home |
@@ -229,7 +277,7 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 | `src/server/Systems/KaijuWilds.luau` | `spawnBug` options for the Rift's critters (`Scale`, `Health`, `Damage`, `Reach`, `Title`, `Stay`, `Wander`) |
 
 A runner carries `RiftRun`, `RiftRoom`, `RiftLeft`, `RiftBoss`,
-`RiftFound`, `RiftRunners`, `RiftWon`, `RiftExitAt`; when down at the boss
+`RiftBossLevel`, `RiftFound`, `RiftRunners`, `RiftWon`, `RiftExitAt`; when down at the boss
 `RiftFallen` and `RiftRestore`. A boss cache is saved with the player's
 Arena Caches (`profile.Duel.StreakCaches`, `Kind = "Boss"`).
 
@@ -243,9 +291,10 @@ Boss and move names stay in English (they're names).
 
 | Suite | What it checks |
 | --- | --- |
-| `run_rift` | 33,283 checks: pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (802). And nothing else starts for a runner |
-| `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (the boss's gem in it, Legendary from a tier-5 boss; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The fighters are stand-ins here: the real Duelist isn't loaded |
+| `run_rift` | 33,462 checks: the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (802). And nothing else starts for a runner |
+| `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (the boss's gem in it, Legendary from a tier-5 boss; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The ladder: the gate's peek (its biome's element, the ladder, the next boss, each boss's level at your kaiju's and rising, locks, a portrait each), a locked boss, an unknown one and another biome's refused, the gate's first boss and its element's fighters, a joiner seeing the party's boss, a win tallied for everyone and the next boss unlocked and offered, the top boss alone allowed and warned. The fighters are stand-ins here: the real Duelist isn't loaded |
 | `run_target_lock` | Your lock takes a pack's leader over nearer critters and those attacking you, holds it against them, takes it back from a critter, but not hidden or out of range; a target you pick still holds |
 | `run_spar` | Going into the Rift ends a spar, the kit stays out in there and can't be put away, nobody spars with a runner, and the kit goes away at home |
 | `run_outpost` | Each vein has its gate, prompt, arch, glow, cracks in its colour and its index |
+| `run_lang` | The gate in Spanish: its biome and element, the ladder's heading and lines, a locked card, BRING FRIENDS and its warning, an unlock, joining your party, the strip's level |
 | `run_topbar` | The crossing is a cover; the card, strip and down window keep clear of Roblox's buttons |
