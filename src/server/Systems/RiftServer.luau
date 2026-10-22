@@ -43,17 +43,18 @@
 	              chosen in RiftRun.Fallen seconds, home you go.
 	  The boss    one of the ten brainrot bosses at random, as the pathway
 	              dungeon's Colossus (a Duelist fighter with its every move,
-	              RiftRun.bossHealth times tougher, its cave's leader): it
-	              tears through in the throne cave once one of you sets foot
-	              there, and calls critters and a fighter through tears of
-	              their own at each of RiftRun.Boss.Adds. Beaten: everyone still in gets
+	              RiftRun.bossHealth times tougher, by its threat too, its
+	              cave's leader): it tears through in the throne cave once
+	              one of you sets foot there, and calls critters and a
+	              fighter through tears of their own at each of
+	              RiftRun.Boss.Adds. Beaten: everyone still in gets
 	              RiftRun.rewardCoins, a lucky cache, EXP for their kaiju
 	              and swings back on their pick (SwingRestore.Dungeon); the
-	              fallen are back up; the way home opens, and its loot comes
-	              up: claim, roll or pass ("RiftLootChoice", the pathway
-	              dungeon's card: DungeonLoot), a fair roll for its gem
-	              (Dungeons.bossGem). RiftRun.Exit seconds after that's
-	              settled, everyone's home.
+	              fallen are back up; the way home opens, and everyone in
+	              gets a boss cache of their own (ArenaStreaks.bossCache:
+	              its gem, Dungeons.bossGem, and six pieces of gear to keep
+	              three of, Shared.BossLoot). RiftRun.Exit seconds on,
+	              everyone's home.
 	  Leaving     "RiftLeave": through a way home you're at (the landing's,
 	              or the throne cave's once it's open), keeping what you found.
 	  The gate    "RiftPeek": what going in looks like (the gate's card):
@@ -94,6 +95,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local RiftWorld = require(script.Parent.Parent.World.RiftWorld)
+local ArenaStreaks = require(script.Parent.ArenaStreaks)
 local Duelist = require(script.Parent.Duelist)
 local Dungeons = require(script.Parent.Dungeons)
 local Enemies = require(script.Parent.Enemies)
@@ -181,9 +183,6 @@ local CLEAR = {
 	"RiftExitAt",
 	"RiftFallen",
 	"RiftRestore",
-	"DungeonLoot",
-	"DungeonLootDeadline",
-	"DungeonLootTitle",
 }
 
 -- The trip's over: what's left of it goes.
@@ -493,7 +492,7 @@ local function summonBoss(run)
 			return
 		end
 		run.BossTier = RiftRun.bossTier(#run.Members, run.Rng)
-		local boss = spawnFighter(run, at, run.Boss, run.BossTier, true, RiftRun.bossHealth(#run.Members))
+		local boss = spawnFighter(run, at, run.Boss, run.BossTier, true, RiftRun.bossHealth(#run.Members, run.Boss))
 		if not boss then
 			-- (It couldn't come through: rather than a trip stuck for good, it's won.)
 			warn("[Rift] the boss couldn't come through")
@@ -572,124 +571,18 @@ local function cleared(run, room: number)
 	show(run)
 end
 
-local LOOT = { "DungeonLoot", "DungeonLootDeadline", "DungeonLootTitle" }
-
--- The boss's loot is settled (everyone chose, or the time's up): a fair roll
--- among those who claimed or rolled, the gem to the highest (Dungeons.bossGem,
--- as the pathway dungeon's), and the way home's clock starts.
-local function resolveLoot(run)
-	local loot = run.Loot
-	if not loot or loot.Resolved or run.Done then
-		return
+-- The boss's loot: everyone still in gets a boss cache of their own
+-- (Systems/ArenaStreaks.bossCache, Shared.BossLoot): its gem (Dungeons.
+-- bossGem, as the pathway dungeon's) and six pieces of gear to keep three
+-- of, opened whenever they like.
+local function bossLoot(run)
+	for _, player in run.Members do
+		ArenaStreaks.bossCache(player, run.Boss, Dungeons.bossGem(run.Boss.Element, run.BossTier or 4), "Rift")
 	end
-	loot.Resolved = true
-	local contenders = {}
-	for _, player in loot.Eligible do
-		if player.Parent and runOf[player] == run and loot.Choices[player] and loot.Choices[player] ~= "Pass" then
-			table.insert(contenders, player)
-		end
-	end
-	local winner, best, rolls, tied = nil, -1, {}, {}
-	for _, player in contenders do
-		local roll = run.Rng:NextInteger(1, 100)
-		table.insert(rolls, player.DisplayName .. " " .. roll)
-		if roll > best then
-			best, tied = roll, { player }
-		elseif roll == best then
-			table.insert(tied, player)
-		end
-	end
-	if #tied > 0 then
-		winner = tied[run.Rng:NextInteger(1, #tied)]
-	end
-	if winner then
-		local gem = Dungeons.bossGem(loot.Element, loot.Tier)
-		if PlayerData.addGem(winner, gem) then
-			run.Found[winner] = run.Found[winner] or {}
-			table.insert(run.Found[winner], gem.Id)
-		else
-			PlayerData.addCoins(winner, 500)
-			notify(winner, "Gem pouch full: boss gem converted to 500 coins.")
-		end
-	end
-	announce(
-		run,
-		if winner
-			then string.format(
-				"RIFT LOOT: %s wins the %s gem. %s",
-				winner.DisplayName,
-				GemConfig.elementName(loot.Element),
-				table.concat(rolls, " · ")
-			)
-			else "The boss's gem was passed."
-	)
-	for _, player in loot.Eligible do
-		if player.Parent then
-			for _, key in LOOT do
-				player:SetAttribute(key, nil)
-			end
-		end
-	end
-	run.ExitAt = os.clock() + RiftRun.Exit
-	run.ExitServer = serverNow() + RiftRun.Exit
-	show(run)
 end
 
--- The boss's loot comes up for everyone still in: claim, roll or pass
--- (the pathway dungeon's card, Client DungeonLoot), RiftRun.Loot.Seconds.
-local function beginLoot(run)
-	local eligible = table.clone(run.Members)
-	local tier = run.BossTier or 4
-	run.Loot = {
-		Eligible = eligible,
-		Choices = {},
-		Tier = tier,
-		Element = run.Boss.Element,
-		Deadline = os.clock() + RiftRun.Loot.Seconds,
-	}
-	local label = string.format(
-		"%s %s Gem  ·  Tier 4 / Rank III",
-		if tier == 5 then "Legendary" else "Ultra Rare",
-		GemConfig.elementName(run.Boss.Element)
-	)
-	for _, player in eligible do
-		player:SetAttribute("DungeonLootTitle", "RIFT BOSS DEFEATED")
-		player:SetAttribute("DungeonLootDeadline", serverNow() + RiftRun.Loot.Seconds)
-		player:SetAttribute("DungeonLoot", label)
-	end
-	task.delay(RiftRun.Loot.Seconds, function()
-		resolveLoot(run)
-	end)
-end
-
--- "RiftLootChoice": claim, roll or pass on the boss's gem.
-local function lootChoice(player: Player, choice: any)
-	local run = runOf[player]
-	local loot = run and run.Loot
-	if not loot or loot.Resolved or not table.find(loot.Eligible, player) then
-		return reply(false, "No boss loot to choose.")
-	end
-	if choice ~= "Claim" and choice ~= "Roll" and choice ~= "Pass" then
-		return reply(false, "Choose Claim, Roll or Pass.")
-	end
-	if loot.Choices[player] then
-		return reply(false, "Your choice is already locked.")
-	end
-	loot.Choices[player] = choice
-	local all = true
-	for _, other in loot.Eligible do
-		if other.Parent and runOf[other] == run and not loot.Choices[other] then
-			all = false
-		end
-	end
-	if all then
-		resolveLoot(run)
-	end
-	return reply(true, "Choice locked: " .. choice)
-end
-
--- The boss is down: the trip's won. Its loot comes up, and the way home
--- opens (and takes everyone RiftRun.Exit seconds after the loot's settled).
+-- The boss is down: the trip's won. Its loot's in everyone's caches, and
+-- the way home opens (and takes everyone RiftRun.Exit seconds on).
 victory = function(run)
 	if run.Won then
 		return
@@ -721,7 +614,9 @@ victory = function(run)
 		)
 	end
 	RiftWorld.openHome(run.World)
-	beginLoot(run)
+	bossLoot(run)
+	run.ExitAt = os.clock() + RiftRun.Exit
+	run.ExitServer = serverNow() + RiftRun.Exit
 	show(run)
 end
 
@@ -1366,7 +1261,6 @@ function RiftServer.start(outpost)
 	Shop.register("RiftLeave", leave)
 	Shop.register("RiftChoice", choose)
 	Shop.register("RiftPeek", peek)
-	Shop.register("RiftLootChoice", lootChoice)
 	Shop.register("RiftMine", healMine)
 	Players.PlayerRemoving:Connect(function(player)
 		if runOf[player] then
@@ -1389,7 +1283,7 @@ end
 -- For tests.
 RiftServer._runs, RiftServer._step, RiftServer._enter = runs, step, enter
 RiftServer._leave, RiftServer._choose, RiftServer._finish = leave, choose, finish
-RiftServer._peek, RiftServer._lootChoice = peek, lootChoice
+RiftServer._peek = peek
 function RiftServer._setSite(outpost)
 	site = outpost
 end

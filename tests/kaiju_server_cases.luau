@@ -5005,7 +5005,15 @@ end)()
 		profiles[player].Coins -= amount
 		return true
 	end
-	-- (A pouch with room for the boss's gem.)
+	-- The boss's caches (ArenaStreaks.bossCache), one for each still in.
+	local bossCaches = {}
+	server.ArenaStreaks = {
+		bossCache = function(player, boss, gem, source)
+			table.insert(bossCaches, { Player = player, Boss = boss, Gem = gem, Source = source })
+			return {}
+		end,
+	}
+	-- (A pouch with room for what you find.)
 	local smallPouch = PlayerData.addGem
 	PlayerData.addGem = function(player, gem)
 		table.insert(profiles[player].Gems, gem)
@@ -5015,9 +5023,10 @@ end)()
 	local RiftServer = serverModule("RiftServer")
 	local site = { Spawn = CFrame.new(outpost + Vector3.new(0, 3, 0)) }
 	RiftServer.start(site)
-	for _, name in { "RiftEnter", "RiftLeave", "RiftChoice", "RiftPeek", "RiftLootChoice" } do
+	for _, name in { "RiftEnter", "RiftLeave", "RiftChoice", "RiftPeek" } do
 		check(registered[name] ~= nil, name .. " isn't a request")
 	end
+	check(registered.RiftLootChoice == nil, "The old claim/roll/pass is still a request")
 	local gate = make("Part", { CFrame = CFrame.new(outpost + Vector3.new(420, 5, 0)) })
 	RiftServer.gateAt = function(index)
 		return if index == 2 then gate else nil
@@ -5322,7 +5331,7 @@ end)()
 	local summoned = fighters[#fighters].Encounter
 	check(table.find(DungeonRules.Bosses, run.Boss) and summoned.Spec == run.Boss, "The boss isn't one of the brainrot bosses")
 	check(summoned.Boss == true and summoned.Rift == true, "The boss isn't a Colossus")
-	check(summoned.GearTier == 4 and summoned.HealthScale == RiftRun.bossHealth(1), "The boss's gear or health, alone")
+	check(summoned.GearTier == 4 and summoned.HealthScale == RiftRun.bossHealth(1, run.Boss), "The boss's gear or health, alone")
 	check(#run.Boss.Moves >= 3, "The boss has no moves of its own")
 	check(run.Foes[boss] == nil, "The boss counted among its cave's foes")
 	check(boss.Model:GetAttribute("RiftLeader") == true, "The boss isn't its cave's leader")
@@ -5381,48 +5390,57 @@ end)()
 	world = built[#built]
 	check(world ~= built[1] and run.Id ~= nil and RiftServer.runOf(b) == run, "Not a new trip, together")
 	throughToBoss()
-	check(fighters[#fighters].Encounter.HealthScale == RiftRun.bossHealth(2), "The boss isn't tougher for two")
+	check(fighters[#fighters].Encounter.HealthScale == RiftRun.bossHealth(2, run.Boss), "The boss isn't tougher for two")
 	check(RiftRun.bossHealth(2) > RiftRun.bossHealth(1), "The boss's health doesn't grow with the party")
+	do
+		-- (Its threat makes it tougher too: Shared.BossLoot.)
+		local strong, weak
+		for _, spec in DungeonRules.Bosses do
+			if spec.Threat == 3 then
+				strong = spec
+			elseif spec.Threat == 1 then
+				weak = spec
+			end
+		end
+		check(
+			RiftRun.bossHealth(1, strong) > RiftRun.bossHealth(1) and RiftRun.bossHealth(1, weak) < RiftRun.bossHealth(1),
+			"A boss's threat doesn't set its health"
+		)
+	end
 	local coins = profiles[a].Coins
 	local found = #profiles[a].Gems
+	local cachesBefore = #bossCaches
 	Enemies.damage(run.BossEnemy, 1e9, a)
 	check(run.Won and a:GetAttribute("RiftWon") == true and homesOpened >= 1, "Beating the boss didn't win the trip")
 	check(profiles[a].Coins == coins + RiftRun.rewardCoins(RiftRun.Rooms) and #profiles[a].Gems == found + 1, "Not paid for the boss")
 	check(restored[a] and noted(a, "is beaten!"), "No swings back or word of the win")
-	for _, p in { a, b } do
-		local label = p:GetAttribute("DungeonLoot")
-		check(type(label) == "string" and string.find(label, "Tier 4 / Rank III", 1, true) ~= nil, "No boss loot card")
-		check(string.find(label, shared("GemConfig").elementName(run.Boss.Element), 1, true) ~= nil, "The loot isn't of the boss's element")
-		check(p:GetAttribute("DungeonLootTitle") == "RIFT BOSS DEFEATED", "The loot card isn't the Rift's")
-		check(p:GetAttribute("DungeonLootDeadline") > now, "The loot card has no clock")
+	-- A boss cache each (no claim, roll or pass): its gem, of its element,
+	-- Legendary from a tier-5 boss.
+	do
+		check(#bossCaches == cachesBefore + 2, "Not a boss cache each")
+		local got = {}
+		for i = cachesBefore + 1, #bossCaches do
+			local c = bossCaches[i]
+			got[c.Player] = true
+			check(c.Boss == run.Boss and c.Source == "Rift", "A boss cache that isn't this boss's")
+			check(c.Gem.Element == run.Boss.Element and c.Gem.Source == "PvEDrop", "Not the boss's gem in its cache")
+			check(c.Gem.Tier == (if run.BossTier == 5 then "Legendary" else "UltraRare"), "The boss's gem at the wrong rarity")
+		end
+		check(got[a] and got[b], "Someone in got no boss cache")
+		check(a:GetAttribute("DungeonLoot") == nil, "The old loot card came up")
 	end
-	-- (Not sent home while the loot's still up.)
-	now += RiftRun.Exit + 1
+	-- The way home's clock starts at once.
+	check(run.ExitAt ~= nil and a:GetAttribute("RiftExitAt") ~= nil, "No clock home after the win")
+	now += RiftRun.Exit - 1
 	RiftServer._step(now)
-	check(a:GetAttribute("RiftRun") == run.Id and run.ExitAt == nil, "Sent home before the loot was settled")
+	check(a:GetAttribute("RiftRun") == run.Id, "Sent home before the clock ran out")
 	-- (Far from a way home, you can't just leave; at it, you can.)
 	check(not registered.RiftLeave(a).Ok, "Left the Rift from the middle of a cave")
-	-- Claim, roll or pass: only those, once each; all chosen, the roll's settled.
-	check(not registered.RiftLootChoice(a, "Grab").Ok, "A loot choice that isn't one")
-	check(registered.RiftLootChoice(a, "Claim").Ok, "Couldn't claim the boss's gem")
-	check(not registered.RiftLootChoice(a, "Pass").Ok, "Chose twice")
-	check(a:GetAttribute("DungeonLoot") ~= nil and run.ExitAt == nil, "Settled before everyone chose")
-	local gemsA, gemsB = #profiles[a].Gems, #profiles[b].Gems
-	check(registered.RiftLootChoice(b, "Pass").Ok, "Couldn't pass")
-	check(run.Loot.Resolved and run.ExitAt ~= nil, "Not settled once everyone chose")
-	check(#profiles[a].Gems == gemsA + 1 and #profiles[b].Gems == gemsB, "The gem didn't go to the one who claimed it")
-	local prize = profiles[a].Gems[#profiles[a].Gems]
-	check(prize.Source == "PvEDrop" and prize.Element == run.Boss.Element, "Not the boss's gem")
-	check(prize.Tier == (if run.Loot.Tier == 5 then "Legendary" else "UltraRare"), "The boss's gem at the wrong rarity")
-	check(noted(a, "RIFT LOOT: ") and noted(b, "RIFT LOOT: "), "Nobody told who won the gem")
-	check(a:GetAttribute("DungeonLoot") == nil and b:GetAttribute("DungeonLootDeadline") == nil, "The loot card stayed up")
-	check(not registered.RiftLootChoice(a, "Roll").Ok, "Chose after it was settled")
-	now += RiftRun.Exit + 1
+	now += 2
 	RiftServer._step(now)
 	check(a:GetAttribute("RiftRun") == nil and b:GetAttribute("RiftRun") == nil and run.Done, "Not sent home after the win")
 	check(kit[a] == false and kit[b] == false, "Still in their kit after the win")
-	-- Nobody chooses: when its time's up, it's settled anyway; everyone
-	-- passes: nobody gets it.
+	-- Alone: a boss cache all the same, then home.
 	parties[a], parties[b] = nil, nil
 	now += 1
 	rootA.CFrame = CFrame.new(gate.Position)
@@ -5430,16 +5448,12 @@ end)()
 	run = RiftServer.runOf(a)
 	world = built[#built]
 	throughToBoss()
-	local gems = #profiles[a].Gems
+	local before = #bossCaches
 	Enemies.damage(run.BossEnemy, 1e9, a)
-	check(a:GetAttribute("DungeonLoot") ~= nil and not run.Loot.Resolved, "No loot for one alone")
-	now += RiftRun.Loot.Seconds + 0.1
-	runDelayed()
-	check(run.Loot.Resolved and run.ExitAt ~= nil and #profiles[a].Gems == gems + 1, "Not settled when the time ran out")
-	check(noted(a, "The boss's gem was passed."), "Not told nobody took it")
+	check(#bossCaches == before + 1 and bossCaches[#bossCaches].Player == a, "No boss cache alone")
 	now += RiftRun.Exit + 1
 	RiftServer._step(now)
-	check(a:GetAttribute("RiftRun") == nil and a:GetAttribute("DungeonLootTitle") == nil, "Not home, or the loot card left behind")
+	check(a:GetAttribute("RiftRun") == nil and a:GetAttribute("RiftExitAt") == nil, "Not home, or the clock left behind")
 	-- Leaving through the landing's way home.
 	now += 1
 	rootA.CFrame = CFrame.new(gate.Position)

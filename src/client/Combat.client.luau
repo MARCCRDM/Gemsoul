@@ -1399,7 +1399,10 @@ RunService.RenderStepped:Connect(function(dt)
 		return
 	end
 	FirstPerson.start()
-	local guideOpen = CombatGuide.isOpen() or AugmentTreeUI.isOpen() or player:GetAttribute("DungeonLoot") ~= nil
+	-- (a cache's board, a boss's in the Rift, needs the cursor too)
+	local guideOpen = CombatGuide.isOpen()
+		or AugmentTreeUI.isOpen()
+		or require(script.Parent.Modules.StreakRewards).isOpen()
 	if guideOpen ~= guideWasOpen then
 		cursorFree = guideOpen
 		FirstPerson.setCursorFree(cursorFree)

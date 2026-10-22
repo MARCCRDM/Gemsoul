@@ -113,6 +113,9 @@ World.buildOpen=function(id,rooms,origin)
  return world
 end
 local awarded={}
+-- Boss caches handed out (Systems/ArenaStreaks.bossCache).
+local bossCaches={}
+local ArenaStreaks={bossCache=function(p,boss,gem,source) table.insert(bossCaches,{Player=p,Boss=boss,Gem=gem,Source=source});return {} end}
 PlayerData.newGemId=function() serial+=1;return "gem"..serial end
 PlayerData.addGem=function(p,g) table.insert(awarded,{Player=p,Gem=g});return true end
 os.time=function() return 100000 end

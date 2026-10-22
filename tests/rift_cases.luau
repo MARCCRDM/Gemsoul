@@ -248,7 +248,33 @@ check(RiftRun.addsDue(0.9, {}) == nil, "Critters called at full health")
 check(RiftRun.addsDue(0.6, {}) == 1 and RiftRun.addsDue(0.6, { [1] = true }) == nil, "The first call")
 check(RiftRun.addsDue(0.2, { [1] = true }) == 2 and RiftRun.addsDue(0.2, {}) == 1, "The second call")
 check(RiftRun.Boss.AddCount >= 1 and RiftRun.Boss.AddFighters >= 1, "The boss calls nobody")
-check(RiftRun.Loot.Seconds >= 20, "No time to choose on the loot")
+-- Its loot (Shared.BossLoot): every boss a threat and a favourite kind of
+-- gear; the higher its threat, the tougher it is and the richer its cache.
+do
+	local BossLoot = load("BossLoot")
+	local Slots = load("EquipmentSlots")
+	local seen = {}
+	for _, boss in DungeonRules.Bosses do
+		local threat = BossLoot.threat(boss)
+		check(boss.Threat == threat, boss.Id .. "'s threat isn't 1 to 3")
+		check(table.find(Slots.Kinds, boss.Loot) ~= nil, boss.Id .. " favours no kind of gear")
+		seen[threat] = true
+		local m = BossLoot.spec(boss)
+		check(m.Element == boss.Element and m.Focus == boss.Loot and m.Name == boss.Name, boss.Id .. "'s cache")
+		check(RiftRun.bossHealth(1, boss) == RiftRun.Boss.Health * BossLoot.health(boss), boss.Id .. "'s health")
+	end
+	check(seen[1] and seen[2] and seen[3], "Not every threat has a boss")
+	for t = 2, #BossLoot.Threats do
+		local lo, hi = BossLoot.Threats[t - 1], BossLoot.Threats[t]
+		check(
+			hi.Health > lo.Health and hi.UltraRare > lo.UltraRare and hi.Gems >= lo.Gems and hi.Quality >= lo.Quality,
+			"Threat " .. t .. " isn't tougher and richer"
+		)
+	end
+	check(BossLoot.threat({}) == 2 and BossLoot.threat({ Threat = 9 }) == 3 and BossLoot.threat(nil) == 2, "A threat out of range")
+	check(BossLoot.numeral(1) == "I" and BossLoot.numeral(3) == "III", "Threat numerals")
+	check(BossLoot.FocusCount >= 1 and BossLoot.FocusCount <= 3, "Its favourite kind's share")
+end
 
 -- Falling, restoring, winning ---------------------------------------------------------------------------------
 

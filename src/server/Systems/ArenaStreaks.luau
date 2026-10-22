@@ -16,17 +16,26 @@
 	leftover the Market couldn't take right then waits (Duel.VaultPending)
 	and goes up later.
 
+	A boss beaten (the Rift's, a pathway dungeon's) gives everyone who
+	fought it a boss cache the same way (ArenaStreaks.bossCache, Shared.
+	BossLoot): the boss's gem and its threat's free gems, of its element,
+	and six pieces of gear to keep three of, two of them its favourite kind.
+	Its leftovers go up from the Rift Vault, with the same commission.
+
 	Requests (Remotes.Request):
 	  "StreakCaches"                     -> { Caches, Streak, Best, Next }
 	  "StreakClaim", cacheId, { offerId, ... }   keep these (gear), vault the rest
+	  "DevBossCache", threat             (test admins) a test boss cache
 	The Social remote tells the player:
 	  "StreakReward", { Wins, Name, Coins, Title }   a cache just opened
+	  "BossCache", { Id, Boss, Source }              a boss cache just opened
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
+local BossLoot = require(ReplicatedStorage.Shared.BossLoot)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
@@ -69,12 +78,14 @@ end
 local GEAR_POOLS = {} -- rarity name -> its gear
 
 -- A gem of `rarity`, Flawless (every metric 10, the surge at its top rank)
--- when the milestone says so.
-local function rollGem(rarity: string, flawless: boolean?)
+-- when the milestone says so, and of `element` when there's one (a boss's).
+local function rollGem(rarity: string, flawless: boolean?, element: string?)
 	local gem = GemGenerator.generate(rng, "MiningStore", {
 		Id = PlayerData.newGemId(),
 		Time = os.time(),
 		Rarity = rarity,
+		Home = element,
+		Bias = if element then 1 else nil,
 	})
 	if flawless then
 		gem.Size, gem.Clarity, gem.Cut = 10, 10, 10
@@ -97,12 +108,22 @@ end
 -- The cache for milestone `m`: about half gems, half gear, each piece Rare
 -- or Ultra-Rare (ArenaStreak.rarities), no piece of gear twice, and at most
 -- ArenaStreak.MaxWeapons swords (so whatever you keep, armor is left over
--- for the Market).
+-- for the Market). A boss's (BossLoot.spec) also has its own gem first
+-- (m.FreeGems), its gems of its element (m.Element), and m.FocusCount of
+-- its gear its favourite kind (m.Focus; a sword boss's two swords).
 function ArenaStreaks.rollCache(m)
 	local gemTiers, gearTiers = ArenaStreak.rarities(m)
 	local items = {}
+	for _, gem in m.FreeGems or {} do
+		table.insert(items, {
+			Item = { Kind = "Gem", Gem = gem },
+			Name = GemConfig.displayName(gem),
+			Rarity = gem.Tier,
+			Free = true,
+		})
+	end
 	for _, rarity in gemTiers do
-		local gem = rollGem(rarity, m.Flawless)
+		local gem = rollGem(rarity, m.Flawless, m.Element)
 		table.insert(items, {
 			Item = { Kind = "Gem", Gem = gem },
 			Name = GemConfig.displayName(gem),
@@ -110,19 +131,44 @@ function ArenaStreaks.rollCache(m)
 			Free = true, -- (yours: not one of the picks)
 		})
 	end
-	local decks = {}
+	local decks, focusDecks, used = {}, {}, {}
 	local weapons = 0
+	local focusLeft = if m.Focus then m.FocusCount or 0 else 0
+	local maxWeapons = if m.Focus == "Weapons"
+		then math.max(ArenaStreak.MaxWeapons, focusLeft)
+		else ArenaStreak.MaxWeapons
+	-- The next piece off `deck`: none twice, no sword past the cap.
+	local function draw(deck)
+		local piece = table.remove(deck)
+		while piece and (used[piece.Id] or (piece.Kind == "Weapons" and weapons >= maxWeapons)) do
+			piece = table.remove(deck)
+		end
+		return piece
+	end
 	for _, rarity in gearTiers do
 		if not decks[rarity] then
 			GEAR_POOLS[rarity] = GEAR_POOLS[rarity] or gearOfTier(ArenaStreak.GearTier[rarity])
 			decks[rarity] = shuffled(GEAR_POOLS[rarity])
 		end
-		local deck = decks[rarity]
-		local piece = table.remove(deck)
-		while piece and piece.Kind == "Weapons" and weapons >= ArenaStreak.MaxWeapons do
-			piece = table.remove(deck)
+		local piece = nil
+		if focusLeft > 0 then
+			if not focusDecks[rarity] then
+				local only = {}
+				for _, candidate in GEAR_POOLS[rarity] do
+					if candidate.Kind == m.Focus then
+						table.insert(only, candidate)
+					end
+				end
+				focusDecks[rarity] = shuffled(only)
+			end
+			piece = draw(focusDecks[rarity])
+			if piece then
+				focusLeft -= 1
+			end
 		end
+		piece = piece or draw(decks[rarity])
 		if piece then
+			used[piece.Id] = true
 			if piece.Kind == "Weapons" then
 				weapons += 1
 			end
@@ -168,6 +214,38 @@ local function record(player: Player)
 	duel.StreakCaches = duel.StreakCaches or {}
 	duel.StreakPaid = duel.StreakPaid or {}
 	return duel, profile
+end
+
+local bossRolls = 0 -- (so every boss cache has its own id)
+
+-- A boss cache from `boss` (a Shared.DungeonRules.Bosses entry), beaten in
+-- `source` ("Rift", "Dungeon"), with `gem` (Dungeons.bossGem) its own free
+-- gem.
+local function rollBossCache(boss, gem, source: string?)
+	local m = BossLoot.spec(boss)
+	m.FreeGems = if gem then { gem } else nil
+	local cache = ArenaStreaks.rollCache(m)
+	bossRolls += 1
+	cache.Id = string.format("boss%d_%s_%d", bossRolls, tostring(boss.Id), os.time())
+	cache.Kind = "Boss"
+	cache.Boss, cache.BossId = boss.Name, boss.Id
+	cache.Threat = BossLoot.threat(boss)
+	cache.Source = source
+	cache.Element, cache.Focus = boss.Element, boss.Loot
+	return cache
+end
+
+-- `player` beat `boss`: their boss cache, saved with their other caches to
+-- claim whenever they like (the client opens it when it comes in).
+function ArenaStreaks.bossCache(player: Player, boss, gem, source: string?)
+	local duel = record(player)
+	if not duel or type(boss) ~= "table" then
+		return nil
+	end
+	local cache = rollBossCache(boss, gem, source)
+	table.insert(duel.StreakCaches, cache)
+	Remotes.Social:FireClient(player, "BossCache", { Id = cache.Id, Boss = boss.Name, Source = source })
+	return cache
 end
 
 -- A milestone reached: coins and title now, the cache to claim.
@@ -273,6 +351,12 @@ local function view(duel)
 			Items = items,
 			Picks = ArenaStreak.Picks,
 			Dev = cache.Dev,
+			Kind = cache.Kind,
+			Boss = cache.Boss,
+			Threat = cache.Threat,
+			Source = cache.Source,
+			Element = cache.Element,
+			Focus = cache.Focus,
 		})
 	end
 	local nextUp = ArenaStreak.next(duel.RankedStreak)
@@ -354,7 +438,14 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 		if entry.Free or chosen[entry.OfferId] then
 			Market.give(profile, entry.Item, math.huge, true)
 		else
-			table.insert(leftovers, { Item = entry.Item, Wins = cache.Wins, Rarity = entry.Rarity })
+			table.insert(leftovers, {
+				Item = entry.Item,
+				Wins = cache.Wins,
+				Rarity = entry.Rarity,
+				Label = if cache.Kind == "Boss"
+					then string.format("%s · %s's %s cache", BossLoot.VaultName, player.DisplayName, cache.Boss or "boss")
+					else nil,
+			})
 		end
 	end
 	table.remove(duel.StreakCaches, index)
@@ -367,7 +458,7 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 		string.format(
 			"Claimed! The other %d went to the Market from the %s: you get %d%% of each sale.",
 			#leftovers,
-			ArenaStreak.VaultName,
+			if cache.Kind == "Boss" then BossLoot.VaultName else ArenaStreak.VaultName,
 			math.floor(ArenaStreak.Commission * 100 + 0.5)
 		),
 		view(duel)
@@ -426,10 +517,50 @@ function ArenaStreaks.devCache(player: Player, wins: any)
 	return Shop.reply(true, string.format("Rolled a %d-win test cache (%s).", m.Wins, m.Name), view(duel))
 end
 
+-- DEV (test admins): a test boss cache from a boss of `threat` (1-3), its
+-- gem and all, first in line. Like devCache, one test cache at a time.
+function ArenaStreaks.devBossCache(player: Player, threat: any)
+	local TestAdmin = require(script.Parent.TestAdmin)
+	if not TestAdmin.allowed(player.UserId) then
+		return Shop.reply(false, "This test tool is restricted to the test admin.")
+	end
+	local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
+	local bosses = {}
+	for _, boss in DungeonRules.Bosses do
+		if BossLoot.threat(boss) == tonumber(threat) then
+			table.insert(bosses, boss)
+		end
+	end
+	if #bosses == 0 then
+		return Shop.reply(false, "No boss at that threat.")
+	end
+	local duel = record(player)
+	if not duel then
+		return Shop.reply(false, "Your data is still loading.")
+	end
+	for i = #duel.StreakCaches, 1, -1 do
+		if duel.StreakCaches[i].Dev then
+			table.remove(duel.StreakCaches, i)
+		end
+	end
+	local boss = bosses[rng:NextInteger(1, #bosses)]
+	local Dungeons = require(script.Parent.Dungeons)
+	local cache = rollBossCache(boss, Dungeons.bossGem(boss.Element, 4), "Dev")
+	devRolls += 1
+	cache.Id, cache.Dev = string.format("dev%d_%s", devRolls, cache.Id), true
+	table.insert(duel.StreakCaches, 1, cache)
+	return Shop.reply(
+		true,
+		string.format("Rolled a test boss cache (%s, threat %s).", boss.Name, BossLoot.numeral(cache.Threat)),
+		view(duel)
+	)
+end
+
 function ArenaStreaks.start()
 	Shop.register("StreakCaches", ArenaStreaks.caches)
 	Shop.register("StreakClaim", ArenaStreaks.claim)
 	Shop.register("DevStreakCache", ArenaStreaks.devCache)
+	Shop.register("DevBossCache", ArenaStreaks.devBossCache)
 	Shop.register("StreakPreviews", ArenaStreaks.previews)
 	-- On joining: the streak on show, and any leftovers still to vault.
 	local function joined(player: Player)

@@ -26,7 +26,7 @@ Dungeon fighters use `Duelist.spawnDungeon`, the existing `DuelistBrain`, `Rival
 
 All three boss Surge slots use its main element at tiers 2/3/4 and rank III. Regular fighters use lower-tier, rank-I Surges. Each archetype has three fixed moves: a room fighter has its signature move and two rig maneuvers, and a boss has three moves of its own, one a big telegraphed attack ([creature-moves.md](creature-moves.md)). The Colossus has increased health and damage over its regular fighter version. The existing AI currently chooses one squad member at a time; this is not a new raid-wide threat/pathfinding system.
 
-A cleared dungeon gives each surviving, still-enrolled player **300 coins and SlayBrute XP**, once. There is no additional gem loot in this first implementation. There is no revive or checkpoint resurrection system. Failed runs grant no completion reward.
+A cleared dungeon gives each surviving, still-enrolled player **300 coins and SlayBrute XP**, once, and a **boss cache** of their own: the boss's gem and six pieces of gear to keep three of, rolled and picked like an Arena Cache, the rest to the Market from the Rift Vault (see [arena-streaks.md](arena-streaks.md#boss-caches)). The run ends five seconds after the boss falls; the cache waits to be opened. There is no revive or checkpoint resurrection system. Failed runs grant no completion reward.
 
 ## Verification and remaining playtest
 - 1,000 seeded layouts checked for uniqueness and connected room order.

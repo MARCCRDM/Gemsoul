@@ -59,6 +59,58 @@ win of each run restore your pick's swings (10%, 25%, 50%). See
 
 All the numbers live in `src/shared/ArenaStreak.luau`.
 
+## Boss caches
+
+Beat a boss in the **Rift** or the **pathway dungeon** and everyone who
+fought it gets a **boss cache** of their own: the same roll and the same
+pick as an Arena Cache, with nothing to share or roll against each other.
+(It replaced the old Claim / Roll / Pass card, where one player got the
+boss's gem.) Who's still standing at the kill gets one; in the dungeon, a
+squadmate already down doesn't.
+
+- **The boss's gem, free:** of its element, Tier 4 / Rank III, Ultra-Rare
+  (Legendary from a tier-5 boss: `Dungeons.bossGem`). It's the first card.
+- **Its threat's free gems,** every one of the boss's element.
+- **Six pieces of gear, keep three.** How many are Ultra-Rare, and their
+  quality, go by the boss's threat. **Two of the six are its favourite
+  kind** (a sword boss gets two swords; the "one sword at most" rule
+  stretches to two for them, so there's still armour left over).
+- **The other three go up on the Market from the Rift Vault**
+  ("Rift Vault · <name>'s <boss> cache"), with your 25% cut, priced like
+  the Arena Vault's.
+- **Threat also makes the boss tougher** in the Rift: its health times
+  0.85, 1 or 1.2.
+
+| Threat | Free gems (beyond its own) | Gear: Ultra-Rare / Rare | Gear quality | Boss health |
+| --- | --- | --- | --- | --- |
+| I | none | 1 / 5 | 2 | x0.85 |
+| II | 1 Rare | 2 / 4 | 3 | x1 |
+| III | 1 Ultra-Rare | 3 / 3 | 3 | x1.2 |
+
+| Boss | Element | Threat | Favourite gear |
+| --- | --- | --- | --- |
+| Gattini Gemellini | Ion | II | Gloves |
+| Bombardiro Drago | Thermal | III | Helmets |
+| Paperotti Gemelli | Cryo | I | Boots |
+| Ranocchio Avocadino | Corrosive | I | Shields |
+| Chimpanzini Bananini | Ion | I | Gloves |
+| Tung Tung Tung Sahur | Thermal | III | Weapons |
+| Tralalero Tralala | Cryo | II | Boots |
+| Brr Brr Patapim | Corrosive | II | Helmets |
+| Frigo Camelo | Cryo | II | Armors |
+| Cappuccino Assassino | Ion | III | Weapons |
+
+The screen is headed **RIFT BOSS DEFEATED · THREAT II** (or **DUNGEON BOSS
+DEFEATED**) over **BOSS CACHE · <the boss>**, with a line in the element's
+colour: "All its gems are Thermal · Its favourite gear: Helmet". It opens
+by itself three seconds after the kill (the Rift's way home is still open
+for 20 seconds; nothing attacks you then). LATER keeps it: a gold **BOSS
+CACHE READY** button (**N CACHES READY** with others waiting) opens it any
+time. In a fight with the combat kit out, the screen frees the cursor.
+
+The tables live in `src/shared/BossLoot.luau` (threats) and
+`src/shared/DungeonRules.luau` (each boss's `Threat` and `Loot`).
+
 ## The roll
 
 The first time a cache opens, the whole grid rolls at once
@@ -99,3 +151,8 @@ milestone and opens it, roll and all (`DevStreakCache` in
 - The other three go up on the Market from the Arena Vault, as any cache's
   do, so every roll leaves armour for the Market.
 - A new test cache replaces the last one.
+
+Under it, a **BOSS CACHE** row with **I · II · III** rolls a test boss
+cache from a random boss of that threat, its gem and all (`DevBossCache`),
+first in line and opened the same way. It also replaces the last test
+cache.

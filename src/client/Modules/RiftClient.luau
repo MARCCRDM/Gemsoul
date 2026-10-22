@@ -432,11 +432,11 @@ end
 -- The strip ---------------------------------------------------------------------------------------------------
 
 -- Its two lines from the Rift attributes: { Room, Left, Boss, Found,
--- Runners, Won, ExitIn (seconds; nil while the boss's loot is still up) }.
+-- Runners, Won, ExitIn (seconds till home, once the boss is down) }.
 function RiftClient.stripText(state): (string, string)
 	local where
 	if state.Won and state.ExitIn == nil then
-		where = "BOSS DOWN  ·  CLAIM, ROLL OR PASS"
+		where = "BOSS DOWN"
 	elseif state.Won then
 		where = string.format("BOSS DOWN  ·  HOME IN %d:%02d", state.ExitIn // 60, state.ExitIn % 60)
 	elseif (state.Room or 1) > RiftRun.Rooms then

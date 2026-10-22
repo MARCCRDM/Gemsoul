@@ -1,6 +1,8 @@
 --[[
 	StreakRewards: the Arena Caches you earn for Ranked win streaks
-	(Shared.ArenaStreak, Systems/ArenaStreaks).
+	(Shared.ArenaStreak, Systems/ArenaStreaks), and the boss caches a
+	beaten Rift or dungeon boss drops (Shared.BossLoot): the same screen,
+	headed with the boss, its threat and its element.
 
 	While a cache waits, a gold "ARENA CACHE" button pulses at the top of the
 	screen. It opens the cache, every piece on a card in its rarity's colour
@@ -20,11 +22,13 @@
 	  StreakRewards.start()   StreakRewards.open()   StreakRewards.refresh()
 	  StreakRewards.show(result)   open a cache list the server just sent
 	                               (the DEV panel's test caches)
+	  StreakRewards.isOpen() -> bool   (Combat frees the cursor for it)
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
+local BossLoot = require(ReplicatedStorage.Shared.BossLoot)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemClient = require(script.Parent.GemClient)
@@ -88,10 +92,27 @@ local function drawLauncher()
 	if not launcher then
 		return
 	end
-	local count = #state.Caches
+	local count, bosses = #state.Caches, 0
+	for _, cache in state.Caches do
+		if cache.Kind == "Boss" then
+			bosses += 1
+		end
+	end
 	launcher.Visible = count > 0 and screen == nil
-	launcher.Text = if count > 1 then string.format("🏆  %d ARENA CACHES READY", count) else "🏆  ARENA CACHE READY"
+	launcher.Text = if count == 1 and bosses == 1
+		then "🏆  BOSS CACHE READY"
+		elseif count == 1 then "🏆  ARENA CACHE READY"
+		elseif bosses == count then string.format("🏆  %d BOSS CACHES READY", count)
+		elseif bosses == 0 then string.format("🏆  %d ARENA CACHES READY", count)
+		else string.format("🏆  %d CACHES READY", count)
 end
+
+function StreakRewards.isOpen(): boolean
+	return screen ~= nil
+end
+
+-- Where a boss cache's boss fell (its kicker).
+local BOSS_FROM = { Rift = "RIFT BOSS DEFEATED", Dungeon = "DUNGEON BOSS DEFEATED" }
 
 function StreakRewards.refresh()
 	task.spawn(function()
@@ -385,8 +406,14 @@ function StreakRewards.prewarm()
 	fetchPreviews(nil)
 end
 
-function StreakRewards.open()
+-- The first cache in line, or the one `id` names.
+function StreakRewards.open(id: string?)
 	local cache = state.Caches[1]
+	for _, c in state.Caches do
+		if c.Id == id then
+			cache = c
+		end
+	end
 	if not gui or not cache then
 		return
 	end
@@ -448,32 +475,49 @@ function StreakRewards.open()
 		scale()
 		shown:GetPropertyChangedSignal("AbsoluteSize"):Connect(scale)
 
+		local boss = cache.Kind == "Boss"
 		local kicker = label(
 			board,
-			string.format("%s%d RANKED WINS IN A ROW", if cache.Dev then "DEV TEST  ·  " else "", cache.Wins),
+			(if cache.Dev then "DEV TEST  ·  " else "")
+				.. if boss
+					then string.format(
+						"%s  ·  THREAT %s",
+						BOSS_FROM[cache.Source] or "BOSS DEFEATED",
+						BossLoot.numeral(cache.Threat or 2)
+					)
+					else string.format("%d RANKED WINS IN A ROW", cache.Wins),
 			14,
 			GOLD,
 			Enum.Font.GothamBlack
 		)
 		kicker.Size = UDim2.new(1, 0, 0, 18)
-		local title =
-			label(board, "ARENA CACHE  ·  " .. string.upper(cache.Name or ""), 34, TEXT, Enum.Font.GothamBlack)
+		local title = label(
+			board,
+			(if boss then "BOSS CACHE  ·  " else "ARENA CACHE  ·  ") .. string.upper(cache.Boss or cache.Name or ""),
+			34,
+			TEXT,
+			Enum.Font.GothamBlack
+		)
 		title.Position, title.Size = UDim2.fromOffset(0, 20), UDim2.new(1, 0, 0, 40)
 		local extras = {}
-		if m and m.Coins then
+		if m and m.Coins and not boss then
 			table.insert(extras, "+" .. commas(m.Coins) .. " coins")
 		end
-		if m and m.Title then
+		if m and m.Title and not boss then
 			table.insert(extras, "a new title")
 		end
+		local focus = cache.Focus and Slots.Definitions[Slots.ByKind[cache.Focus]]
 		local sub = label(
 			board,
-			if cache.Dev
-				then "A test roll: no coins or title, and the gear you don't keep is dropped, not sold."
+			if boss
+				then "All its gems are "
+					.. GemConfig.elementName(cache.Element or "")
+					.. (if focus then "  ·  Its favourite gear: " .. focus.Label else "")
+				elseif cache.Dev then "A test roll: no coins or title, and the gear you don't keep is dropped, not sold."
 				elseif #extras > 0 then "Already yours: " .. table.concat(extras, " and ") .. "."
 				else "",
 			14,
-			DIM,
+			if boss then GemConfig.ElementColors[cache.Element] or DIM else DIM,
 			Enum.Font.GothamMedium
 		)
 		sub.Position, sub.Size = UDim2.fromOffset(0, 64), UDim2.new(1, 0, 0, 20)
@@ -679,19 +723,21 @@ function StreakRewards.start()
 	}, gui)
 	UiKit.round(launcher, 10)
 	pcall(IronUi.shine, launcher, 2.5)
-	launcher.Activated:Connect(StreakRewards.open)
+	launcher.Activated:Connect(function()
+		StreakRewards.open()
+	end)
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
 	remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: any)
-		if kind == "StreakReward" then
-			-- Fetch the new cache, then show it (after the match result).
-			task.delay(2.5, function()
+		if kind == "StreakReward" or kind == "BossCache" then
+			-- Fetch the new cache, then show it (after the match result, or
+			-- the boss's fall).
+			task.delay(if kind == "BossCache" then 3 else 2.5, function()
 				local result = GemClient.request("StreakCaches")
 				if result.Ok then
 					state = result
-					StreakRewards.open()
+					StreakRewards.open(if type(a) == "table" then a.Id else nil)
 				end
 			end)
-			local _ = a
 		elseif kind == "MatchEnd" then
 			StreakRewards.refresh()
 		end

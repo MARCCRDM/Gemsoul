@@ -119,8 +119,15 @@ local stubs = {
 	Equipment = { groupPreviews = function(_, group, items) previewCalls[#previewCalls + 1] = { group, items }; return true, 0 end },
 	MarketBoard = { vaultList = function(item, price, label, commission) table.insert(vaulted, { item, price, label, commission }); return true end },
 	ChatChannels = { announce = function() end },
+	-- (The boss's gem: Dungeons.bossGem.)
+	Dungeons = {
+		bossGem = function(element, tier)
+			nextGem += 1
+			return { Id = "gem" .. nextGem, Element = element, Tier = if tier == 5 then "Legendary" else "UltraRare", Size = 6, Clarity = 6, Cut = 6, SurgeTier = 4, SurgeRank = 3, Source = "PvEDrop" }
+		end,
+	},
 }
-for _, name in { "ArenaStreak", "ArmorFamilies", "Config", "Cosmetics", "ExpandedItemTraits", "GearRolls", "GemConfig", "GemRoller", "Market", "Season", "EquipmentSlots" } do
+for _, name in { "ArenaStreak", "ArmorFamilies", "BossLoot", "Config", "Cosmetics", "DungeonRules", "ExpandedItemTraits", "GearRolls", "GemConfig", "GemRoller", "Market", "Season", "EquipmentSlots" } do
 	stubs[name] = shared(name)
 end
 -- (Lune has no Roblox Random.)
@@ -379,4 +386,99 @@ check(devClaim.Ok and #profile.Gems == Rules.get(10).Gems, "A test cache couldn'
 check(#vaulted == vaultedBefore + Rules.GearOffered - Rules.Picks, "A test cache's leftovers didn't go to the Market")
 check(#profile.Duel.StreakCaches == realCount, "The claimed test cache stayed")
 
-print(string.format("PASS: %d arena streak checks (milestones 10-200, free gems + pick 3 of 6 gear, claims, Arena Vault with commission, DEV test caches)", checks))
+-- Boss caches (Shared.BossLoot, ArenaStreaks.bossCache): the boss's own gem
+-- first, free; its threat's free gems, of its element; six pieces of gear to
+-- keep three of, Ultra Rare by its threat and FocusCount of them its
+-- favourite kind; the rest up on the Market from the Rift Vault.
+do
+	local BossLoot = shared("BossLoot")
+	local Bosses = shared("DungeonRules").Bosses
+	local Slots = shared("EquipmentSlots")
+	profile.Gems = {}
+	local ids = {}
+	for _, boss in Bosses do
+		local rules = BossLoot.Threats[BossLoot.threat(boss)]
+		for _ = 1, 8 do
+			local gem = stubs.Dungeons.bossGem(boss.Element, 4)
+			local before = #profile.Duel.StreakCaches
+			local c = Server.bossCache(player, boss, gem, "Rift")
+			check(c and #profile.Duel.StreakCaches == before + 1 and profile.Duel.StreakCaches[before + 1] == c, "A boss cache wasn't saved")
+			check(not ids[c.Id], "Two boss caches shared an id")
+			ids[c.Id] = true
+			check(fired[#fired][1] == "BossCache" and fired[#fired][2].Id == c.Id and fired[#fired][2].Boss == boss.Name, "Not told of the boss cache")
+			check(c.Kind == "Boss" and c.Boss == boss.Name and c.BossId == boss.Id and c.Source == "Rift", "A boss cache doesn't say whose it is")
+			check(c.Threat == BossLoot.threat(boss) and c.Element == boss.Element and c.Focus == boss.Loot, "A boss cache's threat, element or favourite")
+			check(c.Items[1].Free and c.Items[1].Item.Gem == gem and c.Items[1].Rarity == "UltraRare", "The boss's own gem isn't first, free")
+			local free, gear, ultra, focus, weapons = 0, 0, 0, 0, 0
+			for _, entry in c.Items do
+				if entry.Free then
+					free += 1
+					check(entry.Item.Kind == "Gem" and entry.Item.Gem.Element == boss.Element, boss.Id .. "'s cache has a gem not of its element")
+				else
+					gear += 1
+					local kind = Slots.Definitions[entry.Item.Slot].Kind
+					focus += if kind == boss.Loot then 1 else 0
+					weapons += if kind == "Weapons" then 1 else 0
+					ultra += if entry.Rarity == "UltraRare" then 1 else 0
+					check(gearTier[entry.Item.Id] == Rules.GearTier[entry.Rarity] and entry.Item.Quality == rules.Quality, "A boss cache's gear isn't the rarity or quality it says")
+				end
+			end
+			check(free == 1 + rules.Gems, boss.Id .. "'s cache has the wrong free gems")
+			check(gear == Rules.GearOffered and ultra == rules.UltraRare, boss.Id .. "'s cache has the wrong gear")
+			check(focus >= BossLoot.FocusCount, boss.Id .. "'s cache doesn't favour its " .. boss.Loot)
+			check(weapons <= (if boss.Loot == "Weapons" then BossLoot.FocusCount else Rules.MaxWeapons), boss.Id .. "'s cache has too many swords")
+			table.remove(profile.Duel.StreakCaches)
+		end
+	end
+	-- Higher threats are richer: more Ultra Rare gear, never fewer gems.
+	for t = 2, #BossLoot.Threats do
+		check(BossLoot.Threats[t].UltraRare > BossLoot.Threats[t - 1].UltraRare, "Threat " .. t .. " isn't richer")
+	end
+	-- On the list it says whose it is; claimed, three of its gear and every
+	-- gem arrive, the rest go up from the Rift Vault with your cut.
+	for _, list in profile.Owned do
+		table.clear(list)
+	end
+	local boss = Bosses[1]
+	local c = Server.bossCache(player, boss, stubs.Dungeons.bossGem(boss.Element, 5), "Dungeon")
+	local listed
+	for _, entry in handlers.StreakCaches(player).Caches do
+		if entry.Id == c.Id then
+			listed = entry
+		end
+	end
+	check(listed and listed.Kind == "Boss" and listed.Boss == boss.Name and listed.Source == "Dungeon", "The cache list doesn't show the boss cache")
+	check(listed.Threat == c.Threat and listed.Element == boss.Element and listed.Focus == boss.Loot, "The cache list loses the boss's threat or element")
+	check(c.Items[1].Rarity == "Legendary", "A tier-5 boss's gem isn't Legendary")
+	local pick = {}
+	for _, entry in c.Items do
+		if not entry.Free and #pick < Rules.Picks then
+			table.insert(pick, entry.OfferId)
+		end
+	end
+	local vaultedBefore = #vaulted
+	local claimed = handlers.StreakClaim(player, c.Id, pick)
+	check(claimed.Ok and string.find(claimed.Message, BossLoot.VaultName, 1, true), "A boss cache's claim doesn't name the Rift Vault")
+	check(#profile.Gems == 1 + BossLoot.Threats[BossLoot.threat(boss)].Gems, "A boss cache's gems didn't all arrive")
+	check(#vaulted == vaultedBefore + Rules.GearOffered - Rules.Picks, "A boss cache's leftovers didn't go to the Market")
+	for i = vaultedBefore + 1, #vaulted do
+		local v = vaulted[i]
+		check(string.find(v[3], BossLoot.VaultName, 1, true) and string.find(v[3], boss.Name, 1, true), "A boss cache's leftover isn't labelled the Rift Vault's")
+		check(v[4].UserId == player.UserId and v[4].Rate == Rules.Commission, "A boss cache's leftover carries no commission")
+	end
+	-- DEV test boss caches: admins only, a real threat, first in line, one
+	-- at a time, and no "BossCache" word (the DEV panel opens it itself).
+	profile.Gems = {}
+	check(not handlers.DevBossCache(outsider, 2).Ok, "A non-admin rolled a test boss cache")
+	check(not handlers.DevBossCache(player, 4).Ok and not handlers.DevBossCache(player, "x").Ok, "A test boss cache for no threat")
+	local real = #profile.Duel.StreakCaches
+	for threat = 1, 3 do
+		local firedBefore = #fired
+		local reply = handlers.DevBossCache(player, threat)
+		check(reply.Ok and reply.Caches[1].Dev and reply.Caches[1].Kind == "Boss" and reply.Caches[1].Threat == threat, "The threat " .. threat .. " test boss cache isn't first in line")
+		check(#profile.Duel.StreakCaches == real + 1, "Test boss caches piled up")
+		check(#fired == firedBefore, "A test boss cache was announced")
+	end
+end
+
+print(string.format("PASS: %d arena streak checks (milestones 10-200, free gems + pick 3 of 6 gear, claims, Arena Vault with commission, DEV test caches, boss caches by threat)", checks))

@@ -50,6 +50,8 @@ Dungeon.Roster = {
 -- (Server BrainrotBosses dresses them; most have two or three heads). Each
 -- is weak to what the Roster's fighters of its element are weak to (Fire
 -- to Frost, Frost to Shock, Shock to Poison, Poison to Fire).
+-- Threat (1 to 3): how tough it is and how rich the cache it drops
+-- (Shared.BossLoot); Loot: the kind of gear its cache favours.
 Dungeon.Bosses = {
 	{
 		Id = "Gattini",
@@ -58,6 +60,8 @@ Dungeon.Bosses = {
 		Weakness = "Poison",
 		Shape = "TwinCat",
 		Moves = { "TwinPounce", "ClawFrenzy", "StaticStorm" },
+		Threat = 2,
+		Loot = "Gloves",
 	},
 	{
 		Id = "Drago",
@@ -66,6 +70,8 @@ Dungeon.Bosses = {
 		Weakness = "Frost",
 		Shape = "DragonCroc",
 		Moves = { "FlameBreath", "TailSweep", "FirebombDive" },
+		Threat = 3,
+		Loot = "Helmets",
 	},
 	{
 		Id = "Paperotti",
@@ -74,6 +80,8 @@ Dungeon.Bosses = {
 		Weakness = "Shock",
 		Shape = "TwinDuck",
 		Moves = { "IcePeck", "HailVolley", "QuackSquall" },
+		Threat = 1,
+		Loot = "Boots",
 	},
 	{
 		Id = "Ranocchio",
@@ -82,6 +90,8 @@ Dungeon.Bosses = {
 		Weakness = "Fire",
 		Shape = "FrogAvocado",
 		Moves = { "TongueLash", "ToxicPits", "BogLeap" },
+		Threat = 1,
+		Loot = "Shields",
 	},
 	{
 		Id = "Chimpanzini",
@@ -90,6 +100,8 @@ Dungeon.Bosses = {
 		Weakness = "Poison",
 		Shape = "Chimpanzini",
 		Moves = { "PeelToss", "JungleRush", "BananaSmash" },
+		Threat = 1,
+		Loot = "Gloves",
 	},
 	{
 		Id = "SahurTrio",
@@ -98,6 +110,8 @@ Dungeon.Bosses = {
 		Weakness = "Frost",
 		Shape = "SahurTrio",
 		Moves = { "TungTungTung", "ThreeHeadRoar", "EmberQuake" },
+		Threat = 3,
+		Loot = "Weapons",
 		PoseProfile = "SahurBat",
 	},
 	{
@@ -107,6 +121,8 @@ Dungeon.Bosses = {
 		Weakness = "Shock",
 		Shape = "TwinShark",
 		Moves = { "TwinSharkDash", "JawSnap", "TidalCrash" },
+		Threat = 2,
+		Loot = "Boots",
 	},
 	{
 		Id = "PatapimTrio",
@@ -115,6 +131,8 @@ Dungeon.Bosses = {
 		Weakness = "Fire",
 		Shape = "TreeTrio",
 		Moves = { "BranchSweep", "RootSnare", "SporeStorm" },
+		Threat = 2,
+		Loot = "Helmets",
 	},
 	{
 		Id = "Frigo",
@@ -123,6 +141,8 @@ Dungeon.Bosses = {
 		Weakness = "Shock",
 		Shape = "Frigo",
 		Moves = { "IceSpit", "DoorSlam", "FreezerBlast" },
+		Threat = 2,
+		Loot = "Armors",
 	},
 	{
 		Id = "Cappuccino",
@@ -131,6 +151,8 @@ Dungeon.Bosses = {
 		Weakness = "Poison",
 		Shape = "Cappuccino",
 		Moves = { "KnifeFlurry", "ShadowStep", "KunaiStorm" },
+		Threat = 3,
+		Loot = "Weapons",
 	},
 }
 -- What fights as foe `kind` (an index) in `room` (a room or a camp): a

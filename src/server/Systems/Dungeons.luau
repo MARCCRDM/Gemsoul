@@ -14,6 +14,7 @@ local Raids = require(script.Parent.Raids)
 local Duelist = require(script.Parent.Duelist)
 local ArenaSessions = require(script.Parent.ArenaSessions)
 local ArenaDrop = require(script.Parent.ArenaDrop)
+local ArenaStreaks = require(script.Parent.ArenaStreaks)
 local CombatServer = require(script.Parent.CombatServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
@@ -97,8 +98,6 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonObjective", nil)
 				p:SetAttribute("DungeonRoom", nil)
 				p:SetAttribute("DungeonBoss", nil)
-				p:SetAttribute("DungeonLoot", nil)
-				p:SetAttribute("DungeonLootDeadline", nil)
 				-- A clear also restores a share of the pick's swings (Shared.SwingRestore).
 				local swings = 0
 				if eligible then
@@ -120,7 +119,7 @@ finish = function(run, won, reason)
 	run.World.Folder:Destroy()
 	slots[run.Slot] = nil
 end
--- A boss's gem (the loot its party claims and rolls for): of its element,
+-- A boss's gem (free in each one's boss cache): of its element,
 -- Ultra Rare at gear tier 4, Legendary at 5, its surge at tier 4, rank III.
 -- (The Rift's boss pays the same: Server.RiftServer.)
 function Dungeon.bossGem(element: string, tier: number?)
@@ -143,88 +142,26 @@ function Dungeon.bossGem(element: string, tier: number?)
 	gem.Surge = (if rng:NextNumber() < 0.5 then GemRoller.SurgeVariants else GemRoller.Surges)[gem.Element][4]
 	return gem
 end
-local function resolveLoot(run)
-	local loot = run.Loot
-	if not loot or loot.Resolved or run.Done then
-		return
-	end
-	loot.Resolved = true
-	local contenders = {}
-	for _, p in loot.Eligible do
-		if p.Parent and memberRun[p] == run and loot.Choices[p] and loot.Choices[p] ~= "Pass" then
-			table.insert(contenders, p)
-		end
-	end
-	local winner, best = nil, -1
-	local rolls, tied = {}, {}
-	local dice = Random.new()
-	for _, p in contenders do
-		local roll = dice:NextInteger(1, 100)
-		table.insert(rolls, p.Name .. " " .. tostring(roll))
-		if roll > best then
-			best = roll
-			tied = { p }
-		elseif roll == best then
-			table.insert(tied, p)
-		end
-	end
-	if #tied > 0 then
-		winner = tied[dice:NextInteger(1, #tied)]
-	end
-	if winner and not run.Test then
-		local gem = Dungeon.bossGem(loot.Element, loot.Tier)
-		if not PlayerData.addGem(winner, gem) then
-			PlayerData.addCoins(winner, 500)
-			Remotes.Notify:FireClient(winner, "Gem pouch full: boss gem converted to 500 coins.")
-		end
-	end
-	announce(
-		run,
-		if winner
-			then "BOSS LOOT: " .. winner.Name .. " wins the " .. loot.Element .. " gem. " .. table.concat(rolls, " · ")
-			else "Boss loot passed by the squad."
-	)
-	for _, p in loot.Eligible do
-		p:SetAttribute("DungeonLoot", nil)
-		p:SetAttribute("DungeonLootDeadline", nil)
-	end
-	task.delay(5, function()
-		finish(run, true, "Colossus defeated. Expedition complete.")
-	end)
-end
+-- The boss down: everyone still standing gets a boss cache of their own
+-- (Systems/ArenaStreaks.bossCache, Shared.BossLoot): its gem and six pieces
+-- of gear to keep three of, to open any time. The run ends a few seconds on.
 beginLoot = function(run, room)
 	if run.Loot or run.Done then
 		return
 	end
-	Duelist.removeDungeon(run.Id) -- clear hostile actors during the reward decision
+	Duelist.removeDungeon(run.Id) -- clear hostile actors
 	if run.Test then
 		finish(run, true, "Owner expedition complete. No rewards.")
 		return
 	end
-	local eligible = living(run)
-	run.Loot = {
-		Eligible = eligible,
-		Choices = {},
-		Tier = room.GearTier,
-		Element = Rules.specOf(room).Element,
-		Deadline = os.clock() + 30,
-	}
-	for _, p in eligible do
-		p:SetAttribute(
-			"DungeonLoot",
-			(if room.GearTier == 5 then "Legendary" else "Ultra Rare")
-				.. " "
-				.. GemConfig.elementName(run.Loot.Element)
-				.. " Gem · Tier 4 / Rank III"
-		)
-		p:SetAttribute("DungeonLootDeadline", workspace:GetServerTimeNow() + 30)
+	local boss = Rules.specOf(room)
+	run.Loot = { Boss = boss }
+	for _, p in living(run) do
+		ArenaStreaks.bossCache(p, boss, Dungeon.bossGem(boss.Element, room.GearTier), "Dungeon")
 	end
-	announce(
-		run,
-		"BOSS DEFEATED · Claim, roll, or pass on the gem. Multiple claims are resolved by a fair party roll. 30 seconds."
-	)
-	task.delay(30, function()
-		resolveLoot(run)
+	announce(run, "BOSS DEFEATED · Each of you gets a boss cache: open it to roll your loot.")
+	task.delay(5, function()
+		finish(run, true, "Colossus defeated. Expedition complete.")
 	end)
 end
 local function spawnRoom(run, index)
@@ -540,34 +477,6 @@ end
 function Dungeon.start()
 	Shop.register("DungeonMinerSelect", chooseReserve)
 	CombatServer.onDungeonLethal(reserveAfterDefeat)
-	Shop.register("DungeonLootChoice", function(player, choice)
-		local run = memberRun[player]
-		local loot = run and run.Loot
-		if not loot or loot.Resolved or not table.find(loot.Eligible, player) then
-			return Shop.reply(false, "No eligible boss loot.")
-		end
-		if os.clock() >= loot.Deadline then
-			resolveLoot(run)
-			return Shop.reply(false, "Loot voting has ended.")
-		end
-		if choice ~= "Claim" and choice ~= "Roll" and choice ~= "Pass" then
-			return Shop.reply(false, "Choose Claim, Roll or Pass.")
-		end
-		if loot.Choices[player] then
-			return Shop.reply(false, "Your choice is already locked.")
-		end
-		loot.Choices[player] = choice
-		local complete = true
-		for _, p in loot.Eligible do
-			if p.Parent and memberRun[p] == run and not loot.Choices[p] then
-				complete = false
-			end
-		end
-		if complete then
-			resolveLoot(run)
-		end
-		return Shop.reply(true, "Choice locked: " .. choice)
-	end)
 	Shop.register("PartyDungeon", function(player)
 		return queue(player)
 	end)
@@ -592,8 +501,6 @@ function Dungeon.start()
 		p:SetAttribute("DungeonTest", nil)
 		p:SetAttribute("DungeonRoom", nil)
 		p:SetAttribute("DungeonBoss", nil)
-		p:SetAttribute("DungeonLoot", nil)
-		p:SetAttribute("DungeonLootDeadline", nil)
 		p:SetAttribute("DungeonObjective", nil)
 		if #living(run) == 0 and not reservesPending(run) then
 			finish(run, false, "The squad has left the dungeon.")

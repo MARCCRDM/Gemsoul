@@ -127,15 +127,18 @@ for _, e in spawned do
 end
 check(boss ~= nil, "Final boss not spawned")
 clearRoom(id, 5)
-check(team[1]:GetAttribute("DungeonLoot") ~= nil, "Boss loot prompt missing")
-check(not handlers.DungeonLootChoice(second[1], "Claim").Ok, "Other squad stole loot")
-check(not handlers.DungeonLootChoice(team[1], "Invalid").Ok, "Invalid choice accepted")
-check(handlers.DungeonLootChoice(team[1], "Claim").Ok, "Claim refused")
-check(not handlers.DungeonLootChoice(team[1], "Roll").Ok, "Duplicate choice accepted")
-check(handlers.DungeonLootChoice(team[2], "Roll").Ok, "Roll refused")
-check(handlers.DungeonLootChoice(team[3], "Pass").Ok, "Pass refused")
-check(#awarded == 1 and awarded[1].Player ~= team[3], "Loot duplicated or awarded to passer")
-check(awarded[1].Gem.SurgeTier == 4 and awarded[1].Gem.SurgeRank == 3, "Boss gem quality")
+-- The boss down: a boss cache each for the squad (ArenaStreaks.bossCache),
+-- its gem inside; no claim, roll or pass.
+check(handlers.DungeonLootChoice == nil, "The old claim/roll/pass is still up")
+check(#bossCaches == #team, "Not one boss cache each")
+local cached = {}
+for _, c in bossCaches do
+	cached[c.Player] = true
+	check(c.Source == "Dungeon" and table.find(Rules.Bosses, c.Boss) ~= nil, "A boss cache's boss")
+	check(c.Gem.SurgeTier == 4 and c.Gem.SurgeRank == 3 and c.Gem.Element == c.Boss.Element, "Boss gem quality")
+end
+check(cached[team[1]] and cached[team[2]] and cached[team[3]] and not cached[second[1]], "Boss caches went astray")
+check(#awarded == 0, "The boss's gem went straight to a pouch")
 local restoresBefore = #restoresGiven
 tick(5)
 for _, p in team do
@@ -149,6 +152,7 @@ for i = restoresBefore + 1, #restoresGiven do
 end
 boss.Encounter.OnDeath()
 check(profiles[team[1]].Coins == 300, "Duplicate reward")
+check(#bossCaches == #team, "Boss caches twice for one kill")
 check(#restoresGiven - restoresBefore == #team, "Swings restored twice for one clear")
 check(worlds[id].Folder.Destroyed and removed[id], "Dungeon not cleaned")
 check(second[1]:GetAttribute("DungeonId") == id2, "Another squad interrupted")
@@ -188,7 +192,7 @@ check(timeout[1]:GetAttribute("DungeonId") == nil, "Timeout leaked")
 print(
 	"PASS: "
 		.. checks
-		.. " dungeon checks (1,000 connected layouts, roles, elements, queue, readiness, isolation, pathway progression, loot choices, completion, duplicate rewards, aborts, timeout)"
+		.. " dungeon checks (1,000 connected layouts, roles, elements, queue, readiness, isolation, pathway progression, boss caches, completion, duplicate rewards, aborts, timeout)"
 )
 
 local tester = squad(1)[1]
@@ -243,35 +247,24 @@ for seed = 1, 1000 do
 end
 print("PASS: 1,000 open-map populations, camp bounds, randomized difficulty and bandit groups")
 
--- An unanswered offer expires safely; a full pouch gets the disclosed coin fallback.
+-- Only those still standing at the kill get a cache, and the run ends five
+-- seconds on.
 local quiet = squad(3)
 handlers.PartyDungeon(quiet[1])
 tick(3)
 local quietId = quiet[1]:GetAttribute("DungeonId")
-local before = #awarded
 reachBoss(quietId, quiet)
+quiet[3].Humanoid.Health = 0
+local before = #bossCaches
 clearRoom(quietId, 5)
-tick(30)
-tick(5)
-check(#awarded == before and quiet[1]:GetAttribute("DungeonId") == nil, "Unanswered loot leaked or awarded")
-local full = squad(3)
-handlers.PartyDungeon(full[1])
-tick(3)
-local fullId = full[1]:GetAttribute("DungeonId")
-reachBoss(fullId, full)
-clearRoom(fullId, 5)
-local add = PlayerData.addGem
-PlayerData.addGem = function()
-	return false
+check(#bossCaches == before + 2, "A boss cache for the fallen, or one short")
+for i = before + 1, #bossCaches do
+	check(bossCaches[i].Player ~= quiet[3], "The fallen got a boss cache")
 end
-handlers.DungeonLootChoice(full[1], "Claim")
-handlers.DungeonLootChoice(full[2], "Pass")
-handlers.DungeonLootChoice(full[3], "Pass")
-PlayerData.addGem = add
+check(quiet[1]:GetAttribute("DungeonId") == quietId, "The run ended before its caches were out")
 tick(5)
-check(profiles[full[1]].Coins == 800, "Full pouch fallback lost reward")
-check(not handlers.DungeonLootChoice(full[1], "Roll").Ok, "Resolved loot replay accepted")
-print("PASS: loot timeout, full inventory compensation, single claimant and replay rejection")
+check(quiet[1]:GetAttribute("DungeonId") == nil, "The run outlived its boss")
+print("PASS: boss caches for the squad still standing, then home")
 
 -- Explicit owner-only open-world mode remains available alongside Full/Pathway.
 check(not handlers.DungeonTest(outsider, "OpenWorld").Ok, "Public open-world test bypass")

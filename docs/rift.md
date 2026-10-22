@@ -88,13 +88,12 @@ The rules are `Shared.RiftRun`; the server is `Server.RiftServer`.
 | **Fighters** | The pathway dungeon's regular fighters lead each pack (`Duelist.spawnDungeon`; `RiftLeader` on their models): 1, 1, 2, 2 in caves 1 to 4, plus one for every two runners past the first, armed and armoured to gear tier 1, 2, 2, 3, each with 1.5x a room fighter's health. One of the dungeon's roster per cave, with its element and moves. Anyone in the trip can hit them and be hit by them, kaiju too |
 | **Level** | The critters come at your team's level (the average of the runners' lead kaiju), +2 in cave 1, +1 more per cave; the boss's critters +3 over the last cave's. Capped at 30 |
 | **Caches** | Clear a cave (critters and fighters) and everyone in finds a gem (`RiftCache`, "Found in the Rift"), 12% luckier in cave 1 and 6% more each cave |
-| **The boss** | One of the ten brainrot bosses at random, as the pathway dungeon's **Colossus**: its boss fighter with every one of its moves, gear tier 4 alone or 4 to 5 in a party, and 1.8x a Colossus's health (+50% per extra runner). It tears through (a 16-stud tear) when the first runner reaches the throne cave; it's its cave's leader. At 66% and 33% health it calls 3 critters and a tier-3 fighter through, each through a tear of its own |
-| **Beaten** | Everyone still in: 300 coins + 40 per cave, a lucky cache, 120 EXP for their kaiju, and swings back on their pick (the dungeon restore). Anyone down gets up. The way home opens and the boss's loot comes up |
-| **Its loot** | The pathway dungeon's loot card, titled **RIFT BOSS DEFEATED**: a gem of the boss's element at Tier 4 / Rank III, Ultra Rare from a tier-4 boss and Legendary from a tier-5 one. Claim, Roll or Pass within 30 seconds (no answer is a pass). Everyone who claims or rolls rolls 1 to 100; the highest wins, ties broken at random. A full pouch gets 500 coins instead |
-| **Home** | 20 seconds after the loot is settled, everyone still in is home |
+| **The boss** | One of the ten brainrot bosses at random, as the pathway dungeon's **Colossus**: its boss fighter with every one of its moves, gear tier 4 alone or 4 to 5 in a party, and 1.8x a Colossus's health (+50% per extra runner), times its threat's (0.85x, 1x, 1.2x for threat I, II, III: `Shared.BossLoot`). It tears through (a 16-stud tear) when the first runner reaches the throne cave; it's its cave's leader. At 66% and 33% health it calls 3 critters and a tier-3 fighter through, each through a tear of its own |
+| **Beaten** | Everyone still in: 300 coins + 40 per cave, a lucky cache, 120 EXP for their kaiju, and swings back on their pick (the dungeon restore). Anyone down gets up. The way home opens and everyone gets a **boss cache** |
+| **Its loot** | A boss cache each, no sharing and no rolling against each other: the Arena Cache's roll and pick (see [arena-streaks.md](arena-streaks.md#boss-caches)), headed **RIFT BOSS DEFEATED · THREAT II** and the boss's name. Inside: the boss's gem, free (its element, Tier 4 / Rank III, Ultra Rare from a tier-4 boss and Legendary from a tier-5 one), its threat's free gems of its element, and six pieces of gear to keep three of, two of them the boss's favourite kind. The other three go up on the Market from the **Rift Vault**, with your 25% cut. It opens a few seconds after the kill; LATER keeps it for whenever you like (the **BOSS CACHE READY** button) |
+| **Home** | 20 seconds after the kill, everyone still in is home |
 
-While the loot is up the strip says **BOSS DOWN · CLAIM, ROLL OR PASS**;
-once it's settled, the home clock.
+Once the boss is down the strip says **BOSS DOWN · HOME IN 0:20**.
 
 ### Who takes whom
 
@@ -110,7 +109,8 @@ once it's settled, the home clock.
     like (`TargetLockRules`).
 - **The target list** marks them: **LEADER · their name**.
 
-![The boss's loot](rift/loot.png)
+![A boss cache: Tung Tung Tung Sahur, threat III (offline render)](rift/loot.png)
+![A threat I boss cache on a phone (offline render)](rift/loot_phone.png)
 
 Your kaiju come with you: you keep the Outpost's attribute, so
 `KaijuServer` keeps them out and follows you, jumping when you jump. They
@@ -210,9 +210,11 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 
 | File | What |
 | --- | --- |
-| `src/shared/RiftRun.luau` | The rules: the layout, packs and fighters, where their tears open (`Portal`, `portalSpots`), levels, the boss, caches, rewards, the loot's time, robbery, RESTORE's price |
+| `src/shared/RiftRun.luau` | The rules: the layout, packs and fighters, where their tears open (`Portal`, `portalSpots`), levels, the boss and its health, caches, rewards, robbery, RESTORE's price |
+| `src/shared/BossLoot.luau` | Each boss's cache by its threat (free gems, Ultra Rare gear, quality, health), its favourite kind of gear |
 | `src/server/World/RiftWorld.luau` | Builds a trip's world far off in the dark: walled caves, passages under arches, walls of fire, the throne cave, the ways home, the burning sky; `RiftWorld.inside` (is a spot in a cave) |
-| `src/server/Systems/RiftServer.luau` | Runs trips: `RiftEnter`, `RiftLeave`, `RiftChoice`, `RiftPeek`, `RiftLootChoice` |
+| `src/server/Systems/RiftServer.luau` | Runs trips: `RiftEnter`, `RiftLeave`, `RiftChoice`, `RiftPeek`; a boss cache each at the kill |
+| `src/server/Systems/ArenaStreaks.luau` | `ArenaStreaks.bossCache`: rolls and saves a boss cache, and tells its owner |
 | `src/server/Systems/KaijuServer.luau` | Your kaiju take the critters before the leaders |
 | `src/shared/TargetLockRules.luau`, `src/client/Modules/TargetLock.luau` | Your lock takes the leader first |
 | `src/client/Modules/FoeBars.luau` | **LEADER** in the target list |
@@ -221,28 +223,28 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 | `src/server/Systems/Dungeons.luau` | `Dungeons.bossGem`: the boss's gem, shared with the pathway dungeon |
 | `src/server/Systems/SparServer.luau` | `SparServer.riftKit`: the kit out going in, away coming home |
 | `src/client/Modules/RiftClient.luau` | The gate's card, the crossing, hell lighting, the strip, the down window |
-| `src/client/DungeonLoot.client.luau` | The loot card (its title from `DungeonLootTitle`; in the Rift its choice goes to `RiftLootChoice`) |
+| `src/client/Modules/StreakRewards.luau` | The cache screen: the roll, the picks, CLAIM (a boss cache's heading, threat and element) |
 | `src/server/World/OutpostWorld.luau` | The gate on each vein (`veinMarks`) |
 | `src/client/Modules/RiftTear.luau` | The tear in the gate, in the Hell palette |
 | `src/server/Systems/KaijuWilds.luau` | `spawnBug` options for the Rift's critters (`Scale`, `Health`, `Damage`, `Reach`, `Title`, `Stay`, `Wander`) |
 
 A runner carries `RiftRun`, `RiftRoom`, `RiftLeft`, `RiftBoss`,
 `RiftFound`, `RiftRunners`, `RiftWon`, `RiftExitAt`; when down at the boss
-`RiftFallen` and `RiftRestore`; and while the boss's loot is up
-`DungeonLoot`, `DungeonLootDeadline` and `DungeonLootTitle`.
+`RiftFallen` and `RiftRestore`. A boss cache is saved with the player's
+Arena Caches (`profile.Duel.StreakCaches`, `Kind = "Boss"`).
 
 ## Spanish
 
 Every line above is in `Shared.LangEs`: the card, the warning, the strip,
-the down window, the loot card, the server's messages and the prompts.
+the down window, the boss cache, the server's messages and the prompts.
 Boss and move names stay in English (they're names).
 
 ## Tests
 
 | Suite | What it checks |
 | --- | --- |
-| `run_rift` | 32,597 checks: pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (802). And nothing else starts for a runner |
-| `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, the loot (claim, roll, pass, the time running out, the gem to the winner), the kit away at home. The fighters are stand-ins here: the real Duelist isn't loaded |
+| `run_rift` | 33,283 checks: pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (802). And nothing else starts for a runner |
+| `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (the boss's gem in it, Legendary from a tier-5 boss; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The fighters are stand-ins here: the real Duelist isn't loaded |
 | `run_target_lock` | Your lock takes a pack's leader over nearer critters and those attacking you, holds it against them, takes it back from a critter, but not hidden or out of range; a target you pick still holds |
 | `run_spar` | Going into the Rift ends a spar, the kit stays out in there and can't be put away, nobody spars with a runner, and the kit goes away at home |
 | `run_outpost` | Each vein has its gate, prompt, arch, glow, cracks in its colour and its index |

@@ -22,13 +22,14 @@
 	  The boss   one of the ten brainrot bosses (DungeonRules.Bosses) at
 	             random, as a Colossus: the pathway dungeon's boss fighter,
 	             with Boss.Health times its health (more with more
-	             runners). At each of Boss.Adds (shares of its health left)
+	             runners, and by its threat: Shared.BossLoot). At each of
+	             Boss.Adds (shares of its health left)
 	             it tears the ground open and Boss.AddCount critters and
-	             Boss.AddFighters fighters come through. Beaten: its loot
-	             (Loot: claim, roll or pass, as in the pathway dungeon: a
-	             gem of its element, Ultra Rare at gear tier 4, Legendary
-	             at 5) and Reward for everyone still in, then the way home
-	             opens (Exit seconds, then through it you go).
+	             Boss.AddFighters fighters come through. Beaten: Reward
+	             and a boss cache for everyone still in (Shared.BossLoot:
+	             a gem of its element, Ultra Rare at gear tier 4, Legendary
+	             at 5, and six pieces of gear to keep three of), then the
+	             way home opens (Exit seconds, then through it you go).
 	  Levels     the critters come at the runners' kaiju's level (the
 	             average of their leads), Level.Base over it in the first
 	             cave and PerRoom more each cave; the boss's critters
@@ -56,6 +57,7 @@
 	             through any gate while their party's trip is still on the
 	             way. Going in alone, you're warned (RiftRun.solo).
 ]]
+local BossLoot = require(script.Parent.BossLoot)
 local DungeonRules = require(script.Parent.DungeonRules)
 local Kaiju = require(script.Parent.Kaiju)
 
@@ -78,7 +80,6 @@ RiftRun.Boss = {
 }
 RiftRun.Cache = { Luck = 0.12, PerRoom = 0.06 }
 RiftRun.Reward = { Coins = 300, PerRoom = 40, Luck = 0.6, Exp = 120 }
-RiftRun.Loot = { Seconds = 30 }
 RiftRun.Rob = { Share = 0.5 }
 RiftRun.Heal = { PerCave = 2, Hp = 5, Swing = 0.07, Pop = 0.25, Kaiju = 0.35, Regrow = 40, Reach = 10, Inset = 15 }
 RiftRun.Restore = { Coins = 150, Grow = 2 }
@@ -221,10 +222,12 @@ function RiftRun.pickBoss(rng)
 	return DungeonRules.Bosses[rng:NextInteger(1, #DungeonRules.Bosses)]
 end
 
--- The boss's health, times a Colossus's, for `runners` runners.
-function RiftRun.bossHealth(runners: number): number
+-- The boss's health, times a Colossus's, for `runners` runners (and by
+-- `boss`'s threat when given: BossLoot.health).
+function RiftRun.bossHealth(runners: number, boss: any?): number
 	local rule = RiftRun.Boss
-	return rule.Health * (1 + rule.PerRunner * (math.max(1, runners) - 1))
+	local threat = if boss then BossLoot.health(boss) else 1
+	return rule.Health * (1 + rule.PerRunner * (math.max(1, runners) - 1)) * threat
 end
 
 -- The boss's gear tier: 4 alone (its gem Ultra Rare), 4 or 5 for a party.

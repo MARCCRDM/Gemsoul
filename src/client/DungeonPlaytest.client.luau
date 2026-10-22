@@ -42,7 +42,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 426)
+panel.Size = UDim2.fromOffset(300, 458)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -126,7 +126,7 @@ local function run(action: string, ...)
 		panel.Visible = false
 		toggle.Text = arrow(false)
 	end
-	if ok and result and result.Ok and action == "DevStreakCache" then
+	if ok and result and result.Ok and (action == "DevStreakCache" or action == "DevBossCache") then
 		-- Out of the way, so the cache's roll plays in full view.
 		panel.Visible = false
 		toggle.Text = arrow(false)
@@ -316,10 +316,33 @@ for i, wins in { 10, 20, 30, 40, 50 } do
 	end)
 end
 
+-- BOSS CACHE: a test boss cache (Shared.BossLoot) from a boss of threat I,
+-- II or III, its gem and all, opened the same way.
+local bossCaption = versionCaption:Clone()
+bossCaption.Position = UDim2.fromOffset(6, 392)
+bossCaption.Text = "BOSS CACHE"
+bossCaption.Parent = panel
+for threat, numeral in { "I", "II", "III" } do
+	local b = Instance.new("TextButton")
+	b.Name = "BossCache" .. threat
+	b.Size = UDim2.fromOffset(60, 26)
+	b.Position = UDim2.fromOffset(104 + (threat - 1) * 64, 392)
+	b.BackgroundColor3 = Color3.fromRGB(92, 34, 30)
+	b.TextColor3 = Color3.fromRGB(255, 176, 150)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 12
+	b.Text = numeral
+	b.Parent = panel
+	corner(b, 5)
+	b.Activated:Connect(function()
+		run("DevBossCache", threat)
+	end)
+end
+
 -- LANGUAGE: the game in English or Spanish (client/Translate), whatever
 -- Roblox is set to. This session only.
 local languageCaption = versionCaption:Clone()
-languageCaption.Position = UDim2.fromOffset(6, 392)
+languageCaption.Position = UDim2.fromOffset(6, 424)
 languageCaption.Text = "LANGUAGE"
 languageCaption.Parent = panel
 local languageButtons = {}
@@ -335,7 +358,7 @@ for i, id in { "en", "es" } do
 	local b = Instance.new("TextButton")
 	b.Name = "Language" .. id
 	b.Size = UDim2.fromOffset(92, 26)
-	b.Position = UDim2.fromOffset(104 + (i - 1) * 98, 392)
+	b.Position = UDim2.fromOffset(104 + (i - 1) * 98, 424)
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 12
 	b.Text = if id == "en" then "ENGLISH" else "ESPAÑOL"
