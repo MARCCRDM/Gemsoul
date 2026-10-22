@@ -61,7 +61,26 @@ local Creature = load("src/shared/CreatureMoves.luau", "CreatureMoves")
 -- Every creature move is whole: a shape it lands as, a wind-up, damage,
 -- a cooldown, how far it reaches; a ring wide enough to step out of, a
 -- dash a length and a path, bombs a count.
-local SHAPED = { Slam = "Radius", Roar = "Radius", Blast = "Radius", Bombs = "Count", Leap = "Leap", Dash = "Length" }
+local SHAPED = {
+	Slam = "Radius",
+	Roar = "Radius",
+	Blast = "Radius",
+	Bombs = "Count",
+	Leap = "Leap",
+	Dash = "Length",
+	Cone = "Reach",
+	Dive = "Bomb",
+	Wave = "Inner",
+	Pull = "Pull",
+	Hops = "Hops",
+	Trail = "Length",
+	Line = "Length",
+	Aura = "Aura",
+	Fan = "Count",
+}
+-- The shapes with no ring of their own (a path's or a cone's width instead).
+local RINGLESS = { Strike = true, Dash = true, Cone = true, Fan = true }
+local PATHS = { Dash = true, Trail = true, Line = true, Fan = true }
 for id, move in Creature.Catalog do
 	check(type(move.Name) == "string" and Creature.Shapes[move.Shape], id .. ": no shape")
 	check(move.Windup and move.Windup > 0 and move.Damage and move.Damage > 0, id .. ": no wind-up or damage")
@@ -70,19 +89,39 @@ for id, move in Creature.Catalog do
 	if SHAPED[move.Shape] then
 		check(move[SHAPED[move.Shape]], id .. ": no " .. SHAPED[move.Shape])
 	end
-	if move.Shape ~= "Strike" and move.Shape ~= "Dash" then
+	if not RINGLESS[move.Shape] then
 		check(move.Radius and move.Radius >= 4, id .. ": a ring too small to see")
 	end
-	if move.Shape == "Dash" then
-		check(move.Width and move.Width > 0, id .. ": a dash with no path")
+	if PATHS[move.Shape] then
+		check(move.Width and move.Width > 0, id .. ": a path with no width")
+	end
+	if move.Shape == "Cone" or move.Shape == "Fan" then
+		check(move.Angle and move.Angle >= 30 and move.Angle <= 180, id .. ": a cone you can't read")
+	end
+	if move.Shape == "Wave" then
+		check(move.Inner >= 2 and move.Inner < move.Radius - 3, id .. ": a wave with no safe core")
+	end
+	if move.Shape == "Hops" then
+		check(move.Hops >= 2 and move.HopGap and move.HopGap >= 0.5, id .. ": hops too few or too quick")
+	end
+	if move.Shape == "Dive" then
+		check(move.Bomb.Count >= 1 and move.Bomb.Radius >= 3 and move.Bomb.Spread > move.Radius / 2, id .. ": a dive with no bombs round it")
+	end
+	if move.Shape == "Aura" then
+		check(move.Aura.Every and move.Aura.Duration >= 3 and move.Aura.Damage > 0, id .. ": an aura that does nothing")
+	end
+	if move.Shape == "Trail" or move.Shape == "Line" then
+		check(move.Cloud and move.Step and move.Step > 0, id .. ": a path that leaves nothing")
 	end
 	if move.Big then
-		-- Its big one: a long, readable wind-up, a wide ring, a long cooldown.
+		-- Its big one: a long, readable wind-up, something shown, a long cooldown.
 		check(move.Windup >= 1.3 and move.Cooldown >= 14, id .. ": a big attack too quick to read")
-		check(move.Shape ~= "Strike" and move.Shape ~= "Dash", id .. ": a big attack with no ring")
+		check(move.Shape ~= "Strike" and move.Shape ~= "Dash", id .. ": a big attack with nothing shown")
+	else
+		check(not move.Warn, id .. ": a warning on a move that isn't announced")
 	end
 	if move.CC then
-		check(move.Shape == "Slam" or move.Shape == "Leap", id .. ": a core stun on a move with no core")
+		check(Creature.Cores[move.Shape], id .. ": a core stun on a move with no core")
 	end
 	for rider in move.Riders or {} do
 		check(
@@ -158,8 +197,58 @@ for _, spec in Rules.Bosses do
 	end
 	check(big == 1, spec.Id .. ": not one big attack")
 end
-for shape in HEADS do
-	check(seen.Shape[shape], shape .. " isn't a boss")
+-- No two bosses fight the same way: each big attack is the only one of
+-- its shape, each boss's three moves are three different shapes, and no
+-- shape but a strike is on more than two bosses. Two strikes never share
+-- a form (how many blows, how heavy, how far).
+local bigShape, shapeOn, strikeForms = {}, {}, {}
+for _, spec in Rules.Bosses do
+	local shapes, own = {}, 0
+	for _, move in spec.Moves do
+		local creature = Creature.get(move)
+		check(not shapes[creature.Shape], spec.Id .. ": two moves of one shape, " .. creature.Shape)
+		shapes[creature.Shape] = true
+		if creature.Big then
+			check(not bigShape[creature.Shape], spec.Id .. ": its big attack is shaped like " .. tostring(bigShape[creature.Shape]) .. "'s")
+			bigShape[creature.Shape] = spec.Id
+		end
+		if creature.Shape == "Strike" then
+			local form = table.concat({
+				tostring(creature.Hits or 1),
+				tostring(creature.Heavy == true),
+				tostring(creature.HeavyLast == true),
+				tostring(creature.Reach or 0),
+			}, "/")
+			check(not strikeForms[form], spec.Id .. ": " .. move .. " strikes just as " .. tostring(strikeForms[form]) .. " does")
+			strikeForms[form] = move
+		else
+			shapeOn[creature.Shape] = (shapeOn[creature.Shape] or 0) + 1
+		end
+	end
+end
+for shape, count in shapeOn do
+	check(count <= 2, shape .. " is on " .. count .. " bosses")
+end
+-- Where two bosses do share a shape, their moves leave different things on
+-- you (a shock and a slow, a burn and a poison), so neither plays like the
+-- other's.
+local leaves = {}
+for _, spec in Rules.Bosses do
+	for _, move in spec.Moves do
+		local creature = Creature.get(move)
+		if creature.Shape ~= "Strike" then
+			local riders = {}
+			for rider in creature.Riders or {} do
+				if not string.find(rider, "Time", 1, true) and rider ~= "StunKind" then
+					table.insert(riders, rider)
+				end
+			end
+			table.sort(riders)
+			local key = creature.Shape .. ":" .. table.concat(riders, "+")
+			check(not leaves[key], spec.Id .. ": " .. move .. " leaves what " .. tostring(leaves[key]) .. " leaves")
+			leaves[key] = move
+		end
+	end
 end
 
 -- They're the bosses: the last room's, and the open map's middle camp.

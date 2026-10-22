@@ -756,8 +756,28 @@ local function creatureRiders(duel, player: Player, stats, dealt, guarded)
 	end
 end
 
+-- Where its foe is from it, across the ground (where it faces if they're
+-- on top of it).
+local function toward(root: BasePart, target: BasePart): Vector3
+	local offset = flat(target.Position - root.Position)
+	return if offset.Magnitude > 0.1 then offset.Unit else flat(root.CFrame.LookVector).Unit
+end
+
+-- Points every `step` studs along a path, the far end included.
+local function along(from: Vector3, to: Vector3, step: number): { Vector3 }
+	local points = {}
+	local length = (to - from).Magnitude
+	local n = math.max(1, math.floor(length / step))
+	for i = 1, n do
+		table.insert(points, from + (to - from) * (i / n))
+	end
+	return points
+end
+
 -- Starts one: a ring where it lands for its whole wind-up (round its feet,
--- under its foe, or where it jumps), or a crouch before a dash.
+-- under its foe, or where it jumps), rings along a path or down a cone, or
+-- a crouch before a dash. Rings: { Center, Radius } to show and, for the
+-- shapes that land in rings, to hit in.
 local function creatureMove(enemy, duel, move, now: number, target: BasePart)
 	local root, stats = enemy.Root, move.Creature
 	local color = GemConfig.ElementColors[duel.Element] or P_GOLD
@@ -774,27 +794,86 @@ local function creatureMove(enemy, duel, move, now: number, target: BasePart)
 		Hits = stats.Hits or 1,
 	}
 	local shape = stats.Shape
-	if shape == "Slam" or shape == "Roar" then
-		action.Centers = { root.Position }
+	local function ring(center: Vector3, radius: number?)
+		table.insert(action.Centers, center)
+		table.insert(action.Radii, radius or stats.Radius)
+	end
+	action.Centers, action.Radii = {}, {}
+	if shape == "Slam" or shape == "Roar" or shape == "Pull" or shape == "Aura" then
+		ring(root.Position)
+	elseif shape == "Wave" then
+		-- The outer ring, and the safe core marked inside it.
+		ring(root.Position)
+		fx("Telegraph", root.Position - Vector3.new(0, 2.5, 0), stats.Inner, color, windup)
 	elseif shape == "Blast" then
-		action.Centers = { target.Position }
+		ring(target.Position)
 	elseif shape == "Bombs" then
 		-- The first where you stand, the rest scattered round you.
-		action.Centers = { target.Position }
+		ring(target.Position)
 		for _ = 2, stats.Count or 1 do
 			local angle, out = math.random() * math.pi * 2, (0.4 + math.random() * 0.6) * (stats.Spread or 5)
-			table.insert(action.Centers, target.Position + Vector3.new(math.cos(angle) * out, 0, math.sin(angle) * out))
+			ring(target.Position + Vector3.new(math.cos(angle) * out, 0, math.sin(angle) * out))
 		end
-	elseif shape == "Leap" then
+	elseif shape == "Leap" or shape == "Hops" or shape == "Dive" then
 		-- Onto where you stood as it crouched (as far as it jumps).
 		local offset = flat(target.Position - root.Position)
-		action.Centers = { root.Position + (if offset.Magnitude > stats.Leap then offset.Unit * stats.Leap else offset) }
+		local landing = root.Position + (if offset.Magnitude > stats.Leap then offset.Unit * stats.Leap else offset)
+		ring(landing)
+		if shape == "Dive" then
+			-- Its bombs scatter round the crater.
+			local bomb = stats.Bomb
+			for _ = 1, bomb.Count do
+				local angle, out = math.random() * math.pi * 2, (0.5 + math.random() * 0.5) * bomb.Spread
+				ring(landing + Vector3.new(math.cos(angle) * out, 0, math.sin(angle) * out), bomb.Radius)
+			end
+		end
+		action.HopsLeft = if shape == "Hops" then (stats.Hops or 1) - 1 else nil
 		action.LaunchAt = action.At - math.min(LEAP_AIR, windup)
 	elseif shape == "Dash" then
 		action.LaunchAt = action.At - math.min(DASH_TIME, windup)
+	elseif shape == "Trail" or shape == "Line" then
+		-- A path fixed now, from its feet through where you stand.
+		local dir = toward(root, target)
+		local to = root.Position + dir * stats.Length
+		if shape == "Trail" then
+			-- (Its charge's path, From and To, is set as it launches.)
+			action.Lock = to
+			action.LaunchAt = action.At - math.min(DASH_TIME, windup)
+		else
+			action.From, action.To = root.Position, to
+		end
+		for _, point in along(root.Position, to, stats.Step or 6) do
+			ring(point, stats.Width)
+		end
+	elseif shape == "Cone" then
+		-- Where it faced as it started: two rings down the cone show it.
+		local dir = toward(root, target)
+		action.Dir = dir
+		local half = math.tan(math.rad((stats.Angle or 60) / 2))
+		for _, t in { 0.4, 0.85 } do
+			ring(root.Position + dir * stats.Reach * t, math.max(3, stats.Reach * t * half))
+		end
+	elseif shape == "Fan" then
+		-- Count paths spread over Angle degrees, the middle one at its foe.
+		local dir = toward(root, target)
+		local count = stats.Count or 3
+		action.Lines = {}
+		for i = 1, count do
+			local turn = math.rad(-(stats.Angle or 90) / 2 + (stats.Angle or 90) * (i - 1) / math.max(1, count - 1))
+			local spoke = Vector3.new(
+				dir.X * math.cos(turn) - dir.Z * math.sin(turn),
+				0,
+				dir.X * math.sin(turn) + dir.Z * math.cos(turn)
+			)
+			local to = root.Position + spoke * stats.Length
+			table.insert(action.Lines, { From = root.Position, To = to })
+			for _, point in along(root.Position, to, stats.Length / 2) do
+				ring(point, stats.Width)
+			end
+		end
 	end
-	for _, center in action.Centers or {} do
-		fx("Nova", center - Vector3.new(0, 2.5, 0), stats.Radius, color, windup)
+	for i, center in action.Centers do
+		fx("Nova", center - Vector3.new(0, 2.5, 0), action.Radii[i], color, windup)
 	end
 	duel.Action = action
 end
@@ -810,6 +889,11 @@ local function launch(enemy, action, target: BasePart, now: number)
 		local dir = if offset.Magnitude > 0.1 then offset.Unit else flat(root.CFrame.LookVector).Unit
 		to = from + dir * math.min(stats.Length, offset.Magnitude + 4)
 		fx("DodgeRoll", nil, from, dir, (to - from).Magnitude, false)
+	elseif stats.Shape == "Trail" then
+		-- Down the path it showed as it crouched, wherever you've gone.
+		to = action.Lock
+		local run = flat(to - from)
+		fx("DodgeRoll", nil, from, if run.Magnitude > 0.1 then run.Unit else flat(root.CFrame.LookVector).Unit, run.Magnitude, false)
 	else
 		to = action.Centers[1]
 		root.AssemblyLinearVelocity = flat(to - from) / LEAP_AIR
@@ -820,8 +904,8 @@ local function launch(enemy, action, target: BasePart, now: number)
 end
 
 -- How far `point` is from its Dash's path, across the ground.
-local function offPath(action, point: Vector3): number
-	local a, b, p = flat(action.From), flat(action.To), flat(point)
+local function offPath(line, point: Vector3): number
+	local a, b, p = flat(line.From), flat(line.To), flat(point)
 	local ab = b - a
 	local t = if ab.Magnitude > 0.01 then math.clamp((p - a):Dot(ab) / ab:Dot(ab), 0, 1) else 0
 	return (p - (a + ab * t)).Magnitude
@@ -856,23 +940,44 @@ local function landCreature(enemy, duel, action, now: number, damage: number, di
 	for _, player in areaFoes(duel) do
 		local foeRoot = ownerRoot(player)
 		if foeRoot then
-			if shape == "Dash" then
-				if action.From and offPath(action, foeRoot.Position) <= (stats.Width or 4) then
-					local dealt, guarded = strikeAt(duel, player, power, duel.Element, stats.Heavy == true, nil, action.Name)
-					creatureRiders(duel, player, stats, dealt, guarded)
+			local at = foeRoot.Position
+			local function hit(scale: number?)
+				local dealt, guarded =
+					strikeAt(duel, player, power * (scale or 1), duel.Element, stats.Heavy == true, nil, action.Name)
+				creatureRiders(duel, player, stats, dealt, guarded)
+				return dealt, guarded
+			end
+			if shape == "Dash" or shape == "Trail" or shape == "Line" then
+				if action.From and offPath(action, at) <= (stats.Width or 4) then
+					hit()
+				end
+			elseif shape == "Fan" then
+				-- Within reach of any of its paths (it hits once).
+				for _, line in action.Lines or {} do
+					if offPath(line, at) <= (stats.Width or 3) then
+						hit()
+						break
+					end
+				end
+			elseif shape == "Cone" then
+				local offset = flat(at - root.Position)
+				if
+					offset.Magnitude <= stats.Reach
+					and (offset.Magnitude < 0.1 or offset.Unit:Dot(action.Dir) >= math.cos(math.rad((stats.Angle or 60) / 2)))
+				then
+					hit()
 				end
 			else
-				-- Each ring hits once (a bomb each).
-				for _, center in action.Centers do
-					local away = flat(foeRoot.Position - center).Magnitude
-					if away <= stats.Radius then
+				-- Each ring hits once (a bomb each); a Wave spares its core.
+				for i, center in action.Centers do
+					local away = flat(at - center).Magnitude
+					local radius = action.Radii and action.Radii[i] or stats.Radius
+					if away <= radius and (shape ~= "Wave" or away >= (stats.Inner or 0)) then
 						local scale, cc, seconds = 1, nil, 0
-						if shape == "Slam" or shape == "Leap" then
-							scale, cc, seconds = Actions.blastFalloff(away, stats.Radius)
+						if CreatureMoves.Cores[shape] and i == 1 then
+							scale, cc, seconds = Actions.blastFalloff(away, radius)
 						end
-						local dealt, guarded =
-							strikeAt(duel, player, power * scale, duel.Element, stats.Heavy == true, nil, action.Name)
-						creatureRiders(duel, player, stats, dealt, guarded)
+						local dealt, guarded = hit(scale)
 						if cc and type(dealt) == "number" and dealt > 0 then
 							if guarded then
 								cc, seconds = if cc == "Stunned" then "Staggered" else nil, 0.4
@@ -886,11 +991,23 @@ local function landCreature(enemy, duel, action, now: number, damage: number, di
 									if cc == "Stunned" then Actions.Blast.Knockback else 0
 								)
 							end
+						elseif shape == "Pull" and type(dealt) == "number" and dealt > 0 then
+							-- Dragged to its feet (a push the other way).
+							CombatServer.blastCC(player, "Staggered", 0.5, center, -(stats.Pull or 2.5))
 						end
 					end
 				end
 			end
 		end
+	end
+	if shape == "Aura" then
+		-- The storm stays on it: see the aura in think.
+		duel.Aura = {
+			Name = action.Name,
+			Stats = stats,
+			Until = now + stats.Aura.Duration,
+			Next = now + stats.Aura.Every,
+		}
 	end
 	-- Ground that stays harmful (it ticks on the one it's on: see Zones).
 	if stats.Cloud then
@@ -909,6 +1026,24 @@ local function landCreature(enemy, duel, action, now: number, damage: number, di
 			fx("Zone", center, stats.Radius, stats.Cloud.Duration, color)
 		end
 	end
+	if shape == "Hops" and (action.HopsLeft or 0) > 0 then
+		-- Up again, onto where its foe stands now.
+		local foeRoot = ownerRoot(duel.Owner)
+		if foeRoot then
+			local gap = stats.HopGap or 0.6
+			local offset = flat(foeRoot.Position - root.Position)
+			local landing = root.Position + (if offset.Magnitude > stats.Leap then offset.Unit * stats.Leap else offset)
+			action.Centers, action.Radii = { landing }, { stats.Radius }
+			action.HopsLeft -= 1
+			action.At = now + gap
+			action.LaunchAt = action.At - math.min(LEAP_AIR, gap)
+			action.From, action.To, action.Speed = nil, nil, nil
+			fx("Nova", landing - Vector3.new(0, 2.5, 0), stats.Radius, color, gap)
+			animate(duel, stats.Pose or "Leap", gap, nil, action.Name)
+			duel.Action = action
+			return true
+		end
+	end
 	return false
 end
 
@@ -921,7 +1056,11 @@ local function useMove(enemy, duel, move, now: number, target: BasePart, dir: Ve
 	if move.Big then
 		-- Its big one: everyone in the fight is told to get clear.
 		for _, player in areaFoes(duel) do
-			Remotes.CombatFx:FireClient(player, "TechStatus", duel.Name .. " winds up " .. move.Name .. "! Get out of the ring!")
+			Remotes.CombatFx:FireClient(
+				player,
+				"TechStatus",
+				duel.Name .. " winds up " .. move.Name .. "! " .. ((move.Creature and move.Creature.Warn) or "Get out of the ring!")
+			)
 		end
 	else
 		Remotes.CombatFx:FireClient(duel.Owner, "TechStatus", duel.Name .. " uses " .. move.Name .. "!")
@@ -1351,6 +1490,34 @@ local function think(enemy, now: number)
 								* Enemies.healingMultiplier(enemy)
 								* (1 + (duel.Kit and duel.Kit.Effects.HealingReceived or 0))
 					)
+				end
+			end
+		end
+	end
+
+	-- Its storm (an Aura: Shared.CreatureMoves) follows it round, catching
+	-- everyone near it every so often.
+	local aura = duel.Aura
+	if aura then
+		if now >= aura.Until then
+			duel.Aura = nil
+		elseif now >= aura.Next then
+			local stats = aura.Stats
+			aura.Next += stats.Aura.Every
+			fx("Zone", root.Position, stats.Radius, stats.Aura.Every, color)
+			for _, player in areaFoes(duel) do
+				local foeRoot = ownerRoot(player)
+				if foeRoot and flat(foeRoot.Position - root.Position).Magnitude <= stats.Radius then
+					local dealt, guarded = strikeAt(
+						duel,
+						player,
+						duel.Damage * (1 - Enemies.weakness(enemy)) * stats.Aura.Damage,
+						duel.Element,
+						false,
+						nil,
+						aura.Name
+					)
+					creatureRiders(duel, player, stats, dealt, guarded)
 				end
 			end
 		end
