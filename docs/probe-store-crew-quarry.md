@@ -1,5 +1,7 @@
 # PROBE-7, the Store's stands, the crew and the quarry
 
+*Since then (2026-10-22): plain one-word signs, and the Shelter's floor cleared (no PROBE-7 station, duel gate, stands or survey table; PROBE-7 and Brutus are crew; the Gem Gallery is next to the Market). See [plain-signs.md](plain-signs.md).*
+
 This round changes the Outpost's lobby and the quarry round it:
 
 - **PROBE-7** is now the probe itself, landed and unfolded into the station.

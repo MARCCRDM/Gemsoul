@@ -48,9 +48,10 @@
 	EXP. healPick picks the gems for a heal; AutoHeal, switched on, heals
 	your team with your spare Commons by itself, then your spare Uncommons
 	once the Commons run out (autoHealPick). One knocked out comes back by
-	itself once its revive time is up (Revive, reviveSeconds), weak, to be
-	healed with gems; or at once, and stronger, for Robux or a Revive
-	coupon. Gems don't revive it.
+	itself once its revive time is up (Revive, reviveSeconds), weak: low on
+	health, and its gems heal it at a third till it's full again (record.Weak,
+	healShare), so a knockout costs gems; or at once, and stronger, for Robux
+	or a Revive coupon. Gems don't revive it.
 
 	Pure data and logic, for the server, the client and tests.
 ]]
@@ -727,11 +728,12 @@ Kaiju.Infuse = {
 
 -- Knocked out: back by itself once Base seconds, and PerLevel more a level,
 -- have gone by (record.DownUntil, the server's clock: it counts while
--- you're away), but weak, at Health of its health: heal it with gems
--- before it fights again. Or at once, at Bought of its health: Robux (the
--- "KaijuRevive" product, Shared.Store: every one of yours that's down) or
--- a Revive coupon (Shared.Coupons).
-Kaiju.Revive = { Base = 60, PerLevel = 8, Health = 0.15, Bought = 0.5 }
+-- you're away), but weak (record.Weak), at Health of its health, and gems
+-- heal it at Weak of their power till it's full again: three times the
+-- gems a heal would take. Or at once, at Bought of its health and not
+-- weak: Robux (the "KaijuRevive" product, Shared.Store: every one of yours
+-- that's down) or a Revive coupon (Shared.Coupons).
+Kaiju.Revive = { Base = 60, PerLevel = 8, Health = 0.1, Bought = 0.5, Weak = 1 / 3 }
 
 -- How long one knocked out at its level stays down.
 function Kaiju.reviveSeconds(record): number
@@ -841,7 +843,14 @@ function Kaiju.health(record): (number, number)
 	return math.clamp(tonumber(record.Health) or most, 0, most), most
 end
 
--- A stone's power infused into a kaiju (Kaiju.Infuse).
+-- What a gem's power counts for in a kaiju: all of it, or Revive.Weak of
+-- it while it's weak, back by itself from a knockout (record.Weak).
+function Kaiju.healShare(record): number
+	return if record and record.Weak == true and not record.Down then Kaiju.Revive.Weak else 1
+end
+
+-- A stone's power infused into a kaiju (Kaiju.Infuse; weak, Revive.Weak of
+-- it: healShare).
 function Kaiju.infusePower(gem, record): number
 	if type(gem) ~= "table" or not record then
 		return 0
@@ -853,7 +862,7 @@ function Kaiju.infusePower(gem, record): number
 	elseif gem.Element == ElementMatchup.weakTo(record.Element) then
 		power *= infuse.Weak
 	end
-	return power
+	return power * Kaiju.healShare(record)
 end
 
 -- What healing a kaiju with `gems` (in the order given) does: only the

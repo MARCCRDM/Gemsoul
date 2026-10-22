@@ -269,9 +269,11 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **Knocked out**, it goes back into its Gemsoul and stays down (`Down`)
   until it comes back by itself: 60 seconds and 8 more a level
   (`Kaiju.Revive`, `reviveSeconds`; `DownUntil` on the record, the
-  server's clock, so it counts while you're away), **weak, at 15% of its
-  health** (`Revive.Health`): heal it with gems before it fights again.
-  Gems don't revive it. Or revive it now, at half health (`Revive.Bought`):
+  server's clock, so it counts while you're away), **weak, at 10% of its
+  health** (`Revive.Health`), and **gems heal it at a third** till it's
+  full again (`record.Weak`, `Revive.Weak`, `Kaiju.healShare`): a knockout
+  costs about three times the gems a heal would. Gems don't revive it. Or
+  revive it now, at half health and not weak (`Revive.Bought`):
   **REVIVE** for Robux (the `KaijuRevive` product, R$ 25: every one of
   yours that's down) or a **Revive coupon** from inviting friends
   (`Shared.Coupons`). The others fight on. See [Knocked out](#knocked-out).
@@ -652,12 +654,20 @@ A gem's **power** is its rarity's, and its element matters:
 ![Knocked out: the countdown, REVIVE and COUPON](kaiju/revive.png)
 
 - **Back by itself** once its revive time is up: 60 seconds plus 8 a
-  level (a level-11 kaiju waits 2:28), but **weak, at 15% of its health**
-  (`Kaiju.Revive.Health`, `reviveSeconds`, `reviveIn`): heal it with gems
-  (or let AUTO HEAL) before it fights again. The server's upkeep wakes it
-  ("Cryo Razorback is back on its feet, but weak: heal with gems before the
-  next fight."), at home or out, and the time runs while you're offline too.
-  The panel says so while it's down ("It comes back weak, at 15% health").
+  level (a level-11 kaiju waits 2:28), but **weak, at 10% of its health**
+  (`Kaiju.Revive.Health`, `reviveSeconds`, `reviveIn`), and weak
+  (`record.Weak`): every gem heals it at a third of its power
+  (`Revive.Weak`, `Kaiju.healShare`, so `infusePower`, `infusePlan`,
+  `healPick` and AUTO HEAL all count it) till it's full again. From 10%
+  that's 27 Commons of no element, or 14 of its own, where a well kaiju
+  takes 9 (a heal takes at most 25 at a time). Full again, by gems, a
+  Rift's healing crystal or RESTORE, it's no longer weak; a battle doesn't
+  clear it (it's put back weak after). The server's upkeep wakes it ("Cryo
+  Razorback is back on its feet, but weak: gems heal it at a third till
+  it's full again."), at home or out, and the time runs while you're
+  offline too. The panel says so while it's down ("It comes back weak, at
+  10% health, and gems heal it at a third till it's full."), and on its
+  HEAL tab while it's weak.
 - **REVIVE** (R$ 25, the `KaijuRevive` developer product; coins while
   testing): every one of yours that's down, back now, at half health
   (`Kaiju.Revive.Bought`; a Revive coupon too). Paid for when none is
@@ -800,8 +810,9 @@ team, a knocked-out one staying down and in its place, health kept with no
 healing on its own, healing with gems (its own element's gems counting
 double, only loose gems, never a socketed one, never mid-fight, never one
 that's down), knocked out (back by itself at half health once its time by
-level is up, not a moment before, weak at `Revive.Health`, gems refused,
-`reviveAll` at `Revive.Bought`), AUTO HEAL (off till switched on, not
+level is up, not a moment before, weak at `Revive.Health` and `Weak`, a
+weak one's 20% taking six Commons not two and no longer weak once full,
+gems refused, `reviveAll` at `Revive.Bought` and not weak), AUTO HEAL (off till switched on, not
 mid-fight, only spare Commons that fit, then an Uncommon once the Commons
 are gone, never a Rare or one a loadout names, never a revive, out of
 gems said once), fighting as a team (3 on 3 one each, 3 on 1 all

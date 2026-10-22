@@ -3,15 +3,14 @@
 	crater basin on the moon, ringed by weathered crater slopes. In the middle
 	stands the Shelter, the base players arrive in (an armoured barracks on
 	landing legs, ramps down from its doors: the mech garage with its
-	eight bays and a door at each end, the Store, the player Market, PROBE-7,
-	the leaderboard, the Arena Uplink and the kaiju arena); outside is the
+	eight bays and a door at each end, the Store, the player Market, the Gem
+	Gallery, the leaderboard and the kaiju arena, and the crew); outside is the
 	quarry, where they mine and hunt: the Loop, four biomes round the core
 	between four haul roads due north, east, south and west, each with its
 	own ground (Roblox terrain, Shared.Frontier.ground: their borders sway
-	and mix, and the land rises where nothing stands), rock and landmarks,
-	and a sign for it either side of each road (Shared.Frontier.Biomes). A
-	working
-	frontier outpost runs along the north edge (habitat modules strung on
+	and mix, and the land rises where nothing stands), rock and landmarks
+	(Shared.Frontier.Biomes; no sign names one). A working frontier outpost
+	runs along the north edge (habitat modules strung on
 	tubes, a refinery tower, a drill rig over its pit, conveyors, pipes and
 	floodlight masts), with the landing pad and shuttle south-east. Over it
 	all, only stars in the black, and the rift tearing across the north
@@ -21,11 +20,11 @@
 	      Model, Spawn (CFrame: in the Shelter's garage lane, facing bay 04's
 	      Mole drill, on its floor: Shared.Outpost.ShelterLift over the
 	      quarry's),
-	      Probe (BasePart, the terminal), Board (BasePart with the
-	      leaderboard's face), Gate (BasePart), Stations ({ Store, Market }:
+	      Board (BasePart with the leaderboard's face), Stations ({ Store, Market }:
 	      the Shelter's counters, for their prompts), Crew ({ { Id, CFrame } }:
 	      where the Shelter's crew stand, by Shared.Vendors id, for
-	      OutpostServer to build them), Shelter ({ Box, Lift, Ramps,
+	      OutpostServer to build them: PROBE-7 and Brutus among them, the
+	      refills and the duels), Shelter ({ Box, Lift, Ramps,
 	      Feet }: its half size, x and z, kept clear of rocks; how high its
 	      floor stands; each ramp's footprint, { Middle (on the quarry
 	      floor), Half (half sizes, x and z), SlopeHalf (the slope's half
@@ -616,78 +615,59 @@ local function tube(parent, from: Vector3, to: Vector3, radius: number, color: C
 	)
 end
 
--- The base's signs, one system everywhere: a dark face in a steel frame,
--- a bar of its station's colour (`color`) down the left, the name in warm
--- white condensed capitals and a plain line under it in grey. Nothing
--- glows: the colour is a marking, not a light. Read from its front (build
--- it with CFrame.lookAt(where, toward the reader)), and from its back too
--- if `both` (a blade sign standing out from a wall). Returns the panel, its
--- front's SurfaceGui and title.
-local SIGN_FACE = Color3.fromRGB(30, 33, 40)
-local SIGN_EDGE = Color3.fromRGB(92, 96, 106)
-local SIGN_TEXT = Color3.fromRGB(238, 234, 224)
-local SIGN_SUB = Color3.fromRGB(150, 156, 166)
-local function signFace(board: BasePart, side: Enum.NormalId, size: Vector3, title: string, sub: string?, color: Color3)
+-- The base's signs. A sign names a place in a word or two, the words the
+-- HUD uses (STORE, MARKET, ARENA, DUELS, EXIT, QUARRY), and says nothing
+-- else: no line under it, no colour bar, no invented names. What a place is
+-- for is the crew's to say (INFO-9, COACH-4) and the menus'. Two kinds:
+--   painted(...)  the word painted straight onto the wall (or the hull, or a
+--               screen) in worn capitals: an unseen carrier flush with the
+--               surface, the letters on its front (and its back if `both`)
+--   steelPlate(...)  where there's no wall: a bare steel plate, the word in dark
+--               paint on it
+-- Build either with its front toward the reader. Returns the part.
+local PAINT = Color3.fromRGB(226, 220, 204)
+local PLATE_INK = Color3.fromRGB(34, 36, 42)
+local function letters(holder: BasePart, side: Enum.NormalId, size: Vector3, text: string, color: Color3, worn: number)
 	local gui = Instance.new("SurfaceGui")
+	gui.Name = "Letters"
 	gui.Face = side
 	gui.CanvasSize = Vector2.new(size.X * 40, size.Y * 40)
-	gui.LightInfluence = 0
-	gui.Parent = board
-	local tall = size.Y * 40
-	local edge = math.max(2, math.floor(tall * 0.05))
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.fromScale(1, 1)
-	frame.BorderSizePixel = 0
-	frame.BackgroundColor3 = SIGN_EDGE
-	frame.Parent = gui
-	local face = Instance.new("Frame")
-	face.Name = "Face"
-	face.Position = UDim2.fromOffset(edge, edge)
-	face.Size = UDim2.new(1, -edge * 2, 1, -edge * 2)
-	face.BorderSizePixel = 0
-	face.BackgroundColor3 = SIGN_FACE
-	face.Parent = frame
-	local bar = Instance.new("Frame")
-	bar.Name = "Bar"
-	bar.Size = UDim2.new(0, math.max(3, math.floor(tall * 0.09)), 1, 0)
-	bar.BorderSizePixel = 0
-	bar.BackgroundColor3 = color
-	bar.Parent = face
-	local inset = math.floor(tall * 0.09) + math.floor(tall * 0.16)
-	local head = Instance.new("TextLabel")
-	head.Name = "Title"
-	head.BackgroundTransparency = 1
-	head.Position = UDim2.new(0, inset, if sub then 0.1 else 0.14, 0)
-	head.Size = UDim2.new(1, -inset * 1.4, if sub then 0.5 else 0.72, 0)
-	head.Text = title
-	head.TextScaled = true
-	head.TextXAlignment = Enum.TextXAlignment.Left
-	head.Font = Enum.Font.Oswald
-	head.TextColor3 = SIGN_TEXT
-	head.Parent = face
-	if sub then
-		local line = Instance.new("TextLabel")
-		line.Name = "Line"
-		line.BackgroundTransparency = 1
-		line.Position = UDim2.new(0, inset, 0.64, 0)
-		line.Size = UDim2.new(1, -inset * 1.4, 0.24, 0)
-		line.Text = sub
-		line.TextScaled = true
-		line.TextXAlignment = Enum.TextXAlignment.Left
-		line.Font = Enum.Font.GothamMedium
-		line.TextColor3 = SIGN_SUB
-		line.Parent = face
-	end
-	return gui, head
+	gui.LightInfluence = 0.6
+	gui.Parent = holder
+	local word = Instance.new("TextLabel")
+	word.Name = "Word"
+	word.BackgroundTransparency = 1
+	word.Position = UDim2.fromScale(0.04, 0.1)
+	word.Size = UDim2.fromScale(0.92, 0.8)
+	word.Text = text
+	word.TextScaled = true
+	word.Font = Enum.Font.GothamBlack
+	word.TextColor3 = color
+	word.TextTransparency = worn
+	word.Parent = gui
+	return gui
 end
-local function signPanel(parent, cframe: CFrame, size: Vector3, title: string, sub: string?, color: Color3, both: boolean?)
-	local board = part(parent, cframe, size, HULL_DARK, Enum.Material.Metal)
-	board.Name = "Sign"
-	local gui, head = signFace(board, Enum.NormalId.Front, size, title, sub, color)
+local function painted(parent, cframe: CFrame, size: Vector3, text: string, color: Color3?, both: boolean?)
+	local carrier = part(parent, cframe, size, color or PAINT, Enum.Material.SmoothPlastic, nil, {
+		Transparency = 1,
+		CastShadow = false,
+	})
+	carrier.Name = "Painted"
+	carrier.CanQuery, carrier.CanTouch = false, false
+	letters(carrier, Enum.NormalId.Front, size, text, color or PAINT, 0.12)
 	if both then
-		signFace(board, Enum.NormalId.Back, size, title, sub, color)
+		letters(carrier, Enum.NormalId.Back, size, text, color or PAINT, 0.12)
 	end
-	return board, gui, head
+	return carrier
+end
+local function steelPlate(parent, cframe: CFrame, size: Vector3, text: string, both: boolean?)
+	local board = part(parent, cframe, size, STEEL, Enum.Material.Metal)
+	board.Name = "Plate"
+	letters(board, Enum.NormalId.Front, size, text, PLATE_INK, 0.05)
+	if both then
+		letters(board, Enum.NormalId.Back, size, text, PLATE_INK, 0.05)
+	end
+	return board
 end
 
 -- Standing at `from`, turned to face `toward` (level).
@@ -709,192 +689,6 @@ local function strut(parent, a: Vector3, b: Vector3, radius: number, color: Colo
 		material or Enum.Material.Metal,
 		"Cylinder"
 	)
-end
-
--- PROBE-7 STATION: the probe that brought the first miners' supplies,
--- landed and unfolded where it came down. It stands on four landing legs
--- over its pad; its top split into four petals that peeled back round the
--- glowing core; its front hatch folded down over the terminal, its side
--- bays opened into racks of swing refill cells, its solar wings swung out
--- level and its mast telescoped up to the dish. Its name turns over it
--- (ProbeSign: Client.OutpostScene turns it).
--- Returns the terminal's screen.
-local PROBE_HULL = Color3.fromRGB(176, 164, 136)
-local PROBE_GOLD = Color3.fromRGB(214, 166, 72)
-local function probe(parent, at: CFrame)
-	local m = folder(parent, "Probe")
-	local F = 0.86 -- the floor
-	local function p(x, y, z)
-		return (at * CFrame.new(x, F + y, z)).Position
-	end
-	local function cf(x, y, z)
-		return at * CFrame.new(x, F + y, z)
-	end
-	-- Its landing pad: hazard-ringed, scorched under the pod.
-	disc(m, cf(0, 0.03, 0), 12.5, 0.06, HAZARD)
-	disc(m, cf(0, 0.05, 0), 11.9, 0.06, Color3.fromRGB(48, 52, 60))
-	disc(m, cf(0, 0.07, 0), 6, 0.06, Color3.fromRGB(30, 30, 36))
-	-- The pod, its heat shield, and the core where the top opened.
-	solid(part(m, cf(0, 11, 0), Vector3.one * 12, PROBE_HULL, Enum.Material.DiamondPlate, "Ball"))
-	part(
-		m,
-		cf(0, 11, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Vector3.new(1.6, 12.8, 12.8),
-		PROBE_GOLD,
-		Enum.Material.Metal,
-		"Cylinder"
-	)
-	part(
-		m,
-		cf(0, 16, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Vector3.new(0.5, 7, 7),
-		HULL_DARK,
-		Enum.Material.Metal,
-		"Cylinder"
-	)
-	local core = part(m, cf(0, 16.8, 0), Vector3.one * 3.2, GLOW, Enum.Material.Neon, "Ball")
-	core.Name = "ProbeCore"
-	light(core, GLOW, 24, 1.5)
-	-- The four petals of its top, peeled back on their hinges.
-	for k = 0, 3 do
-		local a = math.rad(45 + k * 90)
-		local out = Vector3.new(math.cos(a), 0, math.sin(a))
-		local hinge = Vector3.new(0, 16, 0) + out * 3.4
-		local tip = hinge + out * 4.4 + Vector3.new(0, -2.2, 0)
-		local petal =
-			strut(m, p(hinge.X, hinge.Y, hinge.Z), p(tip.X, tip.Y, tip.Z), 0.2, PROBE_HULL, Enum.Material.DiamondPlate)
-		petal.Shape = Enum.PartType.Block
-		petal.Size = Vector3.new(petal.Size.X, 0.35, 4.2)
-		part(
-			m,
-			cf(hinge.X, hinge.Y, hinge.Z) * CFrame.Angles(0, -a, 0),
-			Vector3.new(0.6, 0.6, 3),
-			PROBE_GOLD,
-			Enum.Material.Metal,
-			"Cylinder"
-		)
-	end
-	-- Four landing legs: a strut to the knee, a hydraulic leg to the foot.
-	for k = 0, 3 do
-		local a = math.rad(45 + k * 90)
-		local hip = Vector3.new(math.cos(a) * 5.9, 9.5, math.sin(a) * 5.9)
-		local knee = Vector3.new(math.cos(a) * 10, 6.5, math.sin(a) * 10)
-		local foot = Vector3.new(math.cos(a) * 11, 0.5, math.sin(a) * 11)
-		strut(m, p(hip.X, hip.Y, hip.Z), p(knee.X, knee.Y, knee.Z), 0.55, STEEL)
-		strut(m, p(knee.X, knee.Y, knee.Z), p(foot.X, foot.Y, foot.Z), 0.38, HULL_DARK)
-		local sleeve = knee + (foot - knee) * 0.45
-		strut(m, p(knee.X, knee.Y, knee.Z), p(sleeve.X, sleeve.Y, sleeve.Z), 0.56, HAZARD)
-		part(m, cf(knee.X, knee.Y, knee.Z), Vector3.one * 1.4, STEEL, Enum.Material.Metal, "Ball")
-		solid(disc(m, cf(foot.X, 0.25, foot.Z), 1.5, 0.5, HULL_DARK, Enum.Material.Metal))
-	end
-	-- The terminal, and the front hatch folded down over it.
-	local console = solid(part(m, at * CFrame.new(0, 3, -10.5), Vector3.new(9, 6, 1.4), HULL_DARK, Enum.Material.Metal))
-	local screen = part(
-		m,
-		console.CFrame * CFrame.new(0, 0.6, -0.75),
-		Vector3.new(7.6, 3.8, 0.1),
-		Color3.fromRGB(20, 40, 60),
-		Enum.Material.Neon
-	)
-	screen.Name = "ProbeScreen"
-	part(m, console.CFrame * CFrame.new(0, -2.2, -1.3), Vector3.new(8, 0.5, 2.2), HULL, Enum.Material.Metal)
-	light(screen, Color3.fromRGB(180, 220, 240), 16, 1.2)
-	local hatch = strut(m, p(0, 8.6, -5.4), p(0, 6.3, -10.2), 0.2, PROBE_HULL, Enum.Material.DiamondPlate)
-	hatch.Shape = Enum.PartType.Block
-	hatch.Size = Vector3.new(hatch.Size.X, 0.4, 7)
-	-- The side bays, opened into racks of swing refill cells.
-	for _, s in { -1, 1 } do
-		local x = s * 8.2
-		solid(part(m, cf(x, 3.6, 0), Vector3.new(3.2, 0.4, 6), HULL_DARK, Enum.Material.Metal))
-		part(m, cf(x + s * 1.5, 5.4, 0), Vector3.new(0.3, 4, 6), PROBE_HULL, Enum.Material.DiamondPlate)
-		part(m, cf(x, 7.5, 0), Vector3.new(3.4, 0.3, 6.4), PROBE_GOLD, Enum.Material.Metal)
-		for k = -1, 1 do
-			part(
-				m,
-				cf(x - s * 0.2, 4.7, k * 1.9) * CFrame.Angles(0, 0, math.rad(90)),
-				Vector3.new(1.8, 1.1, 1.1),
-				if k == 0 then SAGA else GLOW,
-				Enum.Material.Neon,
-				"Cylinder"
-			)
-		end
-	end
-	-- The solar wings, swung out level on their booms.
-	for _, s in { -1, 1 } do
-		strut(m, p(s * 5.8, 13.5, -1), p(s * 9, 13.5, -1), 0.35, STEEL)
-		local wing = cf(s * 13.5, 13.7, -1) * CFrame.Angles(math.rad(8), 0, 0)
-		part(m, wing, Vector3.new(9, 0.35, 7), Color3.fromRGB(40, 60, 110), Enum.Material.Glass)
-		for k = -1, 1 do
-			part(m, wing * CFrame.new(k * 3, 0.22, 0), Vector3.new(0.15, 0.1, 7), STEEL, Enum.Material.Metal)
-		end
-		part(m, wing * CFrame.new(0, 0, -3.55), Vector3.new(9, 0.16, 0.16), STEEL, Enum.Material.Metal)
-	end
-	-- The mast, telescoped up, the dish on top and a beacon.
-	strut(m, p(2.2, 16.2, 2.4), p(2.2, 21, 2.4), 0.45, STEEL)
-	strut(m, p(2.2, 21, 2.4), p(2.2, 25, 2.4), 0.33, HULL)
-	strut(m, p(2.2, 25, 2.4), p(2.2, 28.4, 2.4), 0.22, STEEL)
-	part(
-		m,
-		cf(2.2, 28.9, 2.4) * CFrame.Angles(math.rad(-35), 0, math.rad(90)),
-		Vector3.new(0.4, 5.2, 5.2),
-		HULL,
-		Enum.Material.Metal,
-		"Cylinder"
-	)
-	part(
-		m,
-		cf(2.2, 29.5, 2.0) * CFrame.Angles(math.rad(-35), 0, math.rad(90)),
-		Vector3.new(1.4, 0.4, 0.4),
-		HULL_DARK,
-		Enum.Material.Metal,
-		"Cylinder"
-	)
-	part(m, cf(2.2, 30.3, 2.4), Vector3.one * 0.6, Color3.fromRGB(255, 70, 70), Enum.Material.Neon, "Ball")
-	-- Its name in light over the core, turning (the client spins it; see
-	-- OutpostScene).
-	local holo = part(
-		m,
-		cf(0, 22.5, 0),
-		Vector3.new(12, 3.6, 0.1),
-		GLOW,
-		Enum.Material.SmoothPlastic,
-		nil,
-		{ Transparency = 1, CastShadow = false }
-	)
-	holo.Name = "ProbeSign"
-	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
-		local gui = Instance.new("SurfaceGui")
-		gui.Face = face
-		gui.CanvasSize = Vector2.new(480, 144)
-		gui.LightInfluence = 0
-		gui.Brightness = 1.2
-		gui.Parent = holo
-		local text = Instance.new("TextLabel")
-		text.BackgroundTransparency = 1
-		text.Size = UDim2.fromScale(1, 1)
-		text.Text = "PROBE-7"
-		text.TextScaled = true
-		text.Font = Enum.Font.Oswald
-		text.TextColor3 = Color3.fromRGB(200, 230, 245)
-		text.TextTransparency = 0.1
-		text.Parent = gui
-	end
-	-- Power cables from its belly into sockets in the floor.
-	for _, spot in { Vector3.new(-4, 0, 9.5), Vector3.new(4, 0, 9.5), Vector3.new(0, 0, 10.5) } do
-		strut(m, p(spot.X * 0.3, 5.4, 2), p(spot.X, 0.6, spot.Z), 0.3, Color3.fromRGB(30, 30, 36))
-		part(m, cf(spot.X, 0.3, spot.Z), Vector3.new(1.4, 0.6, 1.4), HAZARD, Enum.Material.Metal)
-	end
-	-- Its name, on the heat shield over the hatch.
-	local name = (at * CFrame.new(0, F + 13.6, -5.7)).Position
-	signPanel(
-		m,
-		facingPoint(name, name + at:VectorToWorldSpace(Vector3.new(0, 0, -1))),
-		Vector3.new(7, 1.5, 0.3),
-		"PROBE-7 STATION",
-		"SWING REFILLS",
-		GLOW
-	)
-	return screen
 end
 
 -- The leaderboard: a tall twin-panel billboard on legs.
@@ -971,37 +765,6 @@ local function harvestPatches(parent, at: CFrame)
 		pumpkin(decor, at * CFrame.new(x + 4.5, 0, z + 3.5) * CFrame.Angles(0, .3, 0), .55)
 	end
 	return exclusions
-end
-
--- The Arena Uplink: a ring gate on a pad, for queuing duels.
-local function gate(parent, at: CFrame)
-	local m = folder(parent, "ArenaGate")
-	-- (a steel pad, a red ring painted on it)
-	disc(m, at * CFrame.new(0, 0.4, 0), 9, 0.8, HULL_DARK, Enum.Material.Metal)
-	disc(m, at * CFrame.new(0, 0.82, 0), 7, 0.06, Color3.fromRGB(176, 70, 60))
-	disc(m, at * CFrame.new(0, 0.84, 0), 6.3, 0.06, HULL_DARK, Enum.Material.Metal)
-	local ring = part(
-		m,
-		at * CFrame.new(0, 9, 0) * CFrame.Angles(0, math.rad(90), 0),
-		Vector3.new(1.4, 17, 17),
-		HULL,
-		Enum.Material.Metal,
-		"Cylinder"
-	)
-	part(
-		m,
-		ring.CFrame,
-		Vector3.new(1.0, 15, 15),
-		Color3.fromRGB(196, 78, 66),
-		Enum.Material.Neon,
-		"Cylinder",
-		{ Transparency = 0.62 }
-	)
-	local pad =
-		part(m, at * CFrame.new(0, 2, 0), Vector3.new(6, 4, 6), Color3.new(1, 1, 1), nil, nil, { Transparency = 1 })
-	pad.Name = "GatePad"
-	light(pad, Color3.fromRGB(255, 140, 120), 18, 1)
-	return pad
 end
 
 -- Stars, far off in the black: nothing else up there but the rift (the
@@ -1555,35 +1318,6 @@ local function biomeTerrain(at: CFrame, Frontier, blocked: { any }, roads: { any
 	return laid
 end
 
--- At each spoke's mouth, just out of the core, a sign either side of the
--- road naming the biome that side, facing whoever heads out; returns where
--- they stand ({ Vector3, studs }, to keep the rocks off).
-local function crossroads(parent, at: CFrame, Frontier): { any }
-	local signs = folder(parent, "Crossroads")
-	local feet = {}
-	for _, a in Frontier.Spokes do
-		local out = Vector3.new(math.cos(a), 0, math.sin(a))
-		local right = Vector3.new(-out.Z, 0, out.X)
-		for _, side in { -1, 1 } do
-			-- (Right of the road heading out is clockwise round the Loop.)
-			local biome = Frontier.biomeOf(a + side * 0.1)
-			local foot = at.Position + out * (Frontier.Core + 30) + right * side * 15
-			part(signs, CFrame.new(foot + Vector3.new(0, 4.5, 0)), Vector3.new(0.8, 9, 0.8), STEEL, Enum.Material.Metal)
-			local high = foot + Vector3.new(0, 9.6, 0)
-			signPanel(
-				signs,
-				facingPoint(high, high - out),
-				Vector3.new(10, 3.4, 0.4),
-				string.upper(biome.Name),
-				biome.Label,
-				biome.Glow
-			)
-			table.insert(feet, { foot, 9 })
-		end
-	end
-	return feet
-end
-
 -- A striped jump ramp for the machines.
 local function jumpRamp(parent, at: CFrame)
 	solid(
@@ -1600,128 +1334,12 @@ local function jumpRamp(parent, at: CFrame)
 	end
 end
 
--- The survey table, on the west side of the hall: a low steel table with
--- the quarry's survey under its glass (Shared.Frontier's bands as rings,
--- the Core, the Fringe and the Edge, the crater wall round them and the
--- Shelter in the middle), four benches round it for a briefing, and its
--- name on a post. The client sweeps a scan across the map
--- (Client.ShelterLife).
-local function surveyTable(parent, at: CFrame)
-	local m = folder(parent, "SurveyTable")
-	local frontier = OutpostWorld.Frontier
-	local core, edge, rim = 150, 300, 440
-	if frontier then
-		core, edge = frontier.Core or core, frontier.EdgeFrom or edge
-	end
-	-- The table: a plinth, a steel top round the map, the map's dark glass.
-	solid(part(m, at * CFrame.new(0, 1.2, 0), Vector3.new(7, 2.4, 7), HULL_DARK, Enum.Material.Metal))
-	solid(part(m, at * CFrame.new(0, 2.55, 0), Vector3.new(11.6, 0.3, 11.6), STEEL, Enum.Material.Metal))
-	local glass = part(m, at * CFrame.new(0, 2.72, 0), Vector3.new(10.4, 0.06, 10.4), Color3.fromRGB(14, 20, 28),
-		Enum.Material.Glass)
-	glass.Name = "SurveyMap"
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Top
-	gui.CanvasSize = Vector2.new(520, 520)
-	gui.LightInfluence = 0
-	gui.Brightness = 0.9
-	gui.Parent = glass
-	local map = Instance.new("Frame")
-	map.Size = UDim2.fromScale(1, 1)
-	map.BorderSizePixel = 0
-	map.BackgroundColor3 = Color3.fromRGB(12, 19, 27)
-	map.Parent = gui
-	-- (a faint grid, every 100 studs)
-	for k = -4, 4 do
-		for _, across in { true, false } do
-			local line = Instance.new("Frame")
-			line.BorderSizePixel = 0
-			line.BackgroundColor3 = Color3.fromRGB(46, 70, 86)
-			line.BackgroundTransparency = 0.55
-			line.AnchorPoint = Vector2.new(0.5, 0.5)
-			line.Position = if across then UDim2.fromScale(0.5 + k * 100 / (rim * 2.2), 0.5) else UDim2.fromScale(0.5, 0.5 + k * 100 / (rim * 2.2))
-			line.Size = if across then UDim2.new(0, 1, 1, 0) else UDim2.new(1, 0, 0, 1)
-			line.Parent = map
-		end
-	end
-	local function ring(radius: number, color: Color3, thick: number, name: string?)
-		local share = radius * 2 / (rim * 2.2)
-		local circle = Instance.new("Frame")
-		circle.AnchorPoint = Vector2.new(0.5, 0.5)
-		circle.Position = UDim2.fromScale(0.5, 0.5)
-		circle.Size = UDim2.fromScale(share, share)
-		circle.BackgroundTransparency = 1
-		circle.Parent = map
-		local round = Instance.new("UICorner")
-		round.CornerRadius = UDim2.fromScale(0.5, 0).X -- (a UDim: half the size, a circle)
-		round.Parent = circle
-		local stroke = Instance.new("UIStroke")
-		stroke.Color = color
-		stroke.Thickness = thick
-		stroke.Parent = circle
-		if name then
-			local label = Instance.new("TextLabel")
-			label.BackgroundTransparency = 1
-			label.AnchorPoint = Vector2.new(0.5, 1)
-			label.Position = UDim2.new(0.5, 0, 0, -2)
-			label.Size = UDim2.fromOffset(120, 18)
-			label.Font = Enum.Font.GothamBold
-			label.TextSize = 15
-			label.TextColor3 = color
-			label.Text = name
-			label.Parent = circle
-		end
-	end
-	ring(rim, Color3.fromRGB(150, 150, 160), 3)
-	if frontier and frontier.Bands then
-		ring(edge, frontier.Bands.Edge.Color:Lerp(Color3.new(0.5, 0.5, 0.5), 0.35), 2, "EDGE")
-		ring(core, frontier.Bands.Fringe.Color:Lerp(Color3.new(0.5, 0.5, 0.5), 0.35), 2, "FRINGE")
-	end
-	local shelterMark = Instance.new("Frame")
-	shelterMark.AnchorPoint = Vector2.new(0.5, 0.5)
-	shelterMark.Position = UDim2.fromScale(0.5, 0.5)
-	shelterMark.Size = UDim2.fromOffset(18, 13)
-	shelterMark.BorderSizePixel = 0
-	shelterMark.BackgroundColor3 = Color3.fromRGB(232, 228, 216)
-	shelterMark.Parent = map
-	local title = Instance.new("TextLabel")
-	title.BackgroundTransparency = 1
-	title.Position = UDim2.fromOffset(16, 10)
-	title.Size = UDim2.fromOffset(260, 24)
-	title.Font = Enum.Font.Oswald
-	title.TextSize = 22
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.TextColor3 = Color3.fromRGB(200, 210, 220)
-	title.Text = "QUARRY SURVEY"
-	title.Parent = map
-	-- Four benches facing the table, between the ways in.
-	for k = 0, 3 do
-		local a = math.rad(45 + k * 90)
-		local spot = (at * CFrame.new(math.cos(a) * 11.5, 0, math.sin(a) * 11.5)).Position
-		local face = facingPoint(spot, at.Position)
-		solid(part(m, face * CFrame.new(0, 0.65, 0), Vector3.new(4.4, 1.3, 1.4), HULL_DARK, Enum.Material.Metal))
-		local seat = Instance.new("Seat")
-		seat.Name = "BriefingBench"
-		seat.Anchored = true
-		seat.Size = Vector3.new(5, 0.5, 1.9)
-		seat.CFrame = face * CFrame.new(0, 1.55, 0)
-		seat.Color = Color3.fromRGB(84, 88, 98)
-		seat.Material = Enum.Material.Metal
-		seat.TopSurface, seat.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
-		seat.Parent = m
-		part(m, face * CFrame.new(0, 2.7, 1.05), Vector3.new(5, 1.9, 0.35), Color3.fromRGB(84, 88, 98), Enum.Material.Metal)
-	end
-	-- Its name, on a post by the way in from the hall.
-	part(m, at * CFrame.new(9.4, 1.6, 0), Vector3.new(0.5, 3.2, 0.5), STEEL, Enum.Material.Metal)
-	local spot = (at * CFrame.new(9.4, 3.9, 0)).Position
-	signPanel(m, facingPoint(spot, spot + at:VectorToWorldSpace(Vector3.new(1, 0, 0))), Vector3.new(7, 1.6, 0.3),
-		"QUARRY SURVEY", "BANDS AND RANGES", Color3.fromRGB(200, 214, 228))
-	return m
-end
-
 -- The Gem Gallery: five glass cases on plinths in an arc round `at` (on the
 -- floor, in front of the arc), one for each rarity, Common to Legendary,
--- each lit in its colour. The client sets a gem spinning in each case and
--- writes its odds on the plinth (Client.ShelterLife).
+-- each lit in its colour: Radius out, the first From degrees round from
+-- `at`'s x towards its z, the next Step on (GALLERY: the same as Client.
+-- ShelterLife.Gallery). The client sets a gem spinning in each case and
+-- writes its odds on the plinth.
 local GALLERY_COLORS = {
 	Color3.fromRGB(200, 200, 200),
 	Color3.fromRGB(90, 220, 120),
@@ -1729,11 +1347,12 @@ local GALLERY_COLORS = {
 	Color3.fromRGB(255, 90, 220),
 	Color3.fromRGB(255, 176, 60),
 }
+local GALLERY = { Middle = Vector3.new(-44, 0.86, 46), Radius = 11, From = 40, Step = 25 }
 local function gemGallery(parent, at: CFrame)
 	local m = folder(parent, "GemGallery")
 	for i, color in GALLERY_COLORS do
-		local a = math.rad(-50 + (i - 1) * 25)
-		local spot = (at * CFrame.new(math.cos(a) * 13, 0, math.sin(a) * 13)).Position
+		local a = math.rad(GALLERY.From + (i - 1) * GALLERY.Step)
+		local spot = (at * CFrame.new(math.cos(a) * GALLERY.Radius, 0, math.sin(a) * GALLERY.Radius)).Position
 		local face = facingPoint(spot, at.Position)
 		local plinth = solid(part(m, face * CFrame.new(0, 1.7, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(3.4, 3, 3),
 			HULL_DARK, Enum.Material.Metal, "Cylinder"))
@@ -1763,19 +1382,21 @@ end
 -- door, gentle enough for the mechs to climb (ShelterRamp long).
 --   North: the mech garage, eight bays in a row facing a lane that runs out
 --   of a big door at each end (east and west), behind a barrier with gaps.
---   The hall: the kaiju arena in the middle (a steel stage and stands),
---   the Store and the player Market as shopfronts in the west wall, the
---   survey table between them and the arena, the Gem Gallery, PROBE-7 and
---   the leaderboard on the east, the Arena Uplink by the door, INFO-9's
---   kiosk by the arena, and the field guide on the wall beside the door.
+--   The hall: the kaiju arena in the middle (a steel stage, open floor
+--   round it), the Store and the player Market as shopfronts in the west
+--   wall, the Gem Gallery and Ilsa's desk next to the Market along the
+--   south wall, the leaderboard on the east, INFO-9's kiosk by the arena;
+--   Brutus (duels) and PROBE-7 (refills) stand on their own, no gate or
+--   station.
 --   One wide door south, to the quarry.
 -- Inside it's a working base, not a showroom: matte concrete underfoot,
--- plate walls with a rusted band, warm work lights, and one sign system
--- (signPanel): station colours are markings, never neon. The season stays
+-- plate walls with a rusted band, warm work lights, and few signs: a word
+-- painted where it's needed (painted, steelPlate). Station colours are markings,
+-- never neon. The season stays
 -- outside (pumpkins at the landing). `at` is its floor's frame (the
 -- quarry's, lifted).
 -- Returns its places, in `at`'s frame:
--- { Parking, Spawn, Probe, Board, Gate (CFrames for those builders), Store,
+-- { Parking, Spawn, Board (a CFrame for its builder), Store,
 --   Market (the counters, for their prompts), Crew ({ Id, CFrame }: where
 --   its crew stand), Box (half sizes, x and z), Ramps ({ { Middle, Half,
 --   SlopeHalf } }: each ramp and its landing, on the quarry floor, Half
@@ -1940,10 +1561,7 @@ local function shelter(parent, at: CFrame, rules)
 		for _, dz in { -4.6, 4.6 } do
 			part(m, at3(well.MinX - 1.6, 3.6, midZ + dz), Vector3.new(0.5, 7.2, 0.5), HULL_DARK, Enum.Material.Metal)
 		end
-		signPanel(m, facing(well.MinX - 1.6, 6.4, midZ, 1, 0), Vector3.new(11, 3.2, 0.4), "KAIJU ARENA",
-			"DOWNSTAIRS: KAIJU BATTLES", STATION.Arena)
-		signPanel(m, facing((well.MinX + well.MaxX) / 2, 4.6, well.MaxZ + 0.5, 0, 1), Vector3.new(8, 1.8, 0.3), "KAIJU ARENA",
-			"STAIRS DOWN", STATION.Arena)
+		steelPlate(m, facing(well.MinX - 1.6, 6.4, midZ, 1, 0), Vector3.new(8.6, 2, 0.3), "ARENA", true)
 		-- Its landing (walk onto it and you're downstairs), and where you come
 		-- back up: at the top of the steps, facing the hall.
 		stairs.Landing = at3(well.MinX + well.Landing / 2, bottom + 3, midZ)
@@ -2118,12 +1736,9 @@ local function shelter(parent, at: CFrame, rules)
 	part(m, at3(0, gate.Top + 1.3, D + 3 + gate.Out / 2) * CFrame.Angles(0, math.pi, 0), Vector3.new((SHELTER.Door + gate.Pier) * 2 + 1, 2.6, gate.Out + 2),
 		HULL_DARK, Enum.Material.Metal, "Wedge")
 	part(m, at3(0, SHELTER.DoorHeight + 0.2, D + 2 + gate.Out + 0.1), Vector3.new(SHELTER.Door * 2, 0.4, 0.4), RED, Enum.Material.Neon)
-	local name = signPanel(m, facing(0, 31.3, D + 2.5, 0, 1), Vector3.new(48, 5.4, 0.4), "SAGA SHELTER",
-		"FORWARD OPERATING BASE 07", SAGA)
+	local name = painted(m, facing(0, 31.3, D + 2.5, 0, 1), Vector3.new(30, 4.6, 0.4), "SHELTER")
 	light(name, Color3.fromRGB(255, 232, 200), 24, 0.8)
-	local core = if OutpostWorld.Frontier then OutpostWorld.Frontier.Core else 150
-	signPanel(m, facing(0, 25, D - 0.2, 0, -1), Vector3.new(26, 3.2, 0.4), "QUARRY ACCESS",
-		string.format("RIFT ACTIVITY BEYOND %d STUDS", core), STATION.Quarry)
+	painted(m, facing(0, 25, D - 0.2, 0, -1), Vector3.new(16, 2.8, 0.4), "QUARRY")
 
 	-- The ramps: a wide one from the main door down to the quarry, and one
 	-- from each garage door for the mechs (lift over ShelterRamp studs: a
@@ -2171,12 +1786,11 @@ local function shelter(parent, at: CFrame, rules)
 	end
 	for i, kind in bays do
 		local x = -66.5 + (i - 1) * 19
-		signPanel(m, facing(x, 21, -D + 0.4, 0, 1), Vector3.new(15, 5, 0.4), string.format("BAY %02d", i), names[kind], HAZARD)
+		-- (Its number painted big on the wall over it; the mech says what it is.)
+		painted(m, facing(x, 21, -D + 0.4, 0, 1), Vector3.new(8, 5.2, 0.4), string.format("%02d", i), HAZARD)
 		local spot = at3(x, 1, bayZ).Position
 		table.insert(parking, { Kind = kind, CFrame = CFrame.lookAt(spot, spot - at.LookVector) })
 	end
-	signPanel(m, facing(0, 30, -D + 0.4, 0, 1), Vector3.new(56, 5.5, 0.4), "MECH GARAGE",
-		"BAYS 01 TO 08, EXIT BY EITHER GARAGE DOOR", HAZARD)
 	-- Each garage door: hazard posts, the rolled-up door, EXIT over it.
 	for _, s in { -1, 1 } do
 		for _, z in { laneN - 1, laneS + 1 } do
@@ -2184,8 +1798,7 @@ local function shelter(parent, at: CFrame, rules)
 		end
 		part(m, at3(s * (W + 1), SHELTER.LaneDoorHeight + 1.4, laneMid) * CFrame.Angles(0, math.rad(90), 0),
 			Vector3.new(laneS - laneN, 2.6, 2.6), HULL_DARK, Enum.Material.Metal, "Cylinder")
-		signPanel(m, facing(s * (W - 0.4), SHELTER.LaneDoorHeight + 3.4, laneMid, -s, 0),
-			Vector3.new(10, 2.6, 0.4), "EXIT", nil, STATION.Exit)
+		painted(m, facing(s * (W - 0.4), SHELTER.LaneDoorHeight + 3.4, laneMid, -s, 0), Vector3.new(8, 2.4, 0.4), "EXIT")
 		for _, z in { -57, -53.5 } do
 			part(m, at3(s * 80.5, 2.1, z) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(2.6, 2.4, 2.4),
 				Color3.fromRGB(200, 60, 50), Enum.Material.Metal, "Cylinder")
@@ -2199,9 +1812,8 @@ local function shelter(parent, at: CFrame, rules)
 	end
 
 	-- The kaiju arena: a steel stage with a hazard line round its edge and the
-	-- holo projector's lens in the middle, two tiers of stands open to the
-	-- door and the garage (plain plate, no trim), floodlight pylons, and its
-	-- sign over the way in.
+	-- holo projector's lens in the middle, and floodlight pylons round it;
+	-- open floor all round (no stands).
 	local arena = at3(0, 0.8, 18)
 	solid(disc(m, arena * CFrame.new(0, 0.5, 0), 12.6, 1, STEEL, Enum.Material.DiamondPlate))
 	solid(disc(m, arena * CFrame.new(0, 0.75, 0), 12, 1.5, Color3.fromRGB(56, 58, 64), Enum.Material.Concrete))
@@ -2209,18 +1821,6 @@ local function shelter(parent, at: CFrame, rules)
 	disc(m, arena * CFrame.new(0, 1.52, 0), 10.5, 0.05, Color3.fromRGB(56, 58, 64), Enum.Material.Concrete)
 	-- (the projector's lens, glowing faintly: the hologram stands on it)
 	disc(m, arena * CFrame.new(0, 1.54, 0), 2.2, 0.08, Color3.fromRGB(46, 78, 116), Enum.Material.Neon).Name = "ProjectorLens"
-	for tier, spec in { { 16, 1.6 }, { 19.5, 3.2 } } do
-		local r, h = spec[1], spec[2]
-		for k = 0, 11 do
-			local a = (k + 0.5) / 12 * math.pi * 2
-			if math.abs(math.cos(a)) >= 0.3 then
-				local seat = arena * CFrame.new(math.cos(a) * r, h / 2, math.sin(a) * r) * CFrame.Angles(0, math.pi / 2 - a, 0)
-				local length = 2 * math.pi * r / 12 - 0.6
-				solid(part(m, seat, Vector3.new(length, h, 3), if tier == 1 then Color3.fromRGB(110, 114, 124) else Color3.fromRGB(82, 86, 96),
-					Enum.Material.Metal))
-			end
-		end
-	end
 	for k = 0, 3 do
 		local a = (k + 0.5) / 4 * math.pi * 2
 		local foot = arena * CFrame.new(math.cos(a) * 13.6, 0, math.sin(a) * 13.6)
@@ -2230,21 +1830,14 @@ local function shelter(parent, at: CFrame, rules)
 		part(m, head, Vector3.new(1.8, 1.2, 1.4), HULL_DARK, Enum.Material.Metal)
 		part(m, head * CFrame.new(0, 0, -0.72), Vector3.new(1.4, 0.8, 0.06), AMBER, Enum.Material.Neon)
 	end
-	-- (Its sign up high, clear of the hologram on the stage.)
-	for _, s in { -1, 1 } do
-		part(m, arena * CFrame.new(s * 7, 8.5, 19.5), Vector3.new(0.8, 17, 0.8), HULL_DARK, Enum.Material.Metal)
-	end
-	signPanel(m, facing(0, 18.4, 18 + 19.5, 0, 1), Vector3.new(16, 3.4, 0.4), "KAIJU ARENA",
-		"DOWNSTAIRS: TAKE THE WEST STAIRS", STATION.Arena)
 
 	-- The Store and the player Market: two shopfronts in the west wall, built
 	-- alike. Each is an alcove, the Shelter's wall at its back and a ceiling
 	-- over it, behind a steel portal: two columns and a fascia carrying the
-	-- shop's lightbox (dark lettering on a lit face, the station's colour in
-	-- a block beside the name), with a blade sign standing out from a column
-	-- so it reads from down the hall. Inside, a counter with a steel top
+	-- shop's lightbox: its one word (the HUD's STORE, MARKET) in dark
+	-- letters on a lit face. Inside, a counter with a steel top
 	-- and a till, lit from above by downlights. No neon.
-	local function storefront(z: number, brand: string, blade: string, color: Color3)
+	local function storefront(z: number, word: string, color: Color3)
 		local x = -W + 18
 		part(m, at3(-W + 9, 15, z), Vector3.new(18, 0.8, 22.4), HULL_DARK, Enum.Material.Metal)
 		for _, dz in { -10.5, 10.5 } do
@@ -2266,39 +1859,19 @@ local function shelter(parent, at: CFrame, rules)
 		lit.BorderSizePixel = 0
 		lit.BackgroundColor3 = Color3.fromRGB(232, 228, 218)
 		lit.Parent = gui
-		local mark = Instance.new("Frame")
-		mark.Position = UDim2.fromScale(0.03, 0.18)
-		mark.Size = UDim2.fromScale(0.05, 0.64)
-		mark.SizeConstraint = Enum.SizeConstraint.RelativeYY
-		mark.BorderSizePixel = 0
-		mark.BackgroundColor3 = color
-		mark.Parent = lit
-		local glyph = Instance.new("TextLabel")
-		glyph.BackgroundTransparency = 1
-		glyph.Size = UDim2.fromScale(1, 1)
-		glyph.Text = "◆"
-		glyph.TextScaled = true
-		glyph.Font = Enum.Font.GothamBold
-		glyph.TextColor3 = Color3.fromRGB(240, 238, 232)
-		glyph.Parent = mark
-		local word = Instance.new("TextLabel")
-		word.BackgroundTransparency = 1
-		word.Position = UDim2.fromScale(0.13, 0.12)
-		word.Size = UDim2.fromScale(0.84, 0.76)
-		word.Text = brand
-		word.TextScaled = true
-		word.TextXAlignment = Enum.TextXAlignment.Left
-		word.Font = Enum.Font.Oswald
-		word.TextColor3 = Color3.fromRGB(30, 32, 38)
-		word.Parent = lit
-		-- The blade sign, out from the north column at head height and over.
-		local bladeAt = at3(x + 3.1, 12.6, z - 10.5)
-		part(m, bladeAt * CFrame.new(-2.6, 1.15, 0), Vector3.new(3.6, 0.2, 0.2), STEEL, Enum.Material.Metal)
-		signPanel(m, CFrame.lookAt(bladeAt.Position, bladeAt.Position + at:VectorToWorldSpace(Vector3.new(0, 0, 1))),
-			Vector3.new(5.6, 2, 0.24), blade, nil, color, true)
+		local name = Instance.new("TextLabel")
+		name.Name = "Word"
+		name.BackgroundTransparency = 1
+		name.Position = UDim2.fromScale(0.05, 0.16)
+		name.Size = UDim2.fromScale(0.9, 0.68)
+		name.Text = word
+		name.TextScaled = true
+		name.Font = Enum.Font.GothamBlack
+		name.TextColor3 = Color3.fromRGB(30, 32, 38)
+		name.Parent = lit
 		-- The counter, its steel top and a till on it.
 		local counter = solid(part(m, at3(x, 2.6, z), Vector3.new(3.2, 3.6, 16), HULL_DARK, Enum.Material.Metal))
-		counter.Name = blade .. "Counter"
+		counter.Name = word .. "Counter"
 		part(m, at3(x + 0.1, 4.55, z), Vector3.new(3.8, 0.3, 16.4), STEEL, Enum.Material.Metal)
 		local till = part(m, at3(x, 5.3, z - 5) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(math.rad(-20), 0, 0),
 			Vector3.new(1.8, 1.1, 0.14), HULL_DARK, Enum.Material.Metal)
@@ -2326,8 +1899,8 @@ local function shelter(parent, at: CFrame, rules)
 	end
 	-- (Its stands of suits, helmets, picks and skins are the client's:
 	-- Client.StoreDisplays.)
-	local store = storefront(6, "SAGA OUTFITTERS", "STORE", STATION.Store)
-	local market = storefront(40, "MINERS' MARKET", "MARKET", STATION.Market)
+	local store = storefront(6, "STORE", STATION.Store)
+	local market = storefront(40, "MARKET", STATION.Market)
 	-- Behind the Market's counter: the escrow lockers, where sold gear waits
 	-- for its buyer, a wall of numbered doors, a lamp on each.
 	do
@@ -2384,64 +1957,6 @@ local function shelter(parent, at: CFrame, rules)
 		end
 	end
 
-	-- The field guide, on the wall beside the door: what a new miner needs,
-	-- a numbered row each, the subject in the station colour it belongs to.
-	local _, _, head = signPanel(m, facing(-44, 13, D - 0.2, 0, -1), Vector3.new(36, 14, 0.4), "FIELD GUIDE", nil, SAGA)
-	do
-		-- (the title's inset from the colour bar, as signFace sets it)
-		local tall = 14 * 40
-		local inset = math.floor(tall * 0.09) + math.floor(tall * 0.16)
-		head.Size = UDim2.new(1, -inset * 1.4, 0.16, 0)
-		head.Position = UDim2.new(0, inset, 0.06, 0)
-		local rows = Instance.new("Frame")
-		rows.BackgroundTransparency = 1
-		rows.Position = UDim2.new(0, inset, 0.27, 0)
-		rows.Size = UDim2.new(1, -inset * 1.4, 0.68, 0)
-		rows.Parent = head.Parent
-		local list = Instance.new("UIListLayout")
-		list.SortOrder = Enum.SortOrder.LayoutOrder
-		list.Parent = rows
-		for n, row in
-			{
-				{ "QUARRY", "Every rock you break yields one gem.", STATION.Quarry },
-				{ "FRONTIER", string.format("Luck rises past %d studs. So does rift activity.", core), STATION.Quarry },
-				{ "KAIJU", "Your team fights beside you. Heal them once clear.", STATION.Gems },
-				{ "SWINGS", "Arena Uplink win streaks restore swings.", STATION.Arena },
-				{ "MECHS", "Bays 01 to 08. Exit by either garage door.", HAZARD },
-				{ "QUESTIONS", "INFO-9, by the arena.", STATION.Info },
-			}
-		do
-			local line = Instance.new("Frame")
-			line.BackgroundTransparency = 1
-			line.Size = UDim2.fromScale(1, 1 / 6)
-			line.LayoutOrder = n
-			line.Parent = rows
-			for k, cell in
-				{
-					{ string.format("%02d", n), 0, 0.07, Color3.fromRGB(120, 126, 136), Enum.Font.Oswald },
-					{ row[1], 0.08, 0.2, row[3], Enum.Font.Oswald },
-					{ row[2], 0.3, 0.7, Color3.fromRGB(226, 228, 232), Enum.Font.GothamMedium },
-				}
-			do
-				local text = Instance.new("TextLabel")
-				text.Name = if k == 3 then "Line" else "Cell"
-				text.BackgroundTransparency = 1
-				text.Position = UDim2.fromScale(cell[2], 0.14)
-				text.Size = UDim2.fromScale(cell[3], 0.72)
-				text.TextScaled = true
-				text.TextXAlignment = Enum.TextXAlignment.Left
-				text.Font = cell[5]
-				text.TextColor3 = cell[4]
-				text.Text = cell[1]
-				text.Parent = line
-			end
-		end
-	end
-
-	-- The Arena Uplink's sign, over its gate by the door.
-	signPanel(m, facing(36, 21.5, 46, -0.7, 0.7), Vector3.new(18, 4, 0.4), "ARENA UPLINK",
-		"RANKED 1V1 DUELS", STATION.Arena)
-
 	-- The season, kept outside: a pair of giant pumpkins on the quarry floor
 	-- either side of the landing, a little one by each. Inside, the base is
 	-- all business.
@@ -2449,20 +1964,21 @@ local function shelter(parent, at: CFrame, rules)
 		pumpkin(m, at3(s * 36, -lift, D + 8) * CFrame.Angles(0, s * -.3, 0), 3.2, nil)
 		pumpkin(m, at3(s * 41, -lift, D + 16) * CFrame.Angles(0, s * .4, 0), 1.1, nil)
 	end
-	-- The survey table on the west side of the hall, the Gem Gallery on the
-	-- east, in front of the leaderboard.
-	surveyTable(m, at3(-42, 0.86, 14))
-	gemGallery(m, at3(30, 0.86, 4))
+	-- The Gem Gallery next to the Market, between it and the door, along
+	-- the south wall.
+	gemGallery(m, at3(GALLERY.Middle.X, GALLERY.Middle.Y, GALLERY.Middle.Z))
 
 	-- The crew: the old town's shopkeepers, each by the station they run
-	-- now (OutpostServer builds them, Shared.Vendors has their lines), and
-	-- INFO-9, the info rep, by its kiosk. They stand beside their counters,
-	-- not at them, so their Talk prompt and the counter's don't sit on top
-	-- of each other. Ilsa buys gems at a desk in the Gem Gallery, the cases
-	-- behind: a pale-topped counter lit gold along its front edge, its name
-	-- on the front, a balance on top.
+	-- now (OutpostServer builds them, Shared.Vendors has their lines),
+	-- INFO-9, the info rep, by its kiosk, and PROBE-7 on its feet where its
+	-- station stood. They stand beside their counters, not at them, so
+	-- their Talk prompt and the counter's don't sit on top of each other;
+	-- Brutus and PROBE-7 have no counter: talk to them for a duel or a
+	-- refill. Ilsa buys gems at a desk in the Gem Gallery, the cases
+	-- behind: a pale-topped counter lit gold along its front edge, a
+	-- balance on top, facing the hall.
 	local gold = GALLERY_COLORS[5]
-	local desk = at3(31, 0.86, 4)
+	local desk = at3(GALLERY.Middle.X, 0.86, GALLERY.Middle.Z + 1) * CFrame.Angles(0, math.rad(-90), 0)
 	solid(part(m, desk * CFrame.new(0, 1.7, 0), Vector3.new(2.4, 3.4, 8), HULL_DARK, Enum.Material.Metal))
 	part(
 		m,
@@ -2470,15 +1986,6 @@ local function shelter(parent, at: CFrame, rules)
 		Vector3.new(2.8, 0.2, 8.4),
 		Color3.fromRGB(206, 212, 224),
 		Enum.Material.SmoothPlastic
-	)
-	local front = desk.Position + at:VectorToWorldSpace(Vector3.new(-1.25, 1.9, 0))
-	signPanel(
-		m,
-		facingPoint(front, front - at:VectorToWorldSpace(Vector3.new(1, 0, 0))),
-		Vector3.new(7, 1.9, 0.12),
-		"GEM BUYER",
-		"SPARE GEMS BOUGHT AT MARKET RATE",
-		STATION.Gems
 	)
 	part(m, desk * CFrame.new(0, 4.6, 2), Vector3.new(0.24, 2, 0.24), gold, Enum.Material.Metal)
 	part(m, desk * CFrame.new(0, 5.55, 2), Vector3.new(0.16, 0.16, 2.8), gold, Enum.Material.Metal)
@@ -2489,14 +1996,17 @@ local function shelter(parent, at: CFrame, rules)
 	-- arrive: a post with a screen on top.
 	local kiosk = facingPoint(at3(18.5, 0.86, 38).Position, at3(0, 0.86, D - 10).Position)
 	solid(part(m, kiosk * CFrame.new(0, 2.2, 0), Vector3.new(1.6, 4.4, 1.2), HULL_DARK, Enum.Material.Metal))
-	local screen = signPanel(m, kiosk * CFrame.new(0, 5.7, 0), Vector3.new(5, 2.6, 0.3), "INFORMATION", "INFO-9", STATION.Info)
+	local screen = part(m, kiosk * CFrame.new(0, 5.7, 0), Vector3.new(5, 2.6, 0.3), HULL_DARK, Enum.Material.Metal)
+	screen.Name = "Screen"
+	painted(m, kiosk * CFrame.new(0, 5.7, -0.16), Vector3.new(4.2, 1.6, 0.02), "INFO")
 	light(screen, Color3.fromRGB(230, 236, 244), 10, 0.4)
 	local function stand(x, z, tx, tz)
 		return facingPoint(at3(x, 0.86, z).Position, at3(tx, 0.86, tz).Position)
 	end
 	local crew = {
-		{ Id = "GemBuyer", CFrame = stand(34.5, 4, 0, 4) }, -- Ilsa, behind her desk
-		{ Id = "ArenaMaster", CFrame = stand(47.5, 50, 0, 50) }, -- Brutus, by the Uplink
+		{ Id = "GemBuyer", CFrame = stand(GALLERY.Middle.X, GALLERY.Middle.Z + 4.5, GALLERY.Middle.X, 0) }, -- Ilsa, behind her desk
+		{ Id = "ArenaMaster", CFrame = stand(36, 46, 0, 40) }, -- Brutus, where the duel gate stood
+		{ Id = "Probe", CFrame = stand(68, 36, 0, 36) }, -- PROBE-7, where its station stood
 		{ Id = "Broker", CFrame = stand(-61, 52, 0, 52) }, -- Tamsin, by the Market
 		{ Id = "Outfitter", CFrame = stand(-58, 25.5, 0, 25.5) }, -- Borin, by the Store's suits
 		{ Id = "Foreman", CFrame = stand(-24.5, 49, 0, 50) }, -- Garrick, by the door
@@ -2510,9 +2020,7 @@ local function shelter(parent, at: CFrame, rules)
 	return {
 		Parking = parking,
 		Spawn = facingPoint(spawnAt, mech),
-		Probe = at3(68, 0, 36) * CFrame.Angles(0, math.rad(90), 0),
 		Board = at3(72, 0, 2) * CFrame.Angles(0, math.rad(90), 0),
-		Gate = at3(36, 0.8, 46),
 		Store = store,
 		Market = market,
 		Crew = crew,
@@ -2590,8 +2098,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	end
 
 	-- Haul roads out from the Shelter's walls: the four spokes, due north,
-	-- east, south and west between the biomes (Shared.Frontier.Spokes: the
-	-- Crossroads), the ring road round through all four (the Loop), and jump
+	-- east, south and west between the biomes (Shared.Frontier.Spokes), the
+	-- ring road round through all four (the Loop), and jump
 	-- ramps on them.
 	local roads = folder(root, "Roads")
 	local roadLines = {}
@@ -2926,11 +2434,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 	end
 
-	-- PROBE-7 and the leaderboard on the Shelter's east wall, the Arena
-	-- Uplink by its door; Halloween patches out in the quarry.
-	local probeScreen = probe(root, home.Probe)
+	-- The leaderboard on the Shelter's east wall; Halloween patches out in
+	-- the quarry.
 	local face = billboard(root, home.Board)
-	local gatePad = gate(root, home.Gate)
 	local festiveExclusions = harvestPatches(root, at)
 	sky(root, at)
 
@@ -3013,13 +2519,10 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 		return true
 	end
-	-- The biomes round the core: their ground, their landmarks, and a sign
-	-- at each spoke's mouth (kept clear of the rocks after).
+	-- The biomes round the core: their ground and their landmarks (kept
+	-- clear of the rocks after). No signs: the ground says where you are.
 	local biomes = folder(root, "Biomes")
 	for _, standing in biomeGround(biomes, at, rng, Frontier, clear) do
-		table.insert(keepOut, standing)
-	end
-	for _, standing in crossroads(biomes, at, Frontier) do
 		table.insert(keepOut, standing)
 	end
 	-- The frontier first (Shared.Frontier). Where the Rift Veins may surface
@@ -3154,9 +2657,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Shelter = { Box = home.Box, Lift = lift, Ramps = home.Ramps, Feet = home.Feet },
 		-- The stairs down to the Kaiju Arena: { Landing (CFrame), Size, Top (CFrame) }.
 		Stairs = home.Stairs,
-		Probe = probeScreen,
 		Board = face,
-		Gate = gatePad,
 		Spots = spots,
 		ArrivalSpots = arrivalSpots,
 		NearSpots = nearSpots,

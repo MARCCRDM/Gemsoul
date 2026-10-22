@@ -95,59 +95,35 @@ local function model(parent: Instance, name: string): Model
 	m.Parent = parent
 	return m
 end
--- A sign: a dark board with big words on its face (and its back, if `both`).
-local function sign(
-	parent: Instance,
-	cframe: CFrame,
-	size: Vector3,
-	title: string,
-	sub: string?,
-	color: Color3,
-	both: boolean?
-)
-	local board = part(parent, cframe, size, HULL_DARK, Enum.Material.Metal)
-	board.Name = "Sign"
-	for _, face in if both then { Enum.NormalId.Front, Enum.NormalId.Back } else { Enum.NormalId.Front } do
-		local gui = Instance.new("SurfaceGui")
-		gui.Face = face
-		gui.CanvasSize = Vector2.new(size.X * 40, size.Y * 40)
-		gui.LightInfluence = 0
-		gui.Parent = board
-		local back = Instance.new("Frame")
-		back.Size = UDim2.fromScale(1, 1)
-		back.BorderSizePixel = 0
-		back.BackgroundColor3 = Color3.fromRGB(26, 28, 34)
-		back.Parent = gui
-		local bar = Instance.new("Frame")
-		bar.Size = UDim2.new(1, 0, 0.08, 0)
-		bar.Position = UDim2.fromScale(0, 0.92)
-		bar.BorderSizePixel = 0
-		bar.BackgroundColor3 = color
-		bar.Parent = back
-		local head = Instance.new("TextLabel")
-		head.Name = "Title"
-		head.BackgroundTransparency = 1
-		head.Position = UDim2.fromScale(0.04, if sub then 0.06 else 0.12)
-		head.Size = UDim2.fromScale(0.92, if sub then 0.52 else 0.72)
-		head.Text = title
-		head.TextScaled = true
-		head.Font = Enum.Font.Oswald
-		head.TextColor3 = Color3.fromRGB(238, 234, 224)
-		head.Parent = back
-		if sub then
-			local line = Instance.new("TextLabel")
-			line.Name = "Line"
-			line.BackgroundTransparency = 1
-			line.Position = UDim2.fromScale(0.04, 0.6)
-			line.Size = UDim2.fromScale(0.92, 0.26)
-			line.Text = sub
-			line.TextScaled = true
-			line.Font = Enum.Font.GothamMedium
-			line.TextColor3 = Color3.fromRGB(170, 176, 186)
-			line.Parent = back
-		end
-	end
-	return board
+-- A word painted on the wall (or a screen): worn capitals on an unseen
+-- carrier flush with it, read from its front. The hall's signs say where
+-- (EXIT, INFO), nothing more: the rules are COACH-4's to tell, and the
+-- courts' own boards show each court (Client.KaijuPitClient).
+local PAINT = Color3.fromRGB(226, 220, 204)
+local function paint(parent: Instance, cframe: CFrame, size: Vector3, text: string)
+	local carrier = part(parent, cframe, size, PAINT, Enum.Material.SmoothPlastic)
+	carrier.Name = "Painted"
+	carrier.Transparency = 1
+	carrier.CastShadow = false
+	carrier.CanQuery, carrier.CanTouch = false, false
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "Letters"
+	gui.Face = Enum.NormalId.Front
+	gui.CanvasSize = Vector2.new(size.X * 40, size.Y * 40)
+	gui.LightInfluence = 0.6
+	gui.Parent = carrier
+	local word = Instance.new("TextLabel")
+	word.Name = "Word"
+	word.BackgroundTransparency = 1
+	word.Position = UDim2.fromScale(0.04, 0.1)
+	word.Size = UDim2.fromScale(0.92, 0.8)
+	word.Text = text
+	word.TextScaled = true
+	word.Font = Enum.Font.GothamBlack
+	word.TextColor3 = PAINT
+	word.TextTransparency = 0.12
+	word.Parent = gui
+	return carrier
 end
 local function spot(parent: BasePart, color: Color3, range: number, brightness: number, angle: number)
 	local light = Instance.new("SpotLight")
@@ -236,19 +212,33 @@ local function court(parent: Instance, hall: CFrame, info, number: number)
 		ring.Name = "Pad" .. side
 		ring:SetAttribute("Side", side)
 		disc(m, base * CFrame.new(0, 0.33, 0), spec.PadRadius - 0.45, 0.04, HULL_DARK, Enum.Material.DiamondPlate)
-		-- (a post with its corner's colour and the court's number, behind the pad)
+		-- (a post behind the pad, its plate in the corner's colour with the
+		-- court's number painted on it, both ways)
 		local post = at(0, 0, s * (spec.Pad + spec.PadRadius + 1.4))
 		part(m, post * CFrame.new(0, 2, 0), Vector3.new(0.5, 4, 0.5), HULL_DARK, Enum.Material.Metal)
-		local face = sign(
+		local plate = part(
 			m,
 			post * CFrame.new(0, 4.6, 0) * CFrame.Angles(0, if s < 0 then math.pi else 0, 0),
-			Vector3.new(4.6, 1.6, 0.25),
-			if side == "A" then "BLUE CORNER" else "RED CORNER",
-			"COURT " .. number,
-			color,
-			true
+			Vector3.new(2.2, 1.6, 0.25),
+			color:Lerp(HULL_DARK, 0.25),
+			Enum.Material.Metal
 		)
-		face.Name = "Corner" .. side
+		plate.Name = "Corner" .. side
+		for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = face
+			gui.CanvasSize = Vector2.new(88, 64)
+			gui.LightInfluence = 0.6
+			gui.Parent = plate
+			local digit = Instance.new("TextLabel")
+			digit.BackgroundTransparency = 1
+			digit.Position, digit.Size = UDim2.fromScale(0.1, 0.1), UDim2.fromScale(0.8, 0.8)
+			digit.Text = tostring(number)
+			digit.TextScaled = true
+			digit.Font = Enum.Font.GothamBlack
+			digit.TextColor3 = PAINT
+			digit.Parent = gui
+		end
 	end
 	-- The board over its middle, facing both aisles (Client.KaijuPitClient
 	-- draws on it), hung from the roof.
@@ -421,50 +411,15 @@ function KaijuPitWorld.build(origin: CFrame, parent: Instance)
 	end
 	-- (Signs on the north wall face south, into the hall: turned round.)
 	local south = CFrame.Angles(0, math.pi, 0)
-	sign(
-		shell,
-		at(0, leave.Center.Y + 12, -Z + 0.3) * south,
-		Vector3.new(14, 2.4, 0.3),
-		"UP TO THE SHELTER",
-		nil,
-		HAZARD
-	)
-	-- The arena's names: over the balcony on the north wall, and on the
-	-- south wall facing you as you arrive.
-	sign(shell, at(-40, 26, -Z + 0.3) * south, Vector3.new(34, 7, 0.4), "KAIJU ARENA", "STAND ON A PAD TO BATTLE", RED)
-	sign(
-		shell,
-		at(40, 26, -Z + 0.3) * south,
-		Vector3.new(34, 7, 0.4),
-		"KAIJU ARENA",
-		"EVERY KAIJU FIGHTS AT FULL HEALTH",
-		BLUE
-	)
-	sign(
-		shell,
-		at(0, 24, Z - 0.3),
-		Vector3.new(48, 9, 0.4),
-		"KAIJU ARENA",
-		"STAND ON A PAD  ·  WAIT FOR A CHALLENGER  ·  25 S TO PLACE YOUR KAIJU",
-		HAZARD
-	)
-	-- The rules, on the balcony's face beside the stairs (off the floor, out of the way).
-	sign(
-		shell,
-		at(stairs + 7, 6, -Z + deep + 0.2) * south,
-		Vector3.new(9, 4.2, 0.3),
-		"HOW IT WORKS",
-		"PAD · CHALLENGER · PLACE · FIGHT",
-		HAZARD
-	).Name =
-		"Rules"
+	paint(shell, at(0, leave.Center.Y + 12, -Z + 0.3) * south, Vector3.new(8, 2.4, 0.3), "EXIT")
 	-- COACH-4's kiosk on the balcony, beside where you arrive: a post with
 	-- a screen on top, like INFO-9's upstairs. The guide stands by it,
 	-- facing the way you come in (Server.KaijuPitServer builds it).
 	local kiosk = CFrame.lookAt(at(15.5, hall.Balcony, -Z + 9).Position, at(0, hall.Balcony, -Z + 6).Position)
 	solid(part(shell, kiosk * CFrame.new(0, 2.2, 0), Vector3.new(1.6, 4.4, 1.2), HULL_DARK, Enum.Material.Metal))
-	sign(shell, kiosk * CFrame.new(0, 5.7, 0), Vector3.new(5, 2.6, 0.3), "ARENA GUIDE", "COACH-4", HAZARD, true).Name =
-		"GuideSign"
+	local screen = part(shell, kiosk * CFrame.new(0, 5.7, 0), Vector3.new(5, 2.6, 0.3), HULL_DARK, Enum.Material.Metal)
+	screen.Name = "GuideScreen"
+	paint(shell, kiosk * CFrame.new(0, 5.7, -0.16), Vector3.new(4.2, 1.6, 0.02), "INFO")
 	local guide =
 		CFrame.lookAt(at(11, hall.Balcony + 0.1, -Z + 9.5).Position, at(0, hall.Balcony + 0.1, -Z + 8).Position)
 	-- Warm work lights along the walls.

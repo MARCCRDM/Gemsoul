@@ -1013,6 +1013,7 @@ local function healthAndInfusing()
 	check(not record.Down and record.DownUntil == nil, "Not back once its revive time was up")
 	check(record.Health == math.floor(starterMost * Kaiju.Revive.Health + 0.5), "Not back weak, at Revive.Health")
 	check(Kaiju.Revive.Health <= 0.2, "Back by itself, it isn't weak enough to need healing")
+	check(record.Weak == true, "Back by itself, it isn't weak (gems at a third)")
 	check(pet and pet.Record == record and pet.Humanoid.Health == record.Health, "Back, it didn't come out as it was")
 	check(noted(a, "back on its feet") and record.Level == levelBefore and record.Exp == expBefore, "Not told it's back, or given EXP")
 	-- Robux or a Revive coupon (reviveAll): every one that's down, back now.
@@ -1024,6 +1025,7 @@ local function healthAndInfusing()
 		"Bought back, it isn't at Revive.Bought"
 	)
 	check(Kaiju.Revive.Bought > Kaiju.Revive.Health, "Buying it back isn't better than waiting")
+	check(record.Weak == nil, "Bought back, it's still weak")
 	pet = KaijuServer.pets()[a]
 	check(pet and pet.Record == record, "Revived, it didn't come out")
 	check(KaijuServer.reviveAll(a) == 0, "reviveAll counted one that wasn't down")
@@ -1048,6 +1050,21 @@ local function healthAndInfusing()
 	check(pet.Humanoid.Health == pet.Humanoid.MaxHealth and record.Health == pet.Humanoid.MaxHealth, "Not mended whole")
 	check(#profiles[a].Gems == 3, "Stones it didn't need were eaten")
 	check(not registered.KaijuInfuse(a, { "m3" }, record.Id).Ok, "Infused one already whole")
+	-- Weak (back by itself): the same 20% takes three times the gems, and
+	-- once it's full it isn't weak any more.
+	record.Weak = true
+	pet.Humanoid.Health = pet.Humanoid.MaxHealth * 0.8
+	local weakIds = {}
+	for i = 1, 8 do
+		stone("w" .. i, "Common", other)
+		table.insert(weakIds, "w" .. i)
+	end
+	local weakMend = registered.KaijuInfuse(a, weakIds, record.Id)
+	check(weakMend.Ok and weakMend.Used == 6, "Mending 20% weak didn't take six commons: " .. tostring(weakMend.Used))
+	check(record.Health == pet.Humanoid.MaxHealth and record.Weak == nil, "Healed to full, it's still weak")
+	for i = 7, 8 do
+		PlayerData.removeGem(a, "w" .. i)
+	end
 	-- Only out of danger: not while one of the team out has just fought.
 	pet.Humanoid.Health = math.floor(pet.Humanoid.MaxHealth * 0.5)
 	pet.LastFight = now - 1

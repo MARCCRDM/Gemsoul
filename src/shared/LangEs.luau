@@ -2149,7 +2149,8 @@ return {
 	["IN A FIGHT"] = "EN COMBATE",
 	["COUPON ×{1}"] = "CUPÓN ×{1}",
 	["{=} comes back at half health."] = "{=} vuelve con la mitad de vida.",
-	["It comes back weak, at {1}% health: heal it with gems."] = "Vuelve débil, con un {1}% de vida: cúralo con gemas.",
+	["It comes back weak, at {1}% health, and gems heal it at a third till it's full."] = "Vuelve débil, con un {1}% de vida, y las gemas lo curan a un tercio hasta que esté al máximo.",
+	["Weak from a knockout: gems heal it at a third till it's full again."] = "Débil tras un nocaut: las gemas lo curan a un tercio hasta que esté al máximo.",
 	["You have {1} Revive coupons: COUPON brings it back free."] = "Tienes {1} cupones de Revivir: CUPÓN lo revive gratis.",
 	["You have {1} Revive coupon: COUPON brings it back free."] = "Tienes {1} cupón de Revivir: CUPÓN lo revive gratis.",
 	["Invite a friend: a free Revive coupon for each one who joins."] = "Invita a un amigo: un cupón de Revivir gratis por cada uno que se una.",
@@ -2162,7 +2163,7 @@ return {
 	["Your kaiju are back on their feet!"] = "¡Tus kaiju están de pie otra vez!",
 	["Your kaiju is back on its feet!"] = "¡Tu kaiju está de pie otra vez!",
 	["{=} is back on its feet!"] = "¡{=} está de pie otra vez!",
-	["{=} is back on its feet, but weak: heal with gems before the next fight."] = "{=} está de pie otra vez, pero débil: cúralo con gemas antes de la próxima pelea.",
+	["{=} is back on its feet, but weak: gems heal it at a third till it's full again."] = "{=} está de pie otra vez, pero débil: las gemas lo curan a un tercio hasta que esté al máximo.",
 	["{=} was knocked out! It's back by itself in {=}, or revive it now."] = "¡{=} quedó noqueado! Vuelve solo en {=}, o revívelo ahora.",
 	["{=} is knocked out: it's back by itself in {=}, or revive it now."] = "{=} está noqueado: vuelve solo en {=}, o revívelo ahora.",
 	["Not in the middle of a fight: get clear of the critters first."] = "No en medio de un combate: aléjate primero de las criaturas.",
@@ -2206,7 +2207,7 @@ return {
 	["Double XP for {1} minutes!"] = "¡XP doble durante {1} minutos!",
 	["A friend joined on your invite: +{1} reward coupons! Open INVITE to use them."] = "Un amigo se unió con tu invitación: ¡+{1} cupones de recompensa! Abre INVITAR para usarlos.",
 	-- The Saga Shelter's crew (Shared.Vendors, Client.Dialogue): Ilsa buys
-	-- gems, Brutus runs the Uplink, Tamsin the Market, Borin the Store,
+	-- gems, Brutus runs the duels, Tamsin the Market, Borin the Store,
 	-- Garrick the quarry. Staff on a working base: plain, exact, tú.
 	-- (Their roles are kept free of gender.)
 	["►  {*}"] = "►  {*}",
@@ -2237,8 +2238,14 @@ return {
 	["Sell my spare Commons ({1}) for {2} coins"] = "Vender mis gemas comunes de sobra ({1}) por {2} monedas",
 	["Sell my spare Uncommons ({1}) for {2} coins"] = "Vender mis gemas poco comunes de sobra ({1}) por {2} monedas",
 	["Ilsa buys gems at the GEM BUYER desk in the Gem Gallery."] = "Ilsa compra gemas en el mostrador COMPRA DE GEMAS de la Galería de Gemas.",
-	["Brutus, arena master. The Uplink runs ranked 1v1 duels. Consecutive wins restore your swings; one loss resets the count."] = "Brutus, guía de la arena. El Enlace organiza duelos 1v1 clasificatorios. Las victorias seguidas te devuelven golpes; una derrota reinicia la cuenta.",
+	["Brutus, arena master. I run the ranked 1v1 duels. Consecutive wins restore your swings; one loss resets the count."] = "Brutus, guía de la arena. Yo organizo los duelos 1v1 clasificatorios. Las victorias seguidas te devuelven golpes; una derrota reinicia la cuenta.",
 	["Find me a duel"] = "Búscame un duelo",
+	["PROBE-{1}, Refills"] = "PROBE-{1}, recargas",
+	["Refills"] = "Recargas",
+	["Open the Exchange"] = "Abrir el Intercambio",
+	["PROBE-{1}, supply unit. I sell swing refills for your pick, on top of its free charge."] = "PROBE-{1}, unidad de suministro. Vendo recargas de golpes para tu pico, además de su carga gratis.",
+	["How do refills work?"] = "¿Cómo funcionan las recargas?",
+	["A Swing Refill is {1} swings, a Mega Refill {2}. Bought swings are spent first; your free charge keeps recharging, a swing every {3} seconds."] = "Una Recarga de golpes son {1} golpes; una Megarrecarga, {2}. Los golpes comprados se gastan primero; tu carga gratis sigue recargándose, un golpe cada {3} segundos.",
 	["What does a win streak pay?"] = "¿Qué da una racha de victorias?",
 	["First win: a tenth of your swings restored. Fifth: a quarter. Tenth: half, and the tournament title. A loss ends the run."] = "Primera victoria: recuperas una décima parte de tus golpes. Quinta: una cuarta parte. Décima: la mitad, y el título del torneo. Una derrota termina la racha.",
 	["Any advice?"] = "¿Algún consejo?",
@@ -2260,7 +2267,7 @@ return {
 	["What are those critters?"] = "¿Qué son esos bichos?",
 	["Rift critters. Activity rises the longer you work outside the Core. Keep your kaiju close: if your whole team goes down out there, the critters come for your gems."] = "Bichos de la Grieta. La actividad sube cuanto más tiempo trabajas fuera del Núcleo. Mantén cerca a tus kaiju: si cae todo tu equipo ahí fuera, los bichos vienen a por tus gemas.",
 	["My swings ran out"] = "Me quedé sin golpes",
-	["Your pick recharges a swing every {1} seconds. PROBE-{2} sells refills, and win streaks at Brutus's Uplink restore swings."] = "Tu pico recupera un golpe cada {1} segundos. La SONDA-{2} vende recargas, y las rachas de victorias en el Enlace de Brutus devuelven golpes.",
+	["Your pick recharges a swing every {1} seconds. PROBE-{2} sells refills, and ranked 1v1 win streaks restore swings."] = "Tu pico recupera un golpe cada {1} segundos. La SONDA-{2} vende recargas, y las rachas de victorias en 1v1 clasificatorio devuelven golpes.",
 	-- INFO-9, the Shelter's information unit (Shared.Vendors.InfoBot, its
 	-- field tips Vendors.Tips; Client.Dialogue): answers by topic, a tip at
 	-- a time.
@@ -2284,7 +2291,7 @@ return {
 	["How do I heal them?"] = "¿Cómo los curo?",
 	["Once you're clear of danger, open the kaiju panel's HEAL tab and give them gems. Rarer gems heal more, and a gem of their own element heals twice as much. AUTO HEAL spends Commons first, then Uncommons."] = "Cuando estés fuera de peligro, abre la pestaña CURAR del panel de kaiju y dales gemas. Las gemas más raras curan más, y una de su propio elemento cura el doble. AUTOCURA gasta primero las comunes y luego las poco comunes.",
 	["One got knocked out"] = "Noquearon a uno",
-	["It recovers on its own after a cooldown, longer at higher levels, and comes back at {1}% health: heal it with gems. Or revive it now for Robux, at half health."] = "Se recupera solo tras una espera, más larga a mayor nivel, y vuelve con un {1}% de salud: cúralo con gemas. O revívelo ya con Robux, con la mitad de su salud.",
+	["It recovers on its own after a cooldown, longer at higher levels, and comes back weak, at {1}% health: until it's full again, gems heal it at a third of their power. Or revive it now for Robux, at half health and not weak."] = "Se recupera solo tras una espera, más larga a mayor nivel, y vuelve débil, con un {1}% de vida: hasta que esté al máximo, las gemas lo curan con un tercio de su poder. O revívelo ahora con Robux, con la mitad de vida y sin debilidad.",
 	["How do I catch a wild kaiju?"] = "¿Cómo atrapo un kaiju salvaje?",
 	["Challenge one in the quarry and wear it down below half health without knocking it out: it glows gold. Then press CATCH and hold it in your gem's light. Taking a hit or moving off breaks the catch."] = "Desafía a uno en la cantera y bájale la salud por debajo de la mitad sin noquearlo: brillará dorado. Entonces pulsa ATRAPAR y sujétalo con la luz de tu gema. Si recibes un golpe o te alejas, la captura se interrumpe.",
 	["Threats and safety"] = "Amenazas y seguridad",
@@ -2294,7 +2301,7 @@ return {
 	["If your whole kaiju team is knocked out beyond the Core, critters trip you and steal the newest gems from your trip. Hit a thief before it reaches its rift and the gem comes back. Back in the Core, your gems are safe."] = "Si noquean a todo tu equipo de kaiju más allá del Núcleo, los bichos te ponen la zancadilla y roban las gemas más nuevas de tu salida. Golpea al ladrón antes de que llegue a su grieta y recuperas la gema. De vuelta en el Núcleo, tus gemas están a salvo.",
 	["How do I recover health?"] = "¿Cómo recupero salud?",
 	["In the Outpost you heal on your own: a few seconds after your last hit, your health starts to refill. Sparring and being knocked down pause it."] = "En el Puesto te curas solo: unos segundos después del último golpe, tu salud empieza a llenarse. Un combate amistoso o estar derribado lo detienen.",
-	["Your free pick gets a swing back every {1} seconds and is full again in two hours. PROBE-{2} sells refills, and 1v1 win streaks at the Arena Uplink restore swings."] = "Tu pico gratis recupera un golpe cada {1} segundos y vuelve a estar lleno en dos horas. La SONDA-{2} vende recargas, y las rachas de victorias en 1v1 del Enlace de la Arena devuelven golpes.",
+	["Your free pick gets a swing back every {1} seconds and is full again in two hours. PROBE-{2} sells refills, and ranked 1v1 win streaks restore swings."] = "Tu pico gratis recupera un golpe cada {1} segundos y vuelve a estar lleno en dos horas. La SONDA-{2} vende recargas, y las rachas de victorias en 1v1 clasificatorio devuelven golpes.",
 	-- INFO-9's field tips (Vendors.Tips).
 	["Every rock yields exactly one gem, and broken rocks grow back. A picked-over field fills up again."] = "Cada roca da exactamente una gema, y las rocas rotas vuelven a crecer. Un campo agotado se vuelve a llenar.",
 	["The Fringe starts {1} studs from the Shelter and adds luck to every gem. The Edge starts at {2} and adds more."] = "La Franja empieza a {1} studs del Refugio y añade suerte a cada gema. El Borde empieza a {2} y añade más.",

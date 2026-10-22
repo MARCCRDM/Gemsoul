@@ -1,15 +1,8 @@
 --[[
 	The frontier on screen:
 
-	  a banner     as you cross from one band of the Outpost into another
-	               (the server's FrontierBand on your Player: Core, Fringe,
-	               Edge; Shared.Frontier), in the band's colour, so you know
-	               where the critters start and how rich the rocks run; and
-	               as you cross into one of the biomes round the core
-	               (FrontierBiome: Ashfall, Rimefrost, Stormglass,
-	               Blightwood), in its colour, after the band's. The same
-	               banner doesn't come back for a while (crossing to and fro
-	               at a boundary).
+	  (No title card as you cross from one band or biome into another:
+	  the ground, the light and the critters say where you are.)
 	  the light    out in the biomes the screen's grade and the outdoor
 	               light take on the biome's (Frontier.Biomes: Tint,
 	               Ambient), blending across the spokes and in from the
@@ -28,8 +21,6 @@
 	               it is (the vein guardian's in red), so you can find them.
 
 	  FrontierHud.start()
-	  FrontierHud.Lines[band] -> title, subtitle   (pure, for tests)
-	  FrontierHud.biomeLines(id) -> title, subtitle, colour   a biome's banner (pure)
 	  FrontierHud.biomeLight(offset, tint, ambient, fog?) -> tint, ambient, fog
 	      the grade, outdoor light and fog colour at `offset` from the
 	      Outpost's middle, given the Outpost's own (pure)
@@ -49,15 +40,7 @@ local Outpost = require(ReplicatedStorage.Shared.Outpost)
 
 local FrontierHud = {}
 
-FrontierHud.Lines = {
-	Core = { "OUTPOST CORE", "Safe from the rifts" },
-	Fringe = { "THE FRINGE", "Mining out here draws critters  ·  richer rocks" },
-	Edge = { "THE EDGE", "Tougher critters, sooner  ·  the richest rocks" },
-}
-FrontierHud.Again = 20 -- seconds before the same band's banner shows again
-FrontierHud.Hold = 2.6
-
-local shown: { [string]: number } = {}
+FrontierHud.Hold = 2.6 -- seconds the vein news shows
 FrontierHud.Sighting = 220 -- studs: how far off a wild kaiju gets an arrow
 local WILD = Color3.fromRGB(255, 176, 70)
 
@@ -73,16 +56,6 @@ function FrontierHud.edge(size: Vector2, point: Vector2, margin: number): (Vecto
 	local halfW, halfH = math.max(1, middle.X - margin), math.max(1, middle.Y - margin)
 	local scale = math.min(halfW / math.max(math.abs(d.X), 1e-3), halfH / math.max(math.abs(d.Y), 1e-3))
 	return middle + d * scale, math.atan2(d.Y, d.X)
-end
-
--- A biome's banner: its name, its line and its colour (nil for none).
-function FrontierHud.biomeLines(id: string?): (string?, string?, Color3?)
-	for _, biome in Frontier.Biomes do
-		if biome.Id == id then
-			return string.upper(biome.Name), biome.Line, biome.Glow
-		end
-	end
-	return nil, nil, nil
 end
 
 -- The grade's tint and the outdoor light at `offset` from the Outpost's
@@ -146,7 +119,6 @@ local function banner(player: Player, gui: ScreenGui)
 	rule.BackgroundTransparency = 1
 	rule.Parent = frame
 	local token = 0
-	local busyUntil = 0
 	local function fade(to: number, seconds: number)
 		local info = TweenInfo.new(seconds, Enum.EasingStyle.Quad)
 		for _, text in { title, subtitle } do
@@ -157,7 +129,6 @@ local function banner(player: Player, gui: ScreenGui)
 	local function showLines(lines, color: Color3)
 		token += 1
 		local mine = token
-		busyUntil = os.clock() + FrontierHud.Hold + 0.4
 		title.Text, subtitle.Text = lines[1], lines[2]
 		title.TextColor3 = color
 		rule.BackgroundColor3 = color
@@ -176,46 +147,12 @@ local function banner(player: Player, gui: ScreenGui)
 			end
 		end)
 	end
-	local function show(band: string)
-		local lines = FrontierHud.Lines[band]
-		local now = os.clock()
-		if not lines or (shown[band] and now - shown[band] < FrontierHud.Again) then
-			return
-		end
-		shown[band] = now
-		showLines(lines, Frontier.Bands[band].Color)
-	end
 	-- A Rift Vein surfacing somewhere new (while you're in the Outpost).
 	workspace:GetAttributeChangedSignal("VeinNewsAt"):Connect(function()
 		local news = workspace:GetAttribute("VeinNews")
 		if type(news) == "string" and player:GetAttribute("Outpost") == true then
 			showLines({ "RIFT VEIN", news }, Frontier.RiftColor)
 		end
-	end)
-	local last = player:GetAttribute("FrontierBand")
-	player:GetAttributeChangedSignal("FrontierBand"):Connect(function()
-		local band = player:GetAttribute("FrontierBand")
-		-- (Arriving in the Outpost isn't crossing into the core.)
-		if type(band) == "string" and last ~= nil then
-			show(band)
-		end
-		last = band
-	end)
-	-- Into a biome: its banner, once the band's has had its moment.
-	player:GetAttributeChangedSignal("FrontierBiome"):Connect(function()
-		local id = player:GetAttribute("FrontierBiome")
-		local title, line, color = FrontierHud.biomeLines(id)
-		if not title then
-			return
-		end
-		task.delay(math.max(0, busyUntil - os.clock()), function()
-			local now = os.clock()
-			if player:GetAttribute("FrontierBiome") ~= id or (shown[id] and now - shown[id] < FrontierHud.Again) then
-				return
-			end
-			shown[id] = now
-			showLines({ title, line }, color :: Color3)
-		end)
 	end)
 end
 

@@ -1541,7 +1541,7 @@ local function drawHeal(record)
 			pcall(GemArt.viewport, c.Art, shown, false)
 		end
 		c.Have.Text = "×" .. #stack.Gems
-		local base = Kaiju.Infuse.Power[stack.Tier] or Kaiju.Infuse.Power.Common
+		local base = (Kaiju.Infuse.Power[stack.Tier] or Kaiju.Infuse.Power.Common) * Kaiju.healShare(record)
 		c.Gain.Text = if down
 			then string.format("+%g", stack.Power)
 			else string.format("+%d%%", math.floor(stack.Power * Kaiju.Infuse.Mend * 100 + 0.5))
@@ -1600,18 +1600,20 @@ local function drawHeal(record)
 		healBarText.Text = ""
 	end
 	local on = Kaiju.autoHealOn(roster())
+	local weak = not down and not full and record.Weak == true
 	healHint.Text = if down
 		then "Gems and AUTO HEAL don't bring back one that's knocked out."
+		elseif weak then "Weak from a knockout: gems heal it at a third till it's full again."
 		elseif on then "AUTO HEAL is on: your spare Commons, then Uncommons, heal your team between fights."
 		else "Switch on AUTO HEAL by your team and your spare Commons, then Uncommons, heal them by themselves."
-	healHint.TextColor3 = if on and not down then P.Good else P.Dim
+	healHint.TextColor3 = if weak then P.Bad:Lerp(P.Text, 0.35) elseif on and not down then P.Good else P.Dim
 	if down then
 		-- Knocked out: back by itself, or REVIVE (Robux) or COUPON now.
 		local coupons = Coupons.count(GemClient.Profile, "Revive")
 		local onSale = (Store.RobuxProducts.KaijuRevive or 0) ~= 0 or Store.testPrice("KaijuRevive") ~= nil
 		reviveTime.Text = reviveClock(record)
 		reviveLine.Text = string.format(
-			"It comes back weak, at %d%% health: heal it with gems.",
+			"It comes back weak, at %d%% health, and gems heal it at a third till it's full.",
 			math.floor(Kaiju.Revive.Health * 100 + 0.5)
 		)
 		reviveCoupon.Text = if coupons > 0

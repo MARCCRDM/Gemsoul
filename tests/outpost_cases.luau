@@ -557,16 +557,22 @@ do
 		check(heart:FindFirstChildOfClass("PointLight") and heart:FindFirstChildOfClass("ParticleEmitter"), "The gate has no glow or embers")
 	end
 end
-check(site.Probe:FindFirstChildOfClass("ProximityPrompt") ~= nil, "The Probe has no prompt")
+-- (No PROBE-7 station or duel gate: PROBE-7 and Brutus are crew, below.)
+check(site.Probe == nil and site.Gate == nil, "A Probe station or a duel gate is back")
+for _, d in site.Model:GetDescendants() do
+	local kind = d.ClassName == "ProximityPrompt" and d:GetAttribute("PromptKind")
+	check(kind ~= "Probe" and kind ~= "Gate", "A Probe or Gate prompt is back")
+end
 -- The Shelter's Store and Market counters open those screens (OutpostScene).
 for kind, counter in { Store = site.Stations.Store, Market = site.Stations.Market } do
 	local prompt = counter:FindFirstChildOfClass("ProximityPrompt")
 	check(prompt and prompt:GetAttribute("PromptKind") == kind, "The Shelter's " .. kind .. " has no prompt")
 end
--- The Shelter's crew: the old town's shopkeepers and INFO-9, the info rep,
--- each built where the Shelter puts them, on its floor (up on its legs), in
--- its hall (south of the garage's barrier), clear of each other, the
--- counters, the Uplink's pad and where players arrive. Every line they
+-- The Shelter's crew: the old town's shopkeepers, INFO-9, the info rep,
+-- and PROBE-7 (the refills), each built where the Shelter puts them, on its
+-- floor (up on its legs), in its hall (south of the garage's barrier),
+-- clear of each other, the counters and where players arrive. PROBE-7 opens
+-- the Exchange and Brutus finds a duel, first thing they offer. Every line they
 -- offer is a reply, an action the dialogue knows, or a topic of those; and
 -- every one of INFO-9's lines and tips is in the Spanish table.
 do
@@ -577,8 +583,11 @@ do
 		Outfitter = "Borin",
 		Foreman = "Garrick",
 		InfoBot = "INFO-9",
+		Probe = "PROBE-7",
 	}
-	check(#crewBuilt == 6 and #site.Crew == 6, "The Shelter's crew isn't all there: " .. #crewBuilt)
+	check(#crewBuilt == 7 and #site.Crew == 7, "The Shelter's crew isn't all there: " .. #crewBuilt)
+	check(Vendors.Probe.Options[1].Action == "Exchange", "PROBE-7 doesn't open the Exchange first")
+	check(Vendors.ArenaMaster.Options[1].Action == "Duels", "Brutus doesn't find a duel first")
 	local dialogue = fs.readFile(ROOT .. "/src/client/Dialogue.client.luau")
 	local function flat(p)
 		local q = p - Rules.Location.Position
@@ -587,7 +596,6 @@ do
 	local box = site.Shelter.Box
 	local keep = {
 		{ flat(site.Spawn.Position), 9, "where players arrive" },
-		{ flat(site.Gate.CFrame.Position), 10, "the Uplink's pad" },
 		{ flat(site.Stations.Store.CFrame.Position), 9, "the Store's counter" },
 		{ flat(site.Stations.Market.CFrame.Position), 9, "the Market's counter" },
 	}

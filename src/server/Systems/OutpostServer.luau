@@ -35,10 +35,11 @@
 	FrontierHud's banner). A swing at a vein's rock tells its guardian
 	(OutpostServer.onVeinSwing: KaijuWilds). Rocks carry their state as attributes (Hp,
 	MaxHp, Zone, ClaimedBy, LastHitBy, LastCrit, Popped) so every client
-	can show every swing; prompts carry PromptKind (Mine, Probe, Gate,
+	can show every swing; prompts carry PromptKind (Mine, Store, Market,
 	Spar, Duel, Party) for the client to act on. The Shelter's crew
-	(site.Crew: Ilsa the gem buyer, Brutus, Tamsin, Borin and Garrick) are
-	Builder.vendor robots: their Talk prompt opens Client.Dialogue.
+	(site.Crew: Ilsa the gem buyer, Brutus for duels, PROBE-7 for refills,
+	Tamsin, Borin, Garrick and INFO-9) are Builder.vendor robots: their
+	Talk prompt opens Client.Dialogue.
 
 	Every swing out past the core makes noise (OutpostServer.onSwing:
 	FrontierServer.swing, which brings the critters). A player Rift Charged
@@ -914,7 +915,7 @@ local function drawBoard()
 	end
 	-- (In the base's sign style: warm white condensed capitals, grey
 	-- headings, each column's colour a bar beside its heading.)
-	label("MINER STANDINGS", 40, 14, 1060, 52, 44, Color3.fromRGB(238, 234, 224), Enum.Font.Oswald)
+	label("LEADERBOARD", 40, 14, 1060, 52, 44, Color3.fromRGB(238, 234, 224), Enum.Font.GothamBlack)
 	for column, spec in
 		{
 			{ "Gear", "GEAR SCORE", Color3.fromRGB(122, 150, 214) },
@@ -948,27 +949,6 @@ local function drawBoard()
 			)
 		end
 	end
-end
-
--- The Probe's screen and the gate's sign.
-local function drawSigns()
-	local function sign(part: BasePart, title: string, sub: string, color: Color3)
-		local gui = Instance.new("SurfaceGui")
-		gui.Face = Enum.NormalId.Front
-		gui.CanvasSize = Vector2.new(400, 200)
-		gui.LightInfluence = 0
-		gui.Parent = part
-		for i, line in { { title, 46, 30 }, { sub, 24, 110 } } do
-			local l = Instance.new("TextLabel")
-			l.BackgroundTransparency = 1
-			l.Size, l.Position = UDim2.new(1, 0, 0, line[2] + 8), UDim2.fromOffset(0, line[3])
-			l.Text, l.TextSize = line[1], line[2]
-			l.TextColor3 = if i == 1 then color else Color3.fromRGB(160, 166, 176)
-			l.Font = if i == 1 then Enum.Font.Oswald else Enum.Font.GothamMedium
-			l.Parent = gui
-		end
-	end
-	sign(site.Probe, "PROBE-7", "SWING REFILLS", Color3.fromRGB(200, 230, 245))
 end
 
 -- An Easter egg found: paid once per player (and a bonus for the full set),
@@ -1066,13 +1046,11 @@ function OutpostServer.start()
 	for _ = 1, math.min(Rules.FieldNodeCount, #(site.FieldSpots or {})) do
 		spawnNode(true)
 	end
-	-- Prompts at the Probe (refills), the Arena gate, and the Shelter's
-	-- Store and player Market counters.
+	-- Prompts at the Shelter's Store and player Market counters. (The
+	-- refills and the duels are PROBE-7's and Brutus's: talk to them.)
 	local stations = site.Stations or {}
 	for _, spec in
 		{
-			{ site.Probe, "Probe", "Open the Exchange", "PROBE-7" },
-			{ site.Gate, "Gate", "Arena Uplink", "Duels · Rival · Party" },
 			{ stations.Store, "Store", "Open the Store", "STORE" },
 			{ stations.Market, "Market", "Open the Market", "PLAYER MARKET" },
 		}
@@ -1114,7 +1092,6 @@ function OutpostServer.start()
 		prompt:SetAttribute("SecretId", id)
 		prompt.Parent = part
 	end
-	drawSigns()
 	-- Where a finished duel brings an Outpost visitor back to (ArenaSessions.leave).
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
 	if not landmarks then

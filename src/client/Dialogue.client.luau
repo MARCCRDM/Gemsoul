@@ -416,6 +416,12 @@ function actions.Duels()
 	require(script.Parent.Modules.SocialUI).open("Arena")
 end
 
+-- PROBE-7's refills.
+function actions.Exchange()
+	close()
+	require(script.Parent.Modules.OutpostScene).openProbe()
+end
+
 local function open(vendorId: string, part: BasePart)
 	local vendor = Vendors[vendorId]
 	if not vendor then

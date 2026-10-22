@@ -16,8 +16,6 @@
 	                sparkles round the Legendary
 	  drones        three maintenance drones on slow loops round the hall,
 	                their eyes blinking and a spotlight under each
-	  the survey    a scan sweeping round the survey table's map, once
-	                every SweepTurn seconds
 	  motes         dust drifting down through the skylight
 
 	None of it casts a shadow or can be clicked (CanQuery: a click in the
@@ -51,10 +49,8 @@ local ShelterLife = {}
 
 -- Where things are, in the Shelter's frame (Server OutpostWorld.shelter).
 ShelterLife.Stage = Vector3.new(0, 2.35, 18) -- the top of the kaiju arena's stage
-ShelterLife.Gallery = { Middle = Vector3.new(30, 0.86, 4), Radius = 13, From = -50, Step = 25 }
-ShelterLife.Survey = Vector3.new(-42, 0.86, 14) -- the survey table's middle, on the floor
-ShelterLife.SweepTurn = 6 -- seconds a turn of its scan
-ShelterLife.SweepY = 2.78 -- the scan's height over the floor: just over the map
+-- (the Gem Gallery's arc, next to the Market: the server's GALLERY)
+ShelterLife.Gallery = { Middle = Vector3.new(-44, 0.86, 46), Radius = 11, From = 40, Step = 25 }
 ShelterLife.Console = Vector3.new(-10.5, 0.86, 40.5) -- by the stage's way in, facing the door
 ShelterLife.Reach = 320 -- studs from the Shelter's middle: past this it's put away
 
@@ -211,7 +207,6 @@ export type Life = {
 	PlateLine: TextLabel,
 	Gems: { Group },
 	Drones: { { Group: Group, Eye: BasePart } },
-	Sweep: BasePart,
 }
 
 -- A kaiju of `species` in light, at the hologram's scale, its feet at the
@@ -414,19 +409,6 @@ function ShelterLife.build(at: CFrame): Life
 			},
 		})
 	end
-	local header = part(gallery, V(11, 2.6, 0.1), WHITE)
-	header.Name = "GalleryName"
-	header.Transparency = 1
-	do
-		local a = math.rad(spec.From + 2 * spec.Step)
-		local spot = spec.Middle + V(math.cos(a) * (spec.Radius + 1.5), 10.2, math.sin(a) * (spec.Radius + 1.5))
-		header.CFrame = at * facing(spot, spec.Middle + V(0, 10.2, 0))
-	end
-	label(header, Enum.NormalId.Front, {
-		{ Text = "GEM GALLERY", Color = C(238, 234, 224), Size = 0.6, Font = Enum.Font.Oswald },
-		{ Text = "MINING ODDS BY RARITY", Color = C(160, 166, 176), Size = 0.4, Font = Enum.Font.GothamMedium },
-	})
-
 	-- The drones.
 	local fleet = Instance.new("Model")
 	fleet.Name = "Drones"
@@ -436,12 +418,7 @@ function ShelterLife.build(at: CFrame): Life
 		table.insert(drones, drone(fleet))
 	end
 
-	-- The survey table's scan: a thin line of light from the map's middle
-	-- to its edge, going round (posed in ShelterLife.pose); and dust
-	-- drifting down from the skylight.
-	local sweep = part(model, V(0.06, 0.03, 5), C(150, 210, 235), Enum.Material.Neon)
-	sweep.Name = "SurveySweep"
-	sweep.Transparency = 0.35
+	-- Dust drifting down from the skylight.
 	local motes = part(model, V(64, 1, 40), WHITE)
 	motes.Name = "SkylightMotes"
 	motes.Transparency = 1
@@ -475,7 +452,6 @@ function ShelterLife.build(at: CFrame): Life
 		PlateLine = lines[2],
 		Gems = gems,
 		Drones = drones,
-		Sweep = sweep,
 	}
 	ShelterLife.pose(life, 0)
 	return life
@@ -553,18 +529,6 @@ function ShelterLife.pose(life: Life, t: number, stageTime: number?)
 		local turn = t * (0.5 + i * 0.12)
 		put(group, at * CFrame.new(foot + V(0, 5.4 + math.sin(t * 1.4 + i) * 0.18, 0)) * CFrame.Angles(0, turn, 0.12))
 	end
-
-	-- The survey table's scan, going round.
-	local survey = ShelterLife.Survey
-	local turn = (t % ShelterLife.SweepTurn) / ShelterLife.SweepTurn * math.pi * 2
-	table.insert(parts, life.Sweep)
-	table.insert(
-		cframes,
-		at
-			* CFrame.new(survey.X, survey.Y + ShelterLife.SweepY, survey.Z)
-			* CFrame.Angles(0, -turn, 0)
-			* CFrame.new(0, 0, -2.5)
-	)
 
 	-- The drones: on their loops, the eye blinking every couple of seconds.
 	for k, d in life.Drones do

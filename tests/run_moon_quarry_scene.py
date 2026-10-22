@@ -89,8 +89,9 @@ for _,index in site.ArrivalSpots do
  local past=p.Z>=frontMid.Z+front.Half.Y+8 and math.abs(p.X)>=14
  assert(p.Z>box.Y and math.abs(p.X)<=30 and (beside or past),"Welcome nodes aren't outside the door, or block the ramp or the lane out")
 end
-assert(site.Probe.Name=="ProbeScreen" and site.Board.Name=="BoardFace" and site.Gate.Name=="GatePad","Missing lobby services")
-for _,service in {site.Probe,site.Board,site.Gate,site.Stations.Store,site.Stations.Market} do
+-- (PROBE-7 and the duels are crew now: no station or gate to hand out.)
+assert(site.Probe==nil and site.Gate==nil and site.Board.Name=="BoardFace","Missing lobby services, or a station or gate is back")
+for _,service in {site.Board,site.Stations.Store,site.Stations.Market} do
  assert(inShelter(service.CFrame.Position-origin.Position),"A service outside the Shelter: "..service.Name)
 end
 assert(site.Stations.Store.CanCollide and site.Stations.Market.CanCollide,"The Store and Market counters aren't solid")
@@ -156,7 +157,7 @@ assert(floor and math.abs(floor.CFrame.t[2]+floor.Size.X/2)<.001,"Quarry floor m
 assert(floor.Transparency==1,"The quarry floor shows through the Loop's ground")
 assert(roads>80 and ramps==4 and sky>=260 and motor>200 and base>200,"Quarry landmarks or the Shelter missing")
 -- The Loop: each biome's ground and landmarks in its own quarter, past the
--- core; a sign each side of every spoke's mouth, naming the biome that side.
+-- core, and no signs naming them (the ground says where you are).
 local biomeParts,signs,glows={},0,{}
 for _,p in builtParts do
  local folderName=p.Parent and p.Parent.Name
@@ -176,7 +177,7 @@ for _,biome in Frontier.Biomes do
  assert((biomeParts[biome.Id] or 0)>=15,"Too few landmarks in "..biome.Id..": "..tostring(biomeParts[biome.Id]))
  assert(biome.Id=="Rimefrost" or glows[biome.Id],"No glow among "..biome.Id.."'s landmarks")
 end
-assert(signs==#Frontier.Spokes*2,"Not a sign each side of every spoke: "..signs)
+assert(signs==0,"Signs naming the biomes are back at the spokes: "..signs)
 -- The Loop's ground, in terrain: laid once, on terrain's grid, out under the
 -- walls; flush with the floor (0) wherever anything stands, and rising
 -- only out in the open; each biome's own materials, the core's regolith.
@@ -310,7 +311,7 @@ for i=0,10000 do
  local size=Rules.rollSize(i/10001,"Common")
  assert(size=="Pebble" or size=="Boulder","Rare mining object returned")
 end
-print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 4 spokes and their ramps; the Loop's ground in terrain (flat under every rock and road), the biomes' landmarks and crossroads signs; services and safe sky; the crater rim and sky always load")
+print("PASS: quarry "..#builtParts.." scenery parts; "..#site.Spots.." clear mining sites; 4 spokes and their ramps; the Loop's ground in terrain (flat under every rock and road), the biomes' landmarks and no signs; services and safe sky; the crater rim and sky always load")
 local counts={Hauler=0,Mole=0,Digger=0,Skipper=0}
 assert(#site.Parking==8,"The garage has missing bays")
 for _,bay in site.Parking do

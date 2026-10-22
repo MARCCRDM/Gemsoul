@@ -42,10 +42,9 @@ comes from about 5.6% of rocks in the core, 7.3% in the Fringe, 8.5% at the
 Edge and 10.1% on a vein. On the guarded vein the cap takes most of the
 extra 35%: 10.7%. Its guardian's Gemsoul and coins are the real prize.
 
-When you cross into a band, its name and a line about it show at the top of
-the screen in its colour. The same band's banner won't show again for 20
-seconds, so walking back and forth across a boundary doesn't keep showing
-it. Arriving in the Outpost doesn't show one.
+Crossing into a band shows nothing on the screen: no title card (since
+2026-10-22, [plain-signs.md](plain-signs.md)). The rocks and the critters
+tell you where you are.
 
 ## Outcrops
 

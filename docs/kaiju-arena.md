@@ -1,5 +1,7 @@
 # The Kaiju Arena: downstairs, rows of courts, stakes and arrows on the ground
 
+*Since then (2026-10-22): plain one-word signs, and the Shelter's floor cleared (no PROBE-7 station, duel gate, stands or survey table; PROBE-7 and Brutus are crew; the Gem Gallery is next to the Market). See [plain-signs.md](plain-signs.md).*
+
 Kaiju battles now have a home of their own. Take the stairs down from the
 Shelter and you're on the balcony of the **Kaiju Arena**: a hall with eight
 courts in two rows, like ping-pong tables. Each court has a pad at either
@@ -47,10 +49,8 @@ model.
 ## The way down
 
 - **In the Shelter.** A stairwell is cut into the hall's floor on the west
-  side, by the old arena stage. The stage's sign now reads **DOWNSTAIRS:
-  TAKE THE WEST STAIRS**.
+  side, by the old arena stage, a steel plate over it saying **ARENA**.
   - 13 steps go down to a landing and a lit doorway.
-  - Over the doorway: **KAIJU ARENA / DOWNSTAIRS: KAIJU BATTLES**.
   - A rail runs round the other three sides of the well, with hazard
     paint round its lip.
 - **Going down.** Walk onto the landing. A moment's cover (**KAIJU ARENA**)
@@ -58,8 +58,8 @@ model.
   - Your kaiju come with you.
   - You can't take a mech down: "Hop out of the mech first: it won't fit
     down the stairs."
-- **Coming back up.** The lit doorway behind the balcony (**UP TO THE
-  SHELTER**) takes you back to the top of the stairs.
+- **Coming back up.** The lit doorway behind the balcony (**EXIT** painted
+  over it) takes you back to the top of the stairs.
   - Walking up mid-battle forfeits it.
 - **Where it is.** The hall is 150 studs under the Shelter, inside the Core.
   The frontier (critters, rifts, raids) leaves it alone, and so does the
@@ -70,21 +70,17 @@ model.
 - **Size.** 216 × 160 studs and 36 high.
 - **The balcony.** A deck along the north wall, 12 up, with a glass rail.
   A 20-step stair runs down off it to the floor. **COACH-4**, the arena's
-  guide, stands on it by its kiosk (**ARENA GUIDE**), just to the right of
-  where you arrive, facing you.
+  guide, stands on it by its kiosk (**INFO** on its screen), just to the
+  right of where you arrive, facing you.
 - **The courts.** Eight of them, in two rows of four, with wide aisles
   between. Each court has:
   - bleachers along both sides;
   - floodlights over it;
   - a board over it;
   - a pedestal by its side.
-- **Signs.**
-  - **KAIJU ARENA** on the north and south walls. The north wall's two say
-    **STAND ON A PAD TO BATTLE** and **EVERY KAIJU FIGHTS AT FULL HEALTH**.
-  - **STAND ON A PAD · WAIT FOR A CHALLENGER · 25 S TO PLACE YOUR KAIJU**
-    facing you as you arrive.
-  - **HOW IT WORKS** on the balcony's face beside the stairs, off the floor
-    and out of the way.
+- **Signs.** Only **EXIT** and **INFO** (since 2026-10-22,
+  [plain-signs.md](plain-signs.md)). The rules are COACH-4's to tell, and
+  each court's board shows the court.
 
 ## A court
 

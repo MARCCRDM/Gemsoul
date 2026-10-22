@@ -188,7 +188,7 @@ Vendors.ArenaMaster = crew(
 	"Arena",
 	"Arena Master",
 	Color3.fromRGB(214, 84, 70),
-	"Brutus, arena master. The Uplink runs ranked 1v1 duels. Consecutive wins restore your swings; one loss resets the count.",
+	"Brutus, arena master. I run the ranked 1v1 duels. Consecutive wins restore your swings; one loss resets the count.",
 	{
 		{ Text = "Find me a duel", Action = "Duels" },
 		{
@@ -247,10 +247,30 @@ Vendors.Foreman = crew(
 		},
 		{
 			Text = "My swings ran out",
-			Reply = "Your pick recharges a swing every 12 seconds. PROBE-7 sells refills, and win streaks at Brutus's Uplink restore swings.",
+			Reply = "Your pick recharges a swing every 12 seconds. PROBE-7 sells refills, and ranked 1v1 win streaks restore swings.",
 		},
 	}
 )
+
+-- PROBE-7, the probe that brought the first miners' supplies, on its feet
+-- by the east wall where its station stood: it sells the swing refills (the
+-- Exchange: Client OutpostScene.openProbe, Shared.Outpost.Refills).
+Vendors.Probe = {
+	Name = "PROBE-7",
+	Role = "Refills",
+	Color = Color3.fromRGB(214, 166, 72),
+	Tunic = UNIFORM,
+	Face = "",
+	Visor = true,
+	Greeting = "PROBE-7, supply unit. I sell swing refills for your pick, on top of its free charge.",
+	Options = {
+		{ Text = "Open the Exchange", Action = "Exchange" },
+		{
+			Text = "How do refills work?",
+			Reply = "A Swing Refill is 600 swings, a Mega Refill 2,000. Bought swings are spent first; your free charge keeps recharging, a swing every 12 seconds.",
+		},
+	},
+}
 
 -- INFO-9, the Shelter's information unit: a robot by its kiosk near the
 -- door, with answers to what new miners ask (by topic) and a field tip
@@ -302,7 +322,7 @@ Vendors.InfoBot = {
 				},
 				{
 					Text = "One got knocked out",
-					Reply = "It recovers on its own after a cooldown, longer at higher levels, and comes back at 15% health: heal it with gems. Or revive it now for Robux, at half health.",
+					Reply = "It recovers on its own after a cooldown, longer at higher levels, and comes back weak, at 10% health: until it's full again, gems heal it at a third of their power. Or revive it now for Robux, at half health and not weak.",
 				},
 				{
 					Text = "How do I catch a wild kaiju?",
@@ -327,7 +347,7 @@ Vendors.InfoBot = {
 				},
 				{
 					Text = "My swings ran out",
-					Reply = "Your free pick gets a swing back every 12 seconds and is full again in two hours. PROBE-7 sells refills, and 1v1 win streaks at the Arena Uplink restore swings.",
+					Reply = "Your free pick gets a swing back every 12 seconds and is full again in two hours. PROBE-7 sells refills, and ranked 1v1 win streaks restore swings.",
 				},
 			},
 		},

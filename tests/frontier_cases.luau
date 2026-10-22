@@ -684,7 +684,9 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 		check(Frontier.biomeOf(biome.Angle) == biome, biome.Id .. " isn't its own middle's")
 		local before = Frontier.Biomes[(i - 2) % 4 + 1]
 		check(Beats[before.Element] == biome.Element, biome.Id .. " isn't weak to the biome before it")
-		check(biome.Name and biome.Label and biome.Line and biome.Material, biome.Id .. " is missing its look or lines")
+		check(biome.Name and biome.Material, biome.Id .. " is missing its name or look")
+		-- (No sign and no banner names it: the ground says where you are.)
+		check(biome.Label == nil and biome.Line == nil, biome.Id .. " still has a sign or a banner line")
 		check(biome.Glow and biome.Tint and biome.Ambient and biome.Fog and biome.Ground and biome.Stone, biome.Id .. " is missing a colour")
 		local ground = biome.Terrain
 		check(ground and ground.Main and ground.Second and ground.Main ~= ground.Second, biome.Id .. " has no ground of its own")
@@ -706,7 +708,7 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 	check(Frontier.biomeAt(at(-3 * math.pi / 4, 250)).Id == "Blightwood", "North-west isn't Blightwood")
 	check(Frontier.biomeAt(at(0.4, Frontier.Core - 1)) == nil and Frontier.biomeAt(Vector3.zero) == nil, "A biome in the core")
 	check(Frontier.biomeAt(at(0.4, Frontier.Core + 1)) ~= nil, "No biome just out of the core")
-	-- The borders: on the spokes at their mouths (where the signs stand),
+	-- The borders: on the spokes at their mouths,
 	-- swaying off them further out, each its own way (no two alike, so the
 	-- biomes aren't mirror images), never into the next biome's middle.
 	local ground = Frontier.Ground
@@ -832,22 +834,25 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 	check(GemRoller.roll(Random.new(5), 0).Element == GemRoller.roll(Random.new(5), 0).Element, "A plain roll isn't what it was")
 end)()
 
--- The banners as you cross between bands.
+-- No title card as you cross into a band or a biome (THE FRINGE, STORMGLASS
+-- and the rest): the ground, the light and the critters say where you are.
+-- The Rift Vein news is still a banner.
 local FrontierHud = client("FrontierHud")
-for _, band in Frontier.BandOrder do
-	local lines = FrontierHud.Lines[band]
-	check(lines and #lines[1] > 0 and #lines[2] > 0 and lines[1] == string.upper(lines[1]), band .. " has no banner")
+check(FrontierHud.Lines == nil and FrontierHud.biomeLines == nil, "The zones still have title cards")
+do
+	local hud = fs.readFile(ROOT .. "/src/client/Modules/FrontierHud.luau")
+	check(
+		hud:find('GetAttributeChangedSignal("FrontierBand")', 1, true) == nil
+			and hud:find('GetAttributeChangedSignal("FrontierBiome")', 1, true) == nil,
+		"Crossing into a band or a biome still shows a banner"
+	)
+	check(hud:find('showLines({ "RIFT VEIN", news }', 1, true) ~= nil, "The Rift Vein news lost its banner")
+	local world = fs.readFile(ROOT .. "/src/server/World/OutpostWorld.luau")
+	check(world:find("crossroads", 1, true) == nil and world:find("biome.Label", 1, true) == nil, "The biome signs are back by the roads")
 end
 -- The noise ring and stirred-up meter are off the HUD (the screen stays
 -- the game's); each stage past calm still has its note.
 check(FrontierHud.lit == nil and FrontierHud.stirRow == nil, "The noise ring is back on the HUD")
--- A biome's banner, and its light: the Outpost's own in the core, the
--- biome's out in it, half and half on a spoke.
-for _, biome in Frontier.Biomes do
-	local title, line, color = FrontierHud.biomeLines(biome.Id)
-	check(title == string.upper(biome.Name) and line == biome.Line and color == biome.Glow, biome.Id .. " has no banner")
-end
-check(FrontierHud.biomeLines("Nowhere") == nil and FrontierHud.biomeLines(nil) == nil, "A banner for no biome")
 do
 	local tint, ambient = roblox.Color3.fromRGB(248, 250, 255), roblox.Color3.fromRGB(150, 156, 176)
 	local function near(a, b)

@@ -103,19 +103,15 @@ The ground's numbers are `Frontier.Ground`.
 
 ## Finding your way
 
-![The north crossroads: Blightwood's sign left, Ashfall's right](biomes/crossroads.jpg)
+![The north crossroads before 2026-10-22: Blightwood's sign left, Ashfall's right (both gone now)](biomes/crossroads.jpg)
 
-- **Crossroads signs**: at each spoke's mouth, 30 studs out of the core,
-  there's a sign either side of the road. Each names the biome on that side
-  in its colour, with its ground under the name (**ASHFALL**, Thermal
-  ground). That's 8 in all, facing whoever's heading out.
+- **No signs, no title cards** (since 2026-10-22,
+  [plain-signs.md](plain-signs.md)): the crossroads signs and the banner
+  that named a biome as you crossed into it are gone. The ground, the light
+  and the fog tell you where you are.
 - **The way out**: 8 lone rocks stand at the spokes' mouths, two to each
   road, a step either side of it. They lead out of the core into the first
   rocks of each biome.
-- **The banner**: cross into a biome and its name shows at the top of the
-  screen in its colour, with its line: "Thermal ground · Thermal gems,
-  critters and kaiju". It waits for a band's banner to finish first, and
-  the same biome's banner won't show again for 20 seconds.
 - **The light and fog**: there's a slight fog over the whole quarry. The
   far side softens, but the sky stays black: the Atmosphere has density
   and no haze (`Scenes.OutpostFinish.Fog`). As you walk out, three things
@@ -142,17 +138,15 @@ The names and lines are in `Shared.LangEs`:
 | Stormglass | Vidriotormenta |
 | Blightwood | Bosque Marchito |
 
-So is each ground ("Terreno térmico") and each banner line ("Gemas, bichos
-y kaiju térmicos"). The crossroads signs are drawn on the world, like the
-Outpost's other signs. The translator covers the screen and the prompts, so
-the signs stay in English.
+So is each ground ("Terreno térmico"). No sign or banner names a biome any
+more.
 
 ## Where it lives
 
 | File | What |
 | --- | --- |
-| `src/shared/Frontier.luau` | The rules: `Spokes`, `Biomes` (each one's Id, name, ground label, element, angle, colours, screen tint, outdoor light, fog, banner line, and its `Terrain`: two materials, its relief and height), `Biome` (`Bias`, `Critter`, `Blend`), `Ground` (cell, reach, sway, seams, the core's edge, the Hub's ground, each material's colour), `border(k, r)`, `biomeAt(offset)` (nothing in the core), `biomeMix(offset)` (each biome's weight there), `ground(x, z)` (the material, whose ground, how high the land would rise), `pickElement(home, rng)`; the stepping stones at the spokes' mouths (`Outcrop.Stones`) |
-| `src/server/World/OutpostWorld.luau` | Lays the ground in terrain, flat where anything stands (`biomeTerrain`; `OutpostWorld.Terrain` for offline tests); each biome's landmarks (`biomeGround`); the crossroads signs (`crossroads`); the spoke roads and ramps; rocks in the biome's stone |
+| `src/shared/Frontier.luau` | The rules: `Spokes`, `Biomes` (each one's Id, name, ground label, element, angle, colours, screen tint, outdoor light, fog, and its `Terrain`: two materials, its relief and height), `Biome` (`Bias`, `Critter`, `Blend`), `Ground` (cell, reach, sway, seams, the core's edge, the Hub's ground, each material's colour), `border(k, r)`, `biomeAt(offset)` (nothing in the core), `biomeMix(offset)` (each biome's weight there), `ground(x, z)` (the material, whose ground, how high the land would rise), `pickElement(home, rng)`; the stepping stones at the spokes' mouths (`Outcrop.Stones`) |
+| `src/server/World/OutpostWorld.luau` | Lays the ground in terrain, flat where anything stands (`biomeTerrain`; `OutpostWorld.Terrain` for offline tests); each biome's landmarks (`biomeGround`); the spoke roads and ramps; rocks in the biome's stone |
 | `src/shared/GemRoller.luau` | `roll(rng, luck, rarity, base, home, bias)`: a gem's element leans toward `home` |
 | `src/shared/Kaiju.luau` | `wave(count, rng, home, bias)`: an encounter's critters lean toward the biome's own kind |
 | `src/server/Systems/OutpostServer.luau` | A rock's gem leans toward its spot's biome; each rock gets its biome's stone |
@@ -160,14 +154,14 @@ the signs stay in English.
 | `src/server/Systems/KaijuWilds.luau` | Wild kaiju born in a biome lean to its element; `pickWave` and `pickCritter` lean toward its critter |
 | `src/server/Systems/FrontierServer.luau` | Each player's biome (`FrontierBiome`); a rift's critters lean toward the biome it opens in |
 | `src/client/Modules/Scenes.luau` | The Outpost's slight fog (`OutpostFinish.Fog`) |
-| `src/client/Modules/FrontierHud.luau` | The biome banner (`biomeLines`); the light and fog blend (`biomeLight`) |
+| `src/client/Modules/FrontierHud.luau` | The light and fog blend (`biomeLight`); no biome banner |
 | `src/client/Modules/QuarryLife.luau` | The road lights along each spoke |
 
 ## Tests
 
 | Suite | What it checks |
 | --- | --- |
-| `run_frontier` | Four spokes, due north, east, south and west, and the matchup chain round the Loop. The borders: on their spokes at the mouths, swaying more than 6° further out, never into a biome's middle, no two alike. Across a border the biome changes; on one, an even mix; a seam's width past it, all one biome's. The ground: the core's regolith and flat, each biome's two materials deep in it, both neighbours' across its border, the land never above its Height, the same every time. `pickElement` at 60%; `GemRoller` leaning toward the biome. The banner's lines; the light and fog, the Outpost's in the core, the biome's in it, half and half on a border |
+| `run_frontier` | Four spokes, due north, east, south and west, and the matchup chain round the Loop. The borders: on their spokes at the mouths, swaying more than 6° further out, never into a biome's middle, no two alike. Across a border the biome changes; on one, an even mix; a seam's width past it, all one biome's. The ground: the core's regolith and flat, each biome's two materials deep in it, both neighbours' across its border, the land never above its Height, the same every time. `pickElement` at 60%; `GemRoller` leaning toward the biome. No sign or banner line for a biome; the light and fog, the Outpost's in the core, the biome's in it, half and half on a border |
 | `run_moon_quarry_scene` | The ground laid once, in terrain, on its grid, out under the walls; every column the material `Frontier.ground` says, none a hole; the land rising somewhere but never past 6 studs; each biome's materials there and coloured; the core regolith. Flat under every rock spot, along every spoke and round the ring road. The floor part hidden under it. The landmarks deep in their own ground, a glow among them (all but Rimefrost's), 8 signs, 4 spokes and their ramps |
 | `run_kaiju` (`kaiju_cases`) | Waves in each biome: its own kind 57–63% of the melee critters, the others alike. In Stormglass, at least one ranged critter in every swarm, always at the back, and more of them than elsewhere |
 | `run_quarry_life` | The road lights along every spoke |

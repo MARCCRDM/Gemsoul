@@ -146,13 +146,11 @@ Frontier.RiftColor = RIFT
 -- mined gem is of its biome's element Biome.Bias of the time (the other
 -- three share the rest), and so are its wild kaiju; its critters lean the
 -- same way (Biome.Critter). The core is the Hub: all four alike.
---   Label    its ground's name on the crossroads signs
 --   Ground   the regolith's tint out there, and its Material (Enum.Material's name)
 --   Stone    its rocks' basalt
---   Glow     its colour (signs, banners, its props' glow)
+--   Glow     its colour (its props' glow)
 --   Tint     the screen's grade there, Ambient the outdoor light and Fog
 --            its haze's colour
---   Line     the banner's line as you cross into it
 --   Terrain  its ground in Roblox terrain (Frontier.ground): Main, with
 --            patches of Second (where the patch noise is under Share), and
 --            its lie of the land (Relief, up to Height studs, away from
@@ -163,7 +161,6 @@ Frontier.Biomes = {
 	{
 		Id = "Ashfall",
 		Name = "Ashfall",
-		Label = "Thermal ground",
 		Element = "Fire",
 		Angle = -math.pi / 4,
 		Ground = Color3.fromRGB(70, 58, 58),
@@ -173,13 +170,11 @@ Frontier.Biomes = {
 		Tint = Color3.fromRGB(255, 232, 214),
 		Ambient = Color3.fromRGB(184, 146, 132),
 		Fog = Color3.fromRGB(112, 78, 64),
-		Line = "Thermal ground  ·  Thermal gems, critters and kaiju",
 		Terrain = { Main = "CrackedLava", Second = "Basalt", Share = 0.42, Relief = "Cones", Height = 6 },
 	},
 	{
 		Id = "Rimefrost",
 		Name = "Rimefrost",
-		Label = "Cryo ground",
 		Element = "Frost",
 		Angle = math.pi / 4,
 		Ground = Color3.fromRGB(196, 212, 230),
@@ -189,13 +184,11 @@ Frontier.Biomes = {
 		Tint = Color3.fromRGB(228, 242, 255),
 		Ambient = Color3.fromRGB(150, 176, 210),
 		Fog = Color3.fromRGB(160, 182, 210),
-		Line = "Cryo ground  ·  Cryo gems, critters and kaiju",
 		Terrain = { Main = "Snow", Second = "Glacier", Share = 0.38, Relief = "Drifts", Height = 4.5 },
 	},
 	{
 		Id = "Stormglass",
 		Name = "Stormglass",
-		Label = "Ion ground",
 		Element = "Shock",
 		Angle = 3 * math.pi / 4,
 		Ground = Color3.fromRGB(96, 90, 122),
@@ -205,13 +198,11 @@ Frontier.Biomes = {
 		Tint = Color3.fromRGB(250, 246, 228),
 		Ambient = Color3.fromRGB(164, 154, 190),
 		Fog = Color3.fromRGB(112, 102, 150),
-		Line = "Ion ground  ·  Ion gems, critters and kaiju",
 		Terrain = { Main = "Salt", Second = "Limestone", Share = 0.4, Relief = "Ridges", Height = 4 },
 	},
 	{
 		Id = "Blightwood",
 		Name = "Blightwood",
-		Label = "Corrosive ground",
 		Element = "Poison",
 		Angle = 5 * math.pi / 4,
 		Ground = Color3.fromRGB(74, 90, 62),
@@ -221,7 +212,6 @@ Frontier.Biomes = {
 		Tint = Color3.fromRGB(234, 255, 228),
 		Ambient = Color3.fromRGB(140, 166, 132),
 		Fog = Color3.fromRGB(96, 116, 78),
-		Line = "Corrosive ground  ·  Corrosive gems, critters and kaiju",
 		Terrain = { Main = "Mud", Second = "LeafyGrass", Share = 0.45, Relief = "Hummocks", Height = 3.5 },
 	},
 }
@@ -241,7 +231,7 @@ local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 --           far out (two waves, Waves radians of each per stud out, each
 --           border its own: they don't mirror each other); Calm studs past
 --           the core's edge it starts swaying, and from Calm[2] on fully,
---           so at a spoke's mouth (its signs) it's on the road
+--           so at a spoke's mouth it's on the road
 --   Seam    studs either side of a border over which the two grounds mix,
 --           swelling and narrowing along it
 --   Edge    the core's regolith gives way to a biome's ground over Edge[1]

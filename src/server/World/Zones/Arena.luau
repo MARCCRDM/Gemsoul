@@ -302,14 +302,6 @@ function Arena.build(folder: Folder, frame: CFrame, _color: Color3)
 		Color = P.Deep,
 		Material = Enum.Material.Marble,
 	})
-	Builder.sign(
-		architecture,
-		frame,
-		CFrame.new(0, WALL_HEIGHT - 1, gateZ - 2.8),
-		Vector3.new(18, 2.6, 0.6),
-		"CORUNDUM ARENA",
-		P.Pale
-	)
 	local crest = centre * CFrame.new(0, 26, 44)
 	crystal(details, crest, 5, 6, P.Pale, 0.7)
 	crystal(details, crest * CFrame.Angles(math.pi, 0, 0), 5, 6, P.Crystal, 0.7)

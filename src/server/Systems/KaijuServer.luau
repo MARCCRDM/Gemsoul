@@ -283,6 +283,9 @@ end
 -- Its health kept on its record (saved: it never comes back on its own).
 local function keepHealth(pet: Pet)
 	pet.Record.Health = math.max(0, math.floor(pet.Humanoid.Health + 0.5))
+	if pet.Humanoid.Health >= pet.Humanoid.MaxHealth - 0.5 then
+		pet.Record.Weak = nil -- (full again: no longer weak, Kaiju.healShare)
+	end
 end
 
 -- Stats and the attributes clients read, after a level or a new kaiju.
@@ -528,14 +531,15 @@ local function claimRoll(player: Player): { any }
 end
 
 -- One knocked out back on its feet: its revive time up, weak (at
--- Kaiju.Revive.Health of its health, to be healed with gems), or bought
--- (at Revive.Bought).
+-- Kaiju.Revive.Health of its health, and Weak, gems healing it at a third
+-- till it's full: Kaiju.healShare), or bought (at Revive.Bought, not weak).
 local function wake(record, bought: boolean?, into: any?)
 	local _, most = Kaiju.health({ Species = record.Species, Level = record.Level, Soul = record.Soul })
 	local target = into or record
 	target.Down, target.DownUntil = nil, nil
 	local share = if bought then Kaiju.Revive.Bought else Kaiju.Revive.Health
 	target.Health = math.max(1, math.floor(most * share + 0.5))
+	target.Weak = if bought then nil else true
 end
 
 -- A battle's keep put back on every record that has one (Server.KaijuBattles:
@@ -547,6 +551,7 @@ local function putBack(roster): { string }
 		if keep then
 			record.BattleKeep = nil
 			record.Health, record.Down, record.DownUntil = keep.Health, keep.Down, keep.DownUntil
+			record.Weak = keep.Weak
 			table.insert(ids, record.Id)
 		end
 	end
@@ -593,7 +598,7 @@ local function upkeep(player: Player, now: number)
 		Remotes.Notify:FireClient(
 			player,
 			string.format(
-				"%s is back on its feet, but weak: heal with gems before the next fight.",
+				"%s is back on its feet, but weak: gems heal it at a third till it's full again.",
 				table.concat(woke, ", ")
 			)
 		)
@@ -839,7 +844,7 @@ local function knockOut(pet: Pet)
 		Kaiju.setTeam(profile.Kaiju, Kaiju.teamIds(profile.Kaiju))
 	end
 	local wait = Kaiju.reviveSeconds(record)
-	record.Down, record.Health, record.DownUntil = true, 0, os.time() + wait
+	record.Down, record.Health, record.DownUntil, record.Weak = true, 0, os.time() + wait, nil
 	PlayerData.sync(player)
 	-- Out of a battle quietly: it's back as it was once the battle's over.
 	if record.BattleKeep then
@@ -1535,6 +1540,9 @@ local function applyHeal(player: Player, record, pet: Pet?, plan)
 	end
 	PlayerData.removeGems(player, used)
 	record.Health = math.max(1, math.floor(plan.Health + 0.5))
+	if plan.Health >= plan.Most - 0.5 then
+		record.Weak = nil -- (healed to full: no longer weak)
+	end
 	if pet then
 		pet.Humanoid.Health = math.min(pet.Humanoid.MaxHealth, record.Health)
 		petFx("TriadAura", pet.Root, nil, pet.Element, "Heal", 1.5)
@@ -1599,10 +1607,11 @@ function KaijuServer.battleStart(player: Player): number
 		local record = roster.List[id]
 		if record then
 			if not record.BattleKeep then
-				record.BattleKeep = { Health = record.Health, Down = record.Down, DownUntil = record.DownUntil }
+				record.BattleKeep =
+					{ Health = record.Health, Down = record.Down, DownUntil = record.DownUntil, Weak = record.Weak }
 			end
 			local _, most = Kaiju.health({ Species = record.Species, Level = record.Level, Soul = record.Soul })
-			record.Down, record.DownUntil, record.Health = nil, nil, most
+			record.Down, record.DownUntil, record.Health, record.Weak = nil, nil, most, nil
 			count += 1
 		end
 	end
@@ -1683,7 +1692,7 @@ function KaijuServer.restoreAll(player: Player): number
 	for _, record in (roster and roster.List) or {} do
 		local health, most = Kaiju.health(record)
 		if record.Down or health < most then
-			record.Down, record.DownUntil = nil, nil
+			record.Down, record.DownUntil, record.Weak = nil, nil, nil
 			record.Health = most
 			count += 1
 		end

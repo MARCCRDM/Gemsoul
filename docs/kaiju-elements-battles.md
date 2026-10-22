@@ -10,8 +10,8 @@ This round covers four changes:
 - **Kaiju battles.** Two players set their teams against each other, place
   them in a formation, and the kaiju fight it out by themselves.
 - **Revives and auto heal.**
-  - A kaiju that comes back after its wait is weak (15% health) and needs
-    healing with gems.
+  - A kaiju that comes back after its wait is weak (10% health), and gems
+    heal it at a third till it's full: about three times the gems.
   - AUTO HEAL uses your spare Commons first, then your spare Uncommons.
 
 The images are offline renders, not Roblox screenshots:
@@ -248,13 +248,15 @@ since the fighting counts as danger.
 ## Weak revives, and auto heal with Uncommons
 
 **A kaiju back by itself.** Once its wait is up, a knocked-out kaiju comes
-back **weak, at 15% of its health** (`Kaiju.Revive.Health`). Heal it with
-gems, or let AUTO HEAL, before it fights again.
+back **weak, at 10% of its health** (`Kaiju.Revive.Health`), and gems heal
+it at a third till it's full again (`record.Weak`, `Kaiju.Revive.Weak`), so
+a knockout costs gems. Heal it with gems, or let AUTO HEAL, before it
+fights again.
 
-- The kaiju panel says so while it's down: "It comes back weak, at 15%
-  health: heal it with gems."
+- The kaiju panel says so while it's down: "It comes back weak, at 10%
+  health, and gems heal it at a third till it's full."
 - So does the message when it's back: "... is back on its feet, but weak:
-  heal with gems before the next fight."
+  gems heal it at a third till it's full again."
 
 **Brought back now**, it comes back at **half health**
 (`Kaiju.Revive.Bought`), as before. That's REVIVE (Robux) or a Revive

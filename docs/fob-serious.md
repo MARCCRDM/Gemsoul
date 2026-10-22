@@ -1,5 +1,7 @@
 # The FOB as a working base: serious crew, real shopfronts, one sign system, an empty sky
 
+*Since then (2026-10-22): plain one-word signs, and the Shelter's floor cleared (no PROBE-7 station, duel gate, stands or survey table; PROBE-7 and Brutus are crew; the Gem Gallery is next to the Market). See [plain-signs.md](plain-signs.md).*
+
 The Saga Shelter (the FOB players arrive in) read as friendly and a bit
 generated: neon-violet and neon-green booths, a candy-coloured tree with
 glowing fruit, bunting and ghosts, emoticon faces on the crew, chirpy

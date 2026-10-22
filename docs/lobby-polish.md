@@ -1,5 +1,7 @@
 # The lobby: polished and filled in
 
+*Since then (2026-10-22): plain one-word signs, and the Shelter's floor cleared (no PROBE-7 station, duel gate, stands or survey table; PROBE-7 and Brutus are crew; the Gem Gallery is next to the Market). See [plain-signs.md](plain-signs.md).*
+
 This round makes the Shelter, the Outpost's lobby, nicer to stand in, and
 gives it more to look at:
 

@@ -10,8 +10,8 @@
 	             lottery: a gem rises in a beam of its rarity's colour while
 	             a reel spins through the rarities and lands on yours.
 	  Others     you see and hear their swings too (quieter), and their pops.
-	  Probe      PROBE-7, the crashed probe: buy refills, open the Market.
-	  Gate       the Arena Uplink opens Social (1v1 queue, raids, rival).
+	  Probe      PROBE-7's Exchange (talk to PROBE-7 in the Shelter, or
+	             it opens when your swings run out): buy refills.
 	  Players    G at another miner challenges them to a duel, F invites
 	             them to your party.
 
@@ -1548,7 +1548,7 @@ function OutpostScene.openProbe()
 	drawProbe()
 end
 
--- Prompts: rocks, the Probe, the gate, other miners -----------------------------------------------------
+-- Prompts: rocks, the counters, other miners -----------------------------------------------------
 
 local SOCIAL_KINDS = { Spar = true, Duel = true, Party = true, Kaiju = true }
 
@@ -1641,10 +1641,6 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 	local kind = prompt:GetAttribute("PromptKind")
 	if kind == "Mine" then
 		OutpostScene.swing(prompt:GetAttribute("NodeId"))
-	elseif kind == "Probe" then
-		OutpostScene.openProbe()
-	elseif kind == "Gate" then
-		require(script.Parent.SocialUI).open()
 	elseif kind == "Store" then
 		require(script.Parent.ShopUI).open()
 	elseif kind == "Market" then
@@ -1952,7 +1948,7 @@ player:GetAttributeChangedSignal("Outpost"):Connect(function()
 	end
 end)
 
--- Rocks, as they grow; the Probe's ring turning; beacons blinking.
+-- Rocks, as they grow; beacons blinking.
 for _, model in CollectionService:GetTagged(NODE_TAG) do
 	watchRock(model)
 end
@@ -2000,12 +1996,6 @@ RunService.RenderStepped:Connect(function(dt)
 	StoreDisplays.step(dt)
 	QuarryLife.step(dt)
 	RiftTear.step(workspace:GetServerTimeNow())
-	-- PROBE-7's name turning over its core.
-	local site = workspace:FindFirstChild("SagaOutpost")
-	local sign = site and site:FindFirstChild("Probe") and site.Probe:FindFirstChild("ProbeSign")
-	if sign and sign:IsA("BasePart") then
-		sign.CFrame = sign.CFrame * CFrame.Angles(0, dt * 0.6, 0)
-	end
 end)
 
 return OutpostScene

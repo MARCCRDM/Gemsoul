@@ -269,35 +269,40 @@ for i, entry in odds do
 	check((sparkles ~= nil) == (entry.Tier == "Legendary"), "Sparkles on the wrong gem")
 end
 
--- The survey table's scan goes round over its map, under the benches' eyes.
+-- The hall's floor, cleared: no survey table and benches, no stands round
+-- the stage, no PROBE-7 station, no duel gate. The crew stand there
+-- instead (Brutus for duels, PROBE-7 for refills), and the Gem Gallery
+-- and Ilsa's desk are next to the Market, its cases in the hall between
+-- the Market and the door, clear of the stairs' well.
 do
-	local survey = shelter:FindFirstChild("SurveyTable")
-	local sweep = life.Model:FindFirstChild("SurveySweep")
-	check(survey and sweep and life.Sweep == sweep, "No survey table or no scan")
-	local map = survey:FindFirstChild("SurveyMap")
-	check(map and map:FindFirstChildOfClass("SurfaceGui"), "The survey table has no map")
-	local middle = Vector3.new(Life.Survey.X, 0, Life.Survey.Z)
-	local benches = 0
-	for _, d in survey:GetDescendants() do
-		if d:IsA("Seat") then
-			benches += 1
-			local b = here(d.CFrame.Position)
-			check(math.abs((Vector3.new(b.X, 0, b.Z) - middle).Magnitude - 11.5) < 0.1, "A bench away from the table")
+	for _, name in { "SurveyTable", "ArenaGate", "Probe" } do
+		check(site.Model:FindFirstChild(name, true) == nil, "Still built: " .. name)
+	end
+	check(site.Probe == nil and site.Gate == nil, "The site still hands out a Probe or a Gate")
+	local stage = Life.Stage
+	for _, d in shelter:GetDescendants() do
+		if d:IsA("BasePart") then
+			local q = here(d.CFrame.Position)
+			local r = Vector3.new(q.X - stage.X, 0, q.Z - stage.Z).Magnitude
+			check(not (r > 14.5 and r < 21.5 and q.Y < 5 and d.Size.Y > 1), "A stand is still round the stage: " .. d.Name)
 		end
 	end
-	check(benches == 4, "The survey table doesn't have four benches")
-	local seen = {}
-	for _, t in { 0, 1.5, 3, 4.5 } do
-		Life.pose(life, t)
-		local q = here(sweep.CFrame.Position)
-		local off = Vector3.new(q.X, 0, q.Z) - middle
-		check(math.abs(off.Magnitude - 2.5) < 0.05, "The scan isn't on the map")
-		check(math.abs(q.Y - (Life.Survey.Y + Life.SweepY)) < 0.01, "The scan isn't just over the map")
-		local mapTop = here(map.CFrame.Position).Y + map.Size.Y / 2
-		check(q.Y > mapTop, "The scan is under the glass")
-		table.insert(seen, off.Unit)
+	local crewAt = {}
+	for _, spot in site.Crew do
+		crewAt[spot.Id] = here(spot.CFrame.Position)
 	end
-	check(seen[1]:Dot(seen[3]) < -0.99, "The scan doesn't go round")
+	check(crewAt.Probe and (crewAt.Probe - Vector3.new(68, crewAt.Probe.Y, 36)).Magnitude < 1, "PROBE-7 isn't where its station stood")
+	check(crewAt.ArenaMaster and (crewAt.ArenaMaster - Vector3.new(36, crewAt.ArenaMaster.Y, 46)).Magnitude < 1, "Brutus isn't where the duel gate stood")
+	local market = here(site.Stations.Market.CFrame.Position)
+	local middle = Life.Gallery.Middle
+	for i = 1, 5 do
+		local c = cases[i]
+		check((Vector3.new(c.X, 0, c.Z) - Vector3.new(market.X, 0, market.Z)).Magnitude < 36, "A gallery case isn't next to the Market")
+		check(c.Z < 60 - 1.7 and c.X > market.X, "A gallery case is in the wall or the Market")
+		check(not (c.X > -53 and c.X < -25 and c.Z > 29 and c.Z < 41), "A gallery case is in the stairs' well")
+	end
+	check(crewAt.GemBuyer and (Vector3.new(crewAt.GemBuyer.X, 0, crewAt.GemBuyer.Z) - Vector3.new(middle.X, 0, middle.Z)).Magnitude < 6,
+		"Ilsa isn't at the gallery")
 end
 
 -- The drones: in the hall, under the lamps and over everyone's heads,
@@ -334,5 +339,5 @@ print(
 		.. count
 		.. " parts drawn, "
 		.. built
-		.. " built: the hologram, the gallery's gems and odds, the survey scan, the drones)"
+		.. " built: the hologram, the gallery's gems and odds by the Market, the floor cleared for the crew, the drones)"
 )
