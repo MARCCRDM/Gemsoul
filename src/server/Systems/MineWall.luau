@@ -238,7 +238,7 @@ local function grant(player: Player, wall: Wall, tile: Tile)
 			return { Kind = "Full", Text = "Pouch full!" }
 		end
 		PlayerData.milestone(player, "Mined")
-		Progress.addXP(player, "Mine")
+		Progress.mined(player)
 		local loot = {
 			Kind = "Gem",
 			Text = GemConfig.displayName(gem),

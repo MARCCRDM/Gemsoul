@@ -27,11 +27,12 @@
 
 	Hunting is the kit out alone, against the Outpost's wild kaiju and moon
 	bugs (KaijuWilds): Hunt and Spar, with no partner. No player can hit a
-	hunter or be hit by one; a creature's finishing blow knocks them down
-	as in a spar. So it does anyone else in the Outpost (a miner a rift's
-	critter catches out past the core: FrontierServer): down, then up again
-	whole, unless the critters come to rob them (SparServer.onKnockedOut:
-	FrontierServer, Server.Robbery; then they're up when that's over).
+	hunter or be hit by one. A creature's finishing blow, on a hunter or
+	anyone else in the Outpost (a miner a rift's critter catches), kills
+	them (SparServer.onKnockedOut: FrontierServer marks them Killed): they
+	lie dead, robbed first out past the core (Server.Robbery), then they're
+	back at base. They don't get up where they fell (getUp leaves the
+	killed alone); a spar's knock-down is the only one you get up from.
 	"Hunt", true / false takes the kit out or puts it away: the 1 key's
 	(and the phone's kit button, Client.SparKit), in the Outpost and in the
 	Rift alike, never while down.
@@ -137,6 +138,7 @@ local function stop(player: Player, note: string?)
 	player:SetAttribute("Hunt", nil)
 	player:SetAttribute("SparWith", nil)
 	player:SetAttribute("SparDown", nil)
+	player:SetAttribute("Killed", nil)
 	player:SetAttribute("SparHurt", nil)
 	player:SetAttribute("Blocking", false)
 	CombatServer.reset(player)
@@ -341,6 +343,7 @@ local function getUp(player: Player, humanoid: Humanoid, miner: boolean?, trippe
 		humanoidOf(player) ~= humanoid
 		or player:GetAttribute("RiftFallen") ~= nil
 		or player:GetAttribute("Robbed") ~= nil
+		or player:GetAttribute("Killed") ~= nil
 	then
 		return
 	end
@@ -373,6 +376,8 @@ local function knockOut(player: Player, humanoid: Humanoid, source: Player?, tri
 	end
 	CombatServer.reset(player)
 	player:SetAttribute("Blocking", false)
+	-- (A fresh knock-down: whether it's a kill is FrontierServer's to say.)
+	player:SetAttribute("Killed", nil)
 	player:SetAttribute("SparDown", workspace:GetServerTimeNow() + seconds)
 	Remotes.CombatFx:FireAllClients(
 		"SparKO",
@@ -382,7 +387,8 @@ local function knockOut(player: Player, humanoid: Humanoid, source: Player?, tri
 	)
 	task.delay(seconds, getUp, player, humanoid, not Spar.sparring(player), trip ~= nil)
 	-- Knocked out by a creature (not tripped, not in a spar with someone):
-	-- the critters may come to rob them (FrontierServer: Server.Robbery).
+	-- killed, in the Outpost, and robbed past its core (FrontierServer:
+	-- Server.Robbery).
 	if not trip and player:GetAttribute("SparWith") == nil then
 		task.spawn(SparServer.onKnockedOut, player)
 	end
@@ -513,6 +519,7 @@ function SparServer.start()
 	CombatServer.onSparLethal(knockOut)
 	local function watch(player: Player)
 		player.CharacterAdded:Connect(function(character)
+			player:SetAttribute("Killed", nil)
 			stop(player, "The spar with " .. player.DisplayName .. " is over.")
 			task.spawn(watchHealth, player, character)
 		end)

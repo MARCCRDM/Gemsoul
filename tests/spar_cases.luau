@@ -437,22 +437,31 @@ gap()
 check(Ask(c, a.UserId).Message == "P1 is out hunting.", "Asked a hunter to spar")
 gap()
 check(Ask(a, c.UserId).Message == "Put your kit away first (1).", "A hunter asked to spar")
--- A creature's finishing blow knocks a hunter down, as in a spar, and the
--- critters may come to rob them (SparServer.onKnockedOut: FrontierServer).
+-- A creature's finishing blow on a hunter: down (the Humanoid never dies),
+-- and the server's told (SparServer.onKnockedOut: FrontierServer marks it
+-- a kill, robbed out past the core, home after). A fresh knock-down clears
+-- a kill left over from before: whether this one is, is FrontierServer's.
 local knockedOut = {}
 SparServer.onKnockedOut = function(player)
 	table.insert(knockedOut, player)
 end
 local bug = { Root = { Position = ra.Position }, Kind = { Name = "Moon Bug" }, Element = "Fire", Model = nil }
 ha.Health = 5
+a:SetAttribute("Killed", true)
 pcall(Enemies.hitPlayer, a, 500, "Fire", bug)
-check(ha.Health >= 1 and Spar.isDown(a), "A creature's blow killed a hunter (or didn't land)")
+check(ha.Health >= 1 and Spar.isDown(a), "A creature's blow left a hunter dead for real (or didn't land)")
 check(#knockedOut == 1 and knockedOut[1] == a, "Not told a hunter was knocked out")
+check(a:GetAttribute("Killed") == nil, "A kill from before stuck to a fresh knock-down")
 -- Being robbed, they stay down (Server.Robbery gets them up).
 a:SetAttribute("Robbed", now + 5)
 SparServer._getUp(a, ha)
 check(Spar.isDown(a), "Up again in the middle of being robbed")
 a:SetAttribute("Robbed", nil)
+-- Killed, they stay down too: they're sent back to base, not up where they fell.
+a:SetAttribute("Killed", true)
+SparServer._getUp(a, ha)
+check(Spar.isDown(a), "Up where they fell, killed")
+a:SetAttribute("Killed", nil)
 -- Down, the kit can't be swapped (it would stand them up); up, it can, at once.
 check(not Hunt(a, false).Ok and not Hunt(a, true).Ok, "Swapped the kit while down")
 now += Spar.DownSeconds + 0.1

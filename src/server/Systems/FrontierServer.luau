@@ -42,10 +42,13 @@
 	                 waits for it (Raid.Carry.Wait); bonk or knock it out
 	                 first and the gem's back in your pouch.
 
-	Robbed         knocked out out past the core (your health run out, by a
-	                 critter or a wild kaiju: SparServer.onKnockedOut; not
-	                 in a spar with someone, nor in the Rift, which robs its
-	                 own), the critters rob you (Server.Robbery,
+	Killed         your health run out in the Outpost, by a critter or a
+	                 wild kaiju (SparServer.onKnockedOut; not in a spar with
+	                 someone, nor in the Rift, which has its own): you lie
+	                 dead (Killed), then you're back at base. In the core
+	                 that's all (Spar.DeadSeconds; your gems are safe
+	                 there). Out past it you're robbed first, as below.
+	Robbed         killed out past the core, the critters rob you (Server.Robbery,
 	                 Frontier.Rob): those near come for you, and if too few
 	                 are, more tear through round you (Frontier.robSpots),
 	                 robbers all. Each grabs one gem of your haul and runs
@@ -73,7 +76,7 @@
 	  FrontierServer.swing(player, swings)   a swing out there (OutpostServer)
 	  FrontierServer.mined(player, gem)      a gem mined (OutpostServer): this trip's haul
 	  FrontierServer.raid(player) -> boolean   a gem raid on them (their team's all down)
-	  FrontierServer.knockedOut(player) -> robbery?   knocked out out there: robbed
+	  FrontierServer.knockedOut(player) -> robbery?   killed: robbed out there, then home
 	  FrontierServer.open(at, facing, opts?) -> anchor, timeline   a rift on the ground at `at`
 	      (opts: Critter, Prey, Linger, Hop; Height its size; Hell, burning
 	      the critters' world's colours: the Rift's own)
@@ -624,9 +627,11 @@ local function robbers(player: Player, count: number, robbery)
 	end
 end
 
--- Back at base after a robbery: on your feet at the Outpost's spawn, whole,
--- with a moment's guard (and this trip's haul is over).
+-- Back at base after you were killed (and robbed, out past the core): on
+-- your feet at the Outpost's spawn, whole, with a moment's guard (and this
+-- trip's haul is over).
 local function sentHome(player: Player)
+	player:SetAttribute("Killed", nil)
 	player:SetAttribute("SparDown", nil)
 	hauls[player], raiding[player] = nil, nil
 	local character = player.Character
@@ -649,9 +654,11 @@ local function sentHome(player: Player)
 	Debris:AddItem(guard, Spar.GuardSeconds)
 end
 
--- Knocked out out there (SparServer.onKnockedOut): the critters rob them.
--- Not in the core, nor away in the Rift (it robs its own: RiftServer), nor
--- in a fight elsewhere. Returns the robbery.
+-- Killed in the Outpost by a creature (SparServer.onKnockedOut): they lie
+-- dead (Killed), and then they're back at base. Out past the core the
+-- critters rob them first; in the core, where their gems are safe, they
+-- lie there Spar.DeadSeconds. Not away in the Rift (it has its own:
+-- RiftServer), nor in a fight elsewhere. Returns the robbery, if one.
 function FrontierServer.knockedOut(player: Player)
 	local root = rootOf(player)
 	if not root or player:GetAttribute("Outpost") ~= true or player:GetAttribute("RiftRun") ~= nil then
@@ -662,10 +669,18 @@ function FrontierServer.knockedOut(player: Player)
 			return nil
 		end
 	end
+	player:SetAttribute("Killed", true)
 	if Frontier.band(Frontier.distance(root.Position, center())) == "Core" then
+		player:SetAttribute("SparDown", serverNow() + Spar.DeadSeconds)
+		local character = player.Character
+		task.delay(Spar.DeadSeconds, function()
+			if player.Parent and player.Character == character and player:GetAttribute("Killed") ~= nil then
+				sentHome(player)
+			end
+		end)
 		return nil
 	end
-	Remotes.Notify:FireClient(player, "You're down... the critters are coming for your gems!")
+	Remotes.Notify:FireClient(player, "You were killed... the critters are coming for your gems!")
 	Remotes.CombatFx:FireAllClients("CritterGiggle", root.Position + Vector3.new(0, 3, 0), "Cackle")
 	return Robbery.start(player, {
 		Where = "Outpost",

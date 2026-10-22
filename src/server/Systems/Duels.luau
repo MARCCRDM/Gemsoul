@@ -304,6 +304,16 @@ function finish(match, winner: number?, reason: string)
 		end
 		names[t] = table.concat(list, " & ")
 	end
+	-- Each side's level (its players' average): a win's XP goes by the
+	-- other side's against yours (Shared.Levelling).
+	local levels = {}
+	for t, team in match.Teams do
+		local sum = 0
+		for _, member in team do
+			sum += Progress.levelOf(member)
+		end
+		levels[t] = if #team > 0 then sum / #team else 1
+	end
 	for t, team in match.Teams do
 		local won = winner == t
 		local other = ratings[if t == 1 then 2 else 1]
@@ -367,7 +377,8 @@ function finish(match, winner: number?, reason: string)
 				if coins > 0 then
 					PlayerData.addCoins(member, coins)
 				end
-				Progress.addXP(member, if won then "DuelWin" else "DuelPlay")
+				local result = if won then "DuelWin" else "DuelPlay"
+				Progress.won(member, result, levels[if t == 1 then 2 else 1], result, foe)
 				publish(member)
 				PlayerData.sync(member)
 				Remotes.Social:FireClient(member, "MatchEnd", {

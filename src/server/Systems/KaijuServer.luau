@@ -1372,18 +1372,6 @@ function KaijuServer.reward(player: Player, exp: number)
 	end
 end
 
--- A rock `player` broke with their kaiju out beside them (OutpostServer's
--- onRockMined): a little EXP for each (Kaiju.mineExp). Nothing while they're
--- down or put away.
-function KaijuServer.mined(player: Player, size: string)
-	for _, pet in petsOf(player) do
-		if pet.Humanoid.Health > 0 then
-			KaijuServer.reward(player, Kaiju.mineExp(size))
-			return
-		end
-	end
-end
-
 -- A tamed kaiju joins `player`. Returns its record, or nil if they have
 -- room for no more.
 function KaijuServer.adopt(player: Player, speciesId: string, soul, level: number)

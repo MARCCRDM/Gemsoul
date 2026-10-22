@@ -163,7 +163,7 @@ local Shop = {
 		return { Ok = ok, Message = message }
 	end,
 }
-local profiles, xp = {}, {}
+local profiles, xp, xpFoe, levelOf = {}, {}, {}, {}
 local taskEvents = {}
 local PlayerData = {
  training = function(p,event) taskEvents[p]=taskEvents[p] or {};taskEvents[p][event]=(taskEvents[p][event] or 0)+1 end,
@@ -199,6 +199,15 @@ local Presets = {
 local Progress = {
 	addXP = function(p, reason)
 		xp[p] = reason
+	end,
+	-- A win's XP by the other side's level (Shared.Levelling), and who was beaten.
+	won = function(p, kind, foe, season, rival)
+		xp[p] = kind
+		xpFoe[p] = { Level = foe, Season = season, Rival = rival }
+		return 1
+	end,
+	levelOf = function(p)
+		return levelOf[p] or 1
 	end,
 }
 -- Ranked win streaks (Systems/ArenaStreaks has its own suite): each

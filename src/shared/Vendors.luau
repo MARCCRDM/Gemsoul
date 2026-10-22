@@ -294,7 +294,7 @@ Vendors.InfoBot = {
 			Options = {
 				{
 					Text = "How do kaiju fight?",
-					Reply = "Your team of three follows you and fights on its own: they split up the targets and flank them. They also gain experience while you mine.",
+					Reply = "Your team of three follows you and fights on its own: they split up the targets and flank them. They gain experience by fighting, not from your mining.",
 				},
 				{
 					Text = "How do I heal them?",
@@ -360,7 +360,8 @@ Vendors.Tips = {
 	"Kaiju don't heal on their own. Give them gems once you're clear of danger.",
 	"A gem of a kaiju's own element heals it twice as much.",
 	"AUTO HEAL spends spare Commons first, then Uncommons. It never uses a rarer gem or one your loadouts use.",
-	"Kaiju gain experience while you mine, even when they aren't fighting.",
+	"Kaiju gain experience by fighting. Your mining levels you, not them.",
+	"You level fastest by beating bosses and other players, more for ones above your level. Mining gives less the more you mine.",
 	"A knocked-out kaiju comes back on its own after a cooldown. The higher its level, the longer it takes.",
 	"To catch a wild kaiju, wear it down below half health without knocking it out. It glows gold when it's ready.",
 	"A catch breaks if you take a hit or move away. Clear the area first.",

@@ -80,6 +80,16 @@ finish = function(run, won, reason)
 	run.Done = true
 	runs[run.Id] = nil
 	Duelist.removeDungeon(run.Id)
+	-- A dungeon's boss stands at its squad's level (their average): a clear's
+	-- XP goes by that against yours (Shared.Levelling).
+	local sum, count = 0, 0
+	for _, p in run.Members do
+		if p.Parent then
+			sum += Progress.levelOf(p)
+			count += 1
+		end
+	end
+	local squadLevel = if count > 0 then sum / count else nil
 	-- Clear membership before invoking Arena leave, to make cleanup reentrant.
 	for _, p in run.Members do
 		if memberRun[p] == run then
@@ -99,18 +109,18 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonRoom", nil)
 				p:SetAttribute("DungeonBoss", nil)
 				-- A clear also restores a share of the pick's swings (Shared.SwingRestore).
-				local swings = 0
+				local swings, xp = 0, 0
 				if eligible then
                     PlayerData.training(p, "DungeonComplete")
 					PlayerData.addCoins(p, 300)
-					Progress.addXP(p, "SlayBrute")
+					xp = Progress.won(p, "DungeonBoss", squadLevel, "SlayBrute")
 					swings = Restores.give(p, SwingRestore.Dungeon)
 				end
 				ArenaSessions.leave(p)
 				Remotes.Notify:FireClient(
 					p,
 					reason
-						.. (if eligible then " +300 coins." else "")
+						.. (if eligible then string.format(" +300 coins, +%d XP.", xp) else "")
 						.. (if swings > 0 then string.format(" +%d swings!", swings) else "")
 				)
 			end

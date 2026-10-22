@@ -70,6 +70,7 @@ local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local KaijuServer = require(script.Parent.KaijuServer)
+local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
 
@@ -510,6 +511,11 @@ local function finish(battle: Battle, winner: string, reason: string?)
 			KaijuServer.reward(player, KaijuBattle.Exp[result])
 			KaijuServer.battleEnd(player)
 			local foe = foeOf(battle, player)
+			-- XP for you too, by the other player's level against yours
+			-- (Shared.Levelling: the same one beaten again soon, less).
+			if foe.Parent then
+				Progress.won(player, if result == "Win" then "KaijuWin" else "KaijuPlay", Progress.levelOf(foe), nil, foe)
+			end
 			local line = if result == "Win"
 				then string.format("Your kaiju beat %s's!", foe.DisplayName)
 				elseif result == "Lose" then string.format("%s's kaiju won the battle.", foe.DisplayName)

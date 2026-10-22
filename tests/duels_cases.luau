@@ -112,6 +112,7 @@ check(
 )
 advance(Matchmaking.Countdown)
 check(match.State == "Fight" and last(ana, "Fight") ~= nil, "Countdown never ended")
+levelOf[ben] = 7 -- (Ben's a few levels over Ana)
 kill(ben)
 check(match.State == "Done", "A knockout didn't end the match")
 local won, lost = last(ana, "MatchEnd")[2], last(ben, "MatchEnd")[2]
@@ -126,6 +127,15 @@ check(
 	"Rewards wrong"
 )
 check(xp[ana] == "DuelWin" and xp[ben] == "DuelPlay" and Season.XP[xp[ana]] > Season.XP[xp[ben]], "XP wrong")
+-- Your level's XP goes by the other side's level (Shared.Levelling: more
+-- for beating a higher one), the Season Path's by the result, and the one
+-- beaten is named (beaten again soon, worth less).
+check(
+	xpFoe[ana].Level == 7 and xpFoe[ana].Season == "DuelWin" and xpFoe[ana].Rival == ben,
+	"A duel won doesn't go by the loser's level"
+)
+check(xpFoe[ben].Level == 1 and xpFoe[ben].Season == "DuelPlay" and xpFoe[ben].Rival == ana, "A duel lost doesn't go by the winner's level")
+levelOf[ben] = nil
 -- The arena tournament (Shared.SwingRestore): the first win of a run
 -- restores 10% of the pick's swings; the loss ends the loser's run.
 check(
