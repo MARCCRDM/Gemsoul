@@ -64,6 +64,9 @@ local WIN_Y = 74 -- the window's top, in its card
 local TOP = 84 -- the cards' top, on the board
 local ROUND = 26 -- the window's corners
 local AUTO = 20 -- seconds till START goes on its own
+-- Its moves down a card: its kind's E, Q and R, and its gem surge (its Gemsoul's E).
+local MOVE_KEYS = { "E", "Q", "R", "Gem" }
+local MOVE_ROWS = #MOVE_KEYS
 KaijuRoll.Frame = { Side = 0.92, Up = 0.3, Back = 1.12, Aim = 0.02, Fov = 36 }
 
 local function elementColor(element: string?): Color3
@@ -349,8 +352,8 @@ function KaijuRoll.play(after: (() -> ())?)
 	local nameY = captionY + 20
 	local statsY = nameY + 32
 	local aboutY = statsY + 20
-	local movesY = if short then statsY + 22 else aboutY + 34
-	local cardH = movesY + 3 * 20 + 14
+	local movesY = if short then statsY + 22 else aboutY + 48 -- (what it's like: up to three lines)
+	local cardH = movesY + MOVE_ROWS * 20 + 14
 	local goY = TOP + cardH + 14
 	local boardH = goY + 56
 	local board = frame(shade, {
@@ -591,27 +594,27 @@ function KaijuRoll.play(after: (() -> ())?)
 		local about = label(card, "", 12, C.Dim, Enum.Font.GothamMedium)
 		about.TextXAlignment, about.TextYAlignment = Enum.TextXAlignment.Center, Enum.TextYAlignment.Top
 		about.TextWrapped = true
-		about.Position, about.Size = UDim2.fromOffset(16, aboutY), UDim2.new(1, -32, 0, 30)
+		about.Position, about.Size = UDim2.fromOffset(16, aboutY), UDim2.new(1, -32, 0, 44)
 		about.Visible = not short
 		local moves = frame(card, {
 			Name = "Moves",
 			Position = UDim2.fromOffset(16, movesY),
-			Size = UDim2.new(1, -32, 0, 3 * 20),
+			Size = UDim2.new(1, -32, 0, MOVE_ROWS * 20),
 			BackgroundTransparency = 1,
 			Visible = false,
 			ZIndex = 45,
 		})
 		UiKit.list(moves, 2)
-		-- (Till it's out, three blank move slots wait where its moves go.)
+		-- (Till it's out, blank move slots wait where its moves go.)
 		local pending = frame(card, {
 			Name = "Pending",
 			Position = UDim2.fromOffset(16, movesY),
-			Size = UDim2.new(1, -32, 0, 3 * 20),
+			Size = UDim2.new(1, -32, 0, MOVE_ROWS * 20),
 			BackgroundTransparency = 1,
 			ZIndex = 45,
 		})
 		UiKit.list(pending, 2)
-		for order, key in { "E", "Q", "R" } do
+		for order, key in MOVE_KEYS do
 			local row = frame(pending, {
 				LayoutOrder = order,
 				Size = UDim2.new(1, 0, 0, 18),
@@ -620,13 +623,21 @@ function KaijuRoll.play(after: (() -> ())?)
 				ZIndex = 45,
 			})
 			UiKit.round(row, 6)
-			local letter = label(row, key, 11, C.Faint, Enum.Font.GothamBlack)
+			local letter = label(row, if key == "Gem" then "G" else key, 11, C.Faint, Enum.Font.GothamBlack)
 			letter.Position, letter.Size, letter.ZIndex = UDim2.fromOffset(24, 0), UDim2.new(0, 12, 1, 0), 46
 			local word = label(row, "? ? ?", 11, C.Faint, Enum.Font.GothamBlack)
 			word.Position, word.Size, word.ZIndex = UDim2.fromOffset(38, 0), UDim2.new(1, -96, 1, 0), 46
 		end
-		for order, key in { "E", "Q", "R" } do
-			local id, awake = Kaiju.kitMove(entry.Species, key, Kaiju.StarterLevel)
+		for order, key in MOVE_KEYS do
+			-- (Its own moves, and its gem surge: its Gemsoul's E.)
+			local gem = key == "Gem"
+			local id, awake
+			if gem then
+				id = Kaiju.gemSurge(soul)
+				awake = id ~= nil
+			else
+				id, awake = Kaiju.kitMove(entry.Species, key, Kaiju.StarterLevel)
+			end
 			local row = frame(moves, {
 				Name = "Move" .. key,
 				LayoutOrder = order,
@@ -648,16 +659,17 @@ function KaijuRoll.play(after: (() -> ())?)
 			if fine and iconed then
 				pcall(SurgeIcons.dim, chip, not awake)
 			end
-			local letter = label(row, key, 11, if awake then color else C.Faint, Enum.Font.GothamBlack)
+			local letter =
+				label(row, if gem then "G" else key, 11, if awake then color else C.Faint, Enum.Font.GothamBlack)
 			letter.Position, letter.Size, letter.ZIndex = UDim2.fromOffset(24, 0), UDim2.new(0, 12, 1, 0), 46
 			local word =
 				label(row, string.upper(moveName(id)), 11, if awake then C.Text else C.Dim, Enum.Font.GothamBlack)
 			word.Position, word.Size, word.ZIndex = UDim2.fromOffset(38, 0), UDim2.new(1, -96, 1, 0), 46
 			local note = label(
 				row,
-				if awake then "READY" else string.format("LV %d", Kaiju.MoveLevels[key] or 1),
+				if gem then "GEM" elseif awake then "READY" else string.format("LV %d", Kaiju.MoveLevels[key] or 1),
 				10,
-				if awake then C.Good else C.Faint,
+				if gem then tierColor elseif awake then C.Good else C.Faint,
 				Enum.Font.GothamBlack
 			)
 			note.AnchorPoint, note.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right

@@ -227,6 +227,13 @@ just in the arena):
 | Ranged | **Spine Volley** (from Railstorm): five spines rain on its foe and those near, 130% in all, with its element's effect | **Piercing Spine** (from Armor Piercer): one spine through a line of them, 140%, leaving them Vulnerable | **Vault** (from Stim Dodge), a foe too close: it vaults back and leaves a patch that slows and hurts |
 | Assassin | **Shadow Leap** (from Thruster Leap): behind its mark, 200%, leaving it Vulnerable | **Rend** (from Servo Flurry): three quick rakes, 140% in all | **Vanish** (from Null Prism), low on health: untouchable for 1.5 s, then behind their weakest |
 
+**Its gem surge.** Beside its role's three, every kaiju casts its gem
+surge, its Gemsoul's E (of its element: [kaiju.md](kaiju.md#a-kaijus-moves-its-own-and-its-gem-surge)):
+6 seconds into the battle, then every 14, on a foe up to 30 studs off (a
+ring round itself only with its foe inside it). Its damage is the Gemsoul's
+(2.6 of its blows times the Gemsoul's output) times its role's Power, as its
+blows are, so it adds the same share for every role.
+
 **Mana** fills as a kaiju hits (10 a blow for a tank, 14 for a warrior, 12
 for ranged, 16 for an assassin) and as it's hit. A tank fills fastest from
 the hits it takes, so the harder it's pushed, the sooner it roars. Its E
@@ -239,10 +246,10 @@ and a warrior's Q and R carry more of their fight than the others' do:
 
 | Role | Level 1 | Level 5 | Level 10 and up |
 | --- | --- | --- | --- |
-| Tank | 0.9 | 0.7 | 0.65 |
+| Tank | 0.84 | 0.7 | 0.65 |
 | Warrior | 1.05 | 0.95 | 0.85 |
 | Ranged | 1.4 | 1.6 | 1.9 |
-| Assassin | 0.8 | 1.0 | 1.1 |
+| Assassin | 0.88 | 1.0 | 1.1 |
 
 (In between, it moves from one to the next.) With these, and the
 Razorback's health up from 160 to 190, every team of three (repeats
@@ -251,9 +258,15 @@ places. The share of battles won by teams with each kind:
 
 | Level | Bulwark | Razorback | Carapace | Scythe |
 | --- | --- | --- | --- | --- |
-| 1 | 50% | 52% | 51% | 47% |
-| 5 | 48% | 51% | 50% | 51% |
-| 10 | 53% | 47% | 48% | 52% |
+| 1 | 54% | 50% | 48% | 48% |
+| 5 | 52% | 49% | 49% | 51% |
+| 10 | 52% | 50% | 49% | 49% |
+
+(With every kaiju's gem surge in: see below. The surge at first tipped level
+1 to the tank (Carapace 60%) over the assassin (Scythe 39%): a tank lives to
+cast more of them, and they water down an assassin's opening burst. So the
+tank's level-1 power went from 0.9 to 0.84 and the assassin's from 0.8 to
+0.88; levels 5 and 10 are as they were.)
 
 Before (a blow was its Damage alone), the Razorback's teams won 21% to 24%
 and the Carapace's up to 70%, and three Razorbacks never won. Now the
@@ -427,11 +440,11 @@ Where they lead, the first of these that wants you somewhere:
 | `src/server/World/KaijuPitWorld.luau` (new) | Builds the hall under the Shelter: walls, roof, balcony and stairs, the way up, signs, lights, COACH-4's kiosk and spot (`Guide`), and each court (mat, places, rails and keep walls, pads, board, pedestal, bleachers, floodlights) |
 | `src/server/Systems/KaijuPitServer.luau` (new) | The stairs both ways, the pads, waiting and challenging, stakes in and paid out, the boards' attributes, bringing a card's battle down to a court, refunds on shutdown; a rematch's stakes taken again; COACH-4 built on the balcony |
 | `src/server/Systems/KaijuBattles.luau` | Battles on a court (its field, `Bounds`), `findCourt`, `onOver` (the payout), `inPit`, full health and back for both sides (`KaijuServer.battleStart` / `battleEnd`), each kaiju marked with its side (`KaijuTeam`), the rematch (`KaijuBattleRematch`, `KaijuBattles.again`, `rematchOn` / `rematchCost`), the stake in what the client is sent |
-| `src/server/Systems/KaijuServer.luau` | A battling kaiju run by `KaijuBattleBrain` and kept inside its court; every kaiju's moves are its role's (`Kaiju.kitMoves`); the caster's taunt, war cry, leap, vault and pick; `battleStart`, `battleEnd` and `battleable`; the kept health (`BattleKeep`) put back after a rejoin; quiet knockouts in a battle |
+| `src/server/Systems/KaijuServer.luau` | A battling kaiju run by `KaijuBattleBrain` and kept inside its court (one put back in stops walking too, so a wind-up started outside doesn't walk it back out); every kaiju's moves are its role's (`Kaiju.kitMoves`); the caster's taunt, war cry, leap, vault and pick; `battleStart`, `battleEnd` and `battleable`; the kept health (`BattleKeep`) put back after a rejoin; quiet knockouts in a battle |
 | `src/shared/KaijuBattle.luau` | 25 seconds to place, 12 for the result (and a rematch), the sides' names and colours (`Sides`) |
 | `src/shared/KaijuRoles.luau` (new) | The roles (tank, warrior, ranged, assassin) and each kind's, the roles' own moves (`Kits`, `Moves`: copied from the gem surges and renamed), mana, a blow's share of its Damage by level (`power`), who a kaiju fights (`target`), where it stands (`spot`, inside the court: `clamp`), when its R goes off (`wantsR`) |
 | `src/shared/Kaiju.luau`, `KaijuModels.luau`, `KaijuFight.luau`, `CreatureMotion.luau` | The Scythe: its stats (and the Razorback's health up to 190), its model, its blows and its poses |
-| `src/server/Systems/KaijuBattleBrain.luau` (new) | A kaiju in a battle, fighting by its role: picking its foe every think, walking to its spot, blows and spines, its E on full mana, its Q and R, a wind-up dropped when its foe falls, an assassin's opening leap |
+| `src/server/Systems/KaijuBattleBrain.luau` (new) | A kaiju in a battle, fighting by its role: picking its foe every think, walking to its spot, blows and spines, its E on full mana, its Q and R, its gem surge every 14 s (at its role's power), a wind-up dropped when its foe falls, an assassin's opening leap |
 | `src/server/Systems/KaijuAbilities.luau` | The roles' new shapes: a taunt, a war cry, a leap, a vault, rakes and a vanish |
 | `src/client/Modules/KaijuBattleCam.luau` (new) | The overview camera: where it looks from (`view`), easing in, leaning after the fight, dragging and zooming, handing your camera back |
 | `src/client/Modules/KaijuTeamRings.luau` (new) | The ring under each kaiju in a battle, in its side's colour |

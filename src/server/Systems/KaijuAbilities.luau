@@ -81,8 +81,9 @@ local function sender(caster): (string, ...any) -> ()
 	end
 end
 
--- The HUD's attribute for when each key last went off.
-local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" }
+-- The HUD's attribute for when each key last went off (Gem: its gem
+-- surge, its Gemsoul's E).
+local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", Gem = "KaijuGemAt" }
 
 local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
@@ -314,9 +315,13 @@ function KaijuAbilities.cast(caster, aim, id: string?): boolean
 		status = KaijuRoles.ElementStatus[caster.Element]
 	end
 	local model = caster.Model
-	-- (A role's move says its key; a gem's starts with it.)
+	-- (A role's move says its key; a gem's starts with it, and a gem's E is
+	-- its gem surge.)
 	local role = KaijuRoles.Moves[id :: string]
 	local key = if role then role.Key else string.sub(id :: string, 1, 1)
+	if not role and key == "E" then
+		key = "Gem"
+	end
 	caster.Model:SetAttribute(CAST_AT[key] or CAST_AT.E, workspace:GetServerTimeNow())
 
 	if plan.Shape == "Shell" or plan.Shape == "Ward" or plan.Shape == "Mend" then

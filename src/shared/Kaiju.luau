@@ -17,12 +17,15 @@
 
 	Every kaiju carries its Gemsoul: a gem of its element, rolled like any
 	gem (rarity, Size, Clarity, Cut). It gives the kaiju its element, and a
-	finer one makes it stronger (SoulBonus). Its moves are its role's own
-	(kitMoves): its E from the start, its Q from level 5, its R from level
-	10 (MoveLevels), cast in a fight. The Gemsoul's own three moves (move,
-	moves) are the gem's: a kaiju killed (or lost in the arena) leaves its
-	Gemsoul behind as a gem anyone can socket, its Q, E and R working in a
-	sword, a chest and a shield.
+	finer one makes it stronger (SoulBonus). A kaiju fights with its kind's
+	own moves (kitMoves): its E from the start, its Q from level 5, its R
+	from level 10 (MoveLevels). And beside them, its gem surge (gemSurge):
+	its Gemsoul's E, of its element as the Gemsoul always is, cast every
+	GemSurge.Every seconds, harder the finer the Gemsoul. The Gemsoul's
+	three moves (move, moves) are the gem's: a kaiju killed (or lost in the
+	arena) leaves its Gemsoul behind as a gem anyone can socket, its Q, E
+	and R working in a sword, a chest and a shield (its E the surge the
+	kaiju cast).
 
 	Taming: bring a wild kaiju to half health or less WITHOUT killing it (it
 	glows gold when it's ready), then cast your tame (Tame.Cast seconds of
@@ -156,8 +159,10 @@ Kaiju.Growth = 0.08 -- each level adds this share of the level-1 stats
 -- A finer Gemsoul makes a stronger kaiju (and a stronger E).
 Kaiju.SoulBonus = { Common = 1, Uncommon = 1.05, Rare = 1.1, UltraRare = 1.15, Legendary = 1.2 }
 
--- Its E ability: cast every this many seconds in a fight, for this many of
--- its blows (times its Gemsoul's output, GemTraits.Output).
+-- Its E (its kind's own): cast every this many seconds in a fight
+-- (KaijuFighter). AbilityPower: a Gemsoul's E's whole cast, its gem surge,
+-- in its blows (times its Gemsoul's output, GemTraits.Output); its kind's
+-- own moves carry their own Power (Shared.KaijuRoles).
 Kaiju.AbilityEvery = 9
 Kaiju.AbilityPower = 2.6
 -- Its Gemsoul's three moves wake as it levels: E from the start, Q from
@@ -172,6 +177,11 @@ Kaiju.QPower = 1.6
 Kaiju.REvery = 14
 Kaiju.RWhen = 0.6
 Kaiju.RPower = 1
+-- Its gem surge (gemSurge, its Gemsoul's E): cast every Every seconds in a
+-- fight, the first First seconds in (after its own E has opened),
+-- for AbilityPower of its blows (Kaiju.abilityDamage: times its Gemsoul's
+-- output, so a Legendary's hits much harder than a Common's). From level 1.
+Kaiju.GemSurge = { Every = 14, First = 6 }
 -- The moves a Gemsoul rolls, by element and lane (GemTraits.SoulMoves).
 -- Abilities: its E's, the ones you see land (bolts, blasts, storms,
 -- waves), never a dash or a "while ready" bonus.
@@ -1097,6 +1107,13 @@ end
 -- The E ability its Gemsoul carries.
 function Kaiju.ability(gem): string?
 	return Kaiju.isSoul(gem) and GemTraits.traitFor(gem, "E") or nil
+end
+
+-- Its gem surge: its Gemsoul's E, cast beside its own moves (GemSurge). A
+-- Gemsoul is always its kaiju's element (rollSoul), so the surge is too.
+function Kaiju.gemSurge(gem): string?
+	local id = Kaiju.ability(gem)
+	return if id and Kaiju.AbilityPlans[id] then id else nil
 end
 
 -- The move its Gemsoul gives `key` (Q, E or R), and whether a kaiju of

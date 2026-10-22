@@ -2814,4 +2814,7 @@ return {
 	["WARDEN"] = "GUARDIÁN",
 	["Goes for the foe with the toughest guard and breaks it."] = "Va a por el enemigo con la mejor guardia y la rompe.",
 	["Stays at the back and shields and mends its team."] = "Se queda atrás y protege y cura a su equipo.",
+	-- A kaiju's gem surge, its Gemsoul's E, beside its own moves (KaijuHud's panel, KaijuRoll's cards).
+	["GEM SURGE"] = "DESCARGA DE GEMA",
+	["GEM"] = "GEMA",
 }

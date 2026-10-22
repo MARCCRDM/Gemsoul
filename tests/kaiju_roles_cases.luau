@@ -278,7 +278,12 @@ local function runQueued()
 end
 
 local field = { Center = Vector3.zero, Axis = Vector3.new(0, 0, 1) }
+-- Each one's gem surge (its Gemsoul's E): a Fire one's, drawn from a fixed
+-- seed (the same every run), so no kind or place always draws the same.
+local gemSeed = 4242
 local function body(species, side, cell, level)
+	gemSeed = (gemSeed * 16807) % 2147483647
+	local gems = Kaiju.Moves.Fire.Ability
 	local stats = Kaiju.stats(if Kaiju.Species[species] then species else "Razorback", level or 1, "Common")
 	local at = KaijuBattle.cellSpot(field, side, cell)
 	local root = { Position = at, Size = Vector3.new(2, 2, 2), Parent = true }
@@ -306,6 +311,7 @@ local function body(species, side, cell, level)
 		Root = root,
 		Humanoid = humanoid,
 		Element = "Fire",
+		GemSurge = gems[gemSeed % #gems + 1],
 		Stats = stats,
 		StunUntil = 0,
 		SlowUntil = 0,
@@ -688,6 +694,19 @@ for id, move in KaijuRoles.Moves do
 	end
 end
 check(seen >= 8, "Too few of the kits' moves were cast at level 10: " .. seen)
+-- And beside them, their gem surges (each one's own cast time, not its E's).
+local surged = 0
+for _, pet in A do
+	if pet.Model.attrs.KaijuGemAt then
+		surged += 1
+	end
+end
+for _, pet in B do
+	if pet.Model.attrs.KaijuGemAt then
+		surged += 1
+	end
+end
+check(surged >= 3, "Too few gem surges were cast at level 10: " .. surged)
 print(string.format("  level 10: %d of the kits' 12 moves cast", seen))
 
 -- 7. The balance. The first four: every team of three (kinds may repeat)

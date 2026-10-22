@@ -18,7 +18,8 @@ Each new kind has:
 - a role, and two of the roles are new: the **Breaker** and the **Warden**;
 - its own stats, fight style, blow names and roar;
 - three moves of its own: E from level 1, Q at level 5 and R at level 10
-  (84 moves in all);
+  (84 moves in all), and beside them its gem surge, its Gemsoul's E, as
+  every kaiju has ([kaiju.md](kaiju.md#a-kaijus-moves-its-own-and-its-gem-surge));
 - a place where it roams wild.
 
 ## How you get them
@@ -235,6 +236,14 @@ Tuning that came out of it:
   lost a little damage. Starspine and Voltfin were trimmed for level 10.
 - Titanfin, Drillhorn and Bladebrow were nudged up, because they faded at
   level 10.
+
+Since Oct 22 every kaiju in these battles casts its gem surge too (each
+drawn from a fixed seed, so no kind always gets the same one). With them
+in, every kind stays between 31% and 66% and averages 42% to 58% over the
+three levels, and the first four's round robin is 48% to 54%. The surge in
+a battle hits at its role's power, and the tank's and the assassin's level-1
+power moved (0.9 to 0.84, 0.8 to 0.88) to keep level 1 even
+([kaiju-arena.md](kaiju-arena.md)).
 
 ## Spanish
 

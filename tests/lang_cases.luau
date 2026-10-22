@@ -197,6 +197,9 @@ do
 	check(#untranslated == 0, "Not in Spanish: " .. table.concat(untranslated, " | "))
 	same(Lang.translate("BREAKER"), "ROMPEDOR", "The breaker's role")
 	same(Lang.translate("WARDEN"), "GUARDIÁN", "The warden's role")
+	-- A kaiju's gem surge (its Gemsoul's E) on its panel and its roll card.
+	same(Lang.translate("GEM SURGE"), "DESCARGA DE GEMA", "The gem surge's label")
+	same(Lang.translate("GEM"), "GEMA", "The roll card's gem surge note")
 end
 Lang.setLocale("en")
 print("PASS: the frontier's, the Rift's and the kaiju roster's text in Spanish")

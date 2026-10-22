@@ -4,9 +4,10 @@
 	kaiju or a hunter. It fights exactly as the Arena's duellist does, run by
 	the same brain (Shared.DuelistBrain), shrunk to its size: wind-ups and
 	combos, telegraphed heavies, guard and parry, hops aside, pounces,
-	counters, and its Gemsoul's moves (KaijuAbilities) after a wind-up you
-	can see on its cast bar: its E, its Q in place of a blow once it's
-	level 5, its R when it's hard pressed once it's level 10. A Razorback
+	counters, and its moves (KaijuAbilities) after a wind-up you can see on
+	its cast bar: its kind's own E, its Q in place of a blow once it's
+	level 5, its R when it's hard pressed once it's level 10, and its gem
+	surge (its Gemsoul's E) every Kaiju.GemSurge.Every seconds. A Razorback
 	fights from range between its combos (KaijuFight's Ranged): it hops
 	back after a combo and looses volleys of spines (Shot "Spine"), then
 	closes in again.
@@ -24,8 +25,9 @@
 	              wild kaiju, so a hunter's blows meet its guard there) or
 	              its pet record
 	  Stats       Damage, Rate, Speed, Reach (Kaiju.stats)
-	  Ability     its Gemsoul's E (nil: none)
-	  Moves       its Q and R awake (Kaiju.moves: { Q?, R? })
+	  Ability     its own E (Kaiju.kitMoves; nil: none)
+	  Moves       its Q and R awake (Kaiju.kitMoves: { Q?, R? })
+	  GemSurge    its gem surge (Kaiju.gemSurge: its Gemsoul's E; nil: none)
 	  FirstSurge  its E this long into a fight (Kaiju.FirstSurge)
 	  Strike(foe, amount, heavy, name) -> outcome   a blow landing on its foe
 	              ("Parried" leaves it reeling)
@@ -333,8 +335,12 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 		f.RecoverUntil = now + KaijuFight.Recover
 		return
 	elseif action.Kind == "Surge" then
-		KaijuAbilities.cast(f.Caster(), foe)
-		f.NextSurge = now + Kaiju.AbilityEvery
+		if action.Gem then
+			KaijuAbilities.cast(f.Caster(action.Id), foe, action.Id)
+		else
+			KaijuAbilities.cast(f.Caster(), foe)
+			f.NextSurge = now + Kaiju.AbilityEvery
+		end
 		f.NextAttack = math.max(f.NextAttack, now + 0.4)
 		return
 	elseif action.Kind == "Move" then
@@ -465,6 +471,11 @@ local function engage(f, now: number)
 	if f.NextQ == 0 or now - (f.LastFight or 0) > 6 then
 		f.NextQ, f.NextR = now + FIRST_Q, now
 	end
+	if not f.GemSurge then
+		f.NextGem = math.huge
+	elseif f.NextGem == 0 or now - (f.LastFight or 0) > 6 then
+		f.NextGem = now + Kaiju.GemSurge.First
+	end
 end
 
 -- Winds up its Q or R (named on its cast bar), and starts that key's wait.
@@ -484,6 +495,39 @@ local function move(f, key: string, id: string, foe, now: number)
 	animate(f, kind, seconds, nil, if named then named.Name else key)
 	f.Humanoid:MoveTo(f.Root.Position)
 	face(f, foe.Root.Position)
+end
+
+-- Winds up its gem surge (its Gemsoul's E, named on its cast bar: a cast
+-- its foe can read and dodge, as its E is), and starts its wait.
+local function gemSurge(f, foe, now: number)
+	local id = f.GemSurge
+	local kind = KaijuFight.surgeKind(Kaiju.AbilityPlans[id])
+	local seconds = Brain.Windup[kind]
+	local named = Kaiju.moveInfo(id)
+	lower(f, now)
+	f.LastOffense = now
+	f.NextGem = now + Kaiju.GemSurge.Every
+	f.Action = { Kind = "Surge", Gem = true, Id = id, At = now + seconds }
+	animate(f, kind, seconds, nil, if named then named.Name else "Gem")
+	f.Humanoid:MoveTo(f.Root.Position)
+	face(f, foe.Root.Position)
+end
+
+-- Is its gem surge due and worth casting now: free to strike, not stunned
+-- or silenced, no heavy coming at it (it guards that), its foe in range
+-- (a ring round itself only with its foe inside it)?
+local function gemReady(f, view, distance: number, now: number): boolean
+	if not f.GemSurge or now < f.NextGem or view.Stunned or view.FoeCharging then
+		return false
+	end
+	if now < f.NextAttack or now < ((f.Body :: any).SilenceUntil or 0) then
+		return false
+	end
+	local plan = Kaiju.AbilityPlans[f.GemSurge]
+	if plan.Shape == "Nova" then
+		return distance <= (plan.Radius or 6) * (f.Size or 1)
+	end
+	return view.Distance <= Brain.SurgeRange
 end
 
 function KaijuFighter.step(f, foe, now: number)
@@ -550,6 +594,12 @@ function KaijuFighter.step(f, foe, now: number)
 	then
 		f.Choice = "R"
 		move(f, "R", moves.R, foe, now)
+		return
+	end
+	-- Its gem surge, when it's due.
+	if gemReady(f, view, distance, now) then
+		f.Choice = "Gem"
+		gemSurge(f, foe, now)
 		return
 	end
 	local choice = KaijuFight.decide(f, view, KaijuFighter.random())
@@ -713,7 +763,8 @@ function KaijuFighter.new(spec)
 	f.FirstSurge = spec.FirstSurge
 	f.Strike, f.Caster, f.Around = spec.Strike, spec.Caster, spec.Around
 	f.Moves = spec.Moves or {}
-	f.NextQ, f.NextR = 0, 0
+	f.GemSurge = spec.GemSurge
+	f.NextQ, f.NextR, f.NextGem = 0, 0, 0
 	f.Swings, f.Engaged = 0, false
 	fighters[spec.Model] = f
 	return f

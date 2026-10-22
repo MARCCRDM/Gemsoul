@@ -2008,6 +2008,9 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 	-- (Its own moves: its role's, Kaiju.kitMoves.)
 	local moves = Kaiju.kitMoves(species, level)
 	local ability = moves.E
+	-- And its gem surge, its Gemsoul's E (the one it leaves behind).
+	local gem = Kaiju.gemSurge(soul)
+	model:SetAttribute("KaijuGemSurge", gem)
 	model:SetAttribute("KaijuWild", true)
 	model:SetAttribute("KaijuLevel", level)
 	model:SetAttribute("KaijuAbility", ability)
@@ -2041,6 +2044,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Stats = stats,
 		Ability = ability,
 		Moves = moves,
+		GemSurge = gem,
 		FirstSurge = 4,
 		Strike = function(victim, amount: number, heavy: boolean, _name: string): string
 			return hitFoe(enemy, victim, amount * (1 - Enemies.weakness(enemy)), element, nil, heavy)

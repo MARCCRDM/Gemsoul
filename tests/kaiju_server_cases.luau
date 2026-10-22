@@ -711,8 +711,10 @@ for id, plan in Kaiju.AbilityPlans do
 		check(shown, id .. " didn't draw its own look")
 	end
 	local roleMove = shared("KaijuRoles").Moves[id]
-	local at = ({ Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" })[if roleMove
+	-- (A gem's E, cast by a kaiju, is its gem surge.)
+	local at = ({ Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", G = "KaijuGemAt" })[if roleMove
 		then roleMove.Key
+		elseif string.sub(id, 1, 2) == "E_" then "G"
 		else string.sub(id, 1, 1)]
 	check(caster.Model:GetAttribute(at) == now, id .. ": no cast time for the HUD")
 end
@@ -1400,6 +1402,7 @@ local wildFoe = { Root = enemy.Root, Enemy = enemy }
 local function settle(f)
 	f.Action, f.SwingTimes, f.RecoverUntil, f.LastOffense = nil, {}, 0, now
 	f.NextAttack, f.NextDefense, f.NextSurge, f.NextHighBlock = 0, 0, math.huge, 0
+	f.NextGem = math.huge -- (its gem surge only where a check asks for it)
 	f.Body.StunUntil, f.Body.GuardUntil, f.Body.GuardBrokenUntil, f.Body.DodgeUntil = 0, 0, 0, 0
 	f.Body.BlockedAt, f.Body.GuardRaisedAt, f.FoeIdleSince = nil, nil, nil
 end
@@ -1605,6 +1608,49 @@ KaijuFighter.step(fighter, wildFoe, now)
 flush()
 check(pet.Model:GetAttribute("KaijuAbilityAt") == now and fighter.NextSurge == now + Kaiju.AbilityEvery, "No E")
 fightRoll = nil
+
+-- Its gem surge: beside its own moves, its Gemsoul's E (of its element),
+-- on the model for every client; when it's due, a wind-up named on its
+-- cast bar, then cast (its own cast time for the HUD, not its E's), and
+-- not again for a while. A wild one has its own Gemsoul's.
+do
+	local gemId = Kaiju.gemSurge(pet.Record.Soul)
+	check(gemId ~= nil and pet.GemSurge == gemId and fighter.GemSurge == gemId, "No gem surge from its Gemsoul")
+	check(pet.Model:GetAttribute("KaijuGemSurge") == gemId, "Its gem surge isn't on the model")
+	check(table.find(Kaiju.Moves[pet.Element].Ability, gemId) ~= nil, "Its gem surge isn't its element's")
+	check(wf.GemSurge ~= nil and wf.GemSurge == Kaiju.gemSurge(wild.Soul), "A wild one has no gem surge")
+	now += 5
+	settle(fighter)
+	settle(wf)
+	fighter.NextGem = now - 1
+	pet.Root.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(2.5, 0, 0)) -- (inside a ring round it, too)
+	fightRoll = 0.5
+	KaijuFighter.step(fighter, wildFoe, now)
+	check(
+		fighter.Choice == "Gem" and fighter.Action and fighter.Action.Kind == "Surge" and fighter.Action.Id == gemId,
+		"No gem surge when it was due: " .. tostring(fighter.Choice)
+	)
+	check(pet.Model:GetAttribute("ActionName") == Kaiju.moveInfo(gemId).Name, "Its gem surge isn't named on the cast bar")
+	check(fighter.NextGem == now + Kaiju.GemSurge.Every, "Its gem surge's wait didn't start")
+	local eAt = pet.Model:GetAttribute("KaijuAbilityAt")
+	now = fighter.Action.At
+	KaijuFighter.step(fighter, wildFoe, now)
+	flush()
+	check(pet.Model:GetAttribute("KaijuGemAt") == now, "Its gem surge didn't go off")
+	check(pet.Model:GetAttribute("KaijuAbilityAt") == eAt, "Its gem surge went off as its own E")
+	settle(fighter)
+	fighter.NextGem = now + Kaiju.GemSurge.Every
+	KaijuFighter.step(fighter, wildFoe, now + 0.2)
+	check(fighter.Choice ~= "Gem", "Its gem surge went off again straight away")
+	-- Stunned, it doesn't.
+	settle(fighter)
+	fighter.NextGem = now - 1
+	pet.StunUntil = now + 5
+	KaijuFighter.step(fighter, wildFoe, now + 0.3)
+	check(fighter.Choice ~= "Gem", "A stunned kaiju cast its gem surge")
+	pet.StunUntil = 0
+	fightRoll = nil
+end
 
 -- Its Q and R, its role's own (Shared.KaijuRoles): asleep while it's young
 -- (Q wakes at level 5, R at 10), on the model for every client when awake.

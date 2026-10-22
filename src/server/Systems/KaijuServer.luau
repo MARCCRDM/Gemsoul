@@ -56,7 +56,8 @@
 	profile snapshot (Kaiju.rollsOwed reads them). Each one out carries, for every client: KaijuOwner
 	(UserId), KaijuId, KaijuSlot, KaijuName, KaijuLevel, KaijuExp,
 	KaijuExpNext, KaijuAbility, KaijuAbilityAt (server time of its last E),
-	KaijuQ, KaijuR and their *At, KaijuRecallUntil, and its fight
+	KaijuQ, KaijuR and their *At, KaijuGemSurge and KaijuGemAt (its gem
+	surge, its Gemsoul's E), KaijuRecallUntil, and its fight
 	(KaijuFighter's Action* and GuardUntil, HurtAt and BlockedAt, for
 	CreatureAnimation). A record's Health and Down are in the snapshot (the
 	HUD's health for one at home, and DOWN).
@@ -130,6 +131,7 @@ export type Pet = {
 	Element: string,
 	Stats: any,
 	Ability: string?,
+	GemSurge: string?, -- its Gemsoul's E, cast beside its own moves (Kaiju.gemSurge)
 	Target: any?, -- the Enemies record it's fighting
 	Fighter: any, -- how it fights (KaijuFighter), with this as its body
 	LastFight: number,
@@ -359,6 +361,9 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 	model:SetAttribute("KaijuName", Kaiju.title(record))
 	local ability = Kaiju.kitMoves(record.Species, record.Level).E
 	model:SetAttribute("KaijuAbility", ability)
+	-- Beside its own moves, its gem surge (its Gemsoul's E).
+	local gem = Kaiju.gemSurge(record.Soul)
+	model:SetAttribute("KaijuGemSurge", gem)
 	local pet: Pet = {
 		Owner = player,
 		Record = record,
@@ -368,6 +373,7 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		Element = record.Element,
 		Stats = Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier),
 		Ability = ability,
+		GemSurge = gem,
 		Target = nil,
 		Fighter = nil,
 		LastFight = 0,
@@ -394,6 +400,7 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		Stats = pet.Stats,
 		Ability = ability,
 		Moves = Kaiju.kitMoves(record.Species, record.Level),
+		GemSurge = gem,
 		Strike = function(foe, amount: number, heavy: boolean, _name: string): string
 			if foe.Enemy then
 				return KaijuServer.strike(pet, foe.Enemy, amount, nil, heavy)
@@ -1159,6 +1166,9 @@ local function think(pet: Pet, now: number, _dt: number)
 				local inside = KaijuRoles.clamp(bounds, at)
 				if flat(inside - at).Magnitude > 3 then
 					KaijuServer.place(pet.Model, inside, inside + (battle.Look or Vector3.new(0, 0, -1)))
+					-- (And no walking back out to where it was: a wind-up started
+					-- out there left it heading there.)
+					h:MoveTo(pet.Root.Position)
 				end
 			end
 			return

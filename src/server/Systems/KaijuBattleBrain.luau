@@ -16,8 +16,9 @@
 	  Moves    its E when its mana's full (KaijuRoles.mana: it fills as it
 	           hits and is hit), its Q every QEvery seconds from level 5,
 	           its R when its moment comes (KaijuRoles.wantsR) from level 10,
-	           each cast by KaijuAbilities. An assassin leaps on their back
-	           row the moment the battle starts.
+	           and its gem surge (pet.GemSurge, its Gemsoul's E) every
+	           Kaiju.GemSurge.Every seconds, each cast by KaijuAbilities. An
+	           assassin leaps on their back row the moment the battle starts.
 	  Stunned  it stands, and the blow it was winding up is lost.
 
 	  KaijuBattleBrain.step(pet, orders, now, host)   one think (every 0.15s)
@@ -48,7 +49,8 @@ KaijuBattleBrain.fx = function(kind: string, ...)
 	end
 end
 
-local MOVE_WINDUP = { E = 0.5, Q = 0.4, R = 0.25 }
+local MOVE_WINDUP = { E = 0.5, Q = 0.4, R = 0.25, Gem = 0.5 }
+local GEM_RANGE = 30 -- its gem surge reaches a foe this far (a ring round it: only inside it)
 local SIZE = Kaiju.size(Kaiju.Scale.Pet)
 
 local function flat(v: Vector3): Vector3
@@ -73,6 +75,7 @@ local function brainOf(pet, now: number)
 			NextAttack = now + 0.3,
 			NextQ = now + KaijuRoles.FirstQ,
 			NextR = now,
+			NextGem = now + Kaiju.GemSurge.First,
 			LastHealth = pet.Humanoid.Health,
 			Opened = false,
 			Action = nil,
@@ -174,10 +177,10 @@ local POSE = {
 	Vanish = "Dodge",
 }
 
--- Starts winding up its move on `key` at `foe`.
+-- Starts winding up its move on `key` at `foe` (its gem surge: "Gem").
 local function windupMove(pet, brain, key: string, id: string, foe, now: number)
-	local move = KaijuRoles.Moves[id]
-	local plan = move and move.Plan
+	local move = Kaiju.moveInfo(id)
+	local plan = Kaiju.AbilityPlans[id]
 	local seconds = MOVE_WINDUP[key] or 0.4
 	brain.Action = { Kind = "Move", Key = key, Id = id, Foe = foe, At = now + seconds }
 	animate(pet, POSE[plan and plan.Shape or ""] or "Bolt", seconds, if move then move.Name else key)
@@ -218,12 +221,22 @@ local function strike(pet, brain, foe, now: number, host)
 	host.hurt(foe, damage, pet.Element, nil, false)
 end
 
--- Casts its move (the wind-up done).
+-- Casts its move (the wind-up done). Its gem surge hits with its role's
+-- power, as its blows do (its kit's moves carry their own), so the surge
+-- adds the same share to every role.
 local function cast(pet, brain, key: string, id: string, foe, host)
 	if not foe or not foe.Model.Parent then
 		return
 	end
-	local ok = KaijuAbilities.cast(host.caster(pet), victimOf(foe), id)
+	local caster = host.caster(pet)
+	if key == "Gem" then
+		local power = KaijuRoles.power(pet.Unit.Role, pet.Record and pet.Record.Level)
+		local base = caster.DamageOf
+		caster.DamageOf = function(moveId: string): number
+			return (if base then base(moveId) else caster.Damage) * power
+		end
+	end
+	local ok = KaijuAbilities.cast(caster, victimOf(foe), id)
 	if ok then
 		pet.LastFight = os.clock()
 	end
@@ -286,6 +299,8 @@ function KaijuBattleBrain.step(pet, orders, now: number, host)
 				brain.Mana = KaijuRoles.ManaMax
 			elseif action.Key == "Q" then
 				brain.NextQ = now
+			elseif action.Key == "Gem" then
+				brain.NextGem = now
 			else
 				brain.NextR = now
 			end
@@ -342,6 +357,19 @@ function KaijuBattleBrain.step(pet, orders, now: number, host)
 	if level >= KaijuRoles.MoveLevels.R and now >= brain.NextR and KaijuRoles.wantsR(me, foes, now) then
 		brain.NextR = now + KaijuRoles.REvery
 		windupMove(pet, brain, "R", kit.R, foe, now)
+		return
+	end
+	-- Its gem surge, when it's due (a ring round itself only with its foe
+	-- inside it).
+	local gem = pet.GemSurge
+	local gemPlan = gem and Kaiju.AbilityPlans[gem]
+	if
+		gemPlan
+		and now >= brain.NextGem
+		and d <= (if gemPlan.Shape == "Nova" then (gemPlan.Radius or 6) * SIZE else GEM_RANGE)
+	then
+		brain.NextGem = now + Kaiju.GemSurge.Every
+		windupMove(pet, brain, "Gem", gem, foe, now)
 		return
 	end
 	-- Its E, its mana full (in reach of its foe, or near it).

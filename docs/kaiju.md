@@ -43,52 +43,57 @@ they roam. See [kaiju-roster.md](kaiju-roster.md).
 
 ![The 28 new kaiju](kaiju/roster-28.jpg)
 
-## The Gemsoul, and a kaiju's own moves
+## A kaiju's moves: its own, and its gem surge
 
 Every kaiju carries a Gemsoul: a gem of its element, rolled like any gem
 (rarity, Size, Clarity, Cut). The Gemsoul gives it its element and makes it
-stronger the finer it is.
+stronger the finer it is. A kaiju fights with two sets of moves:
 
-**A kaiju's own moves are its role's** (`Kaiju.kitMoves`,
-`KaijuRoles.Kits`): a tank's Taunting Roar, Shell Slam and Fortress, a
-warrior's Cleave, War Cry and Earthshaker, a ranged one's Spine Volley,
-Piercing Spine and Vault, an assassin's Shadow Leap, Rend and Vanish. Each was copied from a gem surge and renamed for
-kaiju. It casts them everywhere it fights, and they're what its card and
-panel show. They wake as it levels (`Kaiju.MoveLevels`): E from the start, Q
+**Its own moves are its kind's** (`Kaiju.kitMoves`; the first four's are
+their role's, `KaijuRoles.Kits`, the roster's are their own,
+[kaiju-roster.md](kaiju-roster.md)): a tank's Taunting Roar, Shell Slam and
+Fortress, a warrior's Cleave, War Cry and Earthshaker, a ranged one's Spine
+Volley, Piercing Spine and Vault, an assassin's Shadow Leap, Rend and
+Vanish. They wake as it levels (`Kaiju.MoveLevels`): E from the start, Q
 at level 5, R at level 10. In a kaiju battle its E goes off when its mana
-is full. Out in the Outpost it keeps the timing below.
+is full. Out in the Outpost its E comes 3 seconds into a fight and then at
+most every 9 seconds, its Q in place of a blow every 7 seconds, and its R
+when it's down to 60% health or a heavy blow or a cast is coming (at most
+every 14 seconds).
 
-**The Gemsoul's own three moves are the gem's.** They work for whoever
-sockets it (below), and they wake on the same levels:
+**Its gem surge is its Gemsoul's E** (`Kaiju.gemSurge`), cast beside its
+own moves from level 1, everywhere it fights:
 
-| Key | Wakes at | What the kaiju does with it |
-| --- | --- | --- |
-| **E** | from the start | Its surge: 3 seconds into a fight, then at most every 9 seconds, after a wind-up its foe can see on its cast bar |
-| **Q** | level 5 | Its strike: in place of a blow, every 7 seconds, named on its cast bar (1.6 of its blows, against the E's 2.6) |
-| **R** | level 10 | Its defense: raised quickly when it's down to 60% health or a heavy blow or a cast is coming, at most every 14 seconds |
+- **Always its element.** A Gemsoul is rolled in its kaiju's element and
+  gives the kaiju that element, so the two always match: a Thermal kaiju's
+  gem surge is a Thermal move, a Cryo one's a Cryo move. Two kaiju of one
+  kind and element can still differ by their Gemsoul.
+- **When:** 6 seconds into a fight, then every 14 seconds
+  (`Kaiju.GemSurge`), after a wind-up its foe can see on its cast bar. Not
+  while it's stunned or silenced, or with a heavy blow coming at it (it
+  guards that). A ring round itself (Solar Flare, Acid Spray) only with its
+  foe inside it; the rest reach a foe up to 30 studs off.
+- **How hard:** 2.6 of its blows, times its Gemsoul's output (a Common's
+  0.6 to a Legendary's 1.0) and a little more for a bigger stone, times the
+  move's own share (`Kaiju.abilityDamage`). In a kaiju battle, times its
+  role's power too, as its blows are, so the surge adds the same share for
+  every role. A Legendary Gemsoul's surge hits two thirds harder than a
+  Common's.
+- **On screen:** a fourth row on its card in the starter roll and in the
+  kaiju panel, GEM SURGE (in the Gemsoul's rarity), with the move's icon and
+  what it does; and a diamond under the Q, E and R dots on its tile in the
+  strip, lit when it's ready (`KaijuGemAt`, its own cast time).
 
-A Gemsoul's moves are the player's own moves that you can see land, never a
-dash or a "while ready" bonus (`GemTraits.SoulMoves`):
+The Gemsoul's E is one of these (`GemTraits.SoulMoves`: the ones you can see
+land, never a dash or a "while ready" bonus); its Q and R, the gem's other
+two moves, are for whoever sockets it:
 
-| Element | Q (strike) | E (surge) | R (defense) |
+| Element | E (the gem surge) | Q (in a sword) | R (in a shield) |
 | --- | --- | --- | --- |
-| Thermal | Furnace Crescent, Magma Fault, Meteor Leap | Ember Lance, Supernova, Solar Flare, Flame Tornado | Heat Shield, Cauterize, Ring of Fire |
-| Cryo | Glacier Fan, Permafrost Spire, Frost Chakram | Cryo Lance, Absolute Zero, Hailstorm | Ice Armor, Glacial Bulwark, Ice Pillar |
-| Ion | Circuit Cleave, Thunder Dash, Skybreaker | Ion Spark, Chain Lightning, Thunder Pylon, Storm Call, Ion Cannon | Ion Shield, Capacitor, Tesla Fence |
-| Corrosive | Caustic Dart, Vitriol Sweep, Toxic Flask | Acid Spray, Toxic Cloud, Armor Melt, Toxic Tide, Maneater | Rad Shield, Bio Regrowth, Toxic Mantle |
-
-A Gemsoul's R is one of these (`Kaiju.AbilityPlans`):
-
-- **A shell** (Heat Shield, Glacial Bulwark, Ice Pillar, Ion Shield,
-  Capacitor, Rad Shield) soaks a share of its health in blows for a few
-  seconds. Glacial Bulwark and Ice Pillar burst when the shell breaks or runs
-  out, slowing everyone near. Heat Shield burns those near it every second.
-  Capacitor brings its next Q and E 3 seconds nearer. Rad Shield cleanses it.
-- **A ward** (Ice Armor, Toxic Mantle) cuts what it takes (Toxic Mantle
-  poisons those near it, too).
-- **A mend** (Cauterize, Bio Regrowth) heals it over a few seconds
-  (Cauterize cleanses burns, poisons, slows and blinds first).
-- **A ring** (Ring of Fire, Tesla Fence) hits everyone round it at once.
+| Thermal | Ember Lance, Supernova, Solar Flare, Flame Tornado | Furnace Crescent, Magma Fault, Meteor Leap | Heat Shield, Cauterize, Ring of Fire |
+| Cryo | Cryo Lance, Absolute Zero, Hailstorm | Glacier Fan, Permafrost Spire, Frost Chakram | Ice Armor, Glacial Bulwark, Ice Pillar |
+| Ion | Ion Spark, Chain Lightning, Thunder Pylon, Storm Call, Ion Cannon | Circuit Cleave, Thunder Dash, Skybreaker | Ion Shield, Capacitor, Tesla Fence |
+| Corrosive | Acid Spray, Toxic Cloud, Armor Melt, Toxic Tide, Maneater | Caustic Dart, Vitriol Sweep, Toxic Flask | Rad Shield, Bio Regrowth, Toxic Mantle |
 
 A Gemsoul you win is a gem like any other: socket it in your gear, enchant
 it, sell it. In your gear all three of its moves work, like any gem's: its
@@ -176,7 +181,8 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   rarity's colour and drops onto a stage in its element's colour; its E
   move's badge rises out of the window, and the card fills in: its
   Gemsoul and rarity, its name, health, damage and speed, what it's like,
-  and its moves with their icons (E ready now, Q at level 5, R at 10).
+  and its moves with their icons (E ready now, Q at level 5, R at 10, and
+  its gem surge, its Gemsoul's E, marked GEM).
   Until then the card holds blank slots where they go. START, the intro's
   one button, brings them out (on its own after 20 seconds, the bar along its foot filling till
   then; a click while they spin lands them all at once), and **the three
@@ -307,13 +313,14 @@ On a computer the strip sits at the bottom left, CATCH above it:
   in full on the right: its portrait, with its Gemsoul's gem on the corner
   (edged in its rarity), kind, level, its Gemsoul's rarity, health, damage
   and speed, its EXP, and its E, Q and R with what each does (READY, or
-  WAKES AT LV 5 / 10, each with its icon and key). Under that, what you can
+  WAKES AT LV 5 / 10, each with its icon and key), and under them its gem
+  surge (G, GEM SURGE in its Gemsoul's rarity). Under that, what you can
   do: **LEAD** (one of the team to the front), **SEND OUT** (one from home:
   then pick which of the team it goes out in place of) and **HEAL**
   (**REVIVE** on one that's down), which opens its HEAL tab (see
   [Healing](#healing)). On a phone the panel is a window of its own, 860 by
   340, drawn near full size (it used to be the computer's window shrunk to
-  about 70%); the one picked scrolls.
+  about 70%); the one picked scrolls. On a computer the window is 800 by 512.
 - **The Gem Vault** shows a Gemsoul's branches as the moves a kaiju casts,
   with KAIJU LV 5 by Q and KAIJU LV 10 by R.
 
@@ -704,7 +711,7 @@ Proposed guardrails:
 
 | Where | What |
 | --- | --- |
-| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), healing (`Infuse`, `infusePower`, `infusePlan`, `healPick`, `AutoHeal`, `autoHealOn`, `Danger`), knocked out (`Revive`, `reviveSeconds`, `reviveIn`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), a kaiju's own moves, its role's (`kitMove`, `kitMoves`, `role`, `moveInfo`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
+| `Shared.Kaiju` | The rules: kinds, stats, EXP, health that stays (`health`), healing (`Infuse`, `infusePower`, `infusePlan`, `healPick`, `AutoHeal`, `autoHealOn`, `Danger`), knocked out (`Revive`, `reviveSeconds`, `reviveIn`), the starter roll (`RollVersion`, `rollsOwed`), taming, the hit spread, slots, Gemsouls and the levels their moves wake at (`MoveLevels`, `move`, `moves`), a kaiju's own moves, its role's (`kitMove`, `kitMoves`, `role`, `moveInfo`), its gem surge (`gemSurge`, `GemSurge`), how each move lands (`AbilityPlans`), the roster, sizes (`Scale`, and next to you: `size`), packs and a wild one's day (`Wild`, `Roam`, `mood`), fighting as a team (`Squad`), how critters fight and their moves (`Bug`, `BugMoves`) |
 | `Shared.Squad` | Fighting as a side: sharing out foes (`assign`, `cost`), places round a shared foe (`slots`, `toward`), keeping clear (`apart`) |
 | `Shared.KaijuFight` | How they fight: each kind's blows and timings, guard, parry and hops (`resolve`), what a foe reads off one, the brain's view |
 | `Shared.KaijuRoster` | The 28 kinds beyond the first four: stats, where they roam (`Habitat`), their own kits and moves, fight styles and voices ([kaiju-roster.md](kaiju-roster.md)) |
@@ -714,7 +721,7 @@ Proposed guardrails:
 | `Shared.GemTraits` | The moves a Gemsoul rolls (`SoulMoves`); an old one's seeded into them (`traitsOf`) |
 | `Shared.KaijuRoles` | Each kind's role and the roles' own moves; how a kaiju fights by its role in a battle (see [kaiju-arena.md](kaiju-arena.md#roles-an-auto-battler)) |
 | `Shared.Spar` | `Spar.hunting`: the kit out alone |
-| `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe (a critter's wind-up too), asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow and its R when hard pressed (`setMoves` after a level), on its side of a shared foe and clear of its own (`Flank`, `Apart`); the attributes clients pose it by |
+| `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe (a critter's wind-up too), asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow, its R when hard pressed (`setMoves` after a level) and its gem surge when it's due (`GemSurge`), on its side of a shared foe and clear of its own (`Flank`, `Apart`); the attributes clients pose it by |
 | `KaijuBattles` | Kaiju battles between two players (see [Kaiju battles](kaiju-elements-battles.md#kaiju-battles)), fought on the courts of the [Kaiju Arena](kaiju-arena.md) |
 | `KaijuPitServer` | The Kaiju Arena downstairs: its stairs, pads, stakes and courts ([kaiju-arena.md](kaiju-arena.md)) |
 | `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, its health kept in its record, knockout (down till its revive time is up: `Down` and `DownUntil` on the record, `KaijuDown_<id>` on you; `reviveAll` for REVIVE and coupons), danger (`inDanger`, `KaijuDanger` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), healing any of yours (`KaijuInfuse`), AUTO HEAL (`KaijuAutoHeal`, healing with spare Commons, then Uncommons, between fights), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
@@ -808,9 +815,14 @@ seconds every ten minutes), and nothing piling up.
 effect draws, kept through its delays and frame loops, never lent to
 another effect, clamped, a body's size by its height), and
 `tests/run_hit_shake.py` a quarter-size kaiju's shake.
-The rules also check every Gemsoul's three moves (a kaiju's own, waking at
-5 and 10), every move's plan, an old Gemsoul's seeded Q and R, and each
-key's power. `tests/kaiju_models_cases.luau` checks each mood's pose (a held kaiju
+The rules also check every Gemsoul's three moves (waking at 5 and 10),
+every move's plan, an old Gemsoul's seeded Q and R, and each key's power;
+and the gem surge: always its Gemsoul's E and its element's, with a plan to
+cast it, none from a plain gem, a Legendary's much harder than a Common's.
+`tests/kaiju_server_cases.luau` checks a kaiju casts it when it's due (named
+on its cast bar, its own cast time, not again straight away, not while
+stunned) and a wild one has its own; `tests/kaiju_roles_cases.luau` that
+battles cast them, with the balance checked with every kaiju's gem surge in. `tests/kaiju_models_cases.luau` checks each mood's pose (a held kaiju
 crouches and struggles). `tests/run_kaiju_taming.py` drives the taming
 screen: a weakened kaiju near you glows with READY TO CATCH and its chance (a
 healthy one, a far one, one being tamed or one out of the Outpost doesn't),

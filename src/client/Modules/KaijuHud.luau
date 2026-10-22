@@ -97,9 +97,10 @@ local HEALTH = Color3.fromRGB(96, 214, 120)
 local EXP = Color3.fromRGB(176, 132, 255)
 local TILE_BACK = Color3.fromRGB(20, 24, 38)
 local TAME_RANGE = Kaiju.Tame.Range
-local KEYS = { "Q", "E", "R" }
-local KEY_EVERY = { Q = Kaiju.QEvery, E = Kaiju.AbilityEvery, R = Kaiju.REvery }
-local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt" }
+-- Its own Q, E and R, and its gem surge (its Gemsoul's E).
+local KEYS = { "Q", "E", "R", "Gem" }
+local KEY_EVERY = { Q = Kaiju.QEvery, E = Kaiju.AbilityEvery, R = Kaiju.REvery, Gem = Kaiju.GemSurge.Every }
+local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", Gem = "KaijuGemAt" }
 
 local function elementColor(element: string?): Color3
 	return GemConfig.ElementColors[element or ""] or P.Gold
@@ -284,18 +285,20 @@ for slot = 1, #Kaiju.SlotLevels do
 	UiKit.round(levelBack, 4)
 	local level = label(levelBack, "", 9, P.Text, IronUi.Bold)
 	level.Size, level.TextXAlignment, level.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
-	-- Q, E and R, down the right edge.
+	-- Q, E and R down the right edge, and under them its gem surge (a diamond).
 	local dots = {}
 	for i, key in KEYS do
+		local gem = key == "Gem"
 		local dot = new("Frame", {
 			Name = "Key" .. key,
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -4, 0, 4 + (i - 1) * 9),
-			Size = UDim2.fromOffset(7, 7),
+			Position = UDim2.new(1, if gem then -5 else -4, 0, 4 + (i - 1) * 9 + (if gem then 1 else 0)),
+			Size = UDim2.fromOffset(if gem then 6 else 7, if gem then 6 else 7),
+			Rotation = if gem then 45 else 0,
 			BackgroundColor3 = P.Gold,
 			ZIndex = 3,
 		}, button)
-		UiKit.round(dot, 4)
+		UiKit.round(dot, if gem then 1 else 4)
 		dots[key] = { Frame = dot, Stroke = new("UIStroke", { Color = P.Gold, Thickness = 1 }, dot) }
 	end
 	local healthBack, healthFill = bar(button, HEALTH)
@@ -568,10 +571,13 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 	local share = healthShare(record, model)
 	tile.HealthFill.Size = UDim2.fromScale(share, 1)
 	tile.HealthFill.BackgroundColor3 = if share < 0.3 then P.Bad else HEALTH
-	-- Q, E and R: lit when ready, faint while recharging, hollow asleep.
+	-- Q, E, R and its gem surge: lit when ready, faint while recharging,
+	-- hollow asleep.
 	local now = workspace:GetServerTimeNow()
 	for key, dot in tile.Dots do
-		local _, awake = Kaiju.kitMove(record.Species, key, level)
+		local awake = if key == "Gem"
+			then Kaiju.gemSurge(record.Soul) ~= nil
+			else select(2, Kaiju.kitMove(record.Species, key, level))
 		local at = model and model:GetAttribute(CAST_AT[key])
 		local ready = awake and model ~= nil and (type(at) ~= "number" or now - at >= KEY_EVERY[key])
 		dot.Frame.BackgroundColor3, dot.Stroke.Color = color, color
@@ -594,7 +600,7 @@ end
 -- (On a phone on its side, a window of its own, drawn near full size: the
 -- one picked scrolls, and HEAL's gems take the width.)
 local SHORT = UiKit.short()
-local W, H = if SHORT then 860 else 800, if SHORT then 340 else 480
+local W, H = if SHORT then 860 else 800, if SHORT then 340 else 512
 local window = IronUi.window("KaijuPanel", 11, W, H, "K", P.Gold)
 window.Title.Text = "YOUR KAIJU"
 window.Subtitle.Text = "Your team fights beside you in the Outpost. Pick one to see it."
@@ -632,6 +638,7 @@ local right = new("Frame", {
 local tabRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30) }, right)
 UiKit.list(tabRow, 8, true)
 
+local DETAIL_H = 394 -- (on a phone: the height of what scrolls)
 local detail = new(if SHORT then "ScrollingFrame" else "Frame", {
 	Name = "Detail",
 	BackgroundTransparency = 1,
@@ -639,7 +646,7 @@ local detail = new(if SHORT then "ScrollingFrame" else "Frame", {
 	Size = UDim2.new(1, 0, 1, -38),
 }, right)
 if SHORT then
-	detail.CanvasSize = UDim2.fromOffset(0, 362)
+	detail.CanvasSize = UDim2.fromOffset(0, DETAIL_H)
 	detail.ScrollBarThickness = 4
 	detail.ScrollingDirection = Enum.ScrollingDirection.Y
 end
@@ -708,31 +715,34 @@ expText.Position, expText.Size = UDim2.fromOffset(0, 148), UDim2.new(1, 0, 0, 12
 local expBack, expFill = bar(info, EXP)
 expBack.Position, expBack.Size = UDim2.fromOffset(0, 162), UDim2.new(1, 0, 0, 6)
 
--- Its moves, from its Gemsoul: E from the start, Q and R as it levels.
+-- Its moves: its kind's own (E from the start, Q and R as it levels), and
+-- its gem surge, its Gemsoul's E.
+local ROW_H = 34
 local moveBox = new("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, 178),
-	Size = UDim2.new(1, 0, 0, 116),
+	Size = UDim2.new(1, 0, 0, 4 * ROW_H + 3 * 4),
 }, detail)
 UiKit.list(moveBox, 4)
 local moveRows = {}
-for order, key in { "E", "Q", "R" } do
+for order, key in { "E", "Q", "R", "Gem" } do
 	local row = new("Frame", {
 		Name = "Move" .. key,
 		LayoutOrder = order,
 		BackgroundColor3 = P.Inset,
-		Size = UDim2.new(1, 0, 0, 36),
+		Size = UDim2.new(1, 0, 0, ROW_H),
 	}, moveBox)
 	UiKit.round(row, 8)
 	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.6 }, row)
 	local chip = new("Frame", {
-		Position = UDim2.fromOffset(6, 6),
+		Position = UDim2.fromOffset(6, 5),
 		Size = UDim2.fromOffset(24, 24),
 		BackgroundColor3 = P.Gold,
 	}, row)
 	UiKit.round(chip, 6)
 	local chipEdge = new("UIStroke", { Color = P.Dim, Thickness = 1, Transparency = 1 }, chip)
-	local letter = label(chip, key, 13, INK, Enum.Font.GothamBlack)
+	local mark = if key == "Gem" then "G" else key
+	local letter = label(chip, mark, 13, INK, Enum.Font.GothamBlack)
 	letter.Size, letter.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
 	-- (Over the move's icon, when it has one: its key on the corner.)
 	local badge = new("Frame", {
@@ -744,13 +754,13 @@ for order, key in { "E", "Q", "R" } do
 		ZIndex = 3,
 	}, chip)
 	UiKit.round(badge, 4)
-	local badgeLetter = label(badge, key, 9, INK, Enum.Font.GothamBlack)
+	local badgeLetter = label(badge, mark, 9, INK, Enum.Font.GothamBlack)
 	badgeLetter.Size, badgeLetter.TextXAlignment, badgeLetter.ZIndex =
 		UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
 	local name = label(row, "", 13, P.Text, IronUi.Bold)
-	name.Position, name.Size = UDim2.fromOffset(38, 3), UDim2.new(1, -144, 0, 16)
+	name.Position, name.Size = UDim2.fromOffset(38, 2), UDim2.new(1, -144, 0, 16)
 	local about = label(row, "", 10, P.Dim, IronUi.Body)
-	about.Position, about.Size = UDim2.fromOffset(38, 19), UDim2.new(1, -144, 0, 13)
+	about.Position, about.Size = UDim2.fromOffset(38, 18), UDim2.new(1, -144, 0, 13)
 	local state = label(row, "", 10, P.Good, Enum.Font.GothamBlack)
 	state.AnchorPoint, state.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
 	state.Position, state.Size = UDim2.new(1, -10, 0, 0), UDim2.new(0, 100, 1, 0)
@@ -777,7 +787,7 @@ local actionBar = new("Frame", {
 }, detail)
 if SHORT then
 	-- (At the foot of what scrolls.)
-	actionBar.AnchorPoint, actionBar.Position = Vector2.zero, UDim2.fromOffset(0, 362 - 40)
+	actionBar.AnchorPoint, actionBar.Position = Vector2.zero, UDim2.fromOffset(0, DETAIL_H - 40)
 end
 local actionText = label(actionBar, "", 11, P.Dim, IronUi.Body)
 actionText.Size = UDim2.new(1, 0, 1, 0)
@@ -1290,8 +1300,16 @@ local function drawDetail(data, record, team: { string })
 		else string.format("EXP %d / %d", record.Exp or 0, need)
 	expFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
 	for key, row in moveRows do
-		-- (Its own moves: its role's, Kaiju.kitMove.)
-		local id, awake = Kaiju.kitMove(record.Species, key, record.Level)
+		-- (Its own moves, its role's: Kaiju.kitMove. And its gem surge, its
+		-- Gemsoul's E, from the start: Kaiju.gemSurge.)
+		local gem = key == "Gem"
+		local id, awake
+		if gem then
+			id = Kaiju.gemSurge(soul)
+			awake = id ~= nil
+		else
+			id, awake = Kaiju.kitMove(record.Species, key, record.Level)
+		end
 		local move = Kaiju.moveInfo(id)
 		row.Name.Text = moveName(id)
 		row.Name.TextColor3 = if awake then P.Text else P.Dim
@@ -1312,9 +1330,13 @@ local function drawDetail(data, record, team: { string })
 		row.Edge.Color = if awake then color else P.Edge
 		row.Edge.Transparency = if awake then 0.45 else 0.7
 		row.Frame.BackgroundColor3 = if awake then color:Lerp(INK, 0.82) else P.Inset
-		row.State.Text = if awake then "READY" else string.format("WAKES AT LV %d", Kaiju.MoveLevels[key] or 1)
+		row.State.Text = if gem
+			then "GEM SURGE"
+			elseif awake then "READY"
+			else string.format("WAKES AT LV %d", Kaiju.MoveLevels[key] or 1)
 		row.State.TextSize = if awake then 10 else 9
-		row.State.TextColor3 = if awake then P.Good else P.Dim
+		-- (The gem surge in its Gemsoul's rarity.)
+		row.State.TextColor3 = if gem then tierColor elseif awake then P.Good else P.Dim
 	end
 	drawActions(data, record, team)
 end

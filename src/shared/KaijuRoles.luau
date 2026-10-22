@@ -63,7 +63,7 @@ KaijuRoles.Roles = {
 		Blurb = "Holds the front and takes the hits. Its roar makes foes attack it.",
 		Reach = 3.2,
 		Windup = 0.4,
-		Power = { 0.9, 0.7, 0.65 },
+		Power = { 0.84, 0.7, 0.65 },
 		Mana = { Attack = 10, Hurt = 1.2 },
 		Front = true,
 	},
@@ -94,7 +94,7 @@ KaijuRoles.Roles = {
 		Blurb = "Leaps over the front line onto their back row, a shooter first.",
 		Reach = 2.8,
 		Windup = 0.3,
-		Power = { 0.8, 1.0, 1.1 },
+		Power = { 0.88, 1.0, 1.1 },
 		Mana = { Attack = 16, Hurt = 0.5 },
 		Front = false,
 		Opens = true, -- leaps at the start of a battle

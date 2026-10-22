@@ -470,6 +470,28 @@ check(math.abs(Kaiju.abilityDamage(10, oldSoul, "Q_MagmaFault") / Kaiju.abilityD
 	- (Kaiju.QPower * Kaiju.AbilityPlans.Q_MagmaFault.Mult) / (Kaiju.AbilityPower * Kaiju.AbilityPlans.E_Supernova.Mult)) < 1e-6, "A Q doesn't hit for QPower")
 local plain = { Id = "plain", Element = "Fire", Tier = "Rare" }
 check(not Kaiju.isSoul(plain) and GemTraits.traitFor(plain, "Q") ~= nil, "A plain gem lost its Q")
+-- Its gem surge, beside its own moves: its Gemsoul's E, always of its
+-- element (a Gemsoul is), with a way to cast it; none from a plain gem.
+for _, element in Kaiju.Elements do
+	for seed = 1, 24 do
+		local soul = Kaiju.rollSoul(Random.new(seed), element, { Id = "g" .. seed, Time = 1, Species = "Emberjaw" })
+		local id = Kaiju.gemSurge(soul)
+		check(id ~= nil and id == Kaiju.ability(soul), element .. ": its gem surge isn't its Gemsoul's E")
+		check(table.find(Kaiju.Moves[element].Ability, id) ~= nil, element .. ": its gem surge isn't its element's: " .. tostring(id))
+		check(Kaiju.AbilityPlans[id] ~= nil, "No way to cast the gem surge " .. tostring(id))
+	end
+end
+check(Kaiju.gemSurge(plain) == nil and Kaiju.gemSurge(nil) == nil, "A plain gem gave a gem surge")
+check(Kaiju.GemSurge.Every > Kaiju.AbilityEvery and Kaiju.GemSurge.First > 0, "The gem surge's timing")
+-- A finer Gemsoul's surge hits harder (its output), as its stats are.
+local legend = table.clone(oldSoul)
+legend.Tier = "Legendary"
+local common = table.clone(oldSoul)
+common.Tier = "Common"
+check(
+	Kaiju.abilityDamage(10, legend, "E_Supernova") > Kaiju.abilityDamage(10, common, "E_Supernova") * 1.5,
+	"A Legendary's gem surge isn't much harder than a Common's"
+)
 local kaiju =
 	Kaiju.new("k1", "Bulwark", Kaiju.rollSoul(Random.new(9), "Frost", { Id = "s", Time = 1, Species = "Bulwark" }))
 check(kaiju.Element == "Frost" and kaiju.Level == 1 and Kaiju.title(kaiju) == "Cryo Bulwark", "A new kaiju is wrong")
