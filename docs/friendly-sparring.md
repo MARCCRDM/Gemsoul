@@ -59,15 +59,17 @@ gives the rule:
 - **A yes that can't start.** If someone accepts while they're in a seat, the
   accept is refused and the asker is told the spar couldn't start.
 
-## Nobody dies
+## Nobody dies in a spar
 
-Only in the lobby: a spar, or a critter or wild kaiju in the Outpost. A
-fight that takes you out of the lobby (a rival, a 1v1, a dungeon, an
-expedition) is fought to the end as ever, even when you started it from
-the Outpost (`Spar.knocksDown`: never with a `CombatSession`, `MatchId`,
-`DungeonId` or `Expedition` on you).
+Only in the lobby (`Spar.knocksDown`: never with a `CombatSession`,
+`MatchId`, `DungeonId` or `Expedition` on you). A fight that takes you out
+of the lobby (a rival, a 1v1, a dungeon, an expedition) is fought to the
+end as ever, even when you started it from the Outpost. A critter or a wild
+kaiju in the Outpost doesn't knock you down either: its finishing blow
+**kills** you, and you're robbed out past the core and back at base after
+(**YOU WERE KILLED**: [frontier.md](frontier.md)).
 
-A blow that would take you to 0 health knocks you down instead. You fall, the
+In a spar, a blow that would take you to 0 health knocks you down instead. You fall, the
 screen tints red, and it counts down who did it and when you're back up:
 
 ![Knocked down](friendly-sparring/down.png)

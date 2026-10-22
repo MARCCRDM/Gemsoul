@@ -4813,6 +4813,17 @@ end)()
 	hB.MaxHealth, hB.Health = 100, 1
 	stand(center + Vector3.new(60, 5, 0))
 	check(FrontierServer.knockedOut(b) == nil and b:GetAttribute("Robbed") == nil, "Robbed in the core")
+	-- Killed in the core all the same: dead a moment, nothing taken, then
+	-- back at base, whole.
+	check(b:GetAttribute("Killed") == true and b:GetAttribute("SparDown") ~= nil, "Not killed in the core")
+	for _ = 1, math.ceil(shared("Spar").DeadSeconds / 0.25) + 2 do
+		now += 0.25
+		runDelayed()
+	end
+	check(b:GetAttribute("Killed") == nil and b:GetAttribute("SparDown") == nil, "Still dead in the core")
+	check((rootB.Position - (center + Vector3.new(0, 3, 0))).Magnitude < 1, "Killed in the core, not back at base")
+	check(hB.Health == hB.MaxHealth, "Killed in the core, not back at base whole")
+	hB.Health = 1
 	stand(center + Vector3.new(220, 5, 0))
 	for i = 1, 2 do
 		local gem = { Id = "rob-" .. i, Tier = "Common", Element = "Frost" }
@@ -4831,6 +4842,7 @@ end)()
 	b:SetAttribute("SparDown", now + 3)
 	local robbery = FrontierServer.knockedOut(b)
 	check(robbery ~= nil and Robbery.of(b) == robbery and b:GetAttribute("Robbed") ~= nil, "Not robbed knocked out out there")
+	check(b:GetAttribute("Killed") == true, "Not killed out there")
 	check(b:GetAttribute("SparDown") > b:GetAttribute("Robbed"), "Up before the robbery's over")
 	check(KaijuWilds._wilds[close].Robbery == robbery, "The critter near didn't come for them")
 	check(KaijuWilds._wilds[far].Robbery == nil, "One far off came for them")
@@ -4871,6 +4883,7 @@ end)()
 	now += Rob.Settle + 0.05
 	Robbery._step()
 	check(Robbery.of(b) == nil and b:GetAttribute("Robbed") == nil and b:GetAttribute("SparDown") == nil, "Still down after the robbery")
+	check(b:GetAttribute("Killed") == nil, "Still dead back at base")
 	check((rootB.Position - (center + Vector3.new(0, 3, 0))).Magnitude < 1, "Not back at base")
 	check(hB.Health == hB.MaxHealth, "Not back at base whole")
 	check(FrontierServer._hauls[b] == nil, "The trip's haul isn't over back at base")

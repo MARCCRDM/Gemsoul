@@ -98,8 +98,8 @@ of level 16 to 20, a head taller than you, keeps a beat 30 studs in front of
 it: pacing, sniffing about, napping. It looks over anyone who comes close
 and roars at them now and then, but leaves them be. The first swing at its
 vein stirs it, the second makes it roar, the third wakes it, and it goes
-for the miners as well as their kaiju (a plain miner is
-knocked down, not killed). Beat it or catch it and the vein is yours until
+for the miners as well as their kaiju (a plain miner it
+finishes is killed, and robbed out here: see below). Beat it or catch it and the vein is yours until
 it moves on. A beaten guardian pays 40 coins on top of its Gemsoul. When
 the vein moves, a fresh guardian sleeps at the new site, and the banner
 says "A guarded Rift Vein surfaced to the …". The other two veins, and the
@@ -167,7 +167,7 @@ nearly full, it turns red.
 Each swing's share of the noise varies (60% to 140%), so encounters don't
 come like clockwork, and the next can't come within 8 seconds of the last.
 A mech's strike makes as much noise as the swings it spends, and its pilot
-is fair game: a critter that knocks them down throws them out of the
+is fair game: a critter that kills them throws them out of the
 cockpit. Back in the core, the noise dies down over a minute or so.
 
 Each critter alone is weak (a third of the health and two fifths of the
@@ -317,13 +317,21 @@ your gems (`Frontier.Raid`; `FrontierServer.raid`, from
   your pouch even if it's full again. Let it hop in and the gem's gone:
   "A critter got away with your ...".
 
-### Knocked out: robbed, then home
+### Killed: robbed, then home
 
-A trip (above) knocks you down for a moment and you can chase. A real
-knockout out past the core (beaten down to nothing with your kit out, by a
-critter or a wild kaiju; not in a spar) is worse: you stay down and the
-critters rob you (`Robbery`, `Frontier.Rob`; `FrontierServer.knockedOut`,
-from `SparServer.onKnockedOut`):
+A trip (above) knocks you down for a moment and you can chase. Beaten down
+to nothing in the Outpost by a critter or a wild kaiju (kit out or not; not
+in a spar with another player) is worse: **you're killed**
+(`FrontierServer.knockedOut`, from `SparServer.onKnockedOut`, marks you
+`Killed`). You don't get up where you fell; you lie there, then you're back
+at base. In the core that's all: you lie dead for 4 seconds
+(`Spar.DeadSeconds`; **YOU WERE KILLED · Your gems are safe in the Core. ·
+Back to base in 4**) and nothing's taken. Out past it the critters rob you
+first (`Robbery`, `Frontier.Rob`):
+
+![Killed out past the core: robbed. Offline render of the game's UI code over a stand-in background, not a Roblox screenshot](frontier/killed-robbed.png)
+![Killed in the core: nothing taken. Offline render, as above](frontier/killed-core.png)
+
 
 - the critters within 70 studs of you come for you; if fewer are near
   than there's to take (up to 3 of your haul), more leap out of rifts that
@@ -331,18 +339,21 @@ from `SparServer.onKnockedOut`):
 - each grabs one gem of your haul, newest first, holds it up and runs for
   a rift with it, as a snatcher does. Knock it out first (a friend, or your
   kaiju) and the gem's back ("GOT IT BACK!");
-- your screen says **KNOCKED OUT · The critters are going through your
-  pouch! · Back to base in 8**;
+- your screen goes dark red: **YOU WERE KILLED · The critters are going
+  through your pouch! · Back to base in 8**;
 - after 8 seconds, or a moment after there's nothing left to take, you're
-  back at base on your feet at full health (a few seconds' shield), your
-  haul cleared, and a card tells you what they took:
+  back at base on your feet at full health (a few seconds' shield, **BACK
+  AT BASE**), your haul cleared, and a card tells you what they took ("You
+  were killed out in the quarry and the critters went through your
+  pouch."):
 
 ![What the critters took: the card. Offline render of the game's UI code, gems drawn as stand-ins, not a Roblox screenshot](rift/robbed.png)
 
 **ROBBED!** and each gem in 3D, **GONE** or **SAVED**; **NOTHING TAKEN**
 if your haul was empty. The robbers turn back into plain critters once it's
-over: they don't follow you home. Not in the core, the Rift (it has its
-own), spars, kaiju battles, matches, dungeons or expeditions.
+over: they don't follow you home. No robbery in the core; no kill at all in
+the Rift (it has its own), spars, kaiju battles, matches, dungeons or
+expeditions.
 
 The giggles are synthesized by `tools/make_critter_sounds.py`
 (`critter_giggle_1..3.mp3`, `critter_cackle.mp3`); until they're uploaded,

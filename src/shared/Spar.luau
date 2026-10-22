@@ -11,11 +11,19 @@
 	then you get up where you fell, at full health, with a moment's guard
 	so you can't be knocked straight back down.
 
+	A creature's finishing blow in the Outpost is another matter: it kills
+	you (Killed). Out past the core the critters rob you first (Server.
+	Robbery); in the core, where your gems are safe, you lie dead for
+	DeadSeconds. Either way you're back at base after, on your feet
+	(Server.FrontierServer). A spar between players is never a kill.
+
 	Attributes, on the Player:
 	  Spar      true while your combat kit is out (the server sets it)
 	  Hunt      true while it's out to hunt (with Spar)
 	  SparWith  your partner's UserId, while sparring
 	  SparDown  server time you get back up, while knocked down
+	  Killed    true while you lie killed by a creature in the Outpost (with
+	            SparDown): you go back to base, not up where you fell
 	  SparHurt  server time you were last hit in a spar: you can't end it
 	            in the middle of an exchange
 
@@ -42,6 +50,7 @@
 local Spar = {}
 
 Spar.DownSeconds = 3 -- knocked down this long
+Spar.DeadSeconds = 4 -- killed in the Outpost's core: dead this long, then back at base
 Spar.GuardSeconds = 1.5 -- then shielded this long, back on your feet
 Spar.SheatheLock = 3 -- no ending the spar this soon after a hit
 Spar.AskSeconds = 20 -- a request stays open this long

@@ -472,8 +472,9 @@ and beats a kaiju of its own level.
   nothing for 30 seconds, and the count
   starts again).
 - Awake, it goes for whoever woke it, and anyone else who mines its vein,
-  **a plain miner too**, not only hunters. Its finishing blow knocks a
-  miner down rather than killing them. And it fights their kaiju.
+  **a plain miner too**, not only hunters. Its finishing blow kills a
+  miner, and the critters rob them before they're back at base
+  ([frontier.md](frontier.md)). And it fights their kaiju.
 - Challenge it, fight it or catch it like any other wild kaiju. Killed, it
   also pays **40 coins** (within the 300 a day from critters).
 - Lead it 70 studs from home and it walks back. Home 8 seconds with

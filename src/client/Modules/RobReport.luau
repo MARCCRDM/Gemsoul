@@ -43,7 +43,7 @@ function RobReport.lines(report): (string, string, string)
 		return "NOTHING TAKEN",
 			if rift
 				then "You went down in the Rift. The critters went through your pouch and found nothing worth taking."
-				else "You went down out in the quarry. The critters went through your pouch and found nothing worth taking.",
+				else "You were killed out in the quarry. The critters went through your pouch and found nothing worth taking.",
 			"You're back at base, on your feet."
 	end
 	local title = if gone == 0 then "ROBBED, BUT YOU GOT IT BACK" else "ROBBED!"
@@ -54,7 +54,7 @@ function RobReport.lines(report): (string, string, string)
 	local line = (
 		if rift
 			then "You went down in the Rift and the critters went through your pouch."
-			else "You went down out in the quarry and the critters went through your pouch."
+			else "You were killed out in the quarry and the critters went through your pouch."
 	)
 		.. "\n"
 		.. count

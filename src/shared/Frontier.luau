@@ -70,9 +70,9 @@
 	and the gem's yours again; let it hop in and it's gone. Back in the
 	core your haul is safe (it starts again on your next trip out).
 
-	Robbed while you're down (Rob): knocked out out there (your health run
-	out, by a critter or a wild kaiju; never a friendly spar's) or in the
-	Rift, you stay down while the critters rob you: those about come for
+	Robbed while you're down (Rob): killed out there (your health run out,
+	by a critter or a wild kaiju; never a friendly spar's) or knocked out in
+	the Rift, you stay down while the critters rob you: those about come for
 	you, and if too few are near, more tear through round you (robCrew,
 	robSpots). Each grabs one of your trip's gems and runs for a tear with
 	it, as a snatcher does; then you're back at base with a report of what

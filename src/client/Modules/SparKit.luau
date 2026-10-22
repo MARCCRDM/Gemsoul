@@ -27,6 +27,10 @@
 	  Knocked down  at 0 health: you fall, the view pulls back to watch, and
 	                you're up again a few seconds later at full health. Whoever
 	                knocked you down gets a banner.
+	  Killed        a creature's finishing blow in the Outpost (Killed, from
+	                the server): YOU WERE KILLED, darker, and you lie there
+	                (robbed first, out past the core) till you're back at
+	                base; BACK AT BASE once you are.
 	  Who's sparring  while you mine, a crossed-swords mark over anyone in a
 	                spar (they can't touch you).
 
@@ -530,36 +534,58 @@ local function rise()
 end
 
 local lastAttacker: string? = nil
+-- (Killed this time: BACK AT BASE once you're up, the death's sound once.)
+local wasKilled = false
+local KILLED = Color3.fromRGB(255, 72, 64)
+local KNOCKED = Color3.fromRGB(255, 120, 104)
 local function refreshDown()
 	local down = Spar.isDown(player)
+	local killed = down and player:GetAttribute("Killed") ~= nil
 	if down and not downGui.Enabled then
 		downGui.Enabled = true
 		if lastAttacker then
 			downBy.Text = "by " .. lastAttacker
 		end
-		CombatSound.play("KnockDown")
+		if not killed then
+			CombatSound.play("KnockDown")
+		end
 	elseif not down and downGui.Enabled then
 		downGui.Enabled = false
 		rise()
-		if Spar.sparring(player) then
+		if wasKilled then
+			flash("BACK AT BASE", "On your feet, full health", Color3.fromRGB(110, 230, 150))
+		elseif Spar.sparring(player) then
 			flash("BACK UP", "Full health  ·  keep going, or 1 to stop", Color3.fromRGB(110, 230, 150))
 		end
 		lastAttacker = nil
 		downBy.Text = ""
 	end
-	if down then
-		-- Being robbed (Server.Robbery): down till it's over, then back at base.
-		local robbed = player:GetAttribute("Robbed")
-		if type(robbed) == "number" then
-			downTitle.Text = "KNOCKED OUT"
-			downBy.Text = "The critters are going through your pouch!"
-			local left = robbed - workspace:GetServerTimeNow()
-			downCount.Text = string.format("Back to base in %d", math.max(1, math.ceil(left)))
-		else
-			downTitle.Text = "KNOCKED DOWN"
-			local left = (player:GetAttribute("SparDown") or 0) - workspace:GetServerTimeNow()
-			downCount.Text = string.format("Back up in %d", math.max(1, math.ceil(left)))
-		end
+	if killed and not wasKilled then
+		CombatSound.play("Death")
+	end
+	wasKilled = if down then wasKilled or killed else false
+	if not down then
+		return
+	end
+	-- Killed by a creature in the Outpost: darker, and red; robbed out past
+	-- the core (Server.Robbery), then back at base either way.
+	downVeil.BackgroundTransparency = if killed then 0.3 else 0.55
+	downTitle.TextColor3 = if killed then KILLED else KNOCKED
+	local robbed = player:GetAttribute("Robbed")
+	if type(robbed) == "number" then
+		downTitle.Text = if killed then "YOU WERE KILLED" else "KNOCKED OUT"
+		downBy.Text = "The critters are going through your pouch!"
+		local left = robbed - workspace:GetServerTimeNow()
+		downCount.Text = string.format("Back to base in %d", math.max(1, math.ceil(left)))
+	elseif killed then
+		downTitle.Text = "YOU WERE KILLED"
+		downBy.Text = "Your gems are safe in the Core."
+		local left = (player:GetAttribute("SparDown") or 0) - workspace:GetServerTimeNow()
+		downCount.Text = string.format("Back to base in %d", math.max(1, math.ceil(left)))
+	else
+		downTitle.Text = "KNOCKED DOWN"
+		local left = (player:GetAttribute("SparDown") or 0) - workspace:GetServerTimeNow()
+		downCount.Text = string.format("Back up in %d", math.max(1, math.ceil(left)))
 	end
 end
 
@@ -715,6 +741,7 @@ function SparKit.start()
 	player.CharacterAdded:Connect(function()
 		fallen = false
 		downGui.Enabled = false
+		wasKilled = false
 	end)
 	task.spawn(function()
 		local fx = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CombatFx")
