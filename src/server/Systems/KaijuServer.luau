@@ -288,7 +288,7 @@ end
 -- Stats and the attributes clients read, after a level or a new kaiju.
 local function refresh(pet: Pet)
 	local record = pet.Record
-	local stats = Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier)
+	local stats = Kaiju.recordStats(record)
 	local h = pet.Humanoid
 	local share = h.Health / math.max(1, h.MaxHealth)
 	pet.Stats = stats
@@ -302,6 +302,13 @@ local function refresh(pet: Pet)
 	KaijuFighter.setMoves(pet.Fighter, moves)
 	model:SetAttribute("KaijuQ", moves.Q)
 	model:SetAttribute("KaijuR", moves.R)
+	-- Its gem surge, attuned (a new Gemsoul may give or take it).
+	local surge = Kaiju.recordSurge(record)
+	if surge ~= pet.GemSurge then
+		pet.GemSurge = surge
+		KaijuFighter.setGemSurge(pet.Fighter, surge)
+		model:SetAttribute("KaijuGemSurge", surge)
+	end
 	model:SetAttribute("KaijuLevel", record.Level)
 	model:SetAttribute("KaijuExp", record.Exp or 0)
 	local next = Kaiju.expToNext(record.Level)
@@ -361,8 +368,8 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 	model:SetAttribute("KaijuName", Kaiju.title(record))
 	local ability = Kaiju.kitMoves(record.Species, record.Level).E
 	model:SetAttribute("KaijuAbility", ability)
-	-- Beside its own moves, its gem surge (its Gemsoul's E).
-	local gem = Kaiju.gemSurge(record.Soul)
+	-- Beside its own moves, its gem surge (its Gemsoul's E, attuned).
+	local gem = Kaiju.recordSurge(record)
 	model:SetAttribute("KaijuGemSurge", gem)
 	local pet: Pet = {
 		Owner = player,
@@ -371,7 +378,7 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		Root = petRoot,
 		Humanoid = humanoid,
 		Element = record.Element,
-		Stats = Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier),
+		Stats = Kaiju.recordStats(record),
 		Ability = ability,
 		GemSurge = gem,
 		Target = nil,
@@ -1772,6 +1779,76 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 	)
 end
 
+-- A gem from your pouch socketed as one of yours' Gemsoul (Kaiju.canSocket:
+-- any element, any rarity); the one it had back in the pouch. Of its own
+-- element it's attuned: harder hits and its gem surge (Kaiju.attuned).
+-- Not in the middle of a fight.
+local function socketSoul(player: Player, kaijuId: any, gemId: any)
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	local record = if type(kaijuId) == "string" and roster and roster.List then roster.List[kaijuId] else nil
+	local gem = nil
+	if profile and type(gemId) == "string" then
+		for _, loose in GemInventory.available(profile) do
+			if loose.Id == gemId then
+				gem = loose
+			end
+		end
+	end
+	local ok, why = Kaiju.canSocket(record, gem)
+	if not ok then
+		return reply(false, why or "That gem can't go in.")
+	end
+	local pet = teams[player] and teams[player][record.Id]
+	if pet and pet.Record ~= record then
+		pet = nil
+	end
+	if pet then
+		keepHealth(pet)
+		if KaijuServer.inDanger(player) then
+			return reply(false, "Not in the middle of a fight: get clear of the critters first.", { Danger = true })
+		end
+	end
+	local old = record.Soul
+	PlayerData.removeGems(player, { [gem.Id] = true })
+	record.Soul = gem
+	if old then
+		-- (Back in the pouch: taking the new one made the room. A wild one's
+		-- never had an id of its own.)
+		if type(old.Id) ~= "string" or old.Id == "wild" then
+			old.Id = PlayerData.newGemId()
+		end
+		PlayerData.returnGem(player, old)
+	end
+	local _, most = Kaiju.health(record)
+	record.Health = math.min(tonumber(record.Health) or most, most)
+	if pet then
+		refresh(pet)
+		petFx("TriadAura", pet.Root, nil, gem.Element, "Heal", 1.2)
+	end
+	PlayerData.sync(player)
+	local tier = GemConfig.TierLabels[gem.Tier] or gem.Tier
+	local attuned = Kaiju.attuned(record)
+	return reply(
+		true,
+		if attuned
+			then string.format(
+				"%s's Gemsoul is now a %s gem (%s). Attuned: +%d%% damage and its gem surge.",
+				Kaiju.title(record),
+				GemConfig.elementName(gem.Element),
+				tier,
+				math.floor((Kaiju.Attuned.Power - 1) * 100 + 0.5)
+			)
+			else string.format(
+				"%s's Gemsoul is now a %s gem (%s). Not its element: no gem surge.",
+				Kaiju.title(record),
+				GemConfig.elementName(gem.Element),
+				tier
+			),
+		{ Attuned = attuned, Surge = Kaiju.recordSurge(record) }
+	)
+end
+
 -- Auto heal (Kaiju.AutoHeal): your spare Commons heal the team by
 -- themselves, out of danger, each one hurt in one go, then your spare
 -- Uncommons once the Commons are gone (Kaiju.autoHealPick). Quiet (it
@@ -1895,6 +1972,7 @@ function KaijuServer.start()
 	Shop.register("KaijuTeam", setTeam)
 	Shop.register("KaijuActive", setActive)
 	Shop.register("KaijuInfuse", infuse)
+	Shop.register("KaijuSocket", socketSoul)
 	Shop.register("KaijuAutoHeal", setAutoHeal)
 	Shop.register("KaijuCallBack", callBack)
 	Shop.register("KaijuRoll", rollRequest)
@@ -1948,7 +2026,7 @@ end
 
 -- For tests.
 KaijuServer._upkeep, KaijuServer._think, KaijuServer._infuse = upkeep, think, infuse
-KaijuServer._autoHeal = autoHeal
+KaijuServer._autoHeal, KaijuServer._socketSoul = autoHeal, socketSoul
 KaijuServer._recall, KaijuServer._setActive, KaijuServer._setTeam = recall, setActive, setTeam
 KaijuServer._callBack, KaijuServer._hops = callBack, hops
 KaijuServer._despawn, KaijuServer._fair = despawn, fair

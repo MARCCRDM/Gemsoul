@@ -56,14 +56,32 @@ local originalHelmet = old.Character.Helmet
 old.Character.HelmetGem = nil
 PlayerData.socketGem(player, "bound", "Helmet")
 old.Owned.Helmets.SurveyHelmet = 1
+-- The gem stays in the slot: it enchants the new piece, the old one bare.
 check(
-	PlayerData.equipGear(player, "Helmets", "SurveyHelmet") and old.Character.HelmetGem == nil,
-	"Enchant transferred to replacement item"
+	PlayerData.equipGear(player, "Helmets", "SurveyHelmet")
+		and old.Character.HelmetGem.Id == "bound"
+		and old.Character.ItemGems.Helmet.SurveyHelmet.Id == "bound"
+		and old.Character.ItemGems.Helmet[originalHelmet] == nil,
+	"The slot's gem didn't move onto the new piece"
 )
 check(
-	PlayerData.equipGear(player, "Helmets", originalHelmet) and old.Character.HelmetGem.Id == "bound",
-	"Original item lost its enchant"
+	PlayerData.equipGear(player, "Helmets", originalHelmet)
+		and old.Character.HelmetGem.Id == "bound"
+		and old.Character.ItemGems.Helmet.SurveyHelmet == nil,
+	"The slot's gem didn't come back with the old piece"
 )
+-- An empty slot takes the new piece's own gem.
+do
+	local kept = old.Character.HelmetGem
+	old.Character.HelmetGem = nil
+	old.Character.ItemGems.Helmet[originalHelmet] = nil
+	old.Character.ItemGems.Helmet.SurveyHelmet = kept
+	check(
+		PlayerData.equipGear(player, "Helmets", "SurveyHelmet") and old.Character.HelmetGem == kept,
+		"An empty slot didn't take the new piece's own gem"
+	)
+	check(PlayerData.equipGear(player, "Helmets", originalHelmet) and old.Character.HelmetGem == kept, "Lost on the way back")
+end
 check(
 	PlayerData.unsocketGem(player, "Helmet").Id == "bound" and old.Character.ItemGems.Helmet[originalHelmet] == nil,
 	"Unsocket left duplicate enchant"

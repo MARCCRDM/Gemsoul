@@ -927,7 +927,11 @@ end
 
 local GEAR_KEYS = Slots.ByKind
 
--- Wears a piece of gear you own ("Weapons" or "Armors", gear id).
+-- Wears a piece of gear you own ("Weapons" or "Armors", gear id). The gem
+-- in the slot stays in the slot: it enchants the new piece (the old one goes
+-- back bare). A slot with no gem takes the new piece's own, if it kept one;
+-- the new piece's own gem, when the slot's takes its place, is back loose in
+-- the pouch.
 function PlayerData.equipGear(player: Player, kind: string, gearId: string): boolean
 	local profile = profiles[player]
 	local key = GEAR_KEYS[kind]
@@ -941,12 +945,17 @@ function PlayerData.equipGear(player: Player, kind: string, gearId: string): boo
 	end
 	local character: { [string]: any } = profile.Character
 	character.ItemGems = character.ItemGems or {}
-	character.ItemGems[key] = character.ItemGems[key] or {}
-	if character[key] and character[key .. "Gem"] then
-		character.ItemGems[key][character[key]] = character[key .. "Gem"]
+	local gems = character.ItemGems[key] or {}
+	character.ItemGems[key] = gems
+	local held = character[key .. "Gem"]
+	if character[key] and character[key] ~= gearId then
+		gems[character[key]] = nil
 	end
 	character[key] = gearId
-	character[key .. "Gem"] = character.ItemGems[key][gearId]
+	if held then
+		gems[gearId] = held
+	end
+	character[key .. "Gem"] = gems[gearId]
 	character[key .. "Quality"] = quality
 	sync(player)
 	characterChanged:Fire(player)

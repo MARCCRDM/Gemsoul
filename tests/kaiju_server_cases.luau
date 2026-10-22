@@ -1200,6 +1200,41 @@ pet = KaijuServer.pets()[a]
 check(pet and pet.Record == second, "The new one didn't come out")
 check(not registered.KaijuActive(a, starter.Id).Ok, "Switched again at once")
 
+-- A Gemsoul socketed (KaijuSocket): any gem from the pouch, the old one back
+-- in the pouch; of its own element it's attuned (harder hits, its surge).
+do
+	assert(registered.KaijuSocket, "No KaijuSocket request")
+	local frostSoul = second.Soul
+	local damageBefore = pet.Stats.Damage
+	check(pet.GemSurge ~= nil and Kaiju.attuned(second), "Born attuned, with a surge")
+	table.insert(profiles[a].Gems, { Id = "fireLegend", Element = "Fire", Tier = "Legendary", Size = 6, Clarity = 6, Cut = 6 })
+	check(not registered.KaijuSocket(a, second.Id, "nope").Ok, "Socketed a gem they don't have")
+	check(not registered.KaijuSocket(b, second.Id, "fireLegend").Ok, "Socketed into someone else's kaiju")
+	pet.LastFight = now
+	local busy = registered.KaijuSocket(a, second.Id, "fireLegend")
+	check(not busy.Ok and busy.Danger and second.Soul == frostSoul, "Socketed mid-fight")
+	pet.LastFight = now - 10
+	local done = registered.KaijuSocket(a, second.Id, "fireLegend")
+	check(done.Ok and not done.Attuned and second.Soul.Id == "fireLegend", "Couldn't socket another element's gem")
+	check(second.Element == "Frost" and pet.Element == "Frost", "A Fire gem changed a Frost kaiju's element")
+	check(pet.GemSurge == nil and pet.Fighter.GemSurge == nil and pet.Model:GetAttribute("KaijuGemSurge") == nil, "Not attuned, still a surge")
+	check(pet.Stats.Health == Kaiju.stats("Carapace", second.Level, "Legendary").Health, "A Legendary Gemsoul didn't make it stronger")
+	local back = nil
+	for _, gem in profiles[a].Gems do
+		if gem.Id == frostSoul.Id then
+			back = gem
+		end
+	end
+	check(back ~= nil, "Its old Gemsoul didn't go back to the pouch")
+	-- Its old one back in: attuned again, harder hits and its surge.
+	local again = registered.KaijuSocket(a, second.Id, frostSoul.Id)
+	check(again.Ok and again.Attuned and second.Soul == frostSoul, "Couldn't socket its own back")
+	check(pet.GemSurge == Kaiju.recordSurge(second) and pet.Fighter.GemSurge == pet.GemSurge, "Attuned, no surge")
+	check(math.abs(pet.Stats.Damage - damageBefore) < 1e-9, "Attuned: its damage isn't what it was")
+	check(not registered.KaijuSocket(a, second.Id, frostSoul.Id).Ok, "Socketed what it already has")
+	PlayerData.removeGem(a, "fireLegend")
+end
+
 -- Wild kaiju --------------------------------------------------------------------------------------------------
 
 flush()

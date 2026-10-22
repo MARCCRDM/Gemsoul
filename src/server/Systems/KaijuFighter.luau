@@ -775,6 +775,13 @@ function KaijuFighter.setMoves(f, moves)
 	f.Moves = moves or {}
 end
 
+-- A new gem surge (a new Gemsoul: Kaiju.recordSurge; nil: none), its wait
+-- starting over.
+function KaijuFighter.setGemSurge(f, id: string?)
+	f.GemSurge = id
+	f.NextGem = 0
+end
+
 -- New stats (a level, a Gemsoul): its blows and reach follow.
 function KaijuFighter.restat(f, stats, scale: number?)
 	f.Stats, f.Rate = stats, stats.Rate

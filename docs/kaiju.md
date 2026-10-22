@@ -64,10 +64,12 @@ every 14 seconds).
 **Its gem surge is its Gemsoul's E** (`Kaiju.gemSurge`), cast beside its
 own moves from level 1, everywhere it fights:
 
-- **Always its element.** A Gemsoul is rolled in its kaiju's element and
-  gives the kaiju that element, so the two always match: a Thermal kaiju's
-  gem surge is a Thermal move, a Cryo one's a Cryo move. Two kaiju of one
-  kind and element can still differ by their Gemsoul.
+- **Only when it's attuned.** A Gemsoul is rolled in its kaiju's element,
+  so a kaiju starts attuned: a Thermal kaiju's gem surge is a Thermal move,
+  a Cryo one's a Cryo move. Socket a gem of another element as its Gemsoul
+  (the GEMSOUL tab, below) and it keeps the stats but loses the surge till
+  it has one of its own element again. Two kaiju of one kind and element
+  can still differ by their Gemsoul.
 - **When:** 6 seconds into a fight, then every 14 seconds
   (`Kaiju.GemSurge`), after a wind-up its foe can see on its cast bar. Not
   while it's stunned or silenced, or with a heavy blow coming at it (it
@@ -94,6 +96,41 @@ two moves, are for whoever sockets it:
 | Cryo | Cryo Lance, Absolute Zero, Hailstorm | Glacier Fan, Permafrost Spire, Frost Chakram | Ice Armor, Glacial Bulwark, Ice Pillar |
 | Ion | Ion Spark, Chain Lightning, Thunder Pylon, Storm Call, Ion Cannon | Circuit Cleave, Thunder Dash, Skybreaker | Ion Shield, Capacitor, Tesla Fence |
 | Corrosive | Acid Spray, Toxic Cloud, Armor Melt, Toxic Tide, Maneater | Caustic Dart, Vitriol Sweep, Toxic Flask | Rad Shield, Bio Regrowth, Toxic Mantle |
+
+### The GEMSOUL tab: any gem, its own element attuned
+
+A kaiju's own element never changes (it's its record's `Element`, not its
+Gemsoul's). Its Gemsoul can: **any loose gem in your pouch can be socketed
+as its Gemsoul** (`KaijuSocket`, `KaijuServer.socketSoul`), and the old one
+goes back to your pouch as a gem.
+
+- **Rarity makes it stronger, whatever the element** (`Kaiju.SoulBonus`):
+  +0% for a Common, +5% Uncommon, +10% Rare, +15% Ultra-Rare, +20%
+  Legendary, on health, damage and speed (`Kaiju.recordStats`).
+- **Its own element is attuned** (`Kaiju.attuned`: the Gemsoul's element is
+  the kaiju's): **+15% damage** (`Kaiju.Attuned.Power`) and its **gem
+  surge**, the Gemsoul's E (`Kaiju.recordSurge`; a gem whose E isn't a move
+  a kaiju can cast lands its element's first one).
+- **Another element:** the rarity's stats only, no surge. The kaiju panel's
+  gem surge row says *No gem surge* and how to get it back.
+- **Not mid-fight** (the same `KaijuDanger` as healing), and not the gem
+  that's its Gemsoul already. The server checks the gem is yours and loose
+  (`GemInventory.available`, `Kaiju.canSocket`). Health is kept, clamped to
+  the new top.
+
+The tab, beside DETAILS and HEAL:
+
+1. **At the top**, its Gemsoul now: the gem, `RARE GEMSOUL · THERMAL`, and
+   `ATTUNED · +15% damage · gem surge: Ember Lance` (green) or
+   `NOT ITS ELEMENT · no gem surge` (gold).
+2. **Your gems**, a card for each rarity and element (the finest of each):
+   how many, `+10% STATS`, and ATTUNED (its own element, first) or NO SURGE.
+3. **At the bottom**, what you picked and what socketing it does, and
+   **SOCKET** (**IN A FIGHT** while you're in one).
+
+The detail view's pill says `RARE GEMSOUL · ATTUNED` when it is.
+
+![The GEMSOUL tab](kaiju/gemsoul-tab.png)
 
 A Gemsoul you win is a gem like any other: socket it in your gear, enchant
 it, sell it. In your gear all three of its moves work, like any gem's: its

@@ -892,6 +892,77 @@ local reviveTime = centred("", if SHORT then 32 else 46, P.Text, Enum.Font.Gotha
 local reviveLine = centred("", 12, P.Text, IronUi.Bold, if SHORT then 58 else 118, 16)
 local reviveCoupon = centred("", 11, P.Gold, IronUi.Bold, if SHORT then 78 else 144, 16)
 
+-- Its Gemsoul (Kaiju.canSocket): the one it carries at the top, attuned or
+-- not and what that gives it; your gems below, a card for each rarity and
+-- element (the finest of each), its own element first; SOCKET at the foot.
+local soulUi: { [string]: any } = {}
+soulUi.soulPane = new("Frame", {
+	Name = "Gemsoul",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 38),
+	Size = UDim2.new(1, 0, 1, -38),
+	Visible = false,
+}, right)
+soulUi.soulHead = new("Frame", { BackgroundColor3 = P.Inset, Size = UDim2.new(1, 0, 0, HEAD_H) }, soulUi.soulPane)
+UiKit.round(soulUi.soulHead, 10)
+soulUi.soulHeadEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.25 }, soulUi.soulHead)
+soulUi.soulHeadArt = new("Frame", {
+	Name = "Gem",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(8, 4),
+	Size = UDim2.fromOffset(HEAD_H - 8, HEAD_H - 8),
+}, soulUi.soulHead)
+soulUi.soulHeadName = label(soulUi.soulHead, "", 14, P.Text, IronUi.Bold)
+soulUi.soulHeadName.Position = UDim2.fromOffset(HEAD_H + 4, if SHORT then 5 else 9)
+soulUi.soulHeadName.Size = UDim2.new(1, -HEAD_H - 12, 0, 18)
+soulUi.soulHeadLine = label(soulUi.soulHead, "", 11, P.Dim, IronUi.Bold)
+soulUi.soulHeadLine.Position = UDim2.fromOffset(HEAD_H + 4, if SHORT then 24 else 31)
+soulUi.soulHeadLine.Size = UDim2.new(1, -HEAD_H - 12, 0, 16)
+soulUi.soulHeadArtId = nil
+soulUi.soulHint = label(
+	soulUi.soulPane,
+	string.format(
+		"Any gem can be its Gemsoul. Its own element: +%d%% damage and its gem surge.",
+		math.floor((Kaiju.Attuned.Power - 1) * 100 + 0.5)
+	),
+	10,
+	P.Dim,
+	IronUi.Bold
+)
+soulUi.soulHint.Position, soulUi.soulHint.Size = UDim2.fromOffset(2, HEAD_H + 4), UDim2.new(1, -4, 0, 14)
+soulUi.soulList = new("ScrollingFrame", {
+	Name = "SoulGems",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, stacksY),
+	Size = UDim2.new(1, 0, 1, -stacksY - footH - 4),
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 4,
+}, soulUi.soulPane)
+new("UIGridLayout", {
+	CellSize = UDim2.fromOffset(CARD_W, CARD_H),
+	CellPadding = UDim2.fromOffset(8, 8),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, soulUi.soulList)
+soulUi.soulEmpty = label(soulUi.soulPane, "No loose gems in your pouch: mine some, then come back.", 12, P.Dim, IronUi.Bold)
+soulUi.soulEmpty.Position, soulUi.soulEmpty.Size = UDim2.fromOffset(2, stacksY + 8), UDim2.new(1, -4, 0, 18)
+soulUi.soulEmpty.Visible = false
+soulUi.soulFoot = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.fromScale(0, 1),
+	Size = UDim2.new(1, 0, 0, footH),
+}, soulUi.soulPane)
+soulUi.soulSummary = label(soulUi.soulFoot, "", 13, P.Text, IronUi.Bold)
+soulUi.soulSummary.Position, soulUi.soulSummary.Size = UDim2.fromOffset(2, 5), UDim2.new(1, -170, 0, 18)
+soulUi.soulNote = label(soulUi.soulFoot, "", 10, P.Dim, IronUi.Body)
+soulUi.soulNote.Position, soulUi.soulNote.Size = UDim2.fromOffset(2, 23), UDim2.new(1, -170, 0, 24)
+soulUi.soulNote.TextWrapped, soulUi.soulNote.TextYAlignment = true, Enum.TextYAlignment.Top
+soulUi.soulButton = smallButton(soulUi.soulFoot, "SOCKET", P.Gold)
+soulUi.soulButton.AnchorPoint = Vector2.new(1, 0.5)
+soulUi.soulButton.Position, soulUi.soulButton.Size = UDim2.new(1, 0, 0.5, 0), UDim2.fromOffset(150, 40)
+soulUi.soulButton.TextSize = 16
+
 local tab = "Details"
 local selected: string? = nil
 local swapping = false -- choosing who a kaiju from home goes out in place of
@@ -904,10 +975,10 @@ local tabButtons = {}
 local rowLive = {} -- [id] = the bits of its row that change while you look
 local drawPanel
 
-for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" } } do
+for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" }, { "Soul", "GEMSOUL" } } do
 	local b = smallButton(tabRow, entry[2], P.Gold)
 	b.LayoutOrder = order
-	b.Size = UDim2.fromOffset(120, 28)
+	b.Size = UDim2.fromOffset(if SHORT then 104 else 120, 28)
 	b.Activated:Connect(function()
 		tab = entry[1]
 		swapping = false
@@ -1267,7 +1338,9 @@ local function drawDetail(data, record, team: { string })
 		record.Level,
 		if record.Down then "DOWN" elseif slot == 1 then "LEADS" elseif slot then "OUT" else "AT HOME"
 	)
-	pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier) .. " GEMSOUL"
+	pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier)
+		.. " GEMSOUL"
+		.. (if Kaiju.attuned(record) then "  ·  ATTUNED" else "")
 	pillText.TextColor3, pillEdge.Color = tierColor, tierColor
 	pill.BackgroundColor3 = tierColor:Lerp(INK, 0.75)
 	soulBadge.Visible = soul ~= nil
@@ -1285,7 +1358,7 @@ local function drawDetail(data, record, team: { string })
 		end
 	end
 	heroBlurb.Text = if species then species.Blurb else ""
-	local stats = Kaiju.stats(record.Species, record.Level, tier)
+	local stats = Kaiju.recordStats(record)
 	if stats then
 		-- (Its health as it is: kept, out or home, none while it's down.)
 		local most = math.floor(stats.Health + 0.5)
@@ -1305,15 +1378,17 @@ local function drawDetail(data, record, team: { string })
 		local gem = key == "Gem"
 		local id, awake
 		if gem then
-			id = Kaiju.gemSurge(soul)
+			id = Kaiju.recordSurge(record)
 			awake = id ~= nil
 		else
 			id, awake = Kaiju.kitMove(record.Species, key, record.Level)
 		end
 		local move = Kaiju.moveInfo(id)
-		row.Name.Text = moveName(id)
+		row.Name.Text = if gem and not id then "No gem surge" else moveName(id)
 		row.Name.TextColor3 = if awake then P.Text else P.Dim
-		row.About.Text = move and move.Description or ""
+		row.About.Text = if gem and not id
+			then "Its Gemsoul isn't its element: socket one that is (GEMSOUL)."
+			else move and move.Description or ""
 		row.Chip.BackgroundColor3 = if awake then color else INK
 		row.ChipEdge.Transparency = if awake then 1 else 0
 		row.Letter.TextColor3 = if awake then INK else P.Dim
@@ -1590,6 +1665,214 @@ local function drawHeal(record)
 	resetButton.Visible = #stacks > 0 and not full and (next(pickCounts) ~= nil or #suggested > 0)
 end
 
+-- GEMSOUL's cards (kept between draws: their gems are 3D views), the one
+-- picked, and for whom.
+soulUi.soulCards = {}
+
+-- The finest gem of each rarity and element in your pouch (any loose gem,
+-- a Gemsoul too), the kaiju's own element first, then the rarest.
+function soulUi.soulStacks(record)
+	local stacks, byKey = {}, {}
+	for _, gem in GemInventory.available(GemClient.Profile) do
+		local key = stackKey(gem)
+		local ok, value = pcall(GemConfig.value, gem)
+		value = if ok and type(value) == "number" then value else 0
+		local stack = byKey[key]
+		if not stack then
+			stack = { Key = key, Tier = gem.Tier or "Common", Element = gem.Element, Gem = gem, Value = value, Count = 0 }
+			byKey[key] = stack
+			table.insert(stacks, stack)
+		end
+		stack.Count += 1
+		if value > stack.Value then
+			stack.Gem, stack.Value = gem, value
+		end
+	end
+	table.sort(stacks, function(a, b)
+		local ma, mb = a.Element == record.Element, b.Element == record.Element
+		if ma ~= mb then
+			return ma
+		end
+		local ra, rb = TIER_RANK[a.Tier] or 0, TIER_RANK[b.Tier] or 0
+		if ra ~= rb then
+			return ra > rb
+		end
+		return tostring(a.Element) < tostring(b.Element)
+	end)
+	return stacks
+end
+
+function soulUi.soulCard(key: string)
+	local entry = soulUi.soulCards[key]
+	if entry then
+		return entry
+	end
+	local b = new("TextButton", {
+		Name = "Soul_" .. key,
+		Text = "",
+		AutoButtonColor = true,
+		BackgroundColor3 = P.Inset,
+	}, soulUi.soulList)
+	UiKit.round(b, 10)
+	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.25 }, b)
+	local art = new("Frame", {
+		Name = "Gem",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(6, 5),
+		Size = UDim2.fromOffset(46, 46),
+	}, b)
+	local have = label(b, "", 12, P.Text, IronUi.Bold)
+	have.AnchorPoint, have.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+	have.Position, have.Size = UDim2.new(1, -8, 0, 5), UDim2.fromOffset(60, 15)
+	local gain = label(b, "", 13, P.Good, Enum.Font.GothamBlack)
+	gain.AnchorPoint, gain.TextXAlignment = Vector2.new(1, 0), Enum.TextXAlignment.Right
+	gain.Position, gain.Size = UDim2.new(1, -8, 0, 22), UDim2.fromOffset(84, 16)
+	local kind = label(b, "", 10, P.Dim, IronUi.Bold)
+	kind.Position, kind.Size = UDim2.fromOffset(8, 53), UDim2.new(1, -16, 0, 12)
+	local pill = new("Frame", {
+		BackgroundColor3 = P.Good,
+		Position = UDim2.fromOffset(8, 66),
+		Size = UDim2.fromOffset(70, 15),
+	}, b)
+	UiKit.round(pill, 7)
+	local pillLabel = label(pill, "", 9, INK, Enum.Font.GothamBlack)
+	pillLabel.Size, pillLabel.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	entry = {
+		Button = b,
+		Edge = edge,
+		Art = art,
+		ArtId = nil :: string?,
+		Have = have,
+		Gain = gain,
+		Kind = kind,
+		Pill = pill,
+		PillLabel = pillLabel,
+	}
+	b.Activated:Connect(function()
+		soulUi.soulPick = key
+		drawPanel()
+	end)
+	soulUi.soulCards[key] = entry
+	return entry
+end
+
+function soulUi.drawSoul(record)
+	record = liveRecord(record)
+	local soul = record.Soul
+	local tier = (soul and soul.Tier) or "Common"
+	local tierColor = GemConfig.TierColors[tier] or P.Text
+	local attuned = Kaiju.attuned(record)
+	local percent = math.floor((Kaiju.Attuned.Power - 1) * 100 + 0.5)
+	-- Its Gemsoul now.
+	soulUi.soulHeadName.Text = string.format(
+		"%s GEMSOUL  ·  %s",
+		string.upper(GemConfig.TierLabels[tier] or tier),
+		string.upper(GemConfig.elementName(soul and soul.Element or record.Element))
+	)
+	soulUi.soulHeadName.TextColor3 = tierColor
+	soulUi.soulHeadEdge.Color = if attuned then elementColor(record.Element) else P.Edge
+	local surge = Kaiju.recordSurge(record)
+	soulUi.soulHeadLine.Text = if attuned
+		then string.format("ATTUNED  ·  +%d%% damage  ·  gem surge: %s", percent, moveName(surge))
+		else "NOT ITS ELEMENT  ·  no gem surge"
+	soulUi.soulHeadLine.TextColor3 = if attuned then P.Good else P.Gold
+	local soulKey = soul and (soul.Id or record.Id) or nil
+	if soulUi.soulHeadArtId ~= soulKey then
+		soulUi.soulHeadArtId = soulKey
+		for _, child in soulUi.soulHeadArt:GetChildren() do
+			child:Destroy()
+		end
+		if soul then
+			pcall(GemArt.viewport, soulUi.soulHeadArt, soul, true)
+		end
+	end
+	-- Your gems.
+	local stacks = soulUi.soulStacks(record)
+	if soulUi.soulPickFor ~= record.Id then
+		soulUi.soulPickFor, soulUi.soulPick = record.Id, nil
+	end
+	local seen = {}
+	soulUi.soulChosen = nil
+	for order, stack in stacks do
+		seen[stack.Key] = true
+		local c = soulUi.soulCard(stack.Key)
+		c.Button.LayoutOrder = order
+		if c.ArtId ~= stack.Gem.Id then
+			c.ArtId = stack.Gem.Id
+			for _, child in c.Art:GetChildren() do
+				child:Destroy()
+			end
+			pcall(GemArt.viewport, c.Art, stack.Gem, false)
+		end
+		local match = stack.Element == record.Element
+		local bonus = math.floor(((Kaiju.SoulBonus[stack.Tier] or 1) - 1) * 100 + 0.5)
+		c.Have.Text = "×" .. stack.Count
+		c.Gain.Text = string.format("+%d%% STATS", bonus)
+		c.Gain.TextColor3 = if bonus > 0 then P.Good else P.Dim
+		c.Kind.Text = string.upper(
+			string.format("%s  ·  %s", GemConfig.TierLabels[stack.Tier] or stack.Tier, GemConfig.elementName(stack.Element))
+		)
+		c.Kind.TextColor3 = GemConfig.TierColors[stack.Tier] or P.Dim
+		c.Pill.BackgroundColor3 = if match then P.Good else P.Edge
+		c.PillLabel.Text = if match then "ATTUNED" else "NO SURGE"
+		c.PillLabel.TextColor3 = if match then INK else P.Dim
+		local picked = soulUi.soulPick == stack.Key
+		c.Edge.Color = if picked then P.Gold elseif match then elementColor(stack.Element) else P.Edge
+		c.Edge.Thickness = if picked then 2.5 else 1.5
+		if picked then
+			soulUi.soulChosen = stack.Gem
+		end
+	end
+	for key, c in soulUi.soulCards do
+		if not seen[key] then
+			c.Button:Destroy()
+			soulUi.soulCards[key] = nil
+		end
+	end
+	soulUi.soulEmpty.Visible = #stacks == 0
+	-- What SOCKET would do.
+	local fighting = player:GetAttribute("KaijuDanger") == true
+	if soulUi.soulChosen then
+		local match = soulUi.soulChosen.Element == record.Element
+		soulUi.soulSummary.Text = string.format(
+			"%s gem  ·  %s",
+			GemConfig.elementName(soulUi.soulChosen.Element),
+			GemConfig.TierLabels[soulUi.soulChosen.Tier] or soulUi.soulChosen.Tier
+		)
+		soulUi.soulNote.Text = if match
+			then string.format("Attuned: +%d%% damage and its gem surge. Its Gemsoul now goes back to your pouch.", percent)
+			else "Not its element: no gem surge. Its Gemsoul now goes back to your pouch."
+	else
+		soulUi.soulSummary.Text = "Pick a gem"
+		soulUi.soulNote.Text = "Its own element is attuned. The rarer the gem, the stronger it is."
+	end
+	if fighting then
+		soulUi.soulNote.Text = "In a fight: get clear of the critters to change its Gemsoul."
+	end
+	local ready = soulUi.soulChosen ~= nil and not fighting
+	soulUi.soulButton.Text = if fighting then "IN A FIGHT" else "SOCKET"
+	soulUi.soulButton.AutoButtonColor = ready
+	soulUi.soulButton.BackgroundColor3 = P.Gold:Lerp(INK, if ready then 0.3 else 0.78)
+	soulUi.soulButton.TextColor3 = if ready then P.Text else P.Dim
+end
+
+soulUi.soulButton.Activated:Connect(function()
+	local target, gem = selected, soulUi.soulChosen
+	if not target or not gem or player:GetAttribute("KaijuDanger") == true then
+		return
+	end
+	act(function()
+		local result = GemClient.request("KaijuSocket", target, gem.Id)
+		say(result)
+		if result and result.Ok then
+			soulUi.soulPick = nil
+			if window.Gui.Enabled then
+				drawPanel()
+			end
+		end
+	end)
+end)
+
 function drawPanel()
 	local data = roster()
 	local team = Kaiju.teamIds(data)
@@ -1603,12 +1886,15 @@ function drawPanel()
 	drawList(data, team)
 	detail.Visible = tab == "Details" and record ~= nil
 	healPane.Visible = tab == "Heal" and record ~= nil
+	soulUi.soulPane.Visible = tab == "Soul" and record ~= nil
 	if not record then
 		portrait(heroView, nil)
 		return
 	end
 	if tab == "Heal" then
 		drawHeal(record)
+	elseif tab == "Soul" then
+		soulUi.drawSoul(record)
 	else
 		drawDetail(data, record, team)
 	end
@@ -1690,7 +1976,10 @@ healButton.Activated:Connect(function()
 end)
 
 function KaijuHud.open(id: string?, onTab: string?)
-	tab = if onTab == "Heal" or onTab == "Infuse" then "Heal" else "Details"
+	tab = if onTab == "Heal" or onTab == "Infuse"
+		then "Heal"
+		elseif onTab == "Soul" or onTab == "Gemsoul" then "Soul"
+		else "Details"
 	swapping = false
 	pickFresh = true
 	selected = id
@@ -1700,7 +1989,7 @@ end
 
 -- In a fight or out of it (KaijuDanger): HEAL follows.
 player:GetAttributeChangedSignal("KaijuDanger"):Connect(function()
-	if window.Gui.Enabled and tab == "Heal" then
+	if window.Gui.Enabled and (tab == "Heal" or tab == "Soul") then
 		drawPanel()
 	end
 end)

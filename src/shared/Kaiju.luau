@@ -15,13 +15,18 @@
 	and Warden). A new player's starter roll is of the first four only
 	(Starters); the rest are caught out in the frontier (Habitat, wildKinds).
 
-	Every kaiju carries its Gemsoul: a gem of its element, rolled like any
-	gem (rarity, Size, Clarity, Cut). It gives the kaiju its element, and a
-	finer one makes it stronger (SoulBonus). A kaiju fights with its kind's
+	Every kaiju carries its Gemsoul: born with one of its element, rolled
+	like any gem (rarity, Size, Clarity, Cut), it gives the kaiju its
+	element, and a finer one makes it stronger (SoulBonus). Any gem from
+	your pouch can take its place (canSocket; the one it had goes back to
+	the pouch); the kaiju keeps its element. A kaiju fights with its kind's
 	own moves (kitMoves): its E from the start, its Q from level 5, its R
-	from level 10 (MoveLevels). And beside them, its gem surge (gemSurge):
-	its Gemsoul's E, of its element as the Gemsoul always is, cast every
-	GemSurge.Every seconds, harder the finer the Gemsoul. The Gemsoul's
+	from level 10 (MoveLevels). Its Gemsoul of its own element is attuned
+	(attuned): its blows and moves hit Attuned.Power harder (recordStats),
+	and beside them it casts its gem surge (recordSurge): its Gemsoul's E,
+	every GemSurge.Every seconds, harder the finer the Gemsoul. A Gemsoul
+	of another element still makes it stronger by its rarity, with no
+	surge. The Gemsoul's
 	three moves (move, moves) are the gem's: a kaiju killed (or lost in the
 	arena) leaves its Gemsoul behind as a gem anyone can socket, its Q, E
 	and R working in a sword, a chest and a shield (its E the surge the
@@ -836,7 +841,7 @@ end
 -- Its health: { now, most } (record.Health is kept; never hurt, it's
 -- full; knocked out, none).
 function Kaiju.health(record): (number, number)
-	local stats = record and Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier)
+	local stats = record and Kaiju.recordStats(record)
 	local most = if stats then stats.Health else 1
 	if not record or record.Down then
 		return 0, most
@@ -1110,10 +1115,67 @@ function Kaiju.ability(gem): string?
 end
 
 -- Its gem surge: its Gemsoul's E, cast beside its own moves (GemSurge). A
--- Gemsoul is always its kaiju's element (rollSoul), so the surge is too.
+-- Gemsoul it was born with is always its kaiju's element (rollSoul), so the
+-- surge is too. (A kaiju's own, with any gem socketed: recordSurge.)
 function Kaiju.gemSurge(gem): string?
 	local id = Kaiju.ability(gem)
 	return if id and Kaiju.AbilityPlans[id] then id else nil
+end
+
+-- Attuned: a kaiju's Gemsoul of its own element. Its blows and its own
+-- moves hit Power times harder, and it casts its gem surge.
+Kaiju.Attuned = { Power = 1.15 }
+
+function Kaiju.attuned(record): boolean
+	local soul = record and record.Soul
+	return type(soul) == "table" and soul.Element ~= nil and soul.Element == record.Element
+end
+
+-- Its stats as it stands: its kind's at its level, by its Gemsoul's rarity,
+-- its damage Attuned.Power more when attuned.
+function Kaiju.recordStats(record)
+	if not record then
+		return nil
+	end
+	local stats = Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier)
+	if stats and Kaiju.attuned(record) then
+		stats.Damage = math.floor(stats.Damage * Kaiju.Attuned.Power * 10 + 0.5) / 10
+	end
+	return stats
+end
+
+-- Its gem surge, attuned only: its Gemsoul's E, or, a mined gem's E being
+-- one a kaiju can't cast (a dash, a "while ready" bonus), its element's
+-- first (Kaiju.Abilities).
+function Kaiju.recordSurge(record): string?
+	if not Kaiju.attuned(record) then
+		return nil
+	end
+	local id = GemTraits.traitFor(record.Soul, "E")
+	if id and Kaiju.AbilityPlans[id] then
+		return id
+	end
+	for _, ability in Kaiju.Abilities[record.Element] or {} do
+		if Kaiju.AbilityPlans[ability] then
+			return ability
+		end
+	end
+	return nil
+end
+
+-- Whether `gem` (a gem from the pouch: any element, any rarity) can be
+-- socketed as `record`'s Gemsoul, and why not.
+function Kaiju.canSocket(record, gem): (boolean, string?)
+	if not record then
+		return false, "That kaiju isn't yours."
+	end
+	if type(gem) ~= "table" or type(gem.Element) ~= "string" or type(gem.Tier) ~= "string" then
+		return false, "That gem isn't in your pouch."
+	end
+	if record.Soul and record.Soul.Id ~= nil and record.Soul.Id == gem.Id then
+		return false, "That's its Gemsoul already."
+	end
+	return true
 end
 
 -- The move its Gemsoul gives `key` (Q, E or R), and whether a kaiju of
