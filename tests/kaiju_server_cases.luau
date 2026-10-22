@@ -4673,6 +4673,94 @@ end
 	KaijuServer._upkeep(a, now)
 	check(kept.BattleKeep == nil and kept.Health == 7 and not kept.Down, "A kept health wasn't put back by itself")
 
+	-- 1V1 + KAIJU: the one waiting picks the mode; once the fight's on the
+	-- two miners duel (paired, kits out, full health) while their kaiju
+	-- fight. Knocked down, a miner's out of the duel (no getting up into
+	-- it), and their side's beaten once their kaiju are down too. A win is
+	-- a MixedWin; a rematch keeps the mode.
+	do
+		local Spar = shared("Spar")
+		local SparServer = serverModule("SparServer")
+		CombatServerStub.reset = CombatServerStub.reset or function() end
+		for _, p in { a, b } do
+			KaijuServer.reviveAll(p)
+			p:SetAttribute("SparDown", nil)
+			if not p:GetAttribute("KaijuPit") then
+				KaijuPitServer.down(p)
+			end
+		end
+		now += 5
+		KaijuServer._upkeep(a, now)
+		KaijuServer._upkeep(b, now)
+		profiles[a].Stats, profiles[b].Stats = {}, {}
+		rootA.CFrame, rootB.CFrame = pit.Arrive, pit.Arrive * CFrame.new(4, 0, 0)
+		step()
+		local mixedCourt, mixedState = pit.Courts[3], KaijuPitServer._stateOf(3)
+		rootA.CFrame = CFrame.new(mixedCourt.PadA + Vector3.new(0, 3, 0))
+		step()
+		check(mixedState.Mode == "Kaiju" and told(a, "KaijuPitPad")[3].Mode == "Kaiju", "A pad doesn't start on the kaiju alone")
+		check(not registered.KaijuPitMode(b, "Mixed").Ok, "Picked a mode off the pads")
+		check(not registered.KaijuPitMode(a, "Chess").Ok, "A mode that isn't one")
+		check(registered.KaijuPitMode(a, "Mixed").Ok and mixedState.Mode == "Mixed", "Couldn't pick 1V1 + KAIJU")
+		check(mixedCourt.Model:GetAttribute("Mode") == "Mixed" and told(a, "KaijuPitPad")[3].Mode == "Mixed", "The board and card don't show the mode")
+		rootB.CFrame = CFrame.new(mixedCourt.PadB + Vector3.new(0, 3, 0))
+		step()
+		check(told(b, "KaijuPitPad")[3].Mode == "Mixed", "The challenger isn't told the mode")
+		check(not registered.KaijuPitMode(b, "Kaiju").Ok, "The challenger changed the mode")
+		check(registered.KaijuPitFight(b).Ok, "FIGHT didn't start a 1V1 + KAIJU battle")
+		local mixed = KaijuBattles.of(a)
+		check(mixed and mixed.Mode == "Mixed" and mixed.Court == mixedCourt, "Not a 1V1 + KAIJU battle on that court")
+		check(not Spar.sparring(a) and told(a, "KaijuBattle")[3].Mode == "Mixed", "Duelling while placing, or not told the mode")
+		local ha = a.Character:FindFirstChildOfClass("Humanoid")
+		local hb = b.Character:FindFirstChildOfClass("Humanoid")
+		ha.MaxHealth, hb.MaxHealth = 100, 100
+		ha.Health, hb.Health = 50, 50
+		registered.KaijuBattleReady(a)
+		registered.KaijuBattleReady(b)
+		check(mixed.Phase == "Battle" and Spar.paired(a, b) and a:GetAttribute("Spar") == true, "The miners aren't duelling once it's on")
+		check(ha.Health == 100 and hb.Health == 100, "The duel doesn't start at full health")
+		local seen = told(a, "KaijuBattle")[3]
+		check(seen.Miners and seen.Miners.A == "In" and seen.Miners.B == "In" and seen.FoeId == b.UserId, "The state doesn't show the duel")
+		check(not SparServer._request(a, false).Ok and Spar.sparring(a), "The duel ended by hand mid-battle")
+		-- Hurt in it: their side's share drops (miner and kaiju, half each).
+		hb.Health = 40
+		local shares = KaijuBattles.shares(mixed)
+		check(shares.A > shares.B and math.abs(shares.B - (0.4 + 1) / 2) < 0.05, "The duel's health isn't in the side's share")
+		-- B knocked down: out of the duel, which is over for both a moment later.
+		SparServer._knockOut(b, hb, a)
+		check(mixed.Out[b] and not mixed.Out[a] and not mixed.Dueling, "Knocked down isn't out of the duel")
+		seen = told(a, "KaijuBattle")[3]
+		check(seen.Miners.A == "Won" and seen.Miners.B == "Out", "The state doesn't show who won the duel")
+		check(noted(a, "You won the duel") and noted(b, "out of the duel"), "Not told about the duel")
+		now += Spar.DownSeconds + 0.1
+		runDelayed()
+		check(not Spar.sparring(a) and not Spar.sparring(b) and hb.Health == hb.MaxHealth, "The duel didn't end once B was down")
+		-- Their kaiju still up: it goes on.
+		KaijuBattles.step(mixed, now)
+		check(mixed.Phase == "Battle", "Over with both sides' kaiju still up")
+		-- Theirs all down: B's side is beaten.
+		for _, pet in KaijuServer.team(b) do
+			pet.Humanoid.Health = 0
+		end
+		KaijuBattles.step(mixed, now)
+		check(mixed.Phase == "Over" and mixed.Result[a] == "Win" and mixed.Result[b] == "Lose", "A miner out and their kaiju down isn't a loss")
+		check(profiles[a].Stats.MixedWins == 1 and profiles[a].Stats.KaijuWins == nil, "A 1V1 + KAIJU win isn't a MixedWin")
+		check(noted(a, "1v1 + Kaiju: you and your kaiju beat"), "The winner isn't told")
+		-- A rematch: the same mode again.
+		for _, pet in KaijuServer.team(b) do
+			pet.Humanoid.Health = pet.Humanoid.MaxHealth
+		end
+		registered.KaijuBattleRematch(a)
+		registered.KaijuBattleRematch(b)
+		local again = KaijuBattles.of(a)
+		check(again and again ~= mixed and again.Mode == "Mixed", "A rematch isn't 1V1 + KAIJU")
+		registered.KaijuBattleLeave(a)
+		now += KaijuBattle.OverSeconds + 0.1
+		KaijuBattles.step(again, now)
+		step()
+		check(KaijuBattles.of(a) == nil and not Spar.sparring(a), "Still in the battle after it closed")
+	end
+
 	-- A battle asked for from the card: both brought down onto a free court.
 	for _, p in { a, b } do
 		KaijuServer.reviveAll(p)

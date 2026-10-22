@@ -19,7 +19,10 @@
 	  Battle     a bar at the top: your kaiju's faces and health on the left,
 	             your foe's on the right, the clock in the middle, LEAVE. The
 	             camera goes up over your end of the court to watch, till
-	             it's over (Client.KaijuBattleCam).
+	             it's over (Client.KaijuBattleCam). In a 1V1 + KAIJU battle
+	             (Mode "Mixed") you duel your foe too, so the camera stays
+	             yours, and a strip under the bar keeps the duel's score:
+	             both miners' health, then who won it.
 	  Over       VICTORY, DEFEAT or DRAW; the EXP your kaiju earned; that
 	             every kaiju's back to its health from before; what the
 	             stake came to.
@@ -40,6 +43,7 @@ local KaijuBattle = require(ReplicatedStorage.Shared.KaijuBattle)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
+local Lang = require(ReplicatedStorage.Shared.Lang)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local KaijuBattleCam = require(script.Parent.KaijuBattleCam)
@@ -181,6 +185,7 @@ UiKit.round(board, 12)
 new("UIStroke", { Color = ORANGE, Thickness = 1.5 }, board)
 new("UIGradient", { Rotation = 90, Color = ColorSequence.new(ORANGE:Lerp(P.Frame, 0.86), P.Frame) }, board)
 local title = line(board, "PLACE YOUR KAIJU", 18, P.Text, IronUi.Heading)
+UiKit.fit(title) -- (longer in a 1V1 + KAIJU battle)
 -- (Which side you are: a pill in your colour.)
 local teamTag = new("TextLabel", {
 	Name = "Team",
@@ -346,6 +351,22 @@ barStake.TextXAlignment = Enum.TextXAlignment.Center
 local barLeave = button(bar, "LEAVE", P.Bad, function()
 	task.spawn(GemClient.request, "KaijuBattleLeave")
 end)
+-- A 1V1 + KAIJU battle's duel, under the bar: both miners' health, then
+-- who won it. (Its words are put in the player's language here: a name's
+-- in it.)
+local duel = new("Frame", {
+	Name = "Duel",
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundColor3 = P.Frame,
+	BackgroundTransparency = 0.08,
+	Visible = false,
+}, bar)
+UiKit.round(duel, 8)
+local duelStroke = new("UIStroke", { Color = HAZARD, Thickness = 1.2 }, duel)
+local duelText = line(duel, "", 12, P.Text, IronUi.Heading)
+duelText.TextXAlignment = Enum.TextXAlignment.Center
+duelText:SetAttribute("NoTranslate", true)
+UiKit.fit(duelText)
 type Gauge = { Frame: Frame, Stroke: UIStroke, Track: Frame, Fill: Frame, Name: TextLabel, View: ViewportFrame }
 local gauges: { Gauge } = {}
 for i = 1, 6 do
@@ -547,6 +568,9 @@ local function layout()
 	barStake.Position = UDim2.new(0.5, -middleW / 2, 0, if short then 27 else 31)
 	barStake.Size = UDim2.fromOffset(middleW, if short then 9 else 10)
 	barStake.TextSize = if short then 8 else 9
+	duel.Position = UDim2.new(0.5, 0, 1, 4)
+	duel.Size = UDim2.fromOffset(math.min(barW - 40, if short then 340 else 420), if short then 18 else 22)
+	duelText.Position, duelText.Size = UDim2.fromOffset(8, 0), UDim2.new(1, -16, 1, 0)
 	barLeave.Position = UDim2.new(0.5, -32, 1, -(if short then 13 else 15))
 	barLeave.Size = UDim2.fromOffset(64, if short then 11 else 13)
 	barLeave.TextSize = 9
@@ -771,6 +795,9 @@ local function drawBoard(state)
 		end
 	end
 	versus.Text = "vs " .. (state.Foe or "")
+	local mixed = state.Mode == "Mixed"
+	title.Text = if mixed then "1V1 + KAIJU: PLACE YOUR KAIJU" else "PLACE YOUR KAIJU"
+	countdownNote.Text = if mixed then "TILL YOU DUEL" else "TILL THE FIGHT"
 	-- Your side's colour, and theirs.
 	local mineColor, foeColor = sideColor(state.Side), sideColor(otherSide(state.Side))
 	teamTag.Text = if state.Side == "B" then "YOU'RE RED" else "YOU'RE BLUE"
@@ -1155,6 +1182,46 @@ function KaijuBattleUI.state()
 	return current
 end
 
+-- A miner's health, 0 to 1 (nil: no body).
+local function minerHealth(who: Player?): number?
+	local character = who and who.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.MaxHealth <= 0 then
+		return nil
+	end
+	return math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+end
+
+-- The duel's strip (a 1V1 + KAIJU battle, once it's on).
+local function drawDuel(state)
+	local miners = state.Miners
+	duel.Visible = state.Mode == "Mixed" and state.Phase ~= "Formation" and miners ~= nil
+	if not duel.Visible then
+		return
+	end
+	local tr = Lang.translate
+	local mine, theirs = miners[state.Side], miners[otherSide(state.Side)]
+	local foeName = string.upper(state.Foe or "")
+	local text, color = "", HAZARD
+	if mine == "Won" then
+		text, color = tr("YOU WON THE DUEL") .. "  ·  " .. tr("YOUR KAIJU FINISH IT"), P.Gold
+	elseif mine == "Out" and theirs == "Won" then
+		text, color = foeName .. " " .. tr("WON THE DUEL") .. "  ·  " .. tr("YOUR KAIJU FIGHT ON"), P.Bad
+	elseif mine == "Out" then
+		text, color = tr("THE DUEL'S OFF") .. "  ·  " .. tr("THE KAIJU DECIDE IT"), P.Dim
+	else
+		local function percent(share: number?): string
+			return if share then string.format("%d%%", math.floor(share * 100 + 0.5)) else "—"
+		end
+		local foe = if state.FoeId then Players:GetPlayerByUserId(state.FoeId) else nil
+		text = tr("DUEL") .. "  ·  " .. tr("YOU") .. " " .. percent(minerHealth(Players.LocalPlayer)) .. "  ·  "
+			.. foeName .. " " .. percent(minerHealth(foe))
+	end
+	duelText.Text = text
+	duelText.TextColor3 = if color == HAZARD then P.Text else color
+	duelStroke.Color = color
+end
+
 -- The clock and the health, a few times a second.
 function KaijuBattleUI.tick()
 	local state = current
@@ -1167,6 +1234,7 @@ function KaijuBattleUI.tick()
 	timeFill.Size = UDim2.fromScale(math.clamp(left / KaijuBattle.FormationSeconds, 0, 1), 1)
 	-- (Once it's over, how long the result's up: time to ask for a rematch.)
 	barClock.Text = clock(left)
+	drawDuel(state)
 	if state.Phase == "Formation" then
 		local list = yours(state)
 		for i, card in cards do

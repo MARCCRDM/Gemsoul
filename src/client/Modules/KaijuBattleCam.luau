@@ -6,7 +6,8 @@
 	right mouse button, or a finger off the controls) to swing round the
 	court, the wheel or a pinch to come in or back. It stays on through the
 	result and hands your own camera back once the battle's gone, or as soon
-	as you're well away from the court (up the stairs, say).
+	as you're well away from the court (up the stairs, say). Not in a 1V1 +
+	KAIJU battle: you're in the fight yourself, so your camera stays yours.
 
 	  KaijuBattleCam.view(center, axis, side, focus?, yaw?, zoom?) -> CFrame
 	                                  where it looks from (pure: tests)
@@ -236,7 +237,14 @@ end
 
 function KaijuBattleCam.follow(state)
 	local phase = state and state.Phase
-	if not state or (phase ~= "Battle" and phase ~= "Over") or not state.Center or not state.Axis then
+	-- (In a 1V1 + KAIJU battle you're fighting too: your own camera.)
+	if
+		not state
+		or (phase ~= "Battle" and phase ~= "Over")
+		or not state.Center
+		or not state.Axis
+		or state.Mode == "Mixed"
+	then
 		KaijuBattleCam.stop()
 		return
 	end

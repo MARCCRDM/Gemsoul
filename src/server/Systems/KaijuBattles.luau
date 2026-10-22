@@ -34,6 +34,16 @@
 	                                        there can't be one), Cost (what
 	                                        it'd take of yours) }) }
 
+	A battle has a Mode (Shared.KaijuBattle.Modes): "Kaiju", the kaiju
+	alone, or "Mixed", 1V1 + KAIJU. In a Mixed one, once the fight starts
+	the two miners are paired to duel (Server.SparServer.pair, kits out,
+	full health) while their kaiju fight. A miner knocked down is out of
+	the duel (SparServer.onSparDown); the spar can't be ended by hand while
+	it's on (SparServer.held). It's won as KaijuBattle.mixedWinner says,
+	and a win counts as MixedWins (KaijuWins for the kaiju alone: the Hall
+	of Fame's columns). Its state also carries Mode, FoeId and Miners ({ A,
+	B }: "In", "Out" or "Won", once it's started).
+
 	Players in one carry the KaijuBattle attribute (its Id). Their kaiju
 	do as KaijuServer.battle says: stand at their places through the
 	formation phase, then fight the other side's by their roles, as an
@@ -57,7 +67,7 @@
 	  KaijuBattles.rematchCost(battle, player) -> string?   what one would
 	      take of theirs ("250 COINS", or the gem)
 	and starts the ones on its pads itself: KaijuBattles.beginOn(a, b,
-	court, pot). On a court the field is the court's (Shared.KaijuPit), and
+	court, pot, mode). On a court the field is the court's (Shared.KaijuPit), and
 	the kaiju are kept inside its rails (orders' Bounds).
 ]]
 local Players = game:GetService("Players")
@@ -74,6 +84,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
+local SparServer = require(script.Parent.SparServer)
 
 local reply = Shop.reply
 
@@ -100,6 +111,9 @@ type Battle = {
 	Spoils: any?, -- the gem the winner took, if any
 	Rematch: { [Player]: boolean }, -- once it's over: who's asked for one
 	RematchOff: string?, -- why there can't be one (one left, short of the stake)
+	Mode: string, -- "Kaiju" | "Mixed" (Shared.KaijuBattle.Modes)
+	Out: { [Player]: boolean }, -- Mixed: miners out of the duel
+	Dueling: boolean?, -- Mixed: the duel's on
 }
 
 -- The Kaiju Arena's hooks (Server.KaijuPitServer sets them).
@@ -198,8 +212,21 @@ local function stateFor(battle: Battle, player: Player)
 	end
 	local result = battle.Result and battle.Result[player]
 	local stake = battle.Pot and battle.Pot.Stake
+	local miners = nil
+	if battle.Mode == "Mixed" and started then
+		miners = {}
+		for _, who in { battle.A, battle.B } do
+			miners[sideOf(battle, who)] = if battle.Out[who]
+				then "Out"
+				elseif battle.Out[foeOf(battle, who)] then "Won"
+				else "In"
+		end
+	end
 	return {
 		Id = battle.Id,
+		Mode = battle.Mode,
+		FoeId = foe.UserId,
+		Miners = miners,
 		Court = if battle.Court then battle.Court.Id else nil,
 		Stake = stake,
 		Pot = if battle.Pot then KaijuPit.pot(stake, stake) else nil,
@@ -287,7 +314,7 @@ end
 -- Both agreed: the field (a court's, or between them), each one's whole
 -- team brought at full health (KaijuServer.battleStart), each in its
 -- default place (on a court, put there at once).
-local function begin(a: Player, b: Player, court: any?, pot: any?): Battle?
+local function begin(a: Player, b: Player, court: any?, pot: any?, mode: string?): Battle?
 	local ra, rb = rootOf(a), rootOf(b)
 	if not ra or not rb then
 		return nil
@@ -312,6 +339,8 @@ local function begin(a: Player, b: Player, court: any?, pot: any?): Battle?
 		Brought = {},
 		Names = {},
 		Rematch = {},
+		Mode = KaijuBattle.mode(mode),
+		Out = {},
 	}
 	-- What its kaiju keep inside: the court, or a court's size round the field.
 	battle.Bounds = court or KaijuRoles.fieldBounds(battle.Field, KaijuPit.Court.HalfLength, KaijuPit.Court.HalfWidth)
@@ -361,12 +390,13 @@ local function agreed(a: Player, b: Player): (Battle?, string?)
 	return begin(a, b), nil
 end
 
--- A battle on a court of the Kaiju Arena, its pot in (Server.KaijuPitServer).
-function KaijuBattles.beginOn(a: Player, b: Player, court: any, pot: any?): Battle?
+-- A battle on a court of the Kaiju Arena, its pot in, in `mode`
+-- (Server.KaijuPitServer).
+function KaijuBattles.beginOn(a: Player, b: Player, court: any, pot: any?, mode: string?): Battle?
 	if battleOf[a] or battleOf[b] or KaijuServer.battleable(a) == 0 or KaijuServer.battleable(b) == 0 then
 		return nil
 	end
-	return begin(a, b, court, pot)
+	return begin(a, b, court, pot, mode)
 end
 
 local function ask(player: Player, userId: any)
@@ -483,9 +513,44 @@ local function standing(battle: Battle, player: Player)
 	return { Up = #up, Share = if most > 0 then left / most else 0 }
 end
 
--- Each side's kaiju's health left, 0 to 1 (the arena's boards).
+-- A Mixed battle's side as Shared.KaijuBattle.mixedWinner reads it: its
+-- kaiju (standing) and its miner (still in the duel, or the one who won
+-- it: whole).
+local function side(battle: Battle, player: Player)
+	local kaiju = standing(battle, player)
+	local entry = { Up = kaiju.Up, Share = kaiju.Share, Miner = true, MinerShare = 1 }
+	if battle.Out[player] then
+		entry.Miner, entry.MinerShare = false, 0
+	elseif not battle.Out[foeOf(battle, player)] then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		entry.MinerShare = if humanoid and humanoid.MaxHealth > 0
+			then math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+			else 0
+	end
+	return entry
+end
+
+-- Each side's health left, 0 to 1 (the arena's boards): its kaiju's, or in
+-- a Mixed battle its miner's and kaiju's together.
 function KaijuBattles.shares(battle: Battle)
+	if battle.Mode == "Mixed" and battle.Phase ~= "Formation" then
+		return {
+			A = KaijuBattle.mixedShare(side(battle, battle.A)),
+			B = KaijuBattle.mixedShare(side(battle, battle.B)),
+		}
+	end
 	return { A = standing(battle, battle.A).Share, B = standing(battle, battle.B).Share }
+end
+
+-- A Mixed battle's duel over: the two unpaired (if they still are).
+local function endDuel(battle: Battle)
+	battle.Dueling = false
+	for _, player in { battle.A, battle.B } do
+		if Spar.partner(player) == foeOf(battle, player).UserId then
+			SparServer.unpair(player)
+		end
+	end
 end
 
 -- Over: the result to both, EXP to every kaiju of theirs still out, then
@@ -497,6 +562,10 @@ local function finish(battle: Battle, winner: string, reason: string?)
 	end
 	battle.Phase = "Over"
 	battle.EndsAt = KaijuBattles.clock() + KaijuBattle.OverSeconds
+	local mixed = battle.Mode == "Mixed"
+	if mixed then
+		endDuel(battle)
+	end
 	if KaijuBattles.onOver then
 		local ok, err = pcall(KaijuBattles.onOver, battle, winner)
 		if not ok then
@@ -511,7 +580,8 @@ local function finish(battle: Battle, winner: string, reason: string?)
 		if player.Parent then
 			KaijuServer.reward(player, KaijuBattle.Exp[result])
 			if result == "Win" then
-				PlayerData.count(player, "KaijuWins") -- (the Hall of Fame's KAIJU BATTLES)
+				-- (The Hall of Fame's KAIJU BATTLES, or its 1V1 + KAIJU.)
+				PlayerData.count(player, if mixed then "MixedWins" else "KaijuWins")
 			end
 			KaijuServer.battleEnd(player)
 			local foe = foeOf(battle, player)
@@ -520,8 +590,12 @@ local function finish(battle: Battle, winner: string, reason: string?)
 			if foe.Parent then
 				Progress.won(player, if result == "Win" then "KaijuWin" else "KaijuPlay", Progress.levelOf(foe), nil, foe)
 			end
-			local line = if result == "Win"
-				then string.format("Your kaiju beat %s's!", foe.DisplayName)
+			local line = if mixed
+				then (if result == "Win"
+					then string.format("1v1 + Kaiju: you and your kaiju beat %s!", foe.DisplayName)
+					elseif result == "Lose" then string.format("1v1 + Kaiju: %s and their kaiju won.", foe.DisplayName)
+					else string.format("1v1 + Kaiju: a draw with %s.", foe.DisplayName))
+				elseif result == "Win" then string.format("Your kaiju beat %s's!", foe.DisplayName)
 				elseif result == "Lose" then string.format("%s's kaiju won the battle.", foe.DisplayName)
 				else string.format("A draw with %s's kaiju.", foe.DisplayName)
 			if reason == "Left" and result == "Win" then
@@ -541,6 +615,10 @@ local function release(battle: Battle, player: Player)
 	end
 	for _, pet in KaijuServer.team(player) do
 		pet.Model:SetAttribute("KaijuTeam", nil)
+	end
+	-- (A Mixed battle's duel, if it's somehow still on.)
+	if battle.Mode == "Mixed" and Spar.partner(player) == foeOf(battle, player).UserId then
+		SparServer.unpair(player)
 	end
 	if player.Parent then
 		KaijuServer.battleEnd(player)
@@ -605,15 +683,41 @@ function KaijuBattles.step(battle: Battle, now: number)
 			battle.EndsAt = now + KaijuBattle.BattleSeconds
 			line(battle, battle.A)
 			line(battle, battle.B)
-			for _, player in { battle.A, battle.B } do
-				Remotes.Notify:FireClient(player, "Kaiju battle: FIGHT!")
+			if battle.Mode == "Mixed" then
+				-- The two miners duel while their kaiju fight.
+				SparServer.pair(battle.A, battle.B)
+				battle.Dueling = true
+				for _, player in { battle.A, battle.B } do
+					Remotes.Notify:FireClient(
+						player,
+						"1v1 + Kaiju: FIGHT! Duel " .. foeOf(battle, player).DisplayName .. " while your kaiju battle."
+					)
+				end
+			else
+				for _, player in { battle.A, battle.B } do
+					Remotes.Notify:FireClient(player, "Kaiju battle: FIGHT!")
+				end
 			end
 			tell(battle)
 		end
 		return
 	end
-	local a, b = standing(battle, battle.A), standing(battle, battle.B)
 	local timedOut = now >= battle.EndsAt
+	if battle.Mode == "Mixed" then
+		-- The duel broken off with nobody knocked down (a respawn, say):
+		-- it's off for both, and the kaiju decide it.
+		if battle.Dueling and not Spar.paired(battle.A, battle.B) then
+			battle.Out[battle.A], battle.Out[battle.B] = true, true
+			endDuel(battle)
+			tell(battle)
+		end
+		local winner = KaijuBattle.mixedWinner(side(battle, battle.A), side(battle, battle.B), timedOut)
+		if winner then
+			finish(battle, winner)
+		end
+		return
+	end
+	local a, b = standing(battle, battle.A), standing(battle, battle.B)
 	if a.Up <= 0 or b.Up <= 0 or timedOut then
 		finish(battle, KaijuBattle.winner(a, b, timedOut))
 	end
@@ -699,7 +803,7 @@ function KaijuBattles.again(battle: Battle, pot: any?): Battle?
 		KaijuServer.battleEnd(player)
 	end
 	battle.EndsAt = KaijuBattles.clock()
-	local new = begin(battle.A, battle.B, battle.Court, pot)
+	local new = begin(battle.A, battle.B, battle.Court, pot, battle.Mode)
 	if not new then
 		-- (Couldn't: both let go of the old one.)
 		for _, player in { battle.A, battle.B } do
@@ -785,6 +889,30 @@ function KaijuBattles.start()
 	KaijuServer.battling = function(player: Player): boolean
 		local battle = battleOf[player]
 		return battle ~= nil and battle.Phase ~= "Over"
+	end
+	-- A Mixed battle's duel: a miner knocked down is out of it, and the
+	-- spar can't be ended by hand while it's on.
+	SparServer.onSparDown = function(player: Player): boolean
+		local battle = battleOf[player]
+		if not battle or battle.Mode ~= "Mixed" or battle.Phase ~= "Battle" or not battle.Dueling then
+			return false
+		end
+		battle.Out[player] = true
+		battle.Dueling = false
+		local foe = foeOf(battle, player)
+		Remotes.Notify:FireClient(player, "You're out of the duel: your kaiju fight on.")
+		if foe.Parent then
+			Remotes.Notify:FireClient(foe, "You won the duel! Your kaiju finish it.")
+		end
+		tell(battle)
+		return true
+	end
+	SparServer.held = function(player: Player): string?
+		local battle = battleOf[player]
+		if battle and battle.Mode == "Mixed" and battle.Phase == "Battle" and battle.Dueling then
+			return "You're in a 1v1 + Kaiju battle: LEAVE it to stop."
+		end
+		return nil
 	end
 	Shop.register("KaijuBattleAsk", ask)
 	Shop.register("KaijuBattleRespond", respond)

@@ -846,8 +846,33 @@ do
 	end
 end
 
+-- 1V1 + KAIJU's result (KaijuBattle.mixedWinner): a side whose miner is
+-- out of the duel and whose kaiju are all down is beaten; while either
+-- side can still reach the other it's not over; out of reach, or out of
+-- time, the side with more left (its miner and its kaiju, half each).
+do
+	local function side(up, share, miner, minerShare)
+		return { Up = up, Share = share, Miner = miner, MinerShare = minerShare }
+	end
+	check(KaijuBattle.mode("Mixed") == "Mixed" and KaijuBattle.mode("Chess") == "Kaiju" and KaijuBattle.mode(nil) == "Kaiju", "A mode that isn't one isn't the kaiju alone")
+	check(KaijuBattle.mixedWinner(side(2, 0.5, true, 0.4), side(3, 0.9, true, 0.9)) == nil, "Over with everyone still fighting")
+	check(KaijuBattle.mixedWinner(side(1, 0.2, true, 1), side(0, 0, false, 0)) == "A", "Out of the duel with its kaiju down isn't beaten")
+	check(KaijuBattle.mixedWinner(side(0, 0, false, 0), side(2, 0.4, true, 0.1)) == "B", "The other side beaten isn't a win")
+	check(KaijuBattle.mixedWinner(side(0, 0, false, 0), side(0, 0, false, 0)) == "Draw", "Both beaten at once isn't a draw")
+	check(KaijuBattle.mixedWinner(side(1, 0.3, true, 1), side(2, 0.8, false, 0)) == nil, "Over with both sides' kaiju still up")
+	check(KaijuBattle.mixedWinner(side(0, 0, true, 0.6), side(2, 0.8, false, 0)) == "B", "Out of reach, the side with more left doesn't win")
+	check(KaijuBattle.mixedWinner(side(0, 0, true, 1), side(2, 1, false, 0)) == "Draw", "Out of reach and even isn't a draw")
+	check(KaijuBattle.mixedWinner(side(2, 0.5, true, 0.4), side(3, 0.9, true, 0.9), true) == "B", "Out of time, the side with more left doesn't win")
+	check(KaijuBattle.mixedWinner(side(2, 0.5, true, 0.5), side(2, 0.5, true, 0.5), true) == "Draw", "Out of time and even isn't a draw")
+	check(
+		math.abs(KaijuBattle.mixedShare(side(1, 0.6, true, 0.4)) - 0.5) < 1e-9
+			and math.abs(KaijuBattle.mixedShare(side(1, 0.6, false, 0.9)) - 0.3) < 1e-9,
+		"A side's share isn't its miner's and its kaiju's, half each"
+	)
+end
+
 print(
 	"PASS: "
 		.. checks
-		.. " kaiju role checks (roles and kits, who it picks and where it stands, whole battles: no standing about, onto the next after a kill, 3 on 1, the shooter at the back, the tank's roar, the assassin's leap, inside the court; the roster's own kits; the balance at levels 1, 5 and 10, the first four and all 32)"
+		.. " kaiju role checks (roles and kits, who it picks and where it stands, whole battles: no standing about, onto the next after a kill, 3 on 1, the shooter at the back, the tank's roar, the assassin's leap, inside the court; the roster's own kits; the balance at levels 1, 5 and 10, the first four and all 32; 1V1 + KAIJU's result)"
 )

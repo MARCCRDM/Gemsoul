@@ -36,6 +36,12 @@
 	"Hunt", true / false takes the kit out or puts it away: the 1 key's
 	(and the phone's kit button, Client.SparKit), in the Outpost and in the
 	Rift alike, never while down.
+
+	A 1v1 + Kaiju battle (Server.KaijuBattles) pairs its two miners here
+	without an ask (SparServer.pair) and ends it with unpair. While it's
+	on, SparServer.held says why the spar can't be ended by hand, and
+	SparServer.onSparDown takes a miner who's knocked down out of it: down
+	a moment, then their spar's over for both (no getting up into it).
 ]]
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -284,6 +290,10 @@ local function request(player: Player, on: any)
 	if not Spar.sparring(player) then
 		return reply(true, "")
 	end
+	local held = SparServer.held(player)
+	if held then
+		return reply(false, held)
+	end
 	local wait = Spar.stopWait({
 		Down = player:GetAttribute("SparDown"),
 		Hurt = player:GetAttribute("SparHurt"),
@@ -385,6 +395,17 @@ local function knockOut(player: Player, humanoid: Humanoid, source: Player?, tri
 		if source then source.UserId else 0,
 		if trip then trip.By else nil
 	)
+	-- Knocked down in a battle's duel: out of it (KaijuBattles), so no
+	-- getting up into it; a moment down, then the duel's over for both.
+	if not trip and player:GetAttribute("SparWith") ~= nil and SparServer.onSparDown(player, source) then
+		task.delay(seconds, function()
+			if humanoidOf(player) == humanoid and humanoid.Health > 0 then
+				humanoid.Health = humanoid.MaxHealth
+			end
+			stop(player)
+		end)
+		return true
+	end
 	task.delay(seconds, getUp, player, humanoid, not Spar.sparring(player), trip ~= nil)
 	-- Knocked out by a creature (not tripped, not in a spar with someone):
 	-- killed, in the Outpost, and robbed past its core (FrontierServer:
@@ -397,6 +418,37 @@ end
 
 -- Someone knocked out by a creature (Main sets it: FrontierServer.knockedOut).
 SparServer.onKnockedOut = function(_player: Player) end
+
+-- Knocked down in a spar: true if that's them out of it (a 1v1 + Kaiju
+-- battle's duel: KaijuBattles sets it).
+SparServer.onSparDown = function(_player: Player, _by: Player?): boolean
+	return false
+end
+
+-- Why `player` can't end their spar by hand just now (nil: they can).
+SparServer.held = function(_player: Player): string?
+	return nil
+end
+
+-- Two paired to fight without an ask (a 1v1 + Kaiju battle's duel), at
+-- full health: any spar they were in is ended first.
+function SparServer.pair(a: Player, b: Player)
+	for _, player in { a, b } do
+		if Spar.sparring(player) then
+			stop(player)
+		end
+		local humanoid = humanoidOf(player)
+		if humanoid and humanoid.Health > 0 then
+			humanoid.Health = humanoid.MaxHealth
+		end
+	end
+	begin(a, b)
+end
+
+-- Their spar over (and their partner's), kits away.
+function SparServer.unpair(player: Player)
+	stop(player)
+end
 
 -- The Rift's (Server.RiftServer): going in, your combat kit comes out to
 -- hunt (a spar ended first); coming home, it's put away. In there it can't

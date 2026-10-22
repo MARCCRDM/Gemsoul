@@ -19,7 +19,7 @@ One board, two halves, five columns:
 | Half | Column | Counts |
 | --- | --- | --- |
 | **PVP HALL OF FAME** (red) | 1V1 DUELS | ranked 1v1 wins (`Duel.Solo`) |
-| | 1V1 + KAIJU | wins in the 1v1 + Kaiju mode (`Stats.MixedWins`; the mode itself is next) |
+| | 1V1 + KAIJU | wins in the Kaiju Arena's 1V1 + KAIJU mode (`Stats.MixedWins`; [kaiju-arena.md](kaiju-arena.md#1v1--kaiju)) |
 | | KAIJU BATTLES | Kaiju Arena wins (`Stats.KaijuWins`, counted from this round on) |
 | **PVE HALL OF FAME** (teal) | BOUNTY HUNTERS | Rift bosses slain, every ladder (`RiftBosses`) |
 | | TOP MINERS | gems mined in the Outpost (`Stats.GemsMined`, from this round on) |

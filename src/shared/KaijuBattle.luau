@@ -26,6 +26,16 @@
 	(Server.KaijuServer.battleStart / battleEnd). Your kaiju need to be out
 	(not put away): at least one each.
 
+	Two modes (Modes): KAIJU BATTLE, the kaiju alone; and 1V1 + KAIJU
+	(Mixed), where the two miners duel each other with their kits (a spar:
+	Server.SparServer) while their kaiju fight. A miner knocked down in it
+	is out of the duel (no getting up into it). A side is beaten when its
+	miner is out and its kaiju are all down. Once nobody left can reach
+	the other side (both miners out and one side's kaiju down, say), or
+	time's up, it goes to the side with more left: its miner's health (a
+	miner who won the duel counts as whole) and its kaiju's, half each
+	(mixedWinner). The Kaiju Arena's pads choose the mode (Shared.KaijuPit).
+
 	The two sides are told apart by colour everywhere (Sides): A is BLUE
 	(the court's blue half and pad), B is RED.
 
@@ -40,6 +50,9 @@
 	  KaijuBattle.formation(wanted, records) -> formation?, problem?
 	  KaijuBattle.field(posA, posB) -> field     the field between them
 	  KaijuBattle.winner(a, b, timedOut) -> "A" | "B" | "Draw"
+	  KaijuBattle.Modes, KaijuBattle.mode(wanted) -> "Kaiju" | "Mixed"
+	  KaijuBattle.mixedWinner(a, b, timedOut) -> "A" | "B" | "Draw" | nil
+	  KaijuBattle.mixedShare(side) -> 0 to 1
 	  KaijuBattle.askProblem(state) -> string?   why one can't ask (nil: can)
 	  KaijuBattle.Sides[side] -> { Name, Color }  BLUE (A) or RED (B)
 ]]
@@ -205,6 +218,53 @@ function KaijuBattle.winner(a, b, timedOut: boolean?): string
 		return "Draw"
 	end
 	return if a.Share > b.Share then "A" else "B"
+end
+
+-- The modes: the kaiju alone, or the two miners duelling too.
+KaijuBattle.Modes = {
+	Kaiju = { Name = "KAIJU BATTLE", Line = "Your kaiju fight it out by themselves." },
+	Mixed = { Name = "1V1 + KAIJU", Line = "You duel them while your kaiju fight." },
+}
+KaijuBattle.ModeOrder = { "Kaiju", "Mixed" }
+
+-- A mode asked for, or the kaiju alone.
+function KaijuBattle.mode(wanted: any): string
+	return if wanted == "Mixed" then "Mixed" else "Kaiju"
+end
+
+-- What a side has left in a 1v1 + Kaiju battle, 0 to 1: its miner (in the
+-- duel still, or having won it) and its kaiju, half each.
+function KaijuBattle.mixedShare(side): number
+	local miner = if side.Miner then math.clamp(side.MinerShare or 0, 0, 1) else 0
+	return (miner + math.clamp(side.Share or 0, 0, 1)) / 2
+end
+
+-- Who won a 1v1 + Kaiju battle (nil: it's not over). Each side's { Up,
+-- Share (its kaiju, as in winner), Miner (its miner still standing: in
+-- the duel, or the one who won it), MinerShare (their health left, 0 to
+-- 1; 1 once they've won the duel) }. A side whose miner is out and whose
+-- kaiju are all down is beaten. When nobody left can reach the other side
+-- (the miners can't duel and one side's kaiju are all down), or time's up,
+-- the side with more left (mixedShare) by a clear margin.
+function KaijuBattle.mixedWinner(a, b, timedOut: boolean?): string?
+	local aBeaten = not a.Miner and a.Up <= 0
+	local bBeaten = not b.Miner and b.Up <= 0
+	if aBeaten and bBeaten then
+		return "Draw"
+	elseif bBeaten then
+		return "A"
+	elseif aBeaten then
+		return "B"
+	end
+	local fighting = (a.Miner and b.Miner) or (a.Up > 0 and b.Up > 0)
+	if fighting and not timedOut then
+		return nil
+	end
+	local sa, sb = KaijuBattle.mixedShare(a), KaijuBattle.mixedShare(b)
+	if math.abs(sa - sb) < 0.02 then
+		return "Draw"
+	end
+	return if sa > sb then "A" else "B"
 end
 
 -- Why you can't ask someone (nil: you can). state = { Here (they're in

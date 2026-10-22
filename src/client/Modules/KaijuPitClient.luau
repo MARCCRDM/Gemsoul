@@ -11,11 +11,13 @@
 	                       turning in its colour or a stack of coins, and
 	                       what the winner takes.
 	  The pads             lit while someone stands on them.
-	  Your pad's card      waiting: the court, and a stake to choose (coins
-	                       or one of your loose gems, KaijuPitStake), then
-	                       who's stepped up. Challenging: who's waiting and
-	                       for what, your gem to match a gem stake with, and
-	                       FIGHT (KaijuPitFight). Step off to stop.
+	  Your pad's card      waiting: the court, the mode (KAIJU BATTLE or
+	                       1V1 + KAIJU, KaijuPitMode) and a stake to choose
+	                       (coins or one of your loose gems, KaijuPitStake),
+	                       then who's stepped up. Challenging: who's waiting,
+	                       for what and in which mode, your gem to match a
+	                       gem stake with, and FIGHT (KaijuPitFight). Step
+	                       off to stop.
 	  The stairs           dark a moment going down or up.
 
 	  KaijuPitClient.start()       once (Lobby.client)
@@ -29,6 +31,7 @@ local TweenService = game:GetService("TweenService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
+local KaijuBattle = require(ReplicatedStorage.Shared.KaijuBattle)
 local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local Lang = require(ReplicatedStorage.Shared.Lang)
 local GemArt = require(script.Parent.GemArt)
@@ -316,6 +319,7 @@ function KaijuPitClient.drawBoard(model: Model)
 	local winner = model:GetAttribute("Winner")
 	local stake = model:GetAttribute("Stake")
 	local pot = model:GetAttribute("Pot")
+	local mode = KaijuBattle.Modes[model:GetAttribute("Mode") or ""]
 	local status, statusColor = "OPEN", P.Good
 	if state == "Waiting" then
 		status, statusColor = "WAITING FOR A CHALLENGER", HAZARD
@@ -349,7 +353,9 @@ function KaijuPitClient.drawBoard(model: Model)
 		f.Stake.Text = if stake and model:GetAttribute("StakeKind")
 			then tr(string.upper(stake) .. "  ·  WINNER TAKES " .. string.upper(pot or ""))
 			else ""
-		f.Line.Text = if state == "Open" then tr("STAND ON A PAD TO WAIT FOR A CHALLENGER") else ""
+		f.Line.Text = if state == "Open" then tr("STAND ON A PAD TO WAIT FOR A CHALLENGER")
+			elseif mode then tr(mode.Name)
+			else ""
 	end
 	-- The pads: lit while someone's on them.
 	for side, ring in entry.Ring do
@@ -385,11 +391,19 @@ heading.LayoutOrder = 1
 local sub = IronUi.text(card, "", 12, P.Dim, IronUi.Body)
 sub.LayoutOrder = 2
 sub.TextWrapped = true
+-- The mode (the host's to pick), and what it means.
+local modeRow =
+	new("Frame", { Name = "Modes", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), LayoutOrder = 3 }, card)
+UiKit.list(modeRow, 6, true)
+local modeLine = IronUi.text(card, "", 12, P.Text, BOLD)
+modeLine.Name = "ModeLine"
+modeLine.LayoutOrder = 4
+modeLine.TextWrapped = true
 local stakeRow =
-	new("Frame", { Name = "Stakes", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), LayoutOrder = 3 }, card)
+	new("Frame", { Name = "Stakes", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), LayoutOrder = 5 }, card)
 UiKit.list(stakeRow, 6, true)
 local staked = IronUi.text(card, "", 12, P.Gold, BOLD)
-staked.LayoutOrder = 4
+staked.LayoutOrder = 6
 staked.TextWrapped = true
 local gemRow = new("ScrollingFrame", {
 	Name = "Gems",
@@ -399,19 +413,19 @@ local gemRow = new("ScrollingFrame", {
 	AutomaticCanvasSize = Enum.AutomaticSize.X,
 	ScrollingDirection = Enum.ScrollingDirection.X,
 	ScrollBarThickness = 4,
-	LayoutOrder = 5,
+	LayoutOrder = 7,
 	Visible = false,
 }, card)
 UiKit.list(gemRow, 6, true)
 local problem = IronUi.text(card, "", 12, P.Bad, BOLD)
-problem.LayoutOrder = 6
+problem.LayoutOrder = 8
 problem.TextWrapped = true
 local fightButton, fightFace =
 	IronUi.chunk(card, { Color = P.Gold, Size = UDim2.new(1, 0, 0, 40), Radius = 8, Stripes = "None" })
-fightButton.LayoutOrder = 7
+fightButton.LayoutOrder = 9
 IronUi.label(fightButton, fightFace, "FIGHT!", 17, BOLD)
 local foot = IronUi.text(card, "", 10, P.Dim, IronUi.Body)
-foot.LayoutOrder = 8
+foot.LayoutOrder = 10
 foot.TextWrapped = true
 
 local shown = nil -- the card last told
@@ -427,7 +441,7 @@ local function request(action: string, ...)
 	end)
 end
 
-local function chip(text: string, on: boolean, enabled: boolean, onClick: () -> ()): TextButton
+local function chip(text: string, on: boolean, enabled: boolean, onClick: () -> (), row: Instance?): TextButton
 	-- (Tighter on a phone, so the whole row fits.)
 	local short = UiKit.short()
 	local b = new("TextButton", {
@@ -439,7 +453,7 @@ local function chip(text: string, on: boolean, enabled: boolean, onClick: () -> 
 		TextColor3 = if on then P.Ink elseif enabled then P.Text else P.Dim,
 		BackgroundColor3 = if on then P.Gold else P.Inset,
 		AutoButtonColor = enabled,
-	}, stakeRow)
+	}, row or stakeRow)
 	UiKit.round(b, 7)
 	new(
 		"UIPadding",
@@ -487,7 +501,7 @@ local function gemTile(gem, on: boolean, onClick: () -> ())
 end
 
 local function clearRows()
-	for _, row in { stakeRow, gemRow } do
+	for _, row in { modeRow, stakeRow, gemRow } do
 		for _, child in row:GetChildren() do
 			if child:IsA("GuiObject") then
 				child:Destroy()
@@ -513,7 +527,17 @@ function KaijuPitClient.showPad(state)
 	local stake = state.Stake
 	local profile = GemClient.Profile
 	local coins = (profile and profile.Coins) or 0
+	local modeId = KaijuBattle.mode(state.Mode)
+	local mode = KaijuBattle.Modes[modeId]
+	modeLine.Text = mode.Name .. ": " .. mode.Line
+	modeLine.TextColor3 = if modeId == "Mixed" then RED:Lerp(P.Text, 0.25) else P.Text
 	if state.Host then
+		modeRow.Visible = true
+		for _, id in KaijuBattle.ModeOrder do
+			chip(KaijuBattle.Modes[id].Name, id == modeId, true, function()
+				request("KaijuPitMode", id)
+			end, modeRow)
+		end
 		cardStroke.Color = HAZARD
 		heading.Text = if state.Foe then state.Foe .. " STEPPED UP!" else "WAITING ON COURT " .. state.Court
 		heading:SetAttribute("NoTranslate", state.Foe ~= nil)
@@ -558,6 +582,7 @@ function KaijuPitClient.showPad(state)
 		fightButton.Visible = false
 		foot.Text = "Step off the pad to stop waiting."
 	else
+		modeRow.Visible = false
 		cardStroke.Color = P.Gold
 		heading.Text = string.upper(state.Foe or "Someone") .. " IS WAITING"
 		heading:SetAttribute("NoTranslate", true)

@@ -417,7 +417,7 @@ Vendors.ArenaGuide = {
 				},
 				{
 					Text = "What happens in a battle?",
-					Reply = "You both get 25 seconds to place your kaiju on your half of the court. Then they fight on their own for up to 90 seconds. A side whose kaiju are all down loses. If time runs out, the side with more health left wins.",
+					Reply = "You both get 25 seconds to place your kaiju on your half of the court. Then they fight on their own for up to 90 seconds. A side whose kaiju are all down loses. If time runs out, the side with more health left wins. In 1V1 + KAIJU you duel each other too: knocked down, you're out of the duel, and your side loses once your kaiju are down as well.",
 				},
 				{
 					Text = "What happens to my kaiju's health?",
@@ -455,7 +455,7 @@ Vendors.ArenaGuide = {
 			Options = {
 				{
 					Text = "Which side am I?",
-					Reply = "The BLUE pad is the blue side, the RED pad the red side, and each kaiju stands on a ring in its side's colour. Once the fight starts, the camera rises over your end of the court: drag to look around, scroll or pinch to zoom.",
+					Reply = "The BLUE pad is the blue side, the RED pad the red side, and each kaiju stands on a ring in its side's colour. Once the fight starts, the camera rises over your end of the court: drag to look around, scroll or pinch to zoom. In 1V1 + KAIJU it stays yours: you're fighting too.",
 				},
 				{
 					Text = "What can we play for?",
@@ -493,6 +493,7 @@ Vendors.ArenaTips = {
 	"Each kaiju casts its E when its mana is full. Mana fills as it hits and as it's hit, so a tank roars sooner the harder it's pushed.",
 	"One foe down, a kaiju goes straight for the next one near it. Ranged kaiju pick off the weakest one in range.",
 	"Your foe's places stay hidden until the fight starts, and so do yours.",
+	"The one waiting on the pad picks the mode. In 1V1 + KAIJU, staying on your feet counts: when time runs out, your health and your kaiju's are weighed together.",
 	"A team of mixed elements is hard to counter. In a rematch you've seen your foe's team: put the kaiju whose element beats theirs in front.",
 	"Anyone down here can watch a battle from the aisles and the balcony. The board over each court shows both sides' health.",
 }

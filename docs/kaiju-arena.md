@@ -2,6 +2,8 @@
 
 *Since then (2026-10-22): plain one-word signs, and the Shelter's floor cleared (no PROBE-7 station, duel gate, stands or survey table; PROBE-7 and Brutus are crew; the Gem Gallery is next to the Market). See [plain-signs.md](plain-signs.md).*
 
+*And later that day: a second mode, 1V1 + KAIJU, where you duel each other while your kaiju fight. See [1V1 + KAIJU](#1v1--kaiju).*
+
 Kaiju battles now have a home of their own. Take the stairs down from the
 Shelter and you're on the balcony of the **Kaiju Arena**: a hall with eight
 courts in two rows, like ping-pong tables. Each court has a pad at either
@@ -346,6 +348,45 @@ other side the win.
 
 **CLOSE** puts the result away. To go again with someone new, step off your
 pad and back on.
+
+## 1V1 + KAIJU
+
+*Added 2026-10-22.* A second mode: you duel each other while your kaiju
+fight. The one waiting on the pad picks it (**KAIJU BATTLE** or **1V1 +
+KAIJU**, `KaijuPitMode`); the challenger sees which before saying FIGHT,
+and the court's board shows it under the names.
+
+![Waiting on a pad: the mode, then the stake](kaiju-arena/mixed-pad.jpg)
+
+![Stepping up to a 1V1 + KAIJU battle](kaiju-arena/mixed-challenger.jpg)
+
+- **Placing** is the same 25 seconds, under "1V1 + KAIJU: PLACE YOUR
+  KAIJU", counting down TILL YOU DUEL.
+- **When the fight starts** the two of you are paired to duel
+  (`SparServer.pair`): kits out, both at full health. Your camera stays
+  your own (no overview): you're fighting too. The spar can't be put away
+  by hand while the duel's on; LEAVE is still the way out (a loss).
+- **Knocked down** in the duel, you're out of it: down a moment, then the
+  duel's over for both of you, kits away (no getting up into it). Your
+  kaiju fight on.
+- **A side is beaten** when its miner is out of the duel and its kaiju are
+  all down. While someone can still reach the other side (both miners
+  duelling, or kaiju up on both sides), it goes on. Once nobody can, or
+  time's up, the side with more left wins: its miner's health (a miner
+  who won the duel counts as whole) and its kaiju's, half each
+  (`KaijuBattle.mixedWinner`). The court's board shows those shares.
+- **The strip under the battle bar** keeps the duel's score: both miners'
+  health, then who won it.
+
+![The duel's strip: both miners' health, then who won it](kaiju-arena/mixed-duel.jpg)
+
+![Placing, in a 1V1 + KAIJU battle](kaiju-arena/mixed-placing.jpg)
+
+Stakes, EXP, kaiju health and rematches work as in a kaiju battle (a
+rematch keeps the mode). A win counts on the Hall of Fame's **1V1 +
+KAIJU** column (`Stats.MixedWins`), a kaiju battle's on **KAIJU BATTLES**
+(`Stats.KaijuWins`): see [hall-of-fame.md](hall-of-fame.md). A battle asked
+for from a player card is a kaiju battle.
 
 ## Full health, and back
 

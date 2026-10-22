@@ -10,7 +10,9 @@
 	The courts' pads:
 	  - Stand on a pad: you're waiting for a challenger. You can set a stake
 	    ("KaijuPitStake": coins, or one of your loose gems), shown on the
-	    court's board and pedestal for everyone.
+	    court's board and pedestal for everyone, and the mode
+	    ("KaijuPitMode": "Kaiju", the kaiju alone, or "Mixed", 1V1 + KAIJU:
+	    you duel each other while they fight; Shared.KaijuBattle.Modes).
 	  - Someone steps onto the other pad: they're told who's waiting and for
 	    what, and FIGHT ("KaijuPitFight", a gem of theirs if the stake's a
 	    gem) puts both stakes in and starts your battle on that court.
@@ -29,13 +31,13 @@
 
 	Clients are told, on the Social remote:
 	  "KaijuPitPad", state | nil   your pad: { Court, Side, Host (you were
-	      there first), Foe, FoeId, Stake, Problem (why you can't fight
-	      yet), Mine (your loose gems that could match a gem stake) }
+	      there first), Foe, FoeId, Stake, Mode, Problem (why you can't
+	      fight yet), Mine (your loose gems that could match a gem stake) }
 	  "KaijuPitCross", "Down" | "Up"   a moment's cover on the stairs
 	and each court's model carries what its board shows: State ("Open",
 	"Waiting", "Challenged", "Battle"), AName, BName, AId, BId, Stake
 	(KaijuPit.stakeText), StakeKind, StakeCoins, StakeTier, StakeElement,
-	StakeGem (its name), Pot, Phase, EndsAt (server time), AShare and
+	StakeGem (its name), Pot, Mode, Phase, EndsAt (server time), AShare and
 	BShare (each side's kaiju's health left, 0 to 1), Winner.
 
 	  KaijuPitServer.start(site)
@@ -52,6 +54,7 @@ local RunService = game:GetService("RunService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
+local KaijuBattle = require(ReplicatedStorage.Shared.KaijuBattle)
 local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local Outpost = require(ReplicatedStorage.Shared.Outpost)
 local Spar = require(ReplicatedStorage.Shared.Spar)
@@ -76,13 +79,14 @@ local stairs = nil -- the Shelter's stairs: { Landing, Size, Top }
 local below: { [Player]: boolean } = {}
 local crossedAt: { [Player]: number } = {}
 -- Each court's pads: Pads[side] = { Player, Since, OffAt? }; Host (the side
--- there first), Stake (the host's), Battle, Rest (players who must step
--- off before they count again), Told (what each was last told).
+-- there first), Stake and Mode (the host's), Battle, Rest (players who
+-- must step off before they count again), Told (what each was last told).
 type CourtState = {
 	Court: any,
 	Pads: { [string]: any },
 	Host: string?,
 	Stake: any,
+	Mode: string,
 	Battle: any,
 	Rest: { [Player]: boolean },
 	Told: { [Player]: string },
@@ -232,6 +236,7 @@ local BOARD = {
 	"StakeElement",
 	"StakeGem",
 	"Pot",
+	"Mode",
 	"Phase",
 	"EndsAt",
 	"AShare",
@@ -305,16 +310,18 @@ local function tellPads(state: CourtState)
 			Foe = if foe then foe.DisplayName else nil,
 			FoeId = if foe then foe.UserId else nil,
 			Stake = stake,
+			Mode = state.Mode,
 			Problem = problem,
 			Mine = mine,
 		}
 		local key = string.format(
-			"%d|%s|%s|%s|%s|%s|%d",
+			"%d|%s|%s|%s|%s|%s|%s|%d",
 			card.Court,
 			side,
 			tostring(host),
 			tostring(card.FoeId),
 			KaijuPit.stakeText(stake) .. (if stake and stake.Gem then stake.Gem.Id else ""),
+			state.Mode,
 			tostring(problem),
 			if mine then #mine else -1
 		)
@@ -339,6 +346,7 @@ local function drawWaiting(state: CourtState)
 	local a, b = state.Pads.A, state.Pads.B
 	local values = stakeAttributes(state.Stake)
 	values.State = if a and b then "Challenged" elseif a or b then "Waiting" else "Open"
+	values.Mode = if a or b then state.Mode else nil
 	values.AName = if a then a.Player.DisplayName else nil
 	values.BName = if b then b.Player.DisplayName else nil
 	values.AId = if a then a.Player.UserId else nil
@@ -380,9 +388,9 @@ local function stepPads(state: CourtState, now: number, taken: { [Player]: boole
 			end
 		end
 	end
-	-- The host: whoever was there first. Their stake goes with them.
+	-- The host: whoever was there first. Their stake and mode go with them.
 	if state.Host and not state.Pads[state.Host] then
-		state.Stake = nil
+		state.Stake, state.Mode = nil, "Kaiju"
 	end
 	local a, b = state.Pads.A, state.Pads.B
 	state.Host = if a and b then (if a.Since <= b.Since then "A" else "B") elseif a then "A" elseif b then "B" else nil
@@ -394,12 +402,13 @@ end
 local function stepBattle(state: CourtState)
 	local battle = state.Battle
 	if KaijuBattles.of(battle.A) ~= battle and KaijuBattles.of(battle.B) ~= battle then
-		-- (Its stake goes with it: the next to wait sets their own.)
-		state.Battle, state.Stake = nil, nil
+		-- (Its stake and mode go with it: the next to wait sets their own.)
+		state.Battle, state.Stake, state.Mode = nil, nil, "Kaiju"
 		return
 	end
 	local values = stakeAttributes(state.Stake)
 	values.State = "Battle"
+	values.Mode = battle.Mode
 	values.Phase = battle.Phase
 	values.EndsAt = serverNow() + (battle.EndsAt - KaijuBattles.clock())
 	values.AName, values.BName = battle.A.DisplayName, battle.B.DisplayName
@@ -501,6 +510,24 @@ local function setStake(player: Player, wanted: any)
 	return reply(true, "")
 end
 
+-- The host picks the mode: the kaiju alone, or 1V1 + KAIJU.
+local function setMode(player: Player, wanted: any)
+	local state, side = padOf(player)
+	if not state or state.Battle then
+		return reply(false, "Stand on a pad first.")
+	end
+	if state.Host ~= side then
+		return reply(false, "The one who was waiting picks the mode.")
+	end
+	if wanted ~= "Kaiju" and wanted ~= "Mixed" then
+		return reply(false, "That isn't a mode.")
+	end
+	state.Mode = KaijuBattle.mode(wanted)
+	tellPads(state)
+	drawWaiting(state)
+	return reply(true, "")
+end
+
 -- Takes a stake into the pot (coins spent, the gem out of the pouch).
 -- Returns what was taken, or nil.
 local function take(player: Player, stake, gemId: string?)
@@ -568,7 +595,7 @@ local function fight(player: Player, offer: any)
 	local a = if hostSide == "A" then host else player
 	local b = if hostSide == "A" then player else host
 	local held = { [host] = hostHeld, [player] = mineHeld }
-	local battle = KaijuBattles.beginOn(a, b, state.Court, { Stake = stake, Held = held })
+	local battle = KaijuBattles.beginOn(a, b, state.Court, { Stake = stake, Held = held }, state.Mode)
 	if not battle then
 		give(host, hostHeld)
 		give(player, mineHeld)
@@ -725,7 +752,7 @@ function KaijuPitServer.start(site, world)
 	end
 	table.clear(states)
 	for _, court in pit.Courts do
-		states[court.Id] = { Court = court, Pads = {}, Rest = {}, Told = {} }
+		states[court.Id] = { Court = court, Pads = {}, Rest = {}, Told = {}, Mode = "Kaiju" }
 		setBoard(states[court.Id], { State = "Open" })
 	end
 	KaijuBattles.findCourt = courtFor
@@ -737,6 +764,7 @@ function KaijuPitServer.start(site, world)
 	end
 	Shop.register("KaijuPitStake", setStake)
 	Shop.register("KaijuPitFight", fight)
+	Shop.register("KaijuPitMode", setMode)
 	Players.PlayerRemoving:Connect(function(player)
 		below[player], crossedAt[player] = nil, nil
 		for _, state in states do
@@ -789,5 +817,6 @@ end
 -- For tests.
 KaijuPitServer._step, KaijuPitServer._states, KaijuPitServer._stateOf = step, states, stateOf
 KaijuPitServer._stake, KaijuPitServer._fight, KaijuPitServer._courtFor = setStake, fight, courtFor
+KaijuPitServer._mode = setMode
 
 return KaijuPitServer
