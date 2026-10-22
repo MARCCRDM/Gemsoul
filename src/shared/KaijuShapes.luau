@@ -152,10 +152,6 @@ function Shapes.install(kit)
 
 	local B = {}
 
-	-- Emberjaw: a black upright brute, glowing plates down its back and tail.
-
-	-- Stormwing: a slate flyer, all wing, a beak and a crest of light.
-
 	-- Ironhide: a low navy roller, rows of glowing spikes along its back,
 	-- a horn on its snout.
 	function B.Ironhide(model, pal, H, H2)
@@ -203,9 +199,6 @@ function Shapes.install(kit)
 			end
 		)
 	end
-
-	-- Sickleclaw: an olive stalker on two legs: a visor of light, a glowing
-	-- saw down its belly, long arms ending in hooks.
 
 	-- Moonmoth: a pale furry moth holding up four wings, spots of light on
 	-- them, feathered feelers.
@@ -296,9 +289,6 @@ function Shapes.install(kit)
 		tail(model, body, V(0, 1.0, 1.45), { V(0.45, 0.35, 0.5), V(0.28, 0.24, 0.4) }, { 18, 10 }, H)
 	end
 
-	-- Mossback: a walking stump grown over with moss, a flower for a mouth,
-	-- long vine arms with glowing claws.
-
 	-- Bastion: a stone lion sitting up on guard, a mane of eight fins tipped
 	-- with light, a tail curled up behind.
 	function B.Bastion(model, pal, H, H2)
@@ -334,9 +324,6 @@ function Shapes.install(kit)
 			end
 		end)
 	end
-
-	-- Hulkshell: a hunched ape under a shell, the shell split with cracks of
-	-- light, knuckles on the ground.
 
 	-- Dreadmaw: a bone-white runner that is mostly jaw, its throat aglow.
 	function B.Dreadmaw(model, pal, H, H2)
@@ -465,9 +452,6 @@ function Shapes.install(kit)
 			end
 		)
 	end
-
-	-- Drillhorn: a brown beetle on two legs, a glowing horn, drills for
-	-- hands and cases over its back.
 
 	-- Grandape: a great brown ape, a grey chest with a core of light in it.
 	function B.Grandape(model, pal, H, H2)
@@ -928,17 +912,6 @@ function Shapes.install(kit)
 			end
 		end)
 	end
-
-	-- Triskull: a golden three-headed dragon on two legs, two tails, wings.
-
-	-- Brightsteel: a chrome machine of a kaiju, a visor and four vents of
-	-- light in its chest.
-
-	-- Dreadcrown: a red horned tyrant, a crown of spikes tipped with light,
-	-- a burst of light in its chest, pincers for hands and small wings.
-
-	-- Bladebrow: a slate-grey brute with four arms, a long blade over its
-	-- brow edged in light.
 
 	-- Lankshade: a pale, gaunt crawler on long thin limbs, eyes and mouth
 	-- of light.
