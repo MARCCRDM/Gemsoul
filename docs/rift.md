@@ -178,6 +178,36 @@ The world is built for each trip, far off in the dark, and gone with it
 - Through the floor somehow (20 studs under it), you're put back in the
   last cave you reached, unhurt.
 
+## Each boss's realm
+
+*2026-10-22.* Every boss's trip is built in a realm of its own (`Shared.
+RiftRealms`), hellish still, but in its element and no two alike: the
+rock, the floor, the glowing cracks and seams, the walls across the
+passages, the braziers' fire, the throne's eyes, the scar across the sky,
+the clouds and what falls from them are all the realm's, and set pieces of
+its own stand by the walls of every cave (never in the middle, which is
+for the fight). Each runner's screen lights the air the realm's way too
+(`RiftClient.hellLighting`, from the `RiftRealm` attribute the server
+sets).
+
+![The ten realms: the throne cave and a cave of each. Offline renders of the game's parts on a lit stage, not Roblox screenshots](rift/realms.jpg)
+
+| Boss | Realm | What stands in it |
+| --- | --- | --- |
+| Bombardiro Drago (Fire) | **The Crater Flats** | Craters ringed with rubble, their floors still glowing, dud bombs nose-down in the ground; ash falling |
+| Tung Tung Tung Sahur (Fire) | **The Burning Grove** | Charred trunks burning at their tops, ember cracks up them, logs fallen by the walls; a deeper red |
+| Paperotti Gemelli (Frost) | **The Frozen Pond** | Sheets of ice over the floor, hail heaped on them, slabs of ice stood at their edges; snow falling; blue |
+| Tralalero Tralala (Frost) | **The Frozen Tide** | Waves frozen as they broke on the walls, their foam still glowing, fins cutting up through the floor, tide lines; teal |
+| Frigo Camelo (Frost) | **The Freezer** | Blocks of ice stacked by the walls with something dark frozen in each, its eyes lit; icicles off the rock; the palest and the heaviest snow |
+| Chimpanzini Bananini (Shock) | **The Charged Jungle** | Vines hanging off the walls with sparks caught in them, trunks banded with live current, bananas at their feet; yellow-green |
+| Gattini Gemellini (Shock) | **The Static Spires** | Clusters of crystal with lit tips and arcs of static jumping between them; violet rock under a yellow sky |
+| Cappuccino Assassino (Shock) | **The Blade Roost** | Katanas driven into the floor at a lean, their edges lit, kunai scattered round them; coffee-dark gold |
+| Ranocchio Avocadino (Poison) | **The Bog** | Pools of poison glowing in the floor and bubbling, lily pads on them, reeds round them, mounds of muck; green |
+| Brr Brr Patapim (Poison) | **The Rotting Grove** | Dead trees with roots hanging off their boughs, moss up their trunks, toadstools glowing underneath; spores drifting |
+
+The frost realms' floors are ice; the fire realms keep their stalagmites.
+A trip is 1250 to 1450 parts (the set pieces are 30 or so a cave).
+
 ## The fallen
 
 Crews went in before you and didn't come back. What's left of them lies in
@@ -389,7 +419,8 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 | --- | --- |
 | `src/shared/RiftRun.luau` | The rules: the layout, packs and fighters, where their tears open (`Portal`, `portalSpots`), levels, the boss and its health, caches, rewards, robbery, RESTORE's price |
 | `src/shared/BossLoot.luau` | Each boss's cache by its threat (free gems, Ultra Rare gear, quality, health), its favourite kind of gear |
-| `src/server/World/RiftWorld.luau` | Builds a trip's world far off in the dark: walled caves, passages under arches, walls of fire, the throne cave, the ways home, the burning sky; `RiftWorld.inside` (is a spot in a cave) |
+| `src/server/World/RiftWorld.luau` | Builds a trip's world far off in the dark, in its boss's realm: walled caves, passages under arches, walls of fire, the throne cave, the ways home, the burning sky, the realm's set pieces (`RiftWorld.Features`); `RiftWorld.inside` (is a spot in a cave) |
+| `src/shared/RiftRealms.luau` | Each boss's realm: its colours, its sky, what falls from it, its set pieces' kind, its lighting |
 | `src/server/World/FallenMiners.luau` | The fallen: `place` (one, in a pose), `heap` (by the boss), `scatter` (round a room, by the walls first, clear of the doors and of what it's told to avoid), `Count`; the dungeon's rooms use it too (`DungeonWorld`) |
 | `src/server/Systems/RiftServer.luau` | Runs trips: `RiftEnter` (going in together: the ready members with their leader), `RiftLeave`, `RiftChoice`, `RiftPeek`; a boss cache each at the kill |
 | `src/server/Systems/ArenaStreaks.luau` | `ArenaStreaks.bossCache`: rolls and saves a boss cache, and tells its owner |
@@ -408,7 +439,7 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 | `src/client/Modules/RiftTear.luau` | The tear in the gate, in the Hell palette |
 | `src/server/Systems/KaijuWilds.luau` | `spawnBug` options for the Rift's critters (`Scale`, `Health`, `Damage`, `Reach`, `Title`, `Stay`, `Wander`) |
 
-A runner carries `RiftRun`, `RiftRoom`, `RiftLeft`, `RiftBoss`,
+A runner carries `RiftRun`, `RiftRealm` (the boss's realm), `RiftRoom`, `RiftLeft`, `RiftBoss`,
 `RiftBossLevel`, `RiftFound`, `RiftRunners`, `RiftWon`, `RiftExitAt`; when down at the boss
 `RiftFallen` and `RiftRestore`. A boss cache is saved with the player's
 Arena Caches (`profile.Duel.StreakCaches`, `Kind = "Boss"`).
@@ -424,7 +455,7 @@ Boss and move names stay in English (they're names).
 
 | Suite | What it checks |
 | --- | --- |
-| `run_rift` | 34,079 checks: the gate's lobby (on your own; the Outpost's rows in order and what each offers; your friends here, elsewhere in the game and online; INVITED; a member's party and a full one; your party already in there); the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open (each leading a little way into the next cave), the ways home, no lava, the sky, parts per trip (1,261). The fallen: 2 in each cave and more round the throne, none on the landing, the heap by the throne, every part one you walk through, none in the way through or the way home, a pose each; scattered alone, by the walls first, clear of what to avoid and of the doorway; in a dungeon, one a room, more and the heap in the boss's. And nothing else starts for a runner |
+| `run_rift` | 53,541 checks: the gate's lobby (on your own; the Outpost's rows in order and what each offers; your friends here, elsewhere in the game and online; INVITED; a member's party and a full one; your party already in there); the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open (each leading a little way into the next cave), the ways home, no lava, the sky, parts per trip (1,447 with the realm's set pieces). Each boss's realm: a trip built in each of the ten, marked with it, its walls across the passages a colour no other realm's are, its rock its own, its fire in its colour, its set pieces in the caves, its sky's scar and ash its own, the middle of every cave clear, lights and fire enough; the client lights the realm you're in and the server builds the boss's. The fallen: 2 in each cave and more round the throne, none on the landing, the heap by the throne, every part one you walk through, none in the way through or the way home, a pose each; scattered alone, by the walls first, clear of what to avoid and of the doorway; in a dungeon, one a room, more and the heap in the boss's. And nothing else starts for a runner |
 | `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (the boss's gem in it, Legendary from a tier-5 boss; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The ladder: the gate's peek (its biome's element, the ladder, the next boss, each boss's level at your kaiju's and rising, locks, a portrait each), a locked boss, an unknown one and another biome's refused, the gate's first boss and its element's fighters, a joiner seeing the party's boss, a win tallied for everyone and the next boss unlocked and offered, the top boss alone allowed and warned. Going in together: a ready member brought in from far off, one not ready told they can follow, a member going in bringing nobody. The fighters are stand-ins here: the real Duelist isn't loaded |
 | `run_target_lock` | Your lock takes a pack's leader over nearer critters and those attacking you, holds it against them, takes it back from a critter, but not hidden or out of range; a target you pick still holds |
 | `run_spar` | Going into the Rift ends a spar, the kit stays out in there and can't be put away, nobody spars with a runner, and the kit goes away at home |

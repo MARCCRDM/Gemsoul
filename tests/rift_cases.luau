@@ -380,7 +380,7 @@ for _, d in world.Folder:GetDescendants() do
 		end
 	end
 end
-check(#parts < 1400, "Too many parts for one trip: " .. #parts)
+check(#parts < 1700, "Too many parts for one trip: " .. #parts)
 -- Standing on a point: a solid part right under it (at its floor).
 local function standing(at: Vector3): boolean
 	for _, p in solid do
@@ -713,6 +713,86 @@ do
 	end
 	folder:Destroy()
 end
+-- Each boss's realm (Shared.RiftRealms): its trip is built in its own
+-- colours with its own set pieces by the walls, no two alike, still
+-- hellish (fire and light to see by), the floor's middle still clear for
+-- the fight, and the client lights the air its way.
+local RiftRealms = load("RiftRealms")
+local PIECES = {
+	Craters = { "Crater", "DudBomb" },
+	Logs = { "Trunk", "Burning", "Log" },
+	Floes = { "Pond", "Hail" },
+	Tide = { "Crest", "Fin" },
+	Freezer = { "IceBlock", "Icicle" },
+	Vines = { "Vine", "Trunk", "Banana" },
+	Spires = { "Spire", "Arc" },
+	Blades = { "Blade", "Kunai" },
+	Bog = { "Pool", "Reed", "Mound" },
+	Grove = { "Trunk", "Bough", "Cap" },
+}
+local seenGate, seenFeature, seenName = {}, {}, {}
+for n, id in RiftRealms.Order do
+	local realm = RiftRealms.of(id)
+	check(realm.Id == id and realm.Boss == id and RiftRun.bossById(id) ~= nil, id .. ": not a boss's realm")
+	check(realm.Element == RiftRun.bossById(id).Element, id .. ": its realm isn't its element's")
+	check(not seenFeature[realm.Feature] and not seenName[realm.Name], id .. ": its realm is another boss's")
+	seenFeature[realm.Feature], seenName[realm.Name] = true, true
+	local trip = RiftWorld.build("R" .. n, origin * CFrame.new(-2000 * n, 0, 0), Random.new(10 + n), realm)
+	check(trip.Folder:GetAttribute("Realm") == id, id .. ": the trip isn't marked with its realm")
+	local wall = trip.Gates[1]:FindFirstChild("Wall")
+	local gateColor = string.format("%.2f/%.2f/%.2f", wall.Color.R, wall.Color.G, wall.Color.B)
+	check(not seenGate[gateColor], id .. ": its walls across the passages are " .. tostring(seenGate[gateColor]) .. "'s")
+	seenGate[gateColor] = id
+	-- Its set pieces, in every cave; fire and light; the rock its colour.
+	local found, fires, lights, count, rock = {}, 0, 0, 0, 0
+	for _, d in trip.Folder:GetDescendants() do
+		if d:IsA("BasePart") then
+			count += 1
+			found[d.Name] = (found[d.Name] or 0) + 1
+			if d.Name == "RockWall" and d.Color == realm.Rock then
+				rock += 1
+			end
+		elseif d:IsA("Fire") then
+			fires += 1
+			check(d.Color == realm.Flame, id .. ": a fire not in its colour")
+		elseif d:IsA("PointLight") then
+			lights += 1
+		end
+	end
+	for _, piece in PIECES[realm.Feature] do
+		check((found[piece] or 0) >= 2, id .. ": no " .. piece .. " in its caves")
+	end
+	check(rock >= 20, id .. ": its walls aren't its rock")
+	check(fires >= RiftRun.Rooms * 4 and lights >= RiftRun.Rooms * 6, id .. ": not hellish enough")
+	check(count < 1700, id .. ": too many parts, " .. count)
+	-- The middle of every cave stays clear for the fight: nothing solid
+	-- standing within 16 studs of its centre but the floor.
+	for _, cave in { trip.Landing, trip.Boss, table.unpack(trip.Rooms) } do
+		for _, d in trip.Folder:GetDescendants() do
+			if d:IsA("BasePart") and d.CanCollide and d.Name ~= "Floor" then
+				local off = (d.CFrame.Position - cave.Center) * Vector3.new(1, 0, 1)
+				check(off.Magnitude > 16 or d.CFrame.Position.Y - cave.Center.Y > 20, id .. ": " .. d.Name .. " stands in the middle of a cave")
+			end
+		end
+	end
+	local sky = trip.Folder:FindFirstChild("Sky")
+	local scar = sky:FindFirstChild("Scar")
+	check(scar and scar.Color == realm.Scar, id .. ": the scar isn't its colour")
+	check(sky:FindFirstChild("Ash"):FindFirstChildOfClass("ParticleEmitter").Rate == realm.Ash.Rate, id .. ": its sky drops the wrong ash")
+	trip.Folder:Destroy()
+end
+check(RiftRealms.of("Nobody") == RiftRealms.Default, "A boss with no realm has no world")
+-- The client lights the air in the realm's colours (RiftClient.lightingFor).
+do
+	local client = fs.readFile(ROOT .. "/src/client/Modules/RiftClient.luau")
+	check(client:find("RiftRealms.of(player:GetAttribute(\"RiftRealm\"))", 1, true) ~= nil, "The client doesn't light the realm you're in")
+	for _, key in { "Ambient", "Outdoor", "HazeColor", "HazeDecay", "Tint" } do
+		check(client:find("\"" .. key .. "\"", 1, true) ~= nil or client:find("air." .. key, 1, true) ~= nil, "The client ignores the realm's " .. key)
+	end
+	local server = fs.readFile(ROOT .. "/src/server/Systems/RiftServer.luau")
+	check(server:find('RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id)', 1, true) ~= nil, "The server doesn't build the boss's realm")
+	check(server:find('"RiftRealm"', 1, true) ~= nil, "Runners aren't told their realm")
+end
 -- Two trips side by side never meet (RiftServer's slots).
 local other = RiftWorld.build("T2", origin * CFrame.new(-2000, 0, 0), Random.new(4))
 for _, a in { other.Landing, other.Boss, table.unpack(other.Rooms) } do
@@ -838,7 +918,7 @@ end
 
 print(
 	string.format(
-		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen; the KIT OUT bar under the strip; the gate's lobby; %d parts a trip)",
+		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen, each boss's realm; the KIT OUT bar under the strip; the gate's lobby; %d parts a trip)",
 		checks,
 		#parts
 	)

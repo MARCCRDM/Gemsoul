@@ -105,6 +105,7 @@ local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
 local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
+local RiftRealms = require(ReplicatedStorage.Shared.RiftRealms)
 local BossLoot = require(ReplicatedStorage.Shared.BossLoot)
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local Outpost = require(ReplicatedStorage.Shared.Outpost)
@@ -197,6 +198,7 @@ end
 
 local CLEAR = {
 	"RiftRun",
+	"RiftRealm",
 	"RiftRoom",
 	"RiftLeft",
 	"RiftBoss",
@@ -1040,6 +1042,7 @@ local function join(run, player: Player)
 	run.Found[player] = run.Found[player] or {}
 	run.Reached[player] = 0
 	player:SetAttribute("RiftRun", run.Id)
+	player:SetAttribute("RiftRealm", run.World.Folder:GetAttribute("Realm"))
 	local spot = run.World.Start * CFrame.new((#run.Members - 1) * 3 - 4.5, 0, 0)
 	player.Character:PivotTo(spot)
 	local root = rootOf(player)
@@ -1263,7 +1266,7 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 		local id = string.format("R%d", nextId)
 		local rng = Random.new()
 		local origin = CFrame.new(RiftServer.Origin + Vector3.new(-(slot - 1) * RiftServer.SlotGap, 0, 0))
-		local ok, world = pcall(RiftWorld.build, id, origin, rng)
+		local ok, world = pcall(RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id))
 		if not ok then
 			warn("[Rift] build failed:", world)
 			return reply(false, "The gate won't open just now. Try again in a moment.")

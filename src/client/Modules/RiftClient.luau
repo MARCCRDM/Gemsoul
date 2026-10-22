@@ -56,6 +56,7 @@ local TweenService = game:GetService("TweenService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
+local RiftRealms = require(ReplicatedStorage.Shared.RiftRealms)
 local RiftLobby = require(ReplicatedStorage.Shared.RiftLobby)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemClient = require(script.Parent.GemClient)
@@ -114,8 +115,12 @@ end
 -- The colours of the place ------------------------------------------------------------------------------------
 
 -- A burning dusk: the sun just down (no disc, no stars), the air glowing
--- orange-red at the horizon and bruised violet overhead, round the scar torn
--- across the sky (World.RiftWorld's); the braziers' fire blooming.
+-- at the horizon and bruised overhead, round the scar torn across the sky
+-- (World.RiftWorld's); the braziers' fire blooming. Its colours are the
+-- realm's (Shared.RiftRealms: the boss's, from the RiftRealm attribute):
+-- orange-red for the fire realms, blue for the frost, gold for the shock,
+-- green for the poison. Hell is the base every realm's lighting lays
+-- over.
 RiftClient.Hell = {
 	Clock = 17.8,
 	Ambient = Color3.fromRGB(96, 42, 40),
@@ -130,6 +135,23 @@ RiftClient.Hell = {
 	Stars = 0,
 }
 
+-- The lighting for `realm` (a RiftRealms realm; the one you're in when
+-- left out): Hell with the realm's colours laid over it.
+function RiftClient.lightingFor(realm): any
+	realm = realm or RiftRealms.of(player:GetAttribute("RiftRealm"))
+	local hell = table.clone(RiftClient.Hell)
+	local air = realm and realm.Lighting or {}
+	for _, key in { "Clock", "Ambient", "Outdoor", "Brightness", "Exposure", "HazeColor", "HazeDecay" } do
+		if air[key] ~= nil then
+			hell[key] = air[key]
+		end
+	end
+	hell.Grade = table.clone(hell.Grade)
+	hell.Grade.Tint = air.Tint or hell.Grade.Tint
+	hell.Grade.Saturation = air.Saturation or hell.Grade.Saturation
+	return hell
+end
+
 local function effect(kind: string): any
 	local found = Lighting:FindFirstChildOfClass(kind)
 	if not found then
@@ -139,8 +161,8 @@ local function effect(kind: string): any
 	return found
 end
 
-function RiftClient.hellLighting()
-	local hell = RiftClient.Hell
+function RiftClient.hellLighting(realm)
+	local hell = RiftClient.lightingFor(realm)
 	Lighting.ClockTime = hell.Clock
 	Lighting.Brightness = hell.Brightness
 	Lighting.Ambient = hell.Ambient
