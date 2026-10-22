@@ -25,6 +25,7 @@ local RunService = game:GetService("RunService")
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
+local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemArt = require(script.Parent.GemArt)
@@ -239,6 +240,10 @@ local function drawList(entries: { Entry })
 			Size = UDim2.fromOffset(CELL_W - 24, CELL_W - 24),
 		}, cell)
 		pcall(GemArt.viewport, art, gem, false)
+		-- Its tier level, top right ("T3 II": its surge tier and rank).
+		local level = text(cell, GemRoller.levelLabel(gem), 10, tier, HEAVY, CELL_W - 52, 8, 44, 12)
+		level.TextXAlignment = Enum.TextXAlignment.Right
+		level.ZIndex = 3
 		local name = text(cell, gemName(gem), 11, C.Text, HEADING, 4, CELL_W - 12, CELL_W - 8, 14)
 		name.TextXAlignment = Enum.TextXAlignment.Center
 		name.TextTruncate = Enum.TextTruncate.AtEnd

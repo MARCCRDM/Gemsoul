@@ -39,6 +39,7 @@ local game={GetService=function(_,name) return if name=="RunService" then RunSer
 local GemArt={viewport=function() end}
 local SurgeIcons={}
 local Tech={Traits={traitsOf=function() return nil end}}
+local GemRoller={levelLabel=function() return "T1 I" end}
 local GemConfig={TierColors={},ElementColors={},TierLabels={},value=function(g) return g.Value or 1 end,
  shade=function(g) return {Name=g.Id} end,elementName=function(e) return e end}
 local function gem(id) return {Id=id,Cut=5,Size=5,Clarity=5,Tier="Common",Element="Frost"} end

@@ -81,6 +81,19 @@ do
 		"An empty slot didn't take the new piece's own gem"
 	)
 	check(PlayerData.equipGear(player, "Helmets", originalHelmet) and old.Character.HelmetGem == kept, "Lost on the way back")
+	-- A piece that kept its own gem from before, into a slot with one: its gem goes to the pouch.
+	local own = { Id = "kept-from-before", Element = "Frost", Tier = "Common", Cut = 1 }
+	old.Character.ItemGems.Helmet.SurveyHelmet = own
+	local pouch = #old.Gems
+	check(
+		PlayerData.equipGear(player, "Helmets", "SurveyHelmet")
+			and old.Character.HelmetGem == kept
+			and #old.Gems == pouch + 1
+			and old.Gems[#old.Gems] == own,
+		"A piece's old gem was lost when the slot's gem moved onto it"
+	)
+	check(PlayerData.equipGear(player, "Helmets", originalHelmet) and old.Character.HelmetGem == kept, "Lost again on the way back")
+	PlayerData.removeGem(player, own.Id)
 end
 check(
 	PlayerData.unsocketGem(player, "Helmet").Id == "bound" and old.Character.ItemGems.Helmet[originalHelmet] == nil,

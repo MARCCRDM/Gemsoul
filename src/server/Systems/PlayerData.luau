@@ -953,6 +953,10 @@ function PlayerData.equipGear(player: Player, kind: string, gearId: string): boo
 	end
 	character[key] = gearId
 	if held then
+		local own = gems[gearId] -- (a gem it kept from before gems stayed in the slot)
+		if own and own ~= held and own.Id ~= held.Id then
+			table.insert(profile.Gems, own)
+		end
 		gems[gearId] = held
 	end
 	character[key .. "Gem"] = gems[gearId]

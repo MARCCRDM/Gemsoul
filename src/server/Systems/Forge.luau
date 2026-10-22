@@ -4,6 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local TestAdmin = require(script.Parent.TestAdmin)
 local Equipment = require(script.Parent.Equipment)
+local AutoEquip = require(ReplicatedStorage.Shared.AutoEquip)
+local Enchanting = require(script.Parent.Enchanting)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local Classes = require(ReplicatedStorage.Shared.Classes)
@@ -118,6 +120,54 @@ local function equipGear(player: Player, kind: any, gearId: any)
 	return reply(true, "Equipped " .. Crafting.gearName(gear.Name, profile.Owned[kind][gearId]) .. ".")
 end
 
+-- AUTO EQUIP (Shared.AutoEquip): the gear you own that fits the mode best,
+-- the weapon first, then the gems (Vey's rule, as socketing by hand).
+local function autoEquip(player: Player, mode: any)
+	if not AutoEquip.valid(mode) then
+		return reply(false, "Pick how to equip: Best, Balanced or an element.")
+	end
+	if not Combat.canChangeBuild(player) then
+		return reply(false, "Change equipment in the Outpost.")
+	end
+	local profile = PlayerData.get(player)
+	if not profile or not profile.Character then
+		return reply(false, "Your equipment is still loading.")
+	end
+	local plan = AutoEquip.plan(profile, mode)
+	local label = AutoEquip.label(mode)
+	if plan.Changes == 0 then
+		return reply(true, string.format("Already your %s build: nothing to change.", label), { Pieces = 0, Gems = 0 })
+	end
+	local pieces, gems = 0, 0
+	for _, step in plan.Gear do
+		if PlayerData.equipGear(player, Slots.Definitions[step.Slot].Kind, step.Id) then
+			pieces += 1
+		end
+	end
+	local enchant = Enchanting.canEnchant(player)
+	if enchant then
+		for _, step in plan.Gems do
+			if PlayerData.socketGem(player, step.Gem, step.Slot) then
+				gems += 1
+			end
+		end
+	end
+	if pieces == 0 and gems == 0 then
+		return reply(
+			false,
+			if not enchant
+				then "Visit Vey at the Arcanum (east road) to change enchantments."
+				else "Couldn't change your equipment. Try again."
+		)
+	end
+	local now = AutoEquip.rating(profile.Character)
+	local message = string.format("%s build on: %d gear and %d gems changed. Rating %d.", label, pieces, gems, math.floor(now + 0.5))
+	if not enchant and #plan.Gems > 0 then
+		message ..= "\nVisit Vey at the Arcanum (east road) to change enchantments."
+	end
+	return reply(true, message, { Pieces = pieces, Gems = gems, Rating = now })
+end
+
 local lastRegeneration: { [Player]: number } = {}
 local function regenerateEquipment(player: Player)
 	if not TestAdmin.allowed(player.UserId) then
@@ -159,6 +209,7 @@ function Forge.start()
 	end)
 	Shop.register("SellGems", marketSell) -- legacy sale requests also pay coins
 	Shop.register("EquipGear", equipGear)
+	Shop.register("AutoEquip", autoEquip)
 	Shop.register("MarketSell", marketSell)
 	Shop.register("SellSpare", sellSpare)
 end

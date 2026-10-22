@@ -26,6 +26,8 @@ local function canEnchant(player: Player): boolean
 	return not (intro and intro.Done) or Nearby.vendor(player, { "Enchanting" }, VEY_RANGE)
 end
 
+Enchanting.canEnchant = canEnchant
+
 local function socketGem(player: Player, gemId: any, slot: any)
 	slot = slot or "Weapon"
 	if

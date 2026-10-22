@@ -265,6 +265,13 @@ function GemRoller.setElement(gem, element: string)
 end
 
 -- The surge a gem carries: its saved roll, or one seeded from its id.
+-- A gem's tier level, short, for its cell: "T3 II" (its surge tier and rank).
+GemRoller.Numerals = { "I", "II", "III" }
+function GemRoller.levelLabel(gem): string
+	local tier, rank = GemRoller.surge(gem)
+	return string.format("T%d %s", tier, GemRoller.Numerals[rank] or "I")
+end
+
 function GemRoller.surge(gem): (number, number)
 	if gem.SurgeTier and gem.SurgeRank then
 		return math.clamp(gem.SurgeTier, 1, 4), math.clamp(gem.SurgeRank, 1, 3)
