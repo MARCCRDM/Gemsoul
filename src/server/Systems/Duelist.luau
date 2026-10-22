@@ -1890,6 +1890,16 @@ local function raidCleared(duel)
 		end
 	end
 	local coins = Matchmaking.raidCoins(raid.Wave)
+	-- Each wave's boss a level over the last, from the raiders' own (their
+	-- average): its XP goes by that against yours (Shared.Levelling).
+	local sum, count = 0, 0
+	for _, member in raid.Members do
+		if member.Parent then
+			sum += Progress.levelOf(member)
+			count += 1
+		end
+	end
+	local bossLevel = (if count > 0 then sum / count else 1) + raid.Wave - 1
 	for _, member in raid.Members do
 		if member.Parent then
 			PlayerData.addCoins(member, coins)
@@ -1897,7 +1907,7 @@ local function raidCleared(duel)
 			if profile then
 				profile.Stats.Kills += 1
 			end
-			Progress.addXP(member, "SlayBrute")
+			Progress.won(member, "RaidWave", bossLevel, "SlayBrute")
 			Remotes.Notify:FireClient(
 				member,
 				string.format(
@@ -1982,10 +1992,11 @@ local function onWin(enemy)
 	if profile then
 		profile.Stats.Kills += 1
 	end
-	Progress.addXP(owner, "SlayBrute")
+	-- (An arena rival is built to match you: it stands at your level.)
+	local xp = Progress.won(owner, "Rival", Progress.levelOf(owner), "SlayBrute")
 	Remotes.Notify:FireClient(
 		owner,
-		string.format("Victory! You defeated %s: +%d coins. A new rival steps in…", duel.Name, WIN_COINS)
+		string.format("Victory! You defeated %s: +%d coins, +%d XP. A new rival steps in…", duel.Name, WIN_COINS, xp)
 	)
 	task.delay(REMATCH_DELAY, function()
 		if owner.Parent and owner:GetAttribute("CombatSession") == session and not duels[owner] then

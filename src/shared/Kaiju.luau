@@ -40,8 +40,8 @@
 	wild kaiju land anywhere from 60% to 140% (Spread), so a big hit can end
 	the tame; hit it with its own element (75%, ElementMatchup) to go gently.
 
-	Levels 1-30 from kills and from your mining, a little for every rock
-	you break with it out beside you (mineExp). It never heals on its own:
+	Levels 1-30 from fighting: kills, a Rift's boss, kaiju battles (never
+	from your mining: your rocks level you, not it). It never heals on its own:
 	its health is kept, out and home, until you heal it with gems
 	(infusePlan: a gem of its own element worth double, one of the element
 	that beats it half), and only out of danger (Danger). Gems never give
@@ -756,14 +756,6 @@ end
 -- within Radius of you.
 Kaiju.Danger = { Calm = 4, Radius = 45 }
 
--- Mining with it out: EXP for every rock you break, by the rock's size
--- (Shared.Outpost.Sizes), so it levels while you mine (and fights the
--- critters your swings bring).
-Kaiju.MineExp = { Pebble = 3, Boulder = 5, Monolith = 8, Geode = 13 }
-function Kaiju.mineExp(size: string?): number
-	return Kaiju.MineExp[size or "Pebble"] or Kaiju.MineExp.Pebble
-end
-
 -- The starter roll: everyone starts with a team of StarterTeam kaiju,
 -- rolled in the intro: each a random kind in a random element, with a
 -- Gemsoul rolled like a mined gem, never the same kind and element twice (or
@@ -806,7 +798,7 @@ function Kaiju.stats(speciesId: string, level: number, rarity: string?)
 end
 
 -- EXP from one level to the next: a steep climb (a level is earned over
--- a session or two of mining and fighting, not a few minutes).
+-- a session or two of fighting, not a few minutes).
 Kaiju.ExpCurve = { Base = 110, Power = 1.65 }
 function Kaiju.expToNext(level: number): number
 	if level >= Kaiju.MaxLevel then

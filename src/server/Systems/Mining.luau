@@ -80,7 +80,7 @@ local function spawnNode(spawner: BasePart, folder: Folder)
 		mined = true
 		if Gems.award(player, if isVip then "VipMiningNode" else "MiningNode") then
 			PlayerData.milestone(player, "Mined")
-			Progress.addXP(player, "Mine")
+			Progress.mined(player)
 			node:Destroy()
 			-- A new crystal grows back on the pad after a while.
 			task.delay(rng:NextNumber(REGROW_SECONDS.Min, REGROW_SECONDS.Max), spawnNode, spawner, folder)

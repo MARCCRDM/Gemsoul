@@ -171,7 +171,15 @@ local MineWall = {
 		return "Test Gear"
 	end,
 }
-local Progress = { addXP = function() end }
+-- Who got XP for a rock (Progress.mined: theirs alone, less the more they mine).
+local minedBy = {}
+local Progress = {
+	addXP = function() end,
+	mined = function(player)
+		table.insert(minedBy, player)
+		return 15
+	end,
+}
 local announced = {}
 local ChatChannels = {
 	announce = function(kind, text)
@@ -877,10 +885,7 @@ advance(Rules.ClaimSeconds)
 local coinsBefore = profiles[ana].Coins
 local syncsBeforePop = synced[ana] or 0
 local gemsBeforePop = gemsAwarded
-local minedRocks = {}
-Server.onRockMined = function(player, size)
-	table.insert(minedRocks, { player, size })
-end
+table.clear(minedBy)
 local result
 for _ = 1, 40 do
 	advance(0.5)
@@ -898,8 +903,9 @@ check(profiles[ana].Coins == coinsBefore, "Mining paid coins")
 check(Server._nodes[target.Id] == nil and target.Model:GetAttribute("Popped") == 1, "The rock didn't pop")
 check(not handlers.OutpostHit(ana, target.Id).Ok, "Mined a popped rock")
 check(profiles[ana].Outpost.Rocks == 1, "Rock not counted")
--- (Her kaiju out gets its EXP for the rock: OutpostServer.onRockMined.)
-check(#minedRocks == 1 and minedRocks[1][1] == ana and minedRocks[1][2] == target.Size, "The rock wasn't passed on")
+-- XP for her (Progress.mined), once; nothing for her kaiju (no hook to them).
+check(#minedBy == 1 and minedBy[1] == ana, "A popped rock didn't give its miner XP once")
+check(Server.onRockMined == nil, "A rock still reaches your kaiju")
 -- It grows back (somewhere) after its respawn time.
 local before = 0
 for _ in Server._nodes do

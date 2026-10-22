@@ -125,8 +125,6 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			-- Revives for Robux (the KaijuRevive product) and Revive coupons.
 			StoreServer.reviveKaiju = KaijuServer.reviveAll
 			CouponServer.reviveKaiju = KaijuServer.reviveAll
-			-- Your kaiju out levels as you mine: EXP for every rock you break.
-			OutpostServer.onRockMined = KaijuServer.mined
 			-- Kaiju battles: two players' teams placed in a formation, then
 			-- fighting it out by themselves.
 			require(script.Parent.Systems.KaijuBattles).start()

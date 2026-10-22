@@ -49,4 +49,4 @@ local Shop = {
  end,
 }
 local Nearby = {vendor = function() return true end}
-local Progress = {addXP = function() end}
+local Progress = {addXP = function() end, mined = function() return 10 end}

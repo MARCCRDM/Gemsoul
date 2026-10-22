@@ -472,6 +472,21 @@ local services = {
 local loaded = {}
 local env
 local server = {
+	-- Your level's XP for a win (Server.Progress, by the foe's level:
+	-- Shared.Levelling), each one kept in Awards.
+	Progress = (function()
+		local awards = {}
+		return {
+			Awards = awards,
+			won = function(player, kind, foe, season, rival)
+				table.insert(awards, { Player = player, Kind = kind, Foe = foe, Season = season, Rival = rival })
+				return 0
+			end,
+			levelOf = function(player)
+				return player:GetAttribute("TestLevel") or 1
+			end,
+		}
+	end)(),
 	Enemies = Enemies,
 	Gems = GemsStub,
 	PlayerData = PlayerData,
@@ -2996,31 +3011,16 @@ local function crittersAndKaiju()
 end
 crittersAndKaiju()
 
--- Mining with it out: EXP for every rock you break (by its size), so it
--- levels while you mine; none while it's down, none with none out.
+-- Mining with it out gives it nothing: your rocks level you (Server.Progress,
+-- Shared.Levelling), it levels by fighting.
 local function minedWithIt()
-	pet = KaijuServer.pets()[a]
-	local record = pet.Record
-	local level, exp = record.Level, record.Exp or 0
-	KaijuServer.mined(a, "Boulder")
+	check(KaijuServer.mined == nil and Kaiju.mineExp == nil, "Kaiju still get EXP for your rocks")
+	local outpost = fs.readFile(ROOT .. "/src/server/Systems/OutpostServer.luau")
+	local main = fs.readFile(ROOT .. "/src/server/Main.server.luau")
 	check(
-		record.Level > level or record.Exp == exp + Kaiju.MineExp.Boulder,
-		"A rock mined with it out gave no EXP"
+		outpost:find("onRockMined", 1, true) == nil and main:find("KaijuServer.mined", 1, true) == nil,
+		"A rock you break still reaches your kaiju"
 	)
-	check(Kaiju.mineExp("Pebble") < Kaiju.mineExp("Boulder") and Kaiju.mineExp(nil) == Kaiju.MineExp.Pebble, "Rock EXP by size")
-	level, exp = record.Level, record.Exp
-	pet.Humanoid.Health = 0
-	KaijuServer.mined(a, "Boulder")
-	check(record.Level == level and record.Exp == exp, "A downed kaiju got mining EXP")
-	pet.Humanoid.Health = pet.Humanoid.MaxHealth
-	KaijuServer.mined(b, "Boulder") -- (b has none out)
-	-- A long session's rocks are worth a couple of early levels, no more
-	-- (levelling is slow: Kaiju.ExpCurve).
-	local session = { Level = 1, Exp = 0 }
-	for i = 1, 130 do
-		Kaiju.addExp(session, Kaiju.mineExp(if i % 8 < 3 then "Boulder" else "Pebble"))
-	end
-	check(session.Level >= 2 and session.Level <= 3, "A long session's mining made level " .. session.Level)
 end
 minedWithIt()
 
@@ -4083,6 +4083,22 @@ do
 		check(battle.Phase == "Over", "The battle never ended")
 		check(battle.Result and battle.Result[a] == "Win" and battle.Result[b] == "Lose", "The wrong side won")
 		check(noted(a, "Your kaiju beat") and noted(b, "kaiju won the battle"), "Not told who won")
+		-- XP for the players too (Server.Progress), by the other's level, the one beaten named.
+		do
+			local won, lost
+			for _, award in server.Progress.Awards do
+				if award.Player == a and award.Kind == "KaijuWin" then
+					won = award
+				elseif award.Player == b and award.Kind == "KaijuPlay" then
+					lost = award
+				end
+			end
+			check(
+				won and won.Rival == b and won.Foe == server.Progress.levelOf(b),
+				"A kaiju battle won gave its player no XP by the loser's level"
+			)
+			check(lost and lost.Rival == a, "A kaiju battle lost gave no XP for playing")
+		end
 		for record, health in cameIn do
 			check(
 				not record.Down and not record.BattleKeep and math.abs(record.Health - health) <= 1,
@@ -5057,6 +5073,14 @@ end)()
 		return true
 	end
 	services.Debris = services.Debris or { AddItem = function() end }
+	-- XP for beating its boss (Server.Progress: by the boss's level against yours).
+	local xpWon = {}
+	server.Progress = {
+		won = function(player, kind, foe, season)
+			table.insert(xpWon, { Player = player, Kind = kind, Foe = foe, Season = season })
+			return 321
+		end,
+	}
 	local RiftServer = serverModule("RiftServer")
 	local site = { Spawn = CFrame.new(outpost + Vector3.new(0, 3, 0)) }
 	RiftServer.start(site)
@@ -5480,6 +5504,20 @@ end)()
 	check(run.Won and a:GetAttribute("RiftWon") == true and homesOpened >= 1, "Beating the boss didn't win the trip")
 	check(profiles[a].Coins == coins + RiftRun.rewardCoins(RiftRun.Rooms) and #profiles[a].Gems == found + 1, "Not paid for the boss")
 	check(restored[a] and noted(a, "is beaten!"), "No swings back or word of the win")
+	-- Your XP for it goes by the boss's level (Shared.Levelling), said with the win.
+	do
+		local mine
+		for _, award in xpWon do
+			if award.Player == a then
+				mine = award
+			end
+		end
+		check(
+			mine and mine.Kind == "RiftBoss" and mine.Foe == run.BossLevel and mine.Season == "SlayBrute",
+			"Beating a Rift's boss gave no XP by its level"
+		)
+		check(noted(a, "+321 XP"), "The win doesn't say the XP it gave")
+	end
 	-- A boss cache each (no claim, roll or pass): its gem, of its element,
 	-- Legendary from a tier-5 boss.
 	do

@@ -11,9 +11,10 @@ local Season = {}
 Season.Name = "Season 1: Lunar Frontier"
 Season.MaxLevel = 30
 
--- XP for each activity.
+-- XP for each activity. A rock's is its most, when you haven't mined in a
+-- while: less the more you mine (Shared.Levelling.Mine).
 Season.XP = {
-	Mine = 15,
+	Mine = 10,
 	Sell = 5,
 	Enchant = 20,
 	SlayCrawler = 12,

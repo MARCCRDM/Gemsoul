@@ -25,6 +25,7 @@ source+=module('SeatExit','src/server/Systems/SeatExit.luau')
 source+=module('ArenaDrop','src/server/Systems/ArenaDrop.luau')
 source+=module('ArenaSessions','src/server/Systems/ArenaSessions.luau')
 source+=module('AugmentSystem','src/server/Systems/Augments.luau')
+source+='Levelling=(function()\n'+read('src/shared/Levelling.luau')+'\nend)()\n'
 source+=module('Progress','src/server/Systems/Progress.luau')
 source+=read('tests/combat_cases.luau')
 source+=module('Market','src/shared/Market.luau')

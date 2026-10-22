@@ -251,7 +251,9 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   down. Only past 150 studs (`Kaiju.Follow.Battle`) does it give up and come
   back to you. Out of a fight, it still runs back past 45 studs and is put
   back beside you past 90.
-- **EXP** goes to each of them out: for kills and for the rocks you mine.
+- **EXP** goes to each of them out, for fighting: kills, a Rift's boss,
+  kaiju battles. Never for the rocks you mine (those level you:
+  [levelling.md](levelling.md)).
 - **Recall.** The server can still call all of them back to you for 4
   seconds (`KaijuRecall`), but the strip no longer has a button for it:
   AUTO HEAL took the place of RECALL and HUNT.
@@ -605,15 +607,14 @@ did the most to it 1 coin from the Fringe or 2 from the Edge, up to 300 a
 day. (One of a swarm: a swarm pays about what one critter used to.)
 A kaiju left at home earns nothing from them.
 
-## Levelling while you mine
+## Mining levels you, not your kaiju
 
-Your kaiju out beside you levels while you mine. Every rock you break gives
-it a little EXP, by the rock's size (`Kaiju.MineExp`: a Regolith Chunk 5, a
-Crystal Boulder 8, a Monolith 12, a Geode 20). It also fights the critters
-your swings bring out past the core, which gives more. A full free charge
-(600 swings, about 130 rocks) is worth about 800 EXP from the rocks alone,
-a few levels for a young kaiju, before the critters. A kaiju that's down, or left at home, earns nothing
-(`KaijuServer.mined`, from `OutpostServer.onRockMined`).
+The rocks you break give your kaiju nothing. They used to give it a little
+EXP each (`Kaiju.MineExp`, through `KaijuServer.mined` from
+`OutpostServer.onRockMined`), and all three are gone. A rock gives you XP
+alone, less the more you've mined lately ([levelling.md](levelling.md)).
+Your kaiju still level while you mine by fighting the critters your swings
+bring out past the core: those kills pay EXP as before.
 
 ## Healing
 
@@ -621,7 +622,7 @@ a few levels for a young kaiju, before the critters. A kaiju that's down, or lef
 
 Gems from your pouch are what keep a kaiju going: they heal it, or bring it
 back once it's down. They never give EXP (a kaiju grows by fighting beside
-you and as you mine). Up to 25 at a time (`Kaiju.Infuse`), only loose gems
+you). Up to 25 at a time (`Kaiju.Infuse`), only loose gems
 in your pouch (none socketed in your gear), never a Gemsoul.
 
 A gem's **power** is its rarity's, and its element matters:
@@ -761,7 +762,7 @@ Proposed guardrails:
 | `KaijuFighter` | A kaiju in a fight (yours or a wild one): reads its foe (a critter's wind-up too), asks the brain, winds up, strikes, guards, hops, casts its E, its Q in place of a blow, its R when hard pressed (`setMoves` after a level) and its gem surge when it's due (`GemSurge`), on its side of a shared foe and clear of its own (`Flank`, `Apart`); the attributes clients pose it by |
 | `KaijuBattles` | Kaiju battles between two players (see [Kaiju battles](kaiju-elements-battles.md#kaiju-battles)), fought on the courts of the [Kaiju Arena](kaiju-arena.md) |
 | `KaijuPitServer` | The Kaiju Arena downstairs: its stairs, pads, stakes and courts ([kaiju-arena.md](kaiju-arena.md)) |
-| `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, its health kept in its record, knockout (down till its revive time is up: `Down` and `DownUntil` on the record, `KaijuDown_<id>` on you; `reviveAll` for REVIVE and coupons), danger (`inDanger`, `KaijuDanger` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), healing any of yours (`KaijuInfuse`), AUTO HEAL (`KaijuAutoHeal`, healing with spare Commons, then Uncommons, between fights), EXP for the rocks you mine (`mined`); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
+| `KaijuServer` | Your team: the starter roll (`KaijuRoll`, `KaijuRollClaim`, kept in the profile's `KaijuRoll` till claimed; `KaijuRolled` once it is), the team out and back, each in its place (`KaijuSlot` on the model), following (pottering round you when you stand about) and fighting, hurt by element and its guard, its health kept in its record, knockout (down till its revive time is up: `Down` and `DownUntil` on the record, `KaijuDown_<id>` on you; `reviveAll` for REVIVE and coupons), danger (`inDanger`, `KaijuDanger` on you), recall, the team and its lead (`KaijuTeam`, `KaijuActive`), healing any of yours (`KaijuInfuse`), AUTO HEAL (`KaijuAutoHeal`, healing with spare Commons, then Uncommons, between fights); `all()`, `team(player)`, `pets()` (each player's lead) for the rest of the server |
 | `KaijuWilds` | Wild kaiju in packs (dens, wandering, moods, `KaijuMood` on the model; a pack shares its foes), the vein guardian (`veinSwing`, `veinMoved`) and moon bugs: spawning (`spawnBug`: one out of a rift at its band's level, at its prey, or roaming a wandering rift), their brain, sharing out your kaiju, how they fight (bites, hops, dodges, their moves, bombs), slipping back through a rift, their pay, the pick's `bonk`, the spread on blows (`TakenScale`, applied by `Enemies.damage`), kills, taming (`KaijuTame`), who started a fight with each (`KaijuChallenge`, its Challenge prompt, or a hit) |
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look, all at its caster's size (`Size`; effects sent `"Sized"`); its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |

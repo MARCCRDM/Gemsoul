@@ -102,9 +102,6 @@ OutpostServer.bonker = nil :: any -- KaijuWilds: critterOf(model) -> enemy?, bon
 OutpostServer.onVeinMoved = function(_index: number, _scar: CFrame) end
 -- Someone swung at one of vein `index`'s rocks (its guardian wakes).
 OutpostServer.onVeinSwing = function(_index: number, _player: Player) end
--- A rock `player` broke (its Size): their kaiju out gets a little EXP
--- (KaijuServer.mined).
-OutpostServer.onRockMined = function(_player: Player, _size: string) end
 -- A gem `player` mined (FrontierServer keeps this trip's haul: a gem raid's snatchers take from it).
 OutpostServer.onGemMined = function(_player: Player, _gem) end
 local secretParts: { [string]: BasePart } = {}
@@ -547,7 +544,7 @@ local function loot(player: Player, node, profile)
  local tutorialLoot = require(script.Parent.Intro).tutorialMined(player)
  if tutorialLoot then
   record(profile).Rocks += 1
-  Progress.addXP(player, "Mine")
+  Progress.mined(player)
   PlayerData.milestone(player, "Mined")
   return tutorialLoot
  end
@@ -585,9 +582,10 @@ local function loot(player: Player, node, profile)
 	else
 		result.Full = true
 	end
-	Progress.addXP(player, "Mine")
+	-- XP for you (less the more you've mined lately), none for your kaiju:
+	-- they level by fighting (Shared.Levelling).
+	Progress.mined(player)
 	record(profile).Rocks += 1
-	OutpostServer.onRockMined(player, node.Size)
 	return result
 end
 

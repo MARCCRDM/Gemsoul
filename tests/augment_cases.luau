@@ -155,12 +155,87 @@ os.time = function() return 100 end
 local synced = 0
 PlayerData.sync = function() synced += 1 end
 Remotes.Notify = { FireClient = function(_, player, message) table.insert(messages, { Player = player, Message = message }) end }
-Progress.addXP(trainee, "Mine", 10)
+Progress.addXP(trainee, "Mine", 15)
 check(profiles[trainee].Augments.XP == 150 and profiles[trainee].Augments.Points == 4 and profiles[trainee].Season.XP == 300, "Mining XP did not award point or XP boost affected tree budget")
 check(synced == 1, "Progress award did not sync saved profile")
 profiles[trainee].Boosts.XPUntil = 0
-Progress.addXP(trainee, "Mine", 15) -- (level 3 is 366 XP)
-check(profiles[trainee].Augments.XP == 375 and profiles[trainee].Augments.Points == 5 and synced == 2, "Second earned point duplicated or missing")
+Progress.addXP(trainee, "Mine", 22) -- (level 3 is 366 XP)
+check(profiles[trainee].Augments.XP == 370 and profiles[trainee].Augments.Points == 5 and synced == 2, "Second earned point duplicated or missing")
 Progress.addXP(trainee, "Unknown")
-check(profiles[trainee].Augments.XP == 375 and synced == 2, "Unknown XP reason awarded points")
+check(profiles[trainee].Augments.XP == 370 and synced == 2, "Unknown XP reason awarded points")
+-- Your level from wins and rocks (Shared.Levelling), the real Progress.
+do
+	local clock = 5000
+	Progress.now = function()
+		return clock
+	end
+	local fighter = makePlayer(41, Vector3.zero, nil)
+	profiles[fighter].Season, profiles[fighter].Boosts = { XP = 0 }, { XPUntil = 0 }
+	Tree.initialize(profiles[fighter])
+	local function xpOf()
+		return profiles[fighter].Augments.XP
+	end
+	-- A rock: its most first, the same to your level and the Season's, then
+	-- less and less (a full charge's worth a fraction of 130 first rocks),
+	-- down to 1; rest and it comes back.
+	local first = Progress.mined(fighter)
+	check(first == Levelling.Mine.Base and first == Season.XP.Mine, "A first rock isn't worth its most")
+	check(xpOf() == first and profiles[fighter].Season.XP == first, "A rock's XP didn't go to your level and the Season")
+	local total, last = first, first
+	for _ = 2, 130 do
+		local xp = Progress.mined(fighter)
+		check(xp <= last and xp >= Levelling.Mine.Floor, "A rock was worth more than the one before")
+		total, last = total + xp, xp
+	end
+	check(total < 130 * first / 3 and total > 300, "A full charge of rocks came to " .. total .. " XP")
+	check(Progress.mined(fighter) == Levelling.Mine.Floor, "Mining on and on didn't come down to the least")
+	check(profiles[fighter].Levelling and profiles[fighter].Levelling.Mined > 100, "Rocks mined lately aren't kept in the save")
+	clock += Levelling.Mine.Rest * 4
+	check(Progress.mined(fighter) >= first / 2, "A rest didn't bring mining's XP back")
+	-- A win: a share of your level's XP, by the foe's level against yours;
+	-- what the Season Path pays for it, as it always has.
+	local function expect(kind, foe, again)
+		local level = Progress.levelOf(fighter)
+		return Levelling.winXP(kind, level, foe, Tree.xpToNext(level), again)
+	end
+	local level = Progress.levelOf(fighter)
+	local want, before, season = expect("RiftBoss", level), xpOf(), profiles[fighter].Season.XP
+	local got = Progress.won(fighter, "RiftBoss", level, "SlayBrute")
+	check(got == want and xpOf() == before + got, "A Rift boss at your level didn't pay its share of a level")
+	check(profiles[fighter].Season.XP == season + Season.XP.SlayBrute, "A boss's Season XP changed")
+	-- (From level 8 on, one Rift boss at your level is worth more than a
+	-- full charge of rocks; before that, mining gets a new miner going.)
+	for at = 8, 30 do
+		check(Levelling.winXP("RiftBoss", at, at, Tree.xpToNext(at)) > total, "A full charge of rocks beats a Rift boss at level " .. at)
+	end
+	level = Progress.levelOf(fighter)
+	want = expect("RiftBoss", level + 5)
+	local high = Progress.won(fighter, "RiftBoss", level + 5)
+	level = Progress.levelOf(fighter)
+	want, got = expect("RiftBoss", level - 5), want
+	local low = Progress.won(fighter, "RiftBoss", level - 5)
+	check(high == got and low == want and high > low * 2, "A higher boss isn't worth more than a lower one")
+	-- The same player beaten again within the hour: half, then a quarter; a
+	-- different one, all of it; an hour on, all of it again.
+	local rival, other = makePlayer(42, Vector3.zero, nil), makePlayer(43, Vector3.zero, nil)
+	level = Progress.levelOf(fighter)
+	want = expect("DuelWin", level, 0)
+	check(Progress.won(fighter, "DuelWin", level, "DuelWin", rival) == want, "A duel won wasn't its share")
+	level = Progress.levelOf(fighter)
+	want = expect("DuelWin", level, 1)
+	check(Progress.won(fighter, "DuelWin", level, "DuelWin", rival) == want, "Beating the same player again wasn't halved")
+	level = Progress.levelOf(fighter)
+	want = expect("DuelWin", level, 0)
+	check(Progress.won(fighter, "DuelWin", level, "DuelWin", other) == want, "Another player's halved too")
+	clock += Levelling.Again.Window
+	level = Progress.levelOf(fighter)
+	want = expect("DuelWin", level, 0)
+	check(Progress.won(fighter, "DuelWin", level, "DuelWin", rival) == want, "Still halved an hour on")
+	-- Nothing for an unknown win; nothing for your level once it's maxed.
+	before = xpOf()
+	check(Progress.won(fighter, "Spoofed", 99) == 0 and xpOf() == before, "An unknown win paid XP")
+	profiles[fighter].Augments.XP = Tree.xpFor(Tree.MaxLevel)
+	Tree.initialize(profiles[fighter])
+	check(Progress.won(fighter, "RiftBoss", 99) == 0, "XP past the level cap")
+end
 print("PASS: " .. count .. " Augment Tree checks (21-node graph, migration, points, prerequisites, refunds, authority and live passive effects)")

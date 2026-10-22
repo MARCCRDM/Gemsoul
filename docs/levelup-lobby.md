@@ -60,7 +60,7 @@ Kaiju were levelling too fast. Both sides of it are slower:
 | | Before | Now |
 | --- | --- | --- |
 | EXP for a level | `80 x level^1.5` | `110 x level^1.65` (`Kaiju.ExpCurve`) |
-| EXP per rock mined | Pebble 5, Boulder 8, Monolith 12, Geode 20 | 3, 5, 8, 13 |
+| EXP per rock mined | Pebble 5, Boulder 8, Monolith 12, Geode 20 | 3, 5, 8, 13 (since then, none: rocks level you, not your kaiju; [levelling.md](levelling.md)) |
 | EXP per kill | `40 + 12 x level` | `26 + 8 x level` |
 
 Level 5 to 6 now takes 1,563 EXP (was 894); level 10 to 11, 4,913 (was

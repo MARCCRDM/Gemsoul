@@ -116,6 +116,7 @@ local KaijuServer = require(script.Parent.KaijuServer)
 local KaijuWilds = require(script.Parent.KaijuWilds)
 local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
+local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local Restores = require(script.Parent.Restores)
 local Robbery = require(script.Parent.Robbery)
@@ -678,6 +679,9 @@ victory = function(run)
 	Duelist.removeDungeon(run.Id)
 	local coins = RiftRun.rewardCoins(RiftRun.Rooms)
 	caches(run, RiftRun.Reward.Luck)
+	-- XP for you by the boss's level against yours: a higher boss, more
+	-- (Shared.Levelling); EXP for your kaiju as before.
+	local bossLevel = run.BossLevel or RiftRun.bossLevel(levelsOf(run), run.Boss)
 	for _, player in run.Members do
 		if run.Fallen[player] then
 			run.Fallen[player] = nil
@@ -685,11 +689,12 @@ victory = function(run)
 		end
 		PlayerData.addCoins(player, coins)
 		KaijuServer.reward(player, RiftRun.Reward.Exp)
+		local xp = Progress.won(player, "RiftBoss", bossLevel, "SlayBrute")
 		local swings = Restores.give(player, SwingRestore.Dungeon)
 		pcall(PlayerData.training, player, "Boss")
 		notify(
 			player,
-			string.format("%s is beaten! +%d coins", run.Boss.Name, coins)
+			string.format("%s is beaten! +%d coins, +%d XP", run.Boss.Name, coins, xp)
 				.. (if swings > 0 then string.format(", +%d swings", swings) else "")
 				.. ". The way home is open."
 		)

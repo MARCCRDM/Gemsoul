@@ -144,6 +144,11 @@ tick(5)
 for _, p in team do
 	check(profiles[p].Coins == 300, "Completion reward missing")
 	check(p:GetAttribute("DungeonId") == nil, "Session leaked")
+	-- XP by the squad's level (its average: Shared.Levelling), the Season's as a Brute.
+	check(
+		xp[p] == "DungeonBoss" and xpFoe[p].Level == 1 and xpFoe[p].Season == "SlayBrute",
+		"A clear's XP doesn't go by the squad's level"
+	)
 end
 -- A clear restores a share of each one's swings (Shared.SwingRestore).
 check(#restoresGiven - restoresBefore == #team, "A clear didn't restore swings for each of the squad")

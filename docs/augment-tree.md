@@ -7,7 +7,7 @@ The screen shows connected nodes, prerequisites, unlocked/locked status, point p
 ## Initial progression tuning
 
 - Three starting Augment Points. Hydraulic Slam and Thermal Burst are free starting nodes.
-- One additional point per 150 base activity XP, up to 24 total points. Mining, selling, socketing, daily rewards and eligible enemy kills contribute through existing XP awards. Season XP boosts do not multiply Augment XP.
+- One additional point per level (`Tree.MaxPoints` in all). Your level comes mostly from wins (Rift and dungeon bosses, raid waves, arena rivals, duels and kaiju battles), each worth a share of your level by the foe's level against yours; mining gives less the more you mine; selling, socketing, daily rewards and eligible enemy kills pay their Season XP. See [levelling.md](levelling.md). Season XP boosts do not multiply Augment XP.
 - Lifetime Augment XP persists independently of the season. Returning profiles are seeded from their existing season XP once.
 - Unlocks and point accounting are saved in profile version 10. The server recomputes spent points from valid learned nodes; unknown nodes, invalid prerequisites and excess spending are discarded during normalization.
 - Unlock or reset in the dashboard/town. Arena sessions, mining expeditions and world combat areas allow viewing but prevent build changes.
