@@ -103,15 +103,32 @@ frame, before the camera moves, it:
    - it sweeps the mech's **hull** ahead (`workspace:Blockcast`) and stops it
      0.4 studs short of anything solid. Players, creatures and rifts don't
      count;
+   - **ground it can walk over doesn't stop it**: when what the hull meets
+     is a surface no steeper than 60 degrees (`MechPilot.Walkable`, its
+     normal's up at least 0.5: the biomes' hummocks, ridges, drifts and
+     cones, ramps), the hull is swept again lifted clear of it (up to
+     `MechPilot.Climb`, 8 studs, at a time), and the mech walks on. Walls,
+     rocks (upright sides), other mechs and ground steeper than that still
+     stop it;
    - it looks down for the ground (`workspace:Raycast`). It steps up anything
      up to 1.6 studs high (times the mech's scale), like a kerb or the Motor
-     Pool's apron. It won't climb a higher ledge. Off a drop, it falls, under
+     Pool's apron. It won't climb a higher ledge. Down ground it walks, it
+     keeps to it (no hop off every bump); off a real drop, it falls, under
      gravity;
    - with no ground found at all (still loading in, say), it keeps its
      height and carries on;
    - it stays inside the crater rim;
 3. sets the chassis's `CFrame`. The chassis is anchored, so it goes exactly
    where it's put, and you go with it.
+
+A move is taken in strides of at most 1 stud (`MechPilot.Stride`), so on a
+slow phone (a long move a frame) a slope never reads as a ledge.
+
+Before this, the hull stopped at any ground that rose more than its 1.6-stud
+step under its front edge: slopes over about 27 degrees head on, 18 at an
+angle (its corner reaches further). About one patch in ten of the biomes'
+ground is that steep (Shared.Frontier's relief, up to 6 studs high), so a
+mech stalled there until "pushing through" let it lurch on.
 
 A cast that errors counts as nothing there, so nothing can hold the mech
 still. Push into something for 1.5 seconds and the mech goes through it for
@@ -131,7 +148,9 @@ limits the move:
 
 - no further than the mech could have gone since the last one (its top
   speed, with some slack for moves that arrive bunched up);
-- no higher than two steps up at once, and no more than 60 studs down;
+- no higher than two steps up at once, plus the steepest ground it walks
+  over the distance it went (`MechPilot.Grade`), and no more than 60 studs
+  down;
 - inside the crater rim, and never far below the quarry floor.
 
 It sets the chassis there and puts it on the model for every client:
@@ -211,7 +230,7 @@ The server's lines also go to Feedback → Reports (owners only).
 
 ## Verification
 
-- `tests/run_mech_pilot.py` (32 checks) runs `Shared.MechPilot` under lune:
+- `tests/run_mech_pilot.py` (36 checks) runs `Shared.MechPilot` under lune:
   - who pilots what, from the attributes;
   - the mech's state from its model;
   - driving, steering and backing up;
@@ -219,8 +238,18 @@ The server's lines also go to Feedback → Reports (owners only).
   - passing over a pebble, stepping up and off a kerb;
   - stopping at a ledge, falling into a pit, and no ground loaded;
   - the crater rim.
-- `tests/run_outpost_vehicles.py` (96 checks) runs the real server module:
-  getting in and out, moves from the pilot only, the limits on a move, the
+- `tests/run_mech_terrain.py` (708 checks) drives every mech over the
+  biomes' own ground (`Shared.Frontier.ground` in 4-stud terrain cells,
+  smoothed, nothing flattening it: the worst case): eight ways through each
+  biome's steepest spot (slope 1.01), never stopped or standing still, on
+  the ground the whole way; long wanders, steering; a slow phone (10 frames
+  a second). A rock on the slope and a 70-degree cliff still stop it; a
+  55-degree slope doesn't. The old rule got stuck on 31 of the 32 runs
+  through the steepest spots. Its stand-in terrain is stricter than
+  Roblox's: the sweep counts ground it starts in as a hit.
+- `tests/run_outpost_vehicles.py` (100 checks) runs the real server module:
+  getting in and out, moves from the pilot only, the limits on a move (a
+  climb up steep ground kept whole), the
   silent-pilot log and letting them out, reports, letting go of pilots who die, respawn, leave or
   get busy, and going home.
 - `tests/run_vehicle_transition.py` (66 checks, then the arena controls)

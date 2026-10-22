@@ -169,13 +169,14 @@ end
 -- fails counts as nothing there, so nothing ever holds the mech still.
 function VehicleDrive.world(d: Driving)
 	return {
-		Sweep = function(from: CFrame, size: Vector3, direction: Vector3): (number?, string?)
+		-- (With the surface it met, so ground it can walk up doesn't stop it.)
+		Sweep = function(from: CFrame, size: Vector3, direction: Vector3): (number?, string?, Vector3?, Vector3?)
 			local ok, hit = pcall(workspace.Blockcast, workspace, from, size, direction, d.Params)
 			if ok and hit then
 				d.Hit = hit.Instance
-				return hit.Distance, hit.Instance.Name
+				return hit.Distance, hit.Instance.Name, hit.Normal, hit.Position
 			end
-			return nil, nil
+			return nil, nil, nil, nil
 		end,
 		Floor = function(origin: Vector3, length: number): number?
 			local ok, hit = pcall(workspace.Raycast, workspace, origin, Vector3.new(0, -length, 0), d.Params)

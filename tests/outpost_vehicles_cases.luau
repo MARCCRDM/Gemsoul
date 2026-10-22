@@ -431,6 +431,13 @@ check((chassis.Position - held).Magnitude > 7, "Moves arriving together were cut
 held = chassis.Position
 move(pilot, held + R.Vector3.new(0, 30, 0), 0, 0, 0)
 check(chassis.Position.Y - held.Y <= 1.6 * 2 + 1 + 1e-3, "It rose 30 studs at once")
+-- Up a slope as steep as it walks (Shared.MechPilot.Grade), as far as it
+-- went: all the way, so everyone else sees it on the ground.
+held = chassis.Position
+local up = R.Vector3.new(0, 0, -2.4)
+local climb = up.Magnitude * 1.0 + 1.6 * 2 + 1
+check(move(pilot, held + up + R.Vector3.new(0, climb - 0.01, 0), 0, 22, 0), "A climb was refused")
+check(math.abs(chassis.Position.Y - (held.Y + climb - 0.01)) < 1e-3, "A climb up steep ground was cut short")
 held = chassis.Position
 move(pilot, held + R.Vector3.new(0, -20, 0), 0, 0, 0)
 check(math.abs(chassis.Position.Y - (held.Y - 20)) < 1e-3, "It couldn't drop")

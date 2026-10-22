@@ -233,7 +233,9 @@ end
 -- Driving --------------------------------------------------------------------------------------
 
 -- MechMove: where its pilot's screen has driven it. Only from its pilot, no
--- further than it could have gone since the last one, inside the rim.
+-- further than it could have gone since the last one, no higher than a step
+-- and the steepest ground it walks over that far (MechPilot.Grade), inside
+-- the rim.
 function OutpostVehicles.move(player: Player, at: any, yaw: any, speed: any, turn: any, now: number?): boolean
 	if typeof(at) ~= "Vector3" or not finite(at.X) or not finite(at.Y) or not finite(at.Z) then
 		return false
@@ -258,7 +260,7 @@ function OutpostVehicles.move(player: Player, at: any, yaw: any, speed: any, tur
 		across = across.Unit * reach
 	end
 	local scale = machine.Model:GetAttribute("MechScale") or 1
-	local rise = math.clamp(offset.Y, -60, MechPilot.Lift * scale * 2 + 1)
+	local rise = math.clamp(offset.Y, -60, MechPilot.Lift * scale * 2 + 1 + across.Magnitude * MechPilot.Grade)
 	local to = here + across + Vector3.new(0, rise, 0)
 	local centre = Rules.Location.Position
 	local out = Vector3.new(to.X - centre.X, 0, to.Z - centre.Z)
