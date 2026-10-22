@@ -86,6 +86,34 @@ middle. Rocks stay at least 12 studs apart.
 
 ![The view from the landing pad, before and now](mining/from-the-pad.png)
 
+## Walk into a rock to mine it
+
+Walking into a rock mines it, as a click or a tap on it does: on foot and
+in a mech, on a computer, a phone or a pad, in the Outpost, at the Rift's
+healing crystals and on an expedition's wall (`Shared.WalkMine`).
+
+- **On foot**: you're heading into its `Body` (your Humanoid's
+  `MoveDirection`, so keys, the thumbstick and a pad alike, at least 0.1 of
+  a full push) and your middle is within 2.6 studs of its side
+  (`WalkMine.Touch`). Heading into it means within about 70 degrees of
+  straight at it (`WalkMine.Facing`, 0.35): walking past it, backing away,
+  standing still against it or walking about on top of it doesn't count.
+- **In a mech**: the rock its hull stopped against while you drive forward
+  (`VehicleDrive.shoving`, for 0.3 s after it last did). A mech never
+  pushes through a rock it's mining, however long you hold forward; it
+  still pushes through anything else after 1.5 s.
+- Looked for every 0.1 s, then it's the same swing a click makes
+  (`OutpostScene.swing(id, true)`, `MineScene.swing(index, true)`), so the
+  pick's cooldown paces it (0.32 s; a mech's own). It only ever swings at
+  the rock you walked into, never at a critter (a click still bonks a
+  critter on you first). With your combat kit out, or a screen open, it
+  doesn't swing.
+- With the pick out of charge, walking into rocks says nothing: PROBE-7
+  only opens (and OUT OF SWINGS only shows) when you click or tap.
+
+The hint at the bottom reads "Walk into a rock or click to mine", and
+INFO-9 says it too.
+
 ## Labels
 
 A rock's name and HP bar show only within 24 studs. Once a rock is hit,
@@ -114,6 +142,11 @@ their old builder.
 
 ## Code and tests
 
+- `src/shared/WalkMine.luau`: walking into a rock (`against`, `Touch`,
+  `Facing`, `Every`, `Shove`, `Push`). `tests/run_walk_mine.py` checks it
+  (into a rock, not past, away, still or on top; a turned rock) and that
+  the Outpost, mechs, the Rift and expeditions use it;
+  `tests/run_vehicle_transition.py` drives a mech into a rock.
 - `src/server/World/OutpostWorld.luau`: `crystalRock` (the two everyday
   rocks), with helpers `shard` (one crystal), `vein` and `upFace`. `build`
   lays out the spots: `ArrivalSpots`, `NearSpots` (`NEAR_SPOTS`) and the

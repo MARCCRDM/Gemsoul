@@ -6,7 +6,8 @@
 	  Rocks       one per tile of your wall, at the foot of the crystal face.
 	              Glinting crystal = gems, ore flecks = salvage credits, gold =
 	              a lucky rock. Pips over each rock show the hits left.
-	  Mining      walk up and press E (or tap the prompt). Your weapon is put
+	  Mining      walk into a rock (Shared.WalkMine), or walk up and press E
+	              (or tap the prompt). Your weapon is put
 	              away and the space pickaxe comes out for the swing; a moment
 	              after you stop, the weapon comes back.
 	  HUD         depth, swings left and what you've found, with Descend and
@@ -26,6 +27,7 @@ local TweenService = game:GetService("TweenService")
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Features = require(ReplicatedStorage.Shared.Config).Features or {}
 local MiningSite = require(ReplicatedStorage.Shared.MiningSite)
+local WalkMine = require(ReplicatedStorage.Shared.WalkMine)
 local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -206,7 +208,7 @@ costNote.Size = UDim2.fromOffset(320, 16)
 costNote.TextXAlignment = Enum.TextXAlignment.Right
 
 -- Bottom centre: a hint until you've swung once, and banners.
-local hint = label(hud, "Walk up to a rock and press E to mine it", 16, Color3.new(1, 1, 1))
+local hint = label(hud, "Walk into a rock, or press E at it, to mine it", 16, Color3.new(1, 1, 1))
 hint.AnchorPoint = Vector2.new(0.5, 1)
 hint.Position = UDim2.new(0.5, 0, 1, -96)
 hint.Size = UDim2.fromOffset(600, 22)
@@ -526,8 +528,8 @@ local function makePick()
 	holdPick(false)
 end
 
--- One swing at rock `index`.
-function MineScene.swing(index: number)
+-- One swing at rock `index` (`walked`: you walked into it, Shared.WalkMine).
+function MineScene.swing(index: number, walked: boolean?)
 	local rock = rocks[index]
 	if not active or not wall or not rock then
 		return
@@ -537,7 +539,9 @@ function MineScene.swing(index: number)
 		return
 	end
 	if wall.Swings <= 0 then
-		showBanner("OUT OF SWINGS", P.Bad)
+		if not walked then
+			showBanner("OUT OF SWINGS", P.Bad)
+		end
 		return
 	end
 	lastSwing = now
@@ -712,6 +716,30 @@ local function exitScene()
 		hiddenGui = nil
 	end
 end
+
+-- Walk into a rock and the pick swings at it, as E does (Shared.WalkMine):
+-- whatever moves you, keys, the thumbstick or a pad.
+local walkLook = 0
+RunService.Heartbeat:Connect(function()
+	local now = os.clock()
+	if not active or not wall or now < walkLook or now - lastSwing < COOLDOWN then
+		return
+	end
+	walkLook = now + WalkMine.Every
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not root or not humanoid or humanoid.Health <= 0 or humanoid.MoveDirection.Magnitude < 0.1 then
+		return
+	end
+	for index, rock in rocks do
+		local body = rock.Body
+		if body.Parent and WalkMine.against(root.Position, humanoid.MoveDirection, body.CFrame, body.Size) then
+			MineScene.swing(index, true)
+			return
+		end
+	end
+end)
 
 function MineScene.begin()
 	if Features.Mining == false then

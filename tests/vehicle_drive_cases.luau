@@ -2,7 +2,8 @@
 -- made you pilot of (your MechPilot attribute), from your keys or a stick,
 -- over the ground (Shared.MechPilot), and tells the server where it went.
 -- Waiting for the mech to stream in, the hello, sending (rate, stopping),
--- steering, chat, a wall and pushing through, a failing cast, a server that
+-- steering, chat, a wall and pushing through, a rock it shoves (and mines,
+-- never pushing through it), a failing cast, a server that
 -- isn't answering, menus, getting out, being let go, a respawn, the camera,
 -- a controls load that fails once, and a touch screen's own drive stick.
 -- The real module under lune, with stand-ins for the services and the HUD.
@@ -228,9 +229,31 @@ local Players = {
 		return { player }
 	end,
 }
--- The world, from this screen: open ground at y = 0, or a wall, or a cast
--- that fails.
+-- The world, from this screen: open ground at y = 0, or a wall (or a rock),
+-- or a cast that fails.
 local wallAt, castsFail, casts = nil, false, 0
+local wallIsRock = false
+local plainWall = {
+	Name = "Wall",
+	IsA = function()
+		return false
+	end,
+}
+local rock = {
+	Name = "Rock7",
+	Parent = "Nodes",
+	Tags = { OutpostNode = true },
+	IsA = function(_, class)
+		return class == "Model"
+	end,
+}
+local rockBody = {
+	Name = "Body",
+	Parent = rock,
+	IsA = function(_, class)
+		return class == "BasePart"
+	end,
+}
 local workspace = {
 	Gravity = 196.2,
 	FindFirstChild = function()
@@ -245,7 +268,7 @@ local workspace = {
 			-- (A wall across the way at Z = wallAt, the hull's front 3 studs ahead.)
 			local gap = from.Position.Z - 3 - wallAt
 			if gap >= 0 and gap <= direction.Magnitude and direction.Z < 0 then
-				return { Distance = gap, Instance = { Name = "Wall" } }
+				return { Distance = gap, Instance = if wallIsRock then rockBody else plainWall }
 			end
 		end
 		return nil
@@ -313,7 +336,16 @@ local MechPilot = luau.load(fs.readFile(ROOT .. "/src/shared/MechPilot.luau"), {
 		Vector3 = R.Vector3,
 	}, { __index = _G }),
 })()
+local WalkMine = luau.load(fs.readFile(ROOT .. "/src/shared/WalkMine.luau"), {
+	debugName = "WalkMine",
+	environment = setmetatable({ Vector3 = R.Vector3 }, { __index = _G }),
+})()
 local services = {
+	CollectionService = {
+		HasTag = function(_, instance, tag)
+			return type(instance) == "table" and instance.Tags ~= nil and instance.Tags[tag] == true
+		end,
+	},
 	Players = Players,
 	ReplicatedStorage = ReplicatedStorage,
 	RunService = RunService,
@@ -375,7 +407,8 @@ local VehicleDrive = luau.load(fs.readFile(ROOT .. "/src/client/Modules/VehicleD
 	}, { __index = _G }),
 })
 -- (It requires Shared.Outpost and Shared.MechPilot off ReplicatedStorage.)
-ReplicatedStorage.Shared = { Outpost = { Module = Rules }, MechPilot = { Module = MechPilot } }
+ReplicatedStorage.Shared =
+	{ Outpost = { Module = Rules }, MechPilot = { Module = MechPilot }, WalkMine = { Module = WalkMine } }
 VehicleDrive = VehicleDrive()
 local hopOut = buttons["HOP OUT"]
 -- Said once a ride: the server isn't hearing you.
@@ -519,6 +552,31 @@ check(casts == castsBefore and mech.Chassis.Position.Z - 3 < wallAt, "Pushing th
 frames(60)
 check(casts > castsBefore, "It never went back to checking the way ahead")
 wallAt = nil
+check(VehicleDrive.shoving() == nil, "A wall counted as a rock to mine")
+-- A rock in the way (Shared.WalkMine): it shoves it, and that mines it
+-- (Client.OutpostScene asks VehicleDrive.shoving); it never pushes through a
+-- rock it's mining, however long. Let go, or the rock's gone, and it isn't.
+keysDown = {}
+frames(120)
+wallAt, wallIsRock = mech.Chassis.Position.Z - 3 - 8, true
+local toastsBefore = #toasts
+keysDown = { W = true }
+frames(90)
+check(VehicleDrive.shoving() == rock, "Driving into a rock isn't shoving it")
+frames(60 * 4)
+check(mech.Chassis.Position.Z - 3 >= wallAt + 0.4 - 1e-3, "Pushed through a rock it was mining")
+check(VehicleDrive.shoving() == rock and #toasts == toastsBefore, "Stopped shoving the rock, or said it was pushing through")
+keysDown = {}
+frames(30)
+check(VehicleDrive.shoving() == nil, "Still shoving a rock after letting go")
+keysDown = { W = true }
+frames(10)
+check(VehicleDrive.shoving() == rock, "Driving into it again isn't shoving it")
+rock.Parent = nil
+check(VehicleDrive.shoving() == nil, "Still shoving a rock that's gone")
+rock.Parent = "Nodes"
+wallAt, wallIsRock = nil, false
+frames(60) -- (W still held: under way again)
 -- A cast that fails doesn't hold it still.
 castsFail = true
 stoodAt = mech.Chassis.Position
@@ -692,5 +750,5 @@ keysDown = {}
 print(
 	"PASS: "
 		.. checks
-		.. " vehicle drive checks (the pilot's screen: driving, sending, walls, a quiet server, menus, getting out, the touch stick)"
+		.. " vehicle drive checks (the pilot's screen: driving, sending, walls, shoving a rock, a quiet server, menus, getting out, the touch stick)"
 )

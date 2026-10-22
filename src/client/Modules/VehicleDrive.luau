@@ -6,7 +6,9 @@
 -- there, you with it. About 15 times a second it tells the server where it
 -- is (MechMove); the server checks it and passes it on to everyone else.
 -- Space (or jump) gets you out. On a touch screen it has a stick of its own
--- (bottom left), so a phone never waits on Roblox's controls.
+-- (bottom left), so a phone never waits on Roblox's controls. Drive it into a
+-- rock and it mines it (VehicleDrive.shoving, Shared.WalkMine).
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,6 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local Rules = require(ReplicatedStorage.Shared.Outpost)
 local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
+local WalkMine = require(ReplicatedStorage.Shared.WalkMine)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
 local UiKit = require(script.Parent.UiKit)
@@ -53,6 +56,10 @@ type Driving = {
 	PushedFor: number,
 	ThroughUntil: number,
 	Hinted: boolean,
+	-- What its hull last stopped against, and the rock it's shoving (and when).
+	Hit: Instance?,
+	Shoving: Model?,
+	ShovedAt: number,
 	-- Your body, and its auto-jump from before (off while you pilot).
 	Humanoid: any,
 	AutoJump: boolean?,
@@ -165,6 +172,7 @@ function VehicleDrive.world(d: Driving)
 		Sweep = function(from: CFrame, size: Vector3, direction: Vector3): (number?, string?)
 			local ok, hit = pcall(workspace.Blockcast, workspace, from, size, direction, d.Params)
 			if ok and hit then
+				d.Hit = hit.Instance
 				return hit.Distance, hit.Instance.Name
 			end
 			return nil, nil
@@ -453,6 +461,9 @@ local function begin(id: string)
 		PushedFor = 0,
 		ThroughUntil = 0,
 		Hinted = false,
+		Hit = nil,
+		Shoving = nil,
+		ShovedAt = 0,
 		Humanoid = nil,
 		AutoJump = nil,
 		Connections = {},
@@ -500,6 +511,18 @@ local function hud(d: Driving, now: number)
 	end
 end
 
+-- The rock a part belongs to, if it's one (Server.OutpostServer's tag).
+local function rockOf(part: Instance?): Model?
+	local at = part
+	while at and at ~= workspace do
+		if at:IsA("Model") and CollectionService:HasTag(at, "OutpostNode") then
+			return at
+		end
+		at = at.Parent
+	end
+	return nil
+end
+
 -- One frame of driving (before the camera follows you).
 function VehicleDrive.step(dt: number)
 	local id = MechPilot.of(player)
@@ -527,11 +550,18 @@ function VehicleDrive.step(dt: number)
 	local before = m.Yaw
 	local speed, yaw = Rules.drive(d.Spec, m.Speed, m.Yaw, throttle, steer, dt)
 	m.Through = now < d.ThroughUntil
+	d.Hit = nil
 	local blockedBy = MechPilot.move(m, d.World, speed * dt, yaw, dt)
 	m.Speed = if blockedBy then 0 else speed
 	d.Turn = if dt > 0 then (m.Yaw - before) / dt else 0
-	-- Pushing into something a moment: then through it, for a moment.
-	if blockedBy and math.abs(throttle) >= 0.5 then
+	-- Driving into a rock: shoving it, which mines it (Client.OutpostScene).
+	local rock = if blockedBy and throttle >= WalkMine.Push then rockOf(d.Hit) else nil
+	if rock then
+		d.Shoving, d.ShovedAt = rock, now
+	end
+	-- Pushing into something a moment: then through it, for a moment. (Not
+	-- a rock it's mining: it stays against that till it breaks.)
+	if blockedBy and math.abs(throttle) >= 0.5 and not (rock and d.Spec.Mine) then
 		d.PushedFor += dt
 		if d.PushedFor >= UNSTICK_AFTER then
 			d.PushedFor, d.ThroughUntil = 0, now + UNSTICK_FOR
@@ -560,6 +590,15 @@ end
 
 function VehicleDrive.isDriving(): boolean
 	return driving ~= nil
+end
+
+-- The rock you're driving it into, while you are (Shared.WalkMine).
+function VehicleDrive.shoving(): Model?
+	local d = driving
+	if d and d.Shoving and d.Shoving.Parent and os.clock() - d.ShovedAt <= WalkMine.Shove then
+		return d.Shoving
+	end
+	return nil
 end
 
 -- Out: Space, jump (the phone's button too) or HOP OUT. Whenever you're a

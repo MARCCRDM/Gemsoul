@@ -115,7 +115,10 @@ frame, before the camera moves, it:
 
 A cast that errors counts as nothing there, so nothing can hold the mech
 still. Push into something for 1.5 seconds and the mech goes through it for
-a second, with a "pushing through" message.
+a second, with a "pushing through" message. Not a rock, though: drive into a
+rock and the mech mines it (`VehicleDrive.shoving`, `Shared.WalkMine`; see
+[mining-rocks.md](mining-rocks.md#walk-into-a-rock-to-mine-it)), staying
+against it till it breaks.
 
 About 15 times a second while it moves, and once when it stops, your game
 sends `MechMove(position, heading, speed, turn rate)`.

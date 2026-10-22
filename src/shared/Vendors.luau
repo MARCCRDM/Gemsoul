@@ -273,7 +273,7 @@ Vendors.InfoBot = {
 			Options = {
 				{
 					Text = "How does mining work?",
-					Reply = "Walk up to a rock and swing. Every rock yields one gem when it breaks, and broken rocks grow back. Crystal Boulders take more swings than Regolith Chunks, and their gems roll rarer.",
+					Reply = "Walk into a rock, or click or tap it, and your pick swings: in a mech too. Every rock yields one gem when it breaks, and broken rocks grow back. Crystal Boulders take more swings than Regolith Chunks, and their gems roll rarer.",
 				},
 				{
 					Text = "What are the odds?",

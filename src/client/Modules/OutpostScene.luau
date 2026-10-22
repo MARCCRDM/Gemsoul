@@ -2,7 +2,8 @@
 	Saga Outpost on the client: walking the shared mining basin with
 	everyone else (OutpostServer decides everything; this shows it).
 
-	  Mining     walk up to a rock and press E (or click / tap). Every swing
+	  Mining     walk into a rock (on foot or in a mech: Shared.WalkMine),
+	             or walk up and press E, click or tap. Every swing
 	             rings a lottery chime that climbs and swells as the rock
 	             nears popping; chips fly and its crystals glow brighter.
 	             The pop bursts the rock open and the find is revealed like a
@@ -34,6 +35,7 @@ local PickaxeLooks = require(ReplicatedStorage.Shared.PickaxeLooks)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local MechPilot = require(ReplicatedStorage.Shared.MechPilot)
 local Store = require(ReplicatedStorage.Shared.Store)
+local WalkMine = require(ReplicatedStorage.Shared.WalkMine)
 local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local PlayerCard = require(script.Parent.PlayerCard)
 local ChargeMeter = require(script.Parent.ChargeMeter)
@@ -47,7 +49,7 @@ local MiningReveal = require(script.Parent.MiningWorldReveal)
 local PickImpacts = require(script.Parent.PickImpacts)
 local ProbeLayout = require(script.Parent.ProbeLayout)
 -- Driving the garage's machines (runs on its own once loaded).
-require(script.Parent.VehicleDrive)
+local VehicleDrive = require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
 local SkyRift = require(script.Parent.SkyRift)
 local ShelterLife = require(script.Parent.ShelterLife)
@@ -204,7 +206,7 @@ local buttons = new("Frame", {
 UiKit.list(buttons, 8, true)
 local hint = text(
 	hud,
-	"Click to mine  ·  Z spar  ·  G duel  ·  F invite  ·  E trade at PROBE-7",
+	"Walk into a rock or click to mine  ·  Z spar  ·  G duel  ·  F invite  ·  E trade at PROBE-7",
 	14,
 	Color3.fromRGB(230, 238, 250),
 	IronUi.Bold,
@@ -806,7 +808,9 @@ local function bonk(critter: Model)
 end
 OutpostScene._nearestCritter = nearestCritter
 
-function OutpostScene.swing(nodeId: number?)
+-- `walked`: you walked into it (Shared.WalkMine), so it's that rock, not a
+-- critter, and an empty pick doesn't open PROBE-7 at you.
+function OutpostScene.swing(nodeId: number?, walked: boolean?)
 	-- (Not with your combat kit out: 1 puts it away.)
 	if not active or Spar.fighting(player) or next(openScreens) ~= nil then
 		return
@@ -821,7 +825,7 @@ function OutpostScene.swing(nodeId: number?)
 		return
 	end
 	-- On foot, a critter on you comes before a rock: the pick bonks it.
-	local critter = if mech then nil else nearestCritter()
+	local critter = if mech or walked then nil else nearestCritter()
 	if critter then
 		nextSwing = now + math.max(Rules.SwingCooldown, Frontier.Bonk.Cooldown) + 0.05
 		bonk(critter)
@@ -840,11 +844,14 @@ function OutpostScene.swing(nodeId: number?)
 	if not model then
 		return
 	end
+	if walked and not model:GetAttribute("HealRock") and state and ChargeMeter.read(state.Picks, state.SurveyAt) <= 0 then
+		return -- (out of swings: say so when you click, not every step)
+	end
 	nextSwing = now + (if mech then mech.Mine.Cooldown else Rules.SwingCooldown) + 0.05
 	-- Face the rock (on foot: a mech turns as you drive it).
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local body = model.PrimaryPart
-	if root and body and not mech then
+	if root and body and not mech and not walked then
 		local look = Vector3.new(body.Position.X, root.Position.Y, body.Position.Z)
 		if (look - root.Position).Magnitude > 0.5 then
 			root.CFrame = CFrame.lookAt(root.Position, look)
@@ -1691,6 +1698,54 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		OutpostScene.swing(nil)
+	end
+end)
+
+-- Or walk into one (Shared.WalkMine): on foot, the rock you're pushing
+-- against; in a mech, the one its hull is shoving (Client.VehicleDrive).
+-- Whatever moves you: keys, the thumbstick, a pad.
+local function walkedInto(): Model?
+	if MechPilot.of(player) then
+		local rock = VehicleDrive.shoving()
+		return if rock and rock:GetAttribute("Popped") == nil then rock else nil
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not root or not humanoid or humanoid.Health <= 0 then
+		return nil
+	end
+	local heading = humanoid.MoveDirection
+	if heading.Magnitude < 0.1 then
+		return nil
+	end
+	for _, model in CollectionService:GetTagged(NODE_TAG) do
+		local body = model.PrimaryPart
+		if body and model:GetAttribute("Popped") == nil then
+			local apart = body.Position - root.Position
+			local near = math.max(body.Size.X, body.Size.Z) + WalkMine.Touch
+			if
+				math.abs(apart.X) < near
+				and math.abs(apart.Z) < near
+				and WalkMine.against(root.Position, heading, body.CFrame, body.Size)
+			then
+				return model
+			end
+		end
+	end
+	return nil
+end
+OutpostScene._walkedInto = walkedInto
+local walkLook = 0
+RunService.Heartbeat:Connect(function()
+	local now = os.clock()
+	if not active or now < walkLook or now < nextSwing then
+		return
+	end
+	walkLook = now + WalkMine.Every
+	local rock = walkedInto()
+	if rock then
+		OutpostScene.swing(rock:GetAttribute("NodeId"), true)
 	end
 end)
 
