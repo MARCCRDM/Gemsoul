@@ -720,7 +720,7 @@ function SparKit.start()
 			refreshSwitch()
 		end)
 	end
-	-- Mid-spar, E is a fight key: no world prompts (rocks, PROBE-7, the
+	-- Mid-spar, E is a fight key: no world prompts (rocks, the crew, the
 	-- spar, duel and party invites) pop up or fire until the kit is away.
 	player:GetAttributeChangedSignal("Spar"):Connect(function()
 		ProximityPromptService.Enabled = not Spar.sparring(player)

@@ -120,6 +120,10 @@ shots are the real client code rendered by the UI harness.
   (`RiftClient.Hell`: a low red evening, thick red haze, no stars). Coming
   home puts the Outpost's lighting back.
 
+**Brutus's bounty board** in the Shelter is the same lobby with a tab per
+biome: every gate's ladder from one counter. See
+[hall-of-fame.md](hall-of-fame.md#brutuss-bounty-booth).
+
 ## The ladders
 
 Each biome's gate opens on a Rift of its element, and each Rift has its

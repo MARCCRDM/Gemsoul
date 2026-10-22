@@ -1424,7 +1424,7 @@ local function drawTooltipContent()
 		if #others == 0 then
 			text(
 				tipBody,
-				"No other " .. string.lower(slotLabel) .. " yet. Win duels and dungeons, or trade at PROBE-7.",
+				"No other " .. string.lower(slotLabel) .. " yet. Win duels and bounties, or trade at the Market.",
 				12,
 				P.Dim
 			)
@@ -2465,7 +2465,7 @@ local function drawEquipmentInventory(profile)
 	end
 	setTabCount("Equipment", #all)
 	equipmentEmpty.Text = if #all == 0
-		then "No spare gear yet.\nWin duels and dungeons, or trade at PROBE-7."
+		then "No spare gear yet.\nWin duels and bounties, or trade at the Market."
 		else string.format(
 			"No spare %s.",
 			string.lower(Slots.Definitions[filter] and Slots.Definitions[filter].Label or filter)

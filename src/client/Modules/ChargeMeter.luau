@@ -1,7 +1,7 @@
 --[[
 	The free Survey Pick as a charge: one swing back every
 	Outpost.FreeSwingSeconds, up to its full swings. Drawn the same way on
-	the Outpost HUD, at PROBE-7 and on the dashboard.
+	the Outpost HUD, in the refills window and on the dashboard.
 
 	  ChargeMeter.read(picks, surveyAt)   swings, seconds to the next one
 	                                      (nil when full), progress 0..1

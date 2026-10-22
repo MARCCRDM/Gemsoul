@@ -1,5 +1,7 @@
 # PROBE-7 Exchange
 
+*Since then (2026-10-22): PROBE-7 is gone. Its window is SWING REFILLS, opened from Garrick or the REFILLS button. See [hall-of-fame.md](hall-of-fame.md#probe-7-removed).*
+
 PROBE-7 is the crashed survey probe on the Outpost's east side. Walk up and
 press E, or run out of swings, to open its window. There you can buy refills
 (more swings for your pick, for Robux) or open the player market.

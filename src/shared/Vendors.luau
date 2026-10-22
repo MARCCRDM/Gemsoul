@@ -188,16 +188,17 @@ Vendors.ArenaMaster = crew(
 	"Arena",
 	"Arena Master",
 	Color3.fromRGB(214, 84, 70),
-	"Brutus, arena master. I run the ranked 1v1 duels. Consecutive wins restore your swings; one loss resets the count.",
+	"Brutus, arena master. I post the bounties on every boss behind the Rift Gates, and I run the ranked 1v1 duels. Pick a target and I'll send you through.",
 	{
+		{ Text = "Show me the bounties", Action = "Bounties" },
 		{ Text = "Find me a duel", Action = "Duels" },
+		{
+			Text = "How do bounties work?",
+			Reply = "Every boss on the wall is one of the Rift's. Pick a biome and a target and you go through from here, your party with you. Each one opens once you've beaten the one before it. Down it and its cache is yours.",
+		},
 		{
 			Text = "What does a win streak pay?",
 			Reply = "First win: a tenth of your swings restored. Fifth: a quarter. Tenth: half, and the tournament title. A loss ends the run.",
-		},
-		{
-			Text = "Any advice?",
-			Reply = "Watch for the wind-up, guard, then punish the opening. Your sword, chest and shield gems power Q, E and R: socket your best before you queue.",
 		},
 	}
 )
@@ -237,6 +238,7 @@ Vendors.Foreman = crew(
 	Color3.fromRGB(240, 178, 48),
 	"Garrick, mining foreman. The quarry is through the main door. Every rock you break yields one gem. The richer ground is farther out, and so is the rift activity.",
 	{
+		{ Text = "Buy swing refills", Action = "Exchange" },
 		{
 			Text = "Where is the best ground?",
 			Reply = "Yield improves with distance. The Fringe starts 150 studs out, the Edge at 300. Three Rift Veins surface by the crater walls; one of them is guarded.",
@@ -247,30 +249,10 @@ Vendors.Foreman = crew(
 		},
 		{
 			Text = "My swings ran out",
-			Reply = "Your pick recharges a swing every 12 seconds. PROBE-7 sells refills, and ranked 1v1 win streaks restore swings.",
+			Reply = "Your pick recharges a swing every 12 seconds. I keep refills in stock, and ranked 1v1 win streaks restore swings.",
 		},
 	}
 )
-
--- PROBE-7, the probe that brought the first miners' supplies, on its feet
--- by the east wall where its station stood: it sells the swing refills (the
--- Exchange: Client OutpostScene.openProbe, Shared.Outpost.Refills).
-Vendors.Probe = {
-	Name = "PROBE-7",
-	Role = "Refills",
-	Color = Color3.fromRGB(214, 166, 72),
-	Tunic = UNIFORM,
-	Face = "",
-	Visor = true,
-	Greeting = "PROBE-7, supply unit. I sell swing refills for your pick, on top of its free charge.",
-	Options = {
-		{ Text = "Open the Exchange", Action = "Exchange" },
-		{
-			Text = "How do refills work?",
-			Reply = "A Swing Refill is 600 swings, a Mega Refill 2,000. Bought swings are spent first; your free charge keeps recharging, a swing every 12 seconds.",
-		},
-	},
-}
 
 -- INFO-9, the Shelter's information unit: a robot by its kiosk near the
 -- door, with answers to what new miners ask (by topic) and a field tip
@@ -347,7 +329,7 @@ Vendors.InfoBot = {
 				},
 				{
 					Text = "My swings ran out",
-					Reply = "Your free pick gets a swing back every 12 seconds and is full again in two hours. PROBE-7 sells refills, and ranked 1v1 win streaks restore swings.",
+					Reply = "Your free pick gets a swing back every 12 seconds and is full again in two hours. Garrick sells refills, and ranked 1v1 win streaks restore swings.",
 				},
 			},
 		},
@@ -365,7 +347,7 @@ Vendors.Tips = {
 	"One Rift Vein is guarded. Bring your whole team before you go near it.",
 	"Clear a wandering rift and every miner who helped is Rift Charged: luckier gems for 60 seconds.",
 	"Your free pick gets a swing back every 12 seconds. A full charge takes two hours.",
-	"Swings bought from PROBE-7 are used before your free charge.",
+	"Swings bought as refills are used before your free charge.",
 	-- Threats
 	"Rift activity rises the longer you work beyond the Core.",
 	"Your pick drives critters back, and hitting them costs no swings.",

@@ -104,11 +104,11 @@ if Config.CombatEnabled or not Config.MenuOnly then
 	require(script.Parent.Systems.Dungeons).start()
 	require(script.Parent.Systems.DungeonQueue).start()
 end
--- Saga Outpost: the shared mining basin (mine, trade at the Probe, duel).
+-- Saga Outpost: the shared mining basin (mine, trade at the Market, duel).
 if Config.Features == nil or Config.Features.Mining ~= false then
 	local OutpostServer = require(script.Parent.Systems.OutpostServer)
 	OutpostServer.start()
-	-- PROBE-7's refills are Robux products: their swings go on the pick.
+	-- The swing refills are Robux products: their swings go on the pick.
 	StoreServer.addSwings = OutpostServer.addSwings
 	-- Swing restores (Shared.SwingRestore): arena streaks, dungeons, coupons.
 	require(script.Parent.Systems.Restores).swings = OutpostServer.restoreSwings
@@ -152,6 +152,8 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			-- pathway of islands to a brainrot boss (your kaiju come too).
 			local RiftServer = require(script.Parent.Systems.RiftServer)
 			RiftServer.gateAt = OutpostServer.veinGate
+			-- (and Brutus's bounty board: any boss, from his counter)
+			RiftServer.bountyAt = OutpostServer.bountyCounter
 			RiftServer.start(OutpostServer.site())
 			-- The Kaiju Arena, down the Shelter's stairs: rows of courts, a pad
 			-- at each end to wait on, stakes, and every kaiju battle fought there.

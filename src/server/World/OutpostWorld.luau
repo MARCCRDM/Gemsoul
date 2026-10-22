@@ -4,11 +4,12 @@
 	stands the Shelter, the base players arrive in (an armoured barracks on
 	landing legs, ramps down from its doors: the mech garage with its
 	eight bays and a door at each end, the Store, the player Market, the Gem
-	Gallery, the leaderboard and the kaiju arena, and the crew); outside is the
-	quarry, where they mine and hunt: the Loop, four biomes round the core
-	between four haul roads due north, east, south and west, each with its
-	own ground (Roblox terrain, Shared.Frontier.ground: their borders sway
-	and mix, and the land rises where nothing stands), rock and landmarks
+	Gallery, the Hall of Fame, Brutus's bounty booth, the kaiju arena and
+	the crew); outside is the quarry, where they mine and hunt: the Loop,
+	four biomes round the core between four haul roads due north, east,
+	south and west, each with its own ground (Roblox terrain,
+	Shared.Frontier.ground: their borders sway and mix, and the land rises
+	where nothing stands), rock and landmarks
 	(Shared.Frontier.Biomes; no sign names one). A working frontier outpost
 	runs along the north edge (habitat modules strung on
 	tubes, a refinery tower, a drill rig over its pit, conveyors, pipes and
@@ -20,11 +21,13 @@
 	      Model, Spawn (CFrame: in the Shelter's garage lane, facing bay 04's
 	      Mole drill, on its floor: Shared.Outpost.ShelterLift over the
 	      quarry's),
-	      Board (BasePart with the leaderboard's face), Stations ({ Store, Market }:
+	      Board (BasePart with the Hall of Fame's face: Shared.HallOfFame),
+	      Bounty ({ Counter, Posters }: Brutus's bounty terminal, for its
+	      prompt, and the WANTED posters behind him), Stations ({ Store, Market }:
 	      the Shelter's counters, for their prompts), Crew ({ { Id, CFrame } }:
 	      where the Shelter's crew stand, by Shared.Vendors id, for
-	      OutpostServer to build them: PROBE-7 and Brutus among them, the
-	      refills and the duels), Shelter ({ Box, Lift, Ramps,
+	      OutpostServer to build them: Brutus among them, behind his
+	      bounty counter), Shelter ({ Box, Lift, Ramps,
 	      Feet }: its half size, x and z, kept clear of rocks; how high its
 	      floor stands; each ramp's footprint, { Middle (on the quarry
 	      floor), Half (half sizes, x and z), SlopeHalf (the slope's half
@@ -72,6 +75,9 @@ OutpostWorld.Rules = (function()
 	end)
 	return if ok then module else nil
 end)()
+-- Posters on Brutus's bounty wall: one for each boss behind the Rift Gates
+-- (Shared.Bounties; OutpostServer draws them).
+OutpostWorld.BountyPosters = 10
 
 -- Imported art (ServerStorage.Assets) when it's there; plain parts when not.
 local AssetKit = (function()
@@ -689,27 +695,6 @@ local function strut(parent, a: Vector3, b: Vector3, radius: number, color: Colo
 		material or Enum.Material.Metal,
 		"Cylinder"
 	)
-end
-
--- The leaderboard: a tall twin-panel billboard on legs.
-local function billboard(parent, at: CFrame)
-	local m = folder(parent, "Leaderboard")
-	for _, x in { -13, 13 } do
-		part(m, at * CFrame.new(x, 9, 0), Vector3.new(1.2, 18, 1.2), HULL_DARK, Enum.Material.Metal)
-		part(m, at * CFrame.new(x, 0.5, 0), Vector3.new(3, 1, 3), HAZARD, Enum.Material.Metal)
-	end
-	local frame = part(m, at * CFrame.new(0, 17, 0.3), Vector3.new(30, 15, 0.6), HULL_DARK, Enum.Material.Metal)
-	local face = part(
-		m,
-		at * CFrame.new(0, 17, -0.05),
-		Vector3.new(28.5, 13.5, 0.2),
-		Color3.fromRGB(10, 16, 28),
-		Enum.Material.SmoothPlastic
-	)
-	face.Name = "BoardFace"
-	part(m, frame.CFrame * CFrame.new(0, 7.8, 0), Vector3.new(30.4, 0.6, 0.9), STEEL, Enum.Material.Metal)
-	light(face, Color3.fromRGB(220, 230, 240), 22, 0.8)
-	return face
 end
 
 -- The season, outside only: carved pumpkins at the Shelter's landing and in
@@ -1371,6 +1356,140 @@ local function gemGallery(parent, at: CFrame)
 	return m
 end
 
+-- The Hall of Fame (Shared.HallOfFame draws its face: Server.OutpostServer):
+-- a big display on the Shelter's east wall, `at` its foot on the floor,
+-- facing into the hall. A dark steel backing with a gold trim round the
+-- face, a cornice over it with lamps lighting it, a pylon either side with
+-- a strip in its hall's colour (PvP red on the left as you face it, PvE
+-- teal on the right), and a dais in front with the three trophies.
+local HOF_GOLD = Color3.fromRGB(214, 170, 82)
+local HOF_SILVER = Color3.fromRGB(196, 202, 214)
+local HOF_BRONZE = Color3.fromRGB(176, 112, 64)
+local function trophy(parent, at: CFrame, color: Color3, scale: number)
+	-- A cup on a two-step plinth: foot, stem, bowl, two handles.
+	solid(part(parent, at * CFrame.new(0, 1.1 * scale, 0), Vector3.new(2.2, 2.2, 2.2) * scale, HULL_DARK, Enum.Material.Metal))
+	part(parent, at * CFrame.new(0, 2.3 * scale, 0), Vector3.new(2.5, 0.2, 2.5) * scale, color, Enum.Material.Metal)
+	disc(parent, at * CFrame.new(0, 2.5 * scale, 0), 0.6 * scale, 0.2 * scale, color, Enum.Material.Metal)
+	part(parent, at * CFrame.new(0, 2.95 * scale, 0), Vector3.new(0.3, 0.8, 0.3) * scale, color, Enum.Material.Metal)
+	part(parent, at * CFrame.new(0, 3.75 * scale, 0), Vector3.new(1.3, 1.3, 1.3) * scale, color, Enum.Material.Metal, "Ball")
+	disc(parent, at * CFrame.new(0, 4.25 * scale, 0), 0.72 * scale, 0.3 * scale, color, Enum.Material.Metal)
+	for _, s in { -1, 1 } do
+		part(parent, at * CFrame.new(s * 0.78 * scale, 3.85 * scale, 0), Vector3.new(0.18, 0.7, 0.18) * scale, color, Enum.Material.Metal)
+	end
+end
+local function hallOfFame(parent, at: CFrame)
+	local m = folder(parent, "HallOfFame")
+	local w, h = 40, 19 -- Shared.HallOfFame.Size
+	local mid = 6 + h / 2
+	part(m, at * CFrame.new(0, mid, 0.5), Vector3.new(w + 3, h + 3, 0.8), HULL_DARK, Enum.Material.Metal)
+	local face = part(m, at * CFrame.new(0, mid, -0.05), Vector3.new(w, h, 0.2), Color3.fromRGB(8, 11, 20), Enum.Material.SmoothPlastic)
+	face.Name = "BoardFace"
+	for _, s in { -1, 1 } do
+		part(m, at * CFrame.new(0, mid + s * (h / 2 + 0.4), -0.12), Vector3.new(w + 1.6, 0.5, 0.3), HOF_GOLD, Enum.Material.Metal)
+		part(m, at * CFrame.new(s * (w / 2 + 0.4), mid, -0.12), Vector3.new(0.5, h + 1.6, 0.3), HOF_GOLD, Enum.Material.Metal)
+	end
+	-- The cornice, its lamps tipped down at the face.
+	local cornice = part(m, at * CFrame.new(0, mid + h / 2 + 2.4, -1.8), Vector3.new(w + 6, 1.2, 4), HULL_DARK, Enum.Material.Metal)
+	for i = -2, 2 do
+		local lamp = part(m, cornice.CFrame * CFrame.new(i * 8.4, -0.66, -0.9), Vector3.new(2.6, 0.12, 1), AMBER, Enum.Material.Neon)
+		light(lamp, Color3.fromRGB(255, 232, 200), 26, 1.1, true)
+	end
+	-- The pylons: PvP (left as you face it: local +X), PvE (right).
+	for _, spec in { { 1, Color3.fromRGB(255, 84, 72) }, { -1, Color3.fromRGB(80, 214, 196) } } do
+		local x = spec[1] * (w / 2 + 2.4)
+		part(m, at * CFrame.new(x, (mid + h / 2 + 3) / 2, -0.4), Vector3.new(2.4, mid + h / 2 + 3, 1.8), HULL_DARK, Enum.Material.Metal)
+		local strip = part(m, at * CFrame.new(x, (mid + h / 2 + 2) / 2 + 0.5, -1.32), Vector3.new(0.4, mid + h / 2 + 1, 0.06), spec[2], Enum.Material.Neon)
+		light(strip, spec[2], 12, 0.5)
+	end
+	-- The dais, a runner up its middle, and the trophies: gold in the
+	-- middle, silver and bronze either side.
+	solid(part(m, at * CFrame.new(0, 0.25, -4.6), Vector3.new(w + 6, 0.5, 7.2), CONCRETE, Enum.Material.Concrete))
+	part(m, at * CFrame.new(0, 0.26, -8.22), Vector3.new(w + 6, 0.52, 0.16), HOF_GOLD, Enum.Material.Metal)
+	part(m, at * CFrame.new(0, 0.51, -4.6), Vector3.new(10, 0.04, 7.2), Color3.fromRGB(110, 30, 28), Enum.Material.Fabric)
+	trophy(m, at * CFrame.new(0, 0.5, -5.6), HOF_GOLD, 1.15)
+	trophy(m, at * CFrame.new(7.5, 0.5, -5.2), HOF_SILVER, 0.9)
+	trophy(m, at * CFrame.new(-7.5, 0.5, -5.2), HOF_BRONZE, 0.9)
+	-- Two steel benches out on the floor, facing it.
+	for _, x in { -11, 11 } do
+		local bench = at * CFrame.new(x, 0, -17)
+		solid(part(m, bench * CFrame.new(0, 1.5, 0), Vector3.new(9, 0.4, 2.2), STEEL, Enum.Material.DiamondPlate))
+		for _, leg in { -3.6, 3.6 } do
+			part(m, bench * CFrame.new(leg, 0.65, 0), Vector3.new(0.5, 1.3, 1.8), HULL_DARK, Enum.Material.Metal)
+		end
+	end
+	return face
+end
+
+-- Brutus's bounty booth, `at` its back on the Shelter's east wall, facing
+-- into the hall: a partition either side, a counter across the front with
+-- the bounty terminal on it (its prompt opens the bounty board: every Rift
+-- boss, Shared.Bounties), a lightbox over it saying BOUNTIES, and on the
+-- wall behind him the WANTED posters (OutpostServer draws them), crossed
+-- blades over them. A red rug in front of the counter.
+local ARENA_RED = Color3.fromRGB(214, 84, 70)
+local function bountyBooth(parent, at: CFrame, posters: number)
+	local m = folder(parent, "BountyBooth")
+	local half, deep = 9.2, 11
+	for _, s in { -1, 1 } do
+		-- (the partitions: plate, a rust band; the posts up to the lightbox)
+		solid(part(m, at * CFrame.new(s * half, 3.5, -deep / 2), Vector3.new(0.6, 7, deep), Color3.fromRGB(96, 100, 110), Enum.Material.Metal))
+		part(m, at * CFrame.new(s * half, 6.2, -deep / 2), Vector3.new(0.66, 1.2, deep), Color3.fromRGB(128, 76, 50), Enum.Material.CorrodedMetal)
+		solid(part(m, at * CFrame.new(s * half, 7.2, -deep), Vector3.new(0.9, 14.4, 0.9), HULL_DARK, Enum.Material.Metal))
+	end
+	-- The lightbox: dark letters on a lit face, a red bar under it.
+	local box = part(m, at * CFrame.new(0, 13.2, -deep), Vector3.new(half * 2, 2.6, 1), HULL_DARK, Enum.Material.Metal)
+	local lit = part(m, box.CFrame * CFrame.new(0, 0.1, -0.52), Vector3.new(half * 2 - 1.2, 2, 0.06), Color3.fromRGB(240, 232, 214), Enum.Material.SmoothPlastic)
+	lit.Name = "Lightbox"
+	letters(lit, Enum.NormalId.Front, lit.Size, "BOUNTIES", PLATE_INK, 0.02)
+	light(lit, Color3.fromRGB(255, 236, 214), 14, 0.7)
+	part(m, box.CFrame * CFrame.new(0, -1.45, -0.3), Vector3.new(half * 2, 0.3, 0.5), ARENA_RED, Enum.Material.SmoothPlastic)
+	-- The counter, and the terminal on it.
+	local counter = at * CFrame.new(0, 0, -deep + 2.2)
+	solid(part(m, counter * CFrame.new(0, 1.7, 0), Vector3.new(15, 3.4, 2.4), HULL_DARK, Enum.Material.Metal))
+	part(m, counter * CFrame.new(0, 3.5, -0.1), Vector3.new(15.4, 0.2, 2.8), STEEL, Enum.Material.Metal)
+	part(m, counter * CFrame.new(0, 2.4, -1.22), Vector3.new(15, 0.5, 0.06), ARENA_RED, Enum.Material.SmoothPlastic)
+	local terminal = part(
+		m,
+		counter * CFrame.new(-3.5, 4.3, 0) * CFrame.Angles(math.rad(-20), 0, 0),
+		Vector3.new(3.2, 1.8, 0.3),
+		HULL_DARK,
+		Enum.Material.Metal
+	)
+	terminal.Name = "BountyTerminal"
+	painted(m, terminal.CFrame * CFrame.new(0, 0, -0.17), Vector3.new(2.8, 1.2, 0.02), "BOUNTIES", Color3.fromRGB(255, 186, 120))
+	light(terminal, Color3.fromRGB(255, 170, 120), 8, 0.6)
+	-- The posters: two rows on a backing on the wall, the crossed blades over them.
+	part(m, at * CFrame.new(0, 9.4, -0.35), Vector3.new(16.6, 8.8, 0.3), Color3.fromRGB(44, 40, 38), Enum.Material.Wood)
+	local list = {}
+	local perRow = math.ceil(posters / 2)
+	for i = 1, posters do
+		local row = (i - 1) // perRow
+		local col = (i - 1) % perRow
+		local x = (col - (perRow - 1) / 2) * 3.2
+		local poster = part(
+			m,
+			at * CFrame.new(x, 11.3 - row * 4.1, -0.56) * CFrame.Angles(0, 0, math.rad(((i * 37) % 7 - 3) * 0.8)),
+			Vector3.new(2.8, 3.8, 0.08),
+			Color3.fromRGB(214, 200, 170),
+			Enum.Material.SmoothPlastic
+		)
+		poster.Name = "Poster" .. i
+		table.insert(list, poster)
+	end
+	disc(m, at * CFrame.new(0, 15.6, -0.3) * CFrame.Angles(math.rad(90), 0, 0), 1.3, 0.2, ARENA_RED, Enum.Material.Metal)
+	for _, s in { -1, 1 } do
+		part(m, at * CFrame.new(0, 15.6, -0.5) * CFrame.Angles(0, 0, math.rad(s * 38)), Vector3.new(0.35, 5.2, 0.12), STEEL, Enum.Material.Metal)
+		part(m, at * CFrame.new(s * 1.6, 13.55, -0.5) * CFrame.Angles(0, 0, math.rad(s * 38)), Vector3.new(0.9, 0.25, 0.16), HULL_DARK, Enum.Material.Metal)
+	end
+	-- The rug in front of the counter, and a lamp over the booth, tucked
+	-- up behind the lightbox.
+	part(m, at * CFrame.new(0, 0.03, -deep - 4), Vector3.new(14, 0.06, 7), Color3.fromRGB(104, 32, 28), Enum.Material.Fabric)
+	part(m, at * CFrame.new(0, 0.04, -deep - 7.4), Vector3.new(14, 0.07, 0.24), HOF_GOLD, Enum.Material.Metal)
+	local lamp = part(m, at * CFrame.new(0, 12.1, -deep + 1.1), Vector3.new(12, 0.2, 1), AMBER, Enum.Material.Neon)
+	light(lamp, Color3.fromRGB(255, 220, 186), 20, 0.9, true)
+	return { Counter = terminal, Posters = list }
+end
+
 -- The Shelter: the outpost's base in the middle of the basin, built like a
 -- barracks: a block of dark armour plate with rusted inserts and red running
 -- lights, a raised deck over the garage with two exhaust stacks glowing red,
@@ -1385,9 +1504,8 @@ end
 --   The hall: the kaiju arena in the middle (a steel stage, open floor
 --   round it), the Store and the player Market as shopfronts in the west
 --   wall, the Gem Gallery and Ilsa's desk next to the Market along the
---   south wall, the leaderboard on the east, INFO-9's kiosk by the arena;
---   Brutus (duels) and PROBE-7 (refills) stand on their own, no gate or
---   station.
+--   south wall, the Hall of Fame and Brutus's bounty booth along the east
+--   wall, INFO-9's kiosk by the arena.
 --   One wide door south, to the quarry.
 -- Inside it's a working base, not a showroom: matte concrete underfoot,
 -- plate walls with a rusted band, warm work lights, and few signs: a word
@@ -1396,7 +1514,7 @@ end
 -- outside (pumpkins at the landing). `at` is its floor's frame (the
 -- quarry's, lifted).
 -- Returns its places, in `at`'s frame:
--- { Parking, Spawn, Board (a CFrame for its builder), Store,
+-- { Parking, Spawn, Board and Bounty (CFrames for their builders), Store,
 --   Market (the counters, for their prompts), Crew ({ Id, CFrame }: where
 --   its crew stand), Box (half sizes, x and z), Ramps ({ { Middle, Half,
 --   SlopeHalf } }: each ramp and its landing, on the quarry floor, Half
@@ -1970,11 +2088,9 @@ local function shelter(parent, at: CFrame, rules)
 
 	-- The crew: the old town's shopkeepers, each by the station they run
 	-- now (OutpostServer builds them, Shared.Vendors has their lines),
-	-- INFO-9, the info rep, by its kiosk, and PROBE-7 on its feet where its
-	-- station stood. They stand beside their counters, not at them, so
-	-- their Talk prompt and the counter's don't sit on top of each other;
-	-- Brutus and PROBE-7 have no counter: talk to them for a duel or a
-	-- refill. Ilsa buys gems at a desk in the Gem Gallery, the cases
+	-- INFO-9, the info rep, by its kiosk, and Brutus behind his bounty
+	-- counter. They stand beside their counters, not at them, so their Talk
+	-- prompt and the counter's don't sit on top of each other. Ilsa buys gems at a desk in the Gem Gallery, the cases
 	-- behind: a pale-topped counter lit gold along its front edge, a
 	-- balance on top, facing the hall.
 	local gold = GALLERY_COLORS[5]
@@ -2005,8 +2121,7 @@ local function shelter(parent, at: CFrame, rules)
 	end
 	local crew = {
 		{ Id = "GemBuyer", CFrame = stand(GALLERY.Middle.X, GALLERY.Middle.Z + 4.5, GALLERY.Middle.X, 0) }, -- Ilsa, behind her desk
-		{ Id = "ArenaMaster", CFrame = stand(36, 46, 0, 40) }, -- Brutus, where the duel gate stood
-		{ Id = "Probe", CFrame = stand(68, 36, 0, 36) }, -- PROBE-7, where its station stood
+		{ Id = "ArenaMaster", CFrame = stand(W - 4.5, 42, 0, 42) }, -- Brutus, behind his bounty counter
 		{ Id = "Broker", CFrame = stand(-61, 52, 0, 52) }, -- Tamsin, by the Market
 		{ Id = "Outfitter", CFrame = stand(-58, 25.5, 0, 25.5) }, -- Borin, by the Store's suits
 		{ Id = "Foreman", CFrame = stand(-24.5, 49, 0, 50) }, -- Garrick, by the door
@@ -2020,7 +2135,8 @@ local function shelter(parent, at: CFrame, rules)
 	return {
 		Parking = parking,
 		Spawn = facingPoint(spawnAt, mech),
-		Board = at3(72, 0, 2) * CFrame.Angles(0, math.rad(90), 0),
+		Board = at3(W - 0.2, 0.86, 10) * CFrame.Angles(0, math.rad(90), 0),
+		Bounty = at3(W - 0.2, 0.86, 46) * CFrame.Angles(0, math.rad(90), 0),
 		Store = store,
 		Market = market,
 		Crew = crew,
@@ -2434,9 +2550,10 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 	end
 
-	-- The leaderboard on the Shelter's east wall; Halloween patches out in
-	-- the quarry.
-	local face = billboard(root, home.Board)
+	-- The Hall of Fame and Brutus's bounty booth along the Shelter's east
+	-- wall; Halloween patches out in the quarry.
+	local face = hallOfFame(root, home.Board)
+	local bounty = bountyBooth(root, home.Bounty, OutpostWorld.BountyPosters)
 	local festiveExclusions = harvestPatches(root, at)
 	sky(root, at)
 
@@ -2658,6 +2775,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		-- The stairs down to the Kaiju Arena: { Landing (CFrame), Size, Top (CFrame) }.
 		Stairs = home.Stairs,
 		Board = face,
+		Bounty = bounty,
 		Spots = spots,
 		ArrivalSpots = arrivalSpots,
 		NearSpots = nearSpots,

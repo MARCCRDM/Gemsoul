@@ -152,6 +152,7 @@ local PlayerData = {
 		synced[p] = (synced[p] or 0) + 1
 	end,
 	milestone = function() end,
+	count = function() end,
 	CharacterChanged = signal(),
 }
 local gemsAwarded = 0
@@ -188,7 +189,27 @@ local ChatChannels = {
 }
 local TopPlayers = {
 	board = function(name)
-		return { { Name = "Ana", Value = if name == "Gear" then 210 else 7 } }
+		return { { Name = "Ana", Value = if name == "Gear" then 210 else 7, UserId = 7 } }
+	end,
+	isGlobal = function()
+		return false
+	end,
+}
+-- Brutus's bounties (Shared.Bounties): two bosses on one ladder, posters
+-- drawn as a label naming each.
+local bountyDrawn = {}
+local Bounties = {
+	Gate = "Bounty",
+	Reach = 16,
+	Poster = R.Vector2.new(280, 380),
+	list = function()
+		return { { Biome = "Ashfall", Element = "Fire", Bosses = { { Id = "Drago", Name = "Bombardiro Drago" }, { Id = "SahurTrio", Name = "Sahur Trio" } } } }
+	end,
+	poster = function(gui, boss)
+		local l = R.Instance.new("TextLabel")
+		l.Text = boss.Name
+		l.Parent = gui
+		table.insert(bountyDrawn, boss.Id)
 	end,
 }
 
@@ -203,6 +224,7 @@ local function load(path, name, extra)
 		Vector2 = R.Vector2,
 		Color3 = R.Color3,
 		UDim2 = R.UDim2,
+		UDim = R.UDim,
 		Enum = R.Enum,
 		NumberRange = R.NumberRange,
 		NumberSequence = R.NumberSequence,
@@ -269,10 +291,10 @@ check(
 	"Rock sizes aren't weighted rarest-last"
 )
 check(Rules.damage("Survey", false) == 1 and Rules.damage("Survey", true) == 2, "Swing damage wrong")
--- PROBE-7 sells refills (swings, for Robux: each a Store product), not
+-- Garrick sells refills (swings, for Robux: each a Store product), not
 -- picks; each is cheaper by the swing the bigger it is, and every pick a
 -- save held from before turns into swings.
-check(#Rules.PickOrder == 1 and Rules.Picks.Survey.Price == 0, "The Probe sells picks again")
+check(#Rules.PickOrder == 1 and Rules.Picks.Survey.Price == 0, "Picks are on sale again")
 for i, id in Rules.RefillOrder do
 	local refill = Rules.Refills[id]
 	check(refill.Swings > 0 and refill.Robux > 0 and type(refill.Product) == "string", id .. " refill incomplete")
@@ -368,7 +390,7 @@ local Server = (function()
 	sharedFolder.Name = "Shared"
 	sharedFolder.Parent = replicated
 	for _, name in
-		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "MechPilot", "Frontier", "SwingRestore", "Vendors" }
+		{ "Outpost", "Config", "GemConfig", "Mine", "PickaxeLooks", "Spar", "Tutorial", "MechPilot", "Frontier", "SwingRestore", "Vendors", "HallOfFame", "Bounties" }
 	do
 		local stub = R.Instance.new("Folder")
 		stub.Name = name
@@ -389,6 +411,8 @@ local Server = (function()
 				MechPilot = load("src/shared/MechPilot.luau", "MechPilot", {}),
 				SwingRestore = load("src/shared/SwingRestore.luau", "SwingRestore", {}),
 				Vendors = Vendors,
+				HallOfFame = load("src/shared/HallOfFame.luau", "HallOfFame", {}),
+				Bounties = Bounties,
 				Builder = Builder,
 				Intro = { tutorialMined = function() return nil end },
 				OutpostWorld = World,
@@ -456,7 +480,7 @@ local Server = (function()
 	env.__serverNow = function()
 		return now
 	end
-	for _, name in { "root", "body", "Probe" } do
+	for _, name in { "root", "body" } do
 		source = string.gsub(source, name .. "%.Position", name .. ".CFrame.Position")
 	end
 	return luau.load(source, { debugName = "OutpostServer", environment = env })()
@@ -557,22 +581,61 @@ do
 		check(heart:FindFirstChildOfClass("PointLight") and heart:FindFirstChildOfClass("ParticleEmitter"), "The gate has no glow or embers")
 	end
 end
--- (No PROBE-7 station or duel gate: PROBE-7 and Brutus are crew, below.)
-check(site.Probe == nil and site.Gate == nil, "A Probe station or a duel gate is back")
+-- (No PROBE-7 and no duel gate: Garrick sells the refills, Brutus is
+-- behind his bounty counter, below.)
+check(site.Probe == nil and site.Gate == nil and Vendors.Probe == nil, "PROBE-7 or a duel gate is back")
 for _, d in site.Model:GetDescendants() do
 	local kind = d.ClassName == "ProximityPrompt" and d:GetAttribute("PromptKind")
 	check(kind ~= "Probe" and kind ~= "Gate", "A Probe or Gate prompt is back")
+	check(not (d:IsA("TextLabel") and string.find(d.Text, "PROBE", 1, true)), "PROBE-7 is still named in the Shelter")
+end
+-- Brutus's bounty booth: its terminal opens the bounty board (Client.
+-- RiftClient: every Rift boss), and a WANTED poster for each boss.
+do
+	local counter = site.Bounty and site.Bounty.Counter
+	local prompt = counter and counter:FindFirstChildOfClass("ProximityPrompt")
+	check(prompt and prompt:GetAttribute("PromptKind") == "Bounty", "Brutus's counter has no Bounty prompt")
+	check(Server.bountyCounter() == counter, "The Rift doesn't know where Brutus's counter is")
+	check(#site.Bounty.Posters >= 10, "Not a poster for every Rift boss: " .. #site.Bounty.Posters)
+	check(table.concat(bountyDrawn, ",") == "Drago,SahurTrio", "The posters aren't the bounties, in order")
+	local poster = site.Bounty.Posters[1]:FindFirstChildOfClass("SurfaceGui")
+	check(poster and poster:FindFirstChildOfClass("TextLabel").Text == "Bombardiro Drago", "The first poster isn't drawn")
+	check(site.Bounty.Posters[3]:FindFirstChildOfClass("SurfaceGui") == nil, "A poster for a boss that isn't there")
+end
+-- The Hall of Fame: the board on the east wall, its five columns from
+-- TopPlayers (Shared.HallOfFame).
+do
+	Server._drawBoard()
+	local gui = site.Board:FindFirstChild("Board")
+	check(gui and gui.CanvasSize == R.Vector2.new(1600, 760), "The Hall of Fame isn't drawn on the board")
+	local texts = {}
+	for _, d in gui:GetDescendants() do
+		if d:IsA("TextLabel") then
+			texts[d.Text] = (texts[d.Text] or 0) + 1
+		end
+	end
+	check(texts["HALL OF FAME"] == 1 and texts["PVP HALL OF FAME"] == 1 and texts["PVE HALL OF FAME"] == 1, "The halls' titles")
+	for _, title in { "1V1 DUELS", "1V1 + KAIJU", "KAIJU BATTLES", "BOUNTY HUNTERS", "TOP MINERS" } do
+		check(texts[title] == 1, "No " .. title .. " column")
+	end
+	check(texts.Ana == 5 and texts.UNCLAIMED == nil, "Each column's champion isn't the board's first")
+	local children = #gui:GetDescendants()
+	Server._drawBoard()
+	check(#gui:GetDescendants() == children, "The board was drawn twice over")
+	local headshot = gui:FindFirstChild("Headshot", true)
+	check(headshot and string.find(headshot.Image, "id=7", 1, true), "The champion's face isn't theirs")
 end
 -- The Shelter's Store and Market counters open those screens (OutpostScene).
 for kind, counter in { Store = site.Stations.Store, Market = site.Stations.Market } do
 	local prompt = counter:FindFirstChildOfClass("ProximityPrompt")
 	check(prompt and prompt:GetAttribute("PromptKind") == kind, "The Shelter's " .. kind .. " has no prompt")
 end
--- The Shelter's crew: the old town's shopkeepers, INFO-9, the info rep,
--- and PROBE-7 (the refills), each built where the Shelter puts them, on its
--- floor (up on its legs), in its hall (south of the garage's barrier),
--- clear of each other, the counters and where players arrive. PROBE-7 opens
--- the Exchange and Brutus finds a duel, first thing they offer. Every line they
+-- The Shelter's crew: the old town's shopkeepers and INFO-9, the info rep,
+-- each built where the Shelter puts them, on its floor (up on its legs),
+-- in its hall (south of the garage's barrier), clear of each other, the
+-- counters and where players arrive. Garrick sells refills and Brutus
+-- shows the bounties, first thing they offer (Brutus from behind his
+-- counter). Every line they
 -- offer is a reply, an action the dialogue knows, or a topic of those; and
 -- every one of INFO-9's lines and tips is in the Spanish table.
 do
@@ -583,11 +646,15 @@ do
 		Outfitter = "Borin",
 		Foreman = "Garrick",
 		InfoBot = "INFO-9",
-		Probe = "PROBE-7",
 	}
-	check(#crewBuilt == 7 and #site.Crew == 7, "The Shelter's crew isn't all there: " .. #crewBuilt)
-	check(Vendors.Probe.Options[1].Action == "Exchange", "PROBE-7 doesn't open the Exchange first")
-	check(Vendors.ArenaMaster.Options[1].Action == "Duels", "Brutus doesn't find a duel first")
+	check(#crewBuilt == 6 and #site.Crew == 6, "The Shelter's crew isn't all there: " .. #crewBuilt)
+	check(Vendors.Foreman.Options[1].Action == "Exchange", "Garrick doesn't sell the refills first")
+	check(Vendors.ArenaMaster.Options[1].Action == "Bounties", "Brutus doesn't show the bounties first")
+	for _, built in crewBuilt do
+		if built.Id == "ArenaMaster" then
+			check((built.Frame.Position - site.Bounty.Counter.CFrame.Position).Magnitude < 10, "Brutus isn't at his bounty counter")
+		end
+	end
 	local dialogue = fs.readFile(ROOT .. "/src/client/Dialogue.client.luau")
 	local function flat(p)
 		local q = p - Rules.Location.Position
@@ -1155,7 +1222,7 @@ check(profiles[ana].Outpost.Picks[profiles[ana].Outpost.Active] == swingsBefore,
 check(nextRock.Hp == nextRock.MaxHp, "A refused swing chipped the rock")
 profiles[ana].Gems = nil
 
--- A pick wears out and breaks; then the Probe sells refills.
+-- A pick wears out and breaks; then Garrick sells refills.
 profiles[ana].Outpost.Picks.Survey = 1
 profiles[ana].Outpost.SurveyAt = 86400 * 20000 + math.floor(now) -- (no swings regained meanwhile)
 advance(Rules.ClaimSeconds + 1)
@@ -1198,7 +1265,7 @@ check(handlers.OutpostState(ana).State.Picks.Survey == 5, "The free pick didn't 
 profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * Rules.Picks.Survey.Swings
 check(handlers.OutpostState(ana).State.Picks.Survey == Rules.Picks.Survey.Swings, "The free pick didn't refill")
 
--- A save from when the Probe sold picks: their swings become extra swings
+-- A save from when picks were sold: their swings become extra swings
 -- on the free pick, which is back in hand.
 profiles[ben].Outpost = {
 	Picks = { Survey = 10, Titan = 100, Plasma = 40 },
@@ -1211,7 +1278,7 @@ check(
 	migrated.Picks.Survey == 10 + 100 + 60 and migrated.Picks.Titan == nil and migrated.Picks.Plasma == nil,
 	"An old save's picks didn't turn into swings"
 )
-check(migrated.Active == "Survey", "An old save kept a pick the Probe doesn't sell in hand")
+check(migrated.Active == "Survey", "An old save kept a pick nobody sells in hand")
 
 -- The secrets are retired: none hidden, none to find. The Motor Pool has
 -- its mech bays.
@@ -1249,5 +1316,5 @@ check(
 print(
 	"PASS: "
 		.. checks
-		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, the Probe's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave)"
+		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, Garrick's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave)"
 )

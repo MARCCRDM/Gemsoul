@@ -98,6 +98,10 @@ function Duels.record(player: Player)
 		return nil
 	end
 	profile.Duel = profile.Duel or { Rating = Matchmaking.StartRating, Wins = 0, Losses = 0, Streak = 0 }
+	-- (Solo: 1v1 wins, for the Hall of Fame. A record from before it counts
+	-- every win it had as one.)
+	local record = profile.Duel :: any
+	record.Solo = record.Solo or record.Wins or 0
 	return profile.Duel
 end
 
@@ -327,6 +331,9 @@ function finish(match, winner: number?, reason: string)
 					record.Rating = after
 				end
 				record.Wins += if won then 1 else 0
+				if won and #match.Teams[1] == 1 and #match.Teams[2] == 1 then
+					(record :: any).Solo = ((record :: any).Solo or 0) + 1
+				end
 				record.Losses += if won then 0 else 1
 				record.Streak = if won then record.Streak + 1 else 0
 			end

@@ -416,10 +416,17 @@ function actions.Duels()
 	require(script.Parent.Modules.SocialUI).open("Arena")
 end
 
--- PROBE-7's refills.
+-- Brutus's bounty board (every Rift boss: Client.RiftClient), at his counter.
+function actions.Bounties()
+	local part = current and current.part
+	close()
+	require(script.Parent.Modules.RiftClient).openGate("Bounty", if part then part.Position else nil)
+end
+
+-- Garrick's swing refills.
 function actions.Exchange()
 	close()
-	require(script.Parent.Modules.OutpostScene).openProbe()
+	require(script.Parent.Modules.OutpostScene).openRefills()
 end
 
 local function open(vendorId: string, part: BasePart)

@@ -190,7 +190,7 @@ Buying opens Roblox's purchase prompt (coins while `Config.TestCosmeticPrice` is
 
 **Party.** Invite up to three players in the server; they get an Accept / Decline popup. The party has a ready check, and the leader can kick members and set a **rally point** (Wilds, Arena, Quarry, Crafting Hall, Market) that draws a trail for everyone. Teammates' health shows at the top right with a marker over their heads. Monster kills reward every party member fighting nearby.
 
-**Top Players.** Global leaderboards (best gem ever owned, Wilds kills, Season level), or the current server when data stores aren't available.
+**Top Players.** Global leaderboards (best gem ever owned, Wilds kills, Season level), or the current server when data stores aren't available. In the Shelter they're drawn as the **Hall of Fame**: PvP (1v1 duels, 1v1 + Kaiju, Kaiju battles) and PvE (bosses slain, gems mined); see [docs/hall-of-fame.md](docs/hall-of-fame.md).
 
 ## Coins, Marks and getting started
 
@@ -219,7 +219,7 @@ Players whose Roblox language is Spanish see the game in Spanish (neutral Latin 
 
 ## Phones
 
-On a phone on its side (`UiKit.short()`: under 500 points tall), the Inventory is built compact: no stats column, everything else larger. The Market, Store, Season Path, Social and Surge Array windows lay out shorter so they show larger, and every window keeps clear of Roblox's buttons at the top (`UiKit.clearTopbar`). Desktop layouts are unchanged. PROBE-7's window (swing refills and the market) is as wide as a phone's screen, so it's drawn near full size; see [docs/probe-exchange.md](docs/probe-exchange.md). The lobby and fights are cleared down on a phone: Roblox's chat (top-bar bubble, bubbles over heads) instead of our chat box, level and coins at the top left, no online pill, icon buttons under PLAY, the next task as one slim strip, and no HEAVY button in a fight (hold ATTACK). See [docs/mobile.md](docs/mobile.md).
+On a phone on its side (`UiKit.short()`: under 500 points tall), the Inventory is built compact: no stats column, everything else larger. The Market, Store, Season Path, Social and Surge Array windows lay out shorter so they show larger, and every window keeps clear of Roblox's buttons at the top (`UiKit.clearTopbar`). Desktop layouts are unchanged. The SWING REFILLS window (Garrick's) is as wide as a phone's screen, so it's drawn near full size; see [docs/probe-exchange.md](docs/probe-exchange.md). The lobby and fights are cleared down on a phone: Roblox's chat (top-bar bubble, bubbles over heads) instead of our chat box, level and coins at the top left, no online pill, icon buttons under PLAY, the next task as one slim strip, and no HEAVY button in a fight (hold ATTACK). See [docs/mobile.md](docs/mobile.md).
 
 ## Code layout
 

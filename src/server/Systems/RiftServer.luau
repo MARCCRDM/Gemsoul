@@ -5,7 +5,9 @@
 	gone with it.
 
 	  Going in    "RiftEnter", vein, bossId, together: through a gate you're
-	              standing at. You join your party's trip if one of them is still on
+	              standing at, or (vein "Bounty", Shared.Bounties) from
+	              Brutus's bounty counter in the Shelter, against any boss
+	              on any biome's ladder (its element the ladder's). You join your party's trip if one of them is still on
 	              the way (up to RiftRun.Party), whatever boss they chose;
 	              or start one against `bossId`, from the gate's biome's
 	              ladder (RiftRun.Ladders, by the element of the biome the
@@ -68,7 +70,9 @@
 	  Leaving     "RiftLeave": through a way home you're at (the landing's,
 	              or the throne cave's once it's open), keeping what you found.
 	  The gate    "RiftPeek", vein: what going in looks like (the gate's
-	              card): { Party, Joining, Solo, Biome, Element, Ladder:
+	              card; for "Bounty", the bounty board's, with Ladders: one
+	              { Biome, Element, Ladder, Next } for each biome):
+	              { Party, Joining, Solo, Biome, Element, Ladder:
 	              { { Id, Name, Element, Threat, Level (bossLevel, at
 	              your party's kaiju), Group, Loot, Unlocked, Beaten,
 	              Need } }, Next (the boss it offers first), Boss (your
@@ -119,6 +123,7 @@ local Gems = require(script.Parent.Gems)
 local KaijuServer = require(script.Parent.KaijuServer)
 local KaijuWilds = require(script.Parent.KaijuWilds)
 local Party = require(script.Parent.Party)
+local Bounties = require(ReplicatedStorage.Shared.Bounties)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
@@ -1222,18 +1227,23 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 	if why then
 		return reply(false, why)
 	end
-	-- (At the gate itself.)
-	local gate = if type(vein) == "number" then RiftServer.gateAt(vein) else nil
+	-- (At the gate itself, or at Brutus's counter for a bounty.)
+	local bounty = vein == Bounties.Gate
+	local gate = if bounty then RiftServer.bountyAt() elseif type(vein) == "number" then RiftServer.gateAt(vein) else nil
 	local root = rootOf(player) :: BasePart
-	if not gate or (root.Position - gate.Position).Magnitude > RiftServer.Reach then
-		return reply(false, "Walk up to a Rift Gate first.")
+	if not gate or (root.Position - gate.Position).Magnitude > (if bounty then Bounties.Reach else RiftServer.Reach) then
+		return reply(false, if bounty then "Walk up to Brutus's counter first." else "Walk up to a Rift Gate first.")
 	end
 	local run = partyRun(player)
 	local boss, element = nil, nil
 	if not run then
-		-- The boss: picked from this gate's ladder, and open to them.
-		local biome = gateBiome(vein)
-		element = biome and biome.Element
+		-- The boss: picked from this gate's ladder (a bounty: from the
+		-- ladder it's on), and open to them.
+		local biome = if bounty then nil else gateBiome(vein)
+		element = if bounty then Bounties.elementOf(bossId) else biome and biome.Element
+		if bounty and not element then
+			return reply(false, "Pick a bounty first.")
+		end
 		local beaten = beatenBy(player)
 		if bossId == nil then
 			bossId = (RiftRun.nextBoss(element, beaten) or {}).Id
@@ -1299,7 +1309,10 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 					if party.Ready[member] and problem(member) == nil and #run.Members < RiftRun.Party then
 						join(run, member)
 					elseif not runOf[member] then
-						notify(member, player.DisplayName .. " went through a Rift Gate: walk up to any gate to follow.")
+						notify(
+							member,
+							player.DisplayName .. " went through a Rift Gate: walk up to any gate, or Brutus's counter, to follow."
+						)
 					end
 				end
 			end
@@ -1381,28 +1394,55 @@ local function peek(player: Player, vein: any)
 	local party = Party.of(player)
 	local size = if party then #party.Members else 1
 	local theirs = partyRun(player)
-	local biome = gateBiome(vein)
-	local element = biome and biome.Element
 	local beaten = beatenBy(player)
 	local levels = leadLevels(if theirs then theirs.Members elseif party then party.Members else { player })
-	local ladder = {}
-	for _, boss in RiftRun.ladder(element) do
-		local open, _, need = RiftRun.canFight(element, boss.Id, beaten)
-		portraitOf(boss)
-		table.insert(ladder, {
-			Id = boss.Id,
-			Name = boss.Name,
-			Element = boss.Element,
-			Threat = BossLoot.threat(boss),
-			Level = RiftRun.bossLevel(levels, boss),
-			Group = RiftRun.isGroup(boss),
-			Loot = boss.Loot,
-			Unlocked = open,
-			Beaten = beaten[boss.Id] or 0,
-			Need = need and need.Name,
+	-- One biome's ladder as its cards show it.
+	local function ladderOf(element: string?)
+		local ladder = {}
+		for _, boss in RiftRun.ladder(element) do
+			local open, _, need = RiftRun.canFight(element, boss.Id, beaten)
+			portraitOf(boss)
+			table.insert(ladder, {
+				Id = boss.Id,
+				Name = boss.Name,
+				Element = boss.Element,
+				Threat = BossLoot.threat(boss),
+				Level = RiftRun.bossLevel(levels, boss),
+				Group = RiftRun.isGroup(boss),
+				Loot = boss.Loot,
+				Unlocked = open,
+				Beaten = beaten[boss.Id] or 0,
+				Need = need and need.Name,
+			})
+		end
+		local nextUp = RiftRun.nextBoss(element, beaten)
+		return ladder, nextUp and nextUp.Id
+	end
+	if vein == Bounties.Gate then
+		-- Brutus's board: every biome's ladder, a tab each; the first
+		-- biome's up first.
+		local ladders = {}
+		for _, entry in Bounties.list() do
+			local ladder, nextId = ladderOf(entry.Element)
+			table.insert(ladders, { Biome = entry.Biome, Element = entry.Element, Ladder = ladder, Next = nextId })
+		end
+		local first = ladders[1] or {}
+		return reply(true, "", {
+			Party = size,
+			Joining = theirs ~= nil,
+			Solo = theirs == nil and size <= 1,
+			Bounty = true,
+			Ladders = ladders,
+			Biome = first.Biome,
+			Element = first.Element,
+			Ladder = first.Ladder or {},
+			Next = first.Next,
+			Boss = theirs and theirs.Boss.Name,
 		})
 	end
-	local nextUp = RiftRun.nextBoss(element, beaten)
+	local biome = gateBiome(vein)
+	local element = biome and biome.Element
+	local ladder, nextId = ladderOf(element)
 	return reply(true, "", {
 		Party = size,
 		Joining = theirs ~= nil,
@@ -1410,13 +1450,19 @@ local function peek(player: Player, vein: any)
 		Biome = biome and biome.Name,
 		Element = element,
 		Ladder = ladder,
-		Next = nextUp and nextUp.Id,
+		Next = nextId,
 		Boss = theirs and theirs.Boss.Name,
 	})
 end
 
 -- Vein `index`'s gate: where to stand (OutpostServer sets this).
 RiftServer.gateAt = function(_index: number): BasePart?
+	return nil
+end
+
+-- Brutus's bounty counter in the Shelter: where to stand for a bounty
+-- (OutpostServer sets this).
+RiftServer.bountyAt = function(): BasePart?
 	return nil
 end
 

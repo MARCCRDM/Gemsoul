@@ -10,8 +10,9 @@
 	             lottery: a gem rises in a beam of its rarity's colour while
 	             a reel spins through the rarities and lands on yours.
 	  Others     you see and hear their swings too (quieter), and their pops.
-	  Probe      PROBE-7's Exchange (talk to PROBE-7 in the Shelter, or
-	             it opens when your swings run out): buy refills.
+	  Refills    the SWING REFILLS window (Garrick, the mining foreman,
+	             sells them in the Shelter; it opens by itself when your
+	             swings run out): buy refills.
 	  Players    G at another miner challenges them to a duel, F invites
 	             them to your party.
 
@@ -69,7 +70,7 @@ local OutpostScene = {}
 local NODE_TAG = "OutpostNode"
 local active, busy = false, false
 local state = nil -- picks and record, from the server
-local probeCharge = nil -- the free pick's meter at PROBE-7, while drawn
+local probeCharge = nil -- the free pick's meter in the refills window, while drawn
 local finds = { Gems = 0, Rocks = 0 }
 local nextSwing = 0
 local hiddenDashboard: ScreenGui? = nil
@@ -206,7 +207,7 @@ local buttons = new("Frame", {
 UiKit.list(buttons, 8, true)
 local hint = text(
 	hud,
-	"Walk into a rock or click to mine  ·  Z spar  ·  G duel  ·  F invite  ·  E trade at PROBE-7",
+	"Walk into a rock or click to mine  ·  Z spar  ·  G duel  ·  F invite  ·  E talk to the crew",
 	14,
 	Color3.fromRGB(230, 238, 250),
 	IronUi.Bold,
@@ -809,7 +810,7 @@ end
 OutpostScene._nearestCritter = nearestCritter
 
 -- `walked`: you walked into it (Shared.WalkMine), so it's that rock, not a
--- critter, and an empty pick doesn't open PROBE-7 at you.
+-- critter, and an empty pick doesn't open the refills at you.
 function OutpostScene.swing(nodeId: number?, walked: boolean?)
 	-- (Not with your combat kit out: 1 puts it away.)
 	if not active or Spar.fighting(player) or next(openScreens) ~= nil then
@@ -902,13 +903,13 @@ function OutpostScene.swing(nodeId: number?, walked: boolean?)
 				UiKit.toast(result.Message, if result.NoPick or result.PouchFull then P.Bad else nil)
 			end
 			if result.NoPick then
-				OutpostScene.openProbe()
+				OutpostScene.openRefills()
 			end
 			return
 		end
 		if result.PickBroke then
 			UiKit.toast(
-				"Free pick out of charge! +1 swing every " .. Rules.rechargeEvery() .. ", or buy a refill at PROBE-7.",
+				"Free pick out of charge! +1 swing every " .. Rules.rechargeEvery() .. ", or buy a refill from Garrick.",
 				P.Bad
 			)
 			sound(CLANG, 0.6, 0.6)
@@ -920,11 +921,11 @@ function OutpostScene.swing(nodeId: number?, walked: boolean?)
 	end)
 end
 
--- The Probe: picks and the Market ---------------------------------------------------------------------
+-- Swing refills: your pick and what tops it up --------------------------------------------------------
 
 --[[
-	PROBE-7's window: your pick (the free Survey Pick in 3D, its charge
-	live), then the refills PROBE-7 sells for Robux (Shared.Outpost.Refills:
+	The SWING REFILLS window: your pick (the free Survey Pick in 3D, its
+	charge live), then the refills Garrick sells for Robux (Shared.Outpost.Refills:
 	swings on top of that charge, about how many rocks that is, what you'll
 	have after, and BUY for its Robux), your coins in the corner, and the
 	player market below.
@@ -933,13 +934,13 @@ end
 	screen and the cards are shorter, so the words stay full size. Where
 	everything sits, and what you're short of a price, is ProbeLayout.
 ]]
-local PROBE_SUBTITLE = "A survey probe that crashed here years ago, rewired into the outpost's trading post."
+local PROBE_SUBTITLE = "Swings for your pick, on top of its free charge. Bought swings are spent first."
 local CARD_TOP = Color3.fromRGB(14, 18, 28)
 local TRACK = Color3.fromRGB(30, 36, 52)
 
 local probe =
-	IronUi.window("ProbeExchange", 12, ProbeLayout.Desk.W, ProbeLayout.Desk.H, "🛰", Color3.fromRGB(80, 200, 255))
-probe.Title.Text = "PROBE-7 EXCHANGE"
+	IronUi.window("ProbeExchange", 12, ProbeLayout.Desk.W, ProbeLayout.Desk.H, "⛏", Color3.fromRGB(240, 178, 48))
+probe.Title.Text = "SWING REFILLS"
 probe.Subtitle.Text = PROBE_SUBTITLE
 UiKit.fit(probe.Subtitle)
 probe.Close.Activated:Connect(function()
@@ -974,7 +975,7 @@ local function commas(n: number): string
 	return s
 end
 
--- A pick in 3D, as PROBE-7 shows it: in its tier's own colour (a skin is
+-- A pick in 3D, as the refills window shows it: in its tier's own colour (a skin is
 -- looks only), leaning across the card, head and spike side on.
 local function pickView(parent: GuiObject, id: string, spec, size: number)
 	local view = new("ViewportFrame", {
@@ -1333,7 +1334,7 @@ local function pickCard(L)
 	}
 end
 
--- A refill PROBE-7 sells: its swings in big figures, about how many rocks
+-- A refill Garrick sells: its swings in big figures, about how many rocks
 -- that is, what you'll have after, and BUY for its Robux.
 local function refillCard(L, index: number, id: string)
 	local refill = Rules.Refills[id]
@@ -1518,7 +1519,7 @@ function drawProbe()
 	local L = ProbeLayout.design(screen.X, screen.Y)
 	local phone = L.Phone
 	probe.Resize(L.W, L.H)
-	probe.Subtitle.Text = if phone then "Refills, and the player market." else PROBE_SUBTITLE
+	probe.Subtitle.Text = if phone then "Swings for your pick." else PROBE_SUBTITLE
 	probe.Subtitle.Size = UDim2.new(0, L.W - 69 - 64 - 132 - 16, 0, 16)
 	probeBody.Position = UDim2.fromOffset(L.Side, L.Top)
 	probeBody.Size = UDim2.new(1, -L.Side * 2, 1, -L.Top)
@@ -1543,7 +1544,7 @@ probe.Gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 		drawProbe()
 	end
 end)
-function OutpostScene.openProbe()
+function OutpostScene.openRefills()
 	probe.Gui.Enabled = true
 	drawProbe()
 end
@@ -1650,6 +1651,13 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 		require(script.Parent.RiftClient).openGate(
 			prompt:GetAttribute("Vein"),
 			if gate and gate:IsA("BasePart") then gate.Position else nil
+		)
+	elseif kind == "Bounty" then
+		-- (Brutus's bounty board: every Rift boss, from his counter.)
+		local counter = prompt.Parent
+		require(script.Parent.RiftClient).openGate(
+			"Bounty",
+			if counter and counter:IsA("BasePart") then counter.Position else nil
 		)
 	elseif kind == "RiftExit" then
 		require(script.Parent.RiftClient).leave()
@@ -1918,10 +1926,10 @@ for _, spec in
 			end,
 		},
 		{
-			"PROBE",
-			Color3.fromRGB(80, 200, 255),
+			"REFILLS",
+			Color3.fromRGB(240, 178, 48),
 			function()
-				UiKit.toast("Walk to PROBE-7 (the crashed probe, east side) and press E.", P.Gold)
+				OutpostScene.openRefills()
 			end,
 		},
 	}

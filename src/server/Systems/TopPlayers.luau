@@ -1,13 +1,16 @@
 --[[
 	Top Players: global leaderboards for the best gem ever owned, monsters
-	slain, Season level, gear score (Gear) and duel wins (Wins). Each player's scores are written to ordered data
+	slain, Season level, gear score (Gear) and duel wins (Wins), and the
+	Shelter's Hall of Fame (Shared.HallOfFame): 1v1 wins (Duel), 1v1 + Kaiju
+	wins (Mixed), Kaiju Arena wins (Kaiju), Rift bosses slain (Bosses) and
+	gems mined (Mined). Each player's scores are written to ordered data
 	stores every couple of minutes; the top ten are read back and cached.
 
 	If data stores aren't available (e.g. Studio without API access), the
 	boards rank the players in this server instead.
 
 	Request action: "TopPlayers" -> { Global = bool, Boards = { Gem, Slain, Level } }
-	where each board is a list of { Name, Value }.
+	where each board is a list of { Name, Value, UserId }.
 ]]
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
@@ -21,7 +24,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 
 local REFRESH_SECONDS = 120
-local BOARDS = { "Gem", "Slain", "Level", "Gear", "Wins" }
+local BOARDS = { "Gem", "Slain", "Level", "Gear", "Wins", "Duel", "Mixed", "Kaiju", "Bosses", "Mined" }
 
 local TopPlayers = {}
 
@@ -48,12 +51,23 @@ local function scores(player: Player): { [string]: number }?
 	consider(profile.Character.WeaponGem)
 	consider(profile.Character.ArmorGem)
 	profile.Stats.BestGem = math.max(profile.Stats.BestGem, best)
+	local stats = profile.Stats :: any
+	local duel = (profile :: any).Duel
+	local bosses = 0
+	for _, times in (profile :: any).RiftBosses or {} do
+		bosses += tonumber(times) or 0
+	end
 	return {
 		Gem = profile.Stats.BestGem,
 		Slain = profile.Stats.Kills,
 		Level = (Season.levelFor(profile.Season.XP)),
 		Gear = GearRolls.gearScore(profile.Character),
-		Wins = profile.Duel and profile.Duel.Wins or 0,
+		Wins = duel and duel.Wins or 0,
+		Duel = duel and (duel.Solo or duel.Wins) or 0,
+		Mixed = stats.MixedWins or 0,
+		Kaiju = stats.KaijuWins or 0,
+		Bosses = bosses,
+		Mined = stats.GemsMined or 0,
 	}
 end
 
@@ -73,7 +87,7 @@ local function localBoards()
 		for _, player in Players:GetPlayers() do
 			local s = scores(player)
 			if s then
-				table.insert(rows, { Name = player.DisplayName, Value = s[board] })
+				table.insert(rows, { Name = player.DisplayName, Value = s[board], UserId = player.UserId })
 			end
 		end
 		table.sort(rows, function(a, b)
@@ -104,7 +118,8 @@ local function refresh()
 			anyRead = true
 			local rows = {}
 			for _, entry in pages:GetCurrentPage() do
-				table.insert(rows, { Name = nameOf(tonumber(entry.key) or 0), Value = entry.value })
+				local userId = tonumber(entry.key) or 0
+				table.insert(rows, { Name = nameOf(userId), Value = entry.value, UserId = userId })
 			end
 			cache[board] = rows
 		end
@@ -116,12 +131,18 @@ local function refresh()
 	end
 end
 
--- A board's top rows ({ Name, Value }), best first (e.g. for the Outpost's billboard).
+-- A board's top rows ({ Name, Value, UserId }), best first (e.g. for the
+-- Shelter's Hall of Fame).
 function TopPlayers.board(name: string)
 	if not global then
 		localBoards()
 	end
 	return cache[name] or {}
+end
+
+-- Whether the boards are every server's (else this server's players).
+function TopPlayers.isGlobal(): boolean
+	return global
 end
 
 function TopPlayers.start()

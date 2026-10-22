@@ -26,11 +26,12 @@ at its peak). Ribs run up the outside, with heavier corners.
 | North | **Mech garage**: eight bays in a row along the north wall (BAY 1-8, each mech's name on its sign and a jack-o'-lantern over it), every mech facing the lane. The lane runs the full width to a **big door at each end** (east and west, 26 high, EXIT over them, hazard posts, the roller door rolled up). A barrier with three gaps keeps the hall clear. |
 | Middle | **Kaiju arena** stage: open floor round it, pylons, the hologram over it. The battles themselves are downstairs: a stairwell west of the stage, a steel plate saying **ARENA**, goes down to the [Kaiju Arena](kaiju-arena.md). |
 | West wall | **STORE** and **MARKET** shopfronts (open the Store and the player Market), each a counter with a prompt and its word on a lightbox. Next to the Market, along the south wall, **Ilsa's desk and the Gem Gallery**. The Store shows what it sells on stands: helmets, weapon skins and pickaxes behind the counter, suits on turntables either side ([the Store's stands](probe-store-crew-quarry.md#the-stores-stands)). |
-| East wall | **PROBE-7**, a crew robot where its station stood: talk to it for the swing refills Exchange. And the **leaderboard**. |
-| By the door | **Brutus**, where the duel gate stood: talk to him for a 1v1 duel (win streaks restore your swings: see [swing-restores.md](swing-restores.md)). |
+| East wall | The **Hall of Fame** (PvP and PvE columns, trophies on a dais) and **Brutus's bounty booth** beside it: talk to him, or walk up to his counter, for the bounty board (every Rift boss, a tab per biome) or a 1v1 duel (win streaks restore your swings: see [swing-restores.md](swing-restores.md)). See [hall-of-fame.md](hall-of-fame.md). |
 | Over the door, inside | **QUARRY**, painted. |
 
 *Since then (2026-10-22): plain one-word signs, and the Shelter's floor cleared (no PROBE-7 station, duel gate, stands or survey table; PROBE-7 and Brutus are crew; the Gem Gallery is next to the Market). See [plain-signs.md](plain-signs.md).*
+
+*And later that day: PROBE-7 removed (Garrick sells the refills), the leaderboard rebuilt as the Hall of Fame, and Brutus given a bounty booth. See [hall-of-fame.md](hall-of-fame.md).*
 
 ![From the spawn: the arena ahead, the garage beyond](shelter/hall.png)
 

@@ -1,7 +1,7 @@
 --[[
 	Saga Outpost: the shared mining basin (Shared.Outpost has the rules,
 	World.OutpostWorld the place). Everyone in the server mines the same
-	rocks, sees each other swing, trades at the Probe and challenges each
+	rocks, sees each other swing, trades at the Market and challenges each
 	other to duels. Request actions:
 
 	  "OutpostEnter"           go to the Outpost (the free Survey Pick recharges)
@@ -9,7 +9,7 @@
 	  "OutpostHit", nodeId     swing at a rock (wears your pick; the last hit
 	                           pops it and pays out one gem, never coins or
 	                           gear; refused while the gem pouch is full)
-	  (PROBE-7's refills are Robux products, Outpost.Refills: StoreServer
+	  (Garrick's swing refills are Robux products, Outpost.Refills: StoreServer
 	  grants their swings through OutpostServer.addSwings, on top of the
 	  free pick's charge; swing restores, Shared.SwingRestore, through
 	  OutpostServer.restoreSwings: never past its full charge)
@@ -37,8 +37,8 @@
 	MaxHp, Zone, ClaimedBy, LastHitBy, LastCrit, Popped) so every client
 	can show every swing; prompts carry PromptKind (Mine, Store, Market,
 	Spar, Duel, Party) for the client to act on. The Shelter's crew
-	(site.Crew: Ilsa the gem buyer, Brutus for duels, PROBE-7 for refills,
-	Tamsin, Borin, Garrick and INFO-9) are Builder.vendor robots: their
+	(site.Crew: Ilsa the gem buyer, Brutus for duels and bounties, Garrick
+	for refills, Tamsin, Borin and INFO-9) are Builder.vendor robots: their
 	Talk prompt opens Client.Dialogue.
 
 	Every swing out past the core makes noise (OutpostServer.onSwing:
@@ -71,6 +71,8 @@ local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Shop = require(script.Parent.Shop)
 local TopPlayers = require(script.Parent.TopPlayers)
+local HallOfFame = require(ReplicatedStorage.Shared.HallOfFame)
+local Bounties = require(ReplicatedStorage.Shared.Bounties)
 
 local reply = Shop.reply
 
@@ -114,7 +116,7 @@ local function record(profile)
 	local o = profile.Outpost
 	o.Picks = o.Picks or {}
 	o.Rocks = o.Rocks or 0
-	-- Picks the Probe no longer sells (it sells refills): their swings
+	-- Picks no longer sold (refills are now): their swings
 	-- become extra swings on the free pick.
 	local legacy = Rules.legacySwings(o.Picks)
 	for id in Rules.LegacyPicks do
@@ -547,6 +549,7 @@ local function loot(player: Player, node, profile)
   record(profile).Rocks += 1
   Progress.mined(player)
   PlayerData.milestone(player, "Mined")
+  PlayerData.count(player, "GemsMined")
   return tutorialLoot
  end
 	local spec = Rules.Sizes[node.Size]
@@ -572,6 +575,7 @@ local function loot(player: Player, node, profile)
 		result.Rarity = gem.Tier
 		result.Text = GemConfig.displayName(gem)
 		PlayerData.milestone(player, "Mined")
+		PlayerData.count(player, "GemsMined")
 		OutpostServer.onGemMined(player, gem)
 		-- Ultra Rare and Legendary finds are called out to the whole server.
 		if (GemConfig.TierRank[gem.Tier] or 0) >= 4 then
@@ -653,8 +657,8 @@ local function hit(player: Player, nodeId: any)
 			if nextIn
 				then "Free pick recharging: +1 swing in "
 					.. Rules.clock(nextIn)
-					.. ". Buy a refill at PROBE-7 to keep mining."
-				else "Out of swings! Buy a refill at PROBE-7.",
+					.. ". Buy a refill from Garrick to keep mining."
+				else "Out of swings! Buy a refill from Garrick.",
 			{ NoPick = true, State = stateOf(player) }
 		)
 	end
@@ -773,7 +777,7 @@ local function bonk(player: Player, model: any)
 	return reply(true, "", { Bonk = true })
 end
 
--- Swings bought for the free pick (a PROBE-7 refill, for Robux: StoreServer
+-- Swings bought for the free pick (a swing refill, for Robux: StoreServer
 -- grants it), on top of its charge brought up to now. They're spent first,
 -- and it recharges again once it's back under its full charge.
 function OutpostServer.addSwings(player: Player, swings: number): boolean
@@ -885,7 +889,8 @@ local function leave(player: Player)
 	return reply(true, "Back at base.")
 end
 
--- The billboard: top gear scores and duel wins.
+-- The Hall of Fame on the Shelter's east wall (Shared.HallOfFame): the PvP
+-- and PvE boards, from TopPlayers.
 local function drawBoard()
 	local face = site and site.Board
 	if not face then
@@ -896,59 +901,25 @@ local function drawBoard()
 		gui = Instance.new("SurfaceGui")
 		gui.Name = "Board"
 		gui.Face = Enum.NormalId.Front
-		gui.CanvasSize = Vector2.new(1140, 540)
+		gui.CanvasSize = HallOfFame.Canvas
 		gui.LightInfluence = 0
-		gui.Brightness = 1.6
+		gui.Brightness = 1.4
 		gui.Parent = face
 	end
-	gui:ClearAllChildren()
-	local function label(text, x, y, w, h, size, color, font, align)
-		local l = Instance.new("TextLabel")
-		l.BackgroundTransparency = 1
-		l.Position, l.Size = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h)
-		l.Text, l.TextSize, l.TextColor3 = text, size, color
-		l.Font = font or Enum.Font.GothamBold
-		l.TextXAlignment = align or Enum.TextXAlignment.Left
-		l.TextTruncate = Enum.TextTruncate.AtEnd
-		l.Parent = gui
-		return l
-	end
-	-- (In the base's sign style: warm white condensed capitals, grey
-	-- headings, each column's colour a bar beside its heading.)
-	label("LEADERBOARD", 40, 14, 1060, 52, 44, Color3.fromRGB(238, 234, 224), Enum.Font.GothamBlack)
-	for column, spec in
-		{
-			{ "Gear", "GEAR SCORE", Color3.fromRGB(122, 150, 214) },
-			{ "Wins", "DUEL WINS", Color3.fromRGB(214, 84, 70) },
-		}
-	do
-		local x = 40 + (column - 1) * 560
-		local bar = Instance.new("Frame")
-		bar.BorderSizePixel = 0
-		bar.BackgroundColor3 = spec[3]
-		bar.Position, bar.Size = UDim2.fromOffset(x, 86), UDim2.fromOffset(6, 30)
-		bar.Parent = gui
-		label(spec[2], x + 16, 84, 504, 34, 28, Color3.fromRGB(160, 166, 176), Enum.Font.Oswald)
-		local rows = TopPlayers.board(spec[1])
-		for i = 1, 8 do
-			local row = rows[i]
-			local y = 128 + (i - 1) * 48
-			local color = if i == 1 then Color3.fromRGB(255, 214, 110) else Color3.fromRGB(225, 232, 245)
-			label(string.format("%d.", i), x, y, 46, 42, 30, color)
-			label(if row then row.Name else "—", x + 50, y, 330, 42, 30, color, Enum.Font.GothamMedium)
-			label(
-				if row then tostring(math.floor(row.Value)) else "",
-				x + 380,
-				y,
-				130,
-				42,
-				30,
-				color,
-				Enum.Font.GothamBold,
-				Enum.TextXAlignment.Right
-			)
+	local boards = {}
+	local key = tostring(TopPlayers.isGlobal())
+	for _, spec in HallOfFame.Boards do
+		boards[spec.Id] = TopPlayers.board(spec.Id)
+		for _, row in boards[spec.Id] do
+			key ..= "|" .. tostring(row.Name) .. ":" .. tostring(row.Value)
 		end
 	end
+	-- (Only when something's changed: it's a few hundred instances.)
+	if gui:GetAttribute("Drawn") == key then
+		return
+	end
+	gui:SetAttribute("Drawn", key)
+	HallOfFame.draw(gui :: SurfaceGui, boards, TopPlayers.isGlobal())
 end
 
 -- An Easter egg found: paid once per player (and a bonus for the full set),
@@ -1046,13 +1017,16 @@ function OutpostServer.start()
 	for _ = 1, math.min(Rules.FieldNodeCount, #(site.FieldSpots or {})) do
 		spawnNode(true)
 	end
-	-- Prompts at the Shelter's Store and player Market counters. (The
-	-- refills and the duels are PROBE-7's and Brutus's: talk to them.)
+	-- Prompts at the Shelter's Store and player Market counters, and
+	-- Brutus's bounty counter (the Bounty Board: Client.RiftClient). (The
+	-- refills are Garrick's: talk to him.)
 	local stations = site.Stations or {}
+	local bounty = site.Bounty or {}
 	for _, spec in
 		{
 			{ stations.Store, "Store", "Open the Store", "STORE" },
 			{ stations.Market, "Market", "Open the Market", "PLAYER MARKET" },
+			{ bounty.Counter, "Bounty", "Bounty Board", "BRUTUS'S BOUNTIES" },
 		}
 	do
 		if not spec[1] then
@@ -1066,6 +1040,24 @@ function OutpostServer.start()
 		prompt.RequiresLineOfSight = false
 		prompt:SetAttribute("PromptKind", spec[2])
 		prompt.Parent = spec[1]
+	end
+	-- The WANTED posters behind Brutus: every boss behind the Rift Gates,
+	-- each biome's ladder in turn (Shared.Bounties).
+	local posted = 0
+	for _, entry in Bounties.list() do
+		for _, boss in entry.Bosses do
+			posted += 1
+			local sheet = (bounty.Posters or {})[posted]
+			if sheet then
+				local gui = Instance.new("SurfaceGui")
+				gui.Name = "Poster"
+				gui.Face = Enum.NormalId.Front
+				gui.CanvasSize = Bounties.Poster
+				gui.LightInfluence = 0.8
+				gui.Parent = sheet
+				Bounties.poster(gui, boss, entry.Element)
+			end
+		end
 	end
 	-- The Shelter's crew, where the Shelter puts them: talk to them (E) for
 	-- their lines and stations (Shared.Vendors, Client.Dialogue).
@@ -1210,6 +1202,7 @@ end
 -- For tests.
 OutpostServer._hit, OutpostServer._enter, OutpostServer._buy = hit, enter, buy
 OutpostServer._secret = secret
+OutpostServer._drawBoard = drawBoard
 OutpostServer._nodes = nodes
 -- For tests.
 OutpostServer._veins = veins
@@ -1219,6 +1212,11 @@ function OutpostServer.site()
 end
 
 -- Vein `index`'s Rift Gate: the part its "Enter the Rift" prompt is on.
+-- Brutus's bounty terminal (Server.RiftServer: where a bounty starts from).
+function OutpostServer.bountyCounter(): BasePart?
+	return site and site.Bounty and site.Bounty.Counter
+end
+
 function OutpostServer.veinGate(index: number): BasePart?
 	local vein = veins[index]
 	local marks = vein and vein.Marks

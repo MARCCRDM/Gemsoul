@@ -1,6 +1,6 @@
 --[[
 	Saga Outpost: the shared mining basin on the moon. Everyone in the
-	server mines the same rocks, sees each other, trades at the Probe and
+	server mines the same rocks, sees each other, trades at the Market and
 	challenges each other to duels. The rules, shared by the server (which
 	decides everything) and the client (which shows it).
 
@@ -10,14 +10,14 @@
 	holds a long session's mining (its full 600: your kaiju fights and
 	levels beside you while you mine) and regains a swing every
 	FreeSwingSeconds, full again in two hours; refills (more swings, on top
-	of those) are bought at the Probe, for Robux.
+	of those) are bought from Garrick, the mining foreman, for Robux.
 
 	  Outpost.Sizes / Outpost.SizeOrder      the rocks
 	  Outpost.Picks / Outpost.PickOrder      the pick (the free Survey Pick)
-	  Outpost.Refills / Outpost.RefillOrder  the swings PROBE-7 sells (Robux:
+	  Outpost.Refills / Outpost.RefillOrder  the swing refills (Robux:
 	                                         each a Shared.Store product)
 	  Outpost.legacySwings(picks)            swings for picks a save still
-	                                         holds from when the Probe sold them
+	                                         holds from when picks were sold
 	  Outpost.rollSize(roll, zone?)          a new rock's size (a ring's mix), 0 <= roll < 1
 	  Outpost.damage(pick, crit)             how many layers a swing chips
 	  Outpost.tension(hp, maxHp)             0 (fresh) .. 1 (about to pop): how
@@ -92,7 +92,7 @@ Outpost.Sizes = {
 Outpost.SizeOrder = { "Pebble", "Boulder", "Monolith", "Geode" }
 
 -- The pick: its full charge, layers per swing, extra crit chance. Tag and
--- Blurb are what PROBE-7 says about it.
+-- Blurb are what the refills window says about it.
 Outpost.Picks = {
 	Survey = {
 		Name = "Survey Pick",
@@ -107,7 +107,7 @@ Outpost.Picks = {
 }
 Outpost.PickOrder = { "Survey" }
 
--- What PROBE-7 sells, for Robux: swings for your pick, on top of its free
+-- The swing refills Garrick sells, for Robux: swings for your pick, on top of its free
 -- charge (they go first; it recharges again once it's back under its full
 -- charge). Each is a Developer Product, its Product key in Shared.Store
 -- (Store.RobuxProducts has the ids).

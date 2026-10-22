@@ -412,7 +412,7 @@ MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, produc
 		return
 	end
 	local key = Store.productKey(productId)
-	-- (A swing refill is PROBE-7's: OutpostScene confirms those.)
+	-- (A swing refill is Garrick's: OutpostScene confirms those.)
 	if key and not Store.refill(key) then
 		task.delay(0.8, function()
 			showReceipt(key)

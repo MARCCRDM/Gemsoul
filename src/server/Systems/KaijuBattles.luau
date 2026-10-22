@@ -70,6 +70,7 @@ local KaijuPit = require(ReplicatedStorage.Shared.KaijuPit)
 local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local KaijuServer = require(script.Parent.KaijuServer)
+local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
@@ -509,6 +510,9 @@ local function finish(battle: Battle, winner: string, reason: string?)
 		battle.Result[player] = result
 		if player.Parent then
 			KaijuServer.reward(player, KaijuBattle.Exp[result])
+			if result == "Win" then
+				PlayerData.count(player, "KaijuWins") -- (the Hall of Fame's KAIJU BATTLES)
+			end
 			KaijuServer.battleEnd(player)
 			local foe = foeOf(battle, player)
 			-- XP for you too, by the other player's level against yours

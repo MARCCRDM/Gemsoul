@@ -4,8 +4,8 @@
 -- painted on or on a bare plate: no line under a name, no colour bar down
 -- its side, no invented names, none of the old taglines back (KAIJU ARENA /
 -- DOWNSTAIRS: TAKE THE WEST STAIRS, ARENA UPLINK, MECH GARAGE, the FIELD
--- GUIDE board...). PROBE-7 and Brutus are crew now, with no station or
--- gate to put a word on. Out in the quarry no sign names
+-- GUIDE board...). Brutus is crew now, with no gate to put a word on,
+-- only his booth's BOUNTIES (and PROBE-7 is gone). Out in the quarry no sign names
 -- a biome, and crossing into a band or a biome shows no title card. Run by
 -- tests/run_signage.py.
 local fs = require("@lune/fs")
@@ -107,6 +107,7 @@ end
 -- The places' words; a bay's or a court's number; nothing else.
 local ALLOWED = {
 	SHELTER = true, QUARRY = true, ARENA = true, EXIT = true, INFO = true, STORE = true, MARKET = true,
+	BOUNTIES = true,
 }
 local function allowed(text: string): boolean
 	return ALLOWED[text] == true or text:match("^%d%d?$") ~= nil

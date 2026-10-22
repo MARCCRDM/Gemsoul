@@ -270,8 +270,8 @@ for i, entry in odds do
 end
 
 -- The hall's floor, cleared: no survey table and benches, no stands round
--- the stage, no PROBE-7 station, no duel gate. The crew stand there
--- instead (Brutus for duels, PROBE-7 for refills), and the Gem Gallery
+-- the stage, no PROBE-7 (gone: Garrick sells the refills), no duel gate.
+-- Brutus stands at his bounty booth instead, and the Gem Gallery
 -- and Ilsa's desk are next to the Market, its cases in the hall between
 -- the Market and the door, clear of the stairs' well.
 do
@@ -291,8 +291,12 @@ do
 	for _, spot in site.Crew do
 		crewAt[spot.Id] = here(spot.CFrame.Position)
 	end
-	check(crewAt.Probe and (crewAt.Probe - Vector3.new(68, crewAt.Probe.Y, 36)).Magnitude < 1, "PROBE-7 isn't where its station stood")
-	check(crewAt.ArenaMaster and (crewAt.ArenaMaster - Vector3.new(36, crewAt.ArenaMaster.Y, 46)).Magnitude < 1, "Brutus isn't where the duel gate stood")
+	check(crewAt.Probe == nil, "PROBE-7 is back in the crew")
+	local counter = here(site.Bounty.Counter.CFrame.Position)
+	check(
+		crewAt.ArenaMaster and (Vector3.new(crewAt.ArenaMaster.X - counter.X, 0, crewAt.ArenaMaster.Z - counter.Z)).Magnitude < 10,
+		"Brutus isn't at his bounty booth"
+	)
 	local market = here(site.Stations.Market.CFrame.Position)
 	local middle = Life.Gallery.Middle
 	for i = 1, 5 do

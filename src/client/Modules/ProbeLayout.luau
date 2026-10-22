@@ -1,5 +1,5 @@
 --[[
-	PROBE-7's window, worked out without Roblox (OutpostScene draws it; the
+	The SWING REFILLS window, worked out without Roblox (OutpostScene draws it; the
 	numbers are tested on their own, tests/probe_layout_cases.luau):
 
 	  ProbeLayout.design(screenX, screenY) -> L   where everything sits, in the

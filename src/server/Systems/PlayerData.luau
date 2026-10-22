@@ -1192,6 +1192,16 @@ function PlayerData.spendCoins(player: Player, amount: number): boolean
 	return true
 end
 
+-- One more (or `n` more) on a tally of theirs (profile.Stats: GemsMined,
+-- KaijuWins, MixedWins ... for the Hall of Fame, Server.TopPlayers).
+function PlayerData.count(player: Player, name: string, n: number?)
+	local profile = profiles[player]
+	if profile then
+		profile.Stats = profile.Stats or { Kills = 0, BestGem = 0 }
+		profile.Stats[name] = ((profile.Stats :: any)[name] or 0) + (n or 1)
+	end
+end
+
 function PlayerData.addCoins(player: Player, amount: number)
 	local profile = profiles[player]
 	if profile then

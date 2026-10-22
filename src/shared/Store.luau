@@ -1,7 +1,7 @@
 --[[
 	The store: weapon skins, suits, pickaxes and bundles, sold for Robux,
-	plus the Free rewards. Looks only, never stats. (PROBE-7's swing refills
-	are Robux products too: Shared.Outpost.Refills, sold at the Probe.)
+	plus the Free rewards. Looks only, never stats. (The swing refills are
+	Robux products too: Shared.Outpost.Refills, sold by Garrick.)
 
 	  Bundles      new-player offers (the Welcome Kit, the Starter Pack), the
 	               squad kits (one, two or all three miners), themed
@@ -316,7 +316,7 @@ Store.RobuxProducts = {
 	-- One-time offers and the Season Path
 	StarterPack = 0,
 	SeasonPremium = 0,
-	-- PROBE-7's swing refills (Shared.Outpost.Refills: their Product keys)
+	-- The swing refills (Shared.Outpost.Refills: their Product keys)
 	SwingRefill = 0,
 	SwingMega = 0,
 	-- Your knocked-out kaiju back on their feet now (Shared.Kaiju.Revive)
@@ -341,7 +341,7 @@ for _, refill in Outpost.Refills do
 	Store.RobuxPrices[refill.Product] = refill.Robux
 end
 
--- The PROBE-7 refill a product key is (nil if it isn't one).
+-- The swing refill a product key is (nil if it isn't one).
 function Store.refill(key: any)
 	for _, refill in Outpost.Refills do
 		if refill.Product == key then

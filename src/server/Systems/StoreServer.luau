@@ -12,7 +12,7 @@
 	Robux: when an id is set in Store.RobuxProducts, buying that Developer
 	Product grants it (ProcessReceipt below), once per purchase: a look, a
 	bundle, squad kits, the Starter Pack, the Season premium track, a
-	PROBE-7 refill's swings (StoreServer.addSwings: OutpostServer's) or a
+	swing refill's swings (StoreServer.addSwings: OutpostServer's) or a
 	kaiju revive (StoreServer.reviveKaiju: KaijuServer.reviveAll; with none
 	down by then, a Revive coupon, Shared.Coupons).
 

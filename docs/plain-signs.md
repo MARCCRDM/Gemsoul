@@ -1,5 +1,7 @@
 # Plain signs, and a clearer Shelter floor
 
+*Since then (later on 2026-10-22): PROBE-7 removed, Brutus given a bounty booth (BOUNTIES is a sign word now), the leaderboard rebuilt as the Hall of Fame. See [hall-of-fame.md](hall-of-fame.md).*
+
 2026-10-22. Two changes to the same building:
 
 - **The signs** say where a place is, in one word, and nothing else. The

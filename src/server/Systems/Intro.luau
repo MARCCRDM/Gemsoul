@@ -297,7 +297,7 @@ function Intro.tutorialStock(player)
 		table.insert(rows, {
 			Id = "Tutorial:" .. i,
 			Seller = 0,
-			SellerName = "PROBE-7",
+			SellerName = "Saga Supply",
 			Mode = "Sell",
 			State = "Open",
 			Price = 15,

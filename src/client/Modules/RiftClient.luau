@@ -43,7 +43,9 @@
 	               what you found), the time left to choose running down.
 
 	  RiftClient.start()            watch your Rift attributes (once)
-	  RiftClient.openGate(vein, at?)  the gate's lobby (`at`: the gate, for who's at it)
+	  RiftClient.openGate(vein, at?)  the gate's lobby (`at`: the gate, for who's at it);
+	                                vein "Bounty": Brutus's bounty board, the same lobby
+	                                with a tab for each biome's ladder (Shared.Bounties)
 	  RiftClient.leave()            through a way home
 	  RiftClient.stripText(state) -> (string, string)   the strip's two lines (pure)
 ]]
@@ -765,7 +767,7 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	local width = math.min(if small then 820 else 980, s.AbsoluteSize.X - 24)
 	local panel, holder = modal("RiftGate", width, EMBER, true, small)
 	gateCard = panel
-	local title = text(panel, "RIFT GATE", if small then 20 else 24, EMBER, IronUi.Heading)
+	local title = text(panel, if info.Bounty then "BOUNTY BOARD" else "RIFT GATE", if small then 20 else 24, EMBER, IronUi.Heading)
 	title.LayoutOrder = 1
 	local cancel = new("TextButton", {
 		Text = "Not now",
@@ -781,7 +783,10 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	cancel.Activated:Connect(function()
 		close(gateCard)
 	end)
-	if info.Element then
+	if info.Bounty then
+		local which = text(panel, "BRUTUS'S BOUNTIES  ·  EVERY BOSS BEHIND THE RIFT GATES", if small then 11 else 12, WARN, BOLD)
+		which.LayoutOrder = 2
+	elseif info.Element then
 		local which = text(
 			panel,
 			string.upper(string.format("%s  ·  %s Rift", info.Biome or "", GemConfig.elementName(info.Element))),
@@ -795,7 +800,9 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	if not small then
 		local about = text(
 			panel,
-			string.format("%d caves of brainrot critters and fighters, then the boss you pick, on its throne.", RiftRun.Rooms),
+			if info.Bounty
+				then "Pick a biome, then its boss: you and your party go through from here. Each boss opens once you've beaten the one before it."
+				else string.format("%d caves of brainrot critters and fighters, then the boss you pick, on its throne.", RiftRun.Rooms),
 			13,
 			P.Dim
 		)
@@ -887,11 +894,27 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	elseif #ladder > 0 then
 		local head = text(left, "CHOOSE YOUR BOSS", if small then 11 else 12, P.Gold, BOLD)
 		head.LayoutOrder = 3
+		-- Brutus's board: a tab for each biome's ladder.
+		local biomeRow = nil
+		if info.Ladders then
+			head.Text = "CHOOSE A BIOME, THEN YOUR BOSS"
+			biomeRow = new("Frame", {
+				Name = "Biomes",
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, if small then 24 else 30),
+				LayoutOrder = 4,
+			}, left)
+			new("UIGridLayout", {
+				CellSize = UDim2.new(1 / #info.Ladders, -6, 1, 0),
+				CellPadding = UDim2.fromOffset(8, 0),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}, biomeRow)
+		end
 		local list = new("Frame", {
 			Name = "Ladder",
 			BackgroundTransparency = 1,
 			Size = UDim2.new(1, 0, 0, if small then 84 else 196),
-			LayoutOrder = 4,
+			LayoutOrder = 5,
 		}, left)
 		local cardGap = if small then 6 else 10
 		new("UIListLayout", {
@@ -899,27 +922,77 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 			Padding = UDim.new(0, cardGap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}, list)
-		for i, entry in ladder do
-			local card, edge = bossCard(list, entry, i, small, function()
-				if view and not view.Lead then
-					UiKit.toast("Your party's leader picks the boss.", P.Bad)
-					return
-				elseif not entry.Unlocked then
-					UiKit.toast(string.format("Beat %s first.", entry.Need or "the one before"), P.Bad)
-					return
+		local function buildCards()
+			for _, child in list:GetChildren() do
+				if child:IsA("GuiObject") then
+					child:Destroy()
 				end
-				picked = entry.Id
-				redrawBoss()
-			end)
-			card.Size = UDim2.new(1 / #ladder, -cardGap * (#ladder - 1) / #ladder, 1, 0)
-			cards[entry.Id] = { Card = card, Edge = edge }
+			end
+			table.clear(cards)
+			for i, entry in ladder do
+				local card, edge = bossCard(list, entry, i, small, function()
+					if view and not view.Lead then
+						UiKit.toast("Your party's leader picks the boss.", P.Bad)
+						return
+					elseif not entry.Unlocked then
+						UiKit.toast(string.format("Beat %s first.", entry.Need or "the one before"), P.Bad)
+						return
+					end
+					picked = entry.Id
+					redrawBoss()
+				end)
+				card.Size = UDim2.new(1 / #ladder, -cardGap * (#ladder - 1) / #ladder, 1, 0)
+				cards[entry.Id] = { Card = card, Edge = edge }
+			end
 		end
+		local biome = 1
+		local function drawBiomes()
+			if not biomeRow then
+				return
+			end
+			for _, child in biomeRow:GetChildren() do
+				if child:IsA("GuiObject") then
+					child:Destroy()
+				end
+			end
+			for i, entry in info.Ladders do
+				local on = i == biome
+				local tint = GemConfig.ElementColors[entry.Element] or P.Text
+				local b = new("TextButton", {
+					Name = entry.Biome,
+					Text = string.upper(entry.Biome),
+					TextSize = if small then 10 else 12,
+					Font = BOLD,
+					TextColor3 = if on then P.Text else tint,
+					BackgroundColor3 = if on then tint:Lerp(Color3.new(0, 0, 0), 0.62) else Color3.fromRGB(20, 16, 20),
+					AutoButtonColor = false,
+					LayoutOrder = i,
+				}, biomeRow)
+				UiKit.round(b, 6)
+				new("UIStroke", {
+					Color = tint,
+					Thickness = if on then 2 else 1,
+					Transparency = if on then 0 else 0.6,
+					ApplyStrokeMode = Enum.ApplyStrokeMode.Border, -- (round the tab, not its word)
+				}, b)
+				b.Activated:Connect(function()
+					biome = i
+					ladder = entry.Ladder or {}
+					picked = entry.Next
+					drawBiomes()
+					buildCards()
+					redrawBoss()
+				end)
+			end
+		end
+		drawBiomes()
+		buildCards()
 		warnHolder = new("Frame", {
 			Name = "Warnings",
 			BackgroundTransparency = 1,
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			LayoutOrder = 5,
+			LayoutOrder = 6,
 		}, left)
 	end
 

@@ -323,6 +323,11 @@ local PlayerData = {
 		profiles[player].Coins += coins
 	end,
 	milestone = function() end,
+	count = function(player, name, n)
+		local profile = profiles[player]
+		profile.Stats = profile.Stats or {}
+		profile.Stats[name] = (profile.Stats[name] or 0) + (n or 1)
+	end,
 	returnGem = function(player, gem)
 		table.insert(profiles[player].Gems, gem)
 		return true
@@ -4184,6 +4189,7 @@ do
 		check(battle.Phase == "Over", "The battle never ended")
 		check(battle.Result and battle.Result[a] == "Win" and battle.Result[b] == "Lose", "The wrong side won")
 		check(noted(a, "Your kaiju beat") and noted(b, "kaiju won the battle"), "Not told who won")
+		check(profiles[a].Stats.KaijuWins >= 1 and (profiles[b].Stats or {}).KaijuWins == nil, "The win isn't on the Hall of Fame's tally")
 		-- XP for the players too (Server.Progress), by the other's level, the one beaten named.
 		do
 			local won, lost
@@ -5721,7 +5727,7 @@ end)()
 	rootA.CFrame = CFrame.new(gate.Position)
 	rootB.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
 	check(registered.RiftEnter(a, 2, nil, true).Ok and RiftServer.runOf(b) == nil, "One who wasn't ready was brought in")
-	check(noted(b, "walk up to any gate to follow"), "One who wasn't ready wasn't told they could follow")
+	check(noted(b, "walk up to any gate, or Brutus's counter, to follow"), "One who wasn't ready wasn't told they could follow")
 	homeBoth()
 	parties[a].Ready = { [a] = true }
 	rootB.CFrame = CFrame.new(gate.Position + Vector3.new(-4, 0, 0))
@@ -5729,6 +5735,49 @@ end)()
 	check(registered.RiftEnter(b, 2, nil, true).Ok and RiftServer.runOf(a) == nil, "A member going in together brought their leader")
 	homeBoth()
 	parties[a], parties[b] = nil, nil
+	-- Brutus's bounties (Shared.Bounties): from his counter, every biome's
+	-- ladder, a boss off any of them, the same trip as through its gate;
+	-- each still opens once the one before it on its ladder is beaten.
+	do
+		local Bounties = shared("Bounties")
+		local counter = make("Part", { CFrame = CFrame.new(outpost + Vector3.new(30, 3, 40)) })
+		RiftServer.bountyAt = function()
+			return counter
+		end
+		rootA.CFrame = CFrame.new(outpost + Vector3.new(-300, 0, 0))
+		local far = registered.RiftEnter(a, Bounties.Gate, riftGate.Ladder[1].Id)
+		check(not far.Ok and far.Message == "Walk up to Brutus's counter first.", "A bounty from across the Outpost")
+		rootA.CFrame = CFrame.new(counter.Position + Vector3.new(3, 0, 0))
+		local list = Bounties.list()
+		local board = registered.RiftPeek(a, Bounties.Gate)
+		check(board.Ok and board.Bounty == true and #board.Ladders == #list and #list >= 2, "The board doesn't post every biome's ladder")
+		for i, entry in board.Ladders do
+			check(
+				entry.Element == list[i].Element and entry.Biome == list[i].Biome and #entry.Ladder == #list[i].Bosses,
+				"The board's " .. tostring(entry.Biome) .. " tab isn't its biome's ladder"
+			)
+		end
+		local none = registered.RiftEnter(a, Bounties.Gate)
+		check(not none.Ok and none.Message == "Pick a bounty first.", "Through the board without a target")
+		check(not registered.RiftEnter(a, Bounties.Gate, "Nope").Ok, "A bounty on no boss")
+		local other = list[1]
+		for _, entry in list do
+			if entry.Element ~= riftGate.Element then
+				other = entry
+			end
+		end
+		check(other.Element ~= riftGate.Element, "No other biome on the board")
+		local locked = registered.RiftEnter(a, Bounties.Gate, other.Bosses[2].Id)
+		check(not locked.Ok and locked.Message == "Beat " .. other.Bosses[1].Name .. " first." and RiftServer.runOf(a) == nil, "A locked bounty let them in")
+		check(Bounties.elementOf(other.Bosses[1].Id) == other.Element and Bounties.elementOf("Nope") == nil, "A bounty's biome")
+		local went = registered.RiftEnter(a, Bounties.Gate, other.Bosses[1].Id)
+		local trip = RiftServer.runOf(a)
+		check(went.Ok and trip and trip.Boss == other.Bosses[1] and trip.Element == other.Element, "The bounty isn't the trip: " .. tostring(went.Message))
+		homeBoth()
+		RiftServer.bountyAt = function()
+			return nil
+		end
+	end
 	-- (Pouches, coins and the kit back as they were for what follows.)
 	PlayerData.addGem = smallPouch
 	for _, p in { a, b } do
