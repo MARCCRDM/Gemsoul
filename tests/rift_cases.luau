@@ -535,6 +535,18 @@ for _, d in world.Gates[1]:GetDescendants() do
 	end
 end
 check(world.Gates[2]:FindFirstChild("Wall").CanCollide, "Opening one opened another")
+-- Where each leads (the arrows on the ground go there once it's open): a
+-- little way into the next cave, on the far side of the fire.
+for i, gate in world.Gates do
+	local into = gate:GetAttribute("Into")
+	local next = world.Rooms[i + 1] or world.Boss
+	local here = world.Rooms[i]
+	check(typeof(into) == "Vector3", "Gate " .. i .. " doesn't say where it leads")
+	check(RiftWorld.inside(next, into) and not RiftWorld.inside(here, into), "Gate " .. i .. " doesn't lead into the next cave")
+	local wallAt = gate:FindFirstChild("Wall").CFrame.Position
+	local on = (next.Center - here.Center) * Vector3.new(1, 0, 1)
+	check(((into - wallAt) * Vector3.new(1, 0, 1)):Dot(on.Unit) > 10, "Gate " .. i .. " leads back the way you came")
+end
 -- The ways home: the landing's open, the throne cave's shut till it's down.
 local function promptOf(part)
 	return part and part:FindFirstChildOfClass("ProximityPrompt")
@@ -738,9 +750,23 @@ for _, name in { "SparServer", "KaijuBattles", "Duels", "Raids", "ArenaSessions"
 	)
 end
 
+-- The KIT OUT bar (Client.SparKit) sits under the strip (Client.RiftClient),
+-- never behind it, as it did when both took the top middle.
+do
+	local kit = fs.readFile(ROOT .. "/src/client/Modules/SparKit.luau")
+	local rift = fs.readFile(ROOT .. "/src/client/Modules/RiftClient.luau")
+	check(rift:find('Name = "RiftStrip"', 1, true) ~= nil, "The strip isn't named RiftStrip")
+	check(
+		kit:find('riftGui:FindFirstChild("RiftStrip")', 1, true) ~= nil
+			and kit:find("top = riftStrip.AbsolutePosition.Y + riftStrip.AbsoluteSize.Y", 1, true) ~= nil
+			and kit:find("bar.Position = UDim2.new(0.5, 0, 0, top)", 1, true) ~= nil,
+		"The KIT OUT bar isn't put under the Rift's strip"
+	)
+end
+
 print(
 	string.format(
-		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire, ways home, the sky, healing crystals, the fallen; %d parts a trip)",
+		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen; the KIT OUT bar under the strip; %d parts a trip)",
 		checks,
 		#parts
 	)

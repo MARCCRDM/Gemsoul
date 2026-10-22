@@ -18,7 +18,8 @@
 	      Landing ({ Center, Radius, Size }),
 	      Rooms ({ { Center (Vector3, on its floor), Radius, Size } }),
 	      Boss ({ Center, Radius, Size }),
-	      Gates ({ Model }: cave n's wall of fire, on the way out of it),
+	      Gates ({ Model }: cave n's wall of fire, on the way out of it;
+	          its "Into" attribute a spot a little way into the next cave),
 	      Exit (BasePart: the way home in the landing, its prompt "RiftExit"),
 	      Home (Model: the way home in the throne cave, shut till it's beaten),
 	  }
@@ -626,6 +627,9 @@ function RiftWorld.build(id: string, origin: CFrame, rng)
 		passage(folder, from, to, rng)
 		if i > 1 then
 			gates[i - 1] = gate(folder, (from + to) / 2, dir, i - 1)
+			-- (Where it leads: a little way into the next cave. Once it's
+			-- open, the arrows on the ground lead there: Client.GroundGuide.)
+			gates[i - 1]:SetAttribute("Into", to + dir * 8)
 		end
 	end
 	-- The landing: the way home stood against its back wall, facing in.

@@ -11,8 +11,10 @@
 	    court's pad. Not once you're on a pad or in a battle.
 	  - In the Shelter: to the stairs down, for a while after someone starts
 	    waiting for a challenger down there.
-	  - In the Rift: through a wall of fire that's just gone out, and to the
-	    way home once the boss is down.
+	  - In the Rift: through a wall of fire that's just gone out, into the
+	    next cave (its "Into", Server.RiftWorld), and no more once you're
+	    through it: never back the way you came. To the way home once the
+	    boss is down.
 
 	  GroundGuide.start()                 once (Lobby.client)
 	  GroundGuide.set(key, where, rank?)  `where() -> Vector3?` (nil: not
@@ -21,6 +23,9 @@
 	  GroundGuide.trail(from, to, count, spacing) -> { CFrame }   where the
 	                                      chevrons go along a straight run (pure)
 	  GroundGuide.arms(at) -> { CFrame }  a chevron's two arms at `at` (pure)
+	  GroundGuide.through(gate, into, at) -> Vector3?   where to lead `at`
+	                                      through a gate at `gate` to `into`:
+	                                      nil once it's through (pure)
 ]]
 local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
@@ -103,6 +108,19 @@ function GroundGuide.arms(base: CFrame): { CFrame }
 		table.insert(out, base * CFrame.new(s * 0.48, 0, 0) * CFrame.Angles(0, s * math.rad(40), 0))
 	end
 	return out
+end
+
+-- Through a gate at `gate` to `into` beyond it: there, from `at` on the
+-- near side; nil once `at` is through (a stride past the gate's line), so
+-- the way never turns back behind you.
+GroundGuide.Past = 2
+function GroundGuide.through(gate: Vector3, into: Vector3, at: Vector3): Vector3?
+	local on = Vector3.new(into.X - gate.X, 0, into.Z - gate.Z)
+	if on.Magnitude < 0.01 then
+		return nil
+	end
+	local past = Vector3.new(at.X - gate.X, 0, at.Z - gate.Z):Dot(on.Unit)
+	return if past < GroundGuide.Past then into else nil
 end
 
 -- The chevrons --------------------------------------------------------------------------------------------
@@ -388,6 +406,10 @@ local function riftWant(): Vector3?
 		local opening = home and home:FindFirstChild("Opening") :: BasePart?
 		return opening and opening.Position
 	end
+	local root = me.Character and me.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return nil
+	end
 	local now, best, bestAt = os.clock(), nil, -math.huge
 	for _, gate in world:GetDescendants() do
 		if gate.Name == "FireGate" and gate:GetAttribute("Open") then
@@ -397,9 +419,14 @@ local function riftWant(): Vector3?
 				gateOpenedAt[gate] = now
 			end
 			if now - at < 15 and at > bestAt then
+				-- (Into the next cave, and no more once you're through.)
 				local wall = gate:FindFirstChild("Wall") :: BasePart?
-				if wall then
-					best, bestAt = wall.Position, at
+				local into = gate:GetAttribute("Into")
+				local lead = if wall and typeof(into) == "Vector3"
+					then GroundGuide.through(wall.Position, into, root.Position)
+					else nil
+				if lead then
+					best, bestAt = lead, at
 				end
 			end
 		end

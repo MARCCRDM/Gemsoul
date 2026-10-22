@@ -304,6 +304,16 @@ local function refreshBar()
 	endLabel.TextXAlignment = if touch then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
 	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
 	barScale.Scale = if viewport.Y < 430 then 0.82 else 1
+	-- In the Rift its strip has the top middle (Client.RiftClient): the bar
+	-- sits just under it, never over it.
+	local top = 10
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	local riftGui = playerGui and playerGui:FindFirstChild("Rift")
+	local riftStrip = riftGui and riftGui:FindFirstChild("RiftStrip") :: GuiObject?
+	if riftStrip and riftStrip.Visible then
+		top = riftStrip.AbsolutePosition.Y + riftStrip.AbsoluteSize.Y - barGui.AbsolutePosition.Y + 6
+	end
+	bar.Position = UDim2.new(0.5, 0, 0, top)
 	-- The rule, for the first few seconds of a spar.
 	if not shown then
 		shown = true

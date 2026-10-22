@@ -221,6 +221,26 @@ are in.
 
 ![The Rift strip](rift/strip.png)
 
+Your kit is out in the Rift, so the **KIT OUT · 1 MINE** bar (`SparKit`) is
+up too. It sat in the same spot as the strip and showed through behind it.
+Now it sits just under the strip whenever the strip is up (`refreshBar`
+reads the strip's bottom edge), on a computer and on a phone:
+
+| Before | Now |
+| --- | --- |
+| ![KIT OUT behind the strip](rift/kit-bar-before.png) | ![KIT OUT under the strip](rift/kit-bar-after.png) |
+
+![On a phone](rift/kit-bar-phone.png)
+
+### The arrows on the ground
+
+When a cave's wall of fire goes out, the yellow arrows (`GroundGuide`) lead
+you through it, a little way into the next cave (the gate's `Into`
+attribute, set by `RiftWorld`). Once you're through, they stop. They used to
+point at the gate itself for 15 seconds, so after you walked through they
+turned round and pointed back the way you came. Once the boss is down they
+lead to the way home.
+
 ## Going down
 
 Down in the Rift works like down in the Outpost: with your kit out, a
@@ -339,7 +359,7 @@ Boss and move names stay in English (they're names).
 
 | Suite | What it checks |
 | --- | --- |
-| `run_rift` | 34,045 checks: the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (1,261). The fallen: 2 in each cave and more round the throne, none on the landing, the heap by the throne, every part one you walk through, none in the way through or the way home, a pose each; scattered alone, by the walls first, clear of what to avoid and of the doorway; in a dungeon, one a room, more and the heap in the boss's. And nothing else starts for a runner |
+| `run_rift` | 34,059 checks: the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open (each leading a little way into the next cave), the ways home, no lava, the sky, parts per trip (1,261). The fallen: 2 in each cave and more round the throne, none on the landing, the heap by the throne, every part one you walk through, none in the way through or the way home, a pose each; scattered alone, by the walls first, clear of what to avoid and of the doorway; in a dungeon, one a room, more and the heap in the boss's. And nothing else starts for a runner |
 | `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (the boss's gem in it, Legendary from a tier-5 boss; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The ladder: the gate's peek (its biome's element, the ladder, the next boss, each boss's level at your kaiju's and rising, locks, a portrait each), a locked boss, an unknown one and another biome's refused, the gate's first boss and its element's fighters, a joiner seeing the party's boss, a win tallied for everyone and the next boss unlocked and offered, the top boss alone allowed and warned. The fighters are stand-ins here: the real Duelist isn't loaded |
 | `run_target_lock` | Your lock takes a pack's leader over nearer critters and those attacking you, holds it against them, takes it back from a critter, but not hidden or out of range; a target you pick still holds |
 | `run_spar` | Going into the Rift ends a spar, the kit stays out in there and can't be put away, nobody spars with a runner, and the kit goes away at home |

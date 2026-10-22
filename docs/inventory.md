@@ -41,8 +41,22 @@ too (top right of each gem).
 ## Middle: you, your stats, AUTO EQUIP
 
 Left of the miner (who now stands between this card and your armor): your
-name and level, then a card with your rating, the four stat bars, your armor
+name and level, then a card with your rating, the four stats, your armor
 set, what you're strong against, weak to and resist, and **AUTO EQUIP**.
+
+The card is packed close and is only as tall as what's in it (`buildLeft`
+sets its height after `buildAuto`). It's about 155 px shorter than it was,
+roughly a third, and nothing was taken out:
+
+- The rating is a size down (38).
+- The four stats sit two by two: name and value over a thin bar.
+- The set and matchup lines have less space between them.
+- AUTO EQUIP comes straight after the matchups instead of being pinned to
+  the foot of the column, and its chips and button are a little slimmer.
+
+On a phone nothing changes (the compact layout hides this card).
+
+![The stats card before and after](inventory/stats-card-before-after.png)
 
 ### AUTO EQUIP
 

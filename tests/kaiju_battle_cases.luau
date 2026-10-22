@@ -426,6 +426,16 @@ do
 		table.insert(tips, outer.X)
 	end
 	check(tips[1] < -0.5 and tips[2] > 0.5, "A chevron's arms aren't one each side")
+	-- In the Rift, through a gate that's gone out and on into the next cave;
+	-- once you're through, nothing (they used to lead back to the gate).
+	local gateAt, into = Vector3.new(0, 9, 0), Vector3.new(0, 0, -28)
+	for _, before in { Vector3.new(0, 3, 30), Vector3.new(6, 3, 4), Vector3.new(-8, 3, 0.5) } do
+		check(Guide.through(gateAt, into, before) == into, "Not led through the gate from this side")
+	end
+	for _, after in { Vector3.new(0, 3, -4), Vector3.new(5, 3, -20), Vector3.new(0, 3, -40) } do
+		check(Guide.through(gateAt, into, after) == nil, "Led back to the gate once through it")
+	end
+	check(Guide.Past > 0 and Guide.Past < 6, "Through the gate isn't just past its line")
 	-- Subtle: see-through, a short trail, and gone once you're there.
 	check(Guide.Transparency >= 0.3 and Guide.Transparency < 0.8, "The arrows aren't subtle (or can't be seen)")
 	check(Guide.Count * Guide.Spacing <= 30, "The trail's too long to be subtle")

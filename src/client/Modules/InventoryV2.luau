@@ -675,8 +675,9 @@ end
 
 -- AUTO EQUIP (Shared.AutoEquip): BEST, BALANCED, then an element each; the
 -- button puts that build on (the server's "AutoEquip"). Full: a block in the
--- stats card. Compact: an AUTO button over the miner, its modes under it.
-local function buildAuto(parent: Instance, x: number, y: number, w: number)
+-- stats card (its foot returned). Compact: an AUTO button over the miner,
+-- its modes under it.
+local function buildAuto(parent: Instance, x: number, y: number, w: number): number
 	ui.AutoModes = {}
 	local function chip(holder: Instance, mode: string, cx: number, cy: number, cw: number, ch: number)
 		local b = new("TextButton", {
@@ -731,47 +732,48 @@ local function buildAuto(parent: Instance, x: number, y: number, w: number)
 		ui.AutoGo.Activated:Connect(function()
 			menu.Visible = not menu.Visible
 		end)
-		return
+		return y + 30
 	end
 	place(text(parent, "AUTO EQUIP", 11, C.Gold, HEAVY), x, y, 110, 14)
 	ui.AutoPreview = place(text(parent, "", 10, C.Dim, HEADING), x + 96, y, w - 96, 14)
 	ui.AutoPreview.TextXAlignment = Enum.TextXAlignment.Right
 	ui.AutoPreview.RichText = true
 	UiKit.fit(ui.AutoPreview)
-	y += 20
+	y += 18
 	local half = (w - 6) / 2
 	for i, mode in { "Best", "Balanced" } do
-		chip(parent, mode, x + (i - 1) * (half + 6), y, half, 26).Activated:Connect(function()
+		chip(parent, mode, x + (i - 1) * (half + 6), y, half, 24).Activated:Connect(function()
 			state.AutoMode = mode
 			draw()
 		end)
 	end
-	y += 32
+	y += 28
 	local quarter = (w - 18) / 4
 	for i, mode in ELEMENTS do
-		chip(parent, mode, x + (i - 1) * (quarter + 6), y, quarter, 26).Activated:Connect(function()
+		chip(parent, mode, x + (i - 1) * (quarter + 6), y, quarter, 24).Activated:Connect(function()
 			state.AutoMode = mode
 			draw()
 		end)
 	end
-	y += 34
+	y += 30
 	ui.AutoGo = new("TextButton", {
 		Name = "AutoEquip",
 		Text = "AUTO EQUIP",
-		TextSize = 14,
+		TextSize = 13,
 		Font = HEAVY,
 		TextColor3 = Color3.fromRGB(26, 18, 6),
 		AutoButtonColor = true,
 		BackgroundColor3 = C.Gold,
 	}, parent)
-	place(ui.AutoGo, x, y, w, 42)
-	round(ui.AutoGo, 10)
+	place(ui.AutoGo, x, y, w, 34)
+	round(ui.AutoGo, 9)
 	ui.AutoGo:SetAttribute("UiSound", "Confirm")
 	ui.AutoGo.Activated:Connect(function()
 		if ui.AutoPlan and ui.AutoPlan.Changes > 0 then
 			request("AutoEquip", state.AutoMode)
 		end
 	end)
+	return y + 34
 end
 
 local function buildLeft(canvas: Frame)
@@ -823,50 +825,52 @@ local function buildLeft(canvas: Frame)
 	ui.Sub = place(text(box, "", 11, C.Dim, HEADING), x, nameY + 40, w, 16)
 	ui.LevelBonus = place(text(box, "", 10, C.Teal, BODY), x, nameY + 58, w + 40, 13)
 	UiKit.fit(ui.LevelBonus)
-	-- The card: the rating and four stats, the set, the elements, AUTO EQUIP.
-	local cardY = nameY + 82
+	-- The card: the rating and four stats, the set, the elements, AUTO EQUIP,
+	-- packed close and as tall as what's in it (its height set at the foot).
+	local cardY = nameY + 78
 	local card = frame(box, Color3.fromRGB(255, 255, 255), 0.965)
 	card.Name = "StatsCard"
-	place(card, x - 16, cardY, w + 32, 744 - cardY)
+	place(card, x - 16, cardY, w + 32, 0)
 	round(card, 14)
 	stroke(card, C.Line, 1, 0.92)
 	local y = cardY + 8
 	-- The rating, big, with its caption beside it on the same baseline.
 	local ratingRow = new("Frame", { BackgroundTransparency = 1 }, box)
-	place(ratingRow, x, y, w, 56)
-	local rowList = UiKit.list(ratingRow, 12, true)
+	place(ratingRow, x, y, w, 44)
+	local rowList = UiKit.list(ratingRow, 10, true)
 	rowList.VerticalAlignment = Enum.VerticalAlignment.Bottom
-	ui.Rating = text(ratingRow, "0", 48, C.Gold, HEAVY)
-	ui.Rating.Size = UDim2.fromOffset(0, 56)
+	ui.Rating = text(ratingRow, "0", 38, C.Gold, HEAVY)
+	ui.Rating.Size = UDim2.fromOffset(0, 44)
 	ui.Rating.AutomaticSize = Enum.AutomaticSize.X
 	ui.Rating.TextTruncate = Enum.TextTruncate.None
 	ui.Rating.LayoutOrder = 1
 	ui.RatingCap = text(ratingRow, "RATING", 11, C.Dim, HEADING)
-	ui.RatingCap.Size = UDim2.fromOffset(80, 28)
+	ui.RatingCap.Size = UDim2.fromOffset(80, 24)
 	ui.RatingCap.LayoutOrder = 2
-	y += 66
-	-- Four stat bars.
+	y += 48
+	-- Four stats, two by two: the name and the value over a thin bar.
 	ui.Stats = {}
+	local cellW = (w - 16) / 2
 	for i, stat in Classes.StatNames do
-		local sy = y + (i - 1) * 30
-		place(text(box, string.upper(stat), 10, C.Dim, HEADING), x, sy, 70, 16)
+		local sx, sy = x + ((i - 1) % 2) * (cellW + 16), y + (i - 1) // 2 * 30
+		place(text(box, string.upper(stat), 10, C.Dim, HEADING), sx, sy + 3, cellW - 48, 14)
+		local value = place(text(box, "0", 15, C.Text, HEAVY), sx + cellW - 46, sy, 46, 18)
+		value.TextXAlignment = Enum.TextXAlignment.Right
 		local track = frame(box, C.Line, 0.93)
-		place(track, x + 72, sy + 6, w - 72 - 52, 4)
+		place(track, sx, sy + 21, cellW, 4)
 		round(track, 2)
 		local fill = frame(track, STAT_COLOR[stat])
 		fill.Size = UDim2.fromScale(0, 1)
 		round(fill, 2)
-		local value = place(text(box, "0", 15, C.Text, HEAVY), x + w - 46, sy - 2, 46, 20)
-		value.TextXAlignment = Enum.TextXAlignment.Right
 		ui.Stats[stat] = { Fill = fill, Value = value, Last = nil }
 	end
-	y += 4 * 30
+	y += 60
 	ui.Vitals = place(text(box, "", 10, C.Teal, HEADING), x, y, w, 14)
 	UiKit.fit(ui.Vitals)
-	y += 22
+	y += 18
 	-- The armor set.
 	place(frame(box, C.Line, 0.93), x, y, w, 1)
-	y += 10
+	y += 8
 	ui.SetName = place(text(box, "", 11, C.Teal, HEADING), x, y, 170, 16)
 	ui.Pips = {}
 	for i = 1, 6 do
@@ -875,28 +879,28 @@ local function buildLeft(canvas: Frame)
 		round(pip, 2)
 		ui.Pips[i] = pip
 	end
-	y += 20
-	ui.SetBonus = place(text(box, "", 12, C.Text, HEADING), x, y, w, 18)
+	y += 18
+	ui.SetBonus = place(text(box, "", 12, C.Text, HEADING), x, y, w, 16)
 	ui.SetBonus.RichText = true
 	UiKit.fit(ui.SetBonus)
-	y += 18
-	ui.SetNext = place(text(box, "", 11, C.Dim, BODY), x, y, w, 30)
+	y += 17
+	ui.SetNext = place(text(box, "", 11, C.Dim, BODY), x, y, w, 26)
 	ui.SetNext.TextWrapped = true
 	ui.SetNext.TextYAlignment = Enum.TextYAlignment.Top
-	y += 34
+	y += 28
 	-- Elements: what you're strong against, weak to and resist (Shared.ElementMatchup).
 	place(frame(box, C.Line, 0.93), x, y, w, 1)
-	y += 10
+	y += 8
 	ui.Verdict = {}
 	for i, caption in { "STRONG VS", "WEAK TO", "RESISTS" } do
-		UiKit.fit(place(text(box, caption, 10, C.Dim, HEADING), x, y + 1, 92, 16))
-		local value = place(text(box, "", 12, C.Text, HEADING), x + 98, y, w - 98, 18)
+		UiKit.fit(place(text(box, caption, 10, C.Dim, HEADING), x, y + 1, 92, 14))
+		local value = place(text(box, "", 12, C.Text, HEADING), x + 98, y, w - 98, 16)
 		value.RichText = true
 		UiKit.fit(value)
 		local detail = text(box, "", 10, C.Faint, MEDIUM)
 		detail.Visible = false
 		ui.Verdict[i] = { Value = value, Detail = detail }
-		y += 22
+		y += 18
 	end
 	-- (the radar and the gem mix: drawn by drawLeft, shown on no layout now)
 	local axes = {}
@@ -910,15 +914,16 @@ local function buildLeft(canvas: Frame)
 	end
 	ui.Mix = text(box, "", 11, C.Dim, HEADING)
 	ui.Mix.Visible = false
-	-- AUTO EQUIP at the foot of the card.
-	y = 744 - 14 - 128
-	place(frame(box, C.Line, 0.93), x, y - 12, w, 1)
+	-- AUTO EQUIP, right under the rest; the card ends with it.
+	place(frame(box, C.Line, 0.93), x, y, w, 1)
+	y += 8
 	if COMPACT then
 		-- (over the miner, top right of its column)
 		buildAuto(canvas, RIGHT_X - 12 - 96, 92, 96)
 	else
-		buildAuto(box, x, y, w)
+		y = buildAuto(box, x, y, w)
 	end
+	card.Size = UDim2.fromOffset(w + 32, y + 10 - cardY)
 end
 
 local function buildStage(canvas: Frame)

@@ -429,7 +429,7 @@ Where they lead, the first of these that wants you somewhere:
 | Where you are | They lead to |
 | --- | --- |
 | Downstairs | The free pad across from someone waiting. Just after you arrive (18 seconds), the nearest open court's pad. Nothing while you're on a pad or in a battle. |
-| In the Rift | Through a wall of fire that's just gone out (15 seconds), and to the way home once the boss is down. |
+| In the Rift | Through a wall of fire that's just gone out (15 seconds), a little way into the next cave (`GroundGuide.through`), and nothing once you're through it. To the way home once the boss is down. |
 | In the Shelter | The stairs down, for 25 seconds after someone starts waiting for a challenger downstairs. A toast says "Sam is waiting for a kaiju battle downstairs. Follow the arrows!", at most once a minute. |
 
 ## Files
