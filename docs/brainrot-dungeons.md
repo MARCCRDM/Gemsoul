@@ -28,6 +28,14 @@ All three boss Surge slots use its main element at tiers 2/3/4 and rank III. Reg
 
 A cleared dungeon gives each surviving, still-enrolled player **300 coins and SlayBrute XP**, once, and a **boss cache** of their own: the boss's gem and six pieces of gear to keep three of, rolled and picked like an Arena Cache, the rest to the Market from the Rift Vault (see [arena-streaks.md](arena-streaks.md#boss-caches)). The run ends five seconds after the boss falls; the cache waits to be opened. There is no revive or checkpoint resurrection system. Failed runs grant no completion reward.
 
+## The fallen
+
+Each room has a fallen miner of a crew that went in before, by a wall, its
+visor's crack and spilt gems glowing the room's element; the boss's room
+has 4 and their heap beside the boss (helmets on spikes, a torn banner).
+Props only, built with the room (`Server.World.FallenMiners`; see
+[rift.md](rift.md#the-fallen)).
+
 ## Verification and remaining playtest
 - 1,000 seeded layouts checked for uniqueness and connected room order.
 - Server lifecycle tests cover party size, readiness, leader authority, duplicate queue attempts, concurrent isolation, gate progression, final boss requirement, one-time rewards, failed spawns, early exits and timeout.

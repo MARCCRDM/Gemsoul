@@ -24,6 +24,8 @@
 	  }
 	  RiftWorld.inside(area, position, margin?)   on that cave's floor
 	  RiftWorld.healRock(parent, at, rng) -> Model   a healing crystal (RiftRun.Heal)
+	  (and what's left of the crews who came before, by the walls and
+	  heaped by the throne: Server.World.FallenMiners)
 	  RiftWorld.openGate(gate)     the fire dies down and the way's open
 	  RiftWorld.openHome(world)    the way home in the throne cave opens
 	  RiftWorld.Spacing, Landing, Cave, Throne, Passage, Wall, Thick: its
@@ -31,6 +33,7 @@
 	      width, the walls' height and thickness)
 ]]
 local RiftRun = require(game:GetService("ReplicatedStorage").Shared.RiftRun)
+local FallenMiners = require(script.Parent.FallenMiners)
 
 local RiftWorld = {}
 
@@ -644,6 +647,27 @@ function RiftWorld.build(id: string, origin: CFrame, rng)
 		hi = Vector3.new(math.max(hi.X, c.X), base.Y, math.max(hi.Z, c.Z))
 	end
 	sky(folder, (lo + hi) / 2, math.max(hi.X - lo.X, hi.Z - lo.Z) + 300, rng)
+	-- What's left of the crews who came before: a couple by the walls of
+	-- each cave, more round the throne, and their heap beside it
+	-- (Server.World.FallenMiners; props only).
+	local remains = { Glow = EMBER, Scratch = BLOOD, Shards = true }
+	for i = 2, last - 1 do
+		local doors = {}
+		for _, j in { i - 1, i + 1 } do
+			table.insert(doors, flat(centers[j] - centers[i]).Unit)
+		end
+		remains.Doors = doors
+		FallenMiners.scatter(folder, centers[i], sizes[i] - 6, FallenMiners.Count.Cave, rng, remains)
+	end
+	local heapAt = seat - seatFrame.RightVector * 20 + facing * 5
+	FallenMiners.heap(folder, heapAt, facing, rng, remains)
+	remains.Doors = { -facing, flat(centers[last - 1] - bossAt).Unit }
+	remains.Avoid = {
+		{ At = seat, Radius = 16 },
+		{ At = beside, Radius = 10 },
+		{ At = heapAt, Radius = 11 },
+	}
+	FallenMiners.scatter(folder, bossAt, RiftWorld.Throne - 8, FallenMiners.Count.Throne, rng, remains)
 	local rooms = {}
 	for room = 1, RiftRun.Rooms do
 		rooms[room] = { Center = centers[room + 1], Radius = RiftWorld.Cave / 2 + 4, Size = RiftWorld.Cave }

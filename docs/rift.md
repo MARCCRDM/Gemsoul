@@ -123,6 +123,53 @@ The world is built for each trip, far off in the dark, and gone with it
 - Through the floor somehow (20 studs under it), you're put back in the
   last cave you reached, unhurt.
 
+## The fallen
+
+Crews went in before you and didn't come back. What's left of them lies in
+the caves, and more of it round the throne (`Server.World.FallenMiners`,
+props only: you walk through them, nothing to press):
+
+![Round the throne: miners fallen by its walls and their heap beside it. Offline render of the game's parts, not a Roblox screenshot](rift/fallen-throne.jpg)
+
+| | |
+| --- | --- |
+| ![The heap by the throne: rubble, helmets, two up on spikes, bones, picks, a torn banner, spilt gems](rift/fallen-heap.jpg) | ![One slumped against a cave wall, its pick across its lap, a gem still glowing by its hand](rift/fallen-cave.jpg) |
+
+- **Each one**: an old expedition suit in one of four faded crew colours,
+  the big visor dark and cracked (the crack glowing), the skull behind it
+  with its sockets still faintly lit, a headlamp that's sometimes still on,
+  its pick, a pouch of gems spilt and glinting (one lights the floor), the
+  floor stained dark under it, and crystals of the place grown up through
+  it. Three ways they lie:
+  - **Slumped** against a wall, head on its chest, the pick across its lap.
+  - **Face down**, reaching for the pick it dropped, its helmet rolled off
+    (the skull bare), claw marks where something dragged it.
+  - **Sprawled** on its back, arms flung out, its pack torn off beside it,
+    its pick stood in the floor like a marker.
+- **Where**: 2 by the walls of each cave (`Count.Cave`), never in the way
+  through; 6 round the throne (`Count.Throne`), clear of the throne, the way
+  home and the heap. None on the landing.
+- **The heap** beside the throne: rubble, three helmets, bones, a skull,
+  two picks stuck in it, a torn crew banner on a pole, two more helmets up
+  on spikes either side, gems spilt round its foot, claw marks.
+- In the Rift their glow is ember and the claw marks blood red. **The
+  pathway dungeon** has them too: one in each room, glowing its element's
+  colour, 4 and the heap in the boss's room.
+
+![The heap in a dungeon's boss room](rift/fallen-dungeon.jpg)
+
+About 27 parts each and 59 for the heap: a trip is 1,261 parts (under the
+1,400 the tests allow).
+
+### What drops what
+
+Critters never drop armor. In the Outpost they pay your kaiju EXP and coins
+(and a robber carries off your gem). In the Rift and the dungeon, critters
+and fighters drop nothing on the way; the boss at the end drops a cache
+(its gem and six pieces of gear, keep three), and the Rift pays coins and
+kaiju EXP when you clear it. Mining pays gems only. Armor otherwise comes
+from the lottery (every roll leaves a piece for the Market) and the Market.
+
 ## A trip
 
 The rules are `Shared.RiftRun`; the server is `Server.RiftServer`.
@@ -261,6 +308,7 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 | `src/shared/RiftRun.luau` | The rules: the layout, packs and fighters, where their tears open (`Portal`, `portalSpots`), levels, the boss and its health, caches, rewards, robbery, RESTORE's price |
 | `src/shared/BossLoot.luau` | Each boss's cache by its threat (free gems, Ultra Rare gear, quality, health), its favourite kind of gear |
 | `src/server/World/RiftWorld.luau` | Builds a trip's world far off in the dark: walled caves, passages under arches, walls of fire, the throne cave, the ways home, the burning sky; `RiftWorld.inside` (is a spot in a cave) |
+| `src/server/World/FallenMiners.luau` | The fallen: `place` (one, in a pose), `heap` (by the boss), `scatter` (round a room, by the walls first, clear of the doors and of what it's told to avoid), `Count`; the dungeon's rooms use it too (`DungeonWorld`) |
 | `src/server/Systems/RiftServer.luau` | Runs trips: `RiftEnter`, `RiftLeave`, `RiftChoice`, `RiftPeek`; a boss cache each at the kill |
 | `src/server/Systems/ArenaStreaks.luau` | `ArenaStreaks.bossCache`: rolls and saves a boss cache, and tells its owner |
 | `src/server/Systems/KaijuServer.luau` | Your kaiju take the critters before the leaders |
@@ -291,7 +339,7 @@ Boss and move names stay in English (they're names).
 
 | Suite | What it checks |
 | --- | --- |
-| `run_rift` | 33,462 checks: the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (802). And nothing else starts for a runner |
+| `run_rift` | 34,045 checks: the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open, the ways home, no lava, the sky, parts per trip (1,261). The fallen: 2 in each cave and more round the throne, none on the landing, the heap by the throne, every part one you walk through, none in the way through or the way home, a pose each; scattered alone, by the walls first, clear of what to avoid and of the doorway; in a dungeon, one a room, more and the heap in the boss's. And nothing else starts for a runner |
 | `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (the boss's gem in it, Legendary from a tier-5 boss; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The ladder: the gate's peek (its biome's element, the ladder, the next boss, each boss's level at your kaiju's and rising, locks, a portrait each), a locked boss, an unknown one and another biome's refused, the gate's first boss and its element's fighters, a joiner seeing the party's boss, a win tallied for everyone and the next boss unlocked and offered, the top boss alone allowed and warned. The fighters are stand-ins here: the real Duelist isn't loaded |
 | `run_target_lock` | Your lock takes a pack's leader over nearer critters and those attacking you, holds it against them, takes it back from a critter, but not hidden or out of range; a target you pick still holds |
 | `run_spar` | Going into the Rift ends a spar, the kit stays out in there and can't be put away, nobody spars with a runner, and the kit goes away at home |

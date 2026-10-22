@@ -1,6 +1,7 @@
 -- Room geometry is generated server-side and owned by one run.
 local Rules = require(game:GetService("ReplicatedStorage").Shared.DungeonRules)
 local GemConfig = require(game:GetService("ReplicatedStorage").Shared.GemConfig)
+local FallenMiners = require(script.Parent.FallenMiners)
 local World = {}
 local function block(parent, name, size, at, color, material)
 	local p = Instance.new("Part")
@@ -34,6 +35,7 @@ function World.build(id, rooms, origin)
 	folder.Parent = workspace
 	local centers, gates = {}, {}
 	local wallColor = Color3.fromRGB(76, 69, 66)
+	local rng = Random.new()
 	for i, room in rooms do
 		local center = origin + Vector3.new(room.X * Rules.Spacing, 0, room.Z * Rules.Spacing)
 		centers[i] = center
@@ -124,6 +126,30 @@ function World.build(id, rooms, origin)
 			glow.Shadows = false
 			glow.Parent = light
 		end
+		-- What's left of the crews who came before (Server.World.FallenMiners):
+		-- one by a wall, and round the boss more of them and their heap.
+		local doorDirs = {}
+		for _, index in { i - 1, i + 1 } do
+			local neighbor = rooms[index]
+			if neighbor then
+				table.insert(doorDirs, Vector3.new(neighbor.X - room.X, 0, neighbor.Z - room.Z).Unit)
+			end
+		end
+		local remains = { Glow = color, Shards = true, Doors = doorDirs }
+		if room.Boss then
+			local back = if #doorDirs > 0 then -doorDirs[1] else Vector3.new(0, 0, 1)
+			local heapAt = center + back * 20 + Vector3.new(-back.Z, 0, back.X) * 12 + Vector3.new(0, 1, 0)
+			FallenMiners.heap(folder, heapAt, -back, rng, remains)
+			remains.Avoid = { { At = heapAt, Radius = 11 } }
+		end
+		FallenMiners.scatter(
+			folder,
+			center + Vector3.new(0, 1, 0),
+			58,
+			if room.Boss then FallenMiners.Count.BossRoom else FallenMiners.Count.Room,
+			rng,
+			remains
+		)
 		if i > 1 then
 			local previous = centers[i - 1]
 			local delta = center - previous

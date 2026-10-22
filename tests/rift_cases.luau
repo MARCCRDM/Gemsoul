@@ -7,8 +7,8 @@
 -- win pays. The world: a pathway of walled caves on a grid that never
 -- touches itself, floor all the way from the landing to the throne (nowhere
 -- to fall), walls too tall to climb, a wall of fire across each way out
--- (until it's opened), the ways home, a scar across the sky. And nothing
--- else starts for a runner. Run by tests/run_rift.py.
+-- (until it's opened), the ways home, a scar across the sky, the fallen
+-- miners (and in the dungeon's rooms). And nothing else starts for a runner. Run by tests/run_rift.py.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local roblox = require("@lune/roblox")
@@ -583,6 +583,124 @@ check(
 	fires >= RiftRun.Rooms * 4 and lights >= RiftRun.Rooms * 4,
 	"Not hellish enough: " .. fires .. " fires, " .. lights .. " lights"
 )
+-- The fallen (Server.World.FallenMiners): a couple by each cave's walls,
+-- more round the throne and their heap beside it; props you walk through,
+-- never in a passage's way, clear of the way home.
+local FallenMiners = load("FallenMiners")
+local function flatGap(a: Vector3, b: Vector3): number
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
+-- How far a point is off the line through two points (a passage's middle).
+local function offLine(p: Vector3, a: Vector3, b: Vector3): number
+	local along = Vector3.new(b.X - a.X, 0, b.Z - a.Z).Unit
+	local rel = Vector3.new(p.X - a.X, 0, p.Z - a.Z)
+	return (rel - along * rel:Dot(along)).Magnitude
+end
+local caves = { world.Landing, table.unpack(world.Rooms) }
+table.insert(caves, world.Boss)
+local fallenIn, heaps = {}, {}
+for _, d in world.Folder:GetChildren() do
+	if d.Name ~= "FallenMiner" and d.Name ~= "FallenHeap" then
+		continue
+	end
+	local at, count = nil, 0
+	for _, p in d:GetDescendants() do
+		if p:IsA("BasePart") then
+			count += 1
+			at = at or p.CFrame.Position
+			check(not p.CanCollide and not p.CanTouch and not p.CanQuery, d.Name .. " has a part you'd bump into")
+		end
+	end
+	check(count > 10 and count < 70, d.Name .. " has " .. count .. " parts")
+	local home
+	for i, cave in caves do
+		if RiftWorld.inside(cave, at) then
+			home = i
+		end
+	end
+	check(home ~= nil, d.Name .. " lies outside the caves")
+	check(home ~= 1, "A fallen miner on the landing (they're further in)")
+	if d.Name == "FallenHeap" then
+		table.insert(heaps, home)
+	else
+		check(table.find(FallenMiners.Poses, d:GetAttribute("Pose")) ~= nil, "A fallen miner without a pose")
+		fallenIn[home] = (fallenIn[home] or 0) + 1
+	end
+	-- Not in the way: off the line from the cave's middle to each of its
+	-- ways through, and clear of the way home.
+	for _, j in { home - 1, home + 1 } do
+		local next = caves[j]
+		if next then
+			local center = caves[home].Center
+			local out = Vector3.new(next.Center.X - center.X, 0, next.Center.Z - center.Z)
+			if Vector3.new(at.X - center.X, 0, at.Z - center.Z):Dot(out) > 0 then
+				check(offLine(at, center, next.Center) > RiftWorld.Passage / 2, d.Name .. " lies in the way through")
+			end
+		end
+	end
+	check(flatGap(at, opening.CFrame.Position) > 7, d.Name .. " lies in the way home")
+end
+check(#heaps == 1 and heaps[1] == #caves, "The heap isn't by the throne")
+for i = 2, #caves - 1 do
+	check((fallenIn[i] or 0) == FallenMiners.Count.Cave, "Cave " .. (i - 1) .. " has " .. (fallenIn[i] or 0) .. " fallen")
+end
+check((fallenIn[#caves] or 0) >= FallenMiners.Count.Cave * 2, "No more of them round the throne than in a cave")
+-- Scattered alone: by the walls first, clear of what it's told to avoid,
+-- out of the doorway.
+do
+	local holder = R.Instance.new("Folder")
+	local avoid = { At = Vector3.new(20, 0, 0), Radius = 12 }
+	local placed = FallenMiners.scatter(
+		holder,
+		Vector3.new(0, 0, 0),
+		60,
+		8,
+		Random.new(5),
+		{ Doors = { Vector3.new(0, 0, 1) }, Avoid = { avoid } }
+	)
+	check(#placed >= 4 and #placed <= 8, "Scattered " .. #placed .. " of 8")
+	check(placed[1]:GetAttribute("Pose") == "Slumped", "The first isn't slumped by a wall")
+	for _, model in placed do
+		local p = model:FindFirstChildWhichIsA("BasePart", true).CFrame.Position
+		check(flatGap(p, avoid.At) >= avoid.Radius - 3, "Scattered onto what it should avoid")
+		check(math.abs(p.X) < 31 and math.abs(p.Z) < 31, "Scattered outside the room")
+		check(not (p.Z > 22 and math.abs(p.X) < 8), "Scattered in the doorway")
+	end
+	holder:Destroy()
+end
+-- And in the dungeon: one in each room, more in the boss's, and the heap.
+do
+	local DungeonWorld = load("DungeonWorld")
+	local rooms = DungeonRules.generate(Random.new(8))
+	local at = Vector3.new(4000, 0, 4000)
+	local folder = DungeonWorld.build("T3", rooms, at).Folder
+	local per, heap = {}, 0
+	for _, d in folder:GetChildren() do
+		if d.Name == "FallenHeap" then
+			heap += 1
+		elseif d.Name == "FallenMiner" then
+			local p = d:FindFirstChildWhichIsA("BasePart", true).CFrame.Position
+			local best, room = math.huge, nil
+			for i, r in rooms do
+				local gap = flatGap(p, at + Vector3.new(r.X * DungeonRules.Spacing, 0, r.Z * DungeonRules.Spacing))
+				if gap < best then
+					best, room = gap, i
+				end
+			end
+			check(best < 32, "A dungeon's fallen miner outside its room")
+			per[room] = (per[room] or 0) + 1
+		end
+	end
+	check(heap == 1, "No heap in the boss's room")
+	for i, room in rooms do
+		if room.Boss then
+			check((per[i] or 0) > FallenMiners.Count.Room, "No more of them in the boss's room")
+		else
+			check(per[i] == FallenMiners.Count.Room, "Room " .. i .. " has " .. (per[i] or 0) .. " fallen")
+		end
+	end
+	folder:Destroy()
+end
 -- Two trips side by side never meet (RiftServer's slots).
 local other = RiftWorld.build("T2", origin * CFrame.new(-2000, 0, 0), Random.new(4))
 for _, a in { other.Landing, other.Boss, table.unpack(other.Rooms) } do
@@ -622,7 +740,7 @@ end
 
 print(
 	string.format(
-		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire, ways home, the sky, healing crystals; %d parts a trip)",
+		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire, ways home, the sky, healing crystals, the fallen; %d parts a trip)",
 		checks,
 		#parts
 	)
