@@ -162,13 +162,8 @@ local function refreshAuto()
 	autoLabel.TextColor3 = if on then GREEN else P.Dim
 	autoRim.Color = if on then GREEN else Color3.fromRGB(70, 80, 96)
 	autoSub.Text = if on
-<<<<<<< HEAD
 		then "JOIN ONLY WHEN YOU ACCEPT AN INVITATION"
 		else "LOBBY MATCH INVITATIONS ARE MUTED"
-=======
-		then string.format("JOIN OFFERS FOR 1v1s IN THE LOBBY  ·  +%d ◆ TO JOIN  ·  NO RATING LOST", AutoQueue.JoinBonus)
-		else "NO JOIN OFFERS FOR OTHER PLAYERS' 1v1s"
->>>>>>> a9b4802824fcea389a88ae3684a58949f60a6b33
 end
 autoButton.Activated:Connect(function()
 	run("DuelAuto", not autoOn())
