@@ -139,6 +139,15 @@ function FallenCrew.body(rng: Random, parent: Instance?): Model?
 	local loadout, cosmetics, skin = FallenCrew.roll(rng)
 	local rig = FighterRig.build(skin)
 	rig.Name = "Body"
+	-- Anchored from the start: it's built inside a live world, and an
+	-- unanchored body would drop (and drag its gear with it) before it's
+	-- laid down.
+	for _, part in rig:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.Anchored = true
+			part.CanCollide = false
+		end
+	end
 	-- (its weapon in its fist, as a fighter holds it)
 	rig:SetAttribute("FistGrip", true)
 	if parent then

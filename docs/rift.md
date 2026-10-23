@@ -258,9 +258,11 @@ props only: you walk through them, nothing to press):
 **How the body gets there.** `FallenMiners` is a world builder and knows
 nothing of gear; the server hands it bodies through `FallenMiners.dresser`
 (set by `FallenCrew.start()` in `Main.server`, before any world is built).
-`FallenMiners.place` asks for one, lays it down (`lay`: the root to the
-pose's frame, each joint from its parent through its Motor6D with the
-pose's bend, then everything welded to a limb back where it sat on it)
+`FallenMiners.place` asks for one, lays it down (`lay`: every part
+anchored first, so that in a live place each moves alone rather than
+dragging the whole welded assembly with it; then the root to the pose's
+frame, each joint from its parent through its Motor6D with the pose's
+bend, then everything welded to a limb back where it sat on it)
 and keeps the old expedition-suit prop as the stand-in when there's no
 body to be had (the world tests build without one, so their part counts
 stay what they were). A laid-out miner is about 300 to 410 parts

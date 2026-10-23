@@ -322,6 +322,18 @@ for i, pose in { "Slumped", "FaceDown", "Sprawled", "Slumped", "FaceDown", "Spra
 	end
 	check(model:FindFirstChild("Stain") ~= nil, "No stain under the fallen miner")
 end
+-- In a live place the rig is one welded assembly until it's anchored, and
+-- moving one unanchored part moves the lot: the body is anchored before
+-- any part of it is placed (lune has no assemblies, so this reads the code).
+do
+	local source = fs.readFile(ROOT .. "/src/server/World/FallenMiners.luau")
+	local layAt = string.find(source, "local function lay(", 1, true)
+	local anchorAt = string.find(source, "d.Anchored = true", layAt, true)
+	local poseAt = string.find(source, "root.CFrame = rootFrame", layAt, true)
+	check(layAt and anchorAt and poseAt and anchorAt < poseAt, "The body isn't anchored before it's posed")
+	local crew = fs.readFile(ROOT .. "/src/server/Systems/FallenCrew.luau")
+	check(string.find(crew, "part.Anchored = true", 1, true) ~= nil, "The rig isn't anchored when it's built")
+end
 -- (and the old suit when there's no body to be had)
 FallenMiners.dresser = nil
 local old = FallenMiners.place(holder, Vector3.new(0, 0, 40), Vector3.new(0, 0, -1), Random.new(9), { Pose = "Slumped" })

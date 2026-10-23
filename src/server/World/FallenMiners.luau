@@ -305,6 +305,21 @@ local function lay(model: Model, rig: Model, rootFrame: CFrame, bends: { [string
 	if not root then
 		return
 	end
+	-- Every part anchored first, and a prop already. In a live place the
+	-- rig and everything welded to it are one physics assembly: set the
+	-- CFrame of one unanchored part and the whole assembly goes with it, so
+	-- nothing bends and the last piece placed decides where the body ends
+	-- up (mostly inside the floor). Anchored, each part is its own and
+	-- moves alone, which is what laying it out needs.
+	for _, d in rig:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+			d.Massless = false
+		end
+	end
 	-- Where everything welded on sits on what it's welded to, before
 	-- anything moves.
 	-- (The body's parts are known by name: each name is one part of the
@@ -351,11 +366,6 @@ local function lay(model: Model, rig: Model, rootFrame: CFrame, bends: { [string
 	local gone = {}
 	for _, d in rig:GetDescendants() do
 		if d:IsA("BasePart") then
-			d.Anchored = true
-			d.CanCollide = false
-			d.CanQuery = false
-			d.CanTouch = false
-			d.Massless = false
 			if d.Transparency >= 0.99 and not bodyNames[d.Name] then
 				table.insert(gone, d)
 			end
