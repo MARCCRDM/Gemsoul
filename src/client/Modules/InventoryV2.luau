@@ -20,8 +20,10 @@
 	             A slot's gem stays in the slot: a new piece takes it on
 	  Bottom     the Surge Array (Q / E / R); click one to change its gem
 
-	(Compact, on a phone: the miner on the left with GEMS, SKINS and AUTO,
-	two columns of three rows, Q / E / R under them.)
+	(Compact, on a phone: the miner on the left with STATS, AUTO, GEMS and
+	SKINS, two columns of three rows, Q / E / R under them. STATS opens the
+	stats card as a sheet over the screen; a piece's card lists every stat
+	on it, since there's no hovering.)
 
 	Drag a gem from the grid onto any row or Q / E / R card to socket it.
 	The server checks every move (the same requests as the first Inventory).
@@ -255,6 +257,25 @@ local function statText(stat: string, amount: number): string
 		return string.format("+%s%% %s", whole(amount * 100), stat)
 	end
 	return string.format("+%s %s", whole(amount), stat)
+end
+-- Every stat on a piece, biggest first, on one line ("+12 Health  ·  +8 Defense").
+local function allStats(roll): string
+	local stats = {}
+	for stat, amount in roll and roll.Stats or {} do
+		local weight = if stat == "Critical" or stat == "Cooldown" then amount * 100 else amount
+		table.insert(stats, { Text = statText(stat, amount), Weight = weight })
+	end
+	table.sort(stats, function(a, b)
+		if a.Weight ~= b.Weight then
+			return a.Weight > b.Weight
+		end
+		return a.Text < b.Text
+	end)
+	local out = {}
+	for _, entry in stats do
+		table.insert(out, entry.Text)
+	end
+	return table.concat(out, "  ·  ")
 end
 local function topStat(roll): string?
 	local best, amount = nil, 0
@@ -776,17 +797,72 @@ local function buildAuto(parent: Instance, x: number, y: number, w: number): num
 	return y + 34
 end
 
+-- Compact: there's no room for the stats card beside the miner, so it
+-- lives in a sheet over the screen: a scrim, a panel with a title and ×,
+-- and inside it a scrolling frame holding the card's box, slid so the
+-- card's corner sits at the panel's. STATS over the miner opens it (with
+-- your rating on it); a tap outside or on × closes it.
+local SHEET_W = STATS_W + 32 + 44 -- (the card, and the level-bonus line that runs a little past it)
+local function buildStatsSheet(canvas: Frame): Frame
+	local scrim = new("TextButton", {
+		Name = "StatsSheet",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 0.4,
+		Size = UDim2.fromScale(1, 1),
+		Visible = false,
+		ZIndex = 30,
+	}, canvas)
+	ui.StatsSheet = scrim
+	local panel = frame(scrim, C.Deep, 0.02)
+	panel.Name = "Panel"
+	panel.AnchorPoint = Vector2.new(0.5, 0.5)
+	panel.Position = UDim2.fromScale(0.5, 0.5)
+	panel.Size = UDim2.fromOffset(SHEET_W, H - 12)
+	round(panel, 14)
+	stroke(panel, C.Teal, 1, 0.5)
+	place(text(panel, "YOUR STATS", 12, C.Teal, HEAVY), 16, 10, 200, 18)
+	local close = new("TextButton", {
+		Name = "Close",
+		Text = "×",
+		TextSize = 22,
+		Font = HEADING,
+		TextColor3 = C.Dim,
+		AutoButtonColor = false,
+		BackgroundTransparency = 1,
+	}, panel)
+	place(close, SHEET_W - 40, 2, 34, 34)
+	close:SetAttribute("UiSound", "Back")
+	local scroller = new("ScrollingFrame", {
+		Name = "Scroller",
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = C.Dim,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		CanvasSize = UDim2.fromOffset(0, 0),
+	}, panel)
+	place(scroller, 0, 34, SHEET_W, H - 12 - 34)
+	-- (the box is laid out in the full layout's coordinates: slid so the
+	-- card's left edge and the line above it land at the panel's padding)
+	local box = new("Frame", { Name = "Stats", BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H) }, scroller)
+	ui.StatsBox, ui.StatsScroller = box, scroller
+	local function hide()
+		scrim.Visible = false
+	end
+	scrim.Activated:Connect(hide)
+	close.Activated:Connect(hide)
+	return box
+end
+
 local function buildLeft(canvas: Frame)
 	local x, w = STATS_X, STATS_W
 	-- Compact keeps only miner 1 / 2 / 3 and the name (over the miner): the
-	-- rest is built (the draw code fills it in) but hidden.
+	-- rest is built in the stats sheet (buildStatsSheet), which STATS opens.
 	local box = canvas
 	if COMPACT then
-		box = new(
-			"Frame",
-			{ Name = "Stats", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false },
-			canvas
-		)
+		box = buildStatsSheet(canvas)
 	end
 	-- Miner 1 / 2 / 3 (none while the roster is off: one miner).
 	ui.Miners = {}
@@ -915,12 +991,40 @@ local function buildLeft(canvas: Frame)
 	ui.Mix = text(box, "", 11, C.Dim, HEADING)
 	ui.Mix.Visible = false
 	-- AUTO EQUIP, right under the rest; the card ends with it.
-	place(frame(box, C.Line, 0.93), x, y, w, 1)
-	y += 8
 	if COMPACT then
-		-- (over the miner, top right of its column)
+		-- (over the miner, top right of its column; STATS, with your rating
+		-- on it, at the top left: it opens the sheet)
 		buildAuto(canvas, RIGHT_X - 12 - 96, 92, 96)
+		local open = new("TextButton", {
+			Name = "StatsButton",
+			Text = "STATS",
+			TextSize = 12,
+			Font = HEAVY,
+			TextColor3 = C.Teal,
+			AutoButtonColor = true,
+			BackgroundColor3 = C.Deep,
+			BackgroundTransparency = 0.1,
+		}, canvas)
+		place(open, 0, 92, 96, 30)
+		round(open, 8)
+		stroke(open, C.Teal, 1, 0.45)
+		UiKit.fit(open)
+		open:SetAttribute("UiSound", "Click")
+		open.Activated:Connect(function()
+			InventoryV2.cancelDrag()
+			if ui.AutoMenu then
+				ui.AutoMenu.Visible = false
+			end
+			ui.StatsSheet.Visible = true
+		end)
+		ui.StatsButton = open
+		-- The box slid into the sheet, the sheet scrolling as far as the card.
+		local top = nameY + 40 - 10
+		box.Position = UDim2.fromOffset(-(x - 16) + 12, -top)
+		ui.StatsScroller.CanvasSize = UDim2.fromOffset(0, y + 10 - top + 12)
 	else
+		place(frame(box, C.Line, 0.93), x, y, w, 1)
+		y += 8
 		y = buildAuto(box, x, y, w)
 	end
 	card.Size = UDim2.fromOffset(w + 32, y + 10 - cardY)
@@ -1955,6 +2059,9 @@ local function drawLeft(profile, loadout)
 		flashValue(entry, value)
 	end
 	ui.Rating.Text = whole(total)
+	if ui.StatsButton then
+		ui.StatsButton.Text = string.format("STATS  ·  %s", whole(total))
+	end
 	if ui.RatingLast and math.abs(total - ui.RatingLast) >= 0.5 then
 		ui.Rating.TextColor3 = if total > ui.RatingLast then C.Good else C.Bad
 		TweenService:Create(ui.Rating, TweenInfo.new(1.2, Enum.EasingStyle.Quad), { TextColor3 = C.Gold }):Play()
@@ -2687,7 +2794,7 @@ local function drawDetail(loadout)
 	ui.PieceWell.Art.Visible = not isKey
 	ui.MoveGlyph.Visible = isKey
 	ui.KeyBadge.Visible = isKey
-	ui.PerkStats.Visible = isKey
+	ui.PerkStats.Visible = true -- (a key: its cost line; a piece: every stat on it)
 	ui.PerkText.RichText = isKey
 	ui.PerkText.TextSize = if COMPACT then 13 else 12
 	local pick = state.Pick
@@ -2758,6 +2865,10 @@ local function drawDetail(loadout)
 		end
 		-- What it does, with its cost, cooldown and output on the right.
 		ui.PerkName.Text = if surge then "WHAT IT DOES" else ""
+		ui.PerkName.Size = UDim2.fromOffset(RIGHT_W - 36, 14)
+		ui.PerkStats.Position = UDim2.fromOffset(128, 182)
+		ui.PerkStats.Size = UDim2.fromOffset(RIGHT_W - 146, 14)
+		ui.PerkStats.TextColor3 = C.Dim
 		ui.PerkStats.Text = if surge
 			then string.format(
 				"%s %s  ·  %ss%s",
@@ -2823,7 +2934,19 @@ local function drawDetail(loadout)
 		well.Edge.Color = if tryPiece or state.Tab == "Pieces" then C.Gold else color
 		well.Edge.Transparency = if tryPiece then 0 elseif state.Tab == "Pieces" then 0.2 else 0.5
 		well.Name.Text = if gear then gear.Name else "Nothing worn"
-		local stat = topStat(GearRolls.get(loadout, slot, viewId))
+		local roll = GearRolls.get(loadout, slot, viewId)
+		local stat = topStat(roll)
+		-- Every stat on it (the hover card's list, here for a tap on a phone),
+		-- right of the perk's name, which makes room for it.
+		local statsText = allStats(roll)
+		ui.PerkStats.Text = statsText
+		ui.PerkStats.TextColor3 = if tryPiece then C.Gold else C.Good
+		-- (the stats take what they need, up to most of the line; the name the rest)
+		local need = math.clamp(math.floor(#statsText * ui.PerkStats.TextSize * 0.62) + 10, 60, RIGHT_W - 36 - 90)
+		ui.PerkStats.Position = UDim2.fromOffset(RIGHT_W - 18 - need, 182)
+		ui.PerkStats.Size = UDim2.fromOffset(need, 14)
+		ui.PerkName.Size = UDim2.fromOffset(RIGHT_W - 36 - need - 6, 14)
+		ui.PerkName.TextTruncate = Enum.TextTruncate.AtEnd
 		if tryPiece then
 			local gain = ratingGain(loadout, slot, tryPiece)
 			well.Sub.Text = string.format("TRYING ON  ·  RATING %s%d", if gain >= 0 then "+" else "", gain)

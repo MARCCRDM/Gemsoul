@@ -54,7 +54,18 @@ roughly a third, and nothing was taken out:
 - AUTO EQUIP comes straight after the matchups instead of being pinned to
   the foot of the column, and its chips and button are a little slimmer.
 
-On a phone nothing changes (the compact layout hides this card).
+On a phone the card is a sheet over the screen: **STATS · 212** over the
+miner (your rating on it) opens it, with everything the desktop card has,
+scrolling if it runs long; a tap outside or × closes it
+(`buildStatsSheet`). The piece card lists every stat on the piece beside
+its perk's name on both layouts, so a phone, with no hover card, still
+shows them all (`allStats` in `drawDetail`).
+
+![STATS over the miner on a phone. Offline render of the game's UI code, not a Roblox screenshot](inventory/stats-button-phone.png)
+
+![The stats sheet on a phone](inventory/stats-sheet-phone.png)
+
+![A sword's card with every stat on it, on a phone](inventory/piece-stats-phone.png)
 
 ![The stats card before and after](inventory/stats-card-before-after.png)
 
@@ -119,5 +130,6 @@ moves onto it.") and tries the piece on with the slot's gem.
 | `Systems/Forge` | `"AutoEquip"`: checks the mode and `Combat.canChangeBuild`, equips the plan's gear, then its gems (`Enchanting.canEnchant`) |
 | `Systems/PlayerData` | `equipGear`: the slot's gem moves onto the new piece |
 | `Shared.GemRoller` | `levelLabel(gem)`: `"T3 II"` |
-| `Modules/InventoryV2` | `buildRow` (each row; the sword's, chest's and shield's `SurgeTile`, drawn in `drawRows`), `buildWeapons` (left), `buildLeft` + `buildAuto` (the card), `buildBag` (spare gear), `drawPouch`, `drawBag`, `drawAuto` |
+| `Modules/InventoryV2` | `buildRow` (each row; the sword's, chest's and shield's `SurgeTile`, drawn in `drawRows`), `buildWeapons` (left), `buildLeft` + `buildAuto` (the card; compact: `buildStatsSheet`, the card in a sheet STATS opens), `buildBag` (spare gear), `drawPouch`, `drawBag`, `drawAuto`, `allStats` (every stat of a piece, on its card) |
+| `tests/inventory_stats_cases.luau` | the stats sheet and STATS button are built compact, the rating is on the button, the piece card lists every stat, the Spanish is there |
 | `tests/auto_equip_cases.luau` | every mode, two hands, other miners, gems, a plan applied leaves nothing to do, and the server request |
