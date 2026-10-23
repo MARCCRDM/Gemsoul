@@ -188,20 +188,43 @@ Vendors.ArenaMaster = crew(
 	"Arena",
 	"Arena Master",
 	Color3.fromRGB(214, 84, 70),
-	"Brutus, arena master. I post the bounties on every boss behind the Rift Gates, and I run the ranked 1v1 duels. Pick a target and I'll send you through.",
+	"Brutus, arena master. I set up the 1v1 duels: ranked, casual, and 1v1 with your kaiju beside you. Say the word and I'll find you an opponent.",
 	{
-		{ Text = "Show me the bounties", Action = "Bounties" },
 		{ Text = "Find me a duel", Action = "Duels" },
 		{
-			Text = "How do bounties work?",
-			Reply = "Every boss on the wall is one of the Rift's. Pick a biome and a target and you go through from here, your party with you. Each one opens once you've beaten the one before it. Down it and its cache is yours.",
+			Text = "How do duels work?",
+			Reply = "Ranked puts your rating on the line, best of three rounds. Casual is the same fight with nothing at stake. 1v1 + Kaiju: you duel while your kaiju fight theirs. Queue at my counter and I'll match you.",
 		},
 		{
 			Text = "What does a win streak pay?",
 			Reply = "First win: a tenth of your swings restored. Fifth: a quarter. Tenth: half, and the tournament title. A loss ends the run.",
 		},
+		{
+			Text = "Where are the bounties?",
+			Reply = "Marlo's office, east wall, under the posters. Every boss behind the Rift Gates is up there.",
+		},
 	}
 )
+Vendors.BountyClerk = {
+	Name = "Marlo",
+	Role = "Bounty Clerk",
+	Color = Color3.fromRGB(240, 178, 48),
+	Tunic = UNIFORM,
+	Face = "",
+	Visor = true,
+	Greeting = "Marlo, bounty clerk. Every boss behind the Rift Gates is posted on this wall. Pick a target and I'll send you through.",
+	Options = {
+		{ Text = "Show me the bounties", Action = "Bounties" },
+		{
+			Text = "How do bounties work?",
+			Reply = "Every boss on the wall is one of the Rift's. Pick a biome and a target and you go through from here, your party with you. Each one opens once you've beaten the one before it. Down it and its cache is yours.",
+		},
+		{
+			Text = "Which one should I take first?",
+			Reply = "The first on any ladder is built for one. The last on each is built for a party. Start where your gear is strongest against the biome's element.",
+		},
+	},
+}
 Vendors.Broker = crew(
 	"Market",
 	"Trade Broker",

@@ -5,7 +5,8 @@
 -- its side, no invented names, none of the old taglines back (KAIJU ARENA /
 -- DOWNSTAIRS: TAKE THE WEST STAIRS, ARENA UPLINK, MECH GARAGE, the FIELD
 -- GUIDE board...). Brutus is crew now, with no gate to put a word on,
--- only his booth's BOUNTIES (and PROBE-7 is gone). Out in the quarry no sign names
+-- only his booth's DUELS and the bounty office's BOUNTIES (and PROBE-7 is
+-- gone). Out in the quarry no sign names
 -- a biome, and crossing into a band or a biome shows no title card. Run by
 -- tests/run_signage.py.
 local fs = require("@lune/fs")
@@ -107,7 +108,7 @@ end
 -- The places' words; a bay's or a court's number; nothing else.
 local ALLOWED = {
 	SHELTER = true, QUARRY = true, ARENA = true, EXIT = true, INFO = true, STORE = true, MARKET = true,
-	BOUNTIES = true,
+	BOUNTIES = true, DUELS = true,
 }
 local function allowed(text: string): boolean
 	return ALLOWED[text] == true or text:match("^%d%d?$") ~= nil
@@ -117,7 +118,7 @@ local OLD = {
 	"SAGA SHELTER", "FORWARD OPERATING", "QUARRY ACCESS", "RIFT ACTIVITY", "QUARRY SURVEY",
 	"BANDS AND", "GEM BUYER", "SAGA OUTFITTERS", "MINERS' MARKET", "INFORMATION", "ARENA GUIDE",
 	"STAND ON A PAD", "FULL HEALTH", "HOW IT WORKS", "UP TO THE SHELTER", "STATION", "SWING REFILLS",
-	"STORMGLASS", "BLIGHTWOOD", "ASHFALL", "RIMEFROST", "GROUND", "CORNER", "·", "DUELS", "PROBE",
+	"STORMGLASS", "BLIGHTWOOD", "ASHFALL", "RIMEFROST", "GROUND", "CORNER", "·", "PROBE",
 	"REFILLS", "GEM GALLERY",
 }
 local seen = {}

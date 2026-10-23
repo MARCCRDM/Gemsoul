@@ -602,6 +602,17 @@ do
 	check(poster and poster:FindFirstChildOfClass("TextLabel").Text == "Bombardiro Drago", "The first poster isn't drawn")
 	check(site.Bounty.Posters[3]:FindFirstChildOfClass("SurfaceGui") == nil, "A poster for a boss that isn't there")
 end
+-- Brutus's duel booth: its terminal opens the duel queue (Client.
+-- OutpostScene: SocialUI's Arena), a prompt of its own, on the south wall
+-- by the bounty office.
+do
+	local counter = site.Duel and site.Duel.Counter
+	local prompt = counter and counter:FindFirstChildOfClass("ProximityPrompt")
+	check(prompt and prompt:GetAttribute("PromptKind") == "Duels", "Brutus's counter has no Duels prompt")
+	check((counter.CFrame.Position - site.Bounty.Counter.CFrame.Position).Magnitude > 20, "The duel booth sits on the bounty office")
+	local scene = fs.readFile(ROOT .. "/src/client/Modules/OutpostScene.luau")
+	check(scene:find('kind == "Duels"', 1, true) ~= nil, "The client doesn't open the duel queue from Brutus's counter")
+end
 -- The Hall of Fame: the board on the east wall, its five columns from
 -- TopPlayers (Shared.HallOfFame).
 do
@@ -646,13 +657,17 @@ do
 		Outfitter = "Borin",
 		Foreman = "Garrick",
 		InfoBot = "INFO-9",
+		BountyClerk = "Marlo",
 	}
-	check(#crewBuilt == 6 and #site.Crew == 6, "The Shelter's crew isn't all there: " .. #crewBuilt)
+	check(#crewBuilt == 7 and #site.Crew == 7, "The Shelter's crew isn't all there: " .. #crewBuilt)
 	check(Vendors.Foreman.Options[1].Action == "Exchange", "Garrick doesn't sell the refills first")
-	check(Vendors.ArenaMaster.Options[1].Action == "Bounties", "Brutus doesn't show the bounties first")
+	check(Vendors.ArenaMaster.Options[1].Action == "Duels", "Brutus doesn't set up a duel first")
+	check(Vendors.BountyClerk.Options[1].Action == "Bounties", "Marlo doesn't show the bounties first")
 	for _, built in crewBuilt do
 		if built.Id == "ArenaMaster" then
-			check((built.Frame.Position - site.Bounty.Counter.CFrame.Position).Magnitude < 10, "Brutus isn't at his bounty counter")
+			check((built.Frame.Position - site.Duel.Counter.CFrame.Position).Magnitude < 10, "Brutus isn't at his duel counter")
+		elseif built.Id == "BountyClerk" then
+			check((built.Frame.Position - site.Bounty.Counter.CFrame.Position).Magnitude < 10, "Marlo isn't at the bounty counter")
 		end
 	end
 	local dialogue = fs.readFile(ROOT .. "/src/client/Dialogue.client.luau")

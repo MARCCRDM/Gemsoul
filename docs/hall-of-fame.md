@@ -74,6 +74,35 @@ opens once you've beaten the one before it on its ladder.
 - Brutus's lines (`Shared.Vendors.ArenaMaster`): **Show me the bounties**,
   **Find me a duel**, how bounties work, what a win streak pays.
 
+## Brutus's duel booth, the bounty office, the hall dressed
+
+*2026-10-23.* Brutus has a booth of his own now, and the bounties an
+office of their own with a clerk.
+
+![Before and after: the corner from the arena, Brutus's booth, and the bounty office along the east wall. Offline renders of the game's parts on a lit stage, not Roblox screenshots](hall-of-fame/booths-before-after.jpg)
+
+- **Brutus's duel booth** stands on the south wall by the corner, a
+  lightbox saying **DUELS** over it: the partitions and counter as the
+  bounty office has them, the duel terminal on the counter (prompt:
+  **Find a duel**, which opens the duel queue: ranked, casual and 1V1 +
+  KAIJU) and a bell beside it, a bracket board under crossed swords on the
+  wall behind him, a rack of blades on one partition, a red rug, and a
+  sparring dummy out beside the booth. Brutus stands behind his counter.
+  His lines (`Shared.Vendors.ArenaMaster`): **Find me a duel** first, how
+  duels work, what a win streak pays, where the bounties are.
+- **The bounty office** is the booth beside the Hall of Fame, in amber
+  now, with **Marlo, bounty clerk** (`Shared.Vendors.BountyClerk`) behind
+  its counter: **Show me the bounties** first, how bounties work, which to
+  take first. Its counter's prompt is **Bounty Board** (BOUNTY OFFICE).
+  The Rift's messages say "the bounty counter" where they said Brutus's.
+- **The hall, dressed** (`OutpostWorld`'s `hallDressing`): dark inlay
+  bands across the floor with an amber seam down each and a gold line
+  along the walls' feet, pilasters up the walls with a slit of light in
+  each, pennants hung from the roof in the stations' colours, pendant
+  lamps over both booths' rugs, stanchions and a rope in front of the Hall
+  of Fame's dais, and a supply corner of crates and barrels between the
+  booths.
+
 ## The area
 
 | Before | After |
@@ -90,12 +119,15 @@ PROBE-7 now sends you to Garrick, and INFO-9's answers and tips say so.
 ## Tests
 
 - `tests/outpost_cases.luau`: no PROBE-7, the Bounty prompt and posters,
-  the Hall of Fame's texts and headshots, no redraw when nothing changed,
-  Garrick's refills and Brutus at his counter.
+  the Duels prompt on Brutus's counter (clear of the bounty office), the
+  Hall of Fame's texts and headshots, no redraw when nothing changed,
+  Garrick's refills, Brutus at his duel counter and Marlo at the bounty
+  counter, seven crew.
 - `tests/kaiju_server_cases.luau`: a bounty from across the Outpost is
   refused; the board lists every biome's ladder; no target, an unknown boss
   and a locked boss are refused; another biome's first boss goes through as
   that biome's trip. A Kaiju Arena win lands on the winner's tally.
 - `tests/shelter_life_cases.luau`, `tests/signage_cases.luau`: Brutus at his
-  booth, BOUNTIES is an allowed sign word.
+  duel booth and Marlo at the bounty office; BOUNTIES and DUELS are
+  allowed sign words.
 - Spanish for every new line (`tests/run_lang.py`).

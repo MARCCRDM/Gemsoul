@@ -294,8 +294,13 @@ do
 	check(crewAt.Probe == nil, "PROBE-7 is back in the crew")
 	local counter = here(site.Bounty.Counter.CFrame.Position)
 	check(
-		crewAt.ArenaMaster and (Vector3.new(crewAt.ArenaMaster.X - counter.X, 0, crewAt.ArenaMaster.Z - counter.Z)).Magnitude < 10,
-		"Brutus isn't at his bounty booth"
+		crewAt.BountyClerk and (Vector3.new(crewAt.BountyClerk.X - counter.X, 0, crewAt.BountyClerk.Z - counter.Z)).Magnitude < 10,
+		"Marlo isn't at the bounty office"
+	)
+	local duel = here(site.Duel.Counter.CFrame.Position)
+	check(
+		crewAt.ArenaMaster and (Vector3.new(crewAt.ArenaMaster.X - duel.X, 0, crewAt.ArenaMaster.Z - duel.Z)).Magnitude < 10,
+		"Brutus isn't at his duel booth"
 	)
 	local market = here(site.Stations.Market.CFrame.Position)
 	local middle = Life.Gallery.Middle

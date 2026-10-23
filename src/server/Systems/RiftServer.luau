@@ -1230,12 +1230,12 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 	if why then
 		return reply(false, why)
 	end
-	-- (At the gate itself, or at Brutus's counter for a bounty.)
+	-- (At the gate itself, or at the bounty office's counter for a bounty.)
 	local bounty = vein == Bounties.Gate
 	local gate = if bounty then RiftServer.bountyAt() elseif type(vein) == "number" then RiftServer.gateAt(vein) else nil
 	local root = rootOf(player) :: BasePart
 	if not gate or (root.Position - gate.Position).Magnitude > (if bounty then Bounties.Reach else RiftServer.Reach) then
-		return reply(false, if bounty then "Walk up to Brutus's counter first." else "Walk up to a Rift Gate first.")
+		return reply(false, if bounty then "Walk up to the bounty counter first." else "Walk up to a Rift Gate first.")
 	end
 	local run = partyRun(player)
 	local boss, element = nil, nil
@@ -1314,7 +1314,7 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 					elseif not runOf[member] then
 						notify(
 							member,
-							player.DisplayName .. " went through a Rift Gate: walk up to any gate, or Brutus's counter, to follow."
+							player.DisplayName .. " went through a Rift Gate: walk up to any gate, or the bounty counter, to follow."
 						)
 					end
 				end

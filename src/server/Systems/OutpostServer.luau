@@ -37,7 +37,7 @@
 	MaxHp, Zone, ClaimedBy, LastHitBy, LastCrit, Popped) so every client
 	can show every swing; prompts carry PromptKind (Mine, Store, Market,
 	Spar, Duel, Party) for the client to act on. The Shelter's crew
-	(site.Crew: Ilsa the gem buyer, Brutus for duels and bounties, Garrick
+	(site.Crew: Ilsa the gem buyer, Brutus for duels, Marlo for bounties, Garrick
 	for refills, Tamsin, Borin and INFO-9) are Builder.vendor robots: their
 	Talk prompt opens Client.Dialogue.
 
@@ -1017,16 +1017,19 @@ function OutpostServer.start()
 	for _ = 1, math.min(Rules.FieldNodeCount, #(site.FieldSpots or {})) do
 		spawnNode(true)
 	end
-	-- Prompts at the Shelter's Store and player Market counters, and
-	-- Brutus's bounty counter (the Bounty Board: Client.RiftClient). (The
+	-- Prompts at the Shelter's Store and player Market counters, the
+	-- bounty office's counter (the Bounty Board: Client.RiftClient) and
+	-- Brutus's duel counter (the duel queue: Client.SocialUI). (The
 	-- refills are Garrick's: talk to him.)
 	local stations = site.Stations or {}
 	local bounty = site.Bounty or {}
+	local duel = site.Duel or {}
 	for _, spec in
 		{
 			{ stations.Store, "Store", "Open the Store", "STORE" },
 			{ stations.Market, "Market", "Open the Market", "PLAYER MARKET" },
-			{ bounty.Counter, "Bounty", "Bounty Board", "BRUTUS'S BOUNTIES" },
+			{ bounty.Counter, "Bounty", "Bounty Board", "BOUNTY OFFICE" },
+			{ duel.Counter, "Duels", "Find a duel", "BRUTUS'S DUELS" },
 		}
 	do
 		if not spec[1] then
@@ -1041,7 +1044,7 @@ function OutpostServer.start()
 		prompt:SetAttribute("PromptKind", spec[2])
 		prompt.Parent = spec[1]
 	end
-	-- The WANTED posters behind Brutus: every boss behind the Rift Gates,
+	-- The WANTED posters behind Marlo: every boss behind the Rift Gates,
 	-- each biome's ladder in turn (Shared.Bounties).
 	local posted = 0
 	for _, entry in Bounties.list() do
@@ -1212,7 +1215,7 @@ function OutpostServer.site()
 end
 
 -- Vein `index`'s Rift Gate: the part its "Enter the Rift" prompt is on.
--- Brutus's bounty terminal (Server.RiftServer: where a bounty starts from).
+-- The bounty office's terminal (Server.RiftServer: where a bounty starts from).
 function OutpostServer.bountyCounter(): BasePart?
 	return site and site.Bounty and site.Bounty.Counter
 end

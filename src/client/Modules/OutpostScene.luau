@@ -1652,8 +1652,11 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 			prompt:GetAttribute("Vein"),
 			if gate and gate:IsA("BasePart") then gate.Position else nil
 		)
+	elseif kind == "Duels" then
+		-- (Brutus's duel counter: the duel queue.)
+		require(script.Parent.SocialUI).open("Arena")
 	elseif kind == "Bounty" then
-		-- (Brutus's bounty board: every Rift boss, from his counter.)
+		-- (The bounty office's board: every Rift boss, from its counter.)
 		local counter = prompt.Parent
 		require(script.Parent.RiftClient).openGate(
 			"Bounty",
