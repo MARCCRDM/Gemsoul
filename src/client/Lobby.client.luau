@@ -252,10 +252,13 @@ task.spawn(function()
 	-- or straight after the fast start's pick (not for saves that skipped it).
 	local intro = GemClient.Profile.Intro
 	local fresh = duelsPlayed() == 0 and not veteran()
+	local hadFirstDuel = false
 	if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled and fresh and not GemClient.Profile.Tutorial then
 		firstDuel()
+		hadFirstDuel = true
 	elseif FastStart.Enabled and fresh and not (intro and intro.Skipped) then
 		firstDuel()
+		hadFirstDuel = true
 	end
 	for _ = 1, 5 do
 		if OutpostScene.isActive() then
@@ -265,6 +268,28 @@ task.spawn(function()
 		if waitFor(OutpostScene.isActive, 6) then
 			break
 		end
+	end
+	-- Straight after the intro: into the 1v1 Casual queue, so the SEARCHING
+	-- card (SocialUI's banner, with CANCEL) is up while they look round the
+	-- Outpost. (A few tries: the server says no until they're back and
+	-- standing in the lobby.)
+	if hadFirstDuel then
+		task.spawn(function()
+			waitFor(function()
+				return player:GetAttribute("Outpost") == true
+			end, 20)
+			for _ = 1, 6 do
+				if player:GetAttribute("DuelQueue") or player:GetAttribute("MatchId") then
+					break
+				end
+				local queued = GemClient.request("DuelQueue", "casual")
+				if queued and queued.Ok then
+					UiKit.toast("You're in the 1v1 queue: keep mining, you'll be called in when a match is found.", GOLD)
+					break
+				end
+				task.wait(2)
+			end
+		end)
 	end
 	-- Never stranded: whenever you're free (no fight, match, dungeon,
 	-- expedition or intro, and alive), you belong in the Outpost. If you
