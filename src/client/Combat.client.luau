@@ -28,6 +28,7 @@ local IronUi = require(script.Parent.Modules.IronUi)
 local StatusBars = require(script.Parent.Modules.StatusBars)
 local FoeCastBar = require(script.Parent.Modules.FoeCastBar)
 require(script.Parent.Modules.FoeBars) -- overhead health and the target list
+require(script.Parent.Modules.BossFocus).start() -- who the boss is on: a red diamond over them
 local CombatLogUI = require(script.Parent.Modules.CombatLogUI)
 local CombatFx = require(script.Parent.Modules.CombatFx)
 local CombatVfx = require(script.Parent.Modules.CombatVfx)
