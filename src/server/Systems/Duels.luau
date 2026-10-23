@@ -13,22 +13,23 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	  "DuelPivot", armor?, weapon?   between Ranked rounds: lock in an armor
 	                          loadout and a weapon loadout (slots 1-3; nil
 	                          keeps what you wear)
-	  "DuelAuto", on          auto queue (Shared.AutoQueue): on call for the
-	                          lobby (the default) or not
+	  "DuelAuto", on          auto queue (Shared.AutoQueue): join offers in the
+	                          lobby (the default) or none
 	  "DuelFill", id, accept  answer a fill-in offer for queue entry `id`
 	  "IntroQueue"            a new player's first fight: queued with another
-	                          new player, else a lobby player on call, else
+	                          new player, else a lobby player who joins, else
 	                          the sparring rival (ArenaSessions.enterTraining)
 
 	The Social remote tells clients:
 	  "Queue", { Mode, Since, Waiting, Intro } | nil   your queue state
-	  "FillIn", { Id, Mode, Name, Who, Rating, Bonus, Seconds }   someone's
-	                                            waiting in a queue: step in?
+	  "FillIn", { Id, Mode, Name, Who, Rating, Bonus, Seconds, Intro, Ranked }
+	                                            someone's waiting in a queue: join?
+	                                            (Bonus: coins paid on joining)
 	  "FillInOver", id                          that queue was filled or left
 	  "Challenge", fromId, fromName, rating, stats   someone challenged you
 	  "Match", { Id, Mode, Ranked, Rules, StartsAt, Ends, Team, Teams,
-	             Called, Bonus, Intro }         (Called: pulled from the lobby
-	                                            for it, Bonus coins on a win)
+	             Called, Bonus, Intro }         (Called: joined from the lobby,
+	                                            Bonus: the coins paid for joining)
 	  "Fight"                                   the countdown is over
 	  "Round", { Phase = "Pivot", Round, Winner, Reason, Wins, Team, Ends, Scout }
 	                                            a Ranked round is over: pick a
@@ -57,12 +58,13 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	(CombatServer.onLethal). Between rounds, the pivot window: preset swaps
 	only (Presets.wear), both lock at once, then the picks are revealed.
 	Each player's rating, wins and losses save in their profile (Duel).
-	Auto queue (Shared.AutoQueue): a lone 1v1 queue entry calls the lobby
-	after a few seconds. Free players on call (the default) are pulled in,
-	closest rating first, their rating safe from a loss and a bonus on a
-	win; players who turned it off are offered the match instead (FillIn).
+	Auto queue (Shared.AutoQueue): a lone 1v1 queue entry asks the lobby
+	after a few seconds. Free players with it on (the default), the closest
+	in rating first, each get a JOIN card (FillIn); nobody is pulled in. The
+	first to join steps in, is paid the join bonus on the spot, and can't
+	lose rating from it; players who turned it off get no offers.
 	A new player's first fight is the "intro" queue: two new players pair at
-	once; alone, a lobby player is called; still alone, the sparring rival.
+	once; alone, the lobby is asked; still alone, the sparring rival.
 	Queued 1v1s (Ranked or Casual, not challenges) are the arena tournament
 	(Shared.SwingRestore): the 1st, 5th and 10th win of a run restore the
 	pick's swings (Restores), and ten in a row wins the tournament (Ranked:
@@ -406,8 +408,9 @@ function finish(match, winner: number?, reason: string)
 				-- Every finished duel counts toward the lobby's unlocks.
 				(record :: any).Played = ((record :: any).Played or 0) + 1
 			end
-			local bonus = if winner ~= nil then AutoQueue.bonus(match.Called[member], won) else 0
-			local coins = (if winner == nil then 0 elseif won then rewards.Win else rewards.Loss) + bonus
+			-- (a fill-in's bonus was paid when they joined: Duels' fillWith)
+			local bonus = 0
+			local coins = if winner == nil then 0 elseif won then rewards.Win else rewards.Loss
 			if member.Parent then
                 if #match.Teams[1] == 1 and #match.Teams[2] == 1 then
                     PlayerData.training(member, "PvPPlayed")
@@ -529,7 +532,7 @@ local function elementsOf(team): { string }
 end
 
 -- `rules`: the PvP rule it plays by (Shared.PvPRules.profile). `extra`
--- (Shared.AutoQueue): Called = { [player] = true } for fighters pulled from
+-- (Shared.AutoQueue): Called = { [player] = true } for fighters who joined from
 -- the lobby; Intro for a first fight (its new players get the hints).
 local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 	extra = extra or {}
@@ -572,6 +575,7 @@ local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 		Connections = {},
 		Shields = {},
 		Called = extra.Called or {},
+		JoinPaid = extra.JoinPaid or {},
 		Intro = extra.Intro == true,
 		FirstFighters = {},
 		-- Rounds (1v1 Ranked): wins per team, rounds played, the pivot's
@@ -630,7 +634,7 @@ local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 				Team = t,
 				Teams = info,
 				Called = match.Called[member] == true,
-				Bonus = if match.Called[member] then AutoQueue.FillBonus else 0,
+				Bonus = if match.Called[member] then (match.JoinPaid and match.JoinPaid[member] or 0) else 0,
 				Intro = match.Intro,
 			})
 		end
@@ -861,23 +865,22 @@ end
 
 -- Auto queue (Shared.AutoQueue) ------------------------------------------------
 
--- Free lobby players who may be called for `entry`: those on call, and
--- those who'd rather be asked. Each { Player, Rating }.
+-- Free lobby players who may be asked to step into `entry`: those with
+-- auto queue on (off: no offers). Each { Player, Rating }.
 local function onCall(entry)
-	local auto, manual = {}, {}
+	local list = {}
 	for _, other in Players:GetPlayers() do
 		if not table.find(entry.Players, other) and not busy(other) then
 			local ok = AutoQueue.ready(function(name)
 				return other:GetAttribute(name)
 			end, entryOf(other) ~= nil)
 			local record = ok and Duels.record(other)
-			if record then
-				local candidate = { Player = other, Rating = record.Rating }
-				table.insert(if AutoQueue.setting(record) then auto else manual, candidate)
+			if record and AutoQueue.setting(record) then
+				table.insert(list, { Player = other, Rating = record.Rating })
 			end
 		end
 	end
-	return auto, manual
+	return list
 end
 
 local function rulesFor(mode: string)
@@ -885,33 +888,56 @@ local function rulesFor(mode: string)
 	return PvPRules.profile(spec and spec.Kind or "Ranked")
 end
 
--- `called` steps into `entry`'s match from the lobby.
+-- When each player was last paid for joining (Shared.AutoQueue.JoinCooldown).
+local joinPaidAt: { [Player]: number } = {}
+Players.PlayerRemoving:Connect(function(player)
+	joinPaidAt[player] = nil
+end)
+
+-- `called` said yes: they step into `entry`'s match from the lobby, paid
+-- the join bonus now (unless they were paid one a moment ago).
 local function fillWith(entry, called: Player): (boolean, string?)
 	local spec = Matchmaking.Modes[entry.Mode]
+	local now = os.clock()
+	local pay = AutoQueue.joinBonus(joinPaidAt[called], now)
 	local ok, problem = startMatch(
 		entry.Mode,
 		{ table.clone(entry.Players), { called } },
 		rulesFor(entry.Mode),
-		{ Called = { [called] = true }, Intro = spec and spec.Intro }
+		{ Called = { [called] = true }, JoinPaid = { [called] = pay }, Intro = spec and spec.Intro }
 	)
 	if ok then
+		if pay > 0 then
+			joinPaidAt[called] = now
+			PlayerData.addCoins(called, pay)
+			PlayerData.sync(called)
+		end
 		Remotes.Notify:FireClient(
 			called,
-			string.format(
-				if spec and spec.Kind == "Ranked"
-					then "Called in: %s is waiting for a %s. Win it for +%d ◆ on top; a loss costs you no rating."
-					else "Called in: %s is waiting for a %s. Win it for +%d ◆ on top.",
-				entry.Players[1].DisplayName,
-				spec and spec.Name or entry.Mode,
-				AutoQueue.FillBonus
-			)
+			if pay > 0
+				then string.format(
+					if spec and spec.Kind == "Ranked"
+						then "You joined %s's %s: +%d ◆ for stepping in. A loss costs you no rating."
+						else "You joined %s's %s: +%d ◆ for stepping in.",
+					entry.Players[1].DisplayName,
+					spec and spec.Name or entry.Mode,
+					pay
+				)
+				else string.format(
+					if spec and spec.Kind == "Ranked"
+						then "You joined %s's %s. A loss costs you no rating."
+						else "You joined %s's %s.",
+					entry.Players[1].DisplayName,
+					spec and spec.Name or entry.Mode
+				)
 		)
 	end
 	return ok, problem
 end
 
--- A lone 1v1 entry has waited long enough: pull someone on call, else ask
--- the lobby; a lone intro entry falls back to the sparring rival.
+-- A lone 1v1 entry has waited long enough: ask the lobby (the closest in
+-- rating first, AutoQueue.AskMax of them), a JOIN card each; nobody is
+-- pulled in. A lone intro entry falls back to the sparring rival.
 local function fill(entry, now: number)
 	if entry.Size ~= 1 then
 		return
@@ -932,15 +958,8 @@ local function fill(entry, now: number)
 	if waited < (if intro then AutoQueue.Intro.CallAfter else AutoQueue.CallAfter) or not freeSlot() then
 		return
 	end
-	local auto, manual = onCall(entry)
-	local picked = AutoQueue.pick(auto, entry.Rating)
-	if picked then
-		local ok = fillWith(entry, picked.Player)
-		if ok then
-			return
-		end
-	end
-	for _, candidate in manual do
+	local clock = os.clock()
+	for _, candidate in AutoQueue.askList(onCall(entry), entry.Rating) do
 		local other = candidate.Player
 		if not entry.Asked[other] then
 			entry.Asked[other] = true
@@ -950,9 +969,10 @@ local function fill(entry, now: number)
 				Name = spec and spec.Name or entry.Mode,
 				Who = entry.Players[1].DisplayName,
 				Rating = entry.Rating,
-				Bonus = AutoQueue.FillBonus,
+				Bonus = AutoQueue.joinBonus(joinPaidAt[other], clock),
 				Seconds = AutoQueue.AskSeconds,
 				Intro = intro == true,
+				Ranked = spec ~= nil and spec.Kind == "Ranked",
 			})
 		end
 	end
@@ -969,8 +989,8 @@ local function setAuto(player: Player, on: any)
 	return reply(
 		true,
 		if on ~= false
-			then string.format("Auto queue on: you're on call for 1v1s while you're in the lobby (+%d ◆ bonus on a win).", AutoQueue.FillBonus)
-			else "Auto queue off: you'll be asked before stepping into anyone's 1v1."
+			then string.format("Auto queue on: you'll get join offers for 1v1s while you're in the lobby (+%d ◆ for joining).", AutoQueue.JoinBonus)
+			else "Auto queue off: no join offers for other players' 1v1s."
 	)
 end
 

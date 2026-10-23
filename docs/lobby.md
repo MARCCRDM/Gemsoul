@@ -142,21 +142,23 @@ is counted from their `DuelQueue` attribute, with no extra server traffic,
 and it refreshes every 2 seconds while the menu is open.
 
 Between the two headings sits the **AUTO QUEUE** switch (see below): ON by
-default, with what being on call means under it.
+default, with what it means under it.
 
 ![The PLAY menu](lobby/play-menu.png)
 
-## Auto queue: the lobby is on call
+## Auto queue: the lobby is asked to join
 
 Nobody should sit in an empty 1v1 queue while the lobby is full of players.
 The rules are in `Shared/AutoQueue.luau`; `Systems/Duels.luau` applies them.
 
 | | |
 | --- | --- |
-| **On call (default)** | Every free player in the Outpost is on call. When a 1v1 queue (Casual or Ranked) has waited `CallAfter` seconds (8) with nobody to pair, the free player closest in rating is pulled straight into the match: the usual face-off countdown, the menus close, and a toast says who called. |
-| **What's in it for the fill-in** | The mode's win coins plus a `FillBonus` (+20 ◆); a called player's rating never drops from a match they were called into (a Ranked win still counts fully). The face-off says `CALLED IN: WIN +20 ◆`, the result card shows the bonus. |
-| **AUTO QUEUE: OFF** | The switch on the PLAY menu (request `DuelAuto`, saved in `profile.Duel.AutoQueue`, published as the `DuelAuto` attribute). Free lobby players who turned it off get an offer card instead (`FillIn`: who's waiting, the mode, the bonus) for `AskSeconds` (15). The first to accept steps in (`DuelFill`); cancelling the queue withdraws the offers (`FillInOver`). |
+| **Asked, never pulled (default)** | When a 1v1 queue (Casual or Ranked) has waited `CallAfter` seconds (8) with nobody to pair, the free lobby players with auto queue on, the closest in rating first (`AskMax`, 4, at most), each get a card: who's waiting, their rating, the mode, the bonus, and **JOIN +25 ◆** / **DECLINE**, standing for `AskSeconds` (15). Nothing happens unless you press JOIN (`DuelFill`). The first to join steps in; everyone else's card comes down, as it does when the queue is cancelled (`FillInOver`). |
+| **The join bonus, up front** | Joining pays `JoinBonus` (+25 ◆) the moment the match starts, win or lose, and a joiner's rating never drops from it (a Ranked win still counts fully). It pays once every `JoinCooldown` (3 minutes) per player, so it can't be farmed by joining and walking off; inside the cooldown the card just says **JOIN**. The face-off says `JOINED: +25 ◆ PAID`. There is no extra win bonus any more. |
+| **AUTO QUEUE: OFF** | The switch on the PLAY menu (request `DuelAuto`, saved in `profile.Duel.AutoQueue`, published as the `DuelAuto` attribute). Off: no join offers at all. |
 | **Who counts as free** | In the Outpost (`Outpost` attribute), not searching, and none of: `CombatSession`, `MatchId`, `Expedition`, `RiftRun`, `DungeonQueue`, `DungeonId`, `KaijuBattle`, `Spar`, `SparDown`, `MechPilot`, `FirstFight`. |
+
+![A join offer on a phone. Offline render of the game's UI code, not a Roblox screenshot](lobby/join-offer-phone.png)
 
 ### The first fight
 
@@ -167,9 +169,11 @@ shows a FINDING YOUR FIRST OPPONENT card with the countdown:
 1. Two new players in the queue pair at once, whatever their ratings: one
    fight (the `FirstFight` rule: even stats, unrated, paid like Casual),
    both with the first-fight hints (`FirstFight` attribute).
-2. Alone after `Intro.CallAfter` seconds (5): a lobby player on call is
-   pulled in (the bonus applies; the new player keeps the hints).
-3. Still alone after `Intro.BotAfter` seconds (15): the sparring rival steps
+2. Alone after `Intro.CallAfter` seconds (5): the lobby is asked ("A new
+   miner needs a first fight"); a veteran who joins is paid the join bonus
+   and the new player keeps the hints.
+3. Still alone after `Intro.BotAfter` seconds (22, room for the offer's 15):
+   the sparring rival steps
    in (`ArenaSessions.enterTraining`, the old flow).
 
 Either way the fight counts as played, the hints come down when it ends
@@ -245,4 +249,4 @@ It is off for now with `Config.Features.ChatBox = false`. Setting it to
 | `tests/run_daily_challenges.py` | 22,446 rules + 8 server | One per group; stable rolls; progress; paying once; the bonus; new days; old saves. The server side: progress pushes, payouts, notes and the bonus |
 | `tests/run_chat_feed.py` | 57 | The real chat feed against chat and GUI doubles. Its place over the kaiju card, under the PLAY stack and on a short screen; names, your green and escaped markup; other channels kept out; system and loot lines; fading; ten shown and sixty kept; / and the hint; sending the trimmed line; Escape and empty lines; out of the Outpost, under a menu, in the intro and on a phone; the ChatBox switch |
 | `tests/run_lobby.py` | 34 board + 36 feed | The real board and feed against GUI doubles. Board: cards per screen; folded rows, tapping one open (one at a time) and closed; the phone's choice, each as one slim strip; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside; stepping aside for a phone's loot card (and not on a computer) |
-| `tests/run_duels.py` | 88 auto queue | The shared rules (who's free, the default, intro phases, the pick, the bonus); a lone Ranked queue pulls the closest-rated lobby player after `CallAfter`; a called loss costs no rating; a called win pays the bonus; busy lobby players are left alone; auto queue off gets one offer, accepting starts the match, cancelling withdraws it; two new players pair at once as a single FirstFight with hints; a lone new player gets a called veteran; nobody around brings the sparring rival |
+| `tests/run_duels.py` | 101 auto queue | The shared rules (who's free, the default, intro phases, the pick, the ask list, the join bonus and its cooldown); a lone Ranked queue asks the closest lobby players after `CallAfter` and pulls nobody in; one offer each; declining; joining starts the match and pays the bonus up front, and the other cards come down; a joiner's loss costs no rating and pays nothing more; inside the cooldown the card shows no bonus and joining pays none; busy players and players with auto queue off get no offers; cancelling withdraws the offers; two new players pair at once; alone, a veteran is asked and joins; with nobody around, the sparring rival |

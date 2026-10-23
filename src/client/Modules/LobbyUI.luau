@@ -162,8 +162,8 @@ local function refreshAuto()
 	autoLabel.TextColor3 = if on then GREEN else P.Dim
 	autoRim.Color = if on then GREEN else Color3.fromRGB(70, 80, 96)
 	autoSub.Text = if on
-		then string.format("ON CALL FOR 1v1s IN THE LOBBY  ·  WIN +%d ◆  ·  NO RATING LOST", AutoQueue.FillBonus)
-		else "YOU'LL BE ASKED BEFORE STEPPING INTO A 1v1"
+		then string.format("JOIN OFFERS FOR 1v1s IN THE LOBBY  ·  +%d ◆ TO JOIN  ·  NO RATING LOST", AutoQueue.JoinBonus)
+		else "NO JOIN OFFERS FOR OTHER PLAYERS' 1v1s"
 end
 autoButton.Activated:Connect(function()
 	run("DuelAuto", not autoOn())

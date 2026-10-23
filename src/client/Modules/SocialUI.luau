@@ -1479,7 +1479,8 @@ local function prompt(
 	line: string,
 	seconds: number,
 	accent: Color3,
-	onAnswer: (boolean) -> ()
+	onAnswer: (boolean) -> (),
+	acceptText: string?
 ): () -> ()
 	local card = new("Frame", {
 		BackgroundColor3 = P.Frame,
@@ -1511,7 +1512,7 @@ local function prompt(
 		card:Destroy()
 		onAnswer(accept)
 	end
-	local yes = chip(card, "Accept", P.Good, function()
+	local yes = chip(card, acceptText or "Accept", P.Good, function()
 		answer(true)
 	end, 100)
 	yes.Position = UDim2.fromOffset(62, 68)
@@ -1853,8 +1854,10 @@ local function showFaceoff(info)
 		else "FRIENDLY " .. string.upper(info.Mode)
 	faceKind.Text = if rules and rules.Label then kind .. "  ·  " .. rules.Label else kind
 	if info.Called then
-		-- Pulled in from the lobby (Shared.AutoQueue): what's in it for you.
-		faceKind.Text ..= string.format("  ·  CALLED IN: WIN +%d ◆", info.Bonus or 0)
+		-- Joined from the lobby (Shared.AutoQueue): the bonus is already paid.
+		faceKind.Text ..= if (info.Bonus or 0) > 0
+			then string.format("  ·  JOINED: +%d ◆ PAID", info.Bonus)
+			else "  ·  JOINED FROM THE LOBBY"
 	end
 	faceLeft.Text, faceRight.Text = names(mine), names(theirs)
 	if info.Rounds then
@@ -2062,27 +2065,39 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 		end
 	elseif kind == "FillIn" and type(a) == "table" then
 		-- Someone's waiting in a 1v1 queue and you're free in the lobby with
-		-- auto queue off (Shared.AutoQueue): step in for a bonus?
+		-- auto queue on (Shared.AutoQueue): join, paid up front? Nothing
+		-- happens unless you press JOIN.
 		local id = tostring(a.Id)
 		if fillCards[id] then
 			fillCards[id]()
 		end
+		local bonus = if type(a.Bonus) == "number" then a.Bonus else 0
 		fillCards[id] = prompt(
 			"⚔",
-			if a.Intro then "A new miner's first fight" else "Fill a 1v1?",
-			string.format(
-				"%s (rating %d) is waiting for a %s. Step in: +%d ◆ on top of the win's coins.",
-				tostring(a.Who),
-				a.Rating or 0,
-				tostring(a.Name),
-				a.Bonus or 0
-			),
+			if a.Intro then "A new miner needs a first fight" else "Join a 1v1?",
+			if bonus > 0
+				then string.format(
+					"%s (rating %d) is waiting for a %s. Join now for +%d ◆, paid the moment you join.%s",
+					tostring(a.Who),
+					a.Rating or 0,
+					tostring(a.Name),
+					bonus,
+					if a.Ranked then " A loss costs you no rating." else ""
+				)
+				else string.format(
+					"%s (rating %d) is waiting for a %s.%s",
+					tostring(a.Who),
+					a.Rating or 0,
+					tostring(a.Name),
+					if a.Ranked then " A loss costs you no rating." else ""
+				),
 			if type(a.Seconds) == "number" then a.Seconds else 15,
 			P.Gold,
 			function(accept)
 				fillCards[id] = nil
 				run("DuelFill", a.Id, accept)
-			end
+			end,
+			if bonus > 0 then string.format("Join +%d ◆", bonus) else "Join"
 		)
 	elseif kind == "FillInOver" then
 		local id = tostring(a)
