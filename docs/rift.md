@@ -220,31 +220,53 @@ props only: you walk through them, nothing to press):
 | --- | --- |
 | ![The heap by the throne: rubble, helmets, two up on spikes, bones, picks, a torn banner, spilt gems](rift/fallen-heap.jpg) | ![One slumped against a cave wall, its pick across its lap, a gem still glowing by its hand](rift/fallen-cave.jpg) |
 
-- **Each one**: an old expedition suit in one of four faded crew colours,
-  the big visor dark and cracked (the crack glowing), the skull behind it
-  with its sockets still faintly lit, a headlamp that's sometimes still on,
-  its pick, a pouch of gems spilt and glinting (one lights the floor), the
-  floor stained dark under it, and crystals of the place grown up through
-  it. Three ways they lie:
-  - **Slumped** against a wall, head on its chest, the pick across its lap.
-  - **Face down**, reaching for the pick it dropped, its helmet rolled off
-    (the skull bare), claw marks where something dragged it.
-  - **Sprawled** on its back, arms flung out, its pack torn off beside it,
-    its pick stood in the floor like a marker.
+- **Each one is a real miner** (since 2026-10-23): the body every player
+  wears (`Server.Systems.FighterRig`) in the gear every player wears, built
+  by the real `Equipment`, rolled at random for each of them by
+  `Server.Systems.FallenCrew`: any helmet, chest, gloves, boots, shield and
+  weapon from the catalogue (commons likelier, no pistols), a gem in a
+  piece or two, and for looks a suit on some (45%), a weapon skin (35%), a
+  visor (40%) or a helmet skin (25%), rolled one by one, so about one in
+  six wears nothing for looks and no two lie alike. Round it: its pick, a
+  pouch of gems spilt and glinting (one lights the floor), the floor
+  stained dark under it, and crystals of the place grown up through it.
+  Three ways they lie, the body's joints bent and every welded piece of
+  gear carried along on its limb:
+  - **Slumped** against a wall, legs out, head dropped onto its chest, one
+    hand in its lap by the pick.
+  - **Face down**, one arm stretched out for the pick it dropped, one knee
+    drawn up, head turned to the side, claw marks where something dragged it.
+  - **Sprawled** on its back, arms flung out, one knee up, head lolled to
+    the side, its pick stood in the floor like a marker.
+- Laid down, it's a prop: no Humanoid, every part anchored, nothing to bump
+  into, and nothing on it moves or shines any more (no sparks off its suit,
+  no glow from its gems: the only light is the spilt gem's).
 - **Where**: 2 by the walls of each cave (`Count.Cave`), never in the way
   through; 6 round the throne (`Count.Throne`), clear of the throne, the way
   home and the heap. None on the landing.
-- **The heap** beside the throne: rubble, three helmets, bones, a skull,
-  two picks stuck in it, a torn crew banner on a pole, two more helmets up
-  on spikes either side, gems spilt round its foot, claw marks.
+- **The heap** beside the throne: rubble, three old helmets, bones, a
+  skull, two picks stuck in it, a torn crew banner on a pole, two more
+  helmets up on spikes either side, gems spilt round its foot, claw marks.
 - In the Rift their glow is ember and the claw marks blood red. **The
   pathway dungeon** has them too: one in each room, glowing its element's
   colour, 4 and the heap in the boss's room.
 
-![The heap in a dungeon's boss room](rift/fallen-dungeon.jpg)
+![Six of them in a line, each in a kit of its own: a Shogun helmet and a greatblade, a chest in a purple suit, a helmet skin, one with nothing for looks. Offline render of the game's parts, not a Roblox screenshot](rift/fallen-lineup.jpg)
 
-About 27 parts each and 59 for the heap: a trip is 1,261 parts (under the
-1,400 the tests allow).
+![Closer: slumped, face down, sprawled, and another slumped in another kit](rift/fallen-miners.jpg)
+
+**How the body gets there.** `FallenMiners` is a world builder and knows
+nothing of gear; the server hands it bodies through `FallenMiners.dresser`
+(set by `FallenCrew.start()` in `Main.server`, before any world is built).
+`FallenMiners.place` asks for one, lays it down (`lay`: the root to the
+pose's frame, each joint from its parent through its Motor6D with the
+pose's bend, then everything welded to a limb back where it sat on it)
+and keeps the old expedition-suit prop as the stand-in when there's no
+body to be had (the world tests build without one, so their part counts
+stay what they were). A laid-out miner is about 300 to 410 parts
+(its armour and, on a suit, its trim seams), so a trip with 14 of them
+carries a few thousand more parts than before; that is the cost of real
+kits, and `Count` is where to trim if a device struggles.
 
 ### What drops what
 
@@ -457,6 +479,7 @@ Boss and move names stay in English (they're names).
 | Suite | What it checks |
 | --- | --- |
 | `run_rift` | 47,784 checks: the gate's lobby (on your own; the Outpost's rows in order and what each offers; your friends here, elsewhere in the game and online; INVITED; a member's party and a full one; your party already in there); the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open (each leading a little way into the next cave), the ways home, no lava, the sky, parts per trip (1,400 with the realm's set pieces). Each boss's realm: a trip built in each of the ten, marked with it, its walls, floor, barrier, lamps, arch and throne each of a kind no other realm has, its sky one of four, its walls across the passages a colour no other realm's are, its rock its own, its fire in its colour, its set pieces in the caves, its sky burning and its ash its own, every barrier solid with its curtain and fires, every arch clear of the floor, the throne lit, the middle of every cave clear, lights and fire enough; the client lights the realm you're in and the server builds the boss's. The fallen: 2 in each cave and more round the throne, none on the landing, the heap by the throne, every part one you walk through, none in the way through or the way home, a pose each; scattered alone, by the walls first, clear of what to avoid and of the doorway; in a dungeon, one a room, more and the heap in the boss's. And nothing else starts for a runner |
+| `run_fallen_miners` | The fallen miners as real miners: 40 kits rolled (whole kits of real catalogue gear, 24 chests, 25 weapons, no pistols, rolls and gems on them; suits, weapon skins, visors and helmet skins of the right kind, owned, and some with nothing); six laid down in the three poses (dressed, no Humanoid, no joints, 20+ gear parts, every part anchored and walk-through, lying low with the head near the floor, slumped sat up, every welded piece still on its limb, the stain under it, the pose recorded); the old suit when no body is handed over |
 | `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (the boss's gem in it, Legendary from a tier-5 boss; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The ladder: the gate's peek (its biome's element, the ladder, the next boss, each boss's level at your kaiju's and rising, locks, a portrait each), a locked boss, an unknown one and another biome's refused, the gate's first boss and its element's fighters, a joiner seeing the party's boss, a win tallied for everyone and the next boss unlocked and offered, the top boss alone allowed and warned. Going in together: a ready member brought in from far off, one not ready told they can follow, a member going in bringing nobody. The fighters are stand-ins here: the real Duelist isn't loaded |
 | `run_target_lock` | Your lock takes a pack's leader over nearer critters and those attacking you, holds it against them, takes it back from a critter, but not hidden or out of range; a target you pick still holds |
 | `run_spar` | Going into the Rift ends a spar, the kit stays out in there and can't be put away, nobody spars with a runner, and the kit goes away at home |

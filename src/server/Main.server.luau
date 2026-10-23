@@ -19,6 +19,9 @@ local Trading = require(script.Parent.Systems.Trading)
 local Equipment = require(script.Parent.Systems.Equipment)
 -- Everyone's body is the rival's rig, before anyone spawns (FighterRig).
 require(script.Parent.Systems.FighterRig).start()
+-- The fallen miners in the dungeons and the Rift wear that rig too, in
+-- random gear (FallenCrew), before any of those worlds is built.
+require(script.Parent.Systems.FallenCrew).start()
 -- Bodies pass through each other (nobody stands on their foe) and nobody
 -- jumps in a fight (FighterBodies).
 require(script.Parent.Systems.FighterBodies).start()

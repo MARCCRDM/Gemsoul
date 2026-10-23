@@ -30,11 +30,12 @@ A cleared dungeon gives each surviving, still-enrolled player **300 coins and Sl
 
 ## The fallen
 
-Each room has a fallen miner of a crew that went in before, by a wall, its
-visor's crack and spilt gems glowing the room's element; the boss's room
-has 4 and their heap beside the boss (helmets on spikes, a torn banner).
-Props only, built with the room (`Server.World.FallenMiners`; see
-[rift.md](rift.md#the-fallen)).
+Each room has a fallen miner of a crew that went in before, by a wall: a
+real miner (the fighter rig in a random kit, a random suit or skin on some,
+`Server.Systems.FallenCrew`), its spilt gems glowing the room's element; the
+boss's room has 4 and their heap beside the boss (old helmets on spikes, a
+torn banner). Props only, built with the room (`Server.World.FallenMiners`;
+see [rift.md](rift.md#the-fallen)).
 
 ## Verification and remaining playtest
 - 1,000 seeded layouts checked for uniqueness and connected room order.

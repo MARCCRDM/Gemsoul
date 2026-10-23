@@ -1,11 +1,15 @@
 --[[
 	Fallen miners: what's left of the crews who went in before you, by the
 	walls of the Rift's caves and the dungeon's rooms, and heaped round the
-	boss. Props only (nothing to bump into, nothing to press): an old
-	expedition suit, its paint faded, its visor cracked and the skull's
-	sockets behind it still glowing faintly; a skull where a helmet rolled
-	off; the pick it dropped; a pouch of gems spilt and glinting; claw
-	marks dragged across the floor; the floor stained dark under it.
+	boss. Props only (nothing to bump into, nothing to press): a dead miner
+	in the gear miners wear (the server hands one over, FallenMiners.dresser:
+	Server.Systems.FallenCrew's real fighter rig in a random kit, a random
+	suit or skin on some), laid out slumped, face down or sprawled; the pick
+	it dropped; a pouch of gems spilt and glinting; claw marks dragged
+	across the floor; the floor stained dark under it. With no dresser (the
+	tests build the worlds without one) an old expedition suit stands in:
+	its paint faded, its visor cracked and the skull's sockets behind it
+	still glowing faintly; a skull where a helmet rolled off.
 
 	  FallenMiners.place(parent, at, facing, rng, opts?) -> Model
 	      one miner at `at` (on the floor) facing `facing` (into the room:
@@ -23,8 +27,12 @@
 	      Vector3s), then further in, clear of the middle and of
 	      opts.Avoid ({ { At, Radius } }: a throne, a way home)
 	  FallenMiners.Count   how many where: Cave, Throne, Room, BossRoom
+	  FallenMiners.dresser (rng, parent) -> Model?: a dressed body standing
+	                       at the origin (set by Server.Systems.FallenCrew)
 ]]
 local FallenMiners = {}
+
+FallenMiners.dresser = nil :: ((any, Instance) -> Model?)?
 
 FallenMiners.Count = { Cave = 2, Throne = 6, Room = 1, BossRoom = 4 }
 FallenMiners.Poses = { "Slumped", "FaceDown", "Sprawled" }
@@ -286,6 +294,181 @@ POSES.Sprawled = function(model, base: CFrame, suit, glow: Color3, rng, opts)
 	end
 end
 
+-- A dressed body (FighterRig, standing at the origin, its gear welded on)
+-- laid down: the root goes to `rootFrame`, each joint is bent by `bends`
+-- (by the joint's name, in its parent's frame, as a Motor6D's Transform
+-- would), and everything welded to a body part rides along with it. Then
+-- it's a prop: every part anchored, nothing to bump into or press, no
+-- Humanoid, and its pieces join the miner's model.
+local function lay(model: Model, rig: Model, rootFrame: CFrame, bends: { [string]: CFrame })
+	local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+	-- Where everything welded on sits on what it's welded to, before
+	-- anything moves.
+	-- (The body's parts are known by name: each name is one part of the
+	-- rig, and no gear is called what a body part is.)
+	local riders = {}
+	local motors: { [string]: { Motor6D } } = {}
+	local bodyNames: { [string]: boolean } = {}
+	for _, d in rig:GetDescendants() do
+		if d:IsA("Motor6D") and d.Part0 and d.Part1 then
+			local list = motors[d.Part0.Name] or {}
+			motors[d.Part0.Name] = list
+			table.insert(list, d)
+			bodyNames[d.Part0.Name], bodyNames[d.Part1.Name] = true, true
+		end
+	end
+	for _, d in rig:GetDescendants() do
+		if d:IsA("WeldConstraint") and d.Part0 and d.Part1 then
+			local part, anchor = d.Part1, d.Part0
+			if bodyNames[part.Name] and not bodyNames[anchor.Name] then
+				part, anchor = d.Part0, d.Part1
+			end
+			table.insert(riders, { Part = part, Anchor = anchor, Offset = anchor.CFrame:Inverse() * part.CFrame })
+		end
+	end
+	-- The body: root first, then each joint from its parent, bent.
+	root.CFrame = rootFrame
+	local queue = { root }
+	while #queue > 0 do
+		local parent = table.remove(queue, 1) :: BasePart
+		for _, m in motors[parent.Name] or {} do
+			local child = m.Part1
+			child.CFrame = parent.CFrame * m.C0 * (bends[m.Name] or CFrame.identity) * m.C1:Inverse()
+			table.insert(queue, child)
+		end
+	end
+	-- What's welded on follows (a few passes: some ride on riders).
+	for _ = 1, 3 do
+		for _, r in riders do
+			r.Part.CFrame = r.Anchor.CFrame * r.Offset
+		end
+	end
+	-- (Nothing on it moves or shines any more: no sparks drifting off its
+	-- suit, no glow from its gems, and nothing invisible kept for a weld.)
+	local gone = {}
+	for _, d in rig:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+			d.Massless = false
+			if d.Transparency >= 0.99 and not bodyNames[d.Name] then
+				table.insert(gone, d)
+			end
+		elseif
+			d:IsA("Humanoid")
+			or d:IsA("Motor6D")
+			or d:IsA("ParticleEmitter")
+			or d:IsA("Light")
+			or d:IsA("Trail")
+			or d:IsA("Beam")
+			or d:IsA("Sparkles")
+			or d:IsA("Fire")
+			or d:IsA("Smoke")
+		then
+			table.insert(gone, d)
+		end
+	end
+	for _, d in gone do
+		d.Parent = nil
+	end
+	for name, value in rig:GetAttributes() do
+		model:SetAttribute(name, value)
+	end
+	for _, child in rig:GetChildren() do
+		child.Parent = model
+	end
+	rig.Parent = nil
+end
+
+local function sign(rng): number
+	return if rng:NextNumber() < 0.5 then -1 else 1
+end
+
+local RIG_POSES = {}
+
+-- Sat against the wall, legs out, head dropped onto its chest, one hand in
+-- its lap by the pick, the other fallen by its spilt pouch.
+RIG_POSES.Slumped = function(model, rig, base: CFrame, glow: Color3, rng, opts)
+	stain(model, base * CFrame.new(0, 0, -0.5), 4.4)
+	local lean = 0.3 + rng:NextNumber(-0.05, 0.1)
+	local tilt = rng:NextNumber(-0.12, 0.12)
+	lay(model, rig, base * CFrame.new(0, 1.05, 0.55) * CFrame.Angles(lean, 0, tilt), {
+		Waist = CFrame.Angles(0.18, rng:NextNumber(-0.1, 0.1), 0),
+		Neck = CFrame.Angles(-0.6, rng:NextNumber(-0.45, 0.45), 0.1),
+		RightHip = CFrame.Angles(math.pi / 2 - lean, 0, -0.12),
+		LeftHip = CFrame.Angles(math.pi / 2 - lean, 0, 0.16),
+		RightKnee = CFrame.Angles(rng:NextNumber(-0.25, 0), 0, 0),
+		LeftKnee = CFrame.Angles(rng:NextNumber(-0.25, 0), 0, 0),
+		RightShoulder = CFrame.Angles(0.95, 0, -0.3),
+		RightElbow = CFrame.Angles(0.45, 0, 0),
+		LeftShoulder = CFrame.Angles(0.25, 0, 0.4),
+		LeftElbow = CFrame.Angles(0.15, 0, 0),
+	})
+	pick(model, base * CFrame.new(0.25, 0.95, -1.15) * CFrame.Angles(math.pi / 2, 0, 1.1))
+	spill(model, base * CFrame.new(1.35, 0, -0.6), glow, rng)
+	if opts.Shards then
+		shards(model, base * CFrame.new(-1.3, 0, 0.6), glow, rng)
+	end
+end
+
+-- Face down, one arm stretched out for the pick it dropped, one knee drawn
+-- up, claw marks behind it where something dragged it.
+RIG_POSES.FaceDown = function(model, rig, base: CFrame, glow: Color3, rng, opts)
+	stain(model, base * CFrame.new(0, 0, 0.5), 5.2)
+	local roll = rng:NextNumber(-0.15, 0.15)
+	local reach = sign(rng)
+	lay(model, rig, base * CFrame.new(0, 0.95, 0.3) * CFrame.Angles(-math.pi / 2 + 0.06, 0, roll), {
+		Waist = CFrame.Angles(0, 0, rng:NextNumber(-0.12, 0.12)),
+		Neck = CFrame.Angles(0.15, reach * rng:NextNumber(0.7, 1.1), 0),
+		RightShoulder = if reach > 0 then CFrame.Angles(-2.85, 0, 0.25) else CFrame.Angles(-0.4, 0, 0.55),
+		LeftShoulder = if reach < 0 then CFrame.Angles(-2.85, 0, -0.25) else CFrame.Angles(-0.4, 0, -0.55),
+		RightElbow = CFrame.Angles(-0.2, 0, 0),
+		LeftElbow = CFrame.Angles(-0.2, 0, 0),
+		RightHip = CFrame.Angles(0, 0, -0.14),
+		LeftHip = CFrame.Angles(if reach > 0 then 0.5 else 0, 0, 0.3),
+		RightKnee = CFrame.Angles(if reach > 0 then -0.1 else -0.7, 0, 0),
+		LeftKnee = CFrame.Angles(if reach > 0 then -0.7 else -0.1, 0, 0),
+	})
+	pick(model, base * CFrame.new(1.6 * reach, 0.2, -3.6) * CFrame.Angles(0, 0.6, math.pi / 2))
+	scratches(model, base * CFrame.new(-1.9, 0, 2.2) * CFrame.Angles(0, 0.2, 0), opts.Scratch or SOCKET, opts.Scratch ~= nil)
+	if rng:NextNumber() < 0.6 then
+		spill(model, base * CFrame.new(-1.6 * reach, 0, -1.4), glow, rng)
+	end
+	if opts.Shards then
+		shards(model, base * CFrame.new(0, 1.0, 0.4), glow, rng)
+	end
+end
+
+-- On its back, arms flung out, one knee up, head lolled to the side, its
+-- pick stood in the ground beside it like a marker.
+RIG_POSES.Sprawled = function(model, rig, base: CFrame, glow: Color3, rng, opts)
+	stain(model, base * CFrame.new(0, 0, -0.4), 5.2)
+	local roll = rng:NextNumber(-0.2, 0.2)
+	local knee = sign(rng)
+	lay(model, rig, base * CFrame.new(0, 0.95, 0) * CFrame.Angles(math.pi / 2 - 0.06, 0, roll), {
+		Waist = CFrame.Angles(0, 0, rng:NextNumber(-0.1, 0.1)),
+		Neck = CFrame.Angles(-0.1, 0, sign(rng) * rng:NextNumber(0.3, 0.55)),
+		RightShoulder = CFrame.Angles(0, 0, rng:NextNumber(0.9, 1.4)),
+		LeftShoulder = CFrame.Angles(0, 0, -rng:NextNumber(0.9, 1.4)),
+		RightElbow = CFrame.Angles(0, 0, rng:NextNumber(0, 0.6)),
+		LeftElbow = CFrame.Angles(0, 0, -rng:NextNumber(0, 0.6)),
+		RightHip = CFrame.Angles(if knee > 0 then 0.8 else 0, 0, -0.2),
+		LeftHip = CFrame.Angles(if knee < 0 then 0.8 else 0, 0, 0.22),
+		RightKnee = CFrame.Angles(if knee > 0 then 1.3 else 0.05, 0, 0),
+		LeftKnee = CFrame.Angles(if knee < 0 then 1.3 else 0.05, 0, 0),
+	})
+	pick(model, base * CFrame.new(2.3, 1.45, -1.4) * CFrame.Angles(0.3, 0.4, 0.15))
+	spill(model, base * CFrame.new(0.9, 0, 1.6), glow, rng)
+	if opts.Shards then
+		shards(model, base * CFrame.new(-0.9, 0, -0.6), glow, rng)
+	end
+end
+
 function FallenMiners.place(parent: Instance, at: Vector3, facing: Vector3, rng, opts: any?): Model
 	opts = opts or {}
 	local model = Instance.new("Model")
@@ -293,8 +476,25 @@ function FallenMiners.place(parent: Instance, at: Vector3, facing: Vector3, rng,
 	model.Parent = parent
 	local base = frameAt(at, facing)
 	local pose = opts.Pose or FallenMiners.Poses[rng:NextInteger(1, #FallenMiners.Poses)]
-	local suit = SUITS[rng:NextInteger(1, #SUITS)]
-	POSES[pose](model, base, suit, opts.Glow or COLD, rng, opts)
+	local glow = opts.Glow or COLD
+	-- A real miner's body, when the server has one to give; the old suit
+	-- otherwise.
+	local rig = nil
+	if FallenMiners.dresser then
+		local ok, body = pcall(FallenMiners.dresser, rng, model)
+		if ok and body then
+			rig = body
+		elseif not ok then
+			warn("FallenMiners: no body to lay down:", body)
+		end
+	end
+	if rig then
+		RIG_POSES[pose](model, rig, base, glow, rng, opts)
+		model:SetAttribute("Dressed", true)
+	else
+		local suit = SUITS[rng:NextInteger(1, #SUITS)]
+		POSES[pose](model, base, suit, glow, rng, opts)
+	end
 	model:SetAttribute("Pose", pose)
 	return model
 end
