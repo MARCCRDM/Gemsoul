@@ -17,12 +17,16 @@
 	                          wild kaiju it finds)
 	  WildBars.start()        which show, a few times a second, and the
 	                          trails draining
-	  WildBars.plate(model) -> BillboardGui   builds one (its Title, Level,
-	                          Back, Fill and Trail inside)
+	  WildBars.plate(model, phone?) -> BillboardGui   builds one (its Title,
+	                          Level, Back, Fill and Trail inside); smaller
+	                          on a phone (PhoneSize, everything inside in
+	                          proportion)
 	  WildBars.draw(plate, share, trail, guardian, catching)   fills it in
 	  WildBars.choose(entries, budget, range) -> { [entry]: true }   which
 	                          show: entries are { Distance, Share } (pure)
-	  WildBars.Budget, Range, Size, Hold, Drain
+	  WildBars.phone() -> boolean          a phone (touch, no keyboard; or a
+	                          short screen): the smaller plates
+	  WildBars.Budget, PhoneBudget, Range, Size, PhoneSize, Hold, Drain
 ]]
 local BodyHealth = require(script.Parent.BodyHealth)
 
@@ -31,6 +35,9 @@ local WildBars = {}
 WildBars.Budget = 6 -- shown at once, at most
 WildBars.Range = 140 -- studs from the camera: further, none
 WildBars.Size = Vector2.new(210, 36) -- the plate, in pixels
+-- On a phone: smaller, and fewer at once (they were a third of the screen).
+WildBars.PhoneSize = Vector2.new(124, 22)
+WildBars.PhoneBudget = 4
 WildBars.Hold = 0.35 -- seconds the trail holds after a blow
 WildBars.Drain = 0.8 -- how much of the bar the trail drains a second
 WildBars.Every = 0.25 -- seconds between picks
@@ -83,9 +90,15 @@ local function lift(model: Model, root: BasePart): number
 end
 
 -- Its plate: the name over a level chip and the bar.
-function WildBars.plate(model: Model): BillboardGui
+function WildBars.plate(model: Model, phone: boolean?): BillboardGui
 	local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
-	local W, H = WildBars.Size.X, WildBars.Size.Y
+	local size = if phone then WildBars.PhoneSize else WildBars.Size
+	local W, H = size.X, size.Y
+	-- (Laid out for the desktop plate, scaled to this one.)
+	local k = H / WildBars.Size.Y
+	local function px(n: number): number
+		return math.max(1, math.floor(n * k + 0.5))
+	end
 	local plate = make("BillboardGui", {
 		Name = "WildBar",
 		Size = UDim2.fromOffset(W, H),
@@ -102,9 +115,9 @@ function WildBars.plate(model: Model): BillboardGui
 	local name = make("TextLabel", {
 		Name = "Title",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 17),
+		Size = UDim2.new(1, 0, 0, px(17)),
 		Font = Enum.Font.GothamBold,
-		TextSize = 14,
+		TextSize = px(14),
 		TextColor3 = NAME,
 		TextStrokeColor3 = INK,
 		TextStrokeTransparency = 0.25,
@@ -113,22 +126,22 @@ function WildBars.plate(model: Model): BillboardGui
 		Text = model.Name,
 	}, plate)
 	-- (A long name, the guardian's, shrinks a little before it's cut short.)
-	make("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 10 }, name)
+	make("UITextSizeConstraint", { MaxTextSize = px(14), MinTextSize = math.min(px(14), if phone then 8 else 10) }, name)
 	local level = make("Frame", {
 		Name = "Level",
 		BackgroundColor3 = INK,
 		BackgroundTransparency = 0.15,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(0, 19),
-		Size = UDim2.fromOffset(38, 15),
+		Position = UDim2.fromOffset(0, px(19)),
+		Size = UDim2.fromOffset(px(38), px(15)),
 	}, plate)
-	make("UICorner", { CornerRadius = UDim.new(0, 4) }, level)
+	make("UICorner", { CornerRadius = UDim.new(0, px(4)) }, level)
 	make("TextLabel", {
 		Name = "Text",
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		Font = Enum.Font.GothamBlack,
-		TextSize = 11,
+		TextSize = math.max(px(11), 8),
 		TextColor3 = GOLD,
 		Text = "Lv " .. tostring(model:GetAttribute("KaijuLevel") or 1),
 	}, level)
@@ -138,10 +151,10 @@ function WildBars.plate(model: Model): BillboardGui
 		BackgroundTransparency = 0.1,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
-		Position = UDim2.fromOffset(42, 21),
-		Size = UDim2.new(1, -42, 0, 11),
+		Position = UDim2.fromOffset(px(42), px(21)),
+		Size = UDim2.new(1, -px(42), 0, px(11)),
 	}, plate)
-	make("UICorner", { CornerRadius = UDim.new(0, 3) }, back)
+	make("UICorner", { CornerRadius = UDim.new(0, px(3)) }, back)
 	make("UIStroke", { Name = "Edge", Color = EDGE, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, back)
 	make("Frame", {
 		Name = "Trail",
@@ -187,6 +200,17 @@ type Entry = {
 }
 local entries: { [Model]: Entry } = {}
 
+-- A phone: touch and no keyboard, or a short screen.
+local function onPhone(): boolean
+	return WildBars.phone()
+end
+function WildBars.phone(): boolean
+	local input = game:GetService("UserInputService")
+	local camera = workspace.CurrentCamera
+	local view = camera and camera.ViewportSize
+	return (input.TouchEnabled and not input.KeyboardEnabled) or (view ~= nil and math.min(view.X, view.Y) < 500)
+end
+
 local function shareOf(humanoid: Humanoid): number
 	if humanoid.MaxHealth <= 0 then
 		return 0
@@ -231,7 +255,7 @@ function WildBars.watch(model: Model)
 	local entry: Entry = {
 		Model = model,
 		Humanoid = humanoid,
-		Plate = WildBars.plate(model),
+		Plate = WildBars.plate(model, onPhone()),
 		Share = share,
 		Trail = share,
 		HitAt = 0,
@@ -301,7 +325,7 @@ function WildBars.start()
 				drop(model)
 			end
 		end
-		local on = WildBars.choose(list, WildBars.Budget, WildBars.Range)
+		local on = WildBars.choose(list, if onPhone() then WildBars.PhoneBudget else WildBars.Budget, WildBars.Range)
 		for _, item in list do
 			local show = on[item] == true
 			if item.Entry.Shown ~= show then

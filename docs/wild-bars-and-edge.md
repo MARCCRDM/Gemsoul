@@ -67,11 +67,18 @@ edge on its bar, with the gold **READY TO CATCH** words sitting just over
 the plate.
 
 The plates show for the 6 nearest wild kaiju within 140 studs, and never
-for one that's knocked out. Your kaiju and the rift's critters still show
+for one that's knocked out.
+
+*2026-10-23, phones:* the plate was the same 210 by 36 pixels as on a
+desktop, so on a phone each kaiju carried a big slab. On a phone (touch
+and no keyboard, or a screen under 500 pixels on its short side,
+`WildBars.phone()`) it's 124 by 22 (`PhoneSize`), with the name, level chip
+and bar scaled to fit, and only the 4 nearest show (`PhoneBudget`). The
+gold READY TO CATCH words over it shrink the same way. Your kaiju and the rift's critters still show
 their health on their bodies only.
 
 - `Client.WildBars`: `watch(model)` (KaijuHud's scan hands it each wild
-  kaiju), `start()`, `plate(model)`, `draw(plate, share, trail, guardian,
+  kaiju), `start()`, `plate(model, phone?)`, `phone()`, `draw(plate, share, trail, guardian,
   catching)`, `choose(entries, budget, range)`.
 
 ## Fewer rifts while you fight a wild kaiju

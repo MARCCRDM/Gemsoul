@@ -28,6 +28,7 @@ local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local CombatSound = require(script.Parent.CombatSound)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
+local WildBars = require(script.Parent.WildBars)
 
 local player = Players.LocalPlayer
 local P = IronUi.Colors
@@ -79,13 +80,14 @@ local function markOf(model: Model, root: BasePart): Mark
 	-- (In PlayerGui, so its words are translated: Translate. Just over its
 	-- plate, WildBars: the same spot, a plate's height and a bit higher.)
 	local height = model:GetExtentsSize().Y
+	local phone = WildBars.phone() -- (smaller on a phone, like the plate)
 	local board = new("BillboardGui", {
 		Name = "TameReadyBoard",
 		Adornee = root,
 		AlwaysOnTop = true,
 		LightInfluence = 0,
 		MaxDistance = SHOW,
-		Size = UDim2.fromOffset(200, 30),
+		Size = if phone then UDim2.fromOffset(130, 20) else UDim2.fromOffset(200, 30),
 		StudsOffsetWorldSpace = Vector3.new(0, height * 0.5 + 1.4, 0),
 		SizeOffset = Vector2.new(0, 1.3),
 	}, player:WaitForChild("PlayerGui"))
@@ -93,7 +95,7 @@ local function markOf(model: Model, root: BasePart): Mark
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		Font = Enum.Font.GothamBlack,
-		TextSize = 15,
+		TextSize = if phone then 11 else 15,
 		TextColor3 = GOLD,
 		TextStrokeColor3 = Color3.fromRGB(40, 26, 0),
 		TextStrokeTransparency = 0.2,

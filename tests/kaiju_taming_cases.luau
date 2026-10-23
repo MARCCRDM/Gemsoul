@@ -122,5 +122,15 @@ check(labels()["CATCH BROKEN"] and gui.Enabled, "A broken tame didn't show")
 weak.Parent = nil
 frames(0.3)
 check(boardFor(weak) == nil, "A gone kaiju's ready words stayed")
+-- On a phone the ready words are smaller, like the plate under them.
+phoneMode = true
+local phoneWeak = wildKaiju("Wild Ion Razorback", Vector3.new(-24, 3, 0), 0.3)
+frames(0.3)
+local small = boardFor(phoneWeak)
+check(small and small.Size.X.Offset <= 140 and small.Size.Y.Offset <= 22, "The ready words aren't smaller on a phone")
+check(small:FindFirstChildOfClass("TextLabel").TextSize <= 12, "The ready words' text isn't smaller on a phone")
+phoneWeak.Parent = nil
+frames(0.3)
+phoneMode = false
 
 print(string.format("PASS: %d kaiju taming checks (ready glow and chance, not healthy/far/held, the beam and motes, the cast bar, results)", checks))

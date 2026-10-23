@@ -116,6 +116,28 @@ for _, child in plate:GetDescendants() do
 	end
 end
 
+-- On a phone: a smaller plate (it was a big slab over every kaiju), fewer
+-- at once, everything inside still on it and still readable.
+check(WildBars.PhoneSize.X <= WildBars.Size.X * 0.65 and WildBars.PhoneSize.Y <= WildBars.Size.Y * 0.65, "The phone plate isn't smaller")
+check(WildBars.PhoneBudget >= 2 and WildBars.PhoneBudget < WildBars.Budget, "As many plates on a phone")
+local small = WildBars.plate(model, true)
+local PW, PH = WildBars.PhoneSize.X, WildBars.PhoneSize.Y
+check(small.Size.X.Offset == PW and small.Size.Y.Offset == PH, "The phone plate's size")
+for _, child in small:GetDescendants() do
+	if child:IsA("GuiObject") and child.Parent == small then
+		local right = child.Position.X.Offset + child.Size.X.Offset + child.Size.X.Scale * PW
+		local bottom = child.Position.Y.Offset + child.Size.Y.Offset + child.Size.Y.Scale * PH
+		check(right <= PW + 0.5 and bottom <= PH + 0.5, child.Name .. " spills off the phone plate")
+	end
+	if child:IsA("TextLabel") then
+		check(child.TextSize >= 8, child.Name .. " too small to read on a phone")
+	end
+end
+local smallBack = small:FindFirstChild("Back")
+check(smallBack.Size.Y.Offset >= 5 and smallBack.Size.Y.Offset < back.Size.Y.Offset, "The phone bar's height")
+WildBars.draw(small, 0.5, 0.8)
+check(math.abs(smallBack:FindFirstChild("Fill").Size.X.Scale - 0.5) < 1e-6, "The phone bar doesn't fill")
+
 -- Filled in --------------------------------------------------------------------------------------------
 local function near(a, b)
 	return math.abs(a.R - b.R) < 1e-3 and math.abs(a.G - b.G) < 1e-3 and math.abs(a.B - b.B) < 1e-3

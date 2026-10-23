@@ -127,6 +127,9 @@ local IronUi = {
 	Bold = "GothamBold",
 	Body = "Gotham",
 }
+-- (A phone or not: the ready words' size, like the wild kaiju plate.)
+local phoneMode = false
+local WildBars = { phone = function() return phoneMode end }
 local UiKit = {
 	gui = function(name, order) return make("ScreenGui", { Name = name, DisplayOrder = order, Enabled = true }, playerGui) end,
 	round = function() end,
