@@ -82,6 +82,7 @@ local CELL_NAMES = {
 }
 
 local current = nil -- the state last told
+local closedId = nil -- a finished battle closed here (its late states ignored)
 local picked: string? = nil -- the kaiju tapped, to move
 local hovered: string? = nil -- the place under a dragged kaiju
 
@@ -348,8 +349,14 @@ local barTitle = line(bar, "KAIJU BATTLE", 10, ORANGE, IronUi.Heading)
 barTitle.TextXAlignment = Enum.TextXAlignment.Center
 local barStake = line(bar, "", 9, P.Gold, IronUi.Heading)
 barStake.TextXAlignment = Enum.TextXAlignment.Center
+-- (Over: CLOSE shuts it here at once, whatever the server says: leaving.)
+local closeNow
 local barLeave = button(bar, "LEAVE", P.Bad, function()
-	task.spawn(GemClient.request, "KaijuBattleLeave")
+	if current and current.Phase == "Over" and closeNow then
+		closeNow()
+	else
+		task.spawn(GemClient.request, "KaijuBattleLeave")
+	end
 end)
 -- A 1V1 + KAIJU battle's duel, under the bar: both miners' health, then
 -- who won it. (Its words are put in the player's language here: a name's
@@ -446,11 +453,23 @@ local rematchButton = button(rematchRow, "REMATCH", P.Good, function()
 		end
 	end)
 end)
-rematchButton.AnchorPoint = Vector2.new(0.5, 0)
-rematchButton.Position = UDim2.new(0.5, 0, 0, 6)
-rematchButton.Size = UDim2.fromOffset(220, 36)
+rematchButton.AnchorPoint = Vector2.new(1, 0)
+rematchButton.Position = UDim2.new(0.5, -5, 0, 6)
+rematchButton.Size = UDim2.fromOffset(200, 36)
 rematchButton.TextSize = 16
 UiKit.fit(rematchButton) -- (WAITING FOR a long name)
+-- LEAVE, beside it, full size: the result closes here at once and the
+-- server lets you go (KaijuBattleLeave), rematch or not.
+local resultLeave = button(rematchRow, "LEAVE", P.Bad, function()
+	if closeNow then
+		closeNow()
+	end
+end)
+resultLeave.Name = "ResultLeave"
+resultLeave.AnchorPoint = Vector2.new(0, 0)
+resultLeave.Position = UDim2.new(0.5, 5, 0, 6)
+resultLeave.Size = UDim2.fromOffset(140, 36)
+resultLeave.TextSize = 16
 rematchNote = line(resultCard, "", 11, P.Dim, IronUi.Body)
 rematchNote.Size = UDim2.new(1, 0, 0, 28)
 rematchNote.TextXAlignment = Enum.TextXAlignment.Center
@@ -601,8 +620,10 @@ local function layout()
 		entry[1].Size = UDim2.new(1, 0, 0, if short then 14 else 18)
 	end
 	rematchRow.Size = UDim2.new(1, 0, 0, if short then 34 else 44)
-	rematchButton.Size = UDim2.fromOffset(if short then 200 else 220, if short then 30 else 36)
-	rematchButton.Position = UDim2.new(0.5, 0, 0, if short then 2 else 6)
+	rematchButton.Size = UDim2.fromOffset(if short then 170 else 200, if short then 30 else 36)
+	rematchButton.Position = UDim2.new(0.5, -5, 0, if short then 2 else 6)
+	resultLeave.Size = UDim2.fromOffset(if short then 110 else 140, if short then 30 else 36)
+	resultLeave.Position = UDim2.new(0.5, 5, 0, if short then 2 else 6)
 	rematchNote.Size = UDim2.new(1, 0, 0, if short then 14 else 28)
 	rematchNote.TextSize = if short then 10 else 11
 end
@@ -1119,7 +1140,11 @@ local function show(state)
 		local foeSide = otherSide(state.Side)
 		local mineAsked, foeAsked = again[state.Side] == true, again[foeSide] == true
 		local foeName = string.upper(state.Foe or "YOUR FOE")
-		rematchRow.Visible = again.Off == nil
+		-- (No rematch to be had: LEAVE alone, in the middle.)
+		rematchRow.Visible = true
+		rematchButton.Visible = again.Off == nil
+		resultLeave.AnchorPoint = if again.Off == nil then Vector2.new(0, 0) else Vector2.new(0.5, 0)
+		resultLeave.Position = UDim2.new(0.5, if again.Off == nil then 5 else 0, 0, resultLeave.Position.Y.Offset)
 		rematchButton.AutoButtonColor = not mineAsked
 		rematchButton.Text = if mineAsked then "WAITING FOR " .. foeName else "REMATCH"
 		rematchButton.BackgroundColor3 = (if mineAsked then P.Dim elseif foeAsked then P.Gold else P.Good):Lerp(
@@ -1256,10 +1281,27 @@ function KaijuBattleUI.tick()
 	end
 end
 
+-- Leaving a finished battle: closed here at once (the server's own nil
+-- follows, and a late state for the old battle is ignored), then the
+-- server's told.
+closeNow = function()
+	local was = current and current.Id
+	closedId = was
+	show(nil)
+	task.spawn(GemClient.request, "KaijuBattleLeave")
+end
+
 function KaijuBattleUI.start()
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
 	remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, state)
 		if kind == "KaijuBattle" then
+			-- (A battle just closed here: its last Over state is stale.)
+			if state and closedId and state.Id == closedId and state.Phase == "Over" then
+				return
+			end
+			if state and state.Id ~= closedId then
+				closedId = nil
+			end
 			show(state)
 		end
 	end)

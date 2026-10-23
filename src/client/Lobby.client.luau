@@ -58,6 +58,8 @@ if Config.Features == nil or Config.Features.Kaiju ~= false then
 	-- Yellow arrows on the ground, to a pad, the stairs down, the Rift's way on.
 	require(script.Parent.Modules.GroundGuide).start()
 end
+-- After the intro's first fight: arrows to a mech, a few rocks, then out.
+require(script.Parent.Modules.IntroGuide).start()
 -- Who a Rift or raid boss is on right now: a red diamond over them (or their kaiju).
 require(script.Parent.Modules.BossFocus).start()
 

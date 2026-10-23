@@ -278,10 +278,11 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   Gemsoul and rarity, its name, health, damage and speed, what it's like,
   and its moves with their icons (E ready now, Q at level 5, R at 10, and
   its gem surge, its Gemsoul's E, marked GEM).
-  Until then the card holds blank slots where they go. START, the intro's
-  one button, brings them out (on its own after 20 seconds, the bar along its foot filling till
-  then; a click while they spin lands them all at once), and **the three
-  rolled are your team**. The server makes the roll once and keeps it till
+  Until then the card holds blank slots where they go. There's no button:
+  once all three are down it reads YOUR KAIJU ARE LOCKED IN and moves on by
+  itself 2.5 seconds later (a click while they spin lands them all at once),
+  and **the three rolled are your team**. Only a claim that fails puts a
+  button up, TRY AGAIN. The server makes the roll once and keeps it till
   it's claimed, so leaving doesn't reroll it; a roll left unclaimed is given
   anyway after 90 seconds in the Outpost. On a phone the cards drop the
   headline and what each kaiju is like, so they come out bigger.
@@ -877,9 +878,9 @@ reels (yours on the third cell, three different kaiju in sight while they
 spin, each named with its rarity), the cards landing in turn with only
 yours left in the window, the cards filled in (name, Gemsoul and rarity,
 stats, what it's like, moves ready and asleep), each one dropping onto its
-stage and settling, START (no "meet your team"), a failed claim saying so,
-a click landing them all, the start on its own after 20 seconds, and a
-phone's shorter cards.
+stage and settling, no button to press (no "meet your team"), the claim on
+its own a moment after they're down, a failed one saying so with TRY AGAIN,
+a click landing them all, and a phone's shorter cards.
 
 Tests: `tests/run_kaiju.py` checks the rules (your team's order, filling
 and size, the roll owed and its picks never repeating a kind and element)

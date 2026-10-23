@@ -443,6 +443,9 @@ function finish(match, winner: number?, reason: string)
 				-- step on this), and the Outpost is next.
 				if match.FirstFighters[member] then
 					member:SetAttribute("FirstFight", nil)
+					-- (And the floor arrows walk them through it: a mech, a
+					-- few rocks, out to the outskirts. Client IntroGuide.)
+					member:SetAttribute("IntroGuide", true)
 					Remotes.Notify:FireClient(
 						member,
 						if won

@@ -28,25 +28,30 @@ if resuming then
  check(selected("Frost") and not selected("Fire"),"Committed kit choice changed")
 else
  check(#funnelSteps==0,"The style step was reported before a style was picked")
+ -- No CONTINUE: tapping a card picks it and, a beat later, moves on.
+ check(not primary.Visible,"The picks still show a CONTINUE button")
  for _,style in {"Prospector","Skirmisher","Juggernaut"} do
   named(style).Activated.Fire()
-  primary.Activated.Fire()
-  check(funnelSteps[#funnelSteps]=="Style","Picking a style wasn't reported to the onboarding funnel")
-  check(area.Visible and not primary.Active,"Element step must start without a choice")
+  runDelayed(now+1)
+  check(funnelSteps[#funnelSteps]=="Style","Tapping a style didn't move on (or wasn't reported to the funnel)")
+  check(area.Visible and not primary.Visible,"The element step didn't open on its own, or shows a button")
   for _,element in {"Fire","Frost","Shock","Poison"} do check(not selected(element),style.." auto-selected "..element) end
-  primary.Activated.Fire()
-  check(#requests==0,"Empty element choice reached the server")
-  primary.MouseEnter.Fire(); primary.MouseLeave.Fire()
-  check(primary.Text=="CHOOSE AN ELEMENT" and not primary.Active,"Hover activated the disabled button")
+  check(#requests==0,"An element request went out before one was tapped")
   back.Activated.Fire()
  end
- named("Prospector").Activated.Fire(); primary.Activated.Fire()
+ -- Tapping an element picks it at once; the kit goes out a beat later,
+ -- unless they've gone back meanwhile.
+ named("Prospector").Activated.Fire(); runDelayed(now+1)
  named("Frost").Activated.Fire()
- check(primary.Active and primary.Text=="EQUIP & FIGHT" and selected("Frost"),"Explicit selection did not enable confirm")
- back.Activated.Fire(); named("Skirmisher").Activated.Fire(); primary.Activated.Fire()
+ check(selected("Frost") and #requests==0,"Tapping an element didn't pick it, or sent it at once")
+ back.Activated.Fire(); runDelayed(now+1)
+ check(#requests==0,"Going back didn't stop the element going out")
+ named("Skirmisher").Activated.Fire(); runDelayed(now+1)
  check(selected("Frost") and not selected("Shock"),"Changing armor overwrote the explicit element choice")
  named("Poison").Activated.Fire()
  check(selected("Poison") and not selected("Frost"),"Selection markers are not exclusive")
+ back.Activated.Fire(); runDelayed(now+1)
+ check(#requests==0,"A pick went out after going back")
 end
 -- The style cards: only the picked one has the bright edge, and at every size
 -- the art fills its window (no gaps) with the bonus strip along the bottom.
@@ -78,7 +83,9 @@ if not resuming then
  end
  styleArea.AbsoluteSize=before
  styleArea:GetPropertyChangedSignal("AbsoluteSize").Fire()
- back.Activated.Fire(); named("Skirmisher").Activated.Fire(); primary.Activated.Fire(); named("Poison").Activated.Fire()
+ back.Activated.Fire(); runDelayed(now+1); named("Skirmisher").Activated.Fire(); runDelayed(now+1)
+ check(area.Visible,"Tapping an armor card did not move on to the elements")
+ named("Poison").Activated.Fire()
 end
 -- Resize the actual layout callback: all four fit without scrolling wherever
 -- they can (side by side when wide and short, two by two when tall), never
@@ -140,8 +147,10 @@ for _,element in {"Fire","Frost","Shock","Poison"} do
  check(string.find(all,"BEATS",1,true)~=nil and string.find(all,"WEAK TO",1,true)~=nil,element.." card has no matchup in words")
 end
 failPrepare=true
-primary.Activated.Fire()
-check(primary.Text=="RETRY THE LAUNCH" and not profile.Intro.Done,"Network failure must leave the picker retryable")
+-- A fresh pick launches by itself a beat after the tap; a saved kit still has
+-- its button.
+if resuming then primary.Activated.Fire() else runDelayed(now+1) end
+check(primary.Visible and primary.Text=="RETRY THE LAUNCH" and not profile.Intro.Done,"Network failure must leave the picker retryable")
 check(prepareArgs[1]==(if resuming then "Juggernaut" else "Skirmisher"),"Wrong armor sent to server")
 check(prepareArgs[2]==(if resuming then "Frost" else "Poison"),"Wrong explicit element sent to server")
 -- The starter roll: three reels of real 3D gems (no flat stand-ins), every
@@ -214,9 +223,9 @@ check(nextUp.Visible and kaiju==0,"The gems out: no next line, or it went on at 
 shade.Activated.Fire()
 check(kaiju==0,"The click that landed the gems went straight past them")
 if resuming then
- runDelayed(landed+3.9)
+ runDelayed(landed+1.9)
  check(kaiju==0,"It went on to the kaiju too soon")
- runDelayed(landed+4.1)
+ runDelayed(landed+2.1)
  check(kaiju==1 and shade.Destroyed,"It didn't go on to the kaiju by itself")
  check(held[1]=="Intro","After the kaiju, the intro didn't close")
 else

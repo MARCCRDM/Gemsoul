@@ -346,8 +346,13 @@ other side the win.
     rematch: Sam left."), or can't cover the stake ("No rematch: Sam can't
     cover the stake."). Whoever pressed first gets their stake back.
 
-**CLOSE** puts the result away. To go again with someone new, step off your
-pad and back on.
+**LEAVE** sits beside REMATCH on the result card, full size (a REMATCH that
+can't happen leaves LEAVE alone in the middle); the bar's small LEAVE does
+the same once it's over. Either puts the result away at once on your
+screen, then tells the server, which takes you out of the battle before
+anything else and answers ok even if you were already out. (It used to wait
+for the server, and a slip on the way out left you stuck on the result.)
+To go again with someone new, step off your pad and back on.
 
 ## 1V1 + KAIJU
 
@@ -468,6 +473,7 @@ Where they lead, the first of these that wants you somewhere:
 | Downstairs | The free pad across from someone waiting. Just after you arrive (18 seconds), the nearest open court's pad. Nothing while you're on a pad or in a battle. |
 | In the Rift | Through a wall of fire that's just gone out (15 seconds), a little way into the next cave (`GroundGuide.through`), and nothing once you're through it. To the way home once the boss is down. |
 | In the Shelter | The stairs down, for 25 seconds after someone starts waiting for a challenger downstairs. A toast says "Sam is waiting for a kaiju battle downstairs. Follow the arrows!", at most once a minute. |
+| After the intro's first fight | Once only, ahead of everything else (`Client/IntroGuide`; the server sets `IntroGuide` as the first fight ends, against a player or the sparring rival). First the nearest free mech ("Hop in a mech: follow the arrows."). Once they're in it, the nearest common rock near the outpost, then the next, until they've mined 3 ("Mine a few rocks: drive into them."). Then outward from where they are, 35 studs at a time, to the outskirts just past the core (`Frontier.Core` + 30) ("Richer rocks lie further out. Head out."), fading over the last 60 studs, and gone. With no free mech it goes straight to the rocks; it gives up after 8 minutes. |
 
 ## Files
 
@@ -491,7 +497,8 @@ Where they lead, the first of these that wants you somewhere:
 | `src/server/Systems/OutpostServer.luau` | Downstairs isn't stranded |
 | `src/client/Modules/KaijuBattleUI.luau` (rebuilt) | The placement board (drag and drop, portraits, cards, AUTO, READY, the clock, your side), the battle bar (by side), the result card (who won, health back, REMATCH) |
 | `src/client/Modules/KaijuPitClient.luau` (new) | The courts' boards, lit pads, the stake on the pedestal, your pad's card, the crossing cover, the toast upstairs |
-| `src/client/Modules/GroundGuide.luau` (new) | The arrows on the ground |
+| `src/client/Modules/GroundGuide.luau` (new) | The arrows on the ground (a want can dim them: `where()` returns a strength too) |
+| `src/client/Modules/IntroGuide.luau` (new) | After the intro's first fight: a mech, a few rocks, then out to the outskirts (`IntroGuide.step`, pure) |
 | `src/shared/Vendors.luau` | INFO-9's tips: where battles are now, 25 seconds, full health and back, stakes. COACH-4 (`ArenaGuide`) and its tips (`ArenaTips`) |
 
 A player downstairs carries `KaijuPit` (and keeps `Outpost`). Each

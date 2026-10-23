@@ -442,6 +442,74 @@ do
 	check(Guide.Arrive > Guide.Ahead, "The arrows stay once you're there")
 end
 
+-- After the intro's first fight (Client IntroGuide): the arrows lead to the
+-- nearest free mech, then once you're in it to the nearest common rocks
+-- close by, a few of them, then out a stretch at a time to the outskirts,
+-- fading as you get there, and gone.
+do
+	local introEnv = setmetatable({
+		game = {
+			GetService = function(_, name)
+				return if name == "ReplicatedStorage"
+					then { Shared = { Frontier = "Frontier", Outpost = "Outpost" } }
+					else { Name = name }
+			end,
+		},
+		Vector3 = Vector3,
+		require = function(name)
+			return shared(name)
+		end,
+	}, { __index = _G })
+	local source = fs.readFile(ROOT .. "/src/client/Modules/IntroGuide.luau")
+	local Intro = luau.load(source, { debugName = "IntroGuide", environment = introEnv })()
+	local Frontier = shared("Frontier")
+	local center = Vector3.new(0, 0, 7000)
+	local at = center + Vector3.new(10, 3, 0)
+	local state = { Stage = "Mech", Mined = 0 }
+	local nearMech, farMech = center + Vector3.new(30, 3, 0), center + Vector3.new(-90, 3, 0)
+	local rocks = { center + Vector3.new(60, 3, 10), center + Vector3.new(20, 3, 15), center + Vector3.new(300, 3, 0) }
+	local function view(over)
+		local v = { At = at, Center = center, Piloting = false, Mechs = { farMech, nearMech }, Rocks = rocks }
+		for k, value in over or {} do
+			v[k] = value
+		end
+		return v
+	end
+	local to, strength = Intro.step(state, view())
+	check(state.Stage == "Mech" and to == nearMech and strength == 1, "Not led to the nearest mech first")
+	to = Intro.step(state, view({ Piloting = true }))
+	check(state.Stage == "Mine" and to == rocks[2], "In the mech, not led to the nearest rock")
+	-- (A rock that's far off isn't a close common.)
+	to = Intro.step(state, view({ Piloting = true, Rocks = { rocks[3] } }))
+	check(state.Stage == "Out", "Led to a rock that's far off, not out")
+	state = { Stage = "Mine", Mined = Intro.MineRocks - 1 }
+	check(Intro.step(state, view({ Piloting = true })) ~= nil and state.Stage == "Mine", "Moved on before a few rocks")
+	state.Mined = Intro.MineRocks
+	to, strength = Intro.step(state, view({ Piloting = true }))
+	check(state.Stage == "Out" and to and strength == 1, "A few rocks mined and not led out")
+	check(Intro.MineRocks >= 2 and Intro.MineRocks <= 5, "Not a few rocks")
+	-- Out: always further out than you are, a stretch at a time, never past the
+	-- outskirts, past the core where the richer rocks are.
+	check(Intro.Outskirts > Frontier.Core and Intro.Outskirts < Frontier.EdgeFrom, "The outskirts aren't past the core")
+	local last = 1
+	for r = 20, Intro.Outskirts - 1, 20 do
+		local here = center + Vector3.new(0, 3, r)
+		to, strength = Intro.step(state, view({ At = here, Piloting = true }))
+		local out = Vector3.new(to.X - center.X, 0, to.Z - center.Z).Magnitude
+		check(out > r and out <= Intro.Outskirts + 10, "Heading out, not led further out")
+		check(math.abs(to.X - center.X) < 1e-3, "Heading out, led off the way they're going")
+		check(strength <= last and strength > 0, "The arrows don't fade as they get there")
+		last = strength
+	end
+	check(last < 0.5, "Nearly there and the arrows haven't faded")
+	to, strength = Intro.step(state, view({ At = center + Vector3.new(0, 3, Intro.Outskirts + 1) }))
+	check(to == nil and strength == 0 and state.Stage == "Done", "The arrows don't go at the outskirts")
+	check(Intro.step(state, view()) == nil, "Done, and still led somewhere")
+	-- No free mech: straight to the rocks.
+	state = { Stage = "Mech", Mined = 0 }
+	check(Intro.step(state, view({ Mechs = {} })) == rocks[2] and state.Stage == "Mine", "No mech and stuck waiting for one")
+end
+
 -- The sides' colours: A blue (the court's blue half), B red; and the ring
 -- each kaiju stands on in its side's colour (Client KaijuTeamRings), a
 -- little wider than it is.
@@ -557,7 +625,7 @@ end
 
 print(
 	string.format(
-		"PASS: %d kaiju battle checks (the field, places, default formation, formations, winners, asks; the arena's courts, pads, kept in, stakes; the ground arrows; the sides' colours and rings; the battle camera)",
+		"PASS: %d kaiju battle checks (the field, places, default formation, formations, winners, asks; the arena's courts, pads, kept in, stakes; the ground arrows; the intro's walk out; the sides' colours and rings; the battle camera)",
 		checks
 	)
 )

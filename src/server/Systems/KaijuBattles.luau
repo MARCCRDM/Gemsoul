@@ -613,17 +613,25 @@ local function release(battle: Battle, player: Player)
 	if battleOf[player] == battle then
 		battleOf[player] = nil
 	end
-	for _, pet in KaijuServer.team(player) do
-		pet.Model:SetAttribute("KaijuTeam", nil)
-	end
-	-- (A Mixed battle's duel, if it's somehow still on.)
-	if battle.Mode == "Mixed" and Spar.partner(player) == foeOf(battle, player).UserId then
-		SparServer.unpair(player)
-	end
+	-- Their screen first: whatever goes wrong below, they're out of it.
 	if player.Parent then
-		KaijuServer.battleEnd(player)
 		player:SetAttribute("KaijuBattle", nil)
 		Remotes.Social:FireClient(player, "KaijuBattle", nil)
+	end
+	local ok, problem = pcall(function()
+		for _, pet in KaijuServer.team(player) do
+			pet.Model:SetAttribute("KaijuTeam", nil)
+		end
+		-- (A Mixed battle's duel, if it's somehow still on.)
+		if battle.Mode == "Mixed" and Spar.partner(player) == foeOf(battle, player).UserId then
+			SparServer.unpair(player)
+		end
+		if player.Parent then
+			KaijuServer.battleEnd(player)
+		end
+	end)
+	if not ok then
+		warn("KaijuBattles.release:", problem)
 	end
 end
 
@@ -755,7 +763,10 @@ end
 local function leave(player: Player)
 	local battle = battleOf[player]
 	if not battle then
-		return reply(false, "You're not in a kaiju battle.")
+		-- (Already let go here: make sure their screen knows.)
+		player:SetAttribute("KaijuBattle", nil)
+		Remotes.Social:FireClient(player, "KaijuBattle", nil)
+		return reply(true, "")
 	end
 	if battle.Phase == "Over" then
 		-- (Closed for you; the other still sees the result a moment, with

@@ -10,6 +10,13 @@ The picker shows each element and its strengths: what its hits do, what it
 beats and what beats it. It never shows the moves. Those stay a surprise
 until the roll.
 
+*Changed 2026-10-23:* there's no CONTINUE button. Tapping a style card
+picks it and, a beat later (0.45 seconds), opens the elements; tapping an
+element picks it and, a beat later, sends the kit and starts the roll.
+"‹ Back to styles" in that beat cancels it. The gold button only comes back
+as RETRY THE LAUNCH when sending the kit fails, and for a saved kit
+(EQUIP & FIGHT), whose cards can't be changed.
+
 | Style | Element | The roll: each card's circle is a reel that lands on your gem, which gives up its surge |
 | --- | --- | --- |
 | ![Style](showcase-kit/style.png) | ![Element](showcase-kit/picker.png) | ![Reveal](showcase-kit/reveal.png) |
@@ -26,9 +33,9 @@ a circle.
 
 Once the last gem gives up its surge, the kit is locked in. The gem roll
 has no button of its own: "NEXT · YOUR KAIJU" shows with a bar filling
-under it, and after 4 seconds (or at once on a click) it goes on to the
-kaiju roll. The intro's one button is START, on the kaiju roll, its last
-screen (see [kaiju.md](kaiju.md)). There used to be a "TO THE FIGHT"
+under it, and after 2 seconds (or at once on a click) it goes on to the
+kaiju roll, which moves on by itself too (see [kaiju.md](kaiju.md)): the
+intro has no buttons to press from the first card to the first fight. There used to be a "TO THE FIGHT"
 button here, from before the kaiju roll came after the gems.
 
 Behind the cards is the arena you're heading to, in your element's colour:

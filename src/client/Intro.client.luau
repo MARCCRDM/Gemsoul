@@ -361,6 +361,10 @@ local function listen(signal, fn)
 end
 local savedKit = GemClient.Profile.Intro and GemClient.Profile.Intro.Lottery
 local chosenStyle = savedKit and savedKit.Style or "Prospector"
+-- The picks move on by themselves (no CONTINUE): set once advance exists.
+local pickAdvance: ((string) -> ())? = nil
+local pickRetry = false -- the launch failed: the button's back, as a retry
+local pickToken = 0 -- bumped by every tap; a stale auto-advance does nothing
 -- Only a previously committed kit restores an element. New choices start empty.
 local chosenElement: string? = savedKit and savedKit.Element or nil
 if savedKit then
@@ -723,6 +727,10 @@ for _, style in STYLES do
 			chosenStyle = style.Id
 			refreshChoices()
 			layoutStyles()
+			-- (A beat to see it picked, then on to the element.)
+			if pickAdvance then
+				pickAdvance("Style")
+			end
 		end
 	end)
 	-- A pointer over it lifts its edge and its art.
@@ -1074,6 +1082,10 @@ for _, element in elementOrder do
 			chosenElement = element
 			refreshChoices()
 			layoutElements()
+			-- (A beat to see it picked, then the kit's equipped and rolled.)
+			if pickAdvance then
+				pickAdvance("Element")
+			end
 		end
 	end)
 	-- A pointer over it lifts its edge.
@@ -1227,14 +1239,17 @@ function refreshChoices()
 				chosenStyle
 			)
 		if not busy then
-			primary.Text = if pickStep == "Style"
-				then "CONTINUE   ›"
-				elseif chosenElement then "EQUIP & FIGHT"
-				else "CHOOSE AN ELEMENT"
-			local ready = pickStep == "Style" or chosenElement ~= nil
-			primary.Active, primary.Selectable = ready, ready
-			primary.BackgroundColor3 = if ready then C.Gold else C.Line
-			primary.TextColor3 = if ready then C.Ink else C.Dim
+			-- (No CONTINUE: tapping a card moves on. The button only shows
+			-- to retry a launch that failed.)
+			-- (A saved kit can't be re-picked: its button walks it through.)
+			local shown = pickRetry or savedKit ~= nil
+			primary.Visible = shown
+			primary.Text = if pickRetry then "RETRY THE LAUNCH"
+				elseif pickStep == "Style" then "CONTINUE   ›"
+				else "EQUIP & FIGHT"
+			primary.Active, primary.Selectable = shown, shown
+			primary.BackgroundColor3 = C.Gold
+			primary.TextColor3 = C.Ink
 		end
 		backStep.Visible = pickStep == "Element" and not savedKit
 	end
@@ -1248,6 +1263,7 @@ local function setPickStep(step: string)
 end
 listen(backStep.Activated, function()
 	if not busy then
+		pickToken += 1
 		setPickStep("Style")
 	end
 end)
@@ -1594,6 +1610,7 @@ local function showCard(card)
 end
 local function animate(entries, isGem)
 	phase = if isGem then "Gems" else "Armor"
+	primary.Visible = true -- (hidden on the picks; the reveal's own button)
 	hero.Visible, rack.Visible = true, true
 	createCards(entries)
 	counter.Text = string.format("0 / %d", #entries)
@@ -1702,7 +1719,7 @@ local function rarityGlow(cell, tier)
 	end
 end
 -- Seconds the locked-in kit stays up before it goes on to your kaiju by itself.
-local AUTO_NEXT = 4
+local AUTO_NEXT = 2 -- seconds to see the rolled kit before it moves on by itself
 local function revealMoves(kit, after)
 	local moves = Lottery.starterMoves(kit.Element, kit)
 	local element = kit.Element
@@ -2393,7 +2410,9 @@ listen(RunService.RenderStepped, function(dt)
 		heroKicker.Text = "COMPLETE  ·  SELECT ANY REWARD TO INSPECT"
 	end
 end)
-listen(primary.Activated, function()
+-- What the primary action does on each page. A tapped style or element
+-- card calls it itself (pickAdvance): the picks have no CONTINUE button.
+local function advance()
 	if busy or spin or closed then
 		return
 	end
@@ -2420,10 +2439,13 @@ listen(primary.Activated, function()
 		end
 		busy = false
 		if not result.Ok then
+			pickRetry = true
+			primary.Visible = true
 			primary.Text = "RETRY THE LAUNCH"
 			UiKit.toast(result.Message)
 			return
 		end
+		pickRetry = false
 		-- No lottery: you chose the kit, so it's claimed straight away and
 		-- you're in.
 		reward = result.Lottery
@@ -2445,7 +2467,18 @@ listen(primary.Activated, function()
 	else
 		finish()
 	end
-end)
+end
+listen(primary.Activated, advance)
+pickAdvance = function(step: string)
+	pickToken += 1
+	local token = pickToken
+	task.delay(0.45, function()
+		-- (Still on that page, nothing else tapped since.)
+		if token == pickToken and phase == "Welcome" and pickStep == step and not busy then
+			advance()
+		end
+	end)
+end
 listen(skip.Activated, finish)
 listen(motion.Activated, function()
 	calm = not calm

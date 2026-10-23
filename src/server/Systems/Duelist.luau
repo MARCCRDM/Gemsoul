@@ -116,6 +116,11 @@ end
 local duels: { [Player]: any } = {}
 -- Combat training's progress, off the player (see the training block below).
 local function clearTutorial(owner: Player)
+	-- A first fight over (won or lost): the floor arrows walk them through
+	-- the Outpost (Client IntroGuide).
+	if owner:GetAttribute("FirstFight") then
+		owner:SetAttribute("IntroGuide", true)
+	end
 	owner:SetAttribute("TutorialStep", nil)
 	owner:SetAttribute("TutorialCount", nil)
 	owner:SetAttribute("TutorialGoal", nil)

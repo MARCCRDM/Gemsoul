@@ -1240,6 +1240,10 @@ return {
 	["No one else is around right now: a sparring partner steps in."] = "No hay nadie más ahora mismo: entra un compañero de entrenamiento.",
 	["The pack holding this patch is coming for you!"] = "¡La manada que cuida este filón viene por ti!",
 	["A hard first fight. Welcome to the Saga Outpost: gear up and come back."] = "Un primer combate duro. Bienvenido al Puesto Saga: equípate y vuelve.",
+	-- The intro's walk through the Outpost (Client IntroGuide).
+	["Hop in a mech: follow the arrows."] = "Súbete a un mech: sigue las flechas.",
+	["Mine a few rocks: drive into them."] = "Mina unas rocas: choca contra ellas.",
+	["Richer rocks lie further out. Head out."] = "Las rocas más ricas están más lejos. Sal a buscarlas.",
 	["FINDING YOUR FIRST OPPONENT"] = "BUSCANDO A TU PRIMER RIVAL",
 	["Looking for another new miner…  {1}s"] = "Buscando a otro minero nuevo…  {1}s",
 	["If nobody comes, a sparring partner steps in."] = "Si no llega nadie, entra un compañero de entrenamiento.",

@@ -499,7 +499,11 @@ for i, card in cards do
 end
 check(table.find(sounds, "Reveal5") ~= nil, "The Legendary landed without its fanfare")
 
--- Yours drops onto its spot as it lands, then stands there.
+-- Yours drops onto its spot as it lands, then stands there. (The claim is
+-- set to fail so the screen stays up to look at.)
+claimOk = false
+local go = find(gui, "Start")[1]
+check(go and not go.Visible, "There's still a START button to press")
 local mine = views(cards[3])[1]:FindFirstChildOfClass("Model")
 step(2)
 local settled = mine:GetPivot().Position.Y
@@ -507,19 +511,17 @@ check(liftAtOpen and liftAtOpen > settled + 0.3, "The kaiju didn't drop onto its
 step(0.5)
 check(math.abs(mine:GetPivot().Position.Y - settled) < 0.2, "The kaiju didn't settle on its spot")
 
--- START, and only START.
-local go = find(gui, "Start")[1]
-check(go and go.Visible and go.Text == "START   ›", "The button doesn't just say START: " .. tostring(go and go.Text))
+-- No button: a moment to see them, then it claims by itself. A failed claim
+-- says so and puts a TRY AGAIN up.
+step(3)
 check(texts(gui):find("YOUR KAIJU ARE LOCKED IN", 1, true), "The headline didn't lock in")
 check(not texts(gui):upper():find("MEET", 1, true), "Still says meet your team")
--- A failed claim says so and keeps the screen.
-claimOk = false
-fire(go, "Activated")
-check(gui.Parent ~= nil and #toasts == 1 and go.Text == "START   ›", "A failed claim wasn't put right")
+check(requests[#requests] == "KaijuRollClaim", "It didn't claim the roll by itself")
+check(gui.Parent ~= nil and #toasts == 1 and go.Visible and go.Text == "TRY AGAIN   ›", "A failed claim wasn't put right: " .. tostring(go.Text))
 claimOk = true
 fire(go, "Activated")
-check(after == 1 and not KaijuRoll.showing(), "START didn't claim them and go on")
-check(requests[#requests] == "KaijuRollClaim", "START didn't claim the roll")
+check(after == 1 and not KaijuRoll.showing(), "TRY AGAIN didn't claim them and go on")
+check(requests[#requests] == "KaijuRollClaim", "TRY AGAIN didn't claim the roll")
 
 -- A click mid-spin lands them all at once ------------------------------------------------------------
 table.clear(frames)
@@ -535,11 +537,11 @@ step(0.05)
 for i, card in cards do
 	check(landed(card) and #views(card) == 1, "Card " .. i .. " didn't land at the click")
 end
-check(find(gui, "Start")[1].Visible, "No START after the click")
+check(not find(gui, "Start")[1].Visible, "A START button after the click")
 local deskHeight = cards[1].Size.Y.Offset
--- Left alone, it starts on its own.
+-- Left alone, it starts on its own, in a couple of seconds.
 local claimsBefore = #requests
-step(21)
+step(3)
 check(#requests == claimsBefore + 1 and not KaijuRoll2.showing(), "It didn't start on its own")
 
 -- A phone: shorter cards, without what each kaiju is like ----------------------------------------------
@@ -562,7 +564,7 @@ check(landed(cards[1]) and landed(cards[3]), "A phone's kaiju didn't land")
 
 print(
 	string.format(
-		"PASS: %d kaiju roll checks (the gem roll's reel, in turn, the cards, START, a click, a phone)",
+		"PASS: %d kaiju roll checks (the gem roll's reel, in turn, the cards, on by itself with TRY AGAIN on a failed claim, a click, a phone)",
 		checks
 	)
 )

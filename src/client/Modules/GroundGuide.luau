@@ -17,8 +17,10 @@
 	    boss is down.
 
 	  GroundGuide.start()                 once (Lobby.client)
-	  GroundGuide.set(key, where, rank?)  `where() -> Vector3?` (nil: not
-	                                      now); the lowest rank wins
+	  GroundGuide.set(key, where, rank?)  `where() -> (Vector3?, number?)`
+	                                      (nil: not now; the number, 0 to 1,
+	                                      dims them: 0 is gone); the lowest
+	                                      rank wins
 	  GroundGuide.clear(key)
 	  GroundGuide.trail(from, to, count, spacing) -> { CFrame }   where the
 	                                      chevrons go along a straight run (pure)
@@ -229,26 +231,31 @@ local function plan(from: Vector3, to: Vector3)
 	end)
 end
 
--- Where you're wanted now (the lowest rank that has somewhere).
-local function target(): Vector3?
-	local best, rank = nil, math.huge
+-- Where you're wanted now (the lowest rank that has somewhere), and how
+-- bright the way there is.
+local function target(): (Vector3?, number)
+	local best, rank, strength = nil, math.huge, 1
 	for _, want in wants do
 		if want.Rank < rank then
-			local ok, at = pcall(want.Where)
+			local ok, at, dim = pcall(want.Where)
 			if ok and typeof(at) == "Vector3" then
 				best, rank = at, want.Rank
+				strength = if type(dim) == "number" then math.clamp(dim, 0, 1) else 1
 			end
 		end
 	end
-	return best
+	return best, strength
 end
 
 local phase = 0
 local function draw(dt: number)
 	local character = Players.LocalPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local to = root and target()
-	if not root or not to then
+	local to, strength = nil, 1
+	if root then
+		to, strength = target()
+	end
+	if not root or not to or strength <= 0 then
 		hide()
 		return
 	end
@@ -291,7 +298,7 @@ local function draw(dt: number)
 			-- (Faint as they appear and as they near the end of the trail.)
 			local k = (i - 1 + phase / GroundGuide.Spacing) / GroundGuide.Count
 			local fade = math.clamp(math.min(k * 3, (1 - k) * 2.2), 0, 1)
-			local alpha = 1 - (1 - GroundGuide.Transparency) * fade
+			local alpha = 1 - (1 - GroundGuide.Transparency) * fade * strength
 			local arms = GroundGuide.arms(base)
 			for j, arm in c.Parts do
 				arm.CFrame = arms[j]

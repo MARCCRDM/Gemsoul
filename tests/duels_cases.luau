@@ -682,6 +682,7 @@ do
 	lethalBlow(new2)
 	check(m.State == "Done", "A first fight didn't end on one knockout")
 	check(new1:GetAttribute("FirstFight") == nil and new2:GetAttribute("FirstFight") == nil, "FirstFight wasn't cleared")
+	check(new1:GetAttribute("IntroGuide") == true and new2:GetAttribute("IntroGuide") == true, "No arrows through the Outpost after the first fight")
 	check(new1:GetAttribute("DuelsPlayed") == 1 and new2:GetAttribute("DuelsPlayed") == 1, "The first fight didn't count as played")
 	check(string.find(last(new1, "Notify")[2], "Welcome to the Saga Outpost", 1, true), "The winner wasn't welcomed")
 	check(string.find(last(new2, "Notify")[2], "Welcome to the Saga Outpost", 1, true), "The loser wasn't welcomed")
@@ -706,6 +707,7 @@ do
 	kimEnd = last(kim, "MatchEnd")[2]
 	check(kimEnd.Won and kimEnd.Bonus == AutoQueue.FillBonus and kimEnd.Intro == true, "The called veteran's bonus")
 	check(new3:GetAttribute("FirstFight") == nil and new3:GetAttribute("DuelsPlayed") == 1, "Pax's first fight didn't count")
+	check(new3:GetAttribute("IntroGuide") == true and kim:GetAttribute("IntroGuide") == nil, "Only the new player is walked through the Outpost")
 	advance(Matchmaking.EndPause)
 	respawn(new3, kim)
 

@@ -63,7 +63,7 @@ local SHORT_WIN_H, SHORT_CELL = 148, 116
 local WIN_Y = 74 -- the window's top, in its card
 local TOP = 84 -- the cards' top, on the board
 local ROUND = 26 -- the window's corners
-local AUTO = 20 -- seconds till START goes on its own
+local AUTO = 2.5 -- seconds to see your kaiju before it moves on by itself
 -- Its moves down a card: its kind's E, Q and R, and its gem surge (its enchant's E).
 local MOVE_KEYS = { "E", "Q", "R", "Gem" }
 local MOVE_ROWS = #MOVE_KEYS
@@ -812,11 +812,13 @@ function KaijuRoll.play(after: (() -> ())?)
 		go.Text = "STARTING…"
 		local reply = GemClient.request("KaijuRollClaim")
 		claiming = false
-		if not screen.Parent then
+		if gui ~= screen then
 			return
 		end
 		if not reply.Ok then
-			go.Text = "START   ›"
+			go.Text = "TRY AGAIN   ›"
+			go.Visible = true
+			tween(goScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
 			UiKit.toast(reply.Message or "Couldn't reach the server. Try again.")
 			return
 		end
@@ -833,11 +835,10 @@ function KaijuRoll.play(after: (() -> ())?)
 		finished = true
 		title.Text = "YOUR KAIJU ARE LOCKED IN"
 		LotterySound.play("Attune")
-		go.Visible = true
-		tween(goScale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
-		tween(fill, AUTO, { Size = UDim2.new(1, -20, 0, 4) }, Enum.EasingStyle.Linear)
+		-- (No button: a moment to see them, then on by itself. START only
+		-- comes back as a retry if the claim fails.)
 		task.delay(AUTO, function()
-			if screen.Parent then
+			if gui == screen then
 				claim()
 			end
 		end)
@@ -934,7 +935,7 @@ function KaijuRoll.play(after: (() -> ())?)
 	for index, item in cards do
 		local spin = 1.2 + (index - 1) * 0.7
 		task.delay(0.4, function()
-			if screen.Parent and item.Phase == "Sealed" then
+			if gui == screen and item.Phase == "Sealed" then
 				item.Spinning = true
 				-- Runs just past yours, then springs back onto it.
 				item.Spin = tween(
@@ -957,12 +958,12 @@ function KaijuRoll.play(after: (() -> ())?)
 		end)
 		local openAt = 0.4 + spin + 0.18
 		task.delay(openAt, function()
-			if screen.Parent then
+			if gui == screen then
 				item.open(false)
 			end
 		end)
 		task.delay(openAt + 0.5, function()
-			if screen.Parent then
+			if gui == screen then
 				item.reveal(false)
 				if index == #cards then
 					task.delay(0.35, allOut)

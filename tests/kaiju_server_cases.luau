@@ -4659,6 +4659,12 @@ end
 		KaijuBattles.of(b) == nil and told(a, "KaijuBattle")[3].Rematch.Off ~= nil,
 		"Closing it didn't end the rematch"
 	)
+	-- The one who left is told it's closed (their result comes down), and
+	-- pressing LEAVE again, already out, still closes their screen.
+	local closed = told(b, "KaijuBattle")
+	check(closed ~= nil and closed[3] == nil, "LEAVE after the result didn't close the leaver's screen")
+	check(registered.KaijuBattleLeave(b).Ok, "LEAVE once out was refused")
+	check(told(b, "KaijuBattle")[3] == nil and b:GetAttribute("KaijuBattle") == nil, "A second LEAVE didn't close the screen again")
 	battle = second
 	-- It closes; standing on the pads still, nobody's waiting till they step off and back on.
 	now += KaijuBattle.OverSeconds + 0.1
