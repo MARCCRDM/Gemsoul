@@ -754,6 +754,59 @@ for name, rows in MOVES do
 	}
 end
 
+-- The starter R moves (TriadVfx): each element's barrier and its escape,
+-- cast where you stand, facing the foe.
+local TriadVfx = requireScript(client.Modules.TriadVfx)
+local facing = CF.lookAt(meAt, foeAt)
+local DEFENSE_FRAMES = { 0.1, 0.25, 0.5, 1, 1.8, 2.6 }
+local DEFENSES = {
+	DefenseFireFrost = {
+		{ "Fire Wall", function()
+			TriadVfx.wall(localPlayer, "Fire", facing * CF.new(0, 0, -5), 10, 2.4, "Fire")
+		end },
+		{ "Ring of Fire", function()
+			TriadVfx.ring(localPlayer, 7, 2.4, "Fire")
+		end },
+		{ "Frozen Wall", function()
+			TriadVfx.wall(localPlayer, "Ice", facing * CF.new(0, 0, -3.5), 8, 2.4, "Frost")
+		end },
+		{ "Ice Pillar", function()
+			TriadVfx.pillar(localPlayer, V3.new(0, 0, 0), 9, 2.4, "Frost")
+		end },
+	},
+	DefenseShockPoison = {
+		{ "Tesla Fence", function()
+			TriadVfx.wall(localPlayer, "Tesla", facing * CF.new(0, 0, -5), 10, 2.4, "Shock")
+		end },
+		{ "Hologram Decoy", function()
+			TriadVfx.decoy(localPlayer, V3.new(0, 3, -6), 3, "Shock")
+			fakeTask.delay(1.6, function()
+				TriadVfx.decoyPop(localPlayer, V3.new(0, 3, -6), 6)
+			end)
+		end },
+		{ "Spore Wall", function()
+			TriadVfx.wall(localPlayer, "Spore", facing * CF.new(0, 0, -5), 10, 2.4, "Poison")
+		end },
+		{ "Acid Slick", function()
+			TriadVfx.slick(V3.new(0, 3, -4), 7, 2.4, "Poison")
+		end },
+	},
+}
+for name, rows in DEFENSES do
+	local labels, byLabel = {}, {}
+	for _, row in rows do
+		table.insert(labels, row[1])
+		byLabel[row[1]] = row[2]
+	end
+	scenarios[name] = {
+		Frames = DEFENSE_FRAMES,
+		Rows = labels,
+		Run = function(label, me, foe)
+			byLabel[label](me, foe)
+		end,
+	}
+end
+
 -- A kaiju's move at its size (FxSize, as the server's "Sized" sends it):
 -- each move as you cast it, then as a pet kaiju (knee high, Kaiju.size of
 -- its scale) does, its area shrunk by the server as KaijuAbilities does.

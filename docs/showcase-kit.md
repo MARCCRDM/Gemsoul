@@ -112,12 +112,80 @@ some a wind-up you can see (a bolt onto your raised blade, a cannon charging).
 
 Rendered from the game's own effect code (`tools/vfx_sim.luau` and
 `tools/vfx_render.py`, scenarios `MovesFire`, `MovesFrost`, `MovesShock`
-and `MovesPoison`):
+and `MovesPoison`; these are offline stand-ins drawn from the effect parts,
+not Roblox screenshots):
 
 ![Thermal](showcase-kit/moves_fire.png)
 ![Cryo](showcase-kit/moves_frost.png)
 ![Ion](showcase-kit/moves_ion.png)
 ![Corrosive](showcase-kit/moves_acid.png)
+
+## The first impression (2026-10-23)
+
+Whatever element a new player picks, their first three moves have to look
+like the best thing in the game. Every one of the 24 starter moves (the Q,
+E and R of all four elements) was rebuilt on a shared spectacle kit,
+`MoveVfx.fx`, which both `MoveVfx` (Q and E) and `TriadVfx` (R) draw from:
+
+| Piece | What it is |
+| --- | --- |
+| `rays` | Spokes of light bursting from a point, flat along the ground or up and out. |
+| `motes` | Glowing motes thrown out of a point that fall under their own weight: embers, sparks, drops, ice. |
+| `column` | A column of light that shoots up from a point and thins away. |
+| `dust` | Dust, smoke or mist rolling out along the ground. |
+| `halo` | A ring that swells and fades, flat or stood up (a thunderclap, a splash, a muzzle ring). |
+| `linger` | What a big hit leaves: a glowing, pulsing, lit plate with motes drifting up off it. |
+| `ghosts` | Afterimages of a body along a line (a dash, a blink). |
+
+Each big moment now has a wind-up, a flash, the thing itself, a shockwave
+or halo, debris, dust, a camera shake near you, and something left on the
+ground. What each move gained:
+
+| Move | Now |
+| --- | --- |
+| Meteor Leap | A comet tail hangs in the air behind the jump; the landing throws a column of fire into the sky, rays, embers, three shockwaves and rolling dust. |
+| Magma Fault | A white-hot seam races along the line ahead of the spikes, lava fountains off it, and the far end blows open in a magma geyser that keeps glowing. |
+| Supernova | Rings of light are pulled into the sun as it charges; it goes off in rays to the horizon, two crossed halos, a column of fire, and leaves the ground burning. |
+| Flame Tornado | A flare at its crown, rings of heat rolling up the column, embers flung from its skirt; it blows apart in a column of flame. |
+| Frost Chakram | Ghost blades hang in the air behind it; it turns in a flash and a burst of shards; frost rings where it comes home. |
+| Permafrost Spire | Frost cracks race out first, then the spike erupts in a column of cold light, rays and snow; it shatters in a second burst. |
+| Hailstorm | Wind whips round under the cloud, which flickers from inside; big stones land in a flash and leave frost patches. |
+| Absolute Zero | A flash of cold with two crossed halos and a column of light; snow falls inside the dome; it shatters in rays and a blizzard of shards. |
+| Thunder Dash | Afterimages along the line, a scorched streak that crackles, a thunderclap halo and rays where you land, static jumping off you after. |
+| Skybreaker | The sky lights up as the bolt comes; two thunder halos, rays, sparks, dust; the ground is left live with arcs for a moment. |
+| Storm Call | A funnel of wind under the cloud, rain driving down, the cloud flashing from inside; the last bolt lands in a column of light. |
+| Ion Cannon | A muzzle ring blown back off the barrel, dust blown out along the ground under the beam, the ground scorched along the line, a blast at the far end. |
+| Viper Lash | A flicking tongue, a bite that spits venom in rays and drops, acid smeared along the ground as it drags them in. |
+| Toxic Flask | The flask bubbles in your hand; it bursts in rays and a geyser, and a cloud of poison vapour boils up and spreads. |
+| Toxic Tide | It rises in a splash, spray flies off the crest the whole way, and it breaks in a burst of foam, rays and mist. |
+| Maneater | Vines whip up round it as it bursts out; the snap spits spores in a cloud, with rays and a halo; the ground stays poisoned. |
+| Fire Wall | Ignites from the middle outward, each column a tall licking tongue with a white heart, embers streaming up, heat rays, the line glowing; it falls in on itself. |
+| Ring of Fire | The flames light one after another round the ring, under a column of light and heat rays; heat shimmers inside it. |
+| Frozen Wall | Rises in a frost shockwave with rays, snow and shards, icicle tips along the top, lit from inside; it shatters in rays. |
+| Ice Pillar | A column of light with rays and a frost halo as it rises, snow drifting off it; it shatters in a flash, rays and shards. |
+| Tesla Fence | A thunderclap halo and rays on ignition, charge humming along the ground between the bolts, sparks on the way out. |
+| Hologram Decoy | The blink leaves afterimages and a halo; the copy materialises in a projector beam with scan rings climbing it; the pop is a column of light, crossed halos and rays. |
+| Spore Wall | Bigger spotted caps that puff spores as they open, a toxic mist drifting through the hedge, rays and a halo; it bursts in spores. |
+| Acid Slick | Spills in a geyser with rays and drops, vapour rising off it lit from below. |
+
+Each Q and E also has a wind-up you can see while it's cast
+(`MoveVfx.cast`): cracks glowing under your feet for Magma Fault, frost
+spiralling into a point for Absolute Zero, static jumping off you for
+Thunder Dash, vines writhing at your feet for Maneater, and so on.
+
+The R moves render from the new scenarios `DefenseFireFrost` and
+`DefenseShockPoison`:
+
+![Fire Wall, Ring of Fire, Frozen Wall, Ice Pillar](showcase-kit/defenses_fire_frost.png)
+![Tesla Fence, Hologram Decoy, Spore Wall, Acid Slick](showcase-kit/defenses_ion_acid.png)
+
+Before and after, for Thermal and the Thermal / Cryo defenses:
+
+![Before and after](showcase-kit/starters-before-after.jpg)
+
+`tests/triad_cases.luau` holds the line: every starter Q and E has a
+wind-up, and every starter move's drawing uses at least three pieces of
+the kit.
 
 **Where they live**
 

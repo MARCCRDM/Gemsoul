@@ -33,6 +33,9 @@ local Debris = game:GetService("Debris")
 local CombatFx = require(script.Parent.CombatFx)
 local FxSize = require(script.Parent.FxSize)
 local MoveVfx = require(script.Parent.MoveVfx)
+-- The spectacle kit the starter moves share (rays, motes, columns of light,
+-- dust, halos, what lingers): the R moves are built from it too.
+local FX = MoveVfx.fx
 local CombatSound = require(script.Parent.CombatSound)
 local GemConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GemConfig"))
 local CombatTechnology = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CombatTechnology"))
@@ -45,6 +48,7 @@ local ICE = Color3.fromRGB(205, 238, 255)
 local DEEP_ICE = Color3.fromRGB(110, 190, 255)
 local HOT = Color3.fromRGB(255, 226, 140)
 local EMBER = Color3.fromRGB(255, 110, 30)
+local MAGMA_RED = Color3.fromRGB(255, 60, 10)
 local ACID = Color3.fromRGB(190, 255, 140)
 local CHARGE = Color3.fromRGB(70, 150, 255)
 local STAMINA = Color3.fromRGB(70, 215, 120)
@@ -689,6 +693,17 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 	local color = colorOf(element)
 	if kind == "Ice" then
 		CombatSound.play("Freeze", floor, { Volume = 1 })
+		CombatFx.flash(floor + Vector3.new(0, 3, 0), DEEP_ICE, 8, width * 2.5, 0.35)
+		FX.halo(floor + Vector3.new(0, 0.1, 0), ICE, 2, width * 1.8, 0.45)
+		FX.rays(floor + Vector3.new(0, 2.5, 0), ICE, 14, width * 0.6, 0.35)
+		FX.dust(floor, Color3.fromRGB(205, 228, 245), width * 0.7, 0.8, 10)
+		FX.motes(floor + Vector3.new(0, 2, 0), ICE, 14, 8, 16, 0.3, 1)
+		-- A crown of icicles along the top, lit from inside.
+		local heart = part(Vector3.new(width, 0.3, 0.3), CFrame.lookAt(floor + Vector3.new(0, 3, 0), floor + Vector3.new(0, 3, 0) + side), WHITE, 0.4)
+		light(heart, DEEP_ICE, 5, width * 2)
+		task.delay(seconds, function()
+			fade(heart, 0.3)
+		end)
 		for i = 1, pieces do
 			local along = (i - 0.5) / pieces - 0.5
 			local height = 5.5 + math.sin(i * 1.7) * 1.2 + math.random() * 0.8
@@ -710,6 +725,15 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 			task.delay(i * 0.025, function()
 				tween(edge, 0.22, { Size = Vector3.new(0.08, height * 0.9, 0.08), CFrame = crystal.CFrame + Vector3.new(0, height / 2, -0.66) }, Enum.EasingStyle.Back)
 			end)
+			-- An icicle tip over each crystal.
+			local foot = CFrame.lookAt(base, base + facing)
+			local tip = glass(Vector3.new(0.5, 0.5, 0.5), foot, ICE, 0.1)
+			task.delay(i * 0.025 + 0.1, function()
+				tween(tip, 0.15, { Size = Vector3.new(0.6, 1.4, 0.6), CFrame = foot * CFrame.new(0, height + 0.5, 0) * CFrame.Angles(0, math.rad(45), 0) * CFrame.Angles(math.rad(45), 0, math.rad(35)) }, Enum.EasingStyle.Back)
+			end)
+			task.delay(seconds, function()
+				fade(tip, 0.25)
+			end)
 			task.delay(seconds, function()
 				-- Shatter: chips fly, the crystals crumble down.
 				fade(crystal, 0.35, { Size = Vector3.new(0.4, height * 0.4, 0.4), CFrame = crystal.CFrame - Vector3.new(0, height * 0.4, 0) })
@@ -722,6 +746,9 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 		local mist = disc(floor + Vector3.new(0, 0.05, 0), width * 1.2, ICE, 0.7)
 		task.delay(seconds, function()
 			fade(mist, 0.5)
+			FX.rays(floor + Vector3.new(0, 3, 0), ICE, 12, width * 0.5, 0.3)
+			FX.motes(floor + Vector3.new(0, 3, 0), ICE, 16, 10, 8, 0.3, 0.9)
+			FX.halo(floor + Vector3.new(0, 0.1, 0), ICE, 2, width * 1.6, 0.4, nil, 0.3)
 			CombatSound.play("GuardBreak", floor, { Volume = 0.5, Pitch = 1.3 })
 		end)
 		CombatFx.burst(floor + Vector3.new(0, 2, 0), ICE, "Frost", 1.6)
@@ -821,7 +848,20 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 		local glow = disc(floor + Vector3.new(0, 0.04, 0), width, color, 0.7)
 		glow.Size = Vector3.new(0.06, 1.8, width + 1)
 		glow.CFrame = CFrame.lookAt(floor, floor + side) * CFrame.Angles(0, math.rad(90), math.rad(90))
-		CombatFx.flash(floor + Vector3.new(0, 4, 0), color, 8, 28, 0.35)
+		CombatFx.flash(floor + Vector3.new(0, 4, 0), color, 12, 30, 0.35)
+		FX.halo(floor + Vector3.new(0, 4, 0), hot, 2, width * 1.6, 0.4, facing, 0.25)
+		FX.rays(floor + Vector3.new(0, 4, 0), color, 16, width * 0.6, 0.35)
+		FX.motes(floor + Vector3.new(0, 1, 0), color, 16, 10, 18, 0.25, 0.9)
+		FX.dust(floor, Color3.fromRGB(120, 115, 135), width * 0.6, 0.7, 8)
+		-- Charge humming along the ground between the bolts.
+		local hum = part(Vector3.new(0.3, 0.3, width + 1), CFrame.lookAt(floor + Vector3.new(0, 0.3, 0), floor + Vector3.new(0, 0.3, 0) + side), hot, 0.3)
+		local attachment = Instance.new("Attachment")
+		attachment.Parent = hum
+		emitter(attachment, color, 30, { Size = 0.3, Speed = 4, Life = 0.3, Acceleration = Vector3.new(0, 6, 0) })
+		light(attachment, color, 4, width * 1.5)
+		task.delay(seconds, function()
+			fade(hum, 0.3)
+		end)
 		task.delay(seconds, function()
 			for _, bolt in bolts do
 				for _, s in { bolt.Core, bolt.Glow } do
@@ -840,20 +880,35 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 			end
 			fade(glow, 0.4)
 			CombatFx.burst(floor + Vector3.new(0, 2, 0), color, "Sparks", 1.2)
+			FX.motes(floor + Vector3.new(0, 2, 0), color, 12, 8, 10, 0.25, 0.8)
 			CombatSound.play("Zap", floor, { Volume = 0.5, Pitch = 0.8 })
 		end)
 	elseif kind == "Spore" then
 		-- Spore Wall: a hedge of giant toadstools that breathes green spores.
 		CombatSound.play("Corrode", floor, { Volume = 1 })
 		CombatSound.element("Impact", "Poison", floor, { Volume = 0.8 })
-		local caps = {}
+		CombatFx.flash(floor + Vector3.new(0, 2, 0), ACID, 7, width * 2.5, 0.35)
+		FX.halo(floor + Vector3.new(0, 0.1, 0), ACID, 2, width * 1.8, 0.45, nil, 0.3)
+		FX.rays(floor + Vector3.new(0, 1.5, 0), ACID, 12, width * 0.5, 0.35)
+		FX.dust(floor, Color3.fromRGB(110, 85, 60), width * 0.6, 0.8, 8)
+		FX.motes(floor + Vector3.new(0, 1, 0), ACID, 14, 6, 14, 0.3, 1.2)
+		local caps, spots = {}, {}
 		for i = 1, pieces do
 			local along = (i - 0.5) / pieces - 0.5
 			local base = floor + side * along * width + facing * (math.random() - 0.5) * 0.8
-			local height = 4 + math.sin(i * 1.9) * 1.2 + math.random() * 0.9
-			local girth = width / pieces * 0.6
+			local height = 5 + math.sin(i * 1.9) * 1.4 + math.random() * 1
+			local girth = width / pieces * 0.7
 			local stalk = part(Vector3.new(girth, 0.2, girth), CFrame.new(base), Color3.fromRGB(150, 176, 120), 0, nil, Enum.Material.SmoothPlastic)
-			local capSize = Vector3.new(width / pieces * 2.1, 1.5, width / pieces * 2.1)
+			local capSize = Vector3.new(width / pieces * 2.6, 1.9, width / pieces * 2.6)
+			-- Spots on the cap, and a puff of spores as it opens.
+			task.delay(i * 0.03 + 0.3, function()
+				FX.motes(base + Vector3.new(0, height, 0), ACID, 4, 3, 5, 0.2, 1.4)
+				for n = 1, 3 do
+					local a = n / 3 * math.pi * 2 + i
+					local spot = part(Vector3.new(0.5, 0.15, 0.5), CFrame.new(base + Vector3.new(math.cos(a) * capSize.X * 0.3, height + 0.75, math.sin(a) * capSize.Z * 0.3)), Color3.fromRGB(240, 250, 220), 0, Enum.PartType.Ball, Enum.Material.SmoothPlastic)
+					table.insert(spots, spot)
+				end
+			end)
 			local cap = part(Vector3.new(0.2, 0.2, 0.2), CFrame.new(base + Vector3.new(0, 0.2, 0)), color, 0.05, Enum.PartType.Ball, Enum.Material.SmoothPlastic)
 			local glowCap = part(Vector3.new(0.2, 0.2, 0.2), cap.CFrame, ACID, 0.45, Enum.PartType.Ball)
 			task.delay(i * 0.03, function()
@@ -877,8 +932,20 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 		local fog = disc(floor + Vector3.new(0, 0.05, 0), width, ACID, 0.6)
 		fog.Size = Vector3.new(0.06, 3, width * 1.1)
 		fog.CFrame = CFrame.lookAt(floor, floor + side) * CFrame.Angles(0, math.rad(90), math.rad(90))
+		-- Spores drifting through the hedge the whole time.
+		local haze = part(Vector3.new(width, 4, 2), CFrame.lookAt(floor + Vector3.new(0, 3, 0), floor + Vector3.new(0, 3, 0) + facing), ACID, 1)
+		local hazeAttachment = Instance.new("Attachment")
+		hazeAttachment.Parent = haze
+		emitter(hazeAttachment, ACID, 24, { Size = 0.35, Speed = 0.6, Life = 1.8, Acceleration = Vector3.new(0, -0.4, 0), Light = 0.5, Shape = Enum.ParticleEmitterShape.Box })
+		light(hazeAttachment, ACID, 4, width * 1.5)
+		task.delay(seconds, function()
+			fade(haze, 0.3)
+		end)
 		CombatFx.burst(floor + Vector3.new(0, 1.5, 0), ACID, "Drips", 1.4)
 		task.delay(seconds, function()
+			for _, spot in spots do
+				fade(spot, 0.3)
+			end
 			for _, c in caps do
 				c.Pulse:Cancel()
 				fade(c.Stalk, 0.4, { Size = Vector3.new(0.2, 0.2, 0.2), CFrame = CFrame.new(c.Base) })
@@ -887,40 +954,73 @@ function TriadVfx.wall(_who: Player, kind: string, frame: CFrame, width: number,
 			end
 			fade(fog, 0.6)
 			CombatFx.burst(floor + Vector3.new(0, 2, 0), ACID, "Smoke", 1.2)
+			FX.motes(floor + Vector3.new(0, 3, 0), ACID, 16, 6, 8, 0.25, 1.2)
+			FX.dust(floor, Color3.fromRGB(120, 180, 90), width * 0.6, 0.9, 8)
 		end)
 	else
+		-- Fire Wall: it ignites from the middle outward, each column a tall
+		-- tongue of flame with a white heart, embers streaming up off the
+		-- whole line, heat rays on ignition, and it falls in on itself.
 		CombatSound.play("Burn", floor, { Volume = 1 })
 		CombatSound.element("Impact", "Fire", floor, { Volume = 0.8 })
+		CombatSound.play("Blast", floor, { Volume = 0.6, Pitch = 1.3 })
+		CombatFx.flash(floor + Vector3.new(0, 3, 0), EMBER, 10, width * 2.5, 0.4)
+		FX.halo(floor + Vector3.new(0, 0.1, 0), HOT, 2, width * 1.8, 0.45)
+		FX.rays(floor + Vector3.new(0, 2, 0), HOT, 14, width * 0.6, 0.35)
+		FX.dust(floor, Color3.fromRGB(110, 90, 80), width * 0.7, 0.8, 10)
+		FX.motes(floor + Vector3.new(0, 1.5, 0), EMBER, 18, 8, 20, 0.3, 1.1)
+		if CombatFx.nearMe(floor, 30) then
+			CombatFx.shake(0.3, 0.25)
+		end
 		for i = 1, pieces do
 			local along = (i - 0.5) / pieces - 0.5
 			local base = floor + side * along * width
-			local height = 4.5 + math.sin(i * 2.1) * 0.8
-			local column = part(Vector3.new(0.2, width / pieces * 1.1, width / pieces * 1.1), CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90)), EMBER, 0.15, Enum.PartType.Cylinder)
-			tween(column, 0.2, { Size = Vector3.new(height, width / pieces * 0.9, width / pieces * 0.9), CFrame = CFrame.new(base + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)) }, Enum.EasingStyle.Back)
+			local height = 6 + math.sin(i * 2.1) * 1.2 + math.random() * 0.8
+			local girth = width / pieces * 1.15
+			local delay = math.abs(along) * 0.25
+			local column = part(Vector3.new(0.2, girth, girth), CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90)), EMBER, 0.15, Enum.PartType.Cylinder)
+			local tongue = part(Vector3.new(girth * 0.7, 0.2, girth * 0.5), CFrame.new(base + Vector3.new(0, 0.1, 0)), if i % 2 == 0 then HOT else Color3.fromRGB(255, 180, 60), 0.2)
 			local heart = part(Vector3.new(0.2, 0.5, 0.5), column.CFrame, HOT, 0.1, Enum.PartType.Cylinder)
-			tween(heart, 0.2, { Size = Vector3.new(height * 0.6, 0.6, 0.6), CFrame = CFrame.new(base + Vector3.new(0, height * 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)) })
-			if i % 2 == 1 then
-				local attachment = Instance.new("Attachment")
-				attachment.Parent = heart
-				emitter(attachment, color, 22, { Texture = "rbxasset://textures/particles/fire_main.dds", Size = 1.4, Acceleration = Vector3.new(0, 8, 0), Spread = 25, Life = 0.6 })
-				light(attachment, EMBER, 2, 10)
-			end
-			-- Flicker while it burns.
 			local flicker = TweenService:Create(column, TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.4 })
-			task.delay(0.2, function()
-				flicker:Play()
+			local lick = TweenService:Create(tongue, TweenInfo.new(0.18 + (i % 3) * 0.05, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Size = Vector3.new(girth * 0.5, height * 1.3, girth * 0.35), CFrame = CFrame.new(base + Vector3.new(0, height * 0.75, 0)) * CFrame.Angles(0, 0, (math.random() - 0.5) * 0.3) })
+			task.delay(delay, function()
+				tween(column, 0.2, { Size = Vector3.new(height, girth * 0.9, girth * 0.9), CFrame = CFrame.new(base + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)) }, Enum.EasingStyle.Back)
+				tween(tongue, 0.2, { Size = Vector3.new(girth * 0.6, height * 1.1, girth * 0.4), CFrame = CFrame.new(base + Vector3.new(0, height * 0.65, 0)) }, Enum.EasingStyle.Back)
+				tween(heart, 0.2, { Size = Vector3.new(height * 0.6, 0.6, 0.6), CFrame = CFrame.new(base + Vector3.new(0, height * 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)) })
+				CombatFx.burst(base + Vector3.new(0, 1, 0), EMBER, "Embers", 0.9)
+				FX.motes(base + Vector3.new(0, 1, 0), EMBER, 3, 4, 12, 0.25, 0.8)
+				if i % 2 == 1 then
+					local attachment = Instance.new("Attachment")
+					attachment.Parent = heart
+					emitter(attachment, color, 30, { Texture = "rbxasset://textures/particles/fire_main.dds", Size = 1.8, Acceleration = Vector3.new(0, 10, 0), Spread = 25, Life = 0.7 })
+					emitter(attachment, Color3.fromRGB(80, 65, 60), 8, { Texture = "rbxasset://textures/particles/smoke_main.dds", Size = 2, Acceleration = Vector3.new(0, 8, 0), Spread = 15, Life = 1.2, Light = 0 })
+					light(attachment, EMBER, 3, 12)
+				end
+				task.delay(0.2, function()
+					flicker:Play()
+					lick:Play()
+				end)
 			end)
 			task.delay(seconds, function()
 				flicker:Cancel()
-				fade(column, 0.35, { Size = Vector3.new(0.2, width / pieces * 0.5, width / pieces * 0.5), CFrame = CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90)) })
+				lick:Cancel()
+				fade(column, 0.35, { Size = Vector3.new(0.2, girth * 0.5, girth * 0.5), CFrame = CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90)) })
+				fade(tongue, 0.3, { Size = Vector3.new(girth * 0.3, 0.3, girth * 0.3), CFrame = CFrame.new(base) })
 				fade(heart, 0.3)
+				if i % 2 == 0 then
+					FX.motes(base + Vector3.new(0, 1, 0), EMBER, 4, 5, 10, 0.25, 0.8)
+				end
 			end)
 		end
 		local scorch = disc(floor + Vector3.new(0, 0.04, 0), width, Color3.fromRGB(60, 20, 10), 0.4)
-		scorch.Size = Vector3.new(0.06, 2.2, width)
+		scorch.Size = Vector3.new(0.06, 2.6, width + 1)
 		scorch.CFrame = CFrame.lookAt(floor, floor + side) * CFrame.Angles(0, math.rad(90), math.rad(90))
+		local glowLine = part(Vector3.new(0.4, 0.08, width + 1), CFrame.lookAt(floor + Vector3.new(0, 0.06, 0), floor + Vector3.new(0, 0.06, 0) + side), MAGMA_RED, 0.2)
+		light(glowLine, EMBER, 4, width * 1.5)
 		task.delay(seconds, function()
-			fade(scorch, 0.6)
+			fade(scorch, 0.9)
+			fade(glowLine, 0.6)
+			FX.dust(floor, Color3.fromRGB(90, 75, 70), width * 0.6, 0.8, 8)
 		end)
 	end
 end
@@ -1239,10 +1339,23 @@ function TriadVfx.pillar(who: Player, floor: Vector3, height: number, seconds: n
 	table.insert(bits, frost)
 	CombatFx.burst(floor + Vector3.new(0, 1, 0), ICE, "Frost", 2)
 	ringAt(floor, 4, color, 0.1, 0.45, 4)
+	CombatFx.flash(floor + Vector3.new(0, 4, 0), DEEP_ICE, 10, 28, 0.4)
+	FX.column(floor, ICE, 3, height + 14, 0.5)
+	FX.rays(floor + Vector3.new(0, 2, 0), ICE, 18, 7, 0.4)
+	FX.halo(floor + Vector3.new(0, 0.15, 0), ICE, 3, 16, 0.5, nil, 0.3)
+	FX.dust(floor, Color3.fromRGB(205, 228, 245), 6, 0.9, 12)
+	FX.motes(floor + Vector3.new(0, 1, 0), ICE, 18, 10, 22, 0.3, 1.1)
+	-- Snow drifting down off it while it stands.
+	local snowfall = part(Vector3.new(5, 0.2, 5), CFrame.new(floor + Vector3.new(0, height + 1, 0)), ICE, 1)
+	local snowAttachment = Instance.new("Attachment")
+	snowAttachment.Parent = snowfall
+	emitter(snowAttachment, WHITE, 30, { Size = 0.2, Speed = 2, Life = 1.2, Spread = 20, Acceleration = Vector3.new(0, -3, 0), Shape = Enum.ParticleEmitterShape.Box, Light = 0.5 })
+	light(snowAttachment, DEEP_ICE, 4, 18)
+	table.insert(bits, snowfall)
 	CombatSound.play("Freeze", floor, { Volume = 1 })
 	CombatSound.play("Blast", floor, { Volume = 0.6, Pitch = 1.4 })
 	if CombatFx.nearMe(floor, 30) then
-		CombatFx.shake(0.4, 0.25)
+		CombatFx.shake(0.5, 0.3)
 	end
 	task.delay(seconds, function()
 		-- Shatter: chunks tumble off as it crumbles (the server's TriadBreak
@@ -1256,6 +1369,14 @@ function TriadVfx.pillar(who: Player, floor: Vector3, height: number, seconds: n
 		end
 		for _, bit in bits do
 			fade(bit, 0.25, { Size = bit.Size * 0.6 })
+		end
+		CombatFx.flash(floor + Vector3.new(0, height / 2, 0), ICE, 8, 24, 0.3)
+		FX.rays(floor + Vector3.new(0, height / 2, 0), ICE, 16, 6, 0.35)
+		FX.motes(floor + Vector3.new(0, height / 2, 0), ICE, 20, 12, 8, 0.3, 1)
+		FX.halo(floor + Vector3.new(0, 0.1, 0), ICE, 3, 18, 0.45, nil, 0.25)
+		FX.dust(floor, Color3.fromRGB(205, 228, 245), 7, 0.8, 10)
+		if CombatFx.nearMe(floor, 30) then
+			CombatFx.shake(0.4, 0.25)
 		end
 		CombatSound.play("GuardBreak", floor, { Volume = 0.8, Pitch = 1.2 })
 	end)
@@ -1299,7 +1420,13 @@ function TriadVfx.ring(who: Player, radius: number, seconds: number, element: st
 			if i % 2 == 0 then 0.15 else 0.3,
 			Enum.PartType.Cylinder
 		)
-		tween(flame, 0.2, { Size = Vector3.new(height, width, width) }, Enum.EasingStyle.Back)
+		-- They light one after another round the ring.
+		task.delay(i / count * 0.35, function()
+			tween(flame, 0.2, { Size = Vector3.new(height, width, width) }, Enum.EasingStyle.Back)
+			if i % 2 == 0 and not busy() then
+				FX.motes(root.Position + Vector3.new(math.cos(a) * radius, feet + 1, math.sin(a) * radius), EMBER, 3, 3, 12, 0.25, 0.8)
+			end
+		end)
 		table.insert(flames, { Angle = a, Height = height, Width = width })
 		hold(f, flame, CFrame.new(math.cos(a) * radius, feet, math.sin(a) * radius) * CFrame.Angles(0, 0, math.rad(90)))
 		if i % 3 == 0 and not busy() then
@@ -1323,6 +1450,25 @@ function TriadVfx.ring(who: Player, radius: number, seconds: number, element: st
 	hold(f, band, CFrame.new(0, feet - 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)))
 	CombatFx.burst(root.Position - Vector3.new(0, 2 * k, 0), EMBER, "Embers", 2)
 	ringAt(floorUnder(root.Position), 2 * k, HOT, 0, 0.35, radius / k)
+	local ground = floorUnder(root.Position)
+	CombatFx.flash(ground + Vector3.new(0, 2, 0), EMBER, 10, radius * 4, 0.4)
+	FX.rays(ground + Vector3.new(0, 1, 0), HOT, 16, radius * 1.3, 0.4, true)
+	FX.halo(ground + Vector3.new(0, 1.5 * k, 0), HOT, 2 * k, radius * 2.4, 0.45, Vector3.new(1, 0, 0), 0.3)
+	FX.column(ground, HOT, 0.8, 12, 0.4)
+	task.delay(0.35, function()
+		FX.dust(ground, Color3.fromRGB(110, 90, 80), radius * 1.3, 0.9, 12)
+	end)
+	-- Heat shimmering up inside the ring while it burns.
+	local heat = part(Vector3.new(radius * 1.6, 0.2, radius * 1.6), root.CFrame, EMBER, 1)
+	hold(f, heat, CFrame.new(0, feet + 0.2, 0))
+	table.insert(flames, false)
+	local heatAttachment = Instance.new("Attachment")
+	heatAttachment.Parent = heat
+	emitter(heatAttachment, EMBER, 24, { Texture = "rbxasset://textures/particles/fire_main.dds", Size = 0.5, Speed = 3, Life = 1, Spread = 15, Acceleration = Vector3.new(0, 6, 0), Shape = Enum.ParticleEmitterShape.Box })
+	light(heatAttachment, EMBER, 4, radius * 2.5)
+	if CombatFx.nearMe(ground, 30) then
+		CombatFx.shake(0.3, 0.25)
+	end
 	CombatSound.play("Burn", root.Position, { Volume = 1 })
 	CombatSound.element("Cast", "Fire", root.Position, { Volume = 0.8 })
 end
@@ -1356,9 +1502,27 @@ function TriadVfx.decoy(who: Player, center: Vector3, seconds: number, element: 
 	local scan = disc(floor + Vector3.new(0, 0.2, 0), 3.2, color, 0.35)
 	TweenService:Create(scan, TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { CFrame = scan.CFrame + Vector3.new(0, 5.4, 0) }):Play()
 	local pad = disc(floor + Vector3.new(0, 0.04, 0), 3.4, color, 0.3)
-	light(pad, color, 2, 10)
+	light(pad, color, 3, 14)
 	table.insert(ghost, scan)
 	table.insert(ghost, pad)
+	-- A projector beam up from the pad, and two more scan rings climbing it.
+	local beam = part(Vector3.new(2.6, 7, 2.6), CFrame.new(floor + Vector3.new(0, 3.5, 0)), color, 0.75, Enum.PartType.Cylinder)
+	beam.CFrame = CFrame.new(floor + Vector3.new(0, 3.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	beam.Size = Vector3.new(7, 2.6, 2.6)
+	table.insert(ghost, beam)
+	for n = 1, 2 do
+		local ring = disc(floor + Vector3.new(0, 0.2 + n * 1.8, 0), 3, WHITE, 0.5)
+		TweenService:Create(ring, TweenInfo.new(0.9, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), { CFrame = ring.CFrame + Vector3.new(0, 5.4 - n * 1.8, 0) }):Play()
+		table.insert(ghost, ring)
+	end
+	-- It materialises: a flash, rays, a halo, sparks.
+	CombatFx.flash(center, color, 8, 20, 0.3)
+	FX.rays(center, color:Lerp(WHITE, 0.5), 12, 4, 0.3)
+	FX.halo(center, color, 1, 8, 0.35, root.CFrame.LookVector, 0.3)
+	FX.motes(center, color, 8, 6, 8, 0.2, 0.7)
+	-- The blink: a streak of light from the body to where it was.
+	FX.ghosts(root.Position, center, color, 4, 0.3)
+	FX.halo(root.Position, color, 1, 6, 0.3, root.CFrame.LookVector, 0.35)
 	for _, copy in ghost do
 		TweenService:Create(copy, TweenInfo.new(0.09, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), { Transparency = math.min(0.7, copy.Transparency + 0.2) }):Play()
 	end
@@ -1387,6 +1551,20 @@ function TriadVfx.decoyPop(who: Player, center: Vector3, radius: number)
 	end
 	local color = GemConfig.ElementColors.Shock
 	TriadVfx.breakBurst(center, radius, "Shock")
+	local floor = floorUnder(center)
+	CombatFx.flash(center, color, 14, radius * 4, 0.4)
+	FX.column(floor, color, radius * 0.25, 18, 0.5)
+	FX.rays(center, color:Lerp(WHITE, 0.5), 20, radius * 1.4, 0.4)
+	FX.halo(center, color, 2, radius * 3, 0.45, Vector3.new(1, 0, 0), 0.25)
+	FX.halo(center, color:Lerp(WHITE, 0.5), 2, radius * 3, 0.5, Vector3.new(0, 0, 1), 0.3)
+	ringAt(floor, 2, color, 0.1, 0.45, radius * 2.6)
+	FX.motes(center, color, 18, 14, 16, 0.3, 1)
+	FX.dust(floor, Color3.fromRGB(120, 115, 135), radius * 1.2, 0.8, 10)
+	FX.linger(floor, color, radius * 0.6, 1.2, nil, color:Lerp(WHITE, 0.5))
+	if CombatFx.nearMe(center, 34) then
+		CombatFx.shake(0.6, 0.3)
+	end
+	CombatSound.play("Blast", center, { Volume = 0.9, Pitch = 1.4 })
 	for _ = 1, 6 do
 		local a = math.random() * math.pi * 2
 		local reach = radius * (0.6 + math.random() * 0.4)
@@ -1443,6 +1621,22 @@ function TriadVfx.slick(center: Vector3, radius: number, seconds: number, elemen
 		end
 	end)
 	CombatFx.burst(floor + Vector3.new(0, 0.5, 0), ACID, "Drips", 1.6)
+	CombatFx.flash(floor + Vector3.new(0, 1.5, 0), ACID, 8, radius * 3, 0.35)
+	FX.column(floor, ACID, 0.8, 8, 0.4)
+	FX.rays(floor + Vector3.new(0, 0.5, 0), ACID, 14, radius * 1.2, 0.35, true)
+	FX.halo(floor + Vector3.new(0, 1, 0), ACID, 1, radius * 2.4, 0.4, Vector3.new(1, 0, 0), 0.3)
+	FX.motes(floor + Vector3.new(0, 1, 0), ACID, 16, 10, 16, 0.3, 1)
+	FX.dust(floor, Color3.fromRGB(120, 180, 90), radius * 1.1, 0.9, 10)
+	-- Vapour rising off it while it lasts, lit from below.
+	local vapour = part(Vector3.new(radius * 1.4, 0.2, radius * 1.4), CFrame.new(floor + Vector3.new(0, 0.3, 0)), ACID, 1)
+	local vapourAttachment = Instance.new("Attachment")
+	vapourAttachment.Parent = vapour
+	emitter(vapourAttachment, ACID, 20, { Texture = "rbxasset://textures/particles/smoke_main.dds", Size = 1.4, Speed = 1.2, Life = 1.4, Spread = 20, Acceleration = Vector3.new(0, 1.5, 0), Shape = Enum.ParticleEmitterShape.Box, Light = 0.4 })
+	light(vapourAttachment, ACID, 4, radius * 2.5)
+	table.insert(pieces, vapour)
+	if CombatFx.nearMe(floor, 30) then
+		CombatFx.shake(0.3, 0.25)
+	end
 	CombatSound.play("Corrode", floor, { Volume = 1 })
 	CombatSound.element("Impact", "Poison", floor, { Volume = 0.7 })
 	task.delay(seconds, function()

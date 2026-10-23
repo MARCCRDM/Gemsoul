@@ -111,6 +111,64 @@ for element, lanes in Traits.Intro do
 		end
 	end
 end
+-- The first impression: every starter move is built from the spectacle kit
+-- (MoveVfx.fx: rays, motes, a column of light, dust, halos, what lingers),
+-- every Q and E has a wind-up you can see (a CAST look), and every R move's
+-- drawing in TriadVfx reaches for the same kit.
+local function drawingOf(source: string, head: string): string
+	local start = string.find(source, head, 1, true)
+	check(start ~= nil, head .. " isn't drawn")
+	local stop = string.find(source, "\nend\n", start :: number, true) or #source
+	return string.sub(source, start :: number, stop)
+end
+local SPECTACLE = { "rays(", "motes(", "column(", "dust(", "halo(", "linger(", "ghosts(" }
+local function usesKit(drawing: string, prefix: string): number
+	local used = 0
+	for _, piece in SPECTACLE do
+		if string.find(drawing, prefix .. piece, 1, true) then
+			used += 1
+		end
+	end
+	return used
+end
+check(string.find(moveVfx, "MoveVfx.fx = {", 1, true) ~= nil, "MoveVfx shares its spectacle kit")
+local triadVfx = fs.readFile(ROOT .. "/src/client/Modules/TriadVfx.luau")
+check(string.find(triadVfx, "local FX = MoveVfx.fx", 1, true) ~= nil, "TriadVfx draws with the spectacle kit")
+for _, lanes in Traits.Intro do
+	for _, id in lanes.Offense do
+		check(string.find(moveVfx, "CAST." .. id .. " = function", 1, true) ~= nil, id .. " has no wind-up to see")
+	end
+	for _, id in lanes.Ability do
+		check(string.find(moveVfx, "CAST." .. id .. " = function", 1, true) ~= nil, id .. " has no wind-up to see")
+	end
+	for _, lane in { "Offense", "Ability" } do
+		for _, id in lanes[lane] do
+			local drawing = drawingOf(moveVfx, "SHOW." .. Traits.Moves[id].Show .. " = function")
+			check(usesKit(drawing, "") >= 3, id .. "'s look uses " .. usesKit(drawing, "") .. " of the spectacle kit (3 or more)")
+		end
+	end
+end
+local R_DRAWINGS = {
+	R_FireWall = "\telse\n\t\t-- Fire Wall",
+	R_RingOfFire = "function TriadVfx.ring(",
+	R_FrozenWall = '\tif kind == "Ice" then',
+	R_IcePillar = "function TriadVfx.pillar(",
+	R_TeslaFence = '\telseif kind == "Tesla" then',
+	R_HoloDecoy = "function TriadVfx.decoy(",
+	R_SporeWall = '\telseif kind == "Spore" then',
+	R_AcidSlick = "function TriadVfx.slick(",
+}
+for _, lanes in Traits.Intro do
+	for _, id in lanes.Defense do
+		local head = R_DRAWINGS[id]
+		check(head ~= nil, id .. " has no drawing to check")
+		local start = string.find(triadVfx, head :: string, 1, true)
+		check(start ~= nil, id .. "'s drawing isn't where expected")
+		local stop = string.find(triadVfx, if string.sub(head :: string, 1, 1) == "\t" then "\n\telse" else "\nend\n", (start :: number) + 1, true) or #triadVfx
+		local drawing = string.sub(triadVfx, start :: number, stop)
+		check(usesKit(drawing, "FX.") >= 3, id .. "'s look uses " .. usesKit(drawing, "FX.") .. " of the spectacle kit (3 or more)")
+	end
+end
 -- Every piece a new move shows has a drawing.
 for _, piece in { "MeteorLeapJump", "Crater", "Puddle", "VortexEnd", "StormWarn", "StormBolt", "ToxicFlaskThrow" } do
 	check(string.find(moveVfx, "SHOW." .. piece .. " = ", 1, true) ~= nil, piece .. " isn't drawn")
