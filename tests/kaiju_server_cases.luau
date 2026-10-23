@@ -5962,14 +5962,45 @@ end)()
 	local claim = Kaiju.Wild.Claim
 	local wildSite = KaijuWilds._site()
 	check(claim.Share > 0.5 and claim.Wake == 3 and claim.Luck > 0, "The claim rules")
-	-- The site grows an outcrop: a seam of three rocks 250 studs out.
+	-- The site grows an outcrop: a seam of three rocks about 290 studs out,
+	-- somewhere no pack already dens (a claiming pack keeps Kaiju.Wild.Apart
+	-- from every other den, so a seam beside an earlier pack could never be
+	-- held) and clear of the landing pad.
+	local function clear(middle: Vector3): boolean
+		for _, pack in KaijuWilds._packs do
+			if (Vector3.new(pack.Den.X, 0, pack.Den.Z) - Vector3.new(middle.X, 0, middle.Z)).Magnitude < Kaiju.Wild.Apart + 30 then
+				return false
+			end
+		end
+		if wildSite.Spawn and (wildSite.Spawn.Position - middle).Magnitude < Kaiju.Wild.FarFromSpawn + 30 then
+			return false
+		end
+		for _, zone in wildSite.KeepOut or {} do
+			if (zone[1] - middle).Magnitude < zone[2] + 30 then
+				return false
+			end
+		end
+		-- (And away from the rock nobody holds, checked below.)
+		return (middle - (outpost + Vector3.new(-250, 0, 0))).Magnitude > 80
+	end
+	local middle = nil
+	for i = 0, 35 do
+		local a = i * math.pi * 2 / 36
+		local candidate = outpost + Vector3.new(math.cos(a), 0, math.sin(a)) * 290
+		if clear(candidate) then
+			middle = candidate
+			break
+		end
+	end
+	check(middle ~= nil, "Nowhere on the ring was clear of every pack")
 	local seam = {}
+	local first = #wildSite.Spots
 	for k = 0, 2 do
-		local p = outpost + Vector3.new(250, 0, -140 + (k - 1) * Frontier.Outcrop.Step)
+		local p = middle + Vector3.new(0, 0, (k - 1) * Frontier.Outcrop.Step)
 		table.insert(wildSite.Spots, CFrame.new(p))
 		table.insert(seam, p)
 	end
-	wildSite.OutcropSpots = { 3, 4, 5 }
+	wildSite.OutcropSpots = { first + 1, first + 2, first + 3 }
 	-- Room for a new pack, and every new pack claims, until one holds the seam.
 	local maxBefore, shareBefore = Kaiju.Wild.Max, claim.Share
 	claim.Share = 1
