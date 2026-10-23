@@ -215,16 +215,19 @@ local function frames(kind: string, s: number, shield: boolean?)
 		-- chest height, so the slash drawn along it (Client.BladeTrails) reads
 		-- as a cut at the foe. Hips and shoulders drive it; the head stays on
 		-- the foe; the front foot steps in; the shield stays up.
-		-- Compact forehand/backhand arcs stay in front of the torso.
-		-- Elbows bend as hinges; shoulder and waist rotation guide the blade.
+		-- Compact forehand/backhand arcs stay in front of the torso: the
+		-- wind-up cocks the blade back by the ear (never over the head), the
+		-- cut crosses at chest height a sword's length ahead. Elbows bend as
+		-- hinges; shoulder and waist rotation guide the blade
+		-- (tests/fighter_rig_cases traces the tip).
 		local leftShoulder = if shield then SHIELD_UP.LeftShoulder else { 0.6, 0, -0.3 }
 		local leftElbow = if shield then SHIELD_UP.LeftElbow else { 0.9, 0, 0 }
 		if s >= 0 then
 			return {
 				Waist = { 0, -0.77, 0.19 },
 				Neck = { -0.04, 0.45, 0 },
-				RightShoulder = { 0.65, -0.55, 0.55 },
-				RightElbow = { 1.65, 0, 0 },
+				RightShoulder = { 0.65, 0.2, 0.9 },
+				RightElbow = { 1.55, 0, 0 },
 				LeftShoulder = leftShoulder,
 				LeftElbow = leftElbow,
 				RightHip = { 0.1, 0, 0 },
@@ -247,8 +250,8 @@ local function frames(kind: string, s: number, shield: boolean?)
 		return {
 			Waist = { -0.01, 0.67, 0.22 },
 			Neck = { -0.04, -0.55, 0 },
-			RightShoulder = { 1.11, 0.08, -0.81 },
-			RightElbow = { 1.15, 0, 0 },
+			RightShoulder = { 0.9, 0.08, -0.81 },
+			RightElbow = { 0.9, 0, 0 },
 			LeftShoulder = leftShoulder,
 			LeftElbow = leftElbow,
 			RightHip = { 0.15, 0, 0 },
@@ -419,8 +422,8 @@ local function frames(kind: string, s: number, shield: boolean?)
 		}, {
 			Waist = { -0.47, 0.14, 0.08 },
 			Neck = { -0.2, 0, 0 },
-			RightShoulder = { 0.64, 0.66, -1.17 },
-			RightElbow = { 0.5, 0, 0 },
+			RightShoulder = { 1.4, 0.3, -0.3 },
+			RightElbow = { 0.1, 0, 0 },
 			LeftShoulder = SHIELD_UP.LeftShoulder,
 			LeftElbow = SHIELD_UP.LeftElbow,
 			RightHip = { 0.6, 0, 0 },
