@@ -551,7 +551,8 @@ local wasKilled = false
 local KILLED = Color3.fromRGB(255, 72, 64)
 local KNOCKED = Color3.fromRGB(255, 120, 104)
 local function refreshDown()
-	local down = Spar.isDown(player)
+	-- (Down at the Rift's boss the Rift's own card has the screen: Client.RiftClient.)
+	local down = Spar.isDown(player) and player:GetAttribute("RiftFallen") == nil
 	local killed = down and player:GetAttribute("Killed") ~= nil
 	if down and not downGui.Enabled then
 		downGui.Enabled = true

@@ -3001,7 +3001,8 @@ local function outpostSoak()
 	check(mostCritters >= 1, "No critters came for a miner at the Edge in fifteen minutes")
 	check(mostCritters <= Frontier.Caps.Server, "Critters past the server's cap: " .. mostCritters)
 	check(emptyFor == 0, "The quarry had no wild kaiju for " .. emptyFor .. " seconds")
-	check(leastWild >= Kaiju.Wild.Max - 2, "Down to " .. leastWild .. " wild kaiju at one time")
+	-- (Eight roam now, each on its own lifetime and respawn: never fewer than half about.)
+	check(leastWild >= math.ceil(Kaiju.Wild.Max / 2), "Down to " .. leastWild .. " wild kaiju at one time")
 	check(wildRecords <= Kaiju.Wild.Max + 1 + Frontier.Caps.Server + 4, "Wild records pile up: " .. wildRecords)
 	FrontierServer._setWanderAt(math.huge)
 	clearCritters()
@@ -5703,23 +5704,45 @@ end)()
 	check(type(a:GetAttribute("RiftFallen")) == "number" and a:GetAttribute("RiftRestore") == RiftRun.restoreCost(0), "Not asked what now")
 	check(a:GetAttribute("SparDown") > now + RiftRun.Fallen - 1, "Not kept down while they choose")
 	check(#profiles[a].Gems == RiftRun.Rooms, "Robbed at the boss")
+	-- Down, their kaiju are called back into their Gemsouls.
+	check(Kaiju.away(profiles[a].Kaiju) == true and #KaijuServer.team(a) == 0, "Down at the boss, the kaiju weren't called back")
+	check(noted(a, "called back while you're down"), "Not told the kaiju were called back")
 	local poor = registered.RiftChoice(a, "Restore")
 	check(not poor.Ok and string.find(poor.Message, "Not enough coins", 1, true), "Restored for nothing")
 	profiles[a].Coins = 1000
-	local team = KaijuServer.team(a)
-	for _, pet in team do
-		pet.Humanoid.Health = 1
+	for _, record in profiles[a].Kaiju.List do
+		record.Health = 1
 	end
+	-- (The boss is right there: in danger, where DEPLOY is otherwise refused.)
+	check(KaijuServer.inDanger(a), "Not in danger at the boss")
+	check(not KaijuServer.deployTeam(a, false), "Deployed in danger without the Rift's say-so")
 	check(registered.RiftChoice(a, "Restore").Ok, "Couldn't restore")
 	check(profiles[a].Coins == 1000 - RiftRun.restoreCost(0), "RESTORE didn't cost its coins")
 	check(a:GetAttribute("RiftFallen") == nil and a:GetAttribute("SparDown") == nil and hA.Health == hA.MaxHealth, "Not back on their feet")
+	-- Restored, the kaiju come out again beside them, in danger or not.
+	local team = KaijuServer.team(a)
+	check(not Kaiju.away(profiles[a].Kaiju) and #team > 0, "Their kaiju didn't come out again after RESTORE")
 	for _, pet in team do
 		check(pet.Humanoid.Health == pet.Humanoid.MaxHealth, "Their kaiju weren't restored")
 	end
-	-- Down again: the next RESTORE costs more; back to base keeps what they found.
+	-- Down again: the next RESTORE costs more. Backup come through the gate
+	-- (their party, CALL FOR BACKUP) gets them up for nothing, kaiju and all.
 	a:SetAttribute("SparDown", now + 3)
 	tick()
 	check(a:GetAttribute("RiftRestore") == RiftRun.restoreCost(1) and RiftRun.restoreCost(1) > RiftRun.restoreCost(0), "RESTORE didn't go up")
+	check(#KaijuServer.team(a) == 0, "Down again, the kaiju stayed out")
+	table.clear(notes)
+	rootB.CFrame = CFrame.new(gate.Position + Vector3.new(-4, 0, 0))
+	check(enter(b, 2).Ok and RiftServer.runOf(b) == run, "A party member couldn't come through to the boss")
+	check(a:GetAttribute("RiftFallen") == nil and a:GetAttribute("SparDown") == nil and hA.Health == hA.MaxHealth, "Backup coming through didn't get them up")
+	check(profiles[a].Coins == 1000 - RiftRun.restoreCost(0), "Backup's revive cost coins")
+	check(#KaijuServer.team(a) > 0 and not Kaiju.away(profiles[a].Kaiju), "Their kaiju didn't come out with backup")
+	check(noted(a, "back on your feet, kaiju and all") and noted(b, "was down"), "Neither told about the revive")
+	check(registered.RiftLeave(b).Ok and RiftServer.runOf(b) == nil, "Backup couldn't leave again")
+	-- Down a third time: back to base keeps what they found.
+	a:SetAttribute("SparDown", now + 3)
+	tick()
+	check(a:GetAttribute("RiftRestore") == RiftRun.restoreCost(1), "A free revive counted as a RESTORE")
 	check(registered.RiftChoice(a, "Home").Ok and a:GetAttribute("RiftRun") == nil, "Not home when they chose it")
 	check(#profiles[a].Gems == RiftRun.Rooms and kit[a] == false, "Home from the boss, robbed or still in their kit")
 	-- The last one out: the trip's gone, its critters, fighters and boss with it.
@@ -5956,7 +5979,7 @@ end)()
 		KaijuWilds._spawnWild()
 		KaijuWilds._spawnWild()
 		for _, pack in KaijuWilds._packs do
-			if pack.Claim then
+			if pack.Claim and pack.Members[1] and pack.Members[1].Enemy.Alive then
 				held = pack
 			end
 		end
@@ -5967,10 +5990,12 @@ end)()
 	Kaiju.Wild.Max, claim.Share = maxBefore, shareBefore
 	check(held ~= nil, "No pack claimed the outcrop")
 	if held then
-		local rock = held.Claim
-		check(table.find(seam, rock) ~= nil, "The pack claimed something that isn't an outcrop rock")
-		local off = across(held.Den - rock).Magnitude
-		check(off >= claim.Den[1] - 0.01 and off <= claim.Den[2] + 0.01, "The den isn't beside its rock: " .. off)
+		-- It claims the whole seam (its three rocks), denned off the middle.
+		local rock = seam[2]
+		check(across(held.Claim - rock).Magnitude < 0.5, "The pack didn't den by the seam's middle")
+		check(#held.Rocks == #seam, "The pack doesn't hold the whole seam: " .. #held.Rocks)
+		local off = across(held.Den - held.Claim).Magnitude
+		check(off >= claim.Den[1] - 0.01 and off <= claim.Den[2] + 0.01, "The den isn't beside its seam: " .. off)
 		check(held.MoveAt == math.huge, "A pack holding a patch still drifts")
 		for _, p in seam do
 			check(KaijuWilds._packAt(p) == held, "A rock of the seam isn't the pack's")

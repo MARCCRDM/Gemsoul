@@ -47,7 +47,8 @@
 	              (bonked or knocked out first, it drops it back). Then
 	              you're back at base, shown what they took (the "Robbed"
 	              report: Client.RobReport). Knocked out at the boss: you
-	              stay down (RiftFallen: SparServer leaves you there) and
+	              stay down (RiftFallen: SparServer leaves you there, your
+	              kaiju are called back: KaijuServer.recallTeam) and
 	              choose ("RiftChoice"): "Restore" (RiftRun.restoreCost
 	              coins: your health and your kaiju's, all of them back:
 	              KaijuServer.restoreAll), "Home" (back to base, keeping
@@ -935,6 +936,8 @@ local function robbed(run, player: Player)
 end
 
 -- Knocked out at the boss: down until they choose (or the time runs out).
+-- Their kaiju are called back meanwhile (KaijuServer.recallTeam): they
+-- come out again with them, restored or with backup come through.
 local function fallAtBoss(run, player: Player)
 	run.Handled[player] = true
 	local deadline = serverNow() + RiftRun.Fallen
@@ -942,6 +945,24 @@ local function fallAtBoss(run, player: Player)
 	player:SetAttribute("RiftFallen", deadline)
 	player:SetAttribute("RiftRestore", RiftRun.restoreCost(run.Restores[player] or 0))
 	player:SetAttribute("SparDown", deadline + 1)
+	if KaijuServer.recallTeam(player) then
+		notify(player, "Your kaiju are called back while you're down.")
+	end
+end
+
+-- Back on their feet at the boss, whole, their kaiju restored and out
+-- again beside them (deployed in danger: the one time it's allowed).
+local function revive(run, player: Player, text: string)
+	run.Fallen[player], run.Handled[player] = nil, nil
+	standUp(player)
+	KaijuServer.restoreAll(player)
+	KaijuServer.deployTeam(player, true)
+	local root = rootOf(player)
+	if root then
+		fx("Deploy", root.Position, 6, nil, root.Position)
+	end
+	notify(player, text)
+	show(run)
 end
 
 -- Where `player` is on the way: the last cave they've reached (0 the
@@ -1057,6 +1078,14 @@ local function join(run, player: Player)
 	for _, other in run.Members do
 		if other ~= player then
 			notify(other, player.DisplayName .. " came through the gate.")
+		end
+	end
+	-- Backup: anyone of the trip down at the boss is back on their feet
+	-- for it, kaiju and all (the down card's CALL FOR BACKUP).
+	for _, other in table.clone(run.Members) do
+		if other ~= player and run.Fallen[other] then
+			revive(run, other, player.DisplayName .. " came through the gate: you're back on your feet, kaiju and all.")
+			notify(player, other.DisplayName .. " was down: your coming in got them back up.")
 		end
 	end
 end
@@ -1378,15 +1407,7 @@ local function choose(player: Player, choice: any)
 			return reply(false, string.format("Not enough coins: RESTORE costs %d.", cost))
 		end
 		run.Restores[player] = used + 1
-		run.Fallen[player], run.Handled[player] = nil, nil
-		standUp(player)
-		KaijuServer.restoreAll(player)
-		local root = rootOf(player)
-		if root then
-			fx("Deploy", root.Position, 6, nil, root.Position)
-		end
-		notify(player, "Restored: you and your kaiju are back on your feet.")
-		show(run)
+		revive(run, player, "Restored: you and your kaiju are back on your feet.")
 		return reply(true, "")
 	end
 	return reply(false, "Choose RESTORE or BACK TO BASE.")

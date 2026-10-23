@@ -972,6 +972,16 @@ do
 	check(client:find('GemClient.request("PartyInvite"', 1, true) ~= nil, "The down card can't invite")
 	check(client:find("INVITE A FRIEND", 1, true) == nil, "The old INVITE A FRIEND button's still on the down card")
 	check(server:find("run.Room <= RiftRun.Rooms and #run.Members", 1, true) == nil, "Backup can't join at the throne")
+	-- BACKUP on the strip opens the same list anywhere on the way; down at
+	-- the boss the kaiju are called back and come out again on a revive.
+	check(client:find('Name = "Backup"', 1, true) ~= nil and client:find("RiftClient.openBackup", 1, true) ~= nil, "No BACKUP on the strip")
+	check(server:find("KaijuServer.recallTeam(player)", 1, true) ~= nil and server:find("KaijuServer.deployTeam(player, true)", 1, true) ~= nil, "The kaiju aren't called back and out again")
+	-- The boss takes turns on the kaiju too (Shared.Aggro's turns, each
+	-- kaiju's own threat: KaijuServer.strike; Duelist's PetTarget).
+	local duelist = fs.readFile(ROOT .. "/src/server/Systems/Duelist.luau")
+	local kaiju = fs.readFile(ROOT .. "/src/server/Systems/KaijuServer.luau")
+	check(duelist:find("duel.PetTarget = pet", 1, true) ~= nil and duelist:find("petsOf(duel, raid.Members)", 1, true) ~= nil, "The boss never targets a kaiju")
+	check(kaiju:find("Aggro.add(e.Threat, e.ThreatAt, pet, dealt, now)", 1, true) ~= nil, "A kaiju's blows aren't its own threat")
 end
 
 print(

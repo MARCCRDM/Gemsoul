@@ -332,8 +332,47 @@ local function ownerRoot(owner: Player): (BasePart?, Humanoid?)
 	return nil, nil
 end
 
+-- (Lazily: the kaiju system is loaded after this one.)
+local function kaijuServer()
+	return require(script.Parent.KaijuServer)
+end
+
+-- The one it's on: a kaiju (duel.PetTarget, Duelist's raidTarget) while
+-- it stands, else its player (duel.Owner).
+local function foeRoot(duel): (BasePart?, Humanoid?)
+	local pet = duel.PetTarget
+	if type(pet) == "table" and pet.Model and pet.Model.Parent and pet.Humanoid.Health > 0 then
+		return pet.Root, pet.Humanoid
+	end
+	return ownerRoot(duel.Owner)
+end
+
+-- The kaiju out with the players it's fighting, that it may hit.
+local function petsOf(duel, members): { any }
+	local list = {}
+	local ok, server = pcall(kaijuServer)
+	if not ok then
+		return list
+	end
+	for _, pet in server.all() do
+		if table.find(members, pet.Owner) and server.targetable(pet) then
+			table.insert(list, pet)
+		end
+	end
+	return list
+end
+
+-- Its blow on a kaiju (KaijuServer.hurt: it may guard, parry or hop clear).
+local function petStrike(duel, pet, amount: number, element: string?, heavy: boolean?): (number, boolean)
+	local before = pet.Humanoid.Health
+	local outcome = kaijuServer().hurt(pet, amount, element, nil, heavy)
+	local dealt = math.max(0, before - pet.Humanoid.Health)
+	return dealt, outcome == "Guarded" or outcome == "Parried"
+end
+
 -- A raid boss: drops raiders who are down or gone and picks who it's after
--- (Owner) by threat (Shared.Aggro). False when nobody's left (the raid is over).
+-- (Owner, or one of their kaiju: PetTarget) by threat (Shared.Aggro). False
+-- when nobody's left (the raid is over).
 local function raidTarget(duel, now: number): boolean
 	local raid = duel.Raid
 	-- (A Rift trip's fighters: its runners are whoever's still in it,
@@ -408,14 +447,36 @@ local function raidTarget(duel, now: number): boolean
 	if rift and #candidates == 0 then
 		return false -- (everyone in is down: it waits)
 	end
+	-- Their kaiju, each on its own threat (KaijuServer.strike adds it): the
+	-- boss takes turns on whoever's hurting it, kaiju too (Aggro.RotateAfter).
+	for _, pet in petsOf(duel, raid.Members) do
+		local distance = (pet.Root.Position - root.Position).Magnitude
+		table.insert(candidates, {
+			Key = pet,
+			Threat = enemy.Threat[pet] or 0,
+			Distance = distance,
+			InReach = distance <= Brain.Reach + 1.5,
+			HealthRatio = pet.Humanoid.Health / math.max(1, pet.Humanoid.MaxHealth),
+		})
+	end
 	if enemy.Aggro.Target == nil and table.find(raid.Members, duel.Owner) then
 		enemy.Aggro.Target, enemy.Aggro.Since = duel.Owner, clock
 	end
 	local best = Aggro.choose(enemy.Aggro, candidates, clock) or raid.Members[1]
-	if best ~= duel.Owner then
-		duel.Owner = best
-		enemy.Model:SetAttribute("RivalOwner", best.UserId)
-		Remotes.CombatFx:FireClient(best, "TechStatus", duel.Name .. " turns on you!")
+	-- (A kaiju: it's on that one; its owner stays the duel's player.)
+	local pet = if type(best) == "table" and best.Record ~= nil and best.Owner ~= nil then best else nil
+	local owner = if pet then pet.Owner else best
+	if pet ~= (duel.PetTarget or nil) or owner ~= duel.Owner then
+		duel.PetTarget = pet
+		if owner ~= duel.Owner then
+			duel.Owner = owner
+			enemy.Model:SetAttribute("RivalOwner", owner.UserId)
+		end
+		Remotes.CombatFx:FireClient(
+			owner,
+			"TechStatus",
+			if pet then string.format("%s turns on %s!", duel.Name, tostring(pet.Record.Name or "your kaiju")) else duel.Name .. " turns on you!"
+		)
 	end
 	return true
 end
@@ -571,7 +632,7 @@ function strike(
 	-- Its weapon's perk, by the same rules as yours (Shared.WeaponForge).
 	local effects = duel.Kit and duel.Kit.Effects
 	if effects then
-		local _, ownerHumanoid = ownerRoot(duel.Owner)
+		local _, ownerHumanoid = foeRoot(duel)
 		amount *= WeaponForge.multiplier(effects, {
 			Heavy = heavy == true,
 			Crit = crit,
@@ -581,6 +642,24 @@ function strike(
 			Versus = true,
 			TargetGuarding = duel.Owner:GetAttribute("Blocking") == true,
 		})
+	end
+	-- On a kaiju (raidTarget's PetTarget): its blow lands as the critters'
+	-- do, and that's all; the rest below is what a blow on a player carries.
+	local pet = duel.PetTarget
+	if type(pet) == "table" and pet.Model and pet.Model.Parent and pet.Humanoid.Health > 0 then
+		local dealt, guarded = petStrike(duel, pet, amount, element, heavy)
+		if swordHit and duel.Kit then
+			local charge, heal = ArmorSignatures.hit(duel, duel.Kit.Signatures, os.clock(), dealt, heavy)
+			armorOutput(duel, charge, heal)
+		end
+		if effects and effects.Lifesteal and dealt > 0 and e.Alive then
+			e.Humanoid.Health = math.min(
+				e.Humanoid.MaxHealth,
+				e.Humanoid.Health
+					+ dealt * effects.Lifesteal * Enemies.healingMultiplier(e) * (1 + (effects.HealingReceived or 0))
+			)
+		end
+		return dealt, guarded
 	end
 	-- Element combos on you, as yours land on it (Shared.ElementCombos).
 	local _, combo =
@@ -741,10 +820,10 @@ end
 -- Its blow on `player`, who may not be the one it's on (strike only hits
 -- duel.Owner).
 local function strikeAt(duel, player: Player, ...)
-	if player == duel.Owner then
+	if player == duel.Owner and not duel.PetTarget then
 		return strike(duel, ...)
 	end
-	return strike(setmetatable({ Owner = player }, { __index = duel }), ...)
+	return strike(setmetatable({ Owner = player, PetTarget = false }, { __index = duel }), ...)
 end
 
 -- What a creature's blow leaves on `player` (its Riders) once it lands;
@@ -925,7 +1004,9 @@ local function landCreature(enemy, duel, action, now: number, damage: number, di
 		fx("Swing", nil, root.Position, dir, reach, 150, color, heavy)
 		if distance <= reach then
 			local dealt, guarded = strike(duel, power, duel.Element, heavy, duel.WeaponGem, action.Name)
-			creatureRiders(duel, duel.Owner, stats, dealt, guarded)
+			if not duel.PetTarget then
+				creatureRiders(duel, duel.Owner, stats, dealt, guarded)
+			end
 		end
 		if not last then
 			-- The next blow, at its own pace (the last one wound up heavier).
@@ -937,11 +1018,25 @@ local function landCreature(enemy, duel, action, now: number, damage: number, di
 		end
 		return false
 	end
+	-- Everyone in the way: the players, and their kaiju beside them.
+	local targets = {}
 	for _, player in areaFoes(duel) do
-		local foeRoot = ownerRoot(player)
-		if foeRoot then
-			local at = foeRoot.Position
+		local playerRoot = ownerRoot(player)
+		if playerRoot then
+			table.insert(targets, { Player = player, Root = playerRoot })
+		end
+	end
+	for _, pet in petsOf(duel, areaFoes(duel)) do
+		table.insert(targets, { Pet = pet, Root = pet.Root })
+	end
+	for _, target in targets do
+		local player = target.Player
+		do
+			local at = target.Root.Position
 			local function hit(scale: number?)
+				if target.Pet then
+					return petStrike(duel, target.Pet, power * (scale or 1), duel.Element, stats.Heavy == true)
+				end
 				local dealt, guarded =
 					strikeAt(duel, player, power * (scale or 1), duel.Element, stats.Heavy == true, nil, action.Name)
 				creatureRiders(duel, player, stats, dealt, guarded)
@@ -978,7 +1073,9 @@ local function landCreature(enemy, duel, action, now: number, damage: number, di
 							scale, cc, seconds = Actions.blastFalloff(away, radius)
 						end
 						local dealt, guarded = hit(scale)
-						if cc and type(dealt) == "number" and dealt > 0 then
+						if not player then
+							-- (A kaiju takes the blow and that's all.)
+						elseif cc and type(dealt) == "number" and dealt > 0 then
 							if guarded then
 								cc, seconds = if cc == "Stunned" then "Staggered" else nil, 0.4
 							end
@@ -1028,10 +1125,10 @@ local function landCreature(enemy, duel, action, now: number, damage: number, di
 	end
 	if shape == "Hops" and (action.HopsLeft or 0) > 0 then
 		-- Up again, onto where its foe stands now.
-		local foeRoot = ownerRoot(duel.Owner)
-		if foeRoot then
+		local landingRoot = foeRoot(duel)
+		if landingRoot then
 			local gap = stats.HopGap or 0.6
-			local offset = flat(foeRoot.Position - root.Position)
+			local offset = flat(landingRoot.Position - root.Position)
 			local landing = root.Position + (if offset.Magnitude > stats.Leap then offset.Unit * stats.Leap else offset)
 			action.Centers, action.Radii = { landing }, { stats.Radius }
 			action.HopsLeft -= 1
@@ -1388,14 +1485,20 @@ local function think(enemy, now: number)
 		Duelist.despawn(owner)
 		return
 	end
+	-- (On one of their kaiju: that's where it goes and swings.)
+	local petTarget = duel.PetTarget
+	local onPet = type(petTarget) == "table" and petTarget.Model.Parent ~= nil and petTarget.Humanoid.Health > 0
+	if onPet then
+		target = petTarget.Root
+	end
 	-- Whom it's fighting (a raid boss turns between players): every client
 	-- turns its head to theirs (BodyPoses).
 	if enemy.Model:GetAttribute("FocusUserId") ~= owner.UserId then
 		enemy.Model:SetAttribute("FocusUserId", owner.UserId)
 	end
-	-- Its shots are aimed at the player's head, eye to eye.
-	local head = owner.Character and owner.Character:FindFirstChild("Head")
-	local eyes = if head and head:IsA("BasePart") then head.Position else target.Position
+	-- Its shots are aimed at the player's head, eye to eye (a kaiju: its body).
+	local head = if onPet then nil else owner.Character and owner.Character:FindFirstChild("Head")
+	local eyes = if head and head:IsA("BasePart") then head.Position else target.Position + (if onPet then Vector3.new(0, 1, 0) else Vector3.zero)
 	local offset = flat(target.Position - root.Position)
 	local distance = offset.Magnitude
 	local dir = if distance > 0.01 then offset.Unit else Vector3.new(0, 0, -1)
@@ -1505,19 +1608,17 @@ local function think(enemy, now: number)
 			local stats = aura.Stats
 			aura.Next += stats.Aura.Every
 			fx("Zone", root.Position, stats.Radius, stats.Aura.Every, color)
+			local auraDamage = duel.Damage * (1 - Enemies.weakness(enemy)) * stats.Aura.Damage
 			for _, player in areaFoes(duel) do
 				local foeRoot = ownerRoot(player)
 				if foeRoot and flat(foeRoot.Position - root.Position).Magnitude <= stats.Radius then
-					local dealt, guarded = strikeAt(
-						duel,
-						player,
-						duel.Damage * (1 - Enemies.weakness(enemy)) * stats.Aura.Damage,
-						duel.Element,
-						false,
-						nil,
-						aura.Name
-					)
+					local dealt, guarded = strikeAt(duel, player, auraDamage, duel.Element, false, nil, aura.Name)
 					creatureRiders(duel, player, stats, dealt, guarded)
+				end
+			end
+			for _, pet in petsOf(duel, areaFoes(duel)) do
+				if flat(pet.Root.Position - root.Position).Magnitude <= stats.Radius then
+					petStrike(duel, pet, auraDamage, duel.Element, false)
 				end
 			end
 		end
@@ -1653,7 +1754,7 @@ local function think(enemy, now: number)
 			local aim = eyes
 			fx("Shot", nil, from, aim, GemConfig.ElementColors[action.Element] or color, "Fireball")
 			task.delay(math.clamp(distance / 140, 0.05, 0.5), function()
-				local stillRoot = ownerRoot(owner)
+				local stillRoot = foeRoot(duel)
 				if (not duel.Dungeon and duels[owner] ~= duel) or not enemy.Alive or not stillRoot then
 					return
 				end

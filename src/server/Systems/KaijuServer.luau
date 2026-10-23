@@ -109,6 +109,7 @@ local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+local Aggro = require(ReplicatedStorage.Shared.Aggro)
 local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -723,9 +724,15 @@ local function strike(pet: Pet, enemy, amount: number, status: string?, heavy: b
 	local color = GemConfig.ElementColors[pet.Element]
 	Enemies.damage(enemy, amount, nil, false, color, heavy, pet.Element)
 	local e = enemy :: any
+	local dealt = math.max(0, before - enemy.Humanoid.Health)
 	e.KaijuCredit = e.KaijuCredit or {}
-	e.KaijuCredit[pet.Owner] = (e.KaijuCredit[pet.Owner] or 0) + math.max(0, before - enemy.Humanoid.Health)
+	e.KaijuCredit[pet.Owner] = (e.KaijuCredit[pet.Owner] or 0) + dealt
 	e.LastPet, e.LastPetAt = pet, now
+	-- Its own threat on what it hits (Shared.Aggro): a boss turns on the
+	-- kaiju hurting it, not only on their owner (Duelist's raidTarget).
+	if e.Threat and e.ThreatAt then
+		Aggro.add(e.Threat, e.ThreatAt, pet, dealt, now)
+	end
 	if enemy.Alive and (outcome == "Hit" or outcome == "Broken") then
 		afflict(enemy, status, amount, pet.Element)
 	end
@@ -1411,6 +1418,49 @@ local function recall(player: Player)
 	return reply(true, "")
 end
 
+-- The team called back into its Gemsouls (the player's own CALL BACK, or
+-- the Rift when they go down at the boss). Returns whether it was out.
+function KaijuServer.recallTeam(player: Player): boolean
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	if not roster or Kaiju.away(roster) then
+		return false
+	end
+	roster.Away = true
+	local root = rootOf(player)
+	for _, pet in petsOf(player) do
+		fx("CallBack", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
+	end
+	despawn(player)
+	PlayerData.sync(player)
+	return true
+end
+
+-- The team deployed again: only out of danger, unless `force` (the one
+-- time it's allowed in danger: back on your feet at the Rift's boss,
+-- restored or with backup come through the gate). Returns ok, why not.
+function KaijuServer.deployTeam(player: Player, force: boolean?): (boolean, string)
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	if not roster then
+		return false, "You have no kaiju."
+	end
+	if not Kaiju.away(roster) then
+		return true, ""
+	end
+	if not force and KaijuServer.inDanger(player, os.clock()) then
+		return false, "Not while you're in danger: get clear of the fight first."
+	end
+	roster.Away = nil
+	PlayerData.sync(player)
+	upkeep(player, os.clock())
+	local root = rootOf(player)
+	for _, pet in petsOf(player) do
+		fx("Deploy", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
+	end
+	return true, "Team deployed."
+end
+
 -- The team called back (`away`), into its Gemsouls; or deployed again,
 -- only out of danger.
 local function callBack(player: Player, away: any)
@@ -1423,32 +1473,13 @@ local function callBack(player: Player, away: any)
 		return reply(false, "Not during a kaiju battle.")
 	end
 	if away then
-		if Kaiju.away(roster) then
+		if not KaijuServer.recallTeam(player) then
 			return reply(true, "")
 		end
-		roster.Away = true
-		local root = rootOf(player)
-		for _, pet in petsOf(player) do
-			fx("CallBack", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
-		end
-		despawn(player)
-		PlayerData.sync(player)
 		return reply(true, "Team called back. Deploy them again once you're clear of danger.")
 	end
-	if not Kaiju.away(roster) then
-		return reply(true, "")
-	end
-	if KaijuServer.inDanger(player, os.clock()) then
-		return reply(false, "Not while you're in danger: get clear of the fight first.")
-	end
-	roster.Away = nil
-	PlayerData.sync(player)
-	upkeep(player, os.clock())
-	local root = rootOf(player)
-	for _, pet in petsOf(player) do
-		fx("Deploy", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
-	end
-	return reply(true, "Team deployed.")
+	local ok, text = KaijuServer.deployTeam(player, false)
+	return reply(ok, text)
 end
 
 -- Puts `ids` out as the team (the first leads): only your own, not while

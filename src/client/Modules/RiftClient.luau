@@ -41,7 +41,8 @@
 	               standing, and what now: RESTORE (its cost: your health and
 	               your kaiju's), CALL FOR BACKUP (the gate's lobby again:
 	               invite your party, the Outpost or a friend to come
-	               through a gate to you) or BACK TO BASE (keeping
+	               through a gate to you; BACKUP on the strip opens the
+	               same list anywhere on the way) or BACK TO BASE (keeping
 	               what you found), the time left to choose running down.
 
 	  RiftClient.start()            watch your Rift attributes (once)
@@ -1392,6 +1393,24 @@ local function buildStrip()
 	tally.TextXAlignment = Enum.TextXAlignment.Right
 	tally.AnchorPoint = Vector2.new(1, 0)
 	tally.Position, tally.Size = UDim2.new(1, -12, 0, 5), UDim2.fromOffset(150, 14)
+	-- BACKUP: the list of who you can call in, anywhere on the way.
+	local chipW, chipH = if small then 58 else 66, if small then 16 else 18
+	where.Size = UDim2.new(1, -24 - chipW - 6, 0, 18)
+	local chip = new("TextButton", {
+		Name = "Backup",
+		Text = "BACKUP",
+		TextSize = if small then 9 else 10,
+		Font = BOLD,
+		TextColor3 = P.Teal,
+		BackgroundColor3 = Color3.fromRGB(14, 22, 26),
+		AutoButtonColor = true,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -10, 1, -5),
+		Size = UDim2.fromOffset(chipW, chipH),
+	}, bar)
+	UiKit.round(chip, 5)
+	new("UIStroke", { Color = P.Teal, Thickness = 1, Transparency = 0.4 }, chip)
+	chip.Activated:Connect(RiftClient.openBackup)
 	whereLabel, tallyLabel = where, tally
 	strip = bar
 end
@@ -1417,12 +1436,11 @@ end
 local downClock: TextLabel? = nil
 local downFill: Frame? = nil
 local restoreButton: TextButton? = nil
--- The backup list (Shared.RiftLobby.backup): redrawn as the server changes.
-local downList: ScrollingFrame? = nil
-local downHead: TextLabel? = nil
-local downHint: TextLabel? = nil
-local downSmall = false
-local downDrawn: string? = nil
+-- The backup lists (Shared.RiftLobby.backup), redrawn as the server
+-- changes: the down card's, and the BACKUP window's from the strip.
+type BackupView = { List: ScrollingFrame, Head: TextLabel, Hint: TextLabel, Small: boolean, Drawn: string? }
+local backupViews: { BackupView } = {}
+local backupCard: Frame? = nil
 
 local function choose(choice: string)
 	task.spawn(function()
@@ -1437,7 +1455,9 @@ end
 -- through any Rift Gate), or Roblox's invite for a friend who isn't here.
 local function callIn(person)
 	invited[person.UserId] = os.clock()
-	downDrawn = nil
+	for _, view in backupViews do
+		view.Drawn = nil
+	end
 	if person.Invite == "Game" then
 		local s = social()
 		if s then
@@ -1449,10 +1469,111 @@ local function callIn(person)
 			UiKit.toast(result.Message or "", if result.Ok then P.Gold else P.Bad)
 			if not result.Ok then
 				invited[person.UserId] = nil
-				downDrawn = nil
+				for _, view in backupViews do
+					view.Drawn = nil
+				end
 			end
 		end)
 	end
+end
+
+-- The backup list in `parent` (a box the caller sizes): its head, the
+-- scrolling rows and the hint along the bottom. Registered for refreshes
+-- until its box is gone.
+local function backupPanel(parent: Frame, small: boolean): BackupView
+	local headH, hintH = 18, if small then 26 else 30
+	local head = text(parent, "CALL FOR BACKUP", if small then 11 else 12, P.Teal, BOLD)
+	head.AutomaticSize = Enum.AutomaticSize.None
+	head.Size = UDim2.new(1, 0, 0, headH)
+	local list = new("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(0, headH + 4),
+		Size = UDim2.new(1, 0, 1, -(headH + 4 + hintH + 4)),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = P.Dim,
+	}, parent)
+	UiKit.list(list, 4)
+	local hint = text(parent, "", if small then 9 else 10, P.Dim)
+	hint.AutomaticSize = Enum.AutomaticSize.None
+	hint.AnchorPoint = Vector2.new(0, 1)
+	hint.Position = UDim2.fromScale(0, 1)
+	hint.Size = UDim2.new(1, 0, 0, hintH)
+	local view: BackupView = { List = list, Head = head, Hint = hint, Small = small, Drawn = nil }
+	table.insert(backupViews, view)
+	return view
+end
+
+-- Drawn again only when something shown has changed.
+local function refreshBackupView(view: BackupView, lobby)
+	local rows = RiftLobby.backup(lobby)
+	local sig = { tostring(lobby.Lead), tostring(lobby.Size) }
+	for _, row in rows do
+		table.insert(sig, string.format("%d%s%s%s", row.UserId, tostring(row.Name), tostring(row.Where), tostring(row.Invite)))
+	end
+	local signature = table.concat(sig, ";")
+	if signature == view.Drawn then
+		return
+	end
+	view.Drawn = signature
+	for _, child in view.List:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	for i, person in rows do
+		personRow(view.List, person, i, view.Small, true, callIn)
+	end
+	if #rows == 0 then
+		local empty = text(view.List, "Nobody's about: no one else in the Outpost, none of your friends online.", if view.Small then 10 else 11, P.Dim)
+		empty.LayoutOrder = 1
+	end
+	view.Head.Text = string.format("CALL FOR BACKUP  ·  %d/%d IN YOUR PARTY", lobby.Size, RiftRun.Party)
+	view.Hint.Text = if not lobby.Lead
+		then "Only your party's leader can invite."
+		elseif lobby.Size >= RiftRun.Party then "Your party's full: everyone's here or on their way."
+		else "INVITE asks them into your party: they come to you through any Rift Gate."
+end
+
+-- Every list that's still up, from one look at the server; gone ones dropped.
+local function refreshBackups()
+	for i = #backupViews, 1, -1 do
+		if not backupViews[i].List.Parent then
+			table.remove(backupViews, i)
+		end
+	end
+	if #backupViews == 0 then
+		return
+	end
+	local lobby = RiftLobby.lobby(lobbyView(nil))
+	for _, view in backupViews do
+		refreshBackupView(view, lobby)
+	end
+end
+
+-- BACKUP, from the strip: the list on its own, anywhere in the Rift (on
+-- the way or at the boss), to be closed again.
+function RiftClient.openBackup()
+	if backupCard and backupCard.Parent then
+		return
+	end
+	local s = screen()
+	local small = narrow(s)
+	local panel, holder = modal("RiftBackup", math.min(if small then 440 else 480, s.AbsoluteSize.X - 24), P.Teal, true, small)
+	backupCard = panel
+	local title = text(panel, "BACKUP", if small then 18 else 22, P.Teal, IronUi.Heading)
+	title.LayoutOrder = 1
+	local line = text(panel, "Call miners in from the Outpost: they come to you through any Rift Gate.", if small then 11 else 12, P.Text)
+	line.LayoutOrder = 2
+	local box = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, if small then 190 else 280), LayoutOrder = 3 }, panel)
+	backupPanel(box, small)
+	local closeButton = button(panel, "CLOSE", P.Edge, 4, function()
+		holder:Destroy()
+	end, if small then 34 else 40)
+	closeButton.Name = "Close"
+	refreshBackups()
 end
 
 -- Down at the boss: on the left what you can do for yourself (RESTORE,
@@ -1464,7 +1585,6 @@ local function showDown()
 	end
 	local s = screen()
 	local small = narrow(s)
-	downSmall = small
 	local width = math.min(if small then 660 else 780, s.AbsoluteSize.X - 24)
 	local panel = modal("RiftDown", width, HELL, false, small)
 	downCard = panel
@@ -1522,63 +1642,12 @@ local function showDown()
 	local keep = text(left, "Home with the gems you found.", if small then 10 else 11, P.Dim)
 	keep.LayoutOrder = 6
 	-- Who you can call in.
-	local headH, hintH = 18, if small then 26 else 30
-	local head = text(right, "CALL FOR BACKUP", if small then 11 else 12, P.Teal, BOLD)
-	head.AutomaticSize = Enum.AutomaticSize.None
-	head.Size = UDim2.new(1, 0, 0, headH)
-	local list = new("ScrollingFrame", {
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(0, headH + 4),
-		Size = UDim2.new(1, 0, 1, -(headH + 4 + hintH + 4)),
-		CanvasSize = UDim2.new(),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollBarThickness = 4,
-		ScrollBarImageColor3 = P.Dim,
-	}, right)
-	UiKit.list(list, 4)
-	local hint = text(right, "", if small then 9 else 10, P.Dim)
-	hint.AutomaticSize = Enum.AutomaticSize.None
-	hint.AnchorPoint = Vector2.new(0, 1)
-	hint.Position = UDim2.fromScale(0, 1)
-	hint.Size = UDim2.new(1, 0, 0, hintH)
-	downList, downHead, downHint, downDrawn = list, head, hint, nil
-end
-
--- The backup list, drawn again only when something shown has changed.
-local function refreshBackup()
-	local list, head, hint = downList, downHead, downHint
-	if not list or not list.Parent or not head or not hint then
-		return
+	backupPanel(right, small)
+	-- (The BACKUP window, if it was open: this card has it now.)
+	if backupCard and backupCard.Parent then
+		close(backupCard)
+		backupCard = nil
 	end
-	local view = RiftLobby.lobby(lobbyView(nil))
-	local rows = RiftLobby.backup(view)
-	local sig = { tostring(view.Lead), tostring(view.Size) }
-	for _, row in rows do
-		table.insert(sig, string.format("%d%s%s%s", row.UserId, tostring(row.Name), tostring(row.Where), tostring(row.Invite)))
-	end
-	local signature = table.concat(sig, ";")
-	if signature == downDrawn then
-		return
-	end
-	downDrawn = signature
-	for _, child in list:GetChildren() do
-		if child:IsA("GuiObject") then
-			child:Destroy()
-		end
-	end
-	for i, person in rows do
-		personRow(list, person, i, downSmall, true, callIn)
-	end
-	if #rows == 0 then
-		local empty = text(list, "Nobody's about: no one else in the Outpost, none of your friends online.", if downSmall then 10 else 11, P.Dim)
-		empty.LayoutOrder = 1
-	end
-	head.Text = string.format("CALL FOR BACKUP  ·  %d/%d IN YOUR PARTY", view.Size, RiftRun.Party)
-	hint.Text = if not view.Lead
-		then "Only your party's leader can invite."
-		elseif view.Size >= RiftRun.Party then "Your party's full: everyone's here or on their way."
-		else "INVITE asks them into your party: they come to you through any Rift Gate."
 end
 
 local function refreshDown()
@@ -1586,7 +1655,6 @@ local function refreshDown()
 	if type(deadline) ~= "number" then
 		close(downCard)
 		downCard = nil
-		downList, downHead, downHint, downDrawn = nil, nil, nil, nil
 		return
 	end
 	showDown()
@@ -1602,7 +1670,6 @@ local function refreshDown()
 		local cost = player:GetAttribute("RiftRestore") or RiftRun.Restore.Coins
 		restoreButton.Text = string.format("RESTORE  ·  %d COINS", cost)
 	end
-	refreshBackup()
 end
 
 -- Watching your attributes ------------------------------------------------------------------------------------
@@ -1619,6 +1686,7 @@ local function tick()
 		while inside do
 			refreshStrip()
 			refreshDown()
+			refreshBackups()
 			task.wait(0.25)
 		end
 		ticking = false

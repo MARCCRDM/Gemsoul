@@ -220,7 +220,8 @@ type Wild = {
 -- first leads: the others keep near it).
 type Pack = {
 	Den: Vector3,
-	Claim: Vector3?, -- the outcrop rock it dens beside (Kaiju.Wild.Claim): its patch
+	Claim: Vector3?, -- the middle of the seam it dens beside (Kaiju.Wild.Claim): its patch
+	Rocks: { Vector3 }?, -- the seam's rocks, every one its own
 	Swings: number?, -- swings at its patch since it last calmed (KaijuWilds.rockSwing)
 	SwingAt: number?,
 	Heading: number,
@@ -2197,14 +2198,47 @@ local function packFor(): Pack?
 	-- (Kaiju.Wild.Claim), the rest of the seam within its radius.
 	local claim = Kaiju.Wild.Claim
 	local crops = site and site.OutcropSpots or {}
+	-- The seam a rock is in: every outcrop rock chained to it a step or so
+	-- apart (Kaiju.Wild.Claim.Link), and where its middle is.
+	local function seamOf(rock: Vector3): ({ Vector3 }, Vector3)
+		local link = Frontier.Outcrop.Step * claim.Link
+		local seam, frontier = { rock }, { rock }
+		while #frontier > 0 do
+			local from = table.remove(frontier) :: Vector3
+			for _, index in crops do
+				local spot = site.Spots[index]
+				local q = spot and spot.Position
+				if q and flat(q - from).Magnitude <= link then
+					local known = false
+					for _, r in seam do
+						if flat(r - q).Magnitude < 0.5 then
+							known = true
+							break
+						end
+					end
+					if not known then
+						table.insert(seam, q)
+						table.insert(frontier, q)
+					end
+				end
+			end
+		end
+		local sum = Vector3.zero
+		for _, r in seam do
+			sum += r
+		end
+		return seam, sum / #seam
+	end
 	if #crops > 0 and rng:NextNumber() < claim.Share then
 		for _ = 1, 60 do
 			local spot = site.Spots[crops[rng:NextInteger(1, #crops)]]
 			local rock = spot and spot.Position
 			if rock then
+				local seam, rockMiddle = seamOf(rock)
 				local a = rng:NextNumber(0, math.pi * 2)
-				local den = rock + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(claim.Den[1], claim.Den[2])
+				local den = rockMiddle + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(claim.Den[1], claim.Den[2])
 				if apartFrom(den) then
+					rock = rockMiddle
 					-- (A kind that roams that far out, and no other pack's, if there's one.)
 					local roams = Kaiju.wildKinds(Frontier.band(Frontier.distance(den, middle)))
 					roams = if #roams > 0 then roams else Kaiju.Starters
@@ -2222,6 +2256,7 @@ local function packFor(): Pack?
 					local pack: Pack = {
 						Den = Vector3.new(den.X, rock.Y, den.Z),
 						Claim = rock,
+						Rocks = seam,
 						Heading = a,
 						MoveAt = math.huge,
 						Species = roams[rng:NextInteger(1, #roams)],
@@ -2371,11 +2406,23 @@ end
 
 -- Claimed patches ------------------------------------------------------------------------------------------
 
--- The pack holding the patch a rock at `position` is in, if any (its den
--- within Kaiju.Wild.Claim.Radius, and someone of it still standing).
+-- The pack holding the patch a rock at `position` is in, if any (one of
+-- its seam's rocks, or any rock within Kaiju.Wild.Claim.Radius of its den;
+-- and someone of it still standing).
+local function holds(pack: Pack, position: Vector3): boolean
+	if not pack.Claim then
+		return false
+	end
+	for _, rock in pack.Rocks or {} do
+		if flat(rock - position).Magnitude < 1.5 then
+			return true
+		end
+	end
+	return flat(pack.Den - position).Magnitude <= Kaiju.Wild.Claim.Radius
+end
 local function packAt(position: Vector3): Pack?
 	for _, pack in packs do
-		if pack.Claim and flat(pack.Den - position).Magnitude <= Kaiju.Wild.Claim.Radius then
+		if holds(pack, position) then
 			for _, member in pack.Members do
 				if member.Enemy.Alive then
 					return pack

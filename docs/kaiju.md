@@ -528,7 +528,9 @@ put back at its den.
 
 Most packs (`Kaiju.Wild.Claim.Share`, 75%) den beside one of the
 frontier's outcrops (the seams of two to five rocks, `Frontier.Outcrop`)
-and hold it: every rock within 32 studs of the den is theirs.
+and hold it: the whole seam (rocks chained a step and a bit apart,
+`Claim.Link`) is theirs, the den 10 to 14 studs off its middle, and any
+other rock within 32 studs of the den too.
 
 - **Their rocks roll luckier** (+8%, `Claim.Luck`) while any of the pack is
   standing: `OutpostServer.patchLuck` asks `KaijuWilds` as the gem is

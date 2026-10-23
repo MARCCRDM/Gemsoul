@@ -315,6 +315,18 @@ Once the boss is down the strip says **BOSS DOWN · HOME IN 0:20**.
 
 ### Who takes whom
 
+**The boss takes turns.** A boss (and a raid boss) picks who it's on by
+threat (`Shared.Aggro`): each player's damage, and now **each kaiju's own**
+(`KaijuServer.strike` adds a kaiju's blows to the enemy's threat under the
+kaiju itself). After 8 seconds on one target (`Aggro.RotateAfter`), whoever
+else is hurting it at least half as much (`RotateShare`) takes a turn, so
+it doesn't glue to the miner while their kaiju hit it for free; the usual
+rules still apply (a new target held 1.5 s, overtaken by 10% up close or
+30% from range, a weakened target drawing it). On a kaiju (`duel.PetTarget`)
+it walks to it, swings at it and aims its shots at it (`KaijuServer.hurt`:
+the kaiju may guard, parry or hop clear), its area moves hit the kaiju in
+them too, and its player hears "Frigo Camelo turns on Pebble!".
+
 - **Your kaiju take the critters.** While any critter of the pack is about,
   your kaiju fight only critters, sharing them out (two on one if there
   are more kaiju than critters). Only once the critters are down do they
@@ -406,6 +418,11 @@ fighters leave you be while you're down; with everyone down, they wait.
     full health right there (`KaijuServer.restoreAll`). It doubles each
     time in a trip (150, 300, 600...). Coins only, no Robux;
   - **BACK TO BASE**: home with the gems you found;
+  - **Your kaiju are called back** the moment you go down (into their
+    Gemsouls: `KaijuServer.recallTeam`), so they're not left fighting
+    without you. Restored, or got up by backup coming through, they come
+    out again beside you at once, **in danger or not** (`deployTeam` with
+    `force`: the one place DEPLOY is allowed in a fight);
   - **CALL FOR BACKUP · 1/4 IN YOUR PARTY**: a list of who you can call in
     (`Shared.RiftLobby.backup`): the rest of your party first (with you in
     the Rift, or where they are in the Outpost, no button), then every
@@ -420,7 +437,14 @@ fighters leave you be while you're down; with everyone down, they wait.
     and comes through to your trip: joining is allowed **at the throne
     too** now, while the boss still stands (`RiftServer.partyRun`), not
     only on the path;
+  - a party member coming through the gate while you're down **gets you up
+    for nothing**: full health, kaiju out again, no RESTORE spent;
   - nothing chosen in 60 seconds: back to base.
+
+**BACKUP, anywhere on the way**: the strip's **BACKUP** chip opens the
+same list on its own (`RiftClient.openBackup`), in any cave, so a party
+can be called in before the boss, not only once you're down. Down on the
+way you're still robbed and sent home (above): call backup before that.
 
   Your kaiju fight on without you while you're down.
 

@@ -18,6 +18,10 @@
 	     their threat, so it turns to finish off a weakened player.
 	  6. Out of reach: when its target has been out of its reach for
 	     UnreachableSeconds, it settles for the nearest player it can hit.
+	  7. Spreading it round: after RotateAfter seconds on one target, whoever
+	     else is hurting it at least RotateShare as much takes a turn (a
+	     boss doesn't glue to one player while the kaiju beside them hit it
+	     for free; keys may be players or kaiju alike).
 ]]
 local Aggro = {
 	MeleeOvertake = 1.1,
@@ -29,6 +33,8 @@ local Aggro = {
 	LowHealthBonus = 1.3,
 	ControlThreat = 0.12, -- a stun or interrupt: this share of its max health as threat
 	UnreachableSeconds = 4,
+	RotateAfter = 8, -- seconds on one target before it turns on the next who's hurting it
+	RotateShare = 0.5, -- the next needs at least this share of the current target's threat
 }
 
 export type Candidate = {
@@ -120,7 +126,24 @@ function Aggro.choose(state: State, candidates: { Candidate }, now: number): any
 			end
 		end
 	end
-	if now - state.Since < Aggro.HoldSeconds or top == current then
+	if now - state.Since < Aggro.HoldSeconds then
+		return state.Target
+	end
+	-- Its turn's up: the next one hurting it enough takes it.
+	if now - state.Since >= Aggro.RotateAfter then
+		local turn = nil
+		local floor = Aggro.effective(current) * Aggro.RotateShare
+		for _, c in candidates do
+			local effective = Aggro.effective(c)
+			if c.Key ~= state.Target and effective > 0 and effective >= floor and (not turn or effective > Aggro.effective(turn)) then
+				turn = c
+			end
+		end
+		if turn then
+			return switch(state, turn, now)
+		end
+	end
+	if top == current then
 		return state.Target
 	end
 	-- Overtaken: by 10% up close, by 30% from range.

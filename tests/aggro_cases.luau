@@ -52,4 +52,18 @@ for t = 11, 80 do
 end
 check(threat.a == nil, "Old threat never faded away")
 check(Aggro.choose(Aggro.new(), {}, 0) == nil, "Picked someone with no candidates")
-print("PASS: " .. checks .. " aggro checks (most damage, overtake margins, hold, low health, unreachable, fading)")
+-- Spreading it round: after RotateAfter on one, the next hurting it enough
+-- (RotateShare of the current's threat) takes a turn, then back again; one
+-- hardly hurting it never gets one.
+s = Aggro.new()
+check(Aggro.choose(s, { c("tank", 100), c("kaiju", 60) }, 0) == "tank", "The biggest threat isn't first")
+check(Aggro.choose(s, { c("tank", 100), c("kaiju", 60) }, Aggro.RotateAfter - 1) == "tank", "Rotated early")
+check(Aggro.choose(s, { c("tank", 100), c("kaiju", 60) }, Aggro.RotateAfter) == "kaiju", "The kaiju never got its turn")
+check(Aggro.choose(s, { c("tank", 100), c("kaiju", 60) }, Aggro.RotateAfter + 1) == "kaiju", "Flickered back inside the hold")
+check(Aggro.choose(s, { c("tank", 100), c("kaiju", 60) }, Aggro.RotateAfter * 2) == "tank", "Never turned back")
+s = Aggro.new()
+check(Aggro.choose(s, { c("tank", 100), c("dps", 20) }, 0) == "tank", "The biggest threat isn't first")
+check(Aggro.choose(s, { c("tank", 100), c("dps", 20) }, Aggro.RotateAfter + 1) == "tank", "Turned on one hardly hurting it")
+s = Aggro.new()
+check(Aggro.choose(s, { c("tank", 100), c("a", 60), c("b", 90) }, 0) == "tank" and Aggro.choose(s, { c("tank", 100), c("a", 60), c("b", 90) }, Aggro.RotateAfter) == "b", "The turn didn't go to the next biggest")
+print("PASS: " .. checks .. " aggro checks (most damage, overtake margins, hold, low health, unreachable, fading, taking turns)")
