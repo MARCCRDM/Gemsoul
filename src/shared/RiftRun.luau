@@ -99,21 +99,35 @@ RiftRun.Exit = 20
 -- critter's is the Outpost's size, Shared.Frontier.Rift).
 RiftRun.Portal = { Every = 0.45, Apart = 9, Clear = 9, Share = 0.6, Hop = 18, Leader = 10, Boss = 16 }
 
--- How many critters come at cave `room` (1..Rooms) for `runners` runners.
-function RiftRun.foeCount(room: number, runners: number): number
+-- How many critters come at cave `room` (1..Rooms) for `runners` runners
+-- (on the way to a starter `boss`: its Foes fewer, never under a kaiju
+-- team's worth, so each of your kaiju has one).
+function RiftRun.foeCount(room: number, runners: number, boss: any?): number
 	local base = RiftRun.Foes[math.clamp(room, 1, #RiftRun.Foes)]
+	local starter = DungeonRules.starter(boss)
+	if starter then
+		base = math.max(#Kaiju.SlotLevels, base - starter.Foes)
+	end
 	return base + math.floor((math.max(1, runners) - 1) * RiftRun.PerRunner + 0.5)
 end
 
--- How many of the pathway dungeon's fighters stand in cave `room`.
-function RiftRun.fighterCount(room: number, runners: number): number
+-- How many of the pathway dungeon's fighters stand in cave `room` (one, on
+-- the way to a starter `boss`).
+function RiftRun.fighterCount(room: number, runners: number, boss: any?): number
 	local rule = RiftRun.Fighters
 	local base = rule.Count[math.clamp(room, 1, #rule.Count)]
+	if DungeonRules.starter(boss) then
+		base = 1
+	end
 	return base + math.floor((math.max(1, runners) - 1) * rule.PerRunner)
 end
 
--- Their gear tier (1..5, DungeonLoadout) in cave `room`.
-function RiftRun.fighterTier(room: number): number
+-- Their gear tier (1..5, DungeonLoadout) in cave `room` (the lowest, on
+-- the way to a starter `boss`).
+function RiftRun.fighterTier(room: number, boss: any?): number
+	if DungeonRules.starter(boss) then
+		return 1
+	end
 	local tiers = RiftRun.Fighters.Tier
 	return tiers[math.clamp(room, 1, #tiers)]
 end
@@ -121,12 +135,13 @@ end
 -- Cave `room`'s critters: { { Critter = roster id, Elite = boolean } }, a
 -- ranged one only at the back (Kaiju.wave), and from Elite.From on, now
 -- and then the first of them a big one. `rng` has NextInteger and NextNumber.
-function RiftRun.pickFoes(room: number, runners: number, rng): { { Critter: string, Elite: boolean } }
+function RiftRun.pickFoes(room: number, runners: number, rng, boss: any?): { { Critter: string, Elite: boolean } }
 	local pack = {}
-	for _, id in Kaiju.wave(RiftRun.foeCount(room, runners), rng) do
+	for _, id in Kaiju.wave(RiftRun.foeCount(room, runners, boss), rng) do
 		table.insert(pack, { Critter = id, Elite = false })
 	end
-	if room >= RiftRun.Elite.From and rng:NextNumber() < RiftRun.Elite.Chance then
+	-- (No big ones on the way to a starter boss.)
+	if not DungeonRules.starter(boss) and room >= RiftRun.Elite.From and rng:NextNumber() < RiftRun.Elite.Chance then
 		for _, foe in pack do
 			if not Kaiju.isRanged(foe.Critter) then
 				foe.Elite = true
@@ -140,7 +155,7 @@ end
 -- Cave `room`'s fighters: one of the pathway dungeon's roster (its element
 -- and moves: DungeonRules.Roster) for the whole cave; of `element` when
 -- given (the Rift's own).
-function RiftRun.pickFighters(room: number, runners: number, rng, element: string?): { any }
+function RiftRun.pickFighters(room: number, runners: number, rng, element: string?, boss: any?): { any }
 	local pool = {}
 	for _, entry in DungeonRules.Roster do
 		if element == nil or entry.Element == element then
@@ -152,7 +167,7 @@ function RiftRun.pickFighters(room: number, runners: number, rng, element: strin
 	end
 	local spec = pool[rng:NextInteger(1, #pool)]
 	local list = {}
-	for _ = 1, RiftRun.fighterCount(room, runners) do
+	for _ = 1, RiftRun.fighterCount(room, runners, boss) do
 		table.insert(list, spec)
 	end
 	return list
@@ -218,8 +233,9 @@ function RiftRun.portalSpots(center: Vector3, radius: number, count: number, avo
 end
 
 -- The critters' level in cave `room` (Rooms + 1: the boss's), for runners
--- whose lead kaiju are at `levels` (none: level 1).
-function RiftRun.level(levels: { number }, room: number): number
+-- whose lead kaiju are at `levels` (none: level 1); on the way to a starter
+-- `boss`, never over its Level.
+function RiftRun.level(levels: { number }, room: number, boss: any?): number
 	local sum = 0
 	for _, level in levels do
 		sum += level
@@ -229,6 +245,10 @@ function RiftRun.level(levels: { number }, room: number): number
 	local level = base + rule.Base + rule.PerRoom * (math.min(room, RiftRun.Rooms) - 1)
 	if room > RiftRun.Rooms then
 		level += rule.Boss
+	end
+	local starter = DungeonRules.starter(boss)
+	if starter then
+		level = math.min(level, starter.Level)
 	end
 	return math.clamp(level, 1, rule.Max)
 end
@@ -277,6 +297,10 @@ end
 -- at `levels`: the last cave's, and Level.Threat more by its threat.
 function RiftRun.bossLevel(levels: { number }, boss): number
 	local rule = RiftRun.Level
+	local starter = DungeonRules.starter(boss)
+	if starter then
+		return math.clamp(starter.Level, 1, rule.Max)
+	end
 	local extra = rule.Threat[BossLoot.threat(boss)] or 0
 	return math.clamp(RiftRun.level(levels, RiftRun.Rooms) + extra, 1, rule.Max)
 end
@@ -316,7 +340,8 @@ end
 function RiftRun.bossHealth(runners: number, boss: any?): number
 	local rule = RiftRun.Boss
 	local threat = if boss then BossLoot.health(boss) else 1
-	return rule.Health * (1 + rule.PerRunner * (math.max(1, runners) - 1)) * threat
+	local starter = DungeonRules.starter(boss)
+	return rule.Health * (1 + rule.PerRunner * (math.max(1, runners) - 1)) * threat * (if starter then starter.Health else 1)
 end
 
 -- The boss's gear tier: 4 alone (its gem Ultra Rare), 4 or 5 for a party.
@@ -358,9 +383,10 @@ function RiftRun.restoreCost(used: number): number
 	return math.floor(RiftRun.Restore.Coins * RiftRun.Restore.Grow ^ math.max(0, used) + 0.5)
 end
 
--- Going in alone (warned: it's built for a party).
-function RiftRun.solo(runners: number): boolean
-	return runners <= 1
+-- Going in alone (warned: it's built for a party; not for a starter
+-- `boss`, which is recommended solo).
+function RiftRun.solo(runners: number, boss: any?): boolean
+	return runners <= 1 and not DungeonRules.starter(boss)
 end
 
 -- The way through: Rooms + 2 cells on a grid ({ X, Z }), the landing first

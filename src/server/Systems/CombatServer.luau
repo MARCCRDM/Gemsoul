@@ -13,6 +13,7 @@ local WeaponForge = require(ReplicatedStorage.Shared.WeaponForge)
 local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
+local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local CrowdControl = require(ReplicatedStorage.Shared.CrowdControl)
 local ElementCombos = require(ReplicatedStorage.Shared.ElementCombos)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
@@ -513,7 +514,30 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 	end
 	-- Elements against your armor gems (ElementMatchup): each resists its
 	-- own element; your main one is weak to the element that beats it.
-	local matchMult, matchTag = ElementMatchup.against(element, ElementMatchup.profile(PlayerData.character(player)))
+	-- A boss (a dungeon's or the Rift's) hits the armor its element beats
+	-- harder still (DungeonRules.bossHit), and says so now and then.
+	local profile = ElementMatchup.profile(PlayerData.character(player))
+	local encounter = enemySource and enemySource.Duel and enemySource.Duel.Dungeon
+	local matchMult, matchTag
+	if encounter and encounter.Boss and encounter.Spec then
+		matchMult, matchTag = DungeonRules.bossHit(element, profile)
+		if matchTag == "Weak" and now >= (st.BossWeakSaidAt or 0) then
+			st.BossWeakSaidAt = now + 20
+			local label = string.upper(GemConfig.ElementLabels[element] or element or "")
+			Remotes.Notify:FireClient(
+				player,
+				string.format(
+					"%s's %s hits your %s armor hard: put %s gems in your armor to resist it.",
+					encounter.Spec.Name,
+					label,
+					string.upper(GemConfig.ElementLabels[profile.Main or ""] or ""),
+					label
+				)
+			)
+		end
+	else
+		matchMult, matchTag = ElementMatchup.against(element, profile)
+	end
 	local resistance = k.Defense.Resistance
 	local defense = rating(k, "Defense") * (if now < st.SunderUntil then 1 - st.Sunder else 1)
 	local damage = amount

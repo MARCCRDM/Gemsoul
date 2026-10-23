@@ -54,6 +54,9 @@ Dungeon.Roster = {
 -- to beat alone, II alone or with a friend, III built for a group), how
 -- tough it is and how rich the cache it drops (Shared.BossLoot); Loot: the
 -- kind of gear its cache favours.
+-- Starter: a first boss for a new miner, recommended solo at Level (its
+-- trip's critters and itself no higher, RiftRun.level), with Health of the
+-- usual health and Foes fewer critters a cave (RiftRun.foeCount).
 Dungeon.Bosses = {
 	{
 		Id = "Gattini",
@@ -74,6 +77,7 @@ Dungeon.Bosses = {
 		Moves = { "FlameBreath", "TailSweep", "FirebombDive" },
 		Threat = 1,
 		Loot = "Helmets",
+		Starter = { Level = 2, Health = 0.6, Foes = 1 },
 	},
 	{
 		Id = "Paperotti",
@@ -104,6 +108,7 @@ Dungeon.Bosses = {
 		Moves = { "PeelToss", "JungleRush", "BananaBounce" },
 		Threat = 1,
 		Loot = "Boots",
+		Starter = { Level = 2, Health = 0.6, Foes = 1 },
 	},
 	{
 		Id = "SahurTrio",
@@ -222,6 +227,54 @@ end
 function Dungeon.elementMultiplier(main, weakness, incoming)
 	return ElementMatchup.versus(incoming, main, weakness)
 end
+-- A boss's hits on a miner whose main armor element its own beats (the
+-- 125% everyone's weakness takes: ElementMatchup.against) land BossWeak
+-- times harder again: bosses punish the wrong armor. Returns the
+-- multiplier and its tag, as ElementMatchup.against does.
+Dungeon.BossWeak = 1.3
+function Dungeon.bossHit(attack: string?, profile): (number, string?)
+	local mult, tag = ElementMatchup.against(attack, profile)
+	if attack and profile and profile.Main and attack == ElementMatchup.weakTo(profile.Main) then
+		return mult * Dungeon.BossWeak, "Weak"
+	end
+	return mult, tag
+end
+
+-- What to bring against `boss` (a Bosses entry), for the gate's card, the
+-- bounty board and the notices in the fight: { Element, Weakness, Hurts
+-- (the armor element it hits hardest), Lines = { the tips, in words } }.
+local function label(element: string?): string
+	-- (Asked for here, not at the top: the rules load without it in tests.)
+	local GemConfig = require(script.Parent.GemConfig)
+	return string.upper(GemConfig.ElementLabels[element or ""] or element or "?")
+end
+function Dungeon.elementTips(boss)
+	local weakness = boss.Weakness or ElementMatchup.weakTo(boss.Element)
+	local hurts = ElementMatchup.Beats[boss.Element]
+	local extra = math.floor((ElementMatchup.Weak * Dungeon.BossWeak - 1) * 100 + 0.5)
+	return {
+		Element = boss.Element,
+		Weakness = weakness,
+		Hurts = hurts,
+		Lines = {
+			string.format("%s is %s.", boss.Name, label(boss.Element)),
+			string.format("Gems give you protection: %s gems in your armor resist its hits.", label(boss.Element)),
+			string.format(
+				"To defeat it, enchant with %s: a %s gem in your sword hits it for +%d%%.",
+				label(weakness),
+				label(weakness),
+				math.floor((ElementMatchup.Weak - 1) * 100 + 0.5)
+			),
+			string.format("Careful: its hits do +%d%% to %s armor.", extra, label(hurts)),
+		},
+	}
+end
+
+-- A first boss for a new miner (Starter), and the level it's for.
+function Dungeon.starter(boss): { Level: number, Health: number, Foes: number }?
+	return boss and boss.Starter
+end
+
 -- Open expedition camps: shared bounded map, no room gates.
 Dungeon.OpenRadius = 260
 Dungeon.WatchRadius = 11 -- approximately ten feet in Roblox scale
