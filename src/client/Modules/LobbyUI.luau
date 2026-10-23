@@ -133,6 +133,43 @@ local function heading(value, color, x, align)
 end
 heading("PRACTICE", P.Text, 0, Enum.TextXAlignment.Left)
 heading("VS PLAYERS", RED, 700, Enum.TextXAlignment.Right)
+-- Auto queue (Shared.AutoQueue): on call for 1v1s while you're in the
+-- lobby, pulled straight in when a queue needs an opponent. The player's
+-- DuelAuto attribute says where it stands; the switch asks the server.
+local AutoQueue = require(game:GetService("ReplicatedStorage").Shared.AutoQueue)
+local autoButton = new("TextButton", {
+	Position = UDim2.fromOffset(440, 4),
+	Size = UDim2.fromOffset(240, 32),
+	Text = "",
+	BackgroundColor3 = Color3.fromRGB(20, 25, 37),
+	AutoButtonColor = true,
+	ZIndex = 21,
+}, stage)
+UiKit.round(autoButton, 16)
+local autoRim = new("UIStroke", { Color = GREEN, Thickness = 1.5 }, autoButton)
+local autoLabel = text(autoButton, "", 14, P.Text, IronUi.Heading)
+autoLabel.Size, autoLabel.ZIndex = UDim2.fromScale(1, 1), 22
+autoLabel.TextStrokeTransparency = 1
+local autoSub = text(stage, "", 10, P.Dim, IronUi.Heading)
+autoSub.Position, autoSub.Size, autoSub.ZIndex = UDim2.fromOffset(400, 38), UDim2.fromOffset(320, 16), 21
+local function autoOn(): boolean
+	local value = player:GetAttribute("DuelAuto")
+	return if value == nil then AutoQueue.Default else value == true
+end
+local function refreshAuto()
+	local on = autoOn()
+	autoLabel.Text = if on then "AUTO QUEUE: ON" else "AUTO QUEUE: OFF"
+	autoLabel.TextColor3 = if on then GREEN else P.Dim
+	autoRim.Color = if on then GREEN else Color3.fromRGB(70, 80, 96)
+	autoSub.Text = if on
+		then string.format("ON CALL FOR 1v1s IN THE LOBBY  ·  WIN +%d ◆  ·  NO RATING LOST", AutoQueue.FillBonus)
+		else "YOU'LL BE ASKED BEFORE STEPPING INTO A 1v1"
+end
+autoButton.Activated:Connect(function()
+	run("DuelAuto", not autoOn())
+end)
+player:GetAttributeChangedSignal("DuelAuto"):Connect(refreshAuto)
+refreshAuto()
 -- The divider between practice and the player modes.
 new("Frame", {
 	Position = UDim2.fromOffset(806, 60),
@@ -1077,6 +1114,13 @@ function LobbyUI.dashboardOpen(): boolean
 end
 
 player:GetAttributeChangedSignal("DuelsPlayed"):Connect(refreshCards)
+-- Called into a match from the lobby (Shared.AutoQueue): the menus come down.
+player:GetAttributeChangedSignal("MatchId"):Connect(function()
+	if player:GetAttribute("MatchId") then
+		LobbyUI.closePicker()
+		LobbyUI.closeDashboard()
+	end
+end)
 player:GetAttributeChangedSignal("DuelRating"):Connect(refreshCards)
 
 return LobbyUI

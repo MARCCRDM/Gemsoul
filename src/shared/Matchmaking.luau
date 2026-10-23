@@ -1,7 +1,8 @@
 --[[
 	Arena duels between players: the rules both sides share.
 
-	  Modes                       "1v1" (solo) and "2v2" (a party of two)
+	  Modes                       "1v1" (solo), "casual", "2v2" (a party of
+	                              two) and "intro" (a first fight, Shared.AutoQueue)
 	  Matchmaking.versus(a, b)    may these two players hurt each other? Duel
 	                              opponents only, and never your own party
 	  Matchmaking.expected(r, s)  Elo: the chance rating r beats rating s
@@ -35,6 +36,9 @@ Matchmaking.Modes = {
 	["1v1"] = { Name = "1v1 Ranked", Size = 1, Kind = "Ranked", Rounds = true },
 	["2v2"] = { Name = "2v2 Party Duel", Size = 2, Kind = "Ranked" },
 	["casual"] = { Name = "1v1 Casual", Size = 1, Kind = "Casual", Rounds = true },
+	-- A new player's first fight (Shared.AutoQueue): entered by the intro,
+	-- never by the PLAY menu; one fight on even stats.
+	["intro"] = { Name = "First Fight", Size = 1, Kind = "FirstFight", Intro = true },
 }
 Matchmaking.StartRating = 1000
 Matchmaking.K = 32

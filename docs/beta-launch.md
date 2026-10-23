@@ -177,7 +177,10 @@ Social, Feedback, Reports.
 - Check for lost or duplicated items.
 
 **The whole loop with several players:**
-- Join, then style, element, first fight, lobby.
+- Join, then style, element, first fight, lobby. With two new players
+  joining together the first fight is against each other (the intro queue,
+  `docs/lobby.md` > Auto queue); with one, a lobby player is called in,
+  and with nobody around the sparring rival steps in.
 - Then mine, enchant, a 1v1, rewards, back to the lobby, rejoin.
 
 **Transitions:**

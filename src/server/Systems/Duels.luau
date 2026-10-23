@@ -13,11 +13,22 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	  "DuelPivot", armor?, weapon?   between Ranked rounds: lock in an armor
 	                          loadout and a weapon loadout (slots 1-3; nil
 	                          keeps what you wear)
+	  "DuelAuto", on          auto queue (Shared.AutoQueue): on call for the
+	                          lobby (the default) or not
+	  "DuelFill", id, accept  answer a fill-in offer for queue entry `id`
+	  "IntroQueue"            a new player's first fight: queued with another
+	                          new player, else a lobby player on call, else
+	                          the sparring rival (ArenaSessions.enterTraining)
 
 	The Social remote tells clients:
-	  "Queue", { Mode, Since, Waiting } | nil   your queue state
+	  "Queue", { Mode, Since, Waiting, Intro } | nil   your queue state
+	  "FillIn", { Id, Mode, Name, Who, Rating, Bonus, Seconds }   someone's
+	                                            waiting in a queue: step in?
+	  "FillInOver", id                          that queue was filled or left
 	  "Challenge", fromId, fromName, rating, stats   someone challenged you
-	  "Match", { Id, Mode, Ranked, Rules, StartsAt, Ends, Team, Teams }
+	  "Match", { Id, Mode, Ranked, Rules, StartsAt, Ends, Team, Teams,
+	             Called, Bonus, Intro }         (Called: pulled from the lobby
+	                                            for it, Bonus coins on a win)
 	  "Fight"                                   the countdown is over
 	  "Round", { Phase = "Pivot", Round, Winner, Reason, Wins, Team, Ends, Scout }
 	                                            a Ranked round is over: pick a
@@ -27,7 +38,7 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	  "Round", { Phase = "Reveal", Round, Wins, Team, StartsAt, Ends, Picks }
 	                                            both picks, then the countdown
 	  "MatchEnd", { Won, Draw, Reason, Rating, Delta, Coins, Ranked, Rules,
-	                Streak, Tournament = { Streak, Win, Of, Counted, Champion,
+	                Streak, Called, Bonus, Intro, Tournament = { Streak, Win, Of, Counted, Champion,
 	                Share, Swings, NextAt, NextShare } (a queued 1v1: the
 	                arena tournament's run, Shared.SwingRestore) }
 	  "Feed", text                              a duel result, for everyone's chat
@@ -46,6 +57,12 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	(CombatServer.onLethal). Between rounds, the pivot window: preset swaps
 	only (Presets.wear), both lock at once, then the picks are revealed.
 	Each player's rating, wins and losses save in their profile (Duel).
+	Auto queue (Shared.AutoQueue): a lone 1v1 queue entry calls the lobby
+	after a few seconds. Free players on call (the default) are pulled in,
+	closest rating first, their rating safe from a loss and a bonus on a
+	win; players who turned it off are offered the match instead (FillIn).
+	A new player's first fight is the "intro" queue: two new players pair at
+	once; alone, a lobby player is called; still alone, the sparring rival.
 	Queued 1v1s (Ranked or Casual, not challenges) are the arena tournament
 	(Shared.SwingRestore): the 1st, 5th and 10th win of a run restore the
 	pick's swings (Restores), and ten in a row wins the tournament (Ranked:
@@ -55,6 +72,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local AutoQueue = require(ReplicatedStorage.Shared.AutoQueue)
 local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
@@ -75,8 +93,9 @@ local reply = Shop.reply
 
 local Duels = {}
 
--- { Mode, Players, Since, SinceServer, Rating, Size }
+-- { Id, Mode, Players, Since, SinceServer, Rating, Size, Asked }
 local queue = {}
+local nextEntry = 0
 -- [id] = { Id, Mode, Ranked, Teams, Out, Slot, State, StartsAt, Ends, Connections }
 local matches = {}
 local matchOf: { [Player]: any } = {}
@@ -112,6 +131,7 @@ local function publish(player: Player)
 		player:SetAttribute("DuelRating", record.Rating)
 		player:SetAttribute("DuelWins", record.Wins)
 		player:SetAttribute("DuelsPlayed", (record :: any).Played or 0)
+		player:SetAttribute("DuelAuto", AutoQueue.setting(record))
 	end
 	local profile = PlayerData.get(player)
 	if profile and profile.Season then
@@ -180,7 +200,7 @@ local function pushQueue(entry)
 		Remotes.Social:FireClient(
 			member,
 			"Queue",
-			{ Mode = entry.Mode, Since = entry.SinceServer, Waiting = waiting(entry.Mode) }
+			{ Mode = entry.Mode, Since = entry.SinceServer, Waiting = waiting(entry.Mode), Intro = entry.Mode == AutoQueue.IntroMode }
 		)
 	end
 end
@@ -196,6 +216,12 @@ local function dequeue(player: Player, note: string?)
 		Remotes.Social:FireClient(member, "Queue", nil)
 		if note and member ~= player then
 			Remotes.Notify:FireClient(member, note)
+		end
+	end
+	-- Anyone offered this entry as a fill-in: the offer's over.
+	for asked in entry.Asked or {} do
+		if asked.Parent then
+			Remotes.Social:FireClient(asked, "FillInOver", entry.Id)
 		end
 	end
 	return true
@@ -328,6 +354,11 @@ function finish(match, winner: number?, reason: string)
 			if record and winner then
 				if match.Ranked then
 					after = Matchmaking.rated(before, other, won)
+					-- Called from the lobby (Shared.AutoQueue): a loss costs
+					-- no rating.
+					if match.Called[member] and after < before then
+						after = before
+					end
 					record.Rating = after
 				end
 				record.Wins += if won then 1 else 0
@@ -375,7 +406,8 @@ function finish(match, winner: number?, reason: string)
 				-- Every finished duel counts toward the lobby's unlocks.
 				(record :: any).Played = ((record :: any).Played or 0) + 1
 			end
-			local coins = if winner == nil then 0 elseif won then rewards.Win else rewards.Loss
+			local bonus = if winner ~= nil then AutoQueue.bonus(match.Called[member], won) else 0
+			local coins = (if winner == nil then 0 elseif won then rewards.Win else rewards.Loss) + bonus
 			if member.Parent then
                 if #match.Teams[1] == 1 and #match.Teams[2] == 1 then
                     PlayerData.training(member, "PvPPlayed")
@@ -396,6 +428,9 @@ function finish(match, winner: number?, reason: string)
 					Rating = after,
 					Delta = after - before,
 					Coins = coins,
+					Bonus = bonus,
+					Called = match.Called[member] == true,
+					Intro = match.Intro == true,
 					Opponents = names[if t == 1 then 2 else 1],
 					Rules = { Name = match.Rules.Name, Stats = match.Rules.Stats },
 					Streak = rankedStreak,
@@ -404,6 +439,17 @@ function finish(match, winner: number?, reason: string)
 						then { Mine = match.Rounds.Wins[t], Theirs = match.Rounds.Wins[if t == 1 then 2 else 1] }
 						else nil,
 				})
+				-- A first fight is over: the hints come down (Funnel logs the
+				-- step on this), and the Outpost is next.
+				if match.FirstFighters[member] then
+					member:SetAttribute("FirstFight", nil)
+					Remotes.Notify:FireClient(
+						member,
+						if won
+							then string.format("You beat %s! Welcome to the Saga Outpost.", names[if t == 1 then 2 else 1])
+							else "A hard first fight. Welcome to the Saga Outpost: gear up and come back."
+					)
+				end
 			end
 		end
 	end
@@ -479,8 +525,11 @@ local function elementsOf(team): { string }
 	return list
 end
 
--- `rules`: the PvP rule it plays by (Shared.PvPRules.profile).
-local function startMatch(mode: string, teams, rules): (boolean, string?)
+-- `rules`: the PvP rule it plays by (Shared.PvPRules.profile). `extra`
+-- (Shared.AutoQueue): Called = { [player] = true } for fighters pulled from
+-- the lobby; Intro for a first fight (its new players get the hints).
+local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
+	extra = extra or {}
 	local ranked = rules.Rated
 	local slot = freeSlot()
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
@@ -519,6 +568,9 @@ local function startMatch(mode: string, teams, rules): (boolean, string?)
 		Ends = now + countdown + limit,
 		Connections = {},
 		Shields = {},
+		Called = extra.Called or {},
+		Intro = extra.Intro == true,
+		FirstFighters = {},
 		-- Rounds (1v1 Ranked): wins per team, rounds played, the pivot's
 		-- picks and locks, and what each side was scouted carrying.
 		Rounds = if rounds then { Wins = { 0, 0 }, Played = 0, Picks = {}, Locked = {}, PivotEnds = 0 } else nil,
@@ -540,6 +592,14 @@ local function startMatch(mode: string, teams, rules): (boolean, string?)
 			member:SetAttribute("MatchTeam", t)
 			member:SetAttribute("PvPEnabled", true)
 			member:SetAttribute("CombatSession", "Duel")
+			if match.Intro then
+				local record = Duels.record(member)
+				if record and ((record :: any).Played or 0) == 0 then
+					-- Their first fight: the controls' hints (Shared.FastStart).
+					match.FirstFighters[member] = true
+					member:SetAttribute("FirstFight", true)
+				end
+			end
 			local humanoid = alive(member)
 			if humanoid then
 				table.insert(entrants, member.Character)
@@ -566,6 +626,9 @@ local function startMatch(mode: string, teams, rules): (boolean, string?)
 				Ends = startsAt + limit,
 				Team = t,
 				Teams = info,
+				Called = match.Called[member] == true,
+				Bonus = if match.Called[member] then AutoQueue.FillBonus else 0,
+				Intro = match.Intro,
 			})
 		end
 	end
@@ -742,9 +805,197 @@ end
 
 -- Queue ----------------------------------------------------------------------
 
+local function enqueue(mode: string, group, size: number)
+	for _, member in group do
+		dequeue(member)
+	end
+	nextEntry += 1
+	local entry = {
+		Id = "Q" .. nextEntry,
+		Mode = mode,
+		Players = group,
+		Since = os.clock(),
+		SinceServer = serverNow(),
+		Rating = teamRating(group),
+		Size = size,
+		Asked = {},
+	}
+	table.insert(queue, entry)
+	pushQueue(entry)
+	for _, other in queue do
+		if other ~= entry and other.Mode == mode then
+			pushQueue(other) -- (the waiting count changed)
+		end
+	end
+	return entry
+end
+
+local function entryById(id: any)
+	for _, entry in queue do
+		if entry.Id == id then
+			return entry
+		end
+	end
+	return nil
+end
+
+-- A new player's first fight (Shared.AutoQueue): the intro queue.
+local function introJoin(player: Player)
+	local record = Duels.record(player)
+	if not record then
+		return reply(false, "Still loading…")
+	end
+	if ((record :: any).Played or 0) > 0 then
+		return reply(false, "You've fought before: pick a mode from the PLAY menu.")
+	end
+	local reason = busy(player)
+	if reason then
+		return reply(false, subject(player, player, reason))
+	end
+	enqueue(AutoQueue.IntroMode, { player }, 1)
+	return reply(true, "Finding your first opponent…")
+end
+
+-- Auto queue (Shared.AutoQueue) ------------------------------------------------
+
+-- Free lobby players who may be called for `entry`: those on call, and
+-- those who'd rather be asked. Each { Player, Rating }.
+local function onCall(entry)
+	local auto, manual = {}, {}
+	for _, other in Players:GetPlayers() do
+		if not table.find(entry.Players, other) and not busy(other) then
+			local ok = AutoQueue.ready(function(name)
+				return other:GetAttribute(name)
+			end, entryOf(other) ~= nil)
+			local record = ok and Duels.record(other)
+			if record then
+				local candidate = { Player = other, Rating = record.Rating }
+				table.insert(if AutoQueue.setting(record) then auto else manual, candidate)
+			end
+		end
+	end
+	return auto, manual
+end
+
+local function rulesFor(mode: string)
+	local spec = Matchmaking.Modes[mode]
+	return PvPRules.profile(spec and spec.Kind or "Ranked")
+end
+
+-- `called` steps into `entry`'s match from the lobby.
+local function fillWith(entry, called: Player): (boolean, string?)
+	local spec = Matchmaking.Modes[entry.Mode]
+	local ok, problem = startMatch(
+		entry.Mode,
+		{ table.clone(entry.Players), { called } },
+		rulesFor(entry.Mode),
+		{ Called = { [called] = true }, Intro = spec and spec.Intro }
+	)
+	if ok then
+		Remotes.Notify:FireClient(
+			called,
+			string.format(
+				if spec and spec.Kind == "Ranked"
+					then "Called in: %s is waiting for a %s. Win it for +%d ◆ on top; a loss costs you no rating."
+					else "Called in: %s is waiting for a %s. Win it for +%d ◆ on top.",
+				entry.Players[1].DisplayName,
+				spec and spec.Name or entry.Mode,
+				AutoQueue.FillBonus
+			)
+		)
+	end
+	return ok, problem
+end
+
+-- A lone 1v1 entry has waited long enough: pull someone on call, else ask
+-- the lobby; a lone intro entry falls back to the sparring rival.
+local function fill(entry, now: number)
+	if entry.Size ~= 1 then
+		return
+	end
+	local spec = Matchmaking.Modes[entry.Mode]
+	local intro = spec and spec.Intro
+	local waited = now - entry.Since
+	if intro and AutoQueue.introPhase(waited) == "Bot" then
+		local player = entry.Players[1]
+		dequeue(player)
+		Remotes.Notify:FireClient(player, "No one else is around right now: a sparring partner steps in.")
+		local result = ArenaSessions.enterTraining(player)
+		if result and result.Ok == false then
+			Remotes.Notify:FireClient(player, result.Message or "The Arena isn't ready yet.")
+		end
+		return
+	end
+	if waited < (if intro then AutoQueue.Intro.CallAfter else AutoQueue.CallAfter) or not freeSlot() then
+		return
+	end
+	local auto, manual = onCall(entry)
+	local picked = AutoQueue.pick(auto, entry.Rating)
+	if picked then
+		local ok = fillWith(entry, picked.Player)
+		if ok then
+			return
+		end
+	end
+	for _, candidate in manual do
+		local other = candidate.Player
+		if not entry.Asked[other] then
+			entry.Asked[other] = true
+			Remotes.Social:FireClient(other, "FillIn", {
+				Id = entry.Id,
+				Mode = entry.Mode,
+				Name = spec and spec.Name or entry.Mode,
+				Who = entry.Players[1].DisplayName,
+				Rating = entry.Rating,
+				Bonus = AutoQueue.FillBonus,
+				Seconds = AutoQueue.AskSeconds,
+				Intro = intro == true,
+			})
+		end
+	end
+end
+
+local function setAuto(player: Player, on: any)
+	local record = Duels.record(player)
+	if not record then
+		return reply(false, "Still loading…")
+	end
+	(record :: any).AutoQueue = on ~= false
+	publish(player)
+	PlayerData.sync(player)
+	return reply(
+		true,
+		if on ~= false
+			then string.format("Auto queue on: you're on call for 1v1s while you're in the lobby (+%d ◆ bonus on a win).", AutoQueue.FillBonus)
+			else "Auto queue off: you'll be asked before stepping into anyone's 1v1."
+	)
+end
+
+local function fillRespond(player: Player, id: any, accept: any)
+	local entry = entryById(id)
+	if not entry then
+		return reply(false, "That queue has been filled already.")
+	end
+	if accept ~= true then
+		return reply(true, "Maybe next time.")
+	end
+	local reason = busy(player)
+	if reason then
+		return reply(false, subject(player, player, reason))
+	end
+	if table.find(entry.Players, player) then
+		return reply(false, "That's your own queue.")
+	end
+	local ok, problem = fillWith(entry, player)
+	if not ok then
+		return reply(false, problem or "The duel couldn't start.")
+	end
+	return reply(true, "Stepping in!")
+end
+
 local function join(player: Player, mode: any)
 	local spec = Matchmaking.Modes[mode]
-	if not spec then
+	if not spec or spec.Intro then
 		return reply(false, "Unknown duel mode.")
 	end
 	local group = { player }
@@ -767,21 +1018,7 @@ local function join(player: Player, mode: any)
 	for _, member in group do
 		dequeue(member)
 	end
-	local entry = {
-		Mode = mode,
-		Players = group,
-		Since = os.clock(),
-		SinceServer = serverNow(),
-		Rating = teamRating(group),
-		Size = spec.Size,
-	}
-	table.insert(queue, entry)
-	pushQueue(entry)
-	for _, other in queue do
-		if other ~= entry and other.Mode == mode then
-			pushQueue(other) -- (the waiting count changed)
-		end
-	end
+	enqueue(mode, group, spec.Size)
 	return reply(true, "Searching for a " .. spec.Name .. "…")
 end
 
@@ -794,14 +1031,32 @@ function Duels.pairUp()
 				table.insert(entries, entry)
 			end
 		end
-		for _, pair in Matchmaking.pair(entries, os.clock()) do
+		local spec = Matchmaking.Modes[mode]
+		local pairs
+		if spec.Intro then
+			-- First fights pair at once, whatever the ratings: everyone's new.
+			table.sort(entries, function(x, y)
+				return x.Since < y.Since
+			end)
+			pairs = {}
+			for i = 1, #entries - 1, 2 do
+				table.insert(pairs, { i, i + 1 })
+			end
+		else
+			pairs = Matchmaking.pair(entries, os.clock())
+		end
+		for _, pair in pairs do
 			if not freeSlot() then
 				return
 			end
 			local a, b = entries[pair[1]], entries[pair[2]]
-			local kind = Matchmaking.Modes[mode].Kind or "Ranked"
-			local ok, problem =
-				startMatch(mode, { table.clone(a.Players), table.clone(b.Players) }, PvPRules.profile(kind))
+			local kind = spec.Kind or "Ranked"
+			local ok, problem = startMatch(
+				mode,
+				{ table.clone(a.Players), table.clone(b.Players) },
+				PvPRules.profile(kind),
+				{ Intro = spec.Intro }
+			)
 			if not ok then
 				-- Someone became busy: drop whoever it was from the queue.
 				for _, entry in { a, b } do
@@ -875,6 +1130,12 @@ end
 local function step()
 	local now = os.clock()
 	Duels.pairUp()
+	-- Lone entries call the lobby (Shared.AutoQueue).
+	for _, entry in table.clone(queue) do
+		if entryById(entry.Id) then
+			fill(entry, now)
+		end
+	end
 	-- A party that changed shape can't stay queued as a pair.
 	for i = #queue, 1, -1 do
 		local entry = queue[i]
@@ -944,6 +1205,9 @@ function Duels.start()
 	Shop.register("DuelChallenge", challenge)
 	Shop.register("DuelRespond", respond)
 	Shop.register("DuelPivot", pivot)
+	Shop.register("DuelAuto", setAuto)
+	Shop.register("DuelFill", fillRespond)
+	Shop.register("IntroQueue", introJoin)
 	CombatServer.onLethal(lethal)
 	Shop.register("DuelLeave", function(player)
 		local match = matchOf[player]

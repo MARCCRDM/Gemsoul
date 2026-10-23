@@ -79,11 +79,22 @@ local function moves()
 	return list
 end
 
+-- The sparring rival, or (a first fight against another new player, the
+-- intro queue: Shared.AutoQueue) the opponent's character: both carry the
+-- same action attributes.
 local function partner(): Model?
 	local folder = workspace:FindFirstChild("Enemies")
 	for _, model in if folder then folder:GetChildren() else {} do
 		if model:IsA("Model") and model:GetAttribute("RivalOwner") == player.UserId then
 			return model
+		end
+	end
+	local mine = player:GetAttribute("MatchId")
+	if mine then
+		for _, other in Players:GetPlayers() do
+			if other ~= player and other:GetAttribute("MatchId") == mine and other.Character then
+				return other.Character
+			end
 		end
 	end
 	return nil

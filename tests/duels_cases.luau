@@ -493,3 +493,234 @@ local playedTasks,wonTasks=0,0
 for _,events in taskEvents do playedTasks+=events.PvPPlayed or 0;wonTasks+=events.PvPWin or 0 end
 assert(playedTasks>0 and wonTasks>0,"Finished 1v1 matches must emit task events")
 print("PASS: real PvP completion emits participation and victory task events")
+
+-- Auto queue (Shared.AutoQueue): the lobby is on call -----------------------------
+do
+	local before = checks
+	-- The shared rules.
+	local function attrs(t)
+		return function(name)
+			return t[name]
+		end
+	end
+	check(AutoQueue.ready(attrs({ Outpost = true })), "A free lobby player isn't ready")
+	check(not AutoQueue.ready(attrs({})), "Someone outside the lobby was ready")
+	check(not AutoQueue.ready(attrs({ Outpost = true }), true), "A player already searching was ready")
+	for _, name in { "CombatSession", "MatchId", "KaijuBattle", "Spar", "MechPilot", "DungeonQueue", "FirstFight", "RiftRun" } do
+		local ok, why = AutoQueue.ready(attrs({ Outpost = true, [name] = true }))
+		check(not ok and type(why) == "string", name .. " didn't make a player unready")
+	end
+	check(AutoQueue.setting(nil) == true and AutoQueue.setting({}) == true, "Auto queue isn't on by default")
+	check(AutoQueue.setting({ AutoQueue = false }) == false, "Switching auto queue off didn't stick")
+	check(
+		AutoQueue.introPhase(0) == "Search"
+			and AutoQueue.introPhase(AutoQueue.Intro.CallAfter) == "Call"
+			and AutoQueue.introPhase(AutoQueue.Intro.BotAfter) == "Bot",
+		"Intro phases"
+	)
+	check(AutoQueue.Intro.CallAfter < AutoQueue.Intro.BotAfter, "The bot comes before the lobby is called")
+	local picked = AutoQueue.pick({ { Rating = 1300, Name = "a" }, { Rating = 1040, Name = "b" }, { Rating = 900, Name = "c" } }, 1000)
+	check(picked and picked.Name == "b", "The closest rating wasn't picked")
+	check(AutoQueue.pick({}, 1000) == nil, "An empty lobby picked someone")
+	check(AutoQueue.bonus(true, true) == AutoQueue.FillBonus and AutoQueue.bonus(true, false) == 0 and AutoQueue.bonus(false, true) == 0, "Fill bonus")
+	check(Matchmaking.Modes.intro and Matchmaking.Modes.intro.Intro and PvPRules.Kinds.FirstFight, "The intro mode and its rule are missing")
+	check(not Matchmaking.playsRounds("intro", "FirstFight"), "A first fight plays rounds")
+
+	-- Clear the decks: the lane test above left duels running and players
+	-- queued (a lobby player would be called into those).
+	for _, p in table.clone(playerList) do
+		if Duels.matchOf(p) or p:GetAttribute("DuelQueue") then
+			Players.PlayerRemoving.Fire(p)
+			local i = table.find(playerList, p)
+			if i then
+				table.remove(playerList, i)
+			end
+		end
+	end
+	advance(Matchmaking.EndPause + 0.25)
+	-- Every finished match so far has left everyone out of the lobby; put the
+	-- cast in the Outpost as veterans with a duel behind them.
+	local function lobby(p, played)
+		p:SetAttribute("Outpost", true)
+		local record = Duels.record(p)
+		record.Played = played or record.Played or 1
+		p:SetAttribute("DuelsPlayed", record.Played)
+	end
+	local ivy, jon, kim = makePlayer(31, "Ivy"), makePlayer(32, "Jon"), makePlayer(33, "Kim")
+	lobby(jon, 4)
+	lobby(kim, 4)
+	Duels.record(jon).Rating = 1300
+	Duels.record(kim).Rating = 1020
+	advance(1) -- (the watch loop publishes)
+	check(jon:GetAttribute("DuelAuto") == true, "Auto queue isn't on by default on the player")
+
+	-- Ivy queues Ranked alone: after CallAfter seconds the closest lobby player is pulled in.
+	check(handlers.DuelQueue(ivy, "1v1").Ok, "Ivy not queued")
+	advance(AutoQueue.CallAfter - 1)
+	check(Duels.matchOf(ivy) == nil, "The lobby was called too soon")
+	advance(1.5)
+	local m = Duels.matchOf(ivy)
+	check(m ~= nil and Duels.matchOf(kim) == m and Duels.matchOf(jon) == nil, "The closest-rated lobby player wasn't pulled in")
+	check(m.Ranked and m.Called[kim] and not m.Called[ivy], "The pulled player isn't marked as called")
+	local info = last(kim, "Match")[2]
+	check(info.Called == true and info.Bonus == AutoQueue.FillBonus and info.Mode == "1v1", "Kim's Match payload doesn't say she was called")
+	check(last(ivy, "Match")[2].Called == false, "Ivy's Match payload says she was called")
+	local note = last(kim, "Notify")
+	check(note and string.find(note[2], "Called in", 1, true), "Kim wasn't told she was called")
+	-- Kim loses: a called player's rating never drops; Ivy's rises.
+	local kimBefore, ivyBefore = Duels.record(kim).Rating, Duels.record(ivy).Rating
+	advance(Matchmaking.Countdown)
+	lethalBlow(kim)
+	advance(Matchmaking.Rounds.Pivot)
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(kim)
+	check(m.State == "Done", "The called match didn't finish")
+	local kimEnd, ivyEnd = last(kim, "MatchEnd")[2], last(ivy, "MatchEnd")[2]
+	check(not kimEnd.Won and kimEnd.Called == true and kimEnd.Bonus == 0 and kimEnd.Delta == 0, "A called loss cost rating or paid a bonus")
+	check(Duels.record(kim).Rating == kimBefore and Duels.record(ivy).Rating > ivyBefore, "Ratings after a called loss")
+	check(ivyEnd.Won and ivyEnd.Called == false and ivyEnd.Bonus == 0, "The queuer got a fill bonus")
+	advance(Matchmaking.EndPause)
+	respawn(ivy, kim)
+
+	-- Kim wins the next one she's called into: the mode's win plus the bonus.
+	lobby(kim)
+	lobby(jon)
+	jon:SetAttribute("Outpost", nil) -- (Jon left the lobby)
+	local coinsBefore = profiles[kim].Coins
+	check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued for Casual")
+	advance(AutoQueue.CallAfter + 0.5)
+	m = Duels.matchOf(ivy)
+	check(m and Duels.matchOf(kim) == m and not m.Ranked, "Kim wasn't pulled into the Casual queue")
+	advance(Matchmaking.Countdown)
+	lethalBlow(ivy)
+	advance(Matchmaking.Rounds.Pivot)
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(ivy)
+	kimEnd = last(kim, "MatchEnd")[2]
+	check(kimEnd.Won and kimEnd.Bonus == AutoQueue.FillBonus, "A called win didn't pay the bonus")
+	check(kimEnd.Coins == PvPRules.Kinds.Casual.Rewards.Win + AutoQueue.FillBonus, "Coins don't include the bonus")
+	check(profiles[kim].Coins == coinsBefore + kimEnd.Coins, "The bonus wasn't paid out")
+	advance(Matchmaking.EndPause)
+	respawn(ivy, kim)
+
+	-- Busy lobby players are never pulled.
+	lobby(kim)
+	for _, name in { "KaijuBattle", "Spar", "MechPilot", "CombatSession" } do
+		kim:SetAttribute(name, true)
+		check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued")
+		advance(AutoQueue.CallAfter + 0.5)
+		check(Duels.matchOf(ivy) == nil, "A lobby player with " .. name .. " was pulled in")
+		handlers.DuelCancel(ivy)
+		kim:SetAttribute(name, nil)
+	end
+	-- (CombatSession was set by hand above; Kim's back in the lobby.)
+	lobby(kim)
+
+	-- Auto queue off: Kim is asked, not pulled.
+	check(handlers.DuelAuto(kim, false).Ok and kim:GetAttribute("DuelAuto") == false, "Auto queue didn't switch off")
+	check(profiles[kim].Duel.AutoQueue == false, "The choice isn't saved in the profile")
+	check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued")
+	local entryId = nil
+	advance(AutoQueue.CallAfter + 0.5)
+	check(Duels.matchOf(ivy) == nil and Duels.matchOf(kim) == nil, "A player with auto queue off was pulled in")
+	local offer = last(kim, "FillIn")
+	check(offer ~= nil, "Kim wasn't offered the fill-in")
+	offer = offer[2]
+	entryId = offer.Id
+	check(offer.Who == "Ivy" and offer.Mode == "casual" and offer.Bonus == AutoQueue.FillBonus and offer.Seconds == AutoQueue.AskSeconds, "The offer's details")
+	local offers = 0
+	for _, message in sent[kim] do
+		if message[1] == "FillIn" then
+			offers += 1
+		end
+	end
+	advance(2)
+	for _, message in sent[kim] do
+		if message[1] == "FillIn" then
+			offers -= 1
+		end
+	end
+	check(offers == 0, "Kim was offered the same queue twice")
+	check(not handlers.DuelFill(kim, "Q999", true).Ok, "A stale offer was accepted")
+	check(handlers.DuelFill(kim, entryId, false).Ok and Duels.matchOf(kim) == nil, "Declining failed")
+	check(handlers.DuelFill(kim, entryId, true).Ok, "Accepting the fill-in failed")
+	m = Duels.matchOf(ivy)
+	check(m and Duels.matchOf(kim) == m and m.Called[kim], "Accepting didn't start the match")
+	advance(Matchmaking.Countdown)
+	lethalBlow(ivy)
+	advance(Matchmaking.Rounds.Pivot)
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(ivy)
+	advance(Matchmaking.EndPause)
+	respawn(ivy, kim)
+	-- Cancelling a queue ends its offers.
+	lobby(kim)
+	check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued")
+	advance(AutoQueue.CallAfter + 0.5)
+	offer = last(kim, "FillIn")[2]
+	handlers.DuelCancel(ivy)
+	local over = last(kim, "FillInOver")
+	check(over and over[2] == offer.Id, "The offer wasn't withdrawn when the queue was cancelled")
+	check(handlers.DuelAuto(kim, true).Ok and kim:GetAttribute("DuelAuto") == true, "Auto queue didn't switch back on")
+
+	-- The intro queue: two new players pair at once ---------------------------------
+	local new1, new2 = makePlayer(41, "Nia"), makePlayer(42, "Oli")
+	check(not handlers.DuelQueue(new1, "intro").Ok, "The PLAY menu could queue the intro")
+	check(not handlers.IntroQueue(kim).Ok, "A veteran joined the intro queue")
+	check(handlers.IntroQueue(new1).Ok and new1:GetAttribute("DuelQueue") == "intro", "Nia isn't in the intro queue")
+	check(last(new1, "Queue")[2].Intro == true, "The intro queue state isn't marked")
+	advance(0.25)
+	check(Duels.matchOf(new1) == nil, "A lone new player was matched")
+	check(handlers.IntroQueue(new2).Ok, "Oli isn't in the intro queue")
+	advance(0.25)
+	m = Duels.matchOf(new1)
+	check(m and Duels.matchOf(new2) == m, "Two new players weren't paired at once")
+	check(m.Intro and m.Rules.Kind == "FirstFight" and not m.Ranked and m.Rounds == nil, "A first fight isn't a FirstFight single fight")
+	check(new1:GetAttribute("FirstFight") == true and new2:GetAttribute("FirstFight") == true, "First fighters didn't get their hints")
+	check(last(new1, "Match")[2].Intro == true, "The Match payload isn't marked as the intro")
+	advance(Matchmaking.Countdown)
+	lethalBlow(new2)
+	check(m.State == "Done", "A first fight didn't end on one knockout")
+	check(new1:GetAttribute("FirstFight") == nil and new2:GetAttribute("FirstFight") == nil, "FirstFight wasn't cleared")
+	check(new1:GetAttribute("DuelsPlayed") == 1 and new2:GetAttribute("DuelsPlayed") == 1, "The first fight didn't count as played")
+	check(string.find(last(new1, "Notify")[2], "Welcome to the Saga Outpost", 1, true), "The winner wasn't welcomed")
+	check(string.find(last(new2, "Notify")[2], "Welcome to the Saga Outpost", 1, true), "The loser wasn't welcomed")
+	check(last(new1, "MatchEnd")[2].Intro == true and last(new1, "MatchEnd")[2].Coins == PvPRules.Kinds.FirstFight.Rewards.Win, "A first fight win's pay")
+	advance(Matchmaking.EndPause)
+	respawn(new1, new2)
+	check(not handlers.IntroQueue(new1).Ok, "A player with a fight behind them re-entered the intro queue")
+
+	-- Alone: a lobby player on call is pulled in after Intro.CallAfter -------------
+	local new3 = makePlayer(43, "Pax")
+	lobby(kim)
+	check(handlers.IntroQueue(new3).Ok, "Pax isn't in the intro queue")
+	advance(AutoQueue.Intro.CallAfter - 1)
+	check(Duels.matchOf(new3) == nil, "The lobby was called into the intro too soon")
+	advance(1.5)
+	m = Duels.matchOf(new3)
+	check(m and Duels.matchOf(kim) == m and m.Intro and m.Called[kim], "A lobby player wasn't called into the first fight")
+	check(new3:GetAttribute("FirstFight") == true and kim:GetAttribute("FirstFight") == nil, "Only the new player gets the hints")
+	advance(Matchmaking.Countdown)
+	lethalBlow(new3)
+	check(m.State == "Done", "The called first fight didn't end")
+	kimEnd = last(kim, "MatchEnd")[2]
+	check(kimEnd.Won and kimEnd.Bonus == AutoQueue.FillBonus and kimEnd.Intro == true, "The called veteran's bonus")
+	check(new3:GetAttribute("FirstFight") == nil and new3:GetAttribute("DuelsPlayed") == 1, "Pax's first fight didn't count")
+	advance(Matchmaking.EndPause)
+	respawn(new3, kim)
+
+	-- Alone with nobody around: the sparring rival after Intro.BotAfter --------------
+	local new4 = makePlayer(44, "Quin")
+	kim:SetAttribute("Outpost", nil)
+	check(handlers.IntroQueue(new4).Ok, "Quin isn't in the intro queue")
+	advance(AutoQueue.Intro.BotAfter - 1)
+	check(new4:GetAttribute("DuelQueue") == "intro" and #trainingEntered == 0, "The rival came too soon")
+	advance(1.5)
+	check(#trainingEntered == 1 and trainingEntered[1] == new4, "The sparring rival didn't step in")
+	check(new4:GetAttribute("DuelQueue") == nil and Duels.matchOf(new4) == nil, "Quin is still queued")
+	check(string.find(last(new4, "Notify")[2], "sparring partner", 1, true), "Quin wasn't told about the rival")
+	new4:SetAttribute("CombatSession", nil)
+
+	-- Nobody is called while the Arena's lanes are full: the entry waits.
+	print("PASS: " .. (checks - before) .. " auto queue checks (on call by default, the closest rating pulled in, rating safe, fill bonus, offers when off, withdrawn offers, intro pairs, called veterans, the rival fallback)")
+end

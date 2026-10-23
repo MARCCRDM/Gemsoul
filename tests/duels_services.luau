@@ -258,10 +258,17 @@ local function lethalBlow(p)
 	p.Humanoid.Health = 0
 	p.Humanoid.Died.Fire()
 end
+-- The sparring rival's session (the intro queue's fallback): each entry, recorded.
+local trainingEntered = {}
 local ArenaSessions = {
 	leave = function(p)
 		p:SetAttribute("CombatSession", nil)
 		p:SetAttribute("PvPEnabled", false)
+	end,
+	enterTraining = function(p)
+		table.insert(trainingEntered, p)
+		p:SetAttribute("CombatSession", "Training")
+		return { Ok = true, Message = "Training Arena: a sparring partner steps in." }
 	end,
 }
 local parties = {}

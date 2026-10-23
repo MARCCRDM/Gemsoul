@@ -7,6 +7,8 @@
 	              "Full" (everything you've          friends with uneven stats)
 	              earned) or "Even"
 	  Casual      Even                         no   Win 15 / Loss 5
+	  FirstFight  Even (a new player's first    no   Win 15 / Loss 5
+	              fight against a player)
 	  Ranked      Even, rarity capped at        yes  Win 40 / Loss 10
 	              Ultra Rare
 
@@ -33,6 +35,9 @@ PvPRules.UltraRare = 4
 PvPRules.Kinds = {
 	Challenge = { Name = "Outpost duel", Rated = false, Rewards = { Win = 5, Loss = 0 } },
 	Casual = { Name = "1v1 Casual", Rated = false, Stats = "Even", Rewards = { Win = 15, Loss = 5 } },
+	-- A new player's first fight against another player (Shared.AutoQueue):
+	-- one fight, unrated, paid like Casual.
+	FirstFight = { Name = "First Fight", Rated = false, Stats = "Even", Rewards = { Win = 15, Loss = 5 } },
 	Ranked = {
 		Name = "Ranked",
 		Rated = true,

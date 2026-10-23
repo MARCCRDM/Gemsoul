@@ -2,8 +2,9 @@
 	Lobby-first: the Saga Outpost is the lobby.
 
 	  New players   after the splash and the starter launch, straight into a
-	                first 1v1 against a sparring rival (one match), then
-	                into the lobby
+	                first 1v1 (one match), then into the lobby. The intro
+	                queue (Shared.AutoQueue) finds another new player, else
+	                calls one from the lobby, else the sparring rival steps in
 	  Everyone else straight into the lobby
 	  The lobby     LobbyUI's PLAY button and tiles show while you're in the
 	                Outpost and not fighting; a finished match returns you
@@ -120,16 +121,77 @@ local function waitFor(condition: () -> boolean, timeout: number): boolean
 	return true
 end
 
--- The intro duel: one match against a sparring rival, then the lobby.
+-- The card over the intro queue: who it's looking for, and the sparring
+-- partner's promise. Returns (setLine, close).
+local GOLD = Color3.fromRGB(255, 202, 91)
+local function searchCard(): ((string) -> (), () -> ())
+	local gui = UiKit.gui("IntroSearch", 25)
+	local card = Instance.new("Frame")
+	card.AnchorPoint = Vector2.new(0.5, 0)
+	card.Position = UDim2.new(0.5, 0, 0, 72)
+	card.Size = UDim2.fromOffset(440, 92)
+	card.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
+	card.BackgroundTransparency = 0.08
+	card.Parent = gui
+	UiKit.round(card, 10)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color, stroke.Thickness = GOLD, 1.5
+	stroke.Parent = card
+	local title = UiKit.text(card, "FINDING YOUR FIRST OPPONENT", 17, GOLD, Enum.Font.GothamBlack)
+	title.AutomaticSize = Enum.AutomaticSize.None
+	title.Position, title.Size = UDim2.fromOffset(0, 14), UDim2.new(1, 0, 0, 22)
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	local line = UiKit.text(card, "", 13, Color3.fromRGB(196, 204, 220))
+	line.AutomaticSize = Enum.AutomaticSize.None
+	line.Position, line.Size = UDim2.fromOffset(16, 42), UDim2.new(1, -32, 0, 36)
+	line.TextXAlignment = Enum.TextXAlignment.Center
+	return function(value: string)
+		line.Text = value
+	end, function()
+		gui:Destroy()
+	end
+end
+
+-- The intro duel: one match, then the lobby. The intro queue (Shared.AutoQueue)
+-- pairs two new players at once; alone, a lobby player is called in; still
+-- alone, the sparring rival steps in (the server sends it all).
 local FastStart = require(game:GetService("ReplicatedStorage").Shared.FastStart)
+local AutoQueue = require(game:GetService("ReplicatedStorage").Shared.AutoQueue)
 local function firstDuel()
 	UiKit.toast(
 		if FastStart.Enabled
-			then "Your first fight: an easy sparring partner. Tips pop up as you go."
+			then "Your first fight: another new miner if one's here, else an easy sparring partner. Tips pop up as you go."
 			else "Combat training: learn the basics, then spar.",
-		Color3.fromRGB(255, 202, 91)
+		GOLD
 	)
-	ArenaScene.enter(false)
+	local result = GemClient.request("IntroQueue")
+	if not (result and result.Ok) then
+		-- (A save that has fought before, or the Arena isn't ready: the old
+		-- way in, straight to a sparring partner.)
+		ArenaScene.enter(false)
+	else
+		local setLine, close = searchCard()
+		local started = os.clock()
+		local deadline = started + AutoQueue.Intro.BotAfter + 20
+		while player:GetAttribute("CombatSession") == nil and os.clock() < deadline do
+			local waited = os.clock() - started
+			local phase = AutoQueue.introPhase(waited)
+			setLine(
+				if phase == "Bot"
+					then "A sparring partner is stepping in…"
+					elseif phase == "Call" then string.format(
+						"Calling a miner from the lobby…  a sparring partner steps in at %ds",
+						AutoQueue.Intro.BotAfter
+					)
+					else string.format(
+						"Looking for another new miner…  %ds\nIf nobody comes, a sparring partner steps in.",
+						math.max(0, math.ceil(AutoQueue.Intro.BotAfter - waited))
+					)
+			)
+			task.wait(0.2)
+		end
+		close()
+	end
 	if not waitFor(function()
 		return player:GetAttribute("CombatSession") ~= nil
 	end, 12) then

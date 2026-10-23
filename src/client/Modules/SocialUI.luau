@@ -1533,6 +1533,8 @@ end
 -- sparring, the rest come down (the server has dropped them).
 local sparCards: { [number]: () -> () } = {}
 local kaijuCards: { [number]: () -> () } = {}
+-- Fill-in offers (Shared.AutoQueue), by queue entry id.
+local fillCards: { [string]: () -> () } = {}
 Players.LocalPlayer:GetAttributeChangedSignal("Spar"):Connect(function()
 	if Spar.sparring(Players.LocalPlayer) then
 		for from, dismiss in sparCards do
@@ -1850,6 +1852,10 @@ local function showFaceoff(info)
 		elseif rules and rules.Name then string.upper(rules.Name)
 		else "FRIENDLY " .. string.upper(info.Mode)
 	faceKind.Text = if rules and rules.Label then kind .. "  ·  " .. rules.Label else kind
+	if info.Called then
+		-- Pulled in from the lobby (Shared.AutoQueue): what's in it for you.
+		faceKind.Text ..= string.format("  ·  CALLED IN: WIN +%d ◆", info.Bonus or 0)
+	end
 	faceLeft.Text, faceRight.Text = names(mine), names(theirs)
 	if info.Rounds then
 		info.Score, info.Round = { Mine = 0, Theirs = 0 }, 1
@@ -1878,8 +1884,9 @@ local function showResult(info)
 			"%s (unrated)",
 			if info.Rules and info.Rules.Name then info.Rules.Name else "Friendly duel"
 		)
+	local bonus = if (info.Bonus or 0) > 0 then string.format("  ·  +%d ◆ fill-in bonus", info.Bonus) else ""
 	resultLine.Text =
-		string.format("%s%svs %s\n%s  ·  +%d coins", why, rounds, info.Opponents or "?", change, info.Coins or 0)
+		string.format("%s%svs %s\n%s  ·  +%d coins%s", why, rounds, info.Opponents or "?", change, info.Coins or 0, bonus)
 	-- The arena tournament: this run's wins, and the swings it restored.
 	local t = info.Tournament
 	tourney.Visible = t ~= nil
@@ -1937,7 +1944,8 @@ game:GetService("RunService").RenderStepped:Connect(function()
 		pivotTimer.Text = string.format("Next round in %s", clock(pivotEnds - now))
 	end
 	-- (not over the Social window: its Arena section shows the search)
-	banner.Visible = queued ~= nil and not gui.Enabled
+	-- (The intro queue has its own card: Lobby.client.)
+	banner.Visible = queued ~= nil and not gui.Enabled and queued.Mode ~= "intro"
 	if queued and searchLine and searchLine.Parent then
 		searchLine.Text = searchText()
 	end
@@ -2051,6 +2059,36 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 		if kaijuCards[a] then
 			kaijuCards[a]()
 			kaijuCards[a] = nil
+		end
+	elseif kind == "FillIn" and type(a) == "table" then
+		-- Someone's waiting in a 1v1 queue and you're free in the lobby with
+		-- auto queue off (Shared.AutoQueue): step in for a bonus?
+		local id = tostring(a.Id)
+		if fillCards[id] then
+			fillCards[id]()
+		end
+		fillCards[id] = prompt(
+			"⚔",
+			if a.Intro then "A new miner's first fight" else "Fill a 1v1?",
+			string.format(
+				"%s (rating %d) is waiting for a %s. Step in: +%d ◆ on top of the win's coins.",
+				tostring(a.Who),
+				a.Rating or 0,
+				tostring(a.Name),
+				a.Bonus or 0
+			),
+			if type(a.Seconds) == "number" then a.Seconds else 15,
+			P.Gold,
+			function(accept)
+				fillCards[id] = nil
+				run("DuelFill", a.Id, accept)
+			end
+		)
+	elseif kind == "FillInOver" then
+		local id = tostring(a)
+		if fillCards[id] then
+			fillCards[id]()
+			fillCards[id] = nil
 		end
 	elseif kind == "SparAskOver" and type(a) == "number" then
 		-- They're sparring with someone else now, busy, or gone.
