@@ -172,8 +172,18 @@ When the full 1600 x 840 layout would show at under 70% of its size, the
 Inventory is built compact instead (`chooseLayout` in `InventoryV2`), at
 990 x 380:
 
-- **No stats column.** The miner's column on the left keeps miner 1 / 2 / 3,
-  the name, the 3D miner and the GEMS / SKINS buttons.
+- **The stats card is a sheet.** The miner's column on the left keeps
+  miner 1 / 2 / 3, the name, the 3D miner and the GEMS / SKINS buttons;
+  over the miner, **STATS · 212** (your rating on it) opens the full stats
+  card as a sheet over the screen (rating, the four stats, max stamina and
+  charge, your armor set and its bonus, what you're strong against, weak
+  to and resist), scrolling if it runs long. Tap outside it or × to close.
+- **Every stat of a piece on its card.** A tapped piece's card lists all
+  its stats beside its perk's name (`+12 Health · +8 Defense · +5%
+  Critical`), since there's no hover card on a touch screen; trying a
+  spare on shows that piece's stats in gold.
+
+  ![The stats sheet on a phone. Offline render of the game's UI code, not a Roblox screenshot](inventory/stats-sheet-phone.png)
 - **Equipment in two columns of three rows**, with the Q / E / R gem cards
   under them. A tapped piece opens in their place.
 - **Larger text.** The small print (under 13 px on desktop) is drawn at

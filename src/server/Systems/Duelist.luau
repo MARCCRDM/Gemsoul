@@ -1491,10 +1491,15 @@ local function think(enemy, now: number)
 	if onPet then
 		target = petTarget.Root
 	end
-	-- Whom it's fighting (a raid boss turns between players): every client
-	-- turns its head to theirs (BodyPoses).
+	-- Whom it's fighting (a raid boss turns between players and their kaiju):
+	-- every client turns its head to theirs (BodyPoses) and marks them
+	-- (BossFocus): FocusKaiju names the kaiju it's on, else it's on the player.
 	if enemy.Model:GetAttribute("FocusUserId") ~= owner.UserId then
 		enemy.Model:SetAttribute("FocusUserId", owner.UserId)
+	end
+	local focusKaiju = if onPet then petTarget.Record.Id else nil
+	if enemy.Model:GetAttribute("FocusKaiju") ~= focusKaiju then
+		enemy.Model:SetAttribute("FocusKaiju", focusKaiju)
 	end
 	-- Its shots are aimed at the player's head, eye to eye (a kaiju: its body).
 	local head = if onPet then nil else owner.Character and owner.Character:FindFirstChild("Head")

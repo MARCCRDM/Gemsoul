@@ -58,6 +58,8 @@ if Config.Features == nil or Config.Features.Kaiju ~= false then
 	-- Yellow arrows on the ground, to a pad, the stairs down, the Rift's way on.
 	require(script.Parent.Modules.GroundGuide).start()
 end
+-- Who a Rift or raid boss is on right now: a red diamond over them (or their kaiju).
+require(script.Parent.Modules.BossFocus).start()
 
 -- The lobby HUD: in the Outpost, not fighting (or sparring), not in a kaiju
 -- battle, not inside a menu, and not away in the Rift (even with the pick

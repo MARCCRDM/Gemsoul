@@ -21,9 +21,10 @@
 
 	Fighters look each other in the eye: their heads turn to the head of
 	whoever they're fighting. Yours follows your lock (setFocus); the
-	Arena rival, raid bosses and dungeon fighters follow the player the
-	server says they're on (FocusUserId, else RivalOwner); another player
-	follows you when you two can fight, else their own rival.
+	Arena rival, raid bosses and dungeon fighters follow whoever the server
+	says they're on: a kaiju (FocusKaiju) or a player (FocusUserId, else
+	RivalOwner); another player follows you when you two can fight, else
+	their own rival.
 
 	  BodyPoses.step(dt)       pose every player's body for this frame
 	  BodyPoses.start()        every frame from now on
@@ -103,6 +104,31 @@ end
 local function characterOf(userId: any): Model?
 	local owner = if type(userId) == "number" then Players:GetPlayerByUserId(userId) else nil
 	return owner and owner.Character
+end
+
+-- A kaiju out in the world (workspace.Kaiju, KaijuServer) by its id.
+local function kaijuOf(id: any): Model?
+	if id == nil then
+		return nil
+	end
+	local folder = workspace:FindFirstChild("Kaiju")
+	if not folder then
+		return nil
+	end
+	for _, model in folder:GetChildren() do
+		if model:IsA("Model") and model:GetAttribute("KaijuId") == id then
+			return model
+		end
+	end
+	return nil
+end
+
+-- Whom a rival, raid boss or dungeon fighter is on: the kaiju the server
+-- names (FocusKaiju, Duelist), else its player (FocusUserId, else the
+-- duel's owner).
+local function foeOfEnemy(model: Model): Model?
+	return kaijuOf(model:GetAttribute("FocusKaiju"))
+		or characterOf(model:GetAttribute("FocusUserId") or model:GetAttribute("RivalOwner"))
 end
 
 local function near(model: Model, eye: Vector3?, range: number?): boolean
@@ -202,7 +228,7 @@ function BodyPoses.step(dt: number)
 		if model:GetAttribute("Posed") and model:IsA("Model") and near(model, eye, range) then
 			posing[model] = true
 			local found, look = pcall(function()
-				return lookPoint(model, characterOf(model:GetAttribute("FocusUserId") or model:GetAttribute("RivalOwner")))
+				return lookPoint(model, foeOfEnemy(model))
 			end)
 			pose(model, dt, now, clock, nil, nil, if found then look else nil)
 		end
