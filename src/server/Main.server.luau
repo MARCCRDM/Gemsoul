@@ -153,6 +153,10 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 				task.spawn(KaijuWilds.veinMoved, index, scar)
 			end
 			OutpostServer.onVeinSwing = KaijuWilds.veinSwing
+			-- A pack holding an outcrop comes for whoever mines it; its rocks
+			-- roll luckier meanwhile.
+			OutpostServer.onRockSwing = KaijuWilds.rockSwing
+			OutpostServer.patchLuck = KaijuWilds.patchLuck
 			-- The Rift: through a vein's gate into the critters' world, a
 			-- pathway of islands to a brainrot boss (your kaiju come too).
 			local RiftServer = require(script.Parent.Systems.RiftServer)

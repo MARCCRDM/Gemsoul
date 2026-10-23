@@ -2667,7 +2667,7 @@ end
 local function across(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
 end
-check(Kaiju.Wild.Max == 4 and Kaiju.Wild.Pack == 2, "Not 4 wild kaiju roaming, in pairs")
+check(Kaiju.Wild.Max == 8 and Kaiju.Wild.Pack == 2, "Not 8 wild kaiju roaming, in pairs")
 local Guarded = Frontier.Veins.Guarded
 local veinScar = CFrame.new(center + Vector3.new(0, 0, -(Frontier.Rim + 2)))
 KaijuWilds._setGuardAt(veinScar)
@@ -5930,6 +5930,121 @@ end)()
 	print(string.format("  rift: %d caches handed out, %d fighters, %d trips", awarded, #fighters, #built))
 end)()
 
+-- Claimed patches ---------------------------------------------------------------------------------------------
+
+-- Most packs den beside an outcrop and hold it (Kaiju.Wild.Claim): its
+-- rocks roll luckier, the pack stays put, and three swings at its rocks
+-- bring the whole pack down on the miner, on foot too.
+;(function()
+	local claim = Kaiju.Wild.Claim
+	local wildSite = KaijuWilds._site()
+	check(claim.Share > 0.5 and claim.Wake == 3 and claim.Luck > 0, "The claim rules")
+	-- The site grows an outcrop: a seam of three rocks 250 studs out.
+	local seam = {}
+	for k = 0, 2 do
+		local p = outpost + Vector3.new(250, 0, -140 + (k - 1) * Frontier.Outcrop.Step)
+		table.insert(wildSite.Spots, CFrame.new(p))
+		table.insert(seam, p)
+	end
+	wildSite.OutcropSpots = { 3, 4, 5 }
+	-- Room for a new pack, and every new pack claims, until one holds the seam.
+	local maxBefore, shareBefore = Kaiju.Wild.Max, claim.Share
+	claim.Share = 1
+	local held = nil
+	for _ = 1, 16 do
+		Kaiju.Wild.Max += 2
+		KaijuWilds._spawnWild()
+		KaijuWilds._spawnWild()
+		for _, pack in KaijuWilds._packs do
+			if pack.Claim then
+				held = pack
+			end
+		end
+		if held then
+			break
+		end
+	end
+	Kaiju.Wild.Max, claim.Share = maxBefore, shareBefore
+	check(held ~= nil, "No pack claimed the outcrop")
+	if held then
+		local rock = held.Claim
+		check(table.find(seam, rock) ~= nil, "The pack claimed something that isn't an outcrop rock")
+		local off = across(held.Den - rock).Magnitude
+		check(off >= claim.Den[1] - 0.01 and off <= claim.Den[2] + 0.01, "The den isn't beside its rock: " .. off)
+		check(held.MoveAt == math.huge, "A pack holding a patch still drifts")
+		for _, p in seam do
+			check(KaijuWilds._packAt(p) == held, "A rock of the seam isn't the pack's")
+			check(KaijuWilds.patchLuck(p) == claim.Luck, "A held rock isn't luckier")
+		end
+		check(KaijuWilds.patchLuck(outpost + Vector3.new(-250, 0, 0)) == 0, "A rock nobody holds is luckier")
+		check(KaijuWilds.rockSwing(outpost + Vector3.new(-250, 0, 0), b) == nil, "A swing far away stirred the pack")
+		-- The den stays where it is, whatever the clock says.
+		local leader = held.Members[1]
+		local den = held.Den
+		held.MoveAt = 0
+		KaijuWilds._brain(leader.Enemy, now)
+		check(across(held.Den - den).Magnitude < 0.01, "A held patch's den moved on")
+		-- Asleep: a miner on foot by the rocks is left be; the first swing stirs
+		-- the pack, the second makes it growl, the third brings it.
+		for _, member in held.Members do
+			member.Engaged = member.Engaged or {}
+			table.clear(member.Engaged)
+			member.Plan = nil
+		end
+		b:SetAttribute("Outpost", true)
+		stand(rock + Vector3.new(4, 0, 0))
+		table.clear(playerHits)
+		for _, member in held.Members do
+			member.Enemy.LastAttack = 0
+			KaijuWilds._brain(member.Enemy, now)
+			check(member.Enemy.Foe == nil, "The pack went for a miner walking by")
+		end
+		check(KaijuWilds.rockSwing(rock, b) == held, "The first swing didn't reach the pack")
+		check(leader.Plan and leader.Plan.Mood == "Look", "The first swing didn't stir the pack")
+		KaijuWilds.rockSwing(seam[#seam], b) -- (another rock of the same seam counts)
+		check(leader.Plan and leader.Plan.Mood == "Roar", "The second swing didn't make it growl")
+		check(next(leader.Engaged) == nil, "The pack came before the third swing")
+		table.clear(notes)
+		KaijuWilds.rockSwing(rock, b)
+		for _, member in held.Members do
+			check(member.Engaged[b] ~= nil, "The third swing didn't bring every one of the pack")
+		end
+		check(noted(b, "holding this patch"), "The miner wasn't warned")
+		leader.Enemy.LastAttack = 0
+		KaijuWilds._brain(leader.Enemy, now)
+		check(leader.Enemy.Foe == b, "It didn't go for the miner on foot")
+		for _ = 1, 80 do
+			now += 0.15
+			stand(leader.Enemy.Root.Position + Vector3.new(3, 0, 0))
+			KaijuWilds._brain(leader.Enemy, now)
+		end
+		check(#playerHits > 0 and playerHits[#playerHits][1] == b, "It never struck the miner")
+		-- Roused, every swing at its rocks puts the miner on its list.
+		check(leader.Engaged[a] == nil, "It started on someone who never touched its patch")
+		KaijuWilds.rockSwing(rock, a)
+		check(leader.Engaged[a] ~= nil, "Mining a held patch while the pack's up didn't count")
+		-- Two stray swings long ago don't count; the count starts again.
+		held.Swings, held.SwingAt = 2, now - 40
+		for _, member in held.Members do
+			table.clear(member.Engaged)
+		end
+		KaijuWilds.rockSwing(rock, b)
+		check(held.Swings == 1 and next(leader.Engaged) == nil, "Old swings still counted")
+		-- The pack gone, the patch is nobody's: no luck, nothing stirs.
+		for _, member in table.clone(held.Members) do
+			member.Enemy.Damage[b] = 100
+			Enemies.damage(member.Enemy, 1e6, nil, false, nil, nil, nil)
+		end
+		check(KaijuWilds._packAt(rock) == nil and KaijuWilds.patchLuck(rock) == 0, "A dead pack still holds its patch")
+		check(KaijuWilds.rockSwing(rock, b) == nil, "A dead pack still stirs")
+		now += Kaiju.Wild.Respawn + 1
+		runDelayed()
+		b:SetAttribute("Outpost", nil)
+		stand(center + Vector3.new(300, 0, 0))
+	end
+	print("  claimed patches: a pack holds the seam, stirs on the third swing, and its rocks roll luckier")
+end)()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do
@@ -5944,7 +6059,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together)",
 		checks
 	)
 )

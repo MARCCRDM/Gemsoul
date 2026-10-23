@@ -1067,6 +1067,42 @@ do
 	end
 	check(math.abs(lastLuck - commonLuck - Frontier.Charged.Luck) < 1e-9, "Rift Charged didn't add its luck")
 	ana:SetAttribute("RiftCharged", nil)
+	-- A patch a wild pack holds (Kaiju.Wild.Claim, KaijuWilds): every swing
+	-- at a rock reaches the pack (its spot's position), and its gems roll
+	-- luckier by what the pack's rules say.
+	local held
+	for _, node in Server._nodes do
+		if node.Zone == target.Zone and node.Size == target.Size and node ~= vein and node ~= plain then
+			held = node
+			break
+		end
+	end
+	check(held ~= nil, "No rock like the first for a pack to hold")
+	local swungAt = {}
+	Server.onRockSwing = function(position, player)
+		table.insert(swungAt, { position, player })
+	end
+	Server.patchLuck = function(position)
+		return if (position - site.Spots[held.Spot].Position).Magnitude < 1 then 0.08 else 0
+	end
+	standBy(anaRoot, held)
+	advance(Rules.ClaimSeconds + 1)
+	for _ = 1, 40 do
+		advance(0.5)
+		if handlers.OutpostHit(ana, held.Id).Loot then
+			break
+		end
+	end
+	check(#swungAt > 0 and swungAt[1][2] == ana, "A swing didn't reach the patch's pack")
+	check(
+		swungAt[1][1] and (swungAt[1][1] - site.Spots[held.Spot].Position).Magnitude < 1,
+		"The swing reached the pack with the wrong rock"
+	)
+	check(math.abs(lastLuck - commonLuck - 0.08) < 1e-9, "A held patch's luck didn't land on the gem")
+	Server.onRockSwing = function() end
+	Server.patchLuck = function()
+		return 0
+	end
 end
 
 -- The pick's bonk on a rift's critter (KaijuWilds does the blow): close, on

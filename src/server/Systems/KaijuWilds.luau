@@ -8,7 +8,13 @@
 	              frontier that moves on now and then; each kaiju wanders
 	              round it, stopping to sniff, look about, lie down or roar,
 	              and stops to look at anyone who comes close (Kaiju.Roam,
-	              KaijuMood on its model for the clients' poses). One
+	              KaijuMood on its model for the clients' poses). Most packs
+	              den beside an outcrop and claim it (Kaiju.Wild.Claim): its
+	              rocks roll luckier gems (KaijuWilds.patchLuck, OutpostServer),
+	              and a swing at one stirs the pack, a second makes it growl,
+	              the third brings it down on the miner, on foot or not, and
+	              their kaiju (KaijuWilds.rockSwing, from OutpostServer). A
+	              claimed den stays put; a free one drifts. One
 	              leaves you and your kaiju alone until you start a fight:
 	              challenge it ("KaijuChallenge", its Challenge prompt, shown
 	              only while it isn't in a fight or being tamed) and
@@ -214,6 +220,9 @@ type Wild = {
 -- first leads: the others keep near it).
 type Pack = {
 	Den: Vector3,
+	Claim: Vector3?, -- the outcrop rock it dens beside (Kaiju.Wild.Claim): its patch
+	Swings: number?, -- swings at its patch since it last calmed (KaijuWilds.rockSwing)
+	SwingAt: number?,
 	Heading: number,
 	MoveAt: number,
 	Species: string,
@@ -414,6 +423,11 @@ local function engaged(wild: Wild, player: Player?): boolean
 	return player ~= nil and player.Parent ~= nil and wild.Engaged[player] ~= nil
 end
 
+-- A guardian, or a pack holding a patch: it goes for miners on foot too.
+local function territorial(wild: Wild): boolean
+	return wild.Guard == true or (wild.Pack ~= nil and wild.Pack.Claim ~= nil)
+end
+
 -- Whether `player` is in a fight with a wild kaiju (started on one, and
 -- did something in it in the last `within` seconds) or casting a tame on
 -- one: FrontierServer holds its rifts back for them (Frontier.Engaged).
@@ -435,7 +449,7 @@ end
 local function foesOf(wild: Wild)
 	return function(center: Vector3, radius: number): { any }
 		local list = {}
-		for _, victim in foesNear(center, radius, wild.Guard) do
+		for _, victim in foesNear(center, radius, territorial(wild)) do
 			if engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
 				table.insert(list, victim)
 			end
@@ -460,7 +474,7 @@ local function hitFoe(enemy, victim, amount: number, element: string?, status: s
 	local player = victim.Player
 	if victim.Pet then
 		return KaijuServer.hurt(victim.Pet, amount, element, status, heavy)
-	elseif player and (hunter(player) or (wild ~= nil and (wild.Bug or wild.Guard) and prey(player))) then
+	elseif player and (hunter(player) or (wild ~= nil and (wild.Bug or territorial(wild)) and prey(player))) then
 		local _, guarded = Enemies.hitPlayer(player, alonePlayer(wild, player, amount), element, enemy, heavy)
 		return if guarded then "Guarded" else "Hit"
 	end
@@ -477,7 +491,7 @@ local function fairFor(enemy, wild: Wild, victim): boolean
 	if victim.Pet and not KaijuServer.targetable(victim.Pet) then
 		return false
 	end
-	local wide = wild.Bug or wild.Guard == true
+	local wide = wild.Bug or territorial(wild)
 	if victim.Player and not (if wide then prey(victim.Player) else hunter(victim.Player)) then
 		return false
 	end
@@ -543,7 +557,7 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 	local now = os.clock()
 	local e = enemy :: any
 	local rifted = wild.Bug
-	local wide = rifted or wild.Guard == true
+	local wide = rifted or territorial(wild)
 	if not wild.Bug then
 		if e.LastPet and e.LastPetAt and now - e.LastPetAt < 6 then
 			engage(wild, e.LastPet.Owner, e.LastPetAt)
@@ -906,13 +920,16 @@ end
 local function driftDen(pack: Pack, now: number)
 	local roam = Kaiju.Roam
 	pack.MoveAt = now + rng:NextNumber(roam.Every[1], roam.Every[2])
+	if pack.Claim then
+		return -- (a pack holding a patch stays on it)
+	end
 	for try = 0, 11 do
 		local heading = pack.Heading + rng:NextNumber(-0.7, 0.7) + try * math.pi / 6
 		local step = rng:NextNumber(roam.Drift[1], roam.Drift[2])
 		local den = pack.Den + Vector3.new(math.cos(heading), 0, math.sin(heading)) * step
 		local apart = roomy(den)
 		for _, other in packs do
-			if other ~= pack and flat(other.Den - den).Magnitude < 80 then
+			if other ~= pack and flat(other.Den - den).Magnitude < Kaiju.Wild.Apart then
 				apart = false
 			end
 		end
@@ -2165,17 +2182,62 @@ local function packFor(): Pack?
 		end
 	end
 	local middle = Outpost.Location.Position
+	local function apartFrom(den: Vector3): boolean
+		if not roomy(den) then
+			return false
+		end
+		for _, other in packs do
+			if flat(other.Den - den).Magnitude < Kaiju.Wild.Apart then
+				return false
+			end
+		end
+		return true
+	end
+	-- Most packs claim an outcrop: a den a few studs off one of its rocks
+	-- (Kaiju.Wild.Claim), the rest of the seam within its radius.
+	local claim = Kaiju.Wild.Claim
+	local crops = site and site.OutcropSpots or {}
+	if #crops > 0 and rng:NextNumber() < claim.Share then
+		for _ = 1, 60 do
+			local spot = site.Spots[crops[rng:NextInteger(1, #crops)]]
+			local rock = spot and spot.Position
+			if rock then
+				local a = rng:NextNumber(0, math.pi * 2)
+				local den = rock + Vector3.new(math.cos(a), 0, math.sin(a)) * rng:NextNumber(claim.Den[1], claim.Den[2])
+				if apartFrom(den) then
+					-- (A kind that roams that far out, and no other pack's, if there's one.)
+					local roams = Kaiju.wildKinds(Frontier.band(Frontier.distance(den, middle)))
+					roams = if #roams > 0 then roams else Kaiju.Starters
+					local kinds = {}
+					for _, species in roams do
+						local taken = false
+						for _, other in packs do
+							taken = taken or other.Species == species
+						end
+						if not taken then
+							table.insert(kinds, species)
+						end
+					end
+					roams = if #kinds > 0 then kinds else roams
+					local pack: Pack = {
+						Den = Vector3.new(den.X, rock.Y, den.Z),
+						Claim = rock,
+						Heading = a,
+						MoveAt = math.huge,
+						Species = roams[rng:NextInteger(1, #roams)],
+						Members = {},
+					}
+					table.insert(packs, pack)
+					return pack
+				end
+			end
+		end
+	end
 	for _ = 1, 80 do
 		local a = rng:NextNumber(0, math.pi * 2)
 		local r = rng:NextNumber(Frontier.Core + 30, Frontier.Rim - 45)
 		local den = middle + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
-		local apart = roomy(den)
-		for _, other in packs do
-			if flat(other.Den - den).Magnitude < 110 then
-				apart = false
-			end
-		end
-		if apart then
+		if apartFrom(den) then
 			-- (A kind that roams that far out, Kaiju.wildKinds, and no other
 			-- pack is, if there's one.)
 			local roams = Kaiju.wildKinds(Frontier.band(r))
@@ -2305,6 +2367,84 @@ function KaijuWilds.veinMoved(index: number, scar: CFrame)
 		gone(old)
 	end
 	spawnGuardian()
+end
+
+-- Claimed patches ------------------------------------------------------------------------------------------
+
+-- The pack holding the patch a rock at `position` is in, if any (its den
+-- within Kaiju.Wild.Claim.Radius, and someone of it still standing).
+local function packAt(position: Vector3): Pack?
+	for _, pack in packs do
+		if pack.Claim and flat(pack.Den - position).Magnitude <= Kaiju.Wild.Claim.Radius then
+			for _, member in pack.Members do
+				if member.Enemy.Alive then
+					return pack
+				end
+			end
+		end
+	end
+	return nil
+end
+
+-- How much luckier a rock at `position` rolls: Kaiju.Wild.Claim.Luck while
+-- a pack holds its patch, else nothing.
+function KaijuWilds.patchLuck(position: Vector3): number
+	return if packAt(position) then Kaiju.Wild.Claim.Luck else 0
+end
+
+-- A swing at a rock at `position`: the pack holding its patch (if one does)
+-- stirs at the first, growls at the next, and comes for the miner on the
+-- Kaiju.Wild.Claim.Wake'th (a stray swing long ago doesn't count); once
+-- roused, every swing at its rocks puts the miner on its list. Returns the
+-- pack, or nil for a rock nobody holds.
+function KaijuWilds.rockSwing(position: Vector3, player: Player): Pack?
+	local pack = packAt(position)
+	if not pack then
+		return nil
+	end
+	local now = os.clock()
+	local awake = false
+	for _, member in pack.Members do
+		if member.Enemy.Alive and next(member.Engaged) ~= nil then
+			awake = true
+		end
+	end
+	if awake then
+		for _, member in pack.Members do
+			if member.Enemy.Alive then
+				engage(member, player, now)
+				member.LastFight = now
+			end
+		end
+		return pack
+	end
+	if now - (pack.SwingAt or now) > 30 then
+		pack.Swings = 0
+	end
+	pack.Swings = (pack.Swings or 0) + 1
+	pack.SwingAt = now
+	local root = rootOf(player)
+	local at = if root then root.Position else nil
+	local wake = Kaiju.Wild.Claim.Wake
+	for _, member in pack.Members do
+		if member.Enemy.Alive then
+			if pack.Swings == wake - 2 then
+				startPlan(member, "Look", 4, now, at)
+			elseif pack.Swings == wake - 1 then
+				member.GrowlAt = now
+				startPlan(member, "Roar", 1.6, now, at)
+			end
+			if pack.Swings >= wake then
+				engage(member, player, now)
+				member.LastFight = now
+				member.Enemy.Model:SetAttribute("ActionAt", serverNow())
+			end
+		end
+	end
+	if pack.Swings == wake then
+		Remotes.Notify:FireClient(player, "The pack holding this patch is coming for you!")
+	end
+	return pack
 end
 
 -- Taming --------------------------------------------------------------------------------------------------
@@ -2788,6 +2928,10 @@ KaijuWilds._challenge = challenge
 KaijuWilds._snatched, KaijuWilds._tripped = snatched, tripped
 KaijuWilds._rushes = rushes
 KaijuWilds._spawnWild, KaijuWilds._packs = spawnWild, packs
+KaijuWilds._packAt = packAt
+function KaijuWilds._site()
+	return site
+end
 KaijuWilds._spawnGuardian, KaijuWilds._lifetimes = spawnGuardian, lifetimes
 function KaijuWilds._guardian()
 	return guardian

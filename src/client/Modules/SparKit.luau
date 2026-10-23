@@ -282,7 +282,9 @@ end
 local shown = false
 local captionUntil = 0
 local function refreshBar()
-	local sparring = Spar.sparring(player)
+	-- (Not in the Rift: your kit is out there as a matter of course, its
+	-- strip has the top, and the kit switch stays by your thumb.)
+	local sparring = Spar.sparring(player) and player:GetAttribute("RiftRun") == nil
 	bar.Visible = sparring
 	if not sparring then
 		shown = false

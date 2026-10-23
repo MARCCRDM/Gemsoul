@@ -454,27 +454,34 @@ past the core.
 
 ### Wild kaiju
 
-Up to four roam the Outpost at once, in **packs of two** of a kind (each
-its own element; the two packs are different kinds). They're within two
-levels of the strongest kaiju near them, with half again the health of a
-kaiju of yours at their level: it takes you and your kaiju together. They
-stand about your height (yours come up to your knee). A fifth guards a Rift
-Vein (see [The vein guardian](#the-vein-guardian)). Their names show from
-160 studs off (60 on a phone; see [Names over heads](#names-over-heads)).
+Up to eight roam the Outpost at once, in **packs of two** of a kind (each
+its own element; the packs are different kinds where there are enough to
+go round). They're within two levels of the strongest kaiju near them,
+with half again the health of a kaiju of yours at their level: it takes
+you and your kaiju together. They stand about your height (yours come up
+to your knee). A ninth guards a Rift Vein (see
+[The vein guardian](#the-vein-guardian)). Their names show from 160 studs
+off (60 on a phone; see [Names over heads](#names-over-heads)).
+
+Three packs in four **hold a patch** (see
+[Claimed patches](#claimed-patches)): they den beside an outcrop and come
+for whoever mines it. The rest roam free.
 
 They go about their day:
 
 - Each pack has a **den** out in the frontier, clear of the rocks, the
-  buildings, the old workings, the ramps and the vein sites, at least 110
-  studs from the other pack's.
+  buildings, the old workings, the ramps and the vein sites, at least 90
+  studs from any other pack's. A pack holding a patch dens 10 to 14 studs
+  off one of its rocks.
 - Each kaiju wanders round its den (up to 34 studs), ambling at under half
   its speed, and stops to do things: **sniff** the ground (head down),
   **look about**, **lie down** for 8 to 16 seconds, or **roar**. Walking
   takes up about half its time, lying down about a quarter. The second of a
   pair keeps near the first, and gets up to follow when it wanders off.
-- Every one to two minutes the den moves on 20 to 30 studs, roughly the way
-  it was going, so a pack wanders about 150 studs across the quarry in ten
-  minutes and you'll meet it somewhere new.
+- Every one to two minutes a free pack's den moves on 20 to 30 studs,
+  roughly the way it was going, so it wanders about 150 studs across the
+  quarry in ten minutes and you'll meet it somewhere new. A pack holding a
+  patch stays on it.
 - Come within 22 studs and it stops to look you over, turning to face you.
   Now and then (at most every 25 seconds) it roars at you, each kind in its
   own voice: a deep bellow, a raspy snarl, a rumble under a hiss, a
@@ -516,6 +523,30 @@ put back at its den.
 - **Kill it:** every kaiju that fought it gets 40 + 12 × its level EXP, and
   the player who (with their kaiju) did the most gets its Gemsoul.
 - **Catch it:** it joins you, Gemsoul and all, at its level.
+
+### Claimed patches
+
+Most packs (`Kaiju.Wild.Claim.Share`, 75%) den beside one of the
+frontier's outcrops (the seams of two to five rocks, `Frontier.Outcrop`)
+and hold it: every rock within 32 studs of the den is theirs.
+
+- **Their rocks roll luckier** (+8%, `Claim.Luck`) while any of the pack is
+  standing: `OutpostServer.patchLuck` asks `KaijuWilds` as the gem is
+  rolled. Beat or catch the pack and the luck goes with it.
+- Mining a held rock is like mining the guarded vein: the **first swing
+  stirs** the pack (every one of it looks round at you), the **second makes
+  it growl**, and the **third brings the whole pack** down on you ("The
+  pack holding this patch is coming for you!"). Two swings, then nothing
+  for 30 seconds, and the count starts again. Once it's up, every swing at
+  its rocks puts the miner on its list, and it goes for **a plain miner
+  too**, on foot, as the guardian does, and their kaiju.
+- The pack stays on its patch (its den never drifts). When the last of it
+  is killed, caught or burrows away, the patch is nobody's: no extra luck,
+  nothing stirs, and the pack that comes up in its place claims a patch of
+  its own somewhere else.
+- `OutpostServer.onRockSwing(position, player)` fires for every swing at any
+  rock (its spot's position); `KaijuWilds.rockSwing` finds the pack holding
+  it, if one does.
 
 ### The vein guardian
 

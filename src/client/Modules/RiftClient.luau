@@ -1352,10 +1352,12 @@ local tallyLabel: TextLabel? = nil
 local function buildStrip()
 	local s = screen()
 	local small = narrow(s)
+	-- (On a phone the kaiju strip has the top right while your kit's out,
+	-- so this one keeps to the top left, under Roblox's buttons.)
 	local bar = new("Frame", {
 		Name = "RiftStrip",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, if small then 4 else 8),
+		AnchorPoint = if small then Vector2.new(0, 0) else Vector2.new(0.5, 0),
+		Position = if small then UDim2.fromOffset(12, 4) else UDim2.new(0.5, 0, 0, 8),
 		Size = UDim2.fromOffset(if small then 300 else 430, if small then 44 else 50),
 		BackgroundColor3 = P.Frame,
 		BackgroundTransparency = 0.12,

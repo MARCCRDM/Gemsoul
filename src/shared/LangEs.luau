@@ -1238,6 +1238,7 @@ return {
 	["Finding your first opponent…"] = "Buscando a tu primer rival…",
 	["You've fought before: pick a mode from the PLAY menu."] = "Ya has combatido: elige un modo en el menú JUGAR.",
 	["No one else is around right now: a sparring partner steps in."] = "No hay nadie más ahora mismo: entra un compañero de entrenamiento.",
+	["The pack holding this patch is coming for you!"] = "¡La manada que cuida este filón viene por ti!",
 	["A hard first fight. Welcome to the Saga Outpost: gear up and come back."] = "Un primer combate duro. Bienvenido al Puesto Saga: equípate y vuelve.",
 	["FINDING YOUR FIRST OPPONENT"] = "BUSCANDO A TU PRIMER RIVAL",
 	["Looking for another new miner…  {1}s"] = "Buscando a otro minero nuevo…  {1}s",

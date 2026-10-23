@@ -105,6 +105,13 @@ OutpostServer.bonker = nil :: any -- KaijuWilds: critterOf(model) -> enemy?, bon
 OutpostServer.onVeinMoved = function(_index: number, _scar: CFrame) end
 -- Someone swung at one of vein `index`'s rocks (its guardian wakes).
 OutpostServer.onVeinSwing = function(_index: number, _player: Player) end
+-- A swing at any rock (its spot's position): a pack holding that patch
+-- comes for the miner (KaijuWilds.rockSwing); and how much luckier a rock
+-- there rolls (KaijuWilds.patchLuck).
+OutpostServer.onRockSwing = function(_position: Vector3, _player: Player) end
+OutpostServer.patchLuck = function(_position: Vector3): number
+	return 0
+end
 -- A gem `player` mined (FrontierServer keeps this trip's haul: a gem raid's snatchers take from it).
 OutpostServer.onGemMined = function(_player: Player, _gem) end
 local secretParts: { [string]: BasePart } = {}
@@ -564,6 +571,10 @@ local function loot(player: Player, node, profile)
 	-- Out in one of the biomes, its element comes up more (Frontier.Biome).
 	local spot = site and site.Spots[node.Spot]
 	local biome = spot and Frontier.biomeAt(spot.Position - Rules.Location.Position)
+	-- A patch a wild pack holds (Kaiju.Wild.Claim): luckier, for the trouble.
+	if spot then
+		luck += OutpostServer.patchLuck(spot.Position)
+	end
 	local gem = Gems.award(player, "MiningNode", {
 		Luck = luck,
 		Silent = true,
@@ -669,6 +680,10 @@ local function hit(player: Player, nodeId: any)
 	task.spawn(OutpostServer.onSwing, player, strikes)
 	if veinOf[node.Spot] then
 		task.spawn(OutpostServer.onVeinSwing, veinOf[node.Spot], player)
+	end
+	local swungSpot = site and site.Spots[node.Spot]
+	if swungSpot then
+		task.spawn(OutpostServer.onRockSwing, swungSpot.Position, player)
 	end
 	o.Picks[pickId] -= strikes
 	local pick = Rules.Picks[pickId]

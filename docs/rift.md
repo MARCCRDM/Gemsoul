@@ -330,10 +330,16 @@ are in.
 
 ![The Rift strip](rift/strip.png)
 
-Your kit is out in the Rift, so the **KIT OUT · 1 MINE** bar (`SparKit`) is
-up too. It sat in the same spot as the strip and showed through behind it.
-Now it sits just under the strip whenever the strip is up (`refreshBar`
-reads the strip's bottom edge), on a computer and on a phone:
+Your kit is out in the Rift as a matter of course, so the **KIT OUT · MINE**
+bar (`SparKit`) stays down there: `refreshBar` hides it while `RiftRun` is
+set. On a phone the kit switch by your thumb still swaps to the pick and
+back, and on a computer 1 does. (It used to sit under the strip, where on
+a phone it ran into the kaiju strip at the top right.)
+
+On a phone the Rift strip keeps to the **top left**, under Roblox's
+buttons, because the kaiju strip has the top right while your kit's out;
+on a computer it stays centred. The old phone layout, with the strip
+centred and the bar under it, is what the pictures below show:
 
 | Before | Now |
 | --- | --- |
