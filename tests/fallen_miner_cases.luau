@@ -31,6 +31,10 @@ local Random = {
 		if state <= 0 then
 			state += 2147483646
 		end
+		-- (Warmed up: a small seed's first draws are all tiny.)
+		for _ = 1, 5 do
+			state = (state * 16807) % 2147483647
+		end
 		local r = {}
 		function r:NextNumber(a, b)
 			state = (state * 16807) % 2147483647
@@ -235,6 +239,12 @@ for i = 1, N do
 	end
 	local weapon = Classes.weapon("Warrior", loadout.Weapon)
 	check(weapon and weapon.WeaponType ~= "Pistol", "Roll " .. i .. " carries a pistol")
+	-- Swords only, and armor of the families players wear today.
+	check(weapon and weapon.WeaponType == "Sword", "Roll " .. i .. " carries a " .. tostring(weapon and weapon.WeaponType) .. ", not a sword")
+	for _, slot in { "Helmet", "Armor", "Gloves", "Boots", "Shield" } do
+		local piece = Classes.gear("Warrior", Slots.Definitions[slot].Kind, loadout[slot])
+		check(piece and piece.ArmorFamily ~= nil, "Roll " .. i .. "'s " .. slot .. " (" .. tostring(loadout[slot]) .. ") isn't a family piece")
+	end
 	armors[loadout.Armor], helmets[loadout.Helmet], weapons[loadout.Weapon] = true, true, true
 	local any = false
 	for _, kind in { "Suit", "Skin", "Visor", "Helmet" } do
@@ -278,7 +288,7 @@ local floorY = 0
 local BODY = { "Head", "UpperTorso", "LowerTorso", "RightHand", "LeftHand", "RightFoot", "LeftFoot" }
 local lineup = {}
 local partCounts = {}
-for i, pose in { "Slumped", "FaceDown", "Sprawled", "Slumped", "FaceDown", "Sprawled" } do
+for i, pose in { "Curled", "FaceDown", "Sprawled", "Curled", "FaceDown", "Sprawled" } do
 	local at = Vector3.new((i - 3.5) * 8, floorY, 0)
 	local model = FallenMiners.place(holder, at, Vector3.new(0, 0, -1), Random.new(300 + i), { Pose = pose, Glow = Color3.fromRGB(255, 120, 60), Shards = i % 2 == 0 })
 	table.insert(lineup, model)
@@ -309,10 +319,36 @@ for i, pose in { "Slumped", "FaceDown", "Sprawled", "Slumped", "FaceDown", "Spra
 		check((part.CFrame.Position - at).Magnitude < 7, name .. " lies far from where it was placed")
 	end
 	local head = model:FindFirstChild("Head")
-	if pose == "Slumped" then
-		check(head.CFrame.Position.Y - floorY > 1.6, "Slumped: the head's on the floor")
-	else
-		check(head.CFrame.Position.Y - floorY < 2, pose .. ": the head's up in the air")
+	check(head.CFrame.Position.Y - floorY < 2, pose .. ": the head's up in the air (" .. string.format("%.2f", head.CFrame.Position.Y - floorY) .. ")")
+	-- Its sword lies flat on the floor by its hand, out of its grip.
+	local weapon = model:FindFirstChild("GemsoulGear") and model.GemsoulGear:FindFirstChild("Weapon")
+	check(weapon ~= nil and model:GetAttribute("WeaponDown") == true, pose .. ": no sword dropped")
+	if weapon then
+		local hand = model:FindFirstChild("RightHand")
+		local lowest, highest, nearest = math.huge, -math.huge, math.huge
+		local blades = 0
+		for _, d in weapon:GetDescendants() do
+			if d:IsA("BasePart") then
+				blades += 1
+				local half = d.Size / 2
+				for sx = -1, 1, 2 do
+					for sy = -1, 1, 2 do
+						for sz = -1, 1, 2 do
+							local corner = d.CFrame * Vector3.new(sx * half.X, sy * half.Y, sz * half.Z)
+							lowest = math.min(lowest, corner.Y)
+							highest = math.max(highest, corner.Y)
+						end
+					end
+				end
+				nearest = math.min(nearest, (d.CFrame.Position - hand.CFrame.Position).Magnitude)
+			elseif d:IsA("WeldConstraint") then
+				check(false, pose .. ": the sword's still welded to the hand")
+			end
+		end
+		check(blades >= 3, pose .. ": the sword has only " .. blades .. " parts")
+		check(highest - floorY < 1.0, pose .. ": the sword's " .. string.format("%.2f", highest - floorY) .. " up, not on the floor")
+		check(lowest - floorY > -0.05, pose .. ": the sword's through the floor (" .. string.format("%.2f", lowest - floorY) .. ")")
+		check(nearest < 3.5, pose .. ": the sword lies " .. string.format("%.1f", nearest) .. " studs from the hand")
 	end
 	-- Each welded piece still sits on its limb where it sat.
 	for _, d in model:GetDescendants() do
@@ -336,7 +372,7 @@ do
 end
 -- (and the old suit when there's no body to be had)
 FallenMiners.dresser = nil
-local old = FallenMiners.place(holder, Vector3.new(0, 0, 40), Vector3.new(0, 0, -1), Random.new(9), { Pose = "Slumped" })
+local old = FallenMiners.place(holder, Vector3.new(0, 0, 40), Vector3.new(0, 0, -1), Random.new(9), { Pose = "Curled" })
 check(old:GetAttribute("Dressed") == nil and old:FindFirstChild("Helmet") ~= nil, "No old suit without a dresser")
 local most = 0
 for _, n in partCounts do

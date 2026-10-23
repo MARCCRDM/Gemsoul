@@ -671,7 +671,7 @@ do
 		{ Doors = { Vector3.new(0, 0, 1) }, Avoid = { avoid } }
 	)
 	check(#placed >= 4 and #placed <= 8, "Scattered " .. #placed .. " of 8")
-	check(placed[1]:GetAttribute("Pose") == "Slumped", "The first isn't slumped by a wall")
+	check(placed[1]:GetAttribute("Pose") == "Curled", "The first isn't curled by a wall")
 	for _, model in placed do
 		local p = model:FindFirstChildWhichIsA("BasePart", true).CFrame.Position
 		check(flatGap(p, avoid.At) >= avoid.Radius - 3, "Scattered onto what it should avoid")
@@ -951,11 +951,32 @@ do
 	-- One of your party in the Rift already: going in, you join them.
 	mates[#mates].InRift = true
 	check(Lobby.lobby({ Me = 1, Party = party, Players = mates, Invited = {} }).Trip, "One of your party in the Rift isn't a trip to join")
+	-- Down in the Rift, who you can call in: your party first (no button),
+	-- then the Outpost, then your friends, each once.
+	local down = Lobby.backup(Lobby.lobby({ Me = 1, Party = party, Players = mates, Friends = friends, Invited = {}, PlaceId = 7 }))
+	check(#down >= 3 and down[1].Party and down[2].Party and down[3].Party, "Your party isn't first in the backup list")
+	check(down[1].Invite == "Busy" and rowOf(down, 1) == nil, "Your party can be invited again, or you're listed")
+	check(rowOf(down, 28).Where == "With you in the Rift", "A party member in the Rift isn't said to be with you")
+	check(string.find(rowOf(down, 21).Where, "In your party", 1, true) ~= nil, "A party member's row doesn't say so")
+	local ids = {}
+	for _, row in down do
+		check(not ids[row.UserId], "Someone's in the backup list twice: " .. tostring(row.Name))
+		ids[row.UserId] = true
+	end
+	check(rowOf(down, 35) ~= nil and rowOf(down, 902) ~= nil and rowOf(down, 902).Invite == "Game", "The Outpost and your friends aren't in the backup list")
+	check(#Lobby.backup(solo) == #solo.Outpost + #solo.Friends - 1, "On your own, the list isn't the Outpost and your friends (a friend here once)")
+	-- The down card draws it, and the server lets the called in join at the throne.
+	local client = fs.readFile(ROOT .. "/src/client/Modules/RiftClient.luau")
+	local server = fs.readFile(ROOT .. "/src/server/Systems/RiftServer.luau")
+	check(client:find("CALL FOR BACKUP", 1, true) ~= nil and client:find("RiftLobby.backup(", 1, true) ~= nil, "The down card has no backup list")
+	check(client:find('GemClient.request("PartyInvite"', 1, true) ~= nil, "The down card can't invite")
+	check(client:find("INVITE A FRIEND", 1, true) == nil, "The old INVITE A FRIEND button's still on the down card")
+	check(server:find("run.Room <= RiftRun.Rooms and #run.Members", 1, true) == nil, "Backup can't join at the throne")
 end
 
 print(
 	string.format(
-		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen, each boss's realm; the KIT OUT bar under the strip; the gate's lobby; %d parts a trip)",
+		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen, each boss's realm; the KIT OUT bar under the strip; the gate's lobby; the down card's backup list; %d parts a trip)",
 		checks,
 		#parts
 	)

@@ -1,13 +1,17 @@
 --[[
 	The fallen crews' bodies: real miners. A dead miner by a dungeon room's
 	wall or in a Rift cave is the body every player wears (FighterRig), in
-	the gear every player wears (Equipment), rolled at random: any helmet,
-	chest, gloves, boots, shield and weapon from the catalogue, a gem in a
-	piece or two, and for some a suit, a weapon skin, a visor or a helmet
-	skin (and for some nothing at all), so no two of them lie alike.
-	Server.World.FallenMiners lays them out in their death poses
-	(FallenMiners.dresser).
+	the gear every player wears (Equipment), rolled at random: a helmet,
+	chest, gloves, boots and shield from the armor families players wear
+	today (Shared.ArmorFamilies: Prospector, Skirmisher, Juggernaut, any
+	rarity, commons likelier), a sword (Traits.rollable: the standard swords
+	and their variants, as the rolls hand out; no axes, hammers, lances or
+	pistols), a gem in a piece or two, and for some a suit, a weapon skin, a
+	visor or a helmet skin (and for some nothing at all), so no two of them
+	lie alike. Server.World.FallenMiners lays them out in their death poses
+	(FallenMiners.dresser), the sword dropped on the floor by its hand.
 
+	  FallenCrew.wearable(kind, gear) -> may a fallen miner wear it?
 	  FallenCrew.roll(rng) -> loadout, cosmetics, skin
 	  FallenCrew.body(rng, parent) -> Model?   a dressed rig, standing at the
 	                                           origin, under `parent`
@@ -33,21 +37,52 @@ FallenCrew.Odds = { Suit = 0.45, Skin = 0.35, Visor = 0.4, Helmet = 0.25 }
 -- How many pieces carry a gem: none, one or two.
 FallenCrew.GemOdds = { 0.3, 0.45, 0.25 }
 FallenCrew.GemTiers = { "Common", "Common", "Uncommon", "Uncommon", "Rare" }
+-- How likely each rarity tier of gear is on one (1 to 5): crews that got
+-- this far carried better than the commons a fresh roll hands out.
+FallenCrew.Weights = { 35, 30, 20, 10, 5 }
 FallenCrew.Elements = { "Fire", "Frost", "Shock", "Poison" }
 
--- One of a kind of gear, commons likelier than legendaries (Traits.Weights
--- by rarity tier), any that can be handed out at all (no pistols).
-local function pickGear(list, rng)
-	local groups = {}
+-- What a fallen miner may wear: armor and shields of the families players
+-- wear today (Shared.ArmorFamilies), and of the weapons only the swords
+-- (Traits.rollable). Anything else in the catalogue is from before.
+function FallenCrew.wearable(kind: string, gear): boolean
+	if gear == nil then
+		return false
+	end
+	if gear.StartPool == false then
+		return false -- (retired: kept for saves, never handed out)
+	end
+	if kind == "Weapons" then
+		return Traits.rollable(gear)
+	end
+	return Traits.obtainable(gear) and gear.ArmorFamily ~= nil
+end
+
+-- One of a kind of gear, commons likelier than legendaries
+-- (FallenCrew.Weights by rarity tier), of what a fallen miner may wear
+-- (FallenCrew.wearable; failing that, anything that can be handed out at all).
+local function pickGear(kind: string, list, rng)
+	local wearable = {}
 	for _, gear in list do
-		if Traits.obtainable(gear) then
-			local tier = gear.RarityTier or 1
-			groups[tier] = groups[tier] or {}
-			table.insert(groups[tier], gear)
+		if FallenCrew.wearable(kind, gear) then
+			table.insert(wearable, gear)
 		end
 	end
+	if #wearable == 0 then
+		for _, gear in list do
+			if Traits.obtainable(gear) then
+				table.insert(wearable, gear)
+			end
+		end
+	end
+	local groups = {}
+	for _, gear in wearable do
+		local tier = gear.RarityTier or 1
+		groups[tier] = groups[tier] or {}
+		table.insert(groups[tier], gear)
+	end
 	local total = 0
-	for tier, weight in Traits.Weights do
+	for tier, weight in FallenCrew.Weights do
 		if groups[tier] then
 			total += weight
 		end
@@ -56,7 +91,7 @@ local function pickGear(list, rng)
 		return list[1]
 	end
 	local pick = rng:NextNumber(0, total)
-	for tier, weight in Traits.Weights do
+	for tier, weight in FallenCrew.Weights do
 		local group = groups[tier]
 		if group then
 			pick -= weight
@@ -87,7 +122,7 @@ function FallenCrew.roll(rng: Random)
 	local c = { Class = "Warrior", GearRolls = {}, ItemGems = {} }
 	for _, slot in Slots.Order do
 		local kind = Slots.Definitions[slot].Kind
-		local gear = pickGear(class[kind] or {}, rng)
+		local gear = pickGear(kind, class[kind] or {}, rng)
 		if gear then
 			c[slot] = gear.Id
 			c[slot .. "Quality"] = 1

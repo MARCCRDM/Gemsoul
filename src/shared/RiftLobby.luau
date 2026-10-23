@@ -5,6 +5,9 @@
 
 	  RiftLobby.Near                      studs from the gate: "at the gate"
 	  RiftLobby.lobby(view) -> lobby      who's where, and the invites
+	  RiftLobby.backup(lobby) -> { row }  who you can call in from down in
+	                                      the Rift: your party, the Outpost,
+	                                      your friends, each once
 ]]
 local RiftRun = require(script.Parent.RiftRun)
 
@@ -172,6 +175,36 @@ function RiftLobby.lobby(view)
 		Friends = friends,
 		Known = view.Friends ~= nil,
 	}
+end
+
+-- Down in the Rift, who you can call in (the down card: Client.RiftClient):
+-- the rest of your party first (with you, or on their way: no button),
+-- then the Outpost's miners, then your friends, each once. Rows as the
+-- lobby's, Invite as there ("Party", "Game", "Invited", "Busy" or nil).
+function RiftLobby.backup(lobby)
+	local rows, seen = {}, {}
+	for _, slot in lobby.Slots or {} do
+		if slot and not slot.You then
+			seen[slot.UserId] = true
+			table.insert(rows, {
+				UserId = slot.UserId,
+				Name = slot.Name,
+				Where = if slot.Where == "In the Rift" then "With you in the Rift" else "In your party  ·  " .. slot.Where,
+				Friend = false,
+				Invite = "Busy",
+				Party = true,
+			})
+		end
+	end
+	for _, list in { lobby.Outpost or {}, lobby.Friends or {} } do
+		for _, person in list do
+			if not seen[person.UserId] then
+				seen[person.UserId] = true
+				table.insert(rows, person)
+			end
+		end
+	end
+	return rows
 end
 
 return RiftLobby

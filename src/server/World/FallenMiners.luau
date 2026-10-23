@@ -4,8 +4,9 @@
 	boss. Props only (nothing to bump into, nothing to press): a dead miner
 	in the gear miners wear (the server hands one over, FallenMiners.dresser:
 	Server.Systems.FallenCrew's real fighter rig in a random kit, a random
-	suit or skin on some), laid out slumped, face down or sprawled; the pick
-	it dropped; a pouch of gems spilt and glinting; claw marks dragged
+	suit or skin on some), laid out curled on its side, face down or
+	sprawled, its sword dropped on the floor by its hand; the pick it
+	dropped; a pouch of gems spilt and glinting; claw marks dragged
 	across the floor; the floor stained dark under it. With no dresser (the
 	tests build the worlds without one) an old expedition suit stands in:
 	its paint faded, its visor cracked and the skull's sockets behind it
@@ -14,7 +15,7 @@
 	  FallenMiners.place(parent, at, facing, rng, opts?) -> Model
 	      one miner at `at` (on the floor) facing `facing` (into the room:
 	      the one slumped against a wall has its back to it). opts:
-	        Pose     "Slumped" | "FaceDown" | "Sprawled" (else picked)
+	        Pose     "Curled" | "FaceDown" | "Sprawled" (else picked)
 	        Glow     the colour of its visor's crack and its spilt gems
 	        Scratch  the claw marks' colour (glowing in the Rift)
 	        Shards   crystals of the place grown up through it
@@ -35,7 +36,7 @@ local FallenMiners = {}
 FallenMiners.dresser = nil :: ((any, Instance) -> Model?)?
 
 FallenMiners.Count = { Cave = 2, Throne = 6, Room = 1, BossRoom = 4 }
-FallenMiners.Poses = { "Slumped", "FaceDown", "Sprawled" }
+FallenMiners.Poses = { "Curled", "FaceDown", "Sprawled" }
 
 local BONE = Color3.fromRGB(214, 202, 176)
 local SOCKET = Color3.fromRGB(28, 22, 22)
@@ -399,30 +400,134 @@ local function sign(rng): number
 	return if rng:NextNumber() < 0.5 then -1 else 1
 end
 
+-- Its sword, dropped: out of its hand and flat on the floor beside it,
+-- hilt by the hand, blade pointing away from the body (turned a little
+-- either way). The gear's "Weapon" model (Server.Systems.Equipment) is
+-- read in the hand's frame to find the blade's long axis and its flat,
+-- so any sword lies right whichever way it was gripped.
+local function dropWeapon(model: Model, base: CFrame, rng)
+	local gear = model:FindFirstChild("GemsoulGear")
+	local weapon = gear and gear:FindFirstChild("Weapon")
+	local hand = model:FindFirstChild("RightHand")
+	local torso = model:FindFirstChild("UpperTorso")
+	if not weapon or not hand or not torso or not hand:IsA("BasePart") or not torso:IsA("BasePart") then
+		return
+	end
+	local parts = {}
+	for _, d in weapon:GetDescendants() do
+		if d:IsA("BasePart") then
+			table.insert(parts, d)
+		end
+	end
+	if #parts == 0 then
+		return
+	end
+	local function corners(part: BasePart, frame: CFrame, fn)
+		local half = part.Size / 2
+		for sx = -1, 1, 2 do
+			for sy = -1, 1, 2 do
+				for sz = -1, 1, 2 do
+					fn(frame * Vector3.new(sx * half.X, sy * half.Y, sz * half.Z))
+				end
+			end
+		end
+	end
+	-- Its extents along the hand's axes.
+	local H = hand.CFrame
+	local lo = { X = math.huge, Y = math.huge, Z = math.huge }
+	local hi = { X = -math.huge, Y = -math.huge, Z = -math.huge }
+	for _, part in parts do
+		corners(part, H:Inverse() * part.CFrame, function(c)
+			for _, axis in { "X", "Y", "Z" } do
+				lo[axis] = math.min(lo[axis], c[axis])
+				hi[axis] = math.max(hi[axis], c[axis])
+			end
+		end)
+	end
+	-- The longest axis is the blade, the shortest its flat.
+	local long, short = "X", "X"
+	for _, axis in { "Y", "Z" } do
+		if hi[axis] - lo[axis] > hi[long] - lo[long] then
+			long = axis
+		end
+		if hi[axis] - lo[axis] < hi[short] - lo[short] then
+			short = axis
+		end
+	end
+	if long == short then
+		return
+	end
+	local middle = if (long ~= "X" and short ~= "X") then "X" elseif (long ~= "Y" and short ~= "Y") then "Y" else "Z"
+	local floorY = base.Position.Y
+	local out = Vector3.new(hand.CFrame.Position.X - torso.CFrame.Position.X, 0, hand.CFrame.Position.Z - torso.CFrame.Position.Z)
+	out = if out.Magnitude > 0.2 then out.Unit else base.RightVector
+	local turn = rng:NextNumber(-0.45, 0.45)
+	out = (CFrame.Angles(0, turn, 0) * out)
+	local side = Vector3.new(-out.Z, 0, out.X) * sign(rng)
+	local v = {}
+	-- (The hilt's at the hand: the blade runs on from it, away from the body.)
+	v[long] = out * (if (lo[long] + hi[long]) / 2 >= 0 then 1 else -1)
+	v[short] = Vector3.new(0, 1, 0)
+	if middle == "X" then
+		v.X = v.Y:Cross(v.Z)
+	elseif middle == "Y" then
+		v.Y = v.Z:Cross(v.X)
+	else
+		v.Z = v.X:Cross(v.Y)
+	end
+	local handAt = Vector3.new(hand.CFrame.Position.X, floorY, hand.CFrame.Position.Z) + side * 0.9 + out * 0.3
+	local G = CFrame.fromMatrix(handAt, v.X, v.Y, v.Z)
+	local lowest = math.huge
+	for _, part in parts do
+		part.CFrame = G * (H:Inverse() * part.CFrame)
+		corners(part, part.CFrame, function(c)
+			lowest = math.min(lowest, c.Y)
+		end)
+	end
+	-- Flat on the floor, its lowest edge just on it.
+	local lift = Vector3.new(0, floorY + 0.03 - lowest, 0)
+	for _, part in parts do
+		part.CFrame = part.CFrame + lift
+	end
+	-- Its own thing now: nothing holds it to the hand.
+	for _, d in weapon:GetDescendants() do
+		if d:IsA("WeldConstraint") or d:IsA("Weld") or d:IsA("Motor6D") then
+			d:Destroy()
+		end
+	end
+	model:SetAttribute("WeaponDown", true)
+end
+
+-- (The old suit has no curled pose: it slumps instead.)
+POSES.Curled = POSES.Slumped
+
 local RIG_POSES = {}
 
--- Sat against the wall, legs out, head dropped onto its chest, one hand in
--- its lap by the pick, the other fallen by its spilt pouch.
-RIG_POSES.Slumped = function(model, rig, base: CFrame, glow: Color3, rng, opts)
-	stain(model, base * CFrame.new(0, 0, -0.5), 4.4)
-	local lean = 0.3 + rng:NextNumber(-0.05, 0.1)
-	local tilt = rng:NextNumber(-0.12, 0.12)
-	lay(model, rig, base * CFrame.new(0, 1.05, 0.55) * CFrame.Angles(lean, 0, tilt), {
-		Waist = CFrame.Angles(0.18, rng:NextNumber(-0.1, 0.1), 0),
-		Neck = CFrame.Angles(-0.6, rng:NextNumber(-0.45, 0.45), 0.1),
-		RightHip = CFrame.Angles(math.pi / 2 - lean, 0, -0.12),
-		LeftHip = CFrame.Angles(math.pi / 2 - lean, 0, 0.16),
-		RightKnee = CFrame.Angles(rng:NextNumber(-0.25, 0), 0, 0),
-		LeftKnee = CFrame.Angles(rng:NextNumber(-0.25, 0), 0, 0),
-		RightShoulder = CFrame.Angles(0.95, 0, -0.3),
-		RightElbow = CFrame.Angles(0.45, 0, 0),
-		LeftShoulder = CFrame.Angles(0.25, 0, 0.4),
-		LeftElbow = CFrame.Angles(0.15, 0, 0),
+-- On its side, curled: knees drawn up, the lower arm stretched out along
+-- the floor in front of it, the upper arm fallen across its body, head
+-- dropped to its chest. (The body leans back a little, so the shoulder
+-- it lies on sits on the floor and not through it.)
+RIG_POSES.Curled = function(model, rig, base: CFrame, glow: Color3, rng, opts)
+	stain(model, base * CFrame.new(0, 0, -0.3), 4.8)
+	local side = sign(rng)
+	local lean = math.rad(78) + rng:NextNumber(-0.06, 0.06)
+	lay(model, rig, base * CFrame.new(0, 1.05, 0) * CFrame.Angles(0, 0, side * lean), {
+		Waist = CFrame.Angles(0.3, 0, side * -0.1),
+		Neck = CFrame.Angles(-0.45, side * rng:NextNumber(0.1, 0.4), side * -0.25),
+		-- (The lower arm out along the floor, the upper one across the body.)
+		RightShoulder = if side > 0 then CFrame.Angles(-1.25, 0, -0.9) else CFrame.Angles(-1.5, 0, 0.1),
+		LeftShoulder = if side < 0 then CFrame.Angles(-1.25, 0, 0.9) else CFrame.Angles(-1.5, 0, -0.1),
+		RightElbow = CFrame.Angles(if side > 0 then -0.9 else -0.2, 0, 0),
+		LeftElbow = CFrame.Angles(if side < 0 then -0.9 else -0.2, 0, 0),
+		RightHip = CFrame.Angles(if side > 0 then 1.25 else 1.05, 0, -0.1),
+		LeftHip = CFrame.Angles(if side < 0 then 1.25 else 1.05, 0, 0.1),
+		RightKnee = CFrame.Angles(rng:NextNumber(1.0, 1.4), 0, 0),
+		LeftKnee = CFrame.Angles(rng:NextNumber(0.8, 1.2), 0, 0),
 	})
-	pick(model, base * CFrame.new(0.25, 0.95, -1.15) * CFrame.Angles(math.pi / 2, 0, 1.1))
-	spill(model, base * CFrame.new(1.35, 0, -0.6), glow, rng)
+	pick(model, base * CFrame.new(-1.9 * side, 0.2, -2.2) * CFrame.Angles(0, 0.9, math.pi / 2))
+	spill(model, base * CFrame.new(1.5 * side, 0, 0.9), glow, rng)
 	if opts.Shards then
-		shards(model, base * CFrame.new(-1.3, 0, 0.6), glow, rng)
+		shards(model, base * CFrame.new(-1.2 * side, 0, 1.4), glow, rng)
 	end
 end
 
@@ -500,6 +605,7 @@ function FallenMiners.place(parent: Instance, at: Vector3, facing: Vector3, rng,
 	end
 	if rig then
 		RIG_POSES[pose](model, rig, base, glow, rng, opts)
+		dropWeapon(model, base, rng)
 		model:SetAttribute("Dressed", true)
 	else
 		local suit = SUITS[rng:NextInteger(1, #SUITS)]
@@ -595,7 +701,7 @@ function FallenMiners.scatter(parent: Instance, center: Vector3, size: number, c
 	for _, d in sides do
 		if not hasDoor(d) then
 			local along = Vector3.new(-d.Z, 0, d.X) * rng:NextNumber(-0.2, 0.2) * half
-			table.insert(spots, { At = center + d * (half - 3.5) + along, Facing = -d, Pose = "Slumped" })
+			table.insert(spots, { At = center + d * (half - 3.5) + along, Facing = -d, Pose = "Curled" })
 		end
 	end
 	for _, d in sides do
@@ -612,7 +718,7 @@ function FallenMiners.scatter(parent: Instance, center: Vector3, size: number, c
 	-- (shuffled within each band, so rooms differ)
 	for i = #spots, 2, -1 do
 		local j = rng:NextInteger(1, i)
-		if (spots[i].Pose == "Slumped") == (spots[j].Pose == "Slumped") then
+		if (spots[i].Pose == "Curled") == (spots[j].Pose == "Curled") then
 			spots[i], spots[j] = spots[j], spots[i]
 		end
 	end
@@ -632,7 +738,7 @@ function FallenMiners.scatter(parent: Instance, center: Vector3, size: number, c
 			continue
 		end
 		local pose = spot.Pose
-		if pose ~= "Slumped" then
+		if pose ~= "Curled" then
 			pose = if rng:NextNumber() < 0.5 then "FaceDown" else "Sprawled"
 		end
 		table.insert(

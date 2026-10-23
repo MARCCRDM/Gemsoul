@@ -39,7 +39,9 @@
 	               you're out.
 	  Down         knocked out at the boss: YOU'RE DOWN, the boss still
 	               standing, and what now: RESTORE (its cost: your health and
-	               your kaiju's), INVITE A FRIEND or BACK TO BASE (keeping
+	               your kaiju's), CALL FOR BACKUP (the gate's lobby again:
+	               invite your party, the Outpost or a friend to come
+	               through a gate to you) or BACK TO BASE (keeping
 	               what you found), the time left to choose running down.
 
 	  RiftClient.start()            watch your Rift attributes (once)
@@ -1415,6 +1417,12 @@ end
 local downClock: TextLabel? = nil
 local downFill: Frame? = nil
 local restoreButton: TextButton? = nil
+-- The backup list (Shared.RiftLobby.backup): redrawn as the server changes.
+local downList: ScrollingFrame? = nil
+local downHead: TextLabel? = nil
+local downHint: TextLabel? = nil
+local downSmall = false
+local downDrawn: string? = nil
 
 local function choose(choice: string)
 	task.spawn(function()
@@ -1425,53 +1433,152 @@ local function choose(choice: string)
 	end)
 end
 
+-- Calling someone in from down there: a party invite (they come to you
+-- through any Rift Gate), or Roblox's invite for a friend who isn't here.
+local function callIn(person)
+	invited[person.UserId] = os.clock()
+	downDrawn = nil
+	if person.Invite == "Game" then
+		local s = social()
+		if s then
+			s.inviteFriends(person.UserId)
+		end
+	else
+		task.spawn(function()
+			local result = GemClient.request("PartyInvite", person.UserId)
+			UiKit.toast(result.Message or "", if result.Ok then P.Gold else P.Bad)
+			if not result.Ok then
+				invited[person.UserId] = nil
+				downDrawn = nil
+			end
+		end)
+	end
+end
+
+-- Down at the boss: on the left what you can do for yourself (RESTORE,
+-- BACK TO BASE, the clock running down); on the right who you can call
+-- in, the gate's lobby again (your party, the Outpost, your friends).
 local function showDown()
 	if downCard and downCard.Parent then
 		return
 	end
 	local s = screen()
 	local small = narrow(s)
-	local panel = modal("RiftDown", math.min(400, s.AbsoluteSize.X - 32), HELL, false, small)
+	downSmall = small
+	local width = math.min(if small then 660 else 780, s.AbsoluteSize.X - 24)
+	local panel = modal("RiftDown", width, HELL, false, small)
 	downCard = panel
 	local title = text(panel, "YOU'RE DOWN", if small then 20 else 24, P.Bad, IronUi.Heading)
 	title.LayoutOrder = 1
 	local boss = player:GetAttribute("RiftBoss") or "The boss"
-	local line = text(panel, string.format("%s is still standing. Your kaiju fight on without you.", boss), 13, P.Text)
+	local line = text(
+		panel,
+		string.format("%s is still standing. Your kaiju fight on without you: get back up, call for backup, or head home.", boss),
+		if small then 11 else 13,
+		P.Text
+	)
 	line.LayoutOrder = 2
+	local columns = new("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, if small then 200 else 300),
+		LayoutOrder = 3,
+	}, panel)
+	local leftW = 0.42
+	local left = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(leftW, -6, 1, 0) }, columns)
+	UiKit.list(left, if small then 5 else 8)
+	local right = new("Frame", {
+		Name = "Backup",
+		BackgroundColor3 = Color3.fromRGB(14, 12, 18),
+		BackgroundTransparency = 0.25,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(1 - leftW, -6, 1, 0),
+	}, columns)
+	UiKit.round(right, 8)
+	new("UIStroke", { Color = P.Teal, Thickness = 1, Transparency = 0.5 }, right)
+	UiKit.pad(right, if small then 6 else 8)
 	-- The time left to choose, running down.
 	local track = new("Frame", {
 		BackgroundColor3 = P.Slot,
 		Size = UDim2.new(1, 0, 0, 6),
-		LayoutOrder = 3,
-	}, panel)
+		LayoutOrder = 1,
+	}, left)
 	UiKit.round(track, 3)
 	local fill = new("Frame", { BackgroundColor3 = HELL, Size = UDim2.fromScale(1, 1) }, track)
 	UiKit.round(fill, 3)
-	local clock = text(panel, "", 12, P.Dim, BOLD)
-	clock.LayoutOrder = 4
+	local clock = text(left, "", if small then 11 else 12, P.Dim, BOLD)
+	clock.LayoutOrder = 2
 	downClock, downFill = clock, fill
 	local cost = player:GetAttribute("RiftRestore") or RiftRun.Restore.Coins
-	local tall = if small then 38 else 44
-	restoreButton = button(panel, string.format("RESTORE  ·  %d COINS", cost), P.Gold, 5, function()
+	local tall = if small then 36 else 44
+	restoreButton = button(left, string.format("RESTORE  ·  %d COINS", cost), P.Gold, 3, function()
 		choose("Restore")
 	end, tall)
-	if not small then
-		local note = text(panel, "You and your kaiju, back to full health, right here.", 11, P.Dim)
-		note.LayoutOrder = 6
-	end
-	-- (Side by side on a phone: its screen is short.)
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, tall), LayoutOrder = 7 }, panel)
-	new("UIGridLayout", {
-		CellSize = UDim2.new(0.5, -4, 0, tall),
-		CellPadding = UDim2.fromOffset(8, 8),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, row)
-	button(row, "INVITE A FRIEND", P.Teal, 1, invite, tall)
-	button(row, "BACK TO BASE", P.Edge, 2, function()
+	local note = text(left, "You and your kaiju, back to full health, right here.", if small then 10 else 11, P.Dim)
+	note.LayoutOrder = 4
+	button(left, "BACK TO BASE", P.Edge, 5, function()
 		choose("Home")
 	end, tall)
-	local keep = text(panel, "You and your kaiju back to full health, or home with the gems you found.", 11, P.Dim)
-	keep.LayoutOrder = 9
+	local keep = text(left, "Home with the gems you found.", if small then 10 else 11, P.Dim)
+	keep.LayoutOrder = 6
+	-- Who you can call in.
+	local headH, hintH = 18, if small then 26 else 30
+	local head = text(right, "CALL FOR BACKUP", if small then 11 else 12, P.Teal, BOLD)
+	head.AutomaticSize = Enum.AutomaticSize.None
+	head.Size = UDim2.new(1, 0, 0, headH)
+	local list = new("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(0, headH + 4),
+		Size = UDim2.new(1, 0, 1, -(headH + 4 + hintH + 4)),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = P.Dim,
+	}, right)
+	UiKit.list(list, 4)
+	local hint = text(right, "", if small then 9 else 10, P.Dim)
+	hint.AutomaticSize = Enum.AutomaticSize.None
+	hint.AnchorPoint = Vector2.new(0, 1)
+	hint.Position = UDim2.fromScale(0, 1)
+	hint.Size = UDim2.new(1, 0, 0, hintH)
+	downList, downHead, downHint, downDrawn = list, head, hint, nil
+end
+
+-- The backup list, drawn again only when something shown has changed.
+local function refreshBackup()
+	local list, head, hint = downList, downHead, downHint
+	if not list or not list.Parent or not head or not hint then
+		return
+	end
+	local view = RiftLobby.lobby(lobbyView(nil))
+	local rows = RiftLobby.backup(view)
+	local sig = { tostring(view.Lead), tostring(view.Size) }
+	for _, row in rows do
+		table.insert(sig, string.format("%d%s%s%s", row.UserId, tostring(row.Name), tostring(row.Where), tostring(row.Invite)))
+	end
+	local signature = table.concat(sig, ";")
+	if signature == downDrawn then
+		return
+	end
+	downDrawn = signature
+	for _, child in list:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	for i, person in rows do
+		personRow(list, person, i, downSmall, true, callIn)
+	end
+	if #rows == 0 then
+		local empty = text(list, "Nobody's about: no one else in the Outpost, none of your friends online.", if downSmall then 10 else 11, P.Dim)
+		empty.LayoutOrder = 1
+	end
+	head.Text = string.format("CALL FOR BACKUP  ·  %d/%d IN YOUR PARTY", view.Size, RiftRun.Party)
+	hint.Text = if not view.Lead
+		then "Only your party's leader can invite."
+		elseif view.Size >= RiftRun.Party then "Your party's full: everyone's here or on their way."
+		else "INVITE asks them into your party: they come to you through any Rift Gate."
 end
 
 local function refreshDown()
@@ -1479,6 +1586,7 @@ local function refreshDown()
 	if type(deadline) ~= "number" then
 		close(downCard)
 		downCard = nil
+		downList, downHead, downHint, downDrawn = nil, nil, nil, nil
 		return
 	end
 	showDown()
@@ -1494,6 +1602,7 @@ local function refreshDown()
 		local cost = player:GetAttribute("RiftRestore") or RiftRun.Restore.Coins
 		restoreButton.Text = string.format("RESTORE  ·  %d COINS", cost)
 	end
+	refreshBackup()
 end
 
 -- Watching your attributes ------------------------------------------------------------------------------------

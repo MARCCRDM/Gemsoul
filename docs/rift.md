@@ -223,17 +223,29 @@ props only: you walk through them, nothing to press):
 - **Each one is a real miner** (since 2026-10-23): the body every player
   wears (`Server.Systems.FighterRig`) in the gear every player wears, built
   by the real `Equipment`, rolled at random for each of them by
-  `Server.Systems.FallenCrew`: any helmet, chest, gloves, boots, shield and
-  weapon from the catalogue (commons likelier, no pistols), a gem in a
-  piece or two, and for looks a suit on some (45%), a weapon skin (35%), a
-  visor (40%) or a helmet skin (25%), rolled one by one, so about one in
-  six wears nothing for looks and no two lie alike. Round it: its pick, a
-  pouch of gems spilt and glinting (one lights the floor), the floor
-  stained dark under it, and crystals of the place grown up through it.
+  `Server.Systems.FallenCrew`: a helmet, chest, gloves, boots and shield
+  from the **armor families players wear today** (Prospector, Skirmisher,
+  Juggernaut, any rarity: `FallenCrew.Weights` 35/30/20/10/5, better than
+  a fresh roll's commons), and **a sword** (`Traits.rollable`: the
+  standard swords and their variants; no axes, hammers, lances, pistols or
+  retired models), a gem in a piece or two, and for looks a suit on some
+  (45%), a weapon skin (35%), a visor (40%) or a helmet skin (25%), rolled
+  one by one, so about one in six wears nothing for looks and no two lie
+  alike. Round it: its pick, a pouch of gems spilt and glinting (one lights
+  the floor), the floor stained dark under it, and crystals of the place
+  grown up through it.
+- **Its sword lies on the floor by its hand** (`FallenMiners.dropWeapon`):
+  out of its grip, flat, hilt by the hand and blade pointing away from the
+  body, turned a little either way. The gear's Weapon model is read in the
+  hand's frame to find the blade's long axis and its flat, so any sword
+  lies right whichever way it was gripped; its lowest edge sits on the
+  floor, and nothing welds it to the hand any more.
   Three ways they lie, the body's joints bent and every welded piece of
   gear carried along on its limb:
-  - **Slumped** against a wall, legs out, head dropped onto its chest, one
-    hand in its lap by the pick.
+  - **Curled** on its side by a wall, knees drawn up, the lower arm
+    stretched out along the floor, the upper arm fallen across its body,
+    head dropped to its chest. (It leans back a little, so the shoulder it
+    lies on sits on the floor, not through it.)
   - **Face down**, one arm stretched out for the pick it dropped, one knee
     drawn up, head turned to the side, claw marks where something dragged it.
   - **Sprawled** on its back, arms flung out, one knee up, head lolled to
@@ -251,9 +263,11 @@ props only: you walk through them, nothing to press):
   pathway dungeon** has them too: one in each room, glowing its element's
   colour, 4 and the heap in the boss's room.
 
-![Six of them in a line, each in a kit of its own: a Shogun helmet and a greatblade, a chest in a purple suit, a helmet skin, one with nothing for looks. Offline render of the game's parts, not a Roblox screenshot](rift/fallen-lineup.jpg)
+![Six of them in a line, each in family armor of its own with its sword dropped on the floor beside it. Offline render of the game's parts, not a Roblox screenshot](rift/fallen-lineup.jpg)
 
-![Closer: slumped, face down, sprawled, and another slumped in another kit](rift/fallen-miners.jpg)
+![Closer: one curled on its side, its sword flat on the floor by its hand, hilt at the hand and blade pointing away. Offline render, not a Roblox screenshot](rift/fallen-miners.jpg)
+
+![Sprawled on its back and face down, each with its sword on the floor beside it. Offline render, not a Roblox screenshot](rift/fallen-facedown.jpg)
 
 **How the body gets there.** `FallenMiners` is a world builder and knows
 nothing of gear; the server hands it bodies through `FallenMiners.dresser`
@@ -385,11 +399,27 @@ fighters leave you be while you're down; with everyone down, they wait.
 
 ![Down at the boss](rift/down.png)
 
+  The card is two columns. On the left, what you can do for yourself; on
+  the right, **CALL FOR BACKUP**: the gate's lobby again, down there.
+
   - **RESTORE · 150 COINS**: you and your kaiju, every one of them, back to
     full health right there (`KaijuServer.restoreAll`). It doubles each
     time in a trip (150, 300, 600...). Coins only, no Robux;
-  - **INVITE A FRIEND**: the invite window, while you wait;
   - **BACK TO BASE**: home with the gems you found;
+  - **CALL FOR BACKUP · 1/4 IN YOUR PARTY**: a list of who you can call in
+    (`Shared.RiftLobby.backup`): the rest of your party first (with you in
+    the Rift, or where they are in the Outpost, no button), then every
+    miner in the Outpost, then your Roblox friends online, each once, with
+    their face, name and level. **INVITE** asks a miner into your party
+    (`PartyInvite`, as the gate does); a friend who isn't in the game gets
+    Roblox's invite (**INVITE ↗**). Asked a moment ago: **INVITED**; in a
+    party or the Rift already: **IN A PARTY** / **IN THE RIFT**. Only your
+    party's leader can invite (the card says so otherwise), and a full
+    party has nobody to ask. The list redraws by itself as people come and
+    go. Whoever accepts walks up to any Rift Gate (or the bounty counter)
+    and comes through to your trip: joining is allowed **at the throne
+    too** now, while the boss still stands (`RiftServer.partyRun`), not
+    only on the path;
   - nothing chosen in 60 seconds: back to base.
 
   Your kaiju fight on without you while you're down.

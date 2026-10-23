@@ -1061,12 +1061,14 @@ local function join(run, player: Player)
 	end
 end
 
--- A trip that `player` may join: their party's, still on the path, with room.
+-- A trip that `player` may join: their party's, with its boss still
+-- standing (the caves, or the throne: backup called from down there),
+-- with room.
 local function partyRun(player: Player)
 	local party = Party.of(player)
 	for _, member in (party and party.Members) or {} do
 		local run = runOf[member]
-		if run and not run.Done and not run.Won and run.Room <= RiftRun.Rooms and #run.Members < RiftRun.Party then
+		if run and not run.Done and not run.Won and #run.Members < RiftRun.Party then
 			return run
 		end
 	end
