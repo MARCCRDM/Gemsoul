@@ -731,12 +731,21 @@ local PIECES = {
 	Grove = { "Trunk", "Bough", "Cap" },
 }
 local seenGate, seenFeature, seenName = {}, {}, {}
+-- How each is built (RiftStyles): its walls, floor, barrier, lamps, arch
+-- and throne are each of a kind no other realm has; its sky one of four.
+local seenStyle = { Wall = {}, Floor = {}, Gate = {}, Lamp = {}, Arch = {}, Throne = {} }
 for n, id in RiftRealms.Order do
 	local realm = RiftRealms.of(id)
 	check(realm.Id == id and realm.Boss == id and RiftRun.bossById(id) ~= nil, id .. ": not a boss's realm")
 	check(realm.Element == RiftRun.bossById(id).Element, id .. ": its realm isn't its element's")
 	check(not seenFeature[realm.Feature] and not seenName[realm.Name], id .. ": its realm is another boss's")
 	seenFeature[realm.Feature], seenName[realm.Name] = true, true
+	for kind, seen in seenStyle do
+		local style = realm.Style[kind]
+		check(type(style) == "string" and not seen[style], id .. ": its " .. kind .. " is built like " .. tostring(seen[style]) .. "'s")
+		seen[style] = id
+	end
+	check(({ Scar = 1, Aurora = 1, Storm = 1, SporeMoon = 1 })[realm.Style.Sky], id .. ": no sky")
 	local trip = RiftWorld.build("R" .. n, origin * CFrame.new(-2000 * n, 0, 0), Random.new(10 + n), realm)
 	check(trip.Folder:GetAttribute("Realm") == id, id .. ": the trip isn't marked with its realm")
 	local wall = trip.Gates[1]:FindFirstChild("Wall")
@@ -776,9 +785,37 @@ for n, id in RiftRealms.Order do
 		end
 	end
 	local sky = trip.Folder:FindFirstChild("Sky")
-	local scar = sky:FindFirstChild("Scar")
-	check(scar and scar.Color == realm.Scar, id .. ": the scar isn't its colour")
+	local scars, clouds = 0, 0
+	for _, d in sky:GetDescendants() do
+		if d.Name == "Scar" then
+			scars += 1
+		elseif d.Name == "Cloud" then
+			clouds += 1
+		end
+	end
+	check(scars >= 8 and clouds >= 8, id .. ": nothing burns in its sky")
 	check(sky:FindFirstChild("Ash"):FindFirstChildOfClass("ParticleEmitter").Rate == realm.Ash.Rate, id .. ": its sky drops the wrong ash")
+	-- Every barrier bars its passage (a solid Wall across it, 8 strands and
+	-- 3 fires at least), and every arch hangs clear of the floor.
+	for i, gate in trip.Gates do
+		local wall = gate:FindFirstChild("Wall")
+		check(wall and wall.CanCollide and wall.Size.X >= RiftWorld.Passage, id .. ": gate " .. i .. " doesn't bar the way")
+		local tongues, flames = 0, 0
+		for _, d in gate:GetDescendants() do
+			if d.Name == "Tongue" then
+				tongues += 1
+			elseif d:IsA("Fire") then
+				flames += 1
+			end
+		end
+		check(tongues >= 8 and flames >= 3, id .. ": gate " .. i .. " has no curtain (" .. tongues .. ", " .. flames .. ")")
+	end
+	for _, d in trip.Folder:GetDescendants() do
+		if d:IsA("BasePart") and (d.Name == "Arch" or d.Name == "Fang") then
+			check(d.CFrame.Position.Y - d.Size.Y / 2 - trip.Boss.Center.Y > 12, id .. ": a passage's roof hangs too low: " .. d.Name)
+		end
+	end
+	check(trip.Folder:FindFirstChild("Throne"):FindFirstChildOfClass("PointLight", true) ~= nil, id .. ": a dark throne")
 	trip.Folder:Destroy()
 end
 check(RiftRealms.of("Nobody") == RiftRealms.Default, "A boss with no realm has no world")

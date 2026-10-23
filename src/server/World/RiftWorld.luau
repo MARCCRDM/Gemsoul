@@ -12,13 +12,15 @@
 	out of each cave until it's cleared. (Each runner's client lights it:
 	Client.RiftClient.)
 
-	All of it is built in the boss's realm (Shared.RiftRealms: its
-	colours, its sky, what falls from it, the fire's colour), with the
-	realm's own set pieces stood by the walls of every cave
-	(RiftWorld.Features: craters and dud bombs, charred logs, frozen
-	ponds, a frozen tide, the freezer's blocks, charged vines, static
-	spires, blades, bog pools, a rotting grove). No two bosses' trips look
-	alike.
+	All of it is built in the boss's realm (Shared.RiftRealms), and built
+	differently for each (World.RiftStyles: the realm's Style names its
+	walls, its floor, the barrier across a passage, its lamps, the arch
+	over a passage, its throne and its sky, each of a kind no other realm
+	has, in its colours), with the realm's own set pieces stood by the
+	walls of every cave besides (RiftWorld.Features: craters and dud
+	bombs, charred logs, frozen ponds, a frozen tide, the freezer's blocks,
+	charged vines, static spires, blades, bog pools, a rotting grove). No
+	two bosses' trips are built alike.
 
 	  RiftWorld.build(id, origin, rng, realm?) -> {
 	      Folder, Origin (CFrame: the landing's middle, on its floor),
@@ -46,6 +48,7 @@
 local RiftRun = require(game:GetService("ReplicatedStorage").Shared.RiftRun)
 local RiftRealms = require(game:GetService("ReplicatedStorage").Shared.RiftRealms)
 local FallenMiners = require(script.Parent.FallenMiners)
+local RiftStyles = require(script.Parent.RiftStyles)
 
 local RiftWorld = {}
 
@@ -133,107 +136,6 @@ local function key(dir: Vector3): string
 	return math.round(dir.X) .. ":" .. math.round(dir.Z)
 end
 
--- A rock face along the floor's edge from `a` to `b`, standing outside it
--- (`inward` points into the cave): a solid slab Wall tall, so nobody climbs
--- or sees out; boulders leaning on its inner side so it reads as rock and
--- not a fence; jagged crowns along its top, now and then a ledge jutting
--- in over the floor (the cave's lip); and a seam of glowing rock down it.
-local function rockFace(parent, a: Vector3, b: Vector3, inward: Vector3, rng, ledges: boolean)
-	local length = (b - a).Magnitude
-	if length < 2 then
-		return
-	end
-	local along = (b - a).Unit
-	local tall, thick = RiftWorld.Wall, RiftWorld.Thick
-	local mid = (a + b) / 2 - inward * thick / 2
-	local frame = face(mid, along)
-	part(
-		parent,
-		frame * CFrame.new(0, tall / 2, 0),
-		Vector3.new(thick, tall, length + thick),
-		P.Rock,
-		Enum.Material.Slate,
-		nil,
-		true
-	).Name =
-		"RockWall"
-	-- (Its boulders: heaped at its foot, half sunk into it, never far out
-	-- over the floor.)
-	for _ = 1, math.max(1, math.floor(length / 11)) do
-		local s = rng:NextNumber(5, 11)
-		local at = a:Lerp(b, rng:NextNumber(0.08, 0.92)) + inward * rng:NextNumber(-1.5, 0.5) + UP * s * 0.35
-		part(
-			parent,
-			CFrame.new(at)
-				* CFrame.Angles(rng:NextNumber(-0.5, 0.5), rng:NextNumber(0, math.pi * 2), rng:NextNumber(-0.5, 0.5)),
-			Vector3.new(s, s * rng:NextNumber(0.6, 1), s * rng:NextNumber(0.7, 1.1)),
-			if rng:NextNumber() < 0.5 then P.Basalt else P.Rock,
-			Enum.Material.Slate,
-			nil,
-			true
-		)
-	end
-	-- (Its crowns, leaning in over the cave.)
-	for _ = 1, math.max(1, math.floor(length / 14)) do
-		local at = a:Lerp(b, rng:NextNumber(0.05, 0.95)) - inward * thick * 0.4
-		local high = rng:NextNumber(6, 16)
-		part(
-			parent,
-			face(at + UP * (tall + high / 2 - 1), -inward)
-				* CFrame.Angles(rng:NextNumber(-0.25, -0.05), 0, rng:NextNumber(-0.15, 0.15)),
-			Vector3.new(rng:NextNumber(5, 9), high, rng:NextNumber(5, 8)),
-			P.Obsidian,
-			Enum.Material.Slate,
-			"Wedge"
-		)
-	end
-	if ledges and length > 30 and rng:NextNumber() < 0.7 then
-		local span = length * rng:NextNumber(0.35, 0.6)
-		local at = a:Lerp(b, rng:NextNumber(0.3, 0.7)) + UP * (tall - 2.5)
-		part(
-			parent,
-			face(at + inward * 5, along) * CFrame.Angles(0, 0, rng:NextNumber(-0.05, 0.05)),
-			Vector3.new(12, 4, span),
-			P.Basalt,
-			Enum.Material.Slate
-		).Name =
-			"Ledge"
-	end
-	-- (Now and then a seam of glowing rock down it, low, where the cracks run in.)
-	if rng:NextNumber() < 0.5 then
-		local top = a:Lerp(b, rng:NextNumber(0.2, 0.8)) + inward * 0.05
-		local drop = rng:NextNumber(5, 9)
-		local seam = glow(
-			part(
-				parent,
-				face(top + UP * drop / 2, along) * CFrame.Angles(rng:NextNumber(-0.5, 0.5), 0, 0),
-				Vector3.new(0.4, drop, 1.2),
-				P.Glow
-			)
-		)
-		seam.Name = "Seam"
-		seam.Transparency = 0.3
-	end
-end
-
--- A brazier: a bowl of fire on a short stem.
-local function brazier(parent, at: Vector3)
-	part(parent, CFrame.new(at + UP * 1.8), Vector3.new(1.4, 3.6, 1.4), P.Obsidian, Enum.Material.Slate, nil, true)
-	local bowl = part(
-		parent,
-		CFrame.new(at + UP * 3.9) * CFrame.Angles(0, 0, math.pi / 2),
-		Vector3.new(1.2, 4, 4),
-		P.Obsidian,
-		Enum.Material.Slate,
-		"Cylinder",
-		true
-	)
-	bowl.Name = "Brazier"
-	local coals = glow(part(parent, CFrame.new(at + UP * 4.55), Vector3.new(3, 0.3, 3), P.Accent))
-	fire(coals, 6, 10)
-	light(coals, P.Accent, 36, 2.2)
-end
-
 -- A stalagmite: three blocks narrowing upward, leaning a little.
 local function stalagmite(parent, at: Vector3, high: number, rng)
 	local frame = CFrame.new(at) * CFrame.Angles(rng:NextNumber(-0.08, 0.08), rng:NextNumber(0, 6), 0)
@@ -256,10 +158,18 @@ end
 
 local SIDES = { Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1), Vector3.new(0, 0, -1) }
 
--- A cave: a solid floor with cracks glowing in it, a rock face along each
--- side but the way(s) in and out (`doors`: the sides, by key), a column of
--- rock in each corner, braziers inside the corners and stalagmites by the
--- walls (clear of the doors: the floor's middle is for fighting).
+-- The realm's builders (RiftStyles), with this file's helpers; P is the
+-- realm being built.
+local Styles
+local function style(kind: string)
+	return P.Style[kind]
+end
+
+-- A cave: a solid floor dressed the realm's way, a wall of the realm's
+-- kind along each side but the way(s) in and out (`doors`: the sides, by
+-- key), its kind of column in each corner, its lamps inside the corners,
+-- its set pieces by the walls (and stalagmites, in the realms that have
+-- them), clear of the doors: the floor's middle is for fighting.
 local function cave(parent, center: Vector3, size: number, doors: { [string]: boolean }, rng)
 	local model = Instance.new("Model")
 	model.Name = "Cave"
@@ -275,44 +185,24 @@ local function cave(parent, center: Vector3, size: number, doors: { [string]: bo
 		true
 	).Name =
 		"Floor"
-	for _ = 1, math.floor(size / 9) do
-		local at = center + Vector3.new(rng:NextNumber(-half + 4, half - 4), 0.03, rng:NextNumber(-half + 4, half - 4))
-		local crack = glow(
-			part(
-				model,
-				CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
-				Vector3.new(rng:NextNumber(0.3, 0.7), 0.06, rng:NextNumber(5, 14)),
-				P.Glow
-			)
-		)
-		crack.Name = "Crack"
-		crack.Transparency = 0.2
-	end
+	Styles.Floors[style("Floor")](model, center, size, rng)
+	local wall = Styles.Walls[style("Wall")]
 	local gap = RiftWorld.Passage + 2
 	for _, d in SIDES do
 		local edge = center + d * half
 		local side = Vector3.new(-d.Z, 0, d.X)
 		local a, b = edge - side * half, edge + side * half
 		if doors[key(d)] then
-			rockFace(model, a, edge - side * gap / 2, -d, rng, false)
-			rockFace(model, edge + side * gap / 2, b, -d, rng, false)
+			wall(model, a, edge - side * gap / 2, -d, rng, false)
+			wall(model, edge + side * gap / 2, b, -d, rng, false)
 		else
-			rockFace(model, a, b, -d, rng, true)
+			wall(model, a, b, -d, rng, true)
 		end
 	end
-	local thick, tall = RiftWorld.Thick, RiftWorld.Wall
+	local thick = RiftWorld.Thick
 	for _, c in { { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } } do
-		local corner = center + Vector3.new(c[1], 0, c[2]) * (half + thick / 2)
-		part(
-			model,
-			CFrame.new(corner + UP * (tall / 2 + 3)) * CFrame.Angles(0, rng:NextNumber(0, 1), 0),
-			Vector3.new(thick + 3, tall + 6, thick + 3),
-			P.Obsidian,
-			Enum.Material.Slate,
-			nil,
-			true
-		)
-		brazier(model, center + Vector3.new(c[1], 0, c[2]) * (half - 6))
+		Styles.Corners[style("Wall")](model, center + Vector3.new(c[1], 0, c[2]) * (half + thick / 2), rng)
+		Styles.Lamps[style("Lamp")](model, center + Vector3.new(c[1], 0, c[2]) * (half - 6))
 	end
 	if P.Stalagmites then
 		for _, d in SIDES do
@@ -333,8 +223,8 @@ local function cave(parent, center: Vector3, size: number, doors: { [string]: bo
 end
 
 -- A passage from one cave's door (`from`) to the next's (`to`): its floor,
--- a rock face each side, and an arch of rock across it with fangs hanging
--- from it (the cave closing in over your head, high enough to fight under).
+-- a wall of the realm's kind each side, and the realm's arch over it (the
+-- cave closing in over your head, high enough to fight under).
 local function passage(parent, from: Vector3, to: Vector3, rng)
 	local model = Instance.new("Model")
 	model.Name = "Passage"
@@ -354,88 +244,24 @@ local function passage(parent, from: Vector3, to: Vector3, rng)
 		true
 	).Name =
 		"Floor"
-	rockFace(model, from + side * width / 2, to + side * width / 2, -side, rng, false)
-	rockFace(model, from - side * width / 2, to - side * width / 2, side, rng, false)
-	local tall = RiftWorld.Wall
-	local arch = face(mid + UP * (tall - 3), side)
-	part(model, arch, Vector3.new(14, 7, width + RiftWorld.Thick * 2 + 6), P.Basalt, Enum.Material.Slate).Name = "Arch"
-	for i = 1, 5 do
-		local across = (i - 3) * width / 5 + rng:NextNumber(-1, 1)
-		local long = rng:NextNumber(4, 9)
-		part(
-			model,
-			CFrame.new(mid + side * across + dir * rng:NextNumber(-4, 4) + UP * (tall - 6.5 - long / 2))
-				* CFrame.Angles(math.pi, rng:NextNumber(0, 6), 0),
-			Vector3.new(2.2, long, 2.2),
-			P.Obsidian,
-			Enum.Material.Slate,
-			"Wedge"
-		).Name =
-			"Fang"
-	end
+	local wall = Styles.Walls[style("Wall")]
+	wall(model, from + side * width / 2, to + side * width / 2, -side, rng, false)
+	wall(model, from - side * width / 2, to - side * width / 2, side, rng, false)
+	Styles.Arches[style("Arch")](model, mid, dir, side, width, rng)
 	return model
 end
 
--- A wall of fire across a passage (`dir`: the way on): a red heat-haze you
--- can't pass, a curtain of flame tongues licking up in front of it, and a
--- column of obsidian either side.
+-- The barrier across a passage (`dir`: the way on), of the realm's kind:
+-- a wall of fire, icicles, a frozen wave, a freezer door, a lattice of
+-- vines, a field of static, a curtain of blades, marsh gas or thorns. Its
+-- solid "Wall" you can't pass; RiftWorld.openGate takes it down.
 local function gate(parent, at: Vector3, dir: Vector3, room: number)
 	local model = Instance.new("Model")
 	model.Name = "FireGate"
 	model:SetAttribute("Room", room)
 	model.Parent = parent
 	local frame = CFrame.new(at) * CFrame.Angles(0, yawOf(dir), 0)
-	local width = RiftWorld.Passage
-	local wall =
-		part(model, frame * CFrame.new(0, 9, 0), Vector3.new(width, 18, 1.2), P.Glow, Enum.Material.Neon, nil, true)
-	wall.Name = "Wall"
-	wall.Transparency = 0.78
-	wall.CastShadow = false
-	local inner =
-		part(model, frame * CFrame.new(0, 8, -0.9), Vector3.new(width - 2, 16, 0.4), P.Accent, Enum.Material.Neon)
-	inner.Name = "Glow"
-	inner.Transparency = 0.85
-	local tongues = { P.Glow, P.Accent, P.Tongue }
-	local count = math.floor(width / 1.3)
-	for i = 0, count - 1 do
-		local x = -width / 2 + 0.8 + i * (width - 1.6) / (count - 1)
-		local tall = 7 + 8 * math.abs(math.sin(i * 1.7 + room)) + (if i % 3 == 0 then 2 else 0)
-		local lick = part(
-			model,
-			frame * CFrame.new(x, tall / 2, -0.2 + (i % 2) * 0.4) * CFrame.Angles(0, 0, math.sin(i * 2.3) * 0.12),
-			Vector3.new(0.7 + (i % 3) * 0.25, tall, 0.35),
-			tongues[i % 3 + 1],
-			Enum.Material.Neon
-		)
-		lick.Name = "Tongue"
-		lick.Transparency = 0.2 + (i % 3) * 0.12
-	end
-	for i = -1, 1 do
-		local base = part(model, frame * CFrame.new(i * 6.5, 0.5, 0), Vector3.new(1, 1, 1), P.Glow, Enum.Material.Neon)
-		base.Name = "Flame"
-		base.Transparency = 1
-		fire(base, 9, 16)
-	end
-	light(wall, P.Accent, 34, 2.4)
-	for _, s in { -1, 1 } do
-		part(
-			model,
-			frame * CFrame.new(s * (width / 2 + 1.5), 10, 0),
-			Vector3.new(3, 20, 3),
-			P.Obsidian,
-			Enum.Material.Slate,
-			nil,
-			true
-		)
-		part(
-			model,
-			frame * CFrame.new(s * (width / 2 + 1.5), 22, 0) * CFrame.Angles(0, if s > 0 then 0 else math.pi, 0),
-			Vector3.new(3, 4, 3),
-			P.Obsidian,
-			Enum.Material.Slate,
-			"CornerWedge"
-		)
-	end
+	Styles.Gates[style("Gate")](model, frame, RiftWorld.Passage, room)
 	return model
 end
 
@@ -479,37 +305,15 @@ local function wayHome(parent, frame: CFrame, open: boolean)
 end
 
 -- The throne at the far end of the throne cave (`facing`: toward the way
--- in): a dais of obsidian, its back stood tall with a skull over it, fire
--- either side, and the scorched ring in the middle where the boss comes
--- through.
+-- in), of the realm's kind, and the ring in the middle where the boss
+-- comes through.
 local function throne(parent, center: Vector3, facing: Vector3, size: number)
 	local model = Instance.new("Model")
 	model.Name = "Throne"
 	model.Parent = parent
 	local seat = center - facing * (size / 2 - 12)
 	local frame = face(seat, facing)
-	part(model, frame * CFrame.new(0, 2, 0), Vector3.new(20, 4, 10), P.Obsidian, Enum.Material.Slate, nil, true)
-	part(model, frame * CFrame.new(0, 5, 2), Vector3.new(14, 2.5, 6), P.Obsidian, Enum.Material.Slate, nil, true)
-	part(model, frame * CFrame.new(0, 14, 4.5), Vector3.new(12, 18, 2.5), P.Obsidian, Enum.Material.Slate, nil, true)
-	local skull =
-		part(model, frame * CFrame.new(0, 25, 4.5), Vector3.new(7, 7, 7), BONE, Enum.Material.SmoothPlastic, "Ball")
-	skull.Name = "Skull"
-	for _, s in { -1, 1 } do
-		glow(part(model, frame * CFrame.new(s * 1.5, 25.4, 1.5), Vector3.new(1.4, 1.4, 1.4), P.Dark, nil, "Ball"))
-		local pillar = part(
-			model,
-			frame * CFrame.new(s * 13, 6, 0),
-			Vector3.new(3, 12, 3),
-			P.Obsidian,
-			Enum.Material.Slate,
-			nil,
-			true
-		)
-		local top =
-			part(model, frame * CFrame.new(s * 13, 12.3, 0), Vector3.new(3.4, 0.6, 3.4), P.Accent, Enum.Material.Neon)
-		fire(top, 10, 20)
-		light(pillar, P.Accent, 44, 2.5)
-	end
+	Styles.Thrones[style("Throne")](model, frame, seat)
 	local ring = glow(
 		part(
 			model,
@@ -532,87 +336,15 @@ local function throne(parent, center: Vector3, facing: Vector3, size: number)
 	return model, seat, frame
 end
 
--- The sky over it all (each client lights the air: RiftClient): a scar torn
--- right across it, white-hot down the middle and bleeding red at its edges,
--- with strands torn off it; banks of black cloud round the edges, lit red
--- from below; ash falling the whole way.
+-- The sky over it all, of the realm's kind (a scar torn across it, an
+-- aurora, a storm, a spore moon), banks of cloud round the edges lit from
+-- below, and what falls from it the whole way (each client lights the
+-- air: RiftClient).
 local function sky(parent, center: Vector3, span: number, rng)
 	local model = Instance.new("Model")
 	model.Name = "Sky"
 	model.Parent = parent
-	local high = center + UP * 260
-	local heading = rng:NextNumber(0, math.pi)
-	local dir = Vector3.new(math.cos(heading), 0, math.sin(heading))
-	local side = Vector3.new(-dir.Z, 0, dir.X)
-	local length = span * 1.5
-	local points = {}
-	for i = 0, 10 do
-		local t = i / 10
-		local wobble = if i == 0 or i == 10 then 0 else rng:NextNumber(-1, 1) * 28
-		table.insert(points, high + dir * (t - 0.5) * length + side * wobble + UP * rng:NextNumber(-12, 12))
-	end
-	for i = 1, #points - 1 do
-		local a, b = points[i], points[i + 1]
-		local mid = (a + b) / 2
-		local t = math.abs((i - 0.5) / (#points - 1) - 0.5) * 2
-		local width = 4 + 12 * (1 - t)
-		local frame = face(mid, flat(b - a))
-		local rim = glow(part(model, frame, Vector3.new(width * 1.9, 3, (b - a).Magnitude + 3), P.Dark))
-		rim.Name = "ScarRim"
-		rim.Transparency = 0.35
-		glow(part(model, frame, Vector3.new(width, 4, (b - a).Magnitude + 2), P.Scar)).Name = "Scar"
-		if i % 3 == 0 then
-			local strand = mid + side * (if i % 2 == 0 then 1 else -1) * rng:NextNumber(30, 60)
-			glow(
-				part(
-					model,
-					face((mid + strand) / 2, flat(strand - mid)),
-					Vector3.new(2, 2, (strand - mid).Magnitude),
-					P.Strand
-				)
-			).Name =
-				"Strand"
-		end
-	end
-	for i = 1, 14 do
-		local a = i / 14 * math.pi * 2 + rng:NextNumber(-0.15, 0.15)
-		local r = span * rng:NextNumber(0.7, 0.95)
-		local at = center + Vector3.new(math.cos(a) * r, rng:NextNumber(150, 210), math.sin(a) * r)
-		local cloud = part(
-			model,
-			CFrame.new(at) * CFrame.Angles(0, 0, math.pi / 2),
-			Vector3.new(rng:NextNumber(16, 26), rng:NextNumber(120, 210), rng:NextNumber(120, 210)),
-			P.Cloud,
-			Enum.Material.SmoothPlastic,
-			"Cylinder"
-		)
-		cloud.Name = "Cloud"
-		cloud.Transparency = 0.2
-		local under = glow(
-			part(
-				model,
-				CFrame.new(at - UP * 9) * CFrame.Angles(0, 0, math.pi / 2),
-				Vector3.new(1, cloud.Size.Y * 0.8, cloud.Size.Z * 0.8),
-				P.CloudUnder,
-				nil,
-				"Cylinder"
-			)
-		)
-		under.Transparency = 0.6
-	end
-	local ashFrom = part(model, CFrame.new(center + UP * 70), Vector3.new(span, 1, span), P.Under)
-	ashFrom.Name = "Ash"
-	ashFrom.Transparency = 1
-	local ash = Instance.new("ParticleEmitter")
-	ash.EmissionDirection = Enum.NormalId.Bottom
-	ash.Rate = P.Ash.Rate
-	ash.Lifetime = NumberRange.new(8, 12)
-	ash.Speed = NumberRange.new(P.Ash.Speed * 0.75, P.Ash.Speed * 1.25)
-	ash.SpreadAngle = Vector2.new(25, 25)
-	ash.Size = NumberSequence.new(P.Ash.Size)
-	ash.Color = ColorSequence.new(P.Ash.From, P.Ash.To)
-	ash.LightEmission = 0.4
-	ash.Parent = ashFrom
+	Styles.Skies[style("Sky")](model, center, span, rng)
 	return model
 end
 
@@ -1106,8 +838,31 @@ RiftWorld.Features.Grove = function(model, center: Vector3, size: number, doors,
 	end
 end
 
+local kit = {
+	part = part,
+	glow = glow,
+	light = light,
+	fire = fire,
+	face = face,
+	flat = flat,
+	yawOf = yawOf,
+	cylinder = nil, -- (set below, once they're defined)
+	disc = nil,
+	UP = UP,
+	Wall = RiftWorld.Wall,
+	Thick = RiftWorld.Thick,
+	Passage = RiftWorld.Passage,
+	BONE = BONE,
+	P = P,
+}
+
 function RiftWorld.build(id: string, origin: CFrame, rng, realm)
 	P = realm or RiftRealms.Default
+	kit.P = P
+	if not Styles then
+		kit.cylinder, kit.disc = cylinder, disc
+		Styles = RiftStyles.install(kit)
+	end
 	local folder = Instance.new("Folder")
 	folder.Name = "Rift_" .. id
 	folder:SetAttribute("Realm", P.Id)

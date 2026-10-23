@@ -11,6 +11,8 @@
 
 	A realm:
 	  Id, Boss, Name, Element
+	  Style         how it's built (World.RiftStyles): Wall, Floor, Gate,
+	                Lamp, Arch, Throne, Sky, each a kind of its own
 	  Feature       its set pieces (RiftWorld.Features: Craters, Logs,
 	                Floes, Tide, Freezer, Vines, Spires, Blades, Bog, Grove)
 	  Stalagmites   rock spikes by the walls too (the fire realms)
@@ -172,12 +174,14 @@ RiftRealms.Realms = {
 	-- Fire
 	Drago = merge(FIRE, {
 		Id = "Drago",
+		Style = { Wall = "Rock", Floor = "Basalt", Gate = "Fire", Lamp = "Brazier", Arch = "Rock", Throne = "Crater", Sky = "Scar" },
 		Boss = "Drago",
 		Name = "The Crater Flats",
 		Feature = "Craters",
 	}),
 	SahurTrio = merge(FIRE, {
 		Id = "SahurTrio",
+		Style = { Wall = "Charred", Floor = "Scorched", Gate = "Logpile", Lamp = "SkullTorch", Arch = "Burnt", Throne = "Stump", Sky = "Scar" },
 		Boss = "SahurTrio",
 		Name = "The Burning Grove",
 		Feature = "Logs",
@@ -195,12 +199,14 @@ RiftRealms.Realms = {
 	-- Frost
 	Paperotti = merge(FROST, {
 		Id = "Paperotti",
+		Style = { Wall = "Ice", Floor = "Lake", Gate = "Icicles", Lamp = "IceLantern", Arch = "IceArch", Throne = "Nest", Sky = "Aurora" },
 		Boss = "Paperotti",
 		Name = "The Frozen Pond",
 		Feature = "Floes",
 	}),
 	TralaleroTwin = merge(FROST, {
 		Id = "TralaleroTwin",
+		Style = { Wall = "Reef", Floor = "Tideflat", Gate = "Wave", Lamp = "Anemone", Arch = "WaveArch", Throne = "Breaker", Sky = "Aurora" },
 		Boss = "TralaleroTwin",
 		Name = "The Frozen Tide",
 		Feature = "Tide",
@@ -223,6 +229,7 @@ RiftRealms.Realms = {
 	}),
 	Frigo = merge(FROST, {
 		Id = "Frigo",
+		Style = { Wall = "Freezer", Floor = "Grate", Gate = "Shutter", Lamp = "ColdTube", Arch = "Lintel", Throne = "Fridge", Sky = "Aurora" },
 		Boss = "Frigo",
 		Name = "The Freezer",
 		Feature = "Freezer",
@@ -246,6 +253,7 @@ RiftRealms.Realms = {
 	-- Shock
 	Chimpanzini = merge(SHOCK, {
 		Id = "Chimpanzini",
+		Style = { Wall = "Jungle", Floor = "Soil", Gate = "Lattice", Lamp = "TeslaPole", Arch = "Canopy", Throne = "Banana", Sky = "Storm" },
 		Boss = "Chimpanzini",
 		Name = "The Charged Jungle",
 		Feature = "Vines",
@@ -261,6 +269,7 @@ RiftRealms.Realms = {
 	}),
 	Gattini = merge(SHOCK, {
 		Id = "Gattini",
+		Style = { Wall = "Crystal", Floor = "Shard", Gate = "ArcField", Lamp = "CrystalCluster", Arch = "CrystalArch", Throne = "CatTower", Sky = "Storm" },
 		Boss = "Gattini",
 		Name = "The Static Spires",
 		Feature = "Spires",
@@ -283,6 +292,7 @@ RiftRealms.Realms = {
 	}),
 	Cappuccino = merge(SHOCK, {
 		Id = "Cappuccino",
+		Style = { Wall = "Shoji", Floor = "Boards", Gate = "BladeCurtain", Lamp = "PaperLantern", Arch = "Torii", Throne = "Cup", Sky = "Storm" },
 		Boss = "Cappuccino",
 		Name = "The Blade Roost",
 		Feature = "Blades",
@@ -307,12 +317,14 @@ RiftRealms.Realms = {
 	-- Poison
 	Ranocchio = merge(POISON, {
 		Id = "Ranocchio",
+		Style = { Wall = "Mangrove", Floor = "Mud", Gate = "Gas", Lamp = "GasLamp", Arch = "RootArch", Throne = "Avocado", Sky = "SporeMoon" },
 		Boss = "Ranocchio",
 		Name = "The Bog",
 		Feature = "Bog",
 	}),
 	PatapimTrio = merge(POISON, {
 		Id = "PatapimTrio",
+		Style = { Wall = "Deadwood", Floor = "Litter", Gate = "Thorns", Lamp = "Toadstool", Arch = "Bough", Throne = "HollowTree", Sky = "SporeMoon" },
 		Boss = "PatapimTrio",
 		Name = "The Rotting Grove",
 		Feature = "Grove",
