@@ -705,6 +705,12 @@ do
 	advance(Matchmaking.EndPause)
 	respawn(new1, new2)
 	check(not handlers.IntroQueue(new1).Ok, "A player with a fight behind them re-entered the intro queue")
+	-- Back in the lobby, the client queues them for a 1v1 Casual (Lobby.client):
+	-- the server takes a fresh player straight out of the intro, and sends the
+	-- queue state the SEARCHING card shows.
+	check(handlers.DuelQueue(new1, "casual").Ok, "A player fresh from the intro couldn't join the Casual queue")
+	check(new1:GetAttribute("DuelQueue") == "casual" and last(new1, "Queue")[2].Mode == "casual" and not last(new1, "Queue")[2].Intro, "No Casual queue state after the intro")
+	check(handlers.DuelCancel(new1).Ok and new1:GetAttribute("DuelQueue") == nil, "Couldn't leave the Casual queue")
 
 	-- Alone: the lobby is asked after Intro.CallAfter, and a veteran joins -------
 	local new3 = makePlayer(43, "Pax")

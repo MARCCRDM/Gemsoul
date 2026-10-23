@@ -179,6 +179,17 @@ shows a FINDING YOUR FIRST OPPONENT card with the countdown:
 Either way the fight counts as played, the hints come down when it ends
 (the Funnel's "First fight" step), and the client heads to the Outpost.
 
+*2026-10-23:* once they're back in the Outpost, the client puts them
+straight into the **1v1 Casual** queue (`DuelQueue`, "casual"; a few tries,
+since the server says no until they're standing in the lobby again), with
+the toast "You're in the 1v1 queue: keep mining, you'll be called in when a
+match is found." The SEARCHING card (🔎 SEARCHING 1V1 CASUAL · time · how
+many in queue, with CANCEL) stays up at the top while they follow the floor
+arrows and mine. The queue asks the lobby like any other, and a match
+found while they're in a mech takes them out of it. It happens for anyone
+straight out of the intro, though the PLAY menu still shows Casual locked
+until 3 duels.
+
 ## Other miners: DUEL, SPAR, PARTY
 
 Walk within 10 studs of another miner and one card appears beside them, at

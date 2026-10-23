@@ -1258,6 +1258,7 @@ return {
 	["The pack holding this patch is coming for you!"] = "¡La manada que cuida este filón viene por ti!",
 	["A hard first fight. Welcome to the Saga Outpost: gear up and come back."] = "Un primer combate duro. Bienvenido al Puesto Saga: equípate y vuelve.",
 	-- The intro's walk through the Outpost (Client IntroGuide).
+	["You're in the 1v1 queue: keep mining, you'll be called in when a match is found."] = "Estás en la cola de 1v1: sigue minando, te llamaremos cuando haya partida.",
 	["Hop in a mech: follow the arrows."] = "Súbete a un mech: sigue las flechas.",
 	["Mine a few rocks: drive into them."] = "Mina unas rocas: choca contra ellas.",
 	["Richer rocks lie further out. Head out."] = "Las rocas más ricas están más lejos. Sal a buscarlas.",
