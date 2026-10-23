@@ -68,7 +68,7 @@ MobileLayout.Drive = { W = 160, H = 38, Bottom = 62 }
 MobileLayout.Stick = { Size = 112, Knob = 46, Left = 20, Bottom = 16 }
 -- (Right: from the screen's right edge, clear of Roblox's tab there.)
 MobileLayout.Toast = { W = 240, H = 28, Top = 8, Right = 30 }
-MobileLayout.Loot = { W = 196, H = 56, Row = 24, Gap = 6 }
+MobileLayout.Loot = { W = 232, H = 72, Row = 24, Gap = 6 }
 
 function MobileLayout.card()
 	return { X = 12, Y = 12, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }
@@ -131,7 +131,9 @@ end
 -- Under the toast's place, right-aligned with it.
 function MobileLayout.loot(screen: Vector2)
 	local l, toast = MobileLayout.Loot, MobileLayout.toast(screen)
-	return { X = toast.X + toast.W - l.W, Y = toast.Y + toast.H + l.Gap, W = l.W, H = l.H }
+	local y = toast.Y + toast.H + l.Gap
+	return { X = toast.X + toast.W - l.W, Y = y, W = l.W, H = l.H,
+		RowsBelow = y + l.H + l.Gap + l.Row <= math.min(screen.Y * 0.42, MobileLayout.party(screen).Y - 6) }
 end
 
 -- Who has the top (pure: no Roblox objects, so it's tested on its own).

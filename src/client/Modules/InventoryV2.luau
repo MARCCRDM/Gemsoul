@@ -62,6 +62,7 @@ local ChargeMeter = require(script.Parent.ChargeMeter)
 local GearArt = require(script.Parent.GearArt)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
+local UpgradeHints = require(script.Parent.UpgradeHints)
 local InventoryPose = require(script.Parent.InventoryPose)
 local IronUi = require(script.Parent.IronUi)
 local LiveLooks = require(script.Parent.LiveLooks)
@@ -679,6 +680,22 @@ end
 -- its modes under it.
 local function buildAuto(parent: Instance, x: number, y: number, w: number): number
 	ui.AutoModes = {}
+	local function surgeButton(holder, sx, sy, sw)
+		local b = new("TextButton", {
+			Name = "UpgradeSurges", Text = "UPGRADE SURGES", TextSize = 12,
+			Font = HEAVY, TextColor3 = C.Teal, BackgroundColor3 = C.Ink,
+			AutoButtonColor = true,
+		}, holder)
+		place(b, sx, sy, sw, 30)
+		round(b, 8)
+		UiKit.fit(b)
+		ui.UpgradeSurges = b
+		UpgradeHints.bind(b, function(hints) return hints.Surges.Changes > 0 end, C.Teal)
+		b.Activated:Connect(function()
+			if UpgradeHints.Current.Surges.Changes > 0 then request("UpgradeSurges") end
+		end)
+		return b
+	end
 	local function chip(holder: Instance, mode: string, cx: number, cy: number, cw: number, ch: number)
 		local b = new("TextButton", {
 			Name = "Auto" .. mode,
@@ -696,6 +713,9 @@ local function buildAuto(parent: Instance, x: number, y: number, w: number): num
 		local edge = stroke(b, C.Line, 1, 0.85)
 		b:SetAttribute("UiSound", "Tab")
 		ui.AutoModes[mode] = { Button = b, Edge = edge }
+		if mode == "Best" then
+			UpgradeHints.bind(b, function(hints) return hints.Equipment end, C.Gold)
+		end
 		return b
 	end
 	if COMPACT then
@@ -716,7 +736,7 @@ local function buildAuto(parent: Instance, x: number, y: number, w: number): num
 		menu.Name = "AutoMenu"
 		menu.Visible = false
 		menu.ZIndex = 8
-		place(menu, x + w - 212, y + 36, 212, 120)
+		place(menu, x + w - 212, y + 36, 212, 158)
 		round(menu, 10)
 		stroke(menu, C.Gold, 1, 0.5)
 		ui.AutoMenu = menu
@@ -732,6 +752,8 @@ local function buildAuto(parent: Instance, x: number, y: number, w: number): num
 		ui.AutoGo.Activated:Connect(function()
 			menu.Visible = not menu.Visible
 		end)
+		surgeButton(menu, 8, 120, 196).ZIndex = 9
+		UpgradeHints.bind(ui.AutoGo, function(hints) return hints.Any end, C.Gold)
 		return y + 30
 	end
 	place(text(parent, "AUTO EQUIP", 11, C.Gold, HEAVY), x, y, 110, 14)
@@ -773,7 +795,11 @@ local function buildAuto(parent: Instance, x: number, y: number, w: number): num
 			request("AutoEquip", state.AutoMode)
 		end
 	end)
-	return y + 34
+	ui.UpdateAutoGlow = UpgradeHints.bind(ui.AutoGo, function(hints)
+		return hints.Equipment and state.AutoMode == "Best"
+	end, C.Gold)
+	surgeButton(parent, x, y + 40, w)
+	return y + 70
 end
 
 local function buildLeft(canvas: Frame)
@@ -1684,6 +1710,7 @@ local function buildSurges(canvas: Frame)
 			UiKit.fit(lane)
 		end
 		ui.Keys[key] = { Card = card, Edge = edge, Icon = icon, Glyph = glyph, Name = name, Info = info, Line = line, Badge = badge, Lane = lane }
+		UpgradeHints.bind(card, function(hints) return hints.Surges.Keys[key] == true end, C.Teal)
 	end
 end
 
@@ -3374,6 +3401,13 @@ local function drawAuto(profile)
 		return
 	end
 	local mode = state.AutoMode
+	if ui.UpdateAutoGlow then ui.UpdateAutoGlow() end
+	if ui.UpgradeSurges then
+		local count = UpgradeHints.Current.Surges.Changes
+		ui.UpgradeSurges.Text = if count > 0 then "UPGRADE SURGES  ↑" else "NO SURGE UPGRADES"
+		ui.UpgradeSurges.TextColor3 = if count > 0 then C.Teal else C.Faint
+		ui.UpgradeSurges.AutoButtonColor = count > 0
+	end
 	local key = mode .. "|" .. profileStamp
 	if autoKey ~= key then
 		autoKey = key
@@ -3699,6 +3733,10 @@ GemClient.Changed:Connect(function()
 			state.Pick = nil
 		end
 	end
+	draw()
+end)
+UpgradeHints.Changed:Connect(function()
+	-- The recommendation is calculated after the profile arrives.
 	draw()
 end)
 local artPending = false

@@ -85,6 +85,28 @@ that fits it best and fills the gem sockets (Forge's `"AutoEquip"`,
 On a phone, **AUTO** sits over the miner; tap it for the six builds, tap
 one to put it on.
 
+### Upgrade cues
+
+After any profile update (including dungeon rewards, mining and trades),
+the lobby's **INVENTORY** tile pulses gold and shows an up arrow if the
+owned stash has an available upgrade. Inside, **BEST** and its **AUTO EQUIP**
+button pulse for that build. Selecting another mode keeps the cue on BEST,
+so it doesn't imply that the other build will apply the recommendation.
+
+**UPGRADE SURGES**, below AUTO EQUIP (inside AUTO on phones), pulses cyan
+along with the affected Q/E/R cards. This separate action fills empty
+surge sockets or replaces a gem with one of the same element and the same
+move for that key, with no lower rarity, Size, Clarity or Cut and at least
+one improvement. If Q and R share the weapon, both moves must be preserved.
+Different moves remain manual choices. Already-socketed gems and other
+miners' gems are excluded. The server rechecks the recommendation and
+enchanting/combat rules when pressed; nothing equips just from receiving loot.
+
+The cues recalculate and clear as the recommendations are applied, removed,
+or no longer available. They use a slow border pulse rather than flashing
+the whole panel. `Shared.UpgradeRecommendations` owns the comparison;
+`Modules.UpgradeHints` caches it once per coalesced profile update.
+
 ![AUTO on a phone](inventory/auto-phone.png)
 
 ## Right: armor, then your spare gear

@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local TestAdmin = require(script.Parent.TestAdmin)
 local Equipment = require(script.Parent.Equipment)
 local AutoEquip = require(ReplicatedStorage.Shared.AutoEquip)
+local UpgradeRecommendations = require(ReplicatedStorage.Shared.UpgradeRecommendations)
 local Enchanting = require(script.Parent.Enchanting)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
@@ -168,6 +169,30 @@ local function autoEquip(player: Player, mode: any)
 	return reply(true, message, { Pieces = pieces, Gems = gems, Rating = now })
 end
 
+local function upgradeSurges(player: Player)
+	if not Combat.canChangeBuild(player) then
+		return reply(false, "Change surges in the Outpost.")
+	end
+	local profile = PlayerData.get(player)
+	if not profile or not profile.Character then
+		return reply(false, "Your equipment is still loading.")
+	end
+	if not Enchanting.canEnchant(player) then
+		return reply(false, "Visit Vey at the Arcanum (east road) to change enchantments.")
+	end
+	-- Recompute from server-owned inventory; never accept a client's suggested gems.
+	local plan = UpgradeRecommendations.surges(profile)
+	local count = 0
+	for _, step in plan.Gems do
+		if PlayerData.socketGem(player, step.Gem, step.Slot) then count += 1 end
+	end
+	if plan.Changes > 0 and count == 0 then
+		return reply(false, "Couldn't upgrade your surges. Try again.")
+	end
+	return reply(true, if count > 0 then string.format("%d surge sockets upgraded. Existing elements and moves kept.", count)
+		else "No stronger gems for your current moves.", { Gems = count })
+end
+
 local lastRegeneration: { [Player]: number } = {}
 local function regenerateEquipment(player: Player)
 	if not TestAdmin.allowed(player.UserId) then
@@ -210,6 +235,7 @@ function Forge.start()
 	Shop.register("SellGems", marketSell) -- legacy sale requests also pay coins
 	Shop.register("EquipGear", equipGear)
 	Shop.register("AutoEquip", autoEquip)
+	Shop.register("UpgradeSurges", upgradeSurges)
 	Shop.register("MarketSell", marketSell)
 	Shop.register("SellSpare", sellSpare)
 end

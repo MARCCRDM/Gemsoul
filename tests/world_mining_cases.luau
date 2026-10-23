@@ -2,9 +2,10 @@ local checks=0
 local function check(ok,message) checks+=1; assert(ok,message) end
 local miner={UserId=99,DisplayName="Another miner"}
 local at=Vector3.new(5,2,3)
-local minerHead={Position=Vector3.new(10,5,7),Size=Vector3.new(2,2,2)}
-local minerRoot={Position=Vector3.new(10,3,7)}
-local minerCharacter={FindFirstChild=function(_,name) return if name=="Head" then minerHead else minerRoot end}
+local minerCharacter=new("Model"); minerCharacter.Parent=workspace
+local minerHead=new("Part"); minerHead.Name="Head"; minerHead.Position=Vector3.new(10,5,7); minerHead.Size=Vector3.new(2,2,2); minerHead.Parent=minerCharacter
+local minerRoot=new("Part"); minerRoot.Name="HumanoidRootPart"; minerRoot.Position=Vector3.new(10,3,7); minerRoot.Parent=minerCharacter
+local humanoid=new("Humanoid"); humanoid.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.Viewer; humanoid.Parent=minerCharacter
 miner.Character=minerCharacter
 remotePlayers[miner.UserId]=miner
 local function reward(tier)
@@ -23,7 +24,9 @@ for rank,tier in GemConfig.TierOrder do
 	check(#liveClass("ScreenGui")==0 and #liveClass("BillboardGui")==1,"World roll became a private screen window")
 	check(#live("MiningRollBox")==1 and #liveClass("ViewportFrame")==1 and live("ReelWindow")[1].ClipsDescendants,"Roll is not enclosed in one clipped box")
 	check(live("Discovery")[1].Parent==playerGui and live("Discovery")[1].Adornee==live("RollAnchor")[1],"Box lost world anchor")
-	check(live("RollAnchor")[1].Position.Y==minerHead.Position.Y+4,"Box is not above miner head")
+	check(live("RollAnchor")[1].Position.Y==minerHead.Position.Y+2.1,"Box is not above miner head")
+	check(humanoid.DisplayDistanceType==Enum.HumanoidDisplayDistanceType.None,"Native name overlaps roll")
+	check(live("Discovery")[1].SizeOffset.Y==0.5 and live("Discovery")[1].AlwaysOnTop,"Box does not sit fully above head")
 	check(textContains(miner.DisplayName) and textContains("ROLLING"),"Public roll missing miner/animation label")
 	check(#live("AwardedGem")==0,"Award shown before lottery completed")
 	local a,b=Roll.sequence(packet),Roll.sequence(packet)
@@ -40,13 +43,14 @@ for rank,tier in GemConfig.TierOrder do
 	check(packet.Coins==nil and packet.Gear==nil and not textContains("+4 coins"),"A gem find advertised coins")
 	check(#live("DiscoveryRing")==0 and #live("RarityBeacon")==0,"World geometry cuts through reward card")
 	check(live("WinningSlot")[1].Visible==false,"Reel selection remains on final gem")
-	check(liveClass("UISizeConstraint")[1].MaxSize.X==260 and liveClass("UISizeConstraint")[1].MaxSize.Y==162,"Close camera can inflate reward card")
+	check(live("Discovery")[1].Size[2]==344 and live("Discovery")[1].Size[4]==206,"Nearby roll did not enlarge with a bounded pixel size")
 	check(liveClass("ParticleEmitter")[1].Emitted==8+rank*10,"Rarity did not increase celebration")
-	for _,p in liveClass("Part") do check(not p.CanQuery and not p.CanCollide and not p.CanTouch,"Cosmetic obstructs mining/players") end
+	for _,p in liveClass("Part") do if p.Parent~=minerCharacter then check(not p.CanQuery and not p.CanCollide and not p.CanTouch,"Cosmetic obstructs mining/players") end end
 	Reveal.receive(packet)
 	check(#live("AwardedGem")==1,"Duplicate event duplicated discovery")
 	step(Roll.lifetime(packet))
-	check(#liveClass("BillboardGui")==0 and #liveClass("Model")==0,"Roll/templates leaked after expiry")
+	check(#liveClass("BillboardGui")==0 and #liveClass("Model")==1,"Roll/templates leaked after expiry")
+	check(humanoid.DisplayDistanceType==Enum.HumanoidDisplayDistanceType.Viewer,"Name not restored after roll")
 end
 -- No gem (a full pouch) must never invent a reward.
 for _,full in {false,true} do
@@ -55,7 +59,7 @@ for _,full in {false,true} do
 	check(#live("AwardedGem")==0,"Empty reward manufactured a gem")
 	check(textContains("ROCK MINED") and (textContains("GEM POUCH FULL")==full),"No-gem outcome not explained")
 	check(live("ReelWindow")[1].Visible==false and live("WinningSlot")[1].Visible==false,"Empty reward leaves blank reel on screen")
-	check(liveClass("UISizeConstraint")[1].MaxSize.Y==74 and live("Discovery")[1].Size[3]==1.65,"No-gem result did not collapse")
+	check(live("Discovery")[1].Size[4]<110,"No-gem result did not collapse")
 	check(not textContains("+2 coins") and #liveClass("ParticleEmitter")==0,"Coins shown or empty find celebrated as a gem")
 	Reveal.close()
 end
@@ -94,11 +98,11 @@ check(#live("RollAnchor")==0,"Expired result replayed")
 -- Multiple nearby miners get separate boxes, with a bounded number of reels.
 for i=1,Roll.MaxActive+5 do MiningRolls.publish({UserId=1000+i,DisplayName="Miner "..i},Vector3.new(i,0,0),reward("Rare")) end
 check(#live("RollAnchor")==Roll.MaxActive,"Concurrent reels exceeded visual budget")
-check(#liveClass("Model")<=Roll.MaxActive*4+5,"Reel geometry allocation unbounded")
+check(#liveClass("Model")<=Roll.MaxActive*4+6,"Reel geometry allocation unbounded")
 step(Roll.Duration+.1)
 check(#live("AwardedGem")==Roll.MaxActive,"Concurrent finds overwrote winners")
 player:SetAttribute("CombatSession","Rival")
-check(#live("RollAnchor")==0 and #liveClass("Model")==0,"Arena transition kept lobby effects")
+check(#live("RollAnchor")==0 and #liveClass("Model")==1,"Arena transition kept lobby effects")
 MiningRolls.publish(miner,at,reward("Rare"))
 check(#live("RollAnchor")==0,"Combat spectator received lobby roll")
 player:SetAttribute("CombatSession",nil)
@@ -111,12 +115,13 @@ workspace.CurrentCamera=nil; step(.1)
 check(#live("RollAnchor")==1,"Missing camera broke roll")
 minerHead.Position=Vector3.new(21,9,11); step(.1)
 local anchor=live("RollAnchor")[1]
-check(anchor.Position.X==21 and anchor.Position.Y==13 and anchor.Position.Z==11,"Box does not follow miner movement")
+check(anchor.Position.X==21 and anchor.Position.Y==11.1 and anchor.Position.Z==11,"Box does not follow miner movement")
 local last=anchor.Position
 miner.Character=nil; step(.1)
 check(anchor.Position==last,"Temporarily streamed-out miner moved box back to rock")
-miner.Character={FindFirstChild=function(_,name) return if name=="HumanoidRootPart" then minerRoot else nil end}; step(.1)
-check(anchor.Position.Y==minerRoot.Position.Y+5.5,"Missing head did not fall back to character root")
+minerHead.Parent=nil; miner.Character=minerCharacter; step(.1)
+check(anchor.Position.Y==minerRoot.Position.Y+3.6,"Missing head did not fall back to character root")
+minerHead.Parent=minerCharacter
 miner.Character=minerCharacter
 MiningRolls.publish(miner,at,reward("Legendary"))
 check(#live("MiningRollBox")==1 and #live("RollAnchor")==1,"Rapid mining stacked boxes over the same player")
@@ -126,4 +131,38 @@ check(live("RollAnchor")[1].Position.X==30,"Result did not follow miner")
 check(live("MiningRollBox")[1].BackgroundTransparency<0.2 and live("GemReel")[1].ImageTransparency==0,"Box unexpectedly transparent before fade")
 player:SetAttribute("Outpost",false)
 check(#liveClass("BillboardGui")==0,"Leaving lobby leaked result labels")
+-- Cosmetic and party names disappear only while this observer sees a roll.
+player:SetAttribute("Outpost",true)
+local title=new("BillboardGui"); title.Name="CosmeticTitle"; title.Enabled=true; title.Parent=minerHead
+local party=new("BillboardGui"); party.Name="PartyMarker"; party.Enabled=false; party.Parent=minerHead
+MiningRolls.publish(miner,at,reward("Rare"))
+check(not title.Enabled and not party.Enabled,"Duplicate overhead titles still cover the reel")
+local lateTitle=new("BillboardGui"); lateTitle.Name="Nameplate"; lateTitle.Enabled=true; lateTitle.Parent=minerHead
+check(not lateTitle.Enabled,"Newly streamed/equipped name overlaps active roll")
+MiningRolls.publish(miner,at,reward("Legendary"))
+check(not title.Enabled and humanoid.DisplayDistanceType==Enum.HumanoidDisplayDistanceType.None,"Fast replacement restored duplicate names too early")
+Reveal.close()
+check(title.Enabled and lateTitle.Enabled and not party.Enabled,"Cleanup failed to restore original enabled states")
+check(humanoid.DisplayDistanceType==Enum.HumanoidDisplayDistanceType.Viewer,"Native name remained hidden after cleanup")
+-- Both portrait and short landscape devices keep a readable, bounded box.
+for _,screen in {Vector2.new(1280,720),Vector2.new(667,339),Vector2.new(812,317),Vector2.new(390,844)} do
+	for _,touch in {false,true} do
+		for _,distance in {5,35,80,180} do
+			local w,h=Roll.displaySize(screen,distance,touch,false)
+			check(w>=240 and h>=144,"Public roll shrank below readable size")
+			check(w<=screen.X*.8 and h<=screen.Y*.5,"Public roll covers too much of a small screen")
+			local _,notice=Roll.displaySize(screen,distance,touch,true)
+			check(notice<h,"Full-pouch notice kept the large reel footprint")
+		end
+	end
+end
+services.UserInputService.TouchEnabled=true
+workspace.CurrentCamera={CFrame=CFrame.new(0,0,100),ViewportSize=Vector2.new(812,317)}
+MiningRolls.publish(miner,at,reward("Rare"))
+local board=live("Discovery")[1]
+check(board.Size[2]>=260 and board.Size[4]<=159,"Mobile card did not use readable pixel sizing")
+workspace.CurrentCamera.ViewportSize=Vector2.new(390,844); step(.1)
+check(board.Size[2]<=312,"Portrait rotation did not resize the public card")
+player:SetAttribute("CombatSession","Rival")
+check(title.Enabled and lateTitle.Enabled and not party.Enabled,"Arena transition failed to restore overhead titles")
 print("PASS: "..checks.." shared world mining lottery checks")

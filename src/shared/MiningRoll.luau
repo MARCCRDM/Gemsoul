@@ -7,6 +7,15 @@ Roll.Target = 23
 Roll.Range = 180
 Roll.MaxActive = 12
 
+-- Pixel-sized public cards stay readable at normal viewing distances.
+-- Cap their footprint on short landscape phones and shrink gently at range.
+function Roll.displaySize(screen, distance, touch, notice)
+	local cap = math.min(if touch then 320 else 344, screen.X * 0.8, screen.Y * 0.5 / 0.6)
+	local floor = math.min(cap, if touch then 260 else 240)
+	local width = math.floor(math.clamp(cap - math.max(0, distance - 35) * 0.8, floor, cap))
+	return width, math.floor(width * (if notice then 0.29 else 0.6))
+end
+
 function Roll.rank(packet)
 	return packet.Gem and GemConfig.TierRank[packet.Gem.Tier] or 0
 end

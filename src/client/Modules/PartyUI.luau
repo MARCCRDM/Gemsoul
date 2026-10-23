@@ -408,6 +408,7 @@ RunService.Heartbeat:Connect(function(dt)
 				markers[member.UserId]:Destroy()
 			end
 			local board = new("BillboardGui", {
+				Name = "PartyMarker",
 				Size = UDim2.fromOffset(140, 24),
 				StudsOffset = Vector3.new(0, 3.2, 0),
 				AlwaysOnTop = true,

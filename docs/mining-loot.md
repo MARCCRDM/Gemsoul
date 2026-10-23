@@ -8,6 +8,15 @@ When you mine a rock in the Outpost, two things show the find:
   (`MinerLoot`). The box over your own head is no longer drawn on your
   screen, so it doesn't block your view while you mine.
 
+The public box now uses bounded pixel sizing (up to 344 × 206 on desktop,
+320 × 192 on touch screens, reduced to fit short landscape screens). It
+shrinks gently with distance instead of becoming an unreadable world-sized
+label. Its bottom sits above the miner's head, and it draws above geometry.
+While it is visible, that miner's native overhead display, cosmetic title,
+and party name are hidden locally; their name remains in the card header.
+Original display states return on expiry, replacement, streaming changes,
+leaving range, or entering combat.
+
 ## The card
 
 ![Rolling, landing, the stats filling](mining/loot-card.png)
@@ -53,7 +62,7 @@ Finds that come quickly stack:
 
 The card used to sit in full in the middle of the bottom of the screen (360
 x 124, three rows above it), right where you look while mining. It's now
-compact (272 x 92) and in the bottom right corner (`MinerLoot.Corner`),
+larger and clearer (320 x 108) in the bottom right corner (`MinerLoot.Corner`),
 above the key hints. The middle of the screen stays clear, and so does a
 mech's HOP OUT at the bottom middle, so the card no longer moves when you
 pilot. It keeps the Size, Clarity and Cut bars, smaller. Up to 2 rows
@@ -67,13 +76,14 @@ and then shows in its place.
 ![The card on a phone, before and after](mobile/mining-phone.png)
 
 On a phone or a tablet (a touch screen, or a window under 540 points tall)
-the card is slim, 196 points wide, and sits in the top right, right under
+the card is 232 × 72 points, with a larger 60-point reel, and sits in the top right, right under
 the place toasts come up and right-aligned with it (`MobileLayout.loot`),
 clear of the slim tab Roblox puts on a phone's right edge. It shows the
 reel, then three lines beside it: the rarity and element, the gem's name
 across the card's full width, and its worth. There are no stat bars. It
-keeps one row under it, the gem's name in its rarity's colour (there's no
-room for the rarity's name too). While a toast is long enough to wrap onto a
+keeps one history row, showing it after the card closes when there isn't room
+below without overlapping the party controls. The row uses the gem's rarity
+colour. While a toast is long enough to wrap onto a
 second line, the card moves down under it (`UiKit.toastBottom`,
 `UiKit.onToastMoved`) and back up when it goes. The middle of the screen
 and the PLAY dock stay clear. The live feed steps aside while the card is

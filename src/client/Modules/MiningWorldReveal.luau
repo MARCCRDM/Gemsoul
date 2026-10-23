@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
+local UserInputService = game:GetService("UserInputService")
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Roll = require(ReplicatedStorage.Shared.MiningRoll)
 local GemArt = require(script.Parent.GemArt)
@@ -33,14 +34,16 @@ local function label(parent, y, height, size, color)
 	text.Text = ""
 	text.Parent = parent
 	local limit = Instance.new("UITextSizeConstraint")
-	limit.MaxTextSize, limit.MinTextSize, limit.Parent = size, 1, text
+	limit.MaxTextSize, limit.MinTextSize, limit.Parent = size, 10, text
 	return text
 end
 local function billboard(anchor, name, offset, size)
 	local board = Instance.new("BillboardGui")
-	board.Name, board.Adornee, board.AlwaysOnTop = name, anchor, false
+	board.Name, board.Adornee, board.AlwaysOnTop = name, anchor, true
 	board.LightInfluence, board.MaxDistance, board.Active = 0, Roll.Range, false
 	board.Size, board.StudsOffsetWorldSpace = size, offset
+	-- The whole card sits above its anchor, rather than half over the head.
+	board.SizeOffset = Vector2.new(0, 0.5)
 	board.Parent = playerGui
 	return board
 end
@@ -60,11 +63,43 @@ local function aboveMiner(packet, previous)
 	local miner = Players:GetPlayerByUserId(packet.MinerId)
 	local character = miner and miner.Character
 	local head = character and character:FindFirstChild("Head")
-	if head then return head.Position + Vector3.new(0, head.Size.Y / 2 + 3, 0) end
+	if head then return head.Position + Vector3.new(0, head.Size.Y / 2 + 1.1, 0) end
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if root then return root.Position + Vector3.new(0, 5.5, 0) end
+	if root then return root.Position + Vector3.new(0, 3.6, 0) end
 	-- Streaming can temporarily hide the miner. Keep the last known head location.
 	return previous or (packet.MinerPosition or packet.Position) + Vector3.new(0, 3.5, 0)
+end
+local function restoreNames(entry)
+	if entry.NameAdded then entry.NameAdded:Disconnect(); entry.NameAdded = nil end
+	for object, previous in entry.HiddenNames or {} do
+		if object.Parent then
+			if object:IsA("Humanoid") then
+				if object.DisplayDistanceType == Enum.HumanoidDisplayDistanceType.None then object.DisplayDistanceType = previous end
+			elseif not object.Enabled then object.Enabled = previous end
+		end
+	end
+	entry.HiddenNames, entry.NameCharacter = {}, nil
+end
+local function hideNames(entry)
+	local miner = Players:GetPlayerByUserId(entry.Packet.MinerId)
+	local character = miner and miner.Character
+	if character == entry.NameCharacter then return end
+	restoreNames(entry)
+	entry.NameCharacter = character
+	if not character then return end
+	local function hide(object)
+		-- Reparenting a title can announce it again; keep its original state.
+		if entry.HiddenNames[object] ~= nil then return end
+		if object:IsA("Humanoid") then
+			entry.HiddenNames[object] = object.DisplayDistanceType
+			object.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		elseif object:IsA("BillboardGui") and (object.Name == "CosmeticTitle" or object.Name == "PartyMarker" or object.Name == "Nameplate") then
+			entry.HiddenNames[object] = object.Enabled
+			object.Enabled = false
+		end
+	end
+	for _, object in character:GetDescendants() do hide(object) end
+	entry.NameAdded = character.DescendantAdded:Connect(hide)
 end
 local function sound(anchor, pitch, volume)
 	local s = Instance.new("Sound")
@@ -94,6 +129,7 @@ local function template(tier)
 	return templates[tier]
 end
 local function destroy(entry)
+	restoreNames(entry)
 	entry.Board:Destroy()
 	entry.Root:Destroy()
 end
@@ -154,9 +190,7 @@ local function showResult(entry, elapsed)
 	else
 		-- Every rock pays a gem; only a full pouch (the server normally
 		-- refuses that swing) lands here, as a short notice, never a blank reel.
-		entry.Board.Size = UDim2.new(5.8, 0, 1.65, 0)
-		entry.Board.StudsOffsetWorldSpace = Vector3.new(0, -0.975, 0)
-		entry.SizeLimit.MaxSize = Vector2.new(260, 74)
+		entry.Notice = true
 		entry.Well.Visible, entry.Stats.Visible, entry.Rarity.Visible = false, false, false
 		entry.Miner.Position, entry.Miner.Size = UDim2.fromScale(0.05, 0.08), UDim2.fromScale(0.90, 0.17)
 		entry.Heading.Position, entry.Heading.Size = UDim2.fromScale(0.05, 0.29), UDim2.fromScale(0.90, 0.30)
@@ -187,6 +221,7 @@ local function step()
 		local t = sample.Elapsed
 		entry.Center = center
 		entry.Anchor.Position = center
+		hideNames(entry)
 		if sample.Landed then
 			if not entry.Landed then showResult(entry, t) end
 			if entry.Winner then
@@ -223,7 +258,12 @@ local function step()
 				if near(center) then sound(entry.Anchor, 2.2 - sample.Position / Roll.Target * 0.6, 0.045) end
 			end
 		end
-		entry.Box.BackgroundTransparency = 0.08 + sample.Fade * 0.92
+		local camera = workspace.CurrentCamera
+		local screen = if camera then camera.ViewportSize else Vector2.new(1280, 720)
+		local distance = if camera then (camera.CFrame.Position - center).Magnitude else 35
+		local width, height = Roll.displaySize(screen, distance, UserInputService.TouchEnabled, entry.Notice)
+		entry.Board.Size = UDim2.fromOffset(width, height)
+		entry.Box.BackgroundTransparency = 0.03 + sample.Fade * 0.97
 		entry.Well.BackgroundTransparency = 0.12 + sample.Fade * 0.88
 		entry.Viewport.ImageTransparency = sample.Fade
 		entry.Edge.Transparency, entry.SelectionEdge.Transparency = 0.35 + sample.Fade * 0.65, 0.5 + sample.Fade * 0.5
@@ -261,12 +301,9 @@ function Reveal.receive(packet)
 	local root = Instance.new("Model")
 	root.Name, root.Parent = "MiningRoll_" .. packet.Id, folder
 	local anchor = part(root, "RollAnchor", center)
-	local board = billboard(anchor, "Discovery", Vector3.zero, UDim2.new(5.8, 0, 3.6, 0))
+	local board = billboard(anchor, "Discovery", Vector3.zero, UDim2.fromOffset(344, 206))
 	local box = frame(board, "MiningRollBox", UDim2.fromScale(0.5, 0.5), UDim2.fromScale(1, 1), Color3.fromRGB(8, 16, 27), 0.08)
 	box.AnchorPoint = Vector2.new(0.5, 0.5)
-	-- World scaling still shrinks with distance; close cameras cannot inflate the card.
-	local sizeLimit = Instance.new("UISizeConstraint")
-	sizeLimit.MaxSize, sizeLimit.Parent = Vector2.new(260, 162), box
 	local gradient = Instance.new("UIGradient")
 	gradient.Color = ColorSequence.new(Color3.fromRGB(25, 36, 49), Color3.fromRGB(7, 13, 22))
 	gradient.Rotation, gradient.Parent = 90, box
@@ -275,11 +312,14 @@ function Reveal.receive(packet)
 	corner.CornerRadius, corner.Parent = UDim.new(0.04, 0), box
 	local border = edge(box, MUTED, 1)
 	local accent = frame(box, "RarityAccent", UDim2.fromScale(0.07, 0.025), UDim2.fromScale(0.86, 0.009), GOLD)
-	local miner = label(box, 0.065, 0.09, 11, MUTED)
+	local miner = label(box, 0.055, 0.105, 14, WHITE)
+	miner.TextWrapped, miner.TextTruncate = false, Enum.TextTruncate.AtEnd
+	miner.Position, miner.Size = UDim2.fromScale(0.04, 0.055), UDim2.fromScale(0.92, 0.105)
+	miner:SetAttribute("NoTranslate", true)
 	miner.Text = packet.MinerName .. "  ·  MINING"
-	local heading = label(box, 0.18, 0.12, 18, WHITE)
+	local heading = label(box, 0.18, 0.12, 22, WHITE)
 	heading.Name = "ResultHeading"
-	local rarity = label(box, 0.22, 0.09, 11, MUTED)
+	local rarity = label(box, 0.22, 0.09, 14, MUTED)
 	rarity.Position, rarity.Size = UDim2.fromScale(0.40, 0.22), UDim2.fromScale(0.55, 0.09)
 	local well = frame(box, "ReelWindow", UDim2.fromScale(0.045, 0.34), UDim2.fromScale(0.91, 0.43), Color3.fromRGB(17, 30, 45), 0.12)
 	well.ClipsDescendants = true
@@ -290,15 +330,15 @@ function Reveal.receive(packet)
 	camera.FieldOfView = 35
 	local selection = frame(well, "WinningSlot", UDim2.fromScale(0.36, 0.05), UDim2.fromScale(0.28, 0.90), GOLD, 1)
 	local selectionEdge = edge(selection, GOLD, 1.5)
-	local detail = label(box, 0.83, 0.09, 11, MUTED)
+	local detail = label(box, 0.83, 0.09, 14, MUTED)
 	detail.Text = "Finding your stone..."
-	local stats, extras = label(box, 0.76, 0.08, 10, MUTED), label(box, 0.88, 0.07, 11, GOLD)
+	local stats, extras = label(box, 0.76, 0.09, 12, WHITE), label(box, 0.88, 0.08, 13, GOLD)
 	stats.Position, stats.Size = UDim2.fromScale(0.04, 0.76), UDim2.fromScale(0.92, 0.08)
 	extras.Position, extras.Size = UDim2.fromScale(0.04, 0.88), UDim2.fromScale(0.92, 0.07)
 	local light = Instance.new("PointLight")
 	light.Range, light.Brightness, light.Color, light.Parent = 10, 0.6, WHITE, anchor
 	active[packet.Id] = { Packet = packet, Sequence = Roll.sequence(packet), Root = root, Anchor = anchor, Light = light,
-		Board = board, Box = box, SizeLimit = sizeLimit, Camera = camera, Selection = selection, Miner = miner, Rarity = rarity, Edge = border, Accent = accent, Well = well, Viewport = viewport, SelectionEdge = selectionEdge, Center = center,
+		Board = board, Box = box, Camera = camera, Selection = selection, Miner = miner, Rarity = rarity, Edge = border, Accent = accent, Well = well, Viewport = viewport, SelectionEdge = selectionEdge, Center = center,
 		Heading = heading, Detail = detail, Stats = stats, Extras = extras, Labels = {miner, heading, rarity, detail, stats, extras}, Cells = {{},{},{}} }
 	if not connection then connection = RunService.RenderStepped:Connect(step) end
 	step()

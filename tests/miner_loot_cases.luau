@@ -209,7 +209,7 @@ check(small.H == MobileLayout.Loot.H, "667x339 got a short card")
 Loot.push(gem("Uncommon", 4, 4, 4))
 step(0.1)
 row = live("LootRow")[1]
-check(card() and row and row.Visible, "A small phone's row didn't show under its card")
+check(card() and row and not row.Visible, "A small phone's history row overlaps the enlarged card/party controls")
 step(5)
 row = live("LootRow")[1]
 check(card() == nil and row and row.Visible, "The row went once the card folded")
@@ -233,8 +233,8 @@ end
 check(inCorner() and holder:FindFirstChildOfClass("UIScale").Scale == 1, "Desktop fit not restored")
 local desk = card()
 check(
-	desk.Size.X.Offset <= 280 and desk.Size.Y.Offset <= 96 and lit(desk, GemConfig.TierColors.Common) >= 0,
-	"The compact card wasn't rebuilt"
+	desk.Size.X.Offset == 320 and desk.Size.Y.Offset == 108 and lit(desk, GemConfig.TierColors.Common) >= 0,
+	"The larger desktop card wasn't rebuilt"
 )
 check(1366 - corner.Right - desk.Size.X.Offset > 1366 / 2 + 200, "The card reaches into the middle of the screen")
 check(not MobileLayout.topClaimed(), "A computer's card kept the top middle")

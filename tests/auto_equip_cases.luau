@@ -379,6 +379,74 @@ do
 	check(by.Armor == "leg" and by.Shield == "unc", "Balanced didn't spread the elements")
 end
 
+-- Upgrade hints use actual owned gear and conservative, move-preserving surge comparisons.
+local Recommendations = shared("UpgradeRecommendations")
+local Traits = shared("GemTraits")
+local function upgradeGem(id, level)
+	return { Id = id, Element = "Fire", Tier = "Common", Size = level, Clarity = level, Cut = level,
+		Traits = { Offense = Traits.Matrix.Fire.Offense[1], Ability = Traits.Matrix.Fire.Ability[1], Defense = Traits.Matrix.Fire.Defense[1] } }
+end
+local function surgeProfile()
+	local p = newProfile()
+	for _, slot in { "Weapon", "Armor", "Shield" } do
+		local gem = upgradeGem("held-" .. slot, 2)
+		p.Character[slot .. "Gem"] = gem
+		p.Character.ItemGems[slot][p.Character[slot]] = gem
+	end
+	return p
+end
+do
+	check(not Recommendations.inspect(nil).Any, "Loading profile shows an upgrade")
+	local p = newProfile()
+	check(Recommendations.inspect(p).Equipment, "Owned better gear did not light Inventory")
+	apply(p, AutoEquip.plan(p, "Best"))
+	check(not Recommendations.inspect(p).Any, "Best worn with no loose gems still glows")
+	p = surgeProfile()
+	check(Recommendations.surges(p).Changes == 0, "No loose gems suggested")
+	local candidate = upgradeGem("upgrade", 5)
+	p.Gems = { candidate, candidate }
+	local plan = Recommendations.surges(p)
+	check(plan.Changes == 1 and plan.Keys.Q, "One stone was offered to more than one socket")
+	check(p.Character.WeaponGem.Id == "held-Weapon" and #p.Gems == 2, "Recommendation mutated inventory")
+	p.Gems = { upgradeGem("q", 5), upgradeGem("e", 5), upgradeGem("r", 5) }
+	plan = Recommendations.surges(p)
+	check(plan.Changes == 3 and plan.Keys.Q and plan.Keys.E and plan.Keys.R, "Q/E/R upgrades not all detected")
+	apply(p, { Gear = {}, Gems = plan.Gems })
+	check(Recommendations.surges(p).Changes == 0, "Surge hint did not clear after equipping")
+	p = surgeProfile()
+	local equal = upgradeGem("equal", 2)
+	local worse = upgradeGem("worse", 1)
+	local tradeoff = upgradeGem("tradeoff", 9)
+	tradeoff.Cut = 1
+	local rough = upgradeGem("rough", 10)
+	rough.Cut = nil
+	local otherMove = upgradeGem("other-moves", 10)
+	otherMove.Traits = { Offense = Traits.Matrix.Fire.Offense[2], Ability = Traits.Matrix.Fire.Ability[2], Defense = Traits.Matrix.Fire.Defense[2] }
+	local otherElement = upgradeGem("other-element", 10)
+	otherElement.Element = "Frost"
+	p.Gems = { equal, worse, tradeoff, rough, otherMove, otherElement }
+	check(Recommendations.surges(p).Changes == 0, "Sidegrade, weaker stat, different move/element or uncut gem suggested")
+	local rare = upgradeGem("rare", 2)
+	rare.Tier = "Rare"
+	p.Gems = { rare }
+	check(Recommendations.surges(p).Changes == 1, "Higher rarity with same metrics was missed")
+	p.Character.LegacySurges = true
+	check(Recommendations.surges(p).Changes == 0, "Triad action offered on legacy loadout")
+	p = surgeProfile()
+	p.Character.Shield, p.Character.ShieldGem = nil, nil
+	p.Gems = { upgradeGem("two-hands", 5) }
+	plan = Recommendations.surges(p)
+	check(plan.Keys.Q and plan.Keys.R and plan.Changes == 1, "Shared Q/R socket did not highlight both keys")
+	p.Character.Armor = nil
+	p.Gems[1].Traits.Defense = Traits.Matrix.Fire.Defense[2]
+	check(Recommendations.surges(p).Changes == 0, "Shared Q/R upgrade silently changed defense")
+	p = surgeProfile()
+	local reserved = upgradeGem("reserved", 9)
+	p.Gems = { reserved }
+	p.Miners = { Active = 1, Slots = { {}, { Character = { WeaponGem = reserved } } } }
+	check(Recommendations.surges(p).Changes == 0, "Another miner's stone suggested")
+end
+
 -- The server: Forge's "AutoEquip" request -----------------------------------------------------
 do
 	local profile = gemProfile()
@@ -472,6 +540,21 @@ do
 	for _, call in calls do
 		check(string.sub(call, 1, 4) ~= "gem:", "Socketed away from Vey")
 	end
+	local upgrade = handlers.UpgradeSurges
+	check(upgrade ~= nil, "UpgradeSurges not registered")
+	profile = surgeProfile()
+	profile.Gems = { upgradeGem("upgrade", 5) }
+	table.clear(calls)
+	check(not upgrade({}).Ok and #calls == 0, "Upgraded away from enchanting access")
+	state.enchant, state.build = true, false
+	check(not upgrade({}).Ok and #calls == 0, "Upgraded surges during combat")
+	state.build = true
+	local upgraded = upgrade({}, { Gem = "unowned-client-id" })
+	check(upgraded.Ok and upgraded.Gems == 1 and #calls == 1, "Server did not apply its own surge plan")
+	check(profile.Character.WeaponGem.Id == "upgrade", "Wrong gem equipped")
+	check(upgrade({}).Gems == 0, "Repeated surge action changed the build again")
+	profile = nil
+	check(not upgrade({}).Ok, "Missing profile accepted")
 end
 
 print(string.format("PASS: %d auto equip checks (Best, Balanced, the elements, two hands, other miners, gems, the server)", checks))

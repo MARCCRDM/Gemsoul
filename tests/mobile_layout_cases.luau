@@ -61,7 +61,7 @@ for _, s in SCREENS do
 	-- A toast at the top right, and the loot card (with its row) under it,
 	-- right-aligned with it: clear of everything round them, of Roblox's
 	-- slim tab on the right edge (about 24 points), and of each other.
-	local row = { X = loot.X, Y = loot.Y + loot.H + MobileLayout.Loot.Gap, W = loot.W, H = MobileLayout.Loot.Row }
+	local row = { X = loot.X, Y = if loot.RowsBelow then loot.Y + loot.H + MobileLayout.Loot.Gap else loot.Y, W = loot.W, H = MobileLayout.Loot.Row }
 	check(toast.H <= 30 and toast.W <= 260, label .. ": a toast's place is too big")
 	check(loot.Y >= toast.Y + toast.H, label .. ": the loot card isn't under the toast")
 	check(loot.X + loot.W == toast.X + toast.W, label .. ": the loot card isn't right-aligned with the toast")

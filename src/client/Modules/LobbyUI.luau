@@ -1024,9 +1024,20 @@ function LobbyUI.closeDashboard()
 	showDashboard(false)
 end
 
-tile("INVENTORY", "Pack", P.Gold, function()
+local inventoryTile = tile("INVENTORY", "Pack", P.Gold, function()
 	showDashboard(true)
 end)
+local UpgradeHints = require(script.Parent.UpgradeHints)
+UpgradeHints.bind(inventoryTile, function(hints) return hints.Any end, P.Gold)
+local function inventoryUpgradeLabel(hints)
+	local chevron = inventoryTile:FindFirstChild("NavChevron")
+	if chevron then
+		chevron.Text = if hints.Any then "↑" else "›"
+		chevron.TextColor3 = if hints.Any then P.Gold else P.Dim
+	end
+end
+UpgradeHints.Changed:Connect(inventoryUpgradeLabel)
+inventoryUpgradeLabel(UpgradeHints.Current)
 -- Tasks and today's challenges: the Tasks window (TrainingRewards.client),
 -- with how many are still to do on the tile. (Nothing of them sits on the
 -- play screen.)

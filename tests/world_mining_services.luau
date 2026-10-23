@@ -16,7 +16,7 @@ Vector3.zero=Vector3.new(0,0,0)
 CFrame.new=function(a,b,c) return setmetatable({Position=if type(a)=="table" then a else Vector3.new(a or 0,b or 0,c or 0),RightVector=Vector3.new(1,0,0)},cmt) end
 CFrame.Angles=function() return CFrame.new() end
 local Vector2={new=function(x,y) return {X=x,Y=y} end}
-local UDim2={new=function(...) return {...} end,fromScale=function(...) return {...} end}
+local UDim2={new=function(...) return {...} end,fromScale=function(...) return {...} end,fromOffset=function(x,y) return {0,x,0,y} end}
 local UDim={new=function(...) return {...} end}
 local NumberRange={new=function(...) return {...} end}
 local NumberSequence={new=function(...) return {...} end}
@@ -27,16 +27,26 @@ local Random={new=function(seed)
 end}
 local methods={}
 local function new(kind)
-	local data={ClassName=kind,Children={},Transparency=0}
+	local data={ClassName=kind,Children={},Transparency=0,DescendantAdded=signal()}
 	local o=setmetatable({}, {__index=function(_,k) return methods[k] or data[k] end,
 	 __newindex=function(self,k,v)
 		assert(not data.Destroyed or k=="Parent","Wrote destroyed "..kind)
-		if k=="Parent" and v then table.insert(v.Children,self) end
+		if k=="Parent" and data.Parent then
+			local index=table.find(data.Parent.Children,self)
+			if index then table.remove(data.Parent.Children,index) end
+		end
 		data[k]=v
+		if k=="Parent" and v then
+			table.insert(v.Children,self)
+			local ancestor=v
+			while ancestor do ancestor.DescendantAdded:Fire(self); ancestor=ancestor.Parent end
+		end
 	 end})
 	table.insert(objects,o); return o
 end
 function methods:IsA(kind) return self.ClassName==kind or kind=="BasePart" and (self.ClassName=="Part" or self.ClassName=="WedgePart") end
+function methods:SetAttribute() end
+function methods:FindFirstChild(name) for _,child in self:GetChildren() do if child.Name==name then return child end end; return nil end
 function methods:GetChildren() local out={}; for _,c in self.Children do if c.Parent==self and not c.Destroyed then table.insert(out,c) end end; return out end
 function methods:GetDescendants()
 	local out={}; for _,c in self:GetChildren() do table.insert(out,c); for _,d in c:GetDescendants() do table.insert(out,d) end end; return out
@@ -58,7 +68,7 @@ function methods:Play() self.Played=true end
 function methods:Emit(count) self.Emitted=count end
 local Instance={new=new}
 local workspace=new("Workspace")
-workspace.CurrentCamera={CFrame=CFrame.new()}
+workspace.CurrentCamera={CFrame=CFrame.new(),ViewportSize=Vector2.new(1280,720)}
 function workspace:GetServerTimeNow() return now end
 local attrs,attrsSignals={Outpost=true},{}
 local player={UserId=42,DisplayName="Observer"}
@@ -73,7 +83,7 @@ local packets={}
 local Remotes={MiningRoll={OnClientEvent=signal()}}
 function Remotes.MiningRoll:FireAllClients(packet) table.insert(packets,packet); self.OnClientEvent:Fire(packet) end
 function Remotes:WaitForChild(k) return self[k] end
-local services={Players={LocalPlayer=player},ReplicatedStorage={WaitForChild=function() return Remotes end},RunService={RenderStepped=signal()},
+local services={Players={LocalPlayer=player},UserInputService={TouchEnabled=false},ReplicatedStorage={WaitForChild=function() return Remotes end},RunService={RenderStepped=signal()},
  Debris={AddItem=function(_,o,t) table.insert(debris,{o,now+t}) end}}
 local remotePlayers={}
 function services.Players:GetPlayerByUserId(id) return remotePlayers[id] end
