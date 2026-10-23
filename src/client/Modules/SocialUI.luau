@@ -1479,11 +1479,12 @@ local function prompt(
 	line: string,
 	seconds: number,
 	accent: Color3,
-	onAnswer: (boolean) -> ()
+	onAnswer: (boolean) -> (),
+	inviteReward: string?
 ): () -> ()
 	local card = new("Frame", {
 		BackgroundColor3 = P.Frame,
-		Size = UDim2.fromOffset(330, 108),
+		Size = UDim2.fromOffset(330, if inviteReward then 154 else 108),
 	}, stack)
 	UiKit.round(card, 10)
 	new("UIStroke", { Color = accent, Thickness = 1.5 }, card)
@@ -1495,6 +1496,11 @@ local function prompt(
 	local sub = text(card, line, 12, P.Dim)
 	sub.AutomaticSize = Enum.AutomaticSize.None
 	sub.Position, sub.Size = UDim2.fromOffset(62, 32), UDim2.new(1, -72, 0, 30)
+	if inviteReward then
+		local reward = text(card, inviteReward, 13, P.Gold, BOLD)
+		reward.AutomaticSize = Enum.AutomaticSize.None
+		reward.Position, reward.Size = UDim2.fromOffset(14, 72), UDim2.new(1, -28, 0, 22)
+	end
 	local track = new("Frame", {
 		BackgroundColor3 = accent,
 		BorderSizePixel = 0,
@@ -1511,14 +1517,18 @@ local function prompt(
 		card:Destroy()
 		onAnswer(accept)
 	end
-	local yes = chip(card, "Accept", P.Good, function()
+	local yes = chip(card, if inviteReward then "Join" else "Accept", P.Good, function()
 		answer(true)
 	end, 100)
 	yes.Position = UDim2.fromOffset(62, 68)
-	local no = chip(card, "Decline", P.Bad, function()
+	local no = chip(card, if inviteReward then "Not now" else "Decline", P.Bad, function()
 		answer(false)
 	end, 100)
 	no.Position = UDim2.fromOffset(170, 68)
+	if inviteReward then
+		yes.Position, yes.Size = UDim2.fromOffset(14, 104), UDim2.fromOffset(146, 40)
+		no.Position, no.Size = UDim2.fromOffset(170, 104), UDim2.fromOffset(146, 40)
+	end
 	local function dismiss()
 		if not answered then
 			answered = true
@@ -1854,7 +1864,7 @@ local function showFaceoff(info)
 	faceKind.Text = if rules and rules.Label then kind .. "  ·  " .. rules.Label else kind
 	if info.Called then
 		-- Pulled in from the lobby (Shared.AutoQueue): what's in it for you.
-		faceKind.Text ..= string.format("  ·  CALLED IN: WIN +%d ◆", info.Bonus or 0)
+		faceKind.Text ..= string.format(if info.BonusUpfront then "  ·  JOIN BONUS +%d ◆" else "  ·  CALLED IN: WIN +%d ◆", info.Bonus or 0)
 	end
 	faceLeft.Text, faceRight.Text = names(mine), names(theirs)
 	if info.Rounds then
@@ -1885,6 +1895,7 @@ local function showResult(info)
 			if info.Rules and info.Rules.Name then info.Rules.Name else "Friendly duel"
 		)
 	local bonus = if (info.Bonus or 0) > 0 then string.format("  ·  +%d ◆ fill-in bonus", info.Bonus) else ""
+	if (info.JoinBonus or 0) > 0 then bonus ..= string.format("  ·  %d ◆ paid when you joined", info.JoinBonus) end
 	resultLine.Text =
 		string.format("%s%svs %s\n%s  ·  +%d coins%s", why, rounds, info.Opponents or "?", change, info.Coins or 0, bonus)
 	-- The arena tournament: this run's wins, and the swings it restored.
@@ -2061,28 +2072,25 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 			kaijuCards[a] = nil
 		end
 	elseif kind == "FillIn" and type(a) == "table" then
-		-- Someone's waiting in a 1v1 queue and you're free in the lobby with
-		-- auto queue off (Shared.AutoQueue): step in for a bonus?
+		-- All lobby fill-ins require this invitation, even old auto-on accounts.
 		local id = tostring(a.Id)
 		if fillCards[id] then
 			fillCards[id]()
 		end
 		fillCards[id] = prompt(
 			"⚔",
-			if a.Intro then "A new miner's first fight" else "Fill a 1v1?",
-			string.format(
-				"%s (rating %d) is waiting for a %s. Step in: +%d ◆ on top of the win's coins.",
-				tostring(a.Who),
-				a.Rating or 0,
-				tostring(a.Name),
-				a.Bonus or 0
-			),
+			if a.Intro then "Help a new miner?" else "Join a 1v1?",
+			if a.Intro then string.format("%s is ready for their first fight.", tostring(a.Who))
+				else string.format("%s is waiting for a %s.", tostring(a.Who), tostring(a.Name)),
 			if type(a.Seconds) == "number" then a.Seconds else 15,
 			P.Gold,
 			function(accept)
 				fillCards[id] = nil
 				run("DuelFill", a.Id, accept)
-			end
+			end,
+			if (a.Bonus or 0) <= 0 then "First-fight bonus already claimed"
+				elseif a.BonusUpfront then string.format("+%d coins when the match starts", a.Bonus)
+				else string.format("+%d bonus coins if you win", a.Bonus)
 		)
 	elseif kind == "FillInOver" then
 		local id = tostring(a)

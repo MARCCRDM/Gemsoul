@@ -141,21 +141,21 @@ Casual and Ranked also show how many players are searching right now. That
 is counted from their `DuelQueue` attribute, with no extra server traffic,
 and it refreshes every 2 seconds while the menu is open.
 
-Between the two headings sits the **AUTO QUEUE** switch (see below): ON by
-default, with what being on call means under it.
+Between the two headings sits the **MATCH INVITES** switch (see below): ON by
+default. Every invitation requires explicit acceptance.
 
 ![The PLAY menu](lobby/play-menu.png)
 
-## Auto queue: the lobby is on call
+## Lobby match invitations
 
 Nobody should sit in an empty 1v1 queue while the lobby is full of players.
 The rules are in `Shared/AutoQueue.luau`; `Systems/Duels.luau` applies them.
 
 | | |
 | --- | --- |
-| **On call (default)** | Every free player in the Outpost is on call. When a 1v1 queue (Casual or Ranked) has waited `CallAfter` seconds (8) with nobody to pair, the free player closest in rating is pulled straight into the match: the usual face-off countdown, the menus close, and a toast says who called. |
+| **Invitations enabled (default)** | When a 1v1 queue has waited `CallAfter` seconds (8), available lobby players receive a Join / Not now offer. Nobody enters without accepting, including accounts with the old auto-queue setting enabled. |
 | **What's in it for the fill-in** | The mode's win coins plus a `FillBonus` (+20 ◆); a called player's rating never drops from a match they were called into (a Ranked win still counts fully). The face-off says `CALLED IN: WIN +20 ◆`, the result card shows the bonus. |
-| **AUTO QUEUE: OFF** | The switch on the PLAY menu (request `DuelAuto`, saved in `profile.Duel.AutoQueue`, published as the `DuelAuto` attribute). Free lobby players who turned it off get an offer card instead (`FillIn`: who's waiting, the mode, the bonus) for `AskSeconds` (15). The first to accept steps in (`DuelFill`); cancelling the queue withdraws the offers (`FillInOver`). |
+| **MATCH INVITES: OFF** | Mutes unsolicited offers. The preference uses `DuelAuto`, saved in `profile.Duel.AutoQueue`. Offers normally expire after 15 seconds; expired, declined or unissued offers cannot start a match. Cancelling the queue withdraws offers. Availability is checked again on acceptance. |
 | **Who counts as free** | In the Outpost (`Outpost` attribute), not searching, and none of: `CombatSession`, `MatchId`, `Expedition`, `RiftRun`, `DungeonQueue`, `DungeonId`, `KaijuBattle`, `Spar`, `SparDown`, `MechPilot`, `FirstFight`. |
 
 ### The first fight
@@ -167,8 +167,10 @@ shows a FINDING YOUR FIRST OPPONENT card with the countdown:
 1. Two new players in the queue pair at once, whatever their ratings: one
    fight (the `FirstFight` rule: even stats, unrated, paid like Casual),
    both with the first-fight hints (`FirstFight` attribute).
-2. Alone after `Intro.CallAfter` seconds (5): a lobby player on call is
-   pulled in (the bonus applies; the new player keeps the hints).
+2. Alone after `Intro.CallAfter` seconds (5): available lobby players receive
+   an invitation advertising +20 coins paid when the match starts. A helper
+   must accept; the bonus is paid once per newcomer's first-fight record,
+   never again at match end. The offer expires before the bot fallback.
 3. Still alone after `Intro.BotAfter` seconds (15): the sparring rival steps
    in (`ArenaSessions.enterTraining`, the old flow).
 

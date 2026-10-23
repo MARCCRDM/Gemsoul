@@ -406,7 +406,7 @@ function finish(match, winner: number?, reason: string)
 				-- Every finished duel counts toward the lobby's unlocks.
 				(record :: any).Played = ((record :: any).Played or 0) + 1
 			end
-			local bonus = if winner ~= nil then AutoQueue.bonus(match.Called[member], won) else 0
+			local bonus = if winner ~= nil and not match.Intro then AutoQueue.bonus(match.Called[member], won) else 0
 			local coins = (if winner == nil then 0 elseif won then rewards.Win else rewards.Loss) + bonus
 			if member.Parent then
                 if #match.Teams[1] == 1 and #match.Teams[2] == 1 then
@@ -429,6 +429,7 @@ function finish(match, winner: number?, reason: string)
 					Delta = after - before,
 					Coins = coins,
 					Bonus = bonus,
+					JoinBonus = if match.Called[member] then match.JoinBonus else 0,
 					Called = match.Called[member] == true,
 					Intro = match.Intro == true,
 					Opponents = names[if t == 1 then 2 else 1],
@@ -572,6 +573,7 @@ local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 		Connections = {},
 		Shields = {},
 		Called = extra.Called or {},
+		JoinBonus = extra.JoinBonus or 0,
 		Intro = extra.Intro == true,
 		FirstFighters = {},
 		-- Rounds (1v1 Ranked): wins per team, rounds played, the pivot's
@@ -630,7 +632,8 @@ local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 				Team = t,
 				Teams = info,
 				Called = match.Called[member] == true,
-				Bonus = if match.Called[member] then AutoQueue.FillBonus else 0,
+				Bonus = if match.Called[member] then (if match.Intro then match.JoinBonus else AutoQueue.FillBonus) else 0,
+				BonusUpfront = match.Intro,
 				Intro = match.Intro,
 			})
 		end
@@ -861,23 +864,22 @@ end
 
 -- Auto queue (Shared.AutoQueue) ------------------------------------------------
 
--- Free lobby players who may be called for `entry`: those on call, and
--- those who'd rather be asked. Each { Player, Rating }.
+-- Free lobby players with invitations enabled. Never automatically matched.
 local function onCall(entry)
-	local auto, manual = {}, {}
+	local manual = {}
 	for _, other in Players:GetPlayers() do
 		if not table.find(entry.Players, other) and not busy(other) then
 			local ok = AutoQueue.ready(function(name)
 				return other:GetAttribute(name)
 			end, entryOf(other) ~= nil)
 			local record = ok and Duels.record(other)
-			if record then
+			if record and AutoQueue.setting(record) then
 				local candidate = { Player = other, Rating = record.Rating }
-				table.insert(if AutoQueue.setting(record) then auto else manual, candidate)
+				table.insert(manual, candidate)
 			end
 		end
 	end
-	return auto, manual
+	return manual
 end
 
 local function rulesFor(mode: string)
@@ -888,13 +890,24 @@ end
 -- `called` steps into `entry`'s match from the lobby.
 local function fillWith(entry, called: Player): (boolean, string?)
 	local spec = Matchmaking.Modes[entry.Mode]
+	local newcomer = spec and spec.Intro and Duels.record(entry.Players[1])
+	local joinBonus = if newcomer and not newcomer.IntroHelpRewarded then AutoQueue.FillBonus else 0
 	local ok, problem = startMatch(
 		entry.Mode,
 		{ table.clone(entry.Players), { called } },
 		rulesFor(entry.Mode),
-		{ Called = { [called] = true }, Intro = spec and spec.Intro }
+		{ Called = { [called] = true }, Intro = spec and spec.Intro, JoinBonus = joinBonus }
 	)
 	if ok then
+		if newcomer then
+			-- Once per newcomer's first fight, including leave/requeue attempts.
+			newcomer.IntroHelpRewarded = true
+			if joinBonus > 0 then PlayerData.addCoins(called, joinBonus) end
+			PlayerData.sync(called)
+			PlayerData.sync(entry.Players[1])
+			Remotes.Notify:FireClient(called, string.format("Joined the first fight: +%d coins paid now. Thanks for helping!", joinBonus))
+			return true, nil
+		end
 		Remotes.Notify:FireClient(
 			called,
 			string.format(
@@ -910,8 +923,8 @@ local function fillWith(entry, called: Player): (boolean, string?)
 	return ok, problem
 end
 
--- A lone 1v1 entry has waited long enough: pull someone on call, else ask
--- the lobby; a lone intro entry falls back to the sparring rival.
+-- A lone 1v1 invites the lobby; only DuelFill acceptance starts a fill-in.
+-- An unanswered intro still falls back to the sparring rival on schedule.
 local function fill(entry, now: number)
 	if entry.Size ~= 1 then
 		return
@@ -932,26 +945,24 @@ local function fill(entry, now: number)
 	if waited < (if intro then AutoQueue.Intro.CallAfter else AutoQueue.CallAfter) or not freeSlot() then
 		return
 	end
-	local auto, manual = onCall(entry)
-	local picked = AutoQueue.pick(auto, entry.Rating)
-	if picked then
-		local ok = fillWith(entry, picked.Player)
-		if ok then
-			return
-		end
-	end
+	local manual = onCall(entry)
+	entry.Offers = entry.Offers or {}
 	for _, candidate in manual do
 		local other = candidate.Player
 		if not entry.Asked[other] then
 			entry.Asked[other] = true
+			local seconds = math.min(AutoQueue.AskSeconds, if intro then AutoQueue.Intro.BotAfter - waited else AutoQueue.AskSeconds)
+			entry.Offers[other] = now + seconds
+			local newcomer = intro and Duels.record(entry.Players[1])
 			Remotes.Social:FireClient(other, "FillIn", {
 				Id = entry.Id,
 				Mode = entry.Mode,
 				Name = spec and spec.Name or entry.Mode,
 				Who = entry.Players[1].DisplayName,
 				Rating = entry.Rating,
-				Bonus = AutoQueue.FillBonus,
-				Seconds = AutoQueue.AskSeconds,
+				Bonus = if newcomer and newcomer.IntroHelpRewarded then 0 else AutoQueue.FillBonus,
+				BonusUpfront = intro == true,
+				Seconds = seconds,
 				Intro = intro == true,
 			})
 		end
@@ -969,8 +980,8 @@ local function setAuto(player: Player, on: any)
 	return reply(
 		true,
 		if on ~= false
-			then string.format("Auto queue on: you're on call for 1v1s while you're in the lobby (+%d ◆ bonus on a win).", AutoQueue.FillBonus)
-			else "Auto queue off: you'll be asked before stepping into anyone's 1v1."
+			then "Match invitations on: you choose whether to join each match."
+			else "Match invitations off: you won't receive lobby fill-in requests."
 	)
 end
 
@@ -979,6 +990,11 @@ local function fillRespond(player: Player, id: any, accept: any)
 	if not entry then
 		return reply(false, "That queue has been filled already.")
 	end
+	local expiry = entry.Offers and entry.Offers[player]
+	if not expiry or expiry <= os.clock() then
+		return reply(false, "That invitation has expired.")
+	end
+	entry.Offers[player] = nil -- one response; decline and retries cannot later accept it
 	if accept ~= true then
 		return reply(true, "Maybe next time.")
 	end
@@ -988,6 +1004,10 @@ local function fillRespond(player: Player, id: any, accept: any)
 	end
 	if table.find(entry.Players, player) then
 		return reply(false, "That's your own queue.")
+	end
+	local ready = AutoQueue.ready(function(name) return player:GetAttribute(name) end, entryOf(player) ~= nil)
+	if not ready or not AutoQueue.setting(Duels.record(player)) then
+		return reply(false, "Return to the lobby to accept a match invitation.")
 	end
 	local ok, problem = fillWith(entry, player)
 	if not ok then

@@ -134,7 +134,7 @@ end
 heading("PRACTICE", P.Text, 0, Enum.TextXAlignment.Left)
 heading("VS PLAYERS", RED, 700, Enum.TextXAlignment.Right)
 -- Auto queue (Shared.AutoQueue): on call for 1v1s while you're in the
--- lobby, pulled straight in when a queue needs an opponent. The player's
+-- lobby, asked when a queue needs an opponent. The player's
 -- DuelAuto attribute says where it stands; the switch asks the server.
 local AutoQueue = require(game:GetService("ReplicatedStorage").Shared.AutoQueue)
 local autoButton = new("TextButton", {
@@ -158,12 +158,12 @@ local function autoOn(): boolean
 end
 local function refreshAuto()
 	local on = autoOn()
-	autoLabel.Text = if on then "AUTO QUEUE: ON" else "AUTO QUEUE: OFF"
+	autoLabel.Text = if on then "MATCH INVITES: ON" else "MATCH INVITES: OFF"
 	autoLabel.TextColor3 = if on then GREEN else P.Dim
 	autoRim.Color = if on then GREEN else Color3.fromRGB(70, 80, 96)
 	autoSub.Text = if on
-		then string.format("ON CALL FOR 1v1s IN THE LOBBY  ·  WIN +%d ◆  ·  NO RATING LOST", AutoQueue.FillBonus)
-		else "YOU'LL BE ASKED BEFORE STEPPING INTO A 1v1"
+		then "JOIN ONLY WHEN YOU ACCEPT AN INVITATION"
+		else "LOBBY MATCH INVITATIONS ARE MUTED"
 end
 autoButton.Activated:Connect(function()
 	run("DuelAuto", not autoOn())

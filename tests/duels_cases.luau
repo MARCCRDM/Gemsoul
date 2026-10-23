@@ -559,6 +559,8 @@ do
 	advance(AutoQueue.CallAfter - 1)
 	check(Duels.matchOf(ivy) == nil, "The lobby was called too soon")
 	advance(1.5)
+	check(Duels.matchOf(ivy) == nil and Duels.matchOf(kim) == nil, "Saved auto-on setting pulled a player without consent")
+	check(handlers.DuelFill(kim, last(kim, "FillIn")[2].Id, true).Ok, "Invitation acceptance failed")
 	local m = Duels.matchOf(ivy)
 	check(m ~= nil and Duels.matchOf(kim) == m and Duels.matchOf(jon) == nil, "The closest-rated lobby player wasn't pulled in")
 	check(m.Ranked and m.Called[kim] and not m.Called[ivy], "The pulled player isn't marked as called")
@@ -589,6 +591,8 @@ do
 	local coinsBefore = profiles[kim].Coins
 	check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued for Casual")
 	advance(AutoQueue.CallAfter + 0.5)
+	check(Duels.matchOf(kim) == nil, "Casual match started before acceptance")
+	check(handlers.DuelFill(kim, last(kim, "FillIn")[2].Id, true).Ok, "Casual invitation failed")
 	m = Duels.matchOf(ivy)
 	check(m and Duels.matchOf(kim) == m and not m.Ranked, "Kim wasn't pulled into the Casual queue")
 	advance(Matchmaking.Countdown)
@@ -616,9 +620,15 @@ do
 	-- (CombatSession was set by hand above; Kim's back in the lobby.)
 	lobby(kim)
 
-	-- Auto queue off: Kim is asked, not pulled.
+	-- Invitations off: neither forced entry nor a popup. On always asks.
 	check(handlers.DuelAuto(kim, false).Ok and kim:GetAttribute("DuelAuto") == false, "Auto queue didn't switch off")
 	check(profiles[kim].Duel.AutoQueue == false, "The choice isn't saved in the profile")
+	local previousOffer = last(kim, "FillIn")
+	check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued while invites muted")
+	advance(AutoQueue.CallAfter + 0.5)
+	check(last(kim, "FillIn") == previousOffer and Duels.matchOf(kim) == nil, "Muted invitations still interrupted player")
+	handlers.DuelCancel(ivy)
+	check(handlers.DuelAuto(kim, true).Ok, "Could not enable invitations")
 	check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued")
 	local entryId = nil
 	advance(AutoQueue.CallAfter + 0.5)
@@ -642,7 +652,19 @@ do
 	end
 	check(offers == 0, "Kim was offered the same queue twice")
 	check(not handlers.DuelFill(kim, "Q999", true).Ok, "A stale offer was accepted")
+	check(not handlers.DuelFill(jon, entryId, true).Ok, "Uninvited player forged an acceptance")
 	check(handlers.DuelFill(kim, entryId, false).Ok and Duels.matchOf(kim) == nil, "Declining failed")
+	check(not handlers.DuelFill(kim, entryId, true).Ok, "Declined invitation could still be accepted")
+	handlers.DuelCancel(ivy)
+	check(handlers.DuelQueue(ivy, "casual").Ok, "Requeue after decline failed")
+	advance(AutoQueue.CallAfter + 0.5)
+	entryId = last(kim, "FillIn")[2].Id
+	advance(AutoQueue.AskSeconds + 0.5)
+	check(not handlers.DuelFill(kim, entryId, true).Ok and Duels.matchOf(kim) == nil, "Expired invitation started a match")
+	handlers.DuelCancel(ivy)
+	check(handlers.DuelQueue(ivy, "casual").Ok, "Requeue after expiry failed")
+	advance(AutoQueue.CallAfter + 0.5)
+	entryId = last(kim, "FillIn")[2].Id
 	check(handlers.DuelFill(kim, entryId, true).Ok, "Accepting the fill-in failed")
 	m = Duels.matchOf(ivy)
 	check(m and Duels.matchOf(kim) == m and m.Called[kim], "Accepting didn't start the match")
@@ -698,6 +720,14 @@ do
 	advance(AutoQueue.Intro.CallAfter - 1)
 	check(Duels.matchOf(new3) == nil, "The lobby was called into the intro too soon")
 	advance(1.5)
+	check(Duels.matchOf(new3) == nil and Duels.matchOf(kim) == nil, "New player pulled a veteran without consent")
+	local introOffer = last(kim, "FillIn")[2]
+	check(introOffer.Intro and introOffer.BonusUpfront and introOffer.Bonus == 20 and introOffer.Seconds <= 10, "Intro invitation does not disclose immediate bonus and actual expiry")
+	local beforeJoin = profiles[kim].Coins
+	check(handlers.DuelFill(kim, introOffer.Id, true).Ok, "First-fight invitation could not be accepted")
+	check(profiles[kim].Coins == beforeJoin + 20, "First-fight join bonus was not paid upfront")
+	check(Duels.record(new3).IntroHelpRewarded == true, "First-fight bonus was not marked paid")
+	check(not handlers.DuelFill(kim, introOffer.Id, true).Ok and profiles[kim].Coins == beforeJoin + 20, "Duplicate acceptance paid twice")
 	m = Duels.matchOf(new3)
 	check(m and Duels.matchOf(kim) == m and m.Intro and m.Called[kim], "A lobby player wasn't called into the first fight")
 	check(new3:GetAttribute("FirstFight") == true and kim:GetAttribute("FirstFight") == nil, "Only the new player gets the hints")
@@ -705,7 +735,8 @@ do
 	lethalBlow(new3)
 	check(m.State == "Done", "The called first fight didn't end")
 	kimEnd = last(kim, "MatchEnd")[2]
-	check(kimEnd.Won and kimEnd.Bonus == AutoQueue.FillBonus and kimEnd.Intro == true, "The called veteran's bonus")
+	check(kimEnd.Won and kimEnd.Bonus == 0 and kimEnd.JoinBonus == AutoQueue.FillBonus and kimEnd.Intro == true, "The intro bonus was paid again at match end")
+	check(profiles[kim].Coins == beforeJoin + 20 + PvPRules.Kinds.FirstFight.Rewards.Win, "Incorrect intro total payout")
 	check(new3:GetAttribute("FirstFight") == nil and new3:GetAttribute("DuelsPlayed") == 1, "Pax's first fight didn't count")
 	check(new3:GetAttribute("IntroGuide") == true and kim:GetAttribute("IntroGuide") == nil, "Only the new player is walked through the Outpost")
 	advance(Matchmaking.EndPause)
@@ -713,10 +744,11 @@ do
 
 	-- Alone with nobody around: the sparring rival after Intro.BotAfter --------------
 	local new4 = makePlayer(44, "Quin")
-	kim:SetAttribute("Outpost", nil)
+	lobby(kim)
 	check(handlers.IntroQueue(new4).Ok, "Quin isn't in the intro queue")
 	advance(AutoQueue.Intro.BotAfter - 1)
 	check(new4:GetAttribute("DuelQueue") == "intro" and #trainingEntered == 0, "The rival came too soon")
+	check(Duels.matchOf(kim) == nil, "Ignoring invitation pulled the lobby player")
 	advance(1.5)
 	check(#trainingEntered == 1 and trainingEntered[1] == new4, "The sparring rival didn't step in")
 	check(new4:GetAttribute("DuelQueue") == nil and Duels.matchOf(new4) == nil, "Quin is still queued")
@@ -724,5 +756,5 @@ do
 	new4:SetAttribute("CombatSession", nil)
 
 	-- Nobody is called while the Arena's lanes are full: the entry waits.
-	print("PASS: " .. (checks - before) .. " auto queue checks (on call by default, the closest rating pulled in, rating safe, fill bonus, offers when off, withdrawn offers, intro pairs, called veterans, the rival fallback)")
+	print("PASS: " .. (checks - before) .. " lobby invitation checks (explicit consent, muted invites, expiry, decline, forged requests, upfront intro bonus, no duplicate payment, normal PvP rewards unchanged, bot fallback)")
 end

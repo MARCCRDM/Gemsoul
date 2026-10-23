@@ -1,23 +1,22 @@
 --[[
-	Auto queue: every player in the lobby is on call for PvP.
+	Lobby invitations: every match needs an explicit acceptance.
 
 	Someone queues for a 1v1 and nobody else is searching. Instead of
 	waiting on an empty queue, matchmaking calls a player from the lobby:
 
-	  On call (the default)   any free player in the Outpost is pulled
-	                          straight into the match after `CallAfter`
-	                          seconds, the one closest in rating first. Their
-	                          rating never drops from a match they were called
-	                          into, and a win pays `FillBonus` coins on top.
-	  Off (AUTO QUEUE: OFF)   free lobby players are asked instead: a card
-	                          offering the match and the bonus for `AskSeconds`.
-	                          The first to accept steps in.
+	  On (the default)       free players receive a timed Join / Not now card.
+	                         The first to accept steps in. Saved AutoQueue=true
+	                         is permission to receive invitations, never teleport.
+	  Off                    no unsolicited lobby invitations.
+	  First fight            +FillBonus coins at successful entry, once per
+	                         newcomer's first fight, never paid again at its end.
+	  Other 1v1s             keep the existing win bonus and rating protection.
 
 	A new player's first fight is a queue of its own ("intro"):
 
 	  two new players          paired at once, each in their first fight
 	                           (hints pop up as they go, Shared.FastStart)
-	  one, after Intro.CallAfter   a lobby player on call is pulled in
+	  one, after Intro.CallAfter   eligible lobby players are invited
 	  one, after Intro.BotAfter    the sparring rival steps in (the old flow)
 
 	Pure: the server (Systems/Duels) applies it, the client shows it, tests
@@ -37,9 +36,9 @@ local AutoQueue = {}
 AutoQueue.Default = true
 AutoQueue.CallAfter = 8 -- seconds a 1v1 queue waits before the lobby is called
 AutoQueue.AskSeconds = 15 -- how long a fill-in offer stands
-AutoQueue.FillBonus = 20 -- coins on top of the mode's win reward for a fill-in
+AutoQueue.FillBonus = 20 -- first-fight join bonus; other fill-ins retain the win bonus
 AutoQueue.Intro = {
-	CallAfter = 5, -- seconds alone before a lobby player is pulled in
+	CallAfter = 5, -- seconds alone before lobby invitations
 	BotAfter = 15, -- seconds alone before the sparring rival steps in
 }
 AutoQueue.IntroMode = "intro"
