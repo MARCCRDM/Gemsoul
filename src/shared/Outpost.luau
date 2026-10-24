@@ -310,9 +310,9 @@ function Outpost.claimHolder(node, userId: number, now: number): boolean
 end
 
 -- The free Survey Pick regains one swing this often, up to its full Swings
--- (600 of them: full again in two hours).
-Outpost.FreeSwingSeconds = 12
--- How often it regains one, in words: "12 s" (or "2 min").
+-- (600 of them: full again in four hours).
+Outpost.FreeSwingSeconds = 24
+-- How often it regains one, in words: "24 s" (or "2 min").
 function Outpost.rechargeEvery(): string
 	local every = Outpost.FreeSwingSeconds
 	return if every % 60 == 0 then string.format("%d min", every // 60) else string.format("%d s", every)

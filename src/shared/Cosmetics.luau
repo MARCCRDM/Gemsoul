@@ -80,7 +80,7 @@ export type VisorLook = {
 }
 export type Cosmetic = {
 	Id: string,
-	Kind: "Trim" | "Back" | "Skin" | "Suit" | "Pick" | "Visor" | "Helmet" | "Title",
+	Kind: "Trim" | "Back" | "Skin" | "Shield" | "Suit" | "Pick" | "Visor" | "Helmet" | "Title",
 	Name: string,
 	Description: string,
 	Rarity: string, -- a gem tier: Common, Uncommon, Rare, UltraRare
@@ -263,6 +263,21 @@ Cosmetics.List = {
 		Exclusive = "Invite",
 	},
 	-- The bring-a-friend rewards (Shared.Referrals.Tiers) -------------------------
+	VisorStarlink = {
+		Id = "VisorStarlink", Kind = "Visor", Name = "Starlink Visor",
+		Description = "An aurora lens flowing from sapphire to violet and gold, with a luminous rim. Bring 3 friends.",
+		Rarity = "UltraRare", Color = Color3.fromRGB(110, 205, 255), Exclusive = "Invite",
+		Visor = {
+			Color = Color3.fromRGB(65, 180, 255), Material = "Neon",
+			Glow = Color3.fromRGB(170, 90, 255), Third = Color3.fromRGB(255, 215, 100),
+			Fx = "Aurora", Bands = 9, Rim = true, Sparks = Color3.fromRGB(165, 220, 255),
+		},
+	},
+	ShieldAegis = {
+		Id = "ShieldAegis", Kind = "Shield", Name = "Celestial Aegis",
+		Description = "A midnight shield with gilded wing plates and a radiant sapphire star. Bring 10 friends. Cosmetic only.",
+		Rarity = "Legendary", Color = Color3.fromRGB(255, 210, 90), Exclusive = "Invite", Look = "Aegis",
+	},
 	BackStandard = {
 		Id = "BackStandard",
 		Kind = "Back",
@@ -1894,9 +1909,9 @@ end
 -- Pick, Visor, Helmet }).
 -- Trims, backs and titles are the account's. A miner with no Wardrobe yet
 -- wears the account's current look.
-Cosmetics.MinerKinds = { "Suit", "Skin", "Pick", "Visor", "Helmet" }
+Cosmetics.MinerKinds = { "Suit", "Skin", "Shield", "Pick", "Visor", "Helmet" }
 function Cosmetics.isMinerKind(kind: any): boolean
-	return kind == "Suit" or kind == "Skin" or kind == "Pick" or kind == "Visor" or kind == "Helmet"
+	return kind == "Suit" or kind == "Skin" or kind == "Shield" or kind == "Pick" or kind == "Visor" or kind == "Helmet"
 end
 local function currentLook(cosmetics: any): { [string]: string? }
 	local look = {}

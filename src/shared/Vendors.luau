@@ -272,7 +272,7 @@ Vendors.Foreman = crew(
 		},
 		{
 			Text = "My swings ran out",
-			Reply = "Your pick recharges a swing every 12 seconds. I keep refills in stock, and ranked 1v1 win streaks restore swings.",
+			Reply = "Your pick recharges a swing every 24 seconds. I keep refills in stock, and ranked 1v1 win streaks restore swings.",
 		},
 	}
 )
@@ -352,7 +352,7 @@ Vendors.InfoBot = {
 				},
 				{
 					Text = "My swings ran out",
-					Reply = "Your free pick gets a swing back every 12 seconds and is full again in two hours. Garrick sells refills, and ranked 1v1 win streaks restore swings.",
+					Reply = "Your free pick gets a swing back every 24 seconds and is full again in four hours. Garrick sells refills, and ranked 1v1 win streaks restore swings.",
 				},
 			},
 		},
@@ -369,7 +369,7 @@ Vendors.Tips = {
 	"Three Rift Veins surface by the crater walls and move from time to time. They are the richest ground in the quarry.",
 	"One Rift Vein is guarded. Bring your whole team before you go near it.",
 	"Clear a wandering rift and every miner who helped is Rift Charged: luckier gems for 60 seconds.",
-	"Your free pick gets a swing back every 12 seconds. A full charge takes two hours.",
+	"Your free pick gets a swing back every 24 seconds. A full charge takes four hours.",
 	"Swings bought as refills are used before your free charge.",
 	-- Threats
 	"Rift activity rises the longer you work beyond the Core.",

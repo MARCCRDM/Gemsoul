@@ -3,10 +3,10 @@
 	through it, you climb a ladder of exclusive cosmetics, never sold:
 	  1 friend   Kindred Edge (Legendary weapon skin, only from here)
 	  2 friends  Twin Star (pickaxe)
-	  3 friends  Crusader's Standard (back piece)
+	  3 friends  Starlink Visor
 	  4 friends  Crusader Gold (weapon skin)
 	  5 friends  Crusader Plate (armor suit)
-	  10 friends CRUSADER LEGEND (title over your head)
+	  10 friends Celestial Aegis (shield skin)
 	Pure, for the server (Systems/Referrals), the client (Modules/ReferralUI,
 	the Shop's Free tab) and tests.
 
@@ -25,10 +25,10 @@ local Referrals = {}
 Referrals.Tiers = {
 	{ Friends = 1, Reward = "SkinKindred" },
 	{ Friends = 2, Reward = "PickTwinStar" },
-	{ Friends = 3, Reward = "BackStandard" },
+	{ Friends = 3, Reward = "VisorStarlink" },
 	{ Friends = 4, Reward = "SkinCrusader" },
 	{ Friends = 5, Reward = "SuitCrusader" },
-	{ Friends = 10, Reward = "TitleLegend" },
+	{ Friends = 10, Reward = "ShieldAegis" },
 }
 Referrals.Reward = Referrals.Tiers[1].Reward
 Referrals.Needed = Referrals.Tiers[1].Friends

@@ -307,10 +307,10 @@ for i, id in Rules.RefillOrder do
 end
 check(Rules.Refills.Refill.Swings == Rules.Picks.Survey.Swings, "A Swing Refill isn't a full charge")
 -- The free charge is a long session (100+ rocks: your kaiju fights and
--- levels beside you), full again within two hours.
+-- levels beside you), full again within four hours.
 check(Rules.Picks.Survey.Swings / Rules.SwingsPerRock >= 100, "The free charge is under 100 rocks")
-check(Rules.Picks.Survey.Swings * Rules.FreeSwingSeconds <= 2 * 3600, "The free pick takes over two hours to fill")
-check(Rules.rechargeEvery() == "12 s", "The recharge reads " .. Rules.rechargeEvery())
+check(Rules.Picks.Survey.Swings * Rules.FreeSwingSeconds == 4 * 3600, "The free pick should take four hours to fill")
+check(Rules.rechargeEvery() == "24 s", "The recharge reads " .. Rules.rechargeEvery())
 check(Rules.legacySwings({ Titan = 100, Plasma = 40, Survey = 7 }) == 160, "Old picks didn't turn into swings")
 check(
 	Rules.tension(10, 10) == 0 and Rules.tension(0, 10) == 1 and math.abs(Rules.tension(3, 4) - 0.25) < 1e-9,

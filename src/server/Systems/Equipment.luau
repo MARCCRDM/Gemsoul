@@ -385,6 +385,39 @@ local function frontierShield(folder, character, accent, gem, finish, rarity, fa
 	gemSocket(folder, arm, mount, Vector3.new(0, 0.1, -0.28), gem, 0.19)
 end
 
+-- Cosmetic overlay preserves the held shield, gem socket and combat geometry.
+local function celestialShield(folder: Instance)
+	local face: BasePart? = nil
+	for _, part in folder:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 1 and part.Size.Z < 0.5 then
+			if not face or part.Size.X * part.Size.Y > face.Size.X * face.Size.Y then face = part end
+		end
+	end
+	if not face then return end
+	local gold, blue = Color3.fromRGB(245, 195, 75), Color3.fromRGB(85, 210, 255)
+	face.Color, face.Material = Color3.fromRGB(20, 29, 58), Enum.Material.Metal
+	local w, h = face.Size.X, face.Size.Y
+	local z = -face.Size.Z / 2 - 0.045
+	for _, side in { -1, 1 } do
+		for i = 1, 3 do
+			local wing = piece(folder, face,
+				CFrame.new(side * w * (0.30 + i * 0.035), h * (0.32 - i * 0.17), z)
+					* CFrame.Angles(0, 0, side * math.rad(24)),
+				Vector3.new(w * 0.17, h * 0.27, 0.09), gold, Enum.Material.Metal)
+			wing.Name = "AegisWing"
+		end
+		neon(folder, face, CFrame.new(side * w * 0.43, 0, z - 0.06), Vector3.new(0.035, h * 0.7, 0.035), blue)
+	end
+	-- Star below the original gem, with an inset sapphire and four gold rays.
+	local center = CFrame.new(0, -h * 0.25, z - 0.08)
+	for i = 0, 3 do
+		piece(folder, face, center * CFrame.Angles(0, 0, i * math.pi / 2) * CFrame.new(0, h * 0.08, 0),
+			Vector3.new(w * 0.055, h * 0.2, 0.07), gold, Enum.Material.Metal).Name = "AegisRay"
+	end
+	local star = neon(folder, face, center * CFrame.Angles(0, 0, math.pi / 4), Vector3.new(w * 0.15, w * 0.15, 0.1), blue)
+	star.Name = "AegisStar"
+end
+
 WEAPONS.PistolShield = function(folder, character, right, _left, accent, gem)
 	pistolKit(folder, character, right, accent, gem, Color3.fromRGB(218, 146, 59), false)
 end
@@ -2933,6 +2966,12 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 		applySkin(weaponFolder, skin.Color, skin.Palette)
 	end
 	-- A helmet skin keeps its own colours through the gem, rarity and
+	local shieldSkin = cosmetics and Cosmetics.get(cosmetics.Shield)
+	local heldShield = folder:FindFirstChild("Shield")
+	if shieldSkin and shieldSkin.Kind == "Shield" and heldShield and (not only or only == "Shield") then
+		celestialShield(heldShield)
+	end
+	-- A helmet skin keeps its own colours through the gem, rarity and
 	-- Prismatic passes (their stones, lights and particles stay).
 	local helmetPiece = folder:FindFirstChild("Helmet")
 	if helmetPiece and helmetPiece:GetAttribute("HelmetSkin") then
@@ -3235,6 +3274,7 @@ function Equipment.cosmeticPreview(id: string): boolean
 		and (
 			if cosmetic.Kind == "Skin"
 				then folder:FindFirstChild("Weapon")
+				elseif cosmetic.Kind == "Shield" then folder:FindFirstChild("Shield")
 				elseif cosmetic.Kind == "Visor" or cosmetic.Kind == "Helmet" then folder:FindFirstChild("Helmet")
 				else folder
 		)

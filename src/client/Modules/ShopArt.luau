@@ -591,6 +591,12 @@ function ShopArt.icon(parent: Instance, kind: string, cosmeticId: string?, size:
 		-- The drawing holds the spot until the real thing loads in 3D.
 		skinArt(root, size, cosmetic)
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)
+	elseif cosmetic and cosmetic.Kind == "Shield" then
+		local plate = piece(root, 0.5, 0.5, 0.62, 0.78, Color3.fromRGB(20, 29, 58))
+		round(plate, math.floor(size * 0.12))
+		stroke(plate, cosmetic.Color, math.max(2, size / 24))
+		piece(plate, 0.5, 0.5, 0.32, 0.25, Color3.fromRGB(85, 210, 255), 45)
+		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Suit" then
 		suitArt(root, size, cosmetic)
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)

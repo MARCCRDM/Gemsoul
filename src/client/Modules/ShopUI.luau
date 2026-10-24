@@ -85,6 +85,7 @@ local PAGE_W, PAGE_H = W - 2 * PAGE_X, H - PAGE_Y - (if SHORT then 8 else 20)
 local UP = if SHORT then 1 else 0
 local KIND_NAMES = {
 	Skin = "Weapon skin",
+	Shield = "Shield skin",
 	Suit = "Suit",
 	Helmet = "Helmet",
 	Visor = "Visor",
@@ -116,7 +117,7 @@ local HOW_TO = {
 local state = {
 	Tab = "Bundles",
 	Selected = {} :: { [string]: string }, -- the picked look, per catalog tab
-	Sort = "Featured",
+	Sort = "Low",
 	Filter = "All",
 	Kits = { Prospector = true, Skirmisher = true, Juggernaut = true },
 	Busy = false,
