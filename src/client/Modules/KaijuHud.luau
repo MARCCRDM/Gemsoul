@@ -80,6 +80,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local Coupons = require(ReplicatedStorage.Shared.Coupons)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
@@ -425,16 +426,20 @@ local tame = new("TextButton", {
 	Visible = false,
 }, gui)
 UiKit.round(tame, 10)
-new("UIStroke", { Color = P.Gold, Thickness = 2 }, tame)
+local catchStroke = new("UIStroke", { Color = P.Gold, Thickness = 2 }, tame)
 local tameTitle = label(tame, "CATCH", 18, P.Gold, Enum.Font.GothamBlack)
 tameTitle.Position, tameTitle.Size = UDim2.fromOffset(0, 6), UDim2.new(1, 0, 0, 22)
 tameTitle.TextXAlignment = Enum.TextXAlignment.Center
 local tameOdds = label(tame, "", 11, P.Text, IronUi.Bold)
-tameOdds.Position, tameOdds.Size = UDim2.fromOffset(0, 30), UDim2.new(1, 0, 0, 13)
+tameOdds.Position, tameOdds.Size = UDim2.fromOffset(0, 50), UDim2.new(1, 0, 0, 16)
 tameOdds.TextXAlignment = Enum.TextXAlignment.Center
 local tameTries = label(tame, "", 10, P.Dim, IronUi.Body)
-tameTries.Position, tameTries.Size = UDim2.fromOffset(0, 43), UDim2.new(1, 0, 0, 12)
+tameTries.Position, tameTries.Size = UDim2.fromOffset(0, 68), UDim2.new(1, 0, 0, 14)
 tameTries.TextXAlignment = Enum.TextXAlignment.Center
+local catchName = label(tame, "READY TO CATCH", 12, P.Text, IronUi.Bold)
+catchName.Position, catchName.Size = UDim2.fromOffset(8, 30), UDim2.new(1, -16, 0, 18)
+catchName.TextXAlignment = Enum.TextXAlignment.Center
+catchName.TextTruncate = Enum.TextTruncate.AtEnd
 
 -- Where the strip and TAME go: see the header.
 local function layout()
@@ -461,6 +466,14 @@ local function layout()
 		tame.Position = UDim2.fromOffset(spot.TameX, spot.TameY or y)
 	end
 	card.Position = UDim2.fromOffset(x, y)
+	-- A readable, non-modal prompt: above the pet strip on touch, above the
+	-- combat HUD at center on desktop. No extra mobile action when unavailable.
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	tame.Size = UDim2.fromOffset(if touch then math.min(210, screen.X - 24) else 260, 90)
+	tame.Position = if touch
+		then UDim2.fromOffset(screen.X - tame.Size.X.Offset - 12, if hunting then y + h + 8 else math.max(12, y - 98))
+		else UDim2.fromOffset((screen.X - 260) / 2, math.max(12, screen.Y - 225))
+	tameTitle.Text = if touch then "TAP TO CATCH" else "[ C ]  CATCH"
 	-- The tiles share what AUTO HEAL and CALL BACK leave.
 	local buttonW, gap = if phone then 54 else 68, if phone then 4 else 6
 	local th = h - 10
@@ -2331,15 +2344,21 @@ end)
 -- The strip, the roll and TAME --------------------------------------------------------------------------------------
 
 -- The wild kaiju you could try to tame now: the weakest near you.
+local catchCooldowns = setmetatable({}, { __mode = "k" })
 local function tameTarget(): (Model?, number)
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local enemies = workspace:FindFirstChild("Enemies")
 	if not root or not enemies then
 		return nil, 0
 	end
+	local body = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	local data = GemClient.Profile and GemClient.Profile.Kaiju
+	if not body or body.Health <= 0 or not data or Kaiju.count(data) >= Kaiju.MaxOwned then
+		return nil, 0
+	end
 	local best, bestChance = nil, 0
 	for _, model in enemies:GetChildren() do
-		if model:IsA("Model") and KaijuTaming.ready(model) then
+		if model:IsA("Model") and KaijuTaming.ready(model) and os.clock() >= (catchCooldowns[model] or 0) then
 			local humanoid = model:FindFirstChildOfClass("Humanoid")
 			local body = model.PrimaryPart
 			if humanoid and body and (body.CFrame.Position - root.CFrame.Position).Magnitude <= TAME_RANGE then
@@ -2381,6 +2400,7 @@ local function refresh()
 	wantShown = #team > 0 and inOutpost and not blocked and not menu
 	gui.Enabled = wantShown
 	if not wantShown then
+		tameModel, tame.Visible = nil, false
 		return
 	end
 	local models = petModels()
@@ -2397,8 +2417,11 @@ local function refresh()
 	-- TAME.
 	local target, chance = tameTarget()
 	tameModel = target
-	tame.Visible = target ~= nil and not KaijuTaming.casting()
+	tame.Visible = target ~= nil and not KaijuTaming.casting() and not window.Gui.Enabled
+		and player:GetAttribute("MechPilot") == nil
 	if target then
+		catchName.Text = target:GetAttribute("KaijuName") or target.Name
+		catchStroke.Transparency = 0.1 + 0.25 * (0.5 + 0.5 * math.sin(os.clock() * 4))
 		tameOdds.Text = string.format("%d%% chance", math.floor(chance * 100 + 0.5))
 		local left = Kaiju.TameTries - (target:GetAttribute("KaijuTries") or 0)
 		tameTries.Text = string.format("%d tr%s left", left, if left == 1 then "y" else "ies")
@@ -2472,14 +2495,18 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 		say(GemClient.request("KaijuChallenge", model))
 	end)
 end)
-tame.Activated:Connect(function()
-	local target = tameModel
-	if not target then
+local function catchReady()
+	if not gui.Enabled or not tame.Visible or busy or KaijuTaming.casting() then
+		return
+	end
+	local target = tameTarget()
+	if not target or target ~= tameModel then
 		return
 	end
 	act(function()
 		local result = GemClient.request("KaijuTame", target)
 		if result and result.Casting then
+			catchCooldowns[target] = os.clock() + Kaiju.TameCooldown
 			-- The cast is on: its bar shows how it goes (KaijuTaming).
 			KaijuTaming.cast(target, result.Chance or 0, result.Seconds or Kaiju.Tame.Cast)
 			tame.Visible = false
@@ -2487,7 +2514,8 @@ tame.Activated:Connect(function()
 			say(result)
 		end
 	end)
-end)
+end
+tame.Activated:Connect(catchReady)
 
 local started = false
 function KaijuHud.start()
@@ -2495,6 +2523,13 @@ function KaijuHud.start()
 		return
 	end
 	started = true
+	ContextActionService:BindActionAtPriority("KaijuCatch", function(_, state)
+		if UserInputService:GetFocusedTextBox() or not gui.Enabled or not tame.Visible then
+			return Enum.ContextActionResult.Pass
+		end
+		if state == Enum.UserInputState.Begin then catchReady() end
+		return Enum.ContextActionResult.Sink
+	end, false, 3000, Enum.KeyCode.C)
 	KaijuTaming.start()
 	BodyHealth.start()
 	WildBars.start()

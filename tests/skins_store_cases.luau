@@ -48,7 +48,7 @@ local FreeRewards = shared("FreeRewards")
 
 -- Catalog -----------------------------------------------------------------------------
 local equipment = fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau")
-local KINDS = { Trim = true, Back = true, Skin = true, Suit = true, Pick = true, Visor = true, Helmet = true, Title = true }
+local KINDS = { Trim = true, Back = true, Skin = true, Shield = true, Suit = true, Pick = true, Visor = true, Helmet = true, Title = true }
 local skins, suits, titles, picks, visors, helmets = 0, 0, 0, 0, 0, 0
 local helmetSource = fs.readFile(ROOT .. "/src/server/Systems/HelmetLooks.luau")
 -- Visors: what each rarity promises.

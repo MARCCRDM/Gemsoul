@@ -220,7 +220,7 @@ end
 check(mean(outer) > mean(inner) + 0.4, "Outcrops aren't bigger further out")
 -- About as many rocks as the six trails had (the same budget), after the
 -- roads and buildings take theirs.
-check(kept / 6 >= 95 and kept / 6 <= 140, "Not about the frontier's number of rocks: " .. kept / 6)
+check(kept / 6 >= 190 and kept / 6 <= 270, "Expanded frontier rock density is out of range: " .. kept / 6)
 check(#Frontier.outcrops(Random.new(5)) == #Frontier.outcrops(Random.new(5)), "Outcrops differ from one seed")
 
 -- Rift Veins -----------------------------------------------------------------------------------------------
@@ -229,7 +229,7 @@ check(#sites == Frontier.Veins.Sites, "Not every vein site")
 for i, angle in sites do
 	local rocks, scar = Frontier.veinAt(angle, rng)
 	check(#rocks == Frontier.Veins.Rocks, "A vein without its six rocks")
-	check(flat(scar) >= Frontier.Rim and flat(scar) < 440, "A vein's rift isn't by the walls")
+	check(flat(scar) >= Frontier.Rim and flat(scar) < Frontier.Rim + 12, "A vein's rift isn't by the walls")
 	for k, p in rocks do
 		check(flat(p) < Frontier.Rim and flat(p) > Frontier.EdgeFrom, "A vein rock out of the edge")
 		check((p - scar).Magnitude < 45, "A vein rock far from its rift")

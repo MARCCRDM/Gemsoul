@@ -2271,7 +2271,8 @@ local function packFor(): Pack?
 	end
 	for _ = 1, 80 do
 		local a = rng:NextNumber(0, math.pi * 2)
-		local r = rng:NextNumber(Frontier.Core + 30, Frontier.Rim - 45)
+		-- Area-weighted dens give the wider outer ground its share of wildlife.
+		local r = math.sqrt(rng:NextNumber((Frontier.Core + 30) ^ 2, (Frontier.Rim - 45) ^ 2))
 		local den = middle + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 		if apartFrom(den) then
 			-- (A kind that roams that far out, Kaiju.wildKinds, and no other

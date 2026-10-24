@@ -2965,7 +2965,6 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	if applySkin and (not only or only == "Weapon") then
 		applySkin(weaponFolder, skin.Color, skin.Palette)
 	end
-	-- A helmet skin keeps its own colours through the gem, rarity and
 	local shieldSkin = cosmetics and Cosmetics.get(cosmetics.Shield)
 	local heldShield = folder:FindFirstChild("Shield")
 	if shieldSkin and shieldSkin.Kind == "Shield" and heldShield and (not only or only == "Shield") then
@@ -3268,7 +3267,9 @@ function Equipment.cosmeticPreview(id: string): boolean
 	task.wait()
 	local origin = rig:GetPivot()
 	local cosmetics = { Owned = {}, [cosmetic.Kind] = id }
-	local ok, folder = pcall(dress, rig, PREVIEW_KIT, cosmetics, 0)
+	local previewKit = table.clone(PREVIEW_KIT)
+	if cosmetic.Kind == "Shield" then previewKit.Shield = "ArmorJuggernautShield1" end
+	local ok, folder = pcall(dress, rig, previewKit, cosmetics, 0)
 	local source = ok
 		and folder
 		and (

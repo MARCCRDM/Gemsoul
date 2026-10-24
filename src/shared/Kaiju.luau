@@ -331,7 +331,7 @@ Kaiju.RecallSeconds = 4 -- recalled: it stays out of the fight this long
 
 -- Wild kaiju in the Outpost.
 Kaiju.Wild = {
-	Max = 8, -- roaming at once (and the guarded Rift Vein's guardian: Shared.Frontier.Guardian)
+	Max = 12, -- six roaming pairs across the expanded quarry, plus the vein guardian
 	Pack = 2, -- of them to a pack, sharing a den out in the frontier
 	Apart = 90, -- studs between dens
 	-- Claimed patches: most packs den beside an outcrop (Shared.Frontier.Outcrop)

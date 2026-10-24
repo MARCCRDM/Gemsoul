@@ -36,6 +36,9 @@ check(
 )
 check(far:FindFirstChildOfClass("Highlight") == nil, "A kaiju across the quarry glows")
 check(Taming.ready(weak) and not Taming.ready(healthy), "ready() is wrong")
+weak:SetAttribute("KaijuTries", Kaiju.TameTries)
+check(not Taming.ready(weak), "Exhausted catch attempts must not show ready")
+weak:SetAttribute("KaijuTries", 0)
 -- It pulses.
 local before = glow.FillTransparency
 frames(0.2)
@@ -127,8 +130,8 @@ phoneMode = true
 local phoneWeak = wildKaiju("Wild Ion Razorback", Vector3.new(-24, 3, 0), 0.3)
 frames(0.3)
 local small = boardFor(phoneWeak)
-check(small and small.Size.X.Offset <= 140 and small.Size.Y.Offset <= 22, "The ready words aren't smaller on a phone")
-check(small:FindFirstChildOfClass("TextLabel").TextSize <= 12, "The ready words' text isn't smaller on a phone")
+check(small and small.Size.X.Offset == 180 and small.Size.Y.Offset == 30, "Mobile readiness should have a readable billboard")
+check(small:FindFirstChildOfClass("TextLabel").TextSize >= 14, "Mobile readiness text is too small")
 phoneWeak.Parent = nil
 frames(0.3)
 phoneMode = false

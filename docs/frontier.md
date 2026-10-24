@@ -49,7 +49,10 @@ tell you where you are.
 ## Outcrops
 
 Past the core's rocks, from 100 studs out to 412, the rocks grow in
-**outcrops**: 46 of them, at least 36 studs apart. An outcrop is a short
+**outcrops**: 72 of them, at least 36 studs apart, reaching 522 studs from
+the center. The expanded quarry supports 12 wild kaiju in six pairs and
+9 landmarks per biome, with outer-ring scenery beyond the old 440-stud
+radius. The central safe area remains unchanged. An outcrop is a short
 row of rocks (one every 13.5 to 15 studs) along a grain of its own, with
 dark seams in the ground joining them, so you can see it's one outcrop:
 

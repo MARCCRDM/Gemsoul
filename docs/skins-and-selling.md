@@ -49,10 +49,10 @@ Every skin, suit and pickaxe for sale, and the bundles, are listed in
 | --- | --- | --- |
 | Bring 1 friend | **Kindred Edge** (Legendary weapon skin, only from here) | `Systems/Referrals` |
 | Bring 2 friends | Twin Star (pickaxe) | `Systems/Referrals` |
-| Bring 3 friends | Crusader's Standard (back piece) | `Systems/Referrals` |
+| Bring 3 friends | Starlink Visor (animated sapphire/violet/gold lens) | `Systems/Referrals` |
 | Bring 4 friends | Crusader Gold (weapon skin) | `Systems/Referrals` |
 | Bring 5 friends | Crusader Plate (suit) | `Systems/Referrals` |
-| Bring 10 friends | CRUSADER LEGEND (title) | `Systems/Referrals` |
+| Bring 10 friends | Celestial Aegis (shield skin, separate from sword skins) | `Systems/Referrals` |
 | Join the Roblox group | Starforged (weapon skin) | `Systems/FreeRewards` |
 | Log in 7 days in a row | Daybreak (weapon skin) | `PlayerData` (the daily streak) |
 | Redeem a promo code | whatever the code gives (LAUNCH: the FOUNDER title) | `Systems/Codes` |

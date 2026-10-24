@@ -56,7 +56,7 @@ local KIND_TITLE = {
 	Back = "BACKS",
 	Title = "TITLES",
 }
-local KIND_WIDTH = { Suit = 98, Skin = 150, Helmet = 116, Visor = 108, Pick = 124, Trim = 92, Back = 92, Title = 98 }
+local KIND_WIDTH = { Suit = 98, Skin = 150, Shield = 150, Helmet = 116, Visor = 108, Pick = 124, Trim = 92, Back = 92, Title = 98 }
 local KIND_STANDARD = {
 	Suit = "Your armour in its own colours, as crafted.",
 	Skin = "Your weapon in its own colours, as forged.",
@@ -558,10 +558,16 @@ local function build(canvas: Instance)
 	ui.Sub = text(window, "", 11, C.Dim, HEADING, 30, 50, 400, 14)
 	ui.Tabs = {}
 	-- (Right of the title: eight tabs take the rest of the row.)
-	local tx = 316
+	local tabStrip = new("ScrollingFrame", {
+		BackgroundTransparency = 1, BorderSizePixel = 0,
+		Position = UDim2.fromOffset(316, 20), Size = UDim2.fromOffset(WIN_W - 390, 42),
+		ScrollingDirection = Enum.ScrollingDirection.X, ScrollBarThickness = 3,
+		CanvasSize = UDim2.fromOffset(0, 0),
+	}, window)
+	local tx = 0
 	for _, kind in KINDS do
 		local w = KIND_WIDTH[kind]
-		local tab = button(window, KIND_TITLE[kind], tx, 22, w, 32)
+		local tab = button(tabStrip, KIND_TITLE[kind], tx, 2, w, 32)
 		tab.Name = kind .. "Tab"
 		tab.Font = HEAVY
 		ui.Tabs[kind] = tab
@@ -573,6 +579,7 @@ local function build(canvas: Instance)
 		end)
 		tx += w + 8
 	end
+	tabStrip.CanvasSize = UDim2.fromOffset(tx, 0)
 	local close = button(window, "", WIN_W - 58, 18, 38, 38)
 	close.Name = "Close"
 	IronUi.cross(close, 14, C.Text)

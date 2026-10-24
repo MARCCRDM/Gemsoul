@@ -51,7 +51,8 @@ end
 
 -- Can this wild kaiju be tamed now: alive, down to half, nobody taming it?
 function KaijuTaming.ready(model: Model): boolean
-	if not model:GetAttribute("KaijuWild") or model:GetAttribute("KaijuTameBy") ~= nil then
+	if not model:GetAttribute("KaijuWild") or model:GetAttribute("KaijuTameBy") ~= nil
+		or (model:GetAttribute("KaijuTries") or 0) >= Kaiju.TameTries then
 		return false
 	end
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
@@ -87,7 +88,7 @@ local function markOf(model: Model, root: BasePart): Mark
 		AlwaysOnTop = true,
 		LightInfluence = 0,
 		MaxDistance = SHOW,
-		Size = if phone then UDim2.fromOffset(130, 20) else UDim2.fromOffset(200, 30),
+		Size = if phone then UDim2.fromOffset(180, 30) else UDim2.fromOffset(220, 34),
 		StudsOffsetWorldSpace = Vector3.new(0, height * 0.5 + 1.4, 0),
 		SizeOffset = Vector2.new(0, 1.3),
 	}, player:WaitForChild("PlayerGui"))
@@ -95,7 +96,7 @@ local function markOf(model: Model, root: BasePart): Mark
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		Font = Enum.Font.GothamBlack,
-		TextSize = if phone then 11 else 15,
+		TextSize = if phone then 14 else 16,
 		TextColor3 = GOLD,
 		TextStrokeColor3 = Color3.fromRGB(40, 26, 0),
 		TextStrokeTransparency = 0.2,

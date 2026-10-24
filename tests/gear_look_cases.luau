@@ -890,6 +890,17 @@ do
 	check(fromSword == 0, string.format("%s: %d of the sword's parts are on the suit's stand", id, fromSword))
 end
 
+do
+	local _, dressed = wear(nil, { Shield = "ShieldAegis", Skin = "SkinKindred", Visor = "VisorStarlink" })
+	local shield = dressed:FindFirstChild("Shield")
+	check(shield and shield:FindFirstChild("AegisStar", true), "Referral shield is missing its sapphire star")
+	check(shield:FindFirstChild("AegisWing", true) ~= nil, "Referral shield has no wing details")
+	check(dressed:FindFirstChild("Weapon"):FindFirstChild("AegisStar", true) == nil, "Shield skin decorated the sword")
+	check(Equipment.cosmeticPreview("ShieldAegis"), "Referral shield preview failed")
+	local preview = game:GetService("ReplicatedStorage"):FindFirstChild("CosmeticPreviews"):FindFirstChild("ShieldAegis")
+	check(preview and preview:FindFirstChild("AegisStar", true), "Referral shield preview is missing its details")
+end
+
 print(
 	string.format(
 		"PASS: %d gear look checks (stones on every gemmed piece, %d suits trimmed in real parts, %d skins held in first person, %d visor looks on 15 helmets, %d banded, %d helmet skins worn, nothing a preview can't draw)",

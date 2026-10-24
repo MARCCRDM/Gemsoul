@@ -95,11 +95,21 @@ for _,service in {site.Board,site.Stations.Store,site.Stations.Market} do
  assert(inShelter(service.CFrame.Position-origin.Position),"A service outside the Shelter: "..service.Name)
 end
 assert(site.Stations.Store.CanCollide and site.Stations.Market.CanCollide,"The Store and Market counters aren't solid")
-assert(Rules.Radius==440 and Rules.NodeCount==210 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
+assert(Rules.Radius==550 and Rules.Edge==584 and Rules.NodeCount==330 and Rules.FieldNodeCount==0,"Lobby bounds/population mismatch")
 -- Every spot holds a rock: the field round the middle, the outcrops out
 -- to the walls (Shared.Frontier) and the three Rift Veins.
 local population=math.min(Rules.NodeCount,#site.Spots)
-assert(#site.Spots>=170 and #site.Spots<=210 and population==#site.Spots,"Not about the old number of mining sites, or more than the cap: "..#site.Spots)
+assert(#site.Spots>=240 and #site.Spots<=330 and population==#site.Spots,"Expanded mining sites missing or beyond cap: "..#site.Spots)
+local outerMining,outerQuadrants=0,{}
+for _,index in site.OutcropSpots do
+ local p=site.Spots[index].Position-origin.Position
+ if Vector3.new(p.X,0,p.Z).Magnitude>440 then
+  outerMining+=1
+  outerQuadrants[(if p.X>=0 then "E" else "W")..(if p.Z>=0 then "S" else "N")]=true
+ end
+end
+assert(outerMining>=30,"The new outer ground needs mining clusters")
+assert(outerQuadrants.ES and outerQuadrants.EN and outerQuadrants.WS and outerQuadrants.WN,"Outer mining missing from a quadrant")
 assert(#site.OutcropSpots>=90 and #site.Veins==Frontier.Veins.Count and #site.Scars==Frontier.Veins.Count,"The outcrops or veins are missing")
 assert(#site.VeinSites>=8,"Too few places for a vein to move to: "..#site.VeinSites)
 for v,vein in site.Veins do
@@ -150,7 +160,7 @@ for _,p in builtParts do
  end
  if name=="Shelter" then motor+=1 end
  if name=="Outpost" then base+=1 end
- if p.CanCollide and p.Size.Y==1040 and p.Size.Z==1040 then floor=p end
+ if p.CanCollide and p.Size.Y==(Rules.Radius+80)*2 and p.Size.Z==(Rules.Radius+80)*2 then floor=p end
  assert(p.Name~="GrassSurface" and p.Name~="MeadowCloudBank" and p.Name~="Secret","Old lobby/retired secrets leaked")
 end
 assert(floor and math.abs(floor.CFrame.t[2]+floor.Size.X/2)<.001,"Quarry floor missing or wrong height")

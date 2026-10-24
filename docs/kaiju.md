@@ -387,7 +387,8 @@ but never on top of each other.
 
 ![The team strip on a phone with AUTO HEAL on, and the HEAL tab](kaiju/hud.png)
 
-On a computer the strip sits at the bottom left, CATCH above it:
+On a computer the strip sits at the bottom left; the CATCH prompt appears
+above the combat HUD near the bottom center:
 [the lobby on a computer](kaiju/hud-desktop.png).
 
 - **The team strip:** a tile for each of your team, the lead first (edged in
@@ -592,7 +593,12 @@ ready to be caught, it **glows gold** (a pulsing outline you can see
 through rocks) with **READY TO CATCH** and the chance over it. Anyone within
 140 studs sees that.
 
-Then tap **CATCH**. Catching is a **cast** of 2.5 seconds (`Kaiju.Tame`):
+Press **C** on desktop or tap **TAP TO CATCH** on mobile. A gold prompt
+shows the target, odds and remaining attempts only when an eligible kaiju
+is within range. Desktop C takes priority over the character-menu shortcut
+while the prompt is visible, but not while typing. The prompt hides during
+the cast, retry cooldown, menus, or when capacity/attempts are exhausted.
+Catching is a **cast** of 2.5 seconds (`Kaiju.Tame`):
 
 - A beam of gold light runs from your hand to it, and motes of light
   spiral in round it, closing in as the cast goes on. Everyone near sees

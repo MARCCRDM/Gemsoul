@@ -1346,7 +1346,7 @@ for i, pack in packs do
 	end
 	for j, other in packs do
 		if j ~= i then
-			check((other.Den - pack.Den).Magnitude >= 110, "Two dens side by side")
+			check((other.Den - pack.Den).Magnitude >= Kaiju.Wild.Apart, "Two dens side by side")
 			check(other.Species ~= pack.Species, "Two packs of one kind")
 		end
 	end
@@ -1354,6 +1354,13 @@ for i, pack in packs do
 		check(member.Species == pack.Species and member.Pack == pack, "A pack of mixed kinds")
 		check((member.Enemy.Root.Position - pack.Den).Magnitude < 12, "A packmate far from its den")
 	end
+end
+do
+	local outer = 0
+	for _, pack in packs do
+		if FrontierRules.distance(pack.Den, outpost) > 440 then outer += 1 end
+	end
+	check(outer > 0, "Wild kaiju did not populate the expanded outer ground")
 end
 local enemy = wilds[1]
 local wild = KaijuWilds._wilds[enemy]
@@ -2704,7 +2711,7 @@ end
 local function across(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
 end
-check(Kaiju.Wild.Max == 8 and Kaiju.Wild.Pack == 2, "Not 8 wild kaiju roaming, in pairs")
+check(Kaiju.Wild.Max == 12 and Kaiju.Wild.Pack == 2, "Expanded quarry should support 12 wild kaiju in pairs")
 local Guarded = Frontier.Veins.Guarded
 local veinScar = CFrame.new(center + Vector3.new(0, 0, -(Frontier.Rim + 2)))
 KaijuWilds._setGuardAt(veinScar)

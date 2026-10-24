@@ -266,7 +266,7 @@ Cosmetics.List = {
 	VisorStarlink = {
 		Id = "VisorStarlink", Kind = "Visor", Name = "Starlink Visor",
 		Description = "An aurora lens flowing from sapphire to violet and gold, with a luminous rim. Bring 3 friends.",
-		Rarity = "UltraRare", Color = Color3.fromRGB(110, 205, 255), Exclusive = "Invite",
+		Rarity = "Legendary", Color = Color3.fromRGB(110, 205, 255), Exclusive = "Invite",
 		Visor = {
 			Color = Color3.fromRGB(65, 180, 255), Material = "Neon",
 			Glow = Color3.fromRGB(170, 90, 255), Third = Color3.fromRGB(255, 215, 100),

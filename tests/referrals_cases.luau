@@ -121,10 +121,10 @@ local stubs = {
 			local kinds = {
 				SkinKindred = "Skin",
 				PickTwinStar = "Pick",
-				BackStandard = "Back",
+				VisorStarlink = "Visor",
 				SkinCrusader = "Skin",
 				SuitCrusader = "Suit",
-				TitleLegend = "Title",
+				ShieldAegis = "Shield",
 			}
 			return if kinds[id] then { Id = id, Kind = kinds[id], Name = id } else nil
 		end,
@@ -261,12 +261,12 @@ for friendId = 31, 33 do
 	join(makePlayer(friendId, 30))
 end
 local owned = profiles[recruiter].Cosmetics
-check(owned.Owned.SkinKindred and owned.Owned.PickTwinStar and owned.Owned.BackStandard, "Three friends didn't unlock the first three tiers")
+check(owned.Owned.SkinKindred and owned.Owned.PickTwinStar and owned.Owned.VisorStarlink, "Three friends didn't unlock the first three tiers")
 check(
-	not owned.Owned.SkinCrusader and not owned.Owned.SuitCrusader and not owned.Owned.TitleLegend,
+	not owned.Owned.SkinCrusader and not owned.Owned.SuitCrusader and not owned.Owned.ShieldAegis,
 	"Three friends unlocked a higher tier"
 )
-check(owned.Skin == "SkinKindred" and owned.Pick == "PickTwinStar" and owned.Back == "BackStandard", "The tier rewards weren't worn")
+check(owned.Skin == "SkinKindred" and owned.Pick == "PickTwinStar" and owned.Visor == "VisorStarlink", "The tier rewards weren't worn")
 join(makePlayer(34, 30))
 check(owned.Owned.SkinCrusader and owned.Skin == "SkinCrusader", "The fourth friend didn't unlock (and put on) Crusader Gold")
 check(owned.Owned.SkinKindred, "Kindred Edge was lost on reaching the next tier")
@@ -284,6 +284,10 @@ for _, note in notes do
 	told = told or (note.Player == recruiter and string.find(note.Text, "coupons", 1, true) ~= nil)
 end
 check(told, "The inviter wasn't told about the coupons")
+for friendId = 301, 306 do join(makePlayer(friendId, 30)) end
+check(owned.Owned.ShieldAegis and owned.Shield == "ShieldAegis", "Ten friends must unlock and wear the shield")
+check(owned.Visor == "VisorStarlink" and owned.Skin == "SkinCrusader", "Shield reward replaced another cosmetic slot")
+check(not owned.Owned.BackStandard and not owned.Owned.TitleLegend, "Retired invitation rewards were still granted")
 
 -- A failed save is tried again: the friend still counts.
 local patient = makePlayer(40, 0)

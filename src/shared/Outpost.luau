@@ -43,12 +43,12 @@ Outpost.Location = CFrame.new(0, 0, 7000)
 -- (Client.ShelterLife, Client.StoreDisplays).
 Outpost.ShelterLift = 8
 Outpost.ShelterRamp = 40
-Outpost.Radius = 440 -- quarry rim; recovery allows the surrounding benches
+Outpost.Radius = 550 -- quarry rim; recovery allows the surrounding benches
 -- Where the world ends for now: the invisible walls round the quarry
 -- (Server OutpostWorld), and the dome over them that says the expansion's
 -- coming (Client.EdgeDome).
-Outpost.Edge = 474
-Outpost.NodeCount = 210 -- rocks out at once (every spot: the field round the middle, the outcrops and the Rift Veins)
+Outpost.Edge = Outpost.Radius + 34
+Outpost.NodeCount = 330 -- room for the expanded quarry's seams, welcome field and Rift Veins
 Outpost.FieldNodeCount = 0 -- this lobby uses the common quarry sites
 Outpost.ClaimSeconds = 8 -- a rock stays with its first hitter this long after each swing
 Outpost.Reach = 11 -- studs from the rock you can swing from

@@ -774,7 +774,7 @@ end
 
 local DIRT = Color3.fromRGB(92, 86, 84)
 local CONCRETE = Color3.fromRGB(86, 90, 98)
-local QUARRY = 440 -- where the stepped quarry walls start (Shared.Outpost.Radius)
+local QUARRY = if OutpostWorld.Rules then OutpostWorld.Rules.Radius else 550
 -- Where a vein's dormant rift sits: its Rift Gate, a way into the
 -- critters' own world (Server.RiftServer). Scorched ground with cracks of
 -- that world's fire running out from it, and over it an arch of black,
@@ -945,7 +945,7 @@ local function craterRim(parent, at: CFrame)
 			local relief = math.sin(angle * 3 + 0.4) * 25 + math.sin(angle * 5 - 0.7) * 14
 			local erosion = (0.5 + 0.5 * math.sin(angle * 11 + 0.8)) ^ 4
 			local weight = if band == 1 then 0 else if band == 2 then 0.24 else if band == 6 then 0.25 else 1
-			local radius = spec[1] + weight * (math.sin(angle * 3) * 22 + math.sin(angle * 7 + band * 0.7) * 14)
+			local radius = spec[1] + (QUARRY - 440) + weight * (math.sin(angle * 3) * 22 + math.sin(angle * 7 + band * 0.7) * 14)
 			local channelDepth = if band == 3 then 26 else 12
 			local height = spec[2] + weight * (relief - erosion * channelDepth + math.sin(angle * 9 + band) * 5)
 			local bearing = angle + weight * math.sin(angle * 6 + band) * 0.018
@@ -969,9 +969,9 @@ local function craterRim(parent, at: CFrame)
 	-- Low, half-buried fragments break up the join with the worked quarry benches.
 	for i = 0, 47 do
 		local angle = (i + rng:NextNumber(-0.25, 0.25)) / 48 * math.pi * 2
-		local radius = rng:NextNumber(481, 495)
+		local radius = rng:NextNumber(QUARRY + 41, QUARRY + 55)
 		local width = rng:NextNumber(8, 18)
-		local rockAt = at * CFrame.new(math.cos(angle) * radius, 16 + (radius - 481) * 0.35, math.sin(angle) * radius)
+		local rockAt = at * CFrame.new(math.cos(angle) * radius, 16 + (radius - QUARRY - 41) * 0.35, math.sin(angle) * radius)
 			* CFrame.Angles(rng:NextNumber(-0.3, 0.3), angle, rng:NextNumber(-0.25, 0.25))
 		local height = rng:NextNumber(5, 9)
 		local color = REGOLITH:Lerp(RIM, rng:NextNumber(0.2, 0.65))
@@ -1164,7 +1164,7 @@ local LANDMARK = { Ashfall = vent, Rimefrost = spires, Stormglass = pylon, Bligh
 -- its look counts LANDMARK_DEEP or more, clear of its swaying borders):
 -- BIOME_LANDMARKS of them where `clear` says there's room; returns where
 -- they stand, as { Vector3, studs } to keep the rocks off.
-local BIOME_LANDMARKS, LANDMARK_DEEP = 6, 0.95
+local BIOME_LANDMARKS, LANDMARK_DEEP = 9, 0.95
 local function biomeGround(parent, at: CFrame, rng, Frontier, clear: (Vector3, number) -> boolean): { any }
 	local taken = {}
 	for index, biome in Frontier.Biomes do
@@ -1173,7 +1173,9 @@ local function biomeGround(parent, at: CFrame, rng, Frontier, clear: (Vector3, n
 		while placed < BIOME_LANDMARKS and tries < 400 do
 			tries += 1
 			local a = biome.Angle + rng:NextNumber(-math.pi / 3, math.pi / 3)
-			local r = rng:NextNumber(Frontier.Core + 35, 370)
+			-- Reserve three landmarks per biome for the newly opened outer ground.
+			local from = if placed >= 6 then 440 else Frontier.Core + 35
+			local r = math.sqrt(rng:NextNumber(from ^ 2, (Frontier.Rim - 35) ^ 2))
 			local offset = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 			local p = (at * CFrame.new(offset)).Position
 			local roomy = Frontier.biomeMix(offset)[index] >= LANDMARK_DEEP and clear(p, 0)
@@ -2325,7 +2327,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local root = Instance.new("Model")
 	root.Name = "SagaOutpost"
 	root:SetAttribute("Landscape", "Moon Quarry")
-	root:SetAttribute("LandscapeVersion", 4)
+	root:SetAttribute("LandscapeVersion", 5)
 	root:SetAttribute("SkySetting", "MoonBase")
 	local rng = Random.new(4242)
 	local ground = folder(root, "Ground")
@@ -2334,9 +2336,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- natural crater rim. Invisible boundary walls stay beyond the benches.
 	-- (Under the Loop's terrain, it's what you stand on: biomeTerrain hides
 	-- it once that's laid.)
-	local floor = solid(disc(ground, at * CFrame.new(0, -1, 0), 520, 2, REGOLITH, Enum.Material.Slate))
+	local floor = solid(disc(ground, at * CFrame.new(0, -1, 0), QUARRY + 80, 2, REGOLITH, Enum.Material.Slate))
 	for _ = 1, 90 do
-		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(10, 430)
+		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(10, QUARRY - 10)
 		local radius = rng:NextNumber(10, 34)
 		local color = REGOLITH:Lerp(REGOLITH_DARK, rng:NextNumber(0.1, 0.5))
 		-- (Out past the core, the ground's the biomes' own: biomeTerrain.)
@@ -2372,14 +2374,14 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	craterRim(ground, at)
 	-- (The edge, for now: Shared.Outpost.Edge. Each player's client draws
 	-- the dome over it as they come near: Client.EdgeDome.)
-	local edge = if OutpostWorld.Rules and OutpostWorld.Rules.Edge then OutpostWorld.Rules.Edge else 474
+	local edge = if OutpostWorld.Rules and OutpostWorld.Rules.Edge then OutpostWorld.Rules.Edge else QUARRY + 34
 	for i = 0, 71 do
 		local a = i / 72 * math.pi * 2
 		local w = solid(
 			part(
 				ground,
 				at * CFrame.new(math.cos(a) * edge, 40, math.sin(a) * edge) * CFrame.Angles(0, -a, 0),
-				Vector3.new(4, 80, 44),
+				Vector3.new(4, 80, 2 * edge * math.tan(math.pi / 72) + 3),
 				RIM,
 				nil,
 				nil,
@@ -2397,7 +2399,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local roadLines = {}
 	for _, a in Frontier.Spokes do
 		local from = (at * CFrame.new(math.cos(a) * 104, 0, math.sin(a) * 104)).Position
-		local to = (at * CFrame.new(math.cos(a) * 420, 0, math.sin(a) * 420)).Position
+		local to = (at * CFrame.new(math.cos(a) * (QUARRY - 20), 0, math.sin(a) * (QUARRY - 20))).Position
 		road(roads, from, to, 18)
 		table.insert(roadLines, { from, to })
 	end

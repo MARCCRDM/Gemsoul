@@ -119,7 +119,7 @@ local Frontier = {}
 
 Frontier.Core = 150 -- studs from the middle: inside, no rifts
 Frontier.EdgeFrom = 300
-Frontier.Rim = 428 -- the furthest out a rock or a rift goes (the walls start at 440)
+Frontier.Rim = 538 -- mining/rift limit, 12 studs inside the 550-stud quarry rim
 Frontier.Safe = 12 -- critters give up on prey this far inside the core
 
 local CYAN = Color3.fromRGB(110, 220, 255)
@@ -246,7 +246,7 @@ local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 --   Colors  each material's colour (Terrain:SetMaterialColor)
 Frontier.Ground = {
 	Cell = 4,
-	Reach = 452,
+	Reach = 562,
 	Depth = 8,
 	Sway = { 0.24, 0.12 },
 	Waves = { 1 / 70, 1 / 31 },
@@ -277,8 +277,8 @@ Frontier.Ground = {
 -- the core.
 Frontier.Outcrop = {
 	From = 100,
-	To = 412,
-	Count = 46,
+	To = Frontier.Rim - 16,
+	Count = 72,
 	Apart = 36,
 	Step = 13.5,
 	Lone = 0.15,
@@ -743,8 +743,17 @@ function Frontier.outcrops(rng): ({ any }, { Vector3 })
 			for k = 1, count do
 				local t = steps[k] - steps[count] / 2
 				local p = middle + along * t + across * rng:NextNumber(-2.5, 2.5)
+				-- Keep the welcome stepping-stone corridors free of dense seams;
+				-- otherwise one blocked mouth can starve all later lone-rock placement.
+				local entrance = false
+				for _, angle in Frontier.Spokes do
+					local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
+					local distance = p:Dot(out)
+					if distance > Frontier.Core - 12 and distance < Frontier.Core + 47
+						and (p - out * distance).Magnitude < 48 then entrance = true end
+				end
 				-- (None past the frontier's edge: that end is cut short.)
-				if p.Magnitude <= o.To then
+				if p.Magnitude <= o.To and not entrance then
 					table.insert(list, p)
 				end
 			end
