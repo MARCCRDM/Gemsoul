@@ -1480,11 +1480,7 @@ local function prompt(
 	seconds: number,
 	accent: Color3,
 	onAnswer: (boolean) -> (),
-<<<<<<< HEAD
 	inviteReward: string?
-=======
-	acceptText: string?
->>>>>>> a9b4802824fcea389a88ae3684a58949f60a6b33
 ): () -> ()
 	local card = new("Frame", {
 		BackgroundColor3 = P.Frame,
@@ -1521,11 +1517,7 @@ local function prompt(
 		card:Destroy()
 		onAnswer(accept)
 	end
-<<<<<<< HEAD
 	local yes = chip(card, if inviteReward then "Join" else "Accept", P.Good, function()
-=======
-	local yes = chip(card, acceptText or "Accept", P.Good, function()
->>>>>>> a9b4802824fcea389a88ae3684a58949f60a6b33
 		answer(true)
 	end, 100)
 	yes.Position = UDim2.fromOffset(62, 68)
@@ -1871,15 +1863,8 @@ local function showFaceoff(info)
 		else "FRIENDLY " .. string.upper(info.Mode)
 	faceKind.Text = if rules and rules.Label then kind .. "  ·  " .. rules.Label else kind
 	if info.Called then
-<<<<<<< HEAD
 		-- Pulled in from the lobby (Shared.AutoQueue): what's in it for you.
 		faceKind.Text ..= string.format(if info.BonusUpfront then "  ·  JOIN BONUS +%d ◆" else "  ·  CALLED IN: WIN +%d ◆", info.Bonus or 0)
-=======
-		-- Joined from the lobby (Shared.AutoQueue): the bonus is already paid.
-		faceKind.Text ..= if (info.Bonus or 0) > 0
-			then string.format("  ·  JOINED: +%d ◆ PAID", info.Bonus)
-			else "  ·  JOINED FROM THE LOBBY"
->>>>>>> a9b4802824fcea389a88ae3684a58949f60a6b33
 	end
 	faceLeft.Text, faceRight.Text = names(mine), names(theirs)
 	if info.Rounds then
@@ -2087,56 +2072,25 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 			kaijuCards[a] = nil
 		end
 	elseif kind == "FillIn" and type(a) == "table" then
-<<<<<<< HEAD
 		-- All lobby fill-ins require this invitation, even old auto-on accounts.
-=======
-		-- Someone's waiting in a 1v1 queue and you're free in the lobby with
-		-- auto queue on (Shared.AutoQueue): join, paid up front? Nothing
-		-- happens unless you press JOIN.
->>>>>>> a9b4802824fcea389a88ae3684a58949f60a6b33
 		local id = tostring(a.Id)
 		if fillCards[id] then
 			fillCards[id]()
 		end
-		local bonus = if type(a.Bonus) == "number" then a.Bonus else 0
 		fillCards[id] = prompt(
 			"⚔",
-<<<<<<< HEAD
 			if a.Intro then "Help a new miner?" else "Join a 1v1?",
 			if a.Intro then string.format("%s is ready for their first fight.", tostring(a.Who))
 				else string.format("%s is waiting for a %s.", tostring(a.Who), tostring(a.Name)),
-=======
-			if a.Intro then "A new miner needs a first fight" else "Join a 1v1?",
-			if bonus > 0
-				then string.format(
-					"%s (rating %d) is waiting for a %s. Join now for +%d ◆, paid the moment you join.%s",
-					tostring(a.Who),
-					a.Rating or 0,
-					tostring(a.Name),
-					bonus,
-					if a.Ranked then " A loss costs you no rating." else ""
-				)
-				else string.format(
-					"%s (rating %d) is waiting for a %s.%s",
-					tostring(a.Who),
-					a.Rating or 0,
-					tostring(a.Name),
-					if a.Ranked then " A loss costs you no rating." else ""
-				),
->>>>>>> a9b4802824fcea389a88ae3684a58949f60a6b33
 			if type(a.Seconds) == "number" then a.Seconds else 15,
 			P.Gold,
 			function(accept)
 				fillCards[id] = nil
 				run("DuelFill", a.Id, accept)
 			end,
-<<<<<<< HEAD
 			if (a.Bonus or 0) <= 0 then "First-fight bonus already claimed"
 				elseif a.BonusUpfront then string.format("+%d coins when the match starts", a.Bonus)
 				else string.format("+%d bonus coins if you win", a.Bonus)
-=======
-			if bonus > 0 then string.format("Join +%d ◆", bonus) else "Join"
->>>>>>> a9b4802824fcea389a88ae3684a58949f60a6b33
 		)
 	elseif kind == "FillInOver" then
 		local id = tostring(a)

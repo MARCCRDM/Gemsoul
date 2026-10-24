@@ -261,7 +261,11 @@ do
 		seen[threat] = true
 		local m = BossLoot.spec(boss)
 		check(m.Element == boss.Element and m.Focus == boss.Loot and m.Name == boss.Name, boss.Id .. "'s cache")
-		check(RiftRun.bossHealth(1, boss) == RiftRun.Boss.Health * BossLoot.health(boss), boss.Id .. "'s health")
+		local starter = DungeonRules.starter(boss)
+		check(
+			math.abs(RiftRun.bossHealth(1, boss) - RiftRun.Boss.Health * BossLoot.health(boss) * (if starter then starter.Health else 1)) < 1e-9,
+			boss.Id .. "'s health"
+		)
 	end
 	check(seen[1] and seen[2] and seen[3], "Not every threat has a boss")
 	for t = 2, #BossLoot.Threats do
@@ -296,8 +300,14 @@ do
 		for i, boss in ladder do
 			local level = RiftRun.bossLevel({ 6 }, boss)
 			check(i == 1 or level > RiftRun.bossLevel({ 6 }, ladder[i - 1]), element .. "'s levels don't rise")
-			check(level == RiftRun.level({ 6 }, RiftRun.Rooms) + RiftRun.Level.Threat[boss.Threat], boss.Id .. "'s level")
-			check(RiftRun.bossLevel({ 99 }, boss) == RiftRun.Level.Max, boss.Id .. "'s level past the top")
+			local starter = DungeonRules.starter(boss)
+			if starter then
+				-- (A first boss: at its own low level, however strong the runners.)
+				check(level == starter.Level and RiftRun.bossLevel({ 99 }, boss) == starter.Level, boss.Id .. "'s level")
+			else
+				check(level == RiftRun.level({ 6 }, RiftRun.Rooms) + RiftRun.Level.Threat[boss.Threat], boss.Id .. "'s level")
+				check(RiftRun.bossLevel({ 99 }, boss) == RiftRun.Level.Max, boss.Id .. "'s level past the top")
+			end
 		end
 		check(RiftRun.isGroup(ladder[#ladder]) and not RiftRun.isGroup(ladder[1]), element .. "'s last boss isn't a group's")
 		check(RiftRun.canFight(element, ladder[1].Id, {}), element .. "'s first boss is locked")
@@ -323,6 +333,81 @@ do
 		check(onLadder[boss.Id], boss.Id .. " is on no ladder")
 	end
 	check(not RiftRun.canFight("Fire", "Paperotti", {}), "Another element's boss behind a gate")
+end
+
+-- First bosses: Chimpanzini Bananini and Bombardiro Drago, the first rung
+-- of their biomes' ladders, for a new miner on their own at level 2: no
+-- higher on the way (critters, fighters, the boss), fewer critters and
+-- fighters, no big ones, the lowest gear, a gentler boss, no warning for
+-- going alone. Every other boss as before.
+do
+	local starters = {}
+	for _, boss in DungeonRules.Bosses do
+		if DungeonRules.starter(boss) then
+			starters[boss.Id] = boss
+		end
+	end
+	check(starters.Chimpanzini and starters.Drago, "Chimpanzini and Drago aren't first bosses")
+	local count = 0
+	for _ in starters do
+		count += 1
+	end
+	check(count == 2, "Other bosses are first bosses too")
+	for id, boss in starters do
+		local s = DungeonRules.starter(boss)
+		check(s.Level == 2, id .. " isn't for level 2")
+		check(boss.Threat == 1 and RiftRun.ladder(boss.Element)[1] == boss, id .. " isn't the first on its ladder")
+		check(not RiftRun.isGroup(boss) and not RiftRun.solo(1, boss) and RiftRun.solo(1, RiftRun.bossById("Gattini")), id .. " warns about going alone")
+		for room = 1, RiftRun.Rooms + 1 do
+			for _, levels in { {}, { 1 }, { 6 }, { 30 } } do
+				check(RiftRun.level(levels, room, boss) <= s.Level, id .. "'s caves come above its level")
+			end
+		end
+		check(RiftRun.bossLevel({ 1 }, boss) == 2 and RiftRun.bossLevel({ 20 }, boss) == 2, id .. "'s own level")
+		for room = 1, RiftRun.Rooms do
+			local fewer = RiftRun.foeCount(room, 1, boss)
+			check(fewer <= RiftRun.foeCount(room, 1) and fewer >= 3, id .. ": more critters, or fewer than a kaiju team")
+			check(room == 1 or fewer < RiftRun.foeCount(room, 1), id .. ": no fewer critters past the first cave")
+			check(RiftRun.fighterCount(room, 1, boss) == 1 and RiftRun.fighterTier(room, boss) == 1, id .. "'s fighters")
+		end
+		check(RiftRun.bossHealth(1, boss) < RiftRun.bossHealth(1, RiftRun.bossById("Paperotti")), id .. " is as tough as another threat I")
+		local rng = Random.new(11)
+		for _ = 1, 50 do
+			for _, foe in RiftRun.pickFoes(RiftRun.Rooms, 1, rng, boss) do
+				check(not foe.Elite, id .. "'s caves have a big one")
+			end
+		end
+	end
+	-- (The others' levels as before: not capped.)
+	check(RiftRun.level({ 20 }, 1, RiftRun.bossById("Gattini")) == RiftRun.level({ 20 }, 1), "A boss's level capped that isn't a first boss")
+end
+
+-- Element tips and the bosses' bite (DungeonRules.elementTips, bossHit): every
+-- boss says what it is, what protects you (its own element in your armor),
+-- what beats it (its weakness in your sword) and what it punishes (the armor
+-- its element beats); a boss's hit on that armor lands harder than anyone
+-- else's on it.
+do
+	local ElementMatchup = load("ElementMatchup")
+	local labels = load("GemConfig").ElementLabels
+	for _, boss in DungeonRules.Bosses do
+		local tips = DungeonRules.elementTips(boss)
+		check(#tips.Lines == 4, boss.Id .. "'s tips")
+		check(tips.Weakness == boss.Weakness and tips.Hurts == ElementMatchup.Beats[boss.Element], boss.Id .. "'s tip elements")
+		check(string.find(tips.Lines[1], string.upper(labels[boss.Element]), 1, true), boss.Id .. ": no element in its tip")
+		check(string.find(tips.Lines[2], string.upper(labels[boss.Element]) .. " gems in your armor", 1, true), boss.Id .. ": no armor tip")
+		check(string.find(tips.Lines[3], "enchant with " .. string.upper(labels[boss.Weakness]), 1, true), boss.Id .. ": no enchant tip")
+		check(string.find(tips.Lines[4], string.upper(labels[tips.Hurts]) .. " armor", 1, true), boss.Id .. ": no warning tip")
+		-- Its hit on the armor it beats, against anyone's on it.
+		local weakArmor = { Resist = {}, Main = tips.Hurts }
+		local base = ElementMatchup.against(boss.Element, weakArmor)
+		local hit, tag = DungeonRules.bossHit(boss.Element, weakArmor)
+		check(tag == "Weak" and math.abs(hit - base * DungeonRules.BossWeak) < 1e-9 and hit > base, boss.Id .. " doesn't punish weak armor")
+		-- On its own element's armor: resisted as usual, no extra.
+		local ownArmor = { Resist = { [boss.Element] = 0.2 }, Main = boss.Element }
+		check(DungeonRules.bossHit(boss.Element, ownArmor) == ElementMatchup.against(boss.Element, ownArmor), boss.Id .. " punishes the right armor")
+	end
+	check(DungeonRules.BossWeak > 1 and DungeonRules.BossWeak <= 1.5, "The bosses' extra bite")
 end
 
 -- Falling, restoring, winning ---------------------------------------------------------------------------------
@@ -986,7 +1071,7 @@ end
 
 print(
 	string.format(
-		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen, each boss's realm; the KIT OUT bar under the strip; the gate's lobby; the down card's backup list; %d parts a trip)",
+		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, first bosses, element tips and the bosses' bite, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen, each boss's realm; the KIT OUT bar under the strip; the gate's lobby; the down card's backup list; %d parts a trip)",
 		checks,
 		#parts
 	)

@@ -5474,7 +5474,14 @@ end)()
 	local world = built[#built]
 	check((rootA.Position - world.Start.Position).Magnitude < 8, "They didn't arrive on the landing")
 	check(kit[a] == true and a:GetAttribute("Hunt") == true, "Not in their combat kit going into the Rift")
-	check(noted(a, "You're in the Rift alone"), "Not warned in there about going alone")
+	-- (Alone: warned, unless it's a first boss, recommended solo; either way
+	-- told what to bring against its element.)
+	if DungeonRules.starter(run.Boss) then
+		check(noted(a, "a first boss, recommended solo at level 2") and not noted(a, "You're in the Rift alone"), "A first boss warned about going alone")
+	else
+		check(noted(a, "You're in the Rift alone"), "Not warned in there about going alone")
+	end
+	check(noted(a, "Gems give you protection") and noted(a, "To defeat it, enchant with"), "Not told what to bring against the boss")
 	check(not enter(a, 2).Ok, "Into the Rift twice")
 	check(not FrontierServer._eligible(a), "The Outpost's critters still come for someone in the Rift")
 	-- On the landing, nothing's up yet; into the first cave, its pack is.
@@ -5499,7 +5506,7 @@ end)()
 	end
 	-- Walking in, the pack's on its way through the cave's floor: counted on
 	-- the strip, and the cave not clear for being empty yet.
-	local pack = RiftRun.foeCount(1, 1) + RiftRun.fighterCount(1, 1)
+	local pack = RiftRun.foeCount(1, 1, run.Boss) + RiftRun.fighterCount(1, 1, run.Boss)
 	local tearsBefore = #tears
 	walkIn(a, world.Rooms[1], true)
 	check(run.Coming == pack and foesLeft(run) == 0, "The first cave's pack isn't on its way: " .. run.Coming)
@@ -5528,7 +5535,7 @@ end)()
 		if i > 1 then
 			check(tear.Time > mine[i - 1].Time, "Tears all at once")
 		end
-		local leaderTear = i > RiftRun.foeCount(1, 1)
+		local leaderTear = i > RiftRun.foeCount(1, 1, run.Boss)
 		check(tear.Opts.Height == (if leaderTear then RiftRun.Portal.Leader else nil), "A tear the wrong size for what came through it")
 	end
 	local critters, armed = 0, 0
@@ -5542,8 +5549,8 @@ end)()
 			armed += 1
 		end
 	end
-	check(critters == RiftRun.foeCount(1, 1), "The first cave's critters aren't up: " .. critters)
-	check(armed == RiftRun.fighterCount(1, 1) and armed >= 1, "No fighters among the first cave's critters: " .. armed)
+	check(critters == RiftRun.foeCount(1, 1, run.Boss), "The first cave's critters aren't up: " .. critters)
+	check(armed == RiftRun.fighterCount(1, 1, run.Boss) and armed >= 1, "No fighters among the first cave's critters: " .. armed)
 	check(critters >= #Kaiju.SlotLevels, "Fewer critters than a team of kaiju: " .. critters)
 	for enemy in run.Foes do
 		local leader = enemy.Model:GetAttribute("RiftLeader") == true
@@ -5553,7 +5560,7 @@ end)()
 	for _, entry in fighters do
 		local enc = entry.Encounter
 		check(enc.Rift == true and entry.Id == run.Id and table.find(entry.Members, a), "A fighter not of the trip")
-		check(enc.GearTier == RiftRun.fighterTier(1) and enc.Boss == false, "A first cave fighter's gear")
+		check(enc.GearTier == RiftRun.fighterTier(1, run.Boss) and enc.Boss == false, "A first cave fighter's gear")
 		check(enc.HealthScale == RiftRun.Fighters.Health and table.find(DungeonRules.Roster, enc.Spec), "A fighter not of the pathway dungeon's")
 		check(enc.Spec.Element == run.Element, "A fighter not of the Rift's element")
 		check(inside(world.Rooms[1], enc.Center), "A fighter out of its cave")
@@ -5581,7 +5588,7 @@ end)()
 	check(a:GetAttribute("RiftLeft") == 0 and not run.Spawned[2], "The next cave's pack came before anyone walked in")
 	walkIn(a, world.Rooms[2])
 	check(
-		foesLeft(run) == RiftRun.foeCount(2, 2) + RiftRun.fighterCount(2, 2),
+		foesLeft(run) == RiftRun.foeCount(2, 2, run.Boss) + RiftRun.fighterCount(2, 2, run.Boss),
 		"The second cave's pack isn't sized for two: " .. foesLeft(run)
 	)
 	-- (Walking back and forth doesn't bring up another.)
@@ -5713,7 +5720,7 @@ end)()
 		check(next(run.Foes) ~= nil, "Cave " .. i .. "'s pack isn't up")
 		for _, entry in fighters do
 			if entry.Encounter.Room == i then
-				check(entry.Encounter.GearTier == RiftRun.fighterTier(i), "Cave " .. i .. "'s fighters' gear")
+				check(entry.Encounter.GearTier == RiftRun.fighterTier(i, run.Boss), "Cave " .. i .. "'s fighters' gear")
 			end
 		end
 		clearCave()

@@ -1257,6 +1257,15 @@ return {
 	["No one else is around right now: a sparring partner steps in."] = "No hay nadie más ahora mismo: entra un compañero de entrenamiento.",
 	["The pack holding this patch is coming for you!"] = "¡La manada que cuida este filón viene por ti!",
 	["A hard first fight. Welcome to the Saga Outpost: gear up and come back."] = "Un primer combate duro. Bienvenido al Puesto Saga: equípate y vuelve.",
+	-- Bosses: what to bring (Shared.DungeonRules.elementTips), first bosses.
+	["Gems give you protection: {*} gems in your armor resist its hits."] = "Las gemas te protegen: las gemas {*} en tu armadura resisten sus golpes.",
+	["To defeat it, enchant with {*}: a {*} gem in your sword hits it for +{=}%."] = "Para vencerlo, encanta con {*}: una gema {*2} en tu espada le hace +{=}%.",
+	["Careful: its hits do +{=}% to {*} armor."] = "Cuidado: sus golpes hacen +{=}% a la armadura {*}.",
+	["{=}: a first boss, recommended solo at level {=}. You've got this."] = "{=}: un primer jefe, recomendado en solitario a nivel {=}. Tú puedes.",
+	["{=}'s {*} hits your {*} armor hard: put {*} gems in your armor to resist it."] = "¡El {*} de {=} golpea fuerte tu armadura {*2}! Pon gemas {*3} en tu armadura para resistirlo.",
+	["RECOMMENDED SOLO"] = "RECOMENDADO EN SOLITARIO",
+	["FIRST BOSS  ·  RECOMMENDED SOLO, LV {=}  ·  WEAK TO {*}"] = "PRIMER JEFE  ·  RECOMENDADO EN SOLITARIO, NV {=}  ·  DÉBIL A {*}",
+	["WEAK TO {*}"] = "DÉBIL A {*}",
 	-- The intro's walk through the Outpost (Client IntroGuide).
 	["You're in the 1v1 queue: keep mining, you'll be called in when a match is found."] = "Estás en la cola de 1v1: sigue minando, te llamaremos cuando haya partida.",
 	["Hop in a mech: follow the arrows."] = "Súbete a un mech: sigue las flechas.",

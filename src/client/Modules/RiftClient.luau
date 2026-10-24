@@ -292,6 +292,34 @@ local function warning(parent: Instance, order: number, compact: boolean?, head:
 	return box
 end
 
+-- What to bring against the boss picked (Shared.DungeonRules.elementTips):
+-- its element's colour round a heading and a line per tip.
+local function tipBox(parent: Instance, order: number, compact: boolean?, head: string, lines: { string }, color: Color3)
+	local box = new("Frame", {
+		Name = "Tips",
+		BackgroundColor3 = Color3.fromRGB(18, 16, 24),
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = order,
+	}, parent)
+	UiKit.round(box, 8)
+	new("UIStroke", { Color = color, Thickness = 1.5 }, box)
+	new("UIPadding", {
+		PaddingTop = UDim.new(0, if compact then 6 else 9),
+		PaddingBottom = UDim.new(0, if compact then 6 else 9),
+		PaddingLeft = UDim.new(0, 12),
+		PaddingRight = UDim.new(0, 10),
+	}, box)
+	UiKit.list(box, 2)
+	local title = text(box, head, if compact then 12 else 14, color, BOLD)
+	title.LayoutOrder = 1
+	for i, line in lines do
+		local l = text(box, "•  " .. line, if compact then 10 else 12, P.Text)
+		l.LayoutOrder = 1 + i
+	end
+	return box
+end
+
 -- Crossing: dark for a moment while you go through.
 local function crossing(alone: boolean): () -> ()
 	if cover then
@@ -537,6 +565,9 @@ local function bossCard(parent: Instance, entry, order: number, compact: boolean
 	name.Position = UDim2.fromOffset(6, if compact then 3 else 7)
 	name.Size = UDim2.new(1, -12, 0, if compact then 15 else 19)
 	local parts = {}
+	if entry.Starter then
+		table.insert(parts, "RECOMMENDED SOLO")
+	end
 	if entry.Unlocked then
 		local favour = Slots.Definitions[Slots.ByKind[entry.Loot or ""] or ""]
 		if favour then
@@ -903,6 +934,21 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 						"%s is built for 2 to 4 of you. You can go in alone, but it won't be easy: invite someone from the list.",
 						chosen.Name
 					)
+				)
+			end
+			-- What to bring against it: its element, what protects you,
+			-- what beats it, what it punishes.
+			if chosen and chosen.Tips then
+				local weak = GemConfig.ElementLabels[chosen.Weakness or ""] or chosen.Weakness or "?"
+				tipBox(
+					warnHolder,
+					2,
+					small,
+					if chosen.Starter
+						then string.format("FIRST BOSS  ·  RECOMMENDED SOLO, LV %d  ·  WEAK TO %s", chosen.Level or 2, string.upper(weak))
+						else string.format("WEAK TO %s", string.upper(weak)),
+					{ chosen.Tips[2], chosen.Tips[3], chosen.Tips[4] },
+					GemConfig.ElementColors[chosen.Element or ""] or WARN
 				)
 			end
 		end

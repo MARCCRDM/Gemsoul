@@ -157,6 +157,45 @@ you've beaten the one before it.
 - **Its fighters** (the caves' leaders and the boss's adds) are of the
   Rift's element (`RiftRun.pickFighters`).
 
+### First bosses: Chimpanzini Bananini and Bombardiro Drago
+
+*2026-10-23.* The first rung of the Ion and Thermal ladders is built for a
+new miner on their own, at **level 2** (`Starter` on their
+`DungeonRules.Bosses` entries: `{ Level = 2, Health = 0.6, Foes = 1 }`):
+
+- **Levels**: the caves' critters, their leaders, the boss and its adds are
+  never over level 2 (`RiftRun.level` and `bossLevel` with the boss), however
+  strong the runners' kaiju. The card reads LV 2.
+- **Fewer of them**: one critter fewer a cave (never under three, one for
+  each of your kaiju), one leader a
+  cave at gear tier 1, and no big Rift Brutes (`foeCount`, `fighterCount`,
+  `fighterTier`, `pickFoes`).
+- **A gentler boss**: 0.6x the health of any other threat I boss.
+- **Recommended solo**: the card says RECOMMENDED SOLO, the tips box FIRST
+  BOSS · RECOMMENDED SOLO, LV 2, and there's no "going alone" warning
+  (`RiftRun.solo` is false for them). Going in: "Chimpanzini Bananini: a
+  first boss, recommended solo at level 2. You've got this."
+
+### Elements: come prepared
+
+Every boss now says what to bring (`DungeonRules.elementTips`):
+
+1. *Bombardiro Drago is THERMAL.*
+2. *Gems give you protection: THERMAL gems in your armor resist its hits.*
+3. *To defeat it, enchant with CRYO: a CRYO gem in your sword hits it for +25%.*
+4. *Careful: its hits do +63% to CRYO armor.*
+
+- **At the gate and Brutus's counter**, the boss you pick has a box in its
+  element's colour, headed WEAK TO CRYO, with lines 2 to 4.
+- **Going in**, lines 2 and 3 as notices; **as the boss comes through**,
+  lines 3 and 4.
+- **Bosses bite the wrong armor**: a boss's hit on a miner whose main armor
+  element its own beats (the 125% everyone's weakness takes) lands 1.3x
+  harder again (`DungeonRules.bossHit`, `BossWeak`; about +63% in all), in
+  the Rift and in the party dungeon. The first such hit, and one every 20
+  seconds after, says so: "Bombardiro Drago's THERMAL hits your CRYO armor
+  hard: put THERMAL gems in your armor to resist it."
+
 ## The way
 
 The world is built for each trip, far off in the dark, and gone with it

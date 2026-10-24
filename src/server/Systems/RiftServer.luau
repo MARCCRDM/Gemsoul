@@ -493,10 +493,10 @@ local function spawnRoom(run, room: number)
 	end
 	run.Spawned[room] = true
 	local cave = run.World.Rooms[room]
-	local level = RiftRun.level(levelsOf(run), room)
+	local level = RiftRun.level(levelsOf(run), room, run.Boss)
 	local band = if room >= 3 then "Edge" else "Fringe"
-	local foes = RiftRun.pickFoes(room, #run.Members, run.Rng)
-	local leaders = RiftRun.pickFighters(room, #run.Members, run.Rng, run.Element)
+	local foes = RiftRun.pickFoes(room, #run.Members, run.Rng, run.Boss)
+	local leaders = RiftRun.pickFighters(room, #run.Members, run.Rng, run.Element, run.Boss)
 	local spots = RiftRun.portalSpots(cave.Center, cave.Radius, #foes + #leaders, runnersAt(run), run.Rng)
 	local every = RiftRun.Portal.Every
 	for i, foe in foes do
@@ -528,7 +528,7 @@ local function spawnRoom(run, room: number)
 	for j, spec in leaders do
 		local at = spots[#foes + j] + Vector3.new(0, 0.5, 0)
 		through(run, at, (#foes + j - 1) * every, RiftRun.Portal.Leader, function()
-			spawnFighter(run, at, spec, RiftRun.fighterTier(room), false, RiftRun.Fighters.Health)
+			spawnFighter(run, at, spec, RiftRun.fighterTier(room, run.Boss), false, RiftRun.Fighters.Health)
 		end)
 	end
 	show(run)
@@ -544,6 +544,10 @@ local function summonBoss(run)
 	local arena = run.World.Boss
 	local at = arena.Center + Vector3.new(0, 0.5, 0)
 	announce(run, string.format("The ground splits open. %s is coming through!", run.Boss.Name))
+	-- (Its element, again, as it comes: what it's weak to, what it punishes.)
+	local tips = DungeonRules.elementTips(run.Boss)
+	announce(run, tips.Lines[3])
+	announce(run, tips.Lines[4])
 	local life = KaijuWilds.rift(
 		at,
 		nearestRunner(run, at, run.World.Start.Position),
@@ -579,7 +583,7 @@ local function callAdds(run)
 	local level = run.BossLevel or RiftRun.bossLevel(levelsOf(run), run.Boss)
 	local arena = run.World.Boss
 	local wave = Kaiju.wave(rule.AddCount, run.Rng)
-	local fighters = RiftRun.pickFighters(RiftRun.Rooms, 1, run.Rng, run.Element)
+	local fighters = RiftRun.pickFighters(RiftRun.Rooms, 1, run.Rng, run.Element, run.Boss)
 	local spots = RiftRun.portalSpots(arena.Center, arena.Radius, #wave + rule.AddFighters, runnersAt(run), run.Rng)
 	local every = RiftRun.Portal.Every
 	for i, id in wave do
@@ -845,7 +849,7 @@ local function riftRobbers(run, player: Player, count: number, robbery)
 	end
 	local here = root.Position
 	local area = areaAt(run, here)
-	local level = RiftRun.level(levelsOf(run), math.clamp(run.Room, 1, RiftRun.Rooms))
+	local level = RiftRun.level(levelsOf(run), math.clamp(run.Room, 1, RiftRun.Rooms), run.Boss)
 	local band = if run.Room >= 3 then "Edge" else "Fringe"
 	for i, spot in Frontier.robSpots(here, count, run.Rng) do
 		local at = onFloor(area, spot, 6)
@@ -1354,7 +1358,13 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 	else
 		join(run, player)
 	end
-	if RiftRun.solo(#run.Members) then
+	local starter = DungeonRules.starter(run.Boss)
+	if starter then
+		notify(
+			player,
+			string.format("%s: a first boss, recommended solo at level %d. You've got this.", run.Boss.Name, starter.Level)
+		)
+	elseif RiftRun.solo(#run.Members, run.Boss) then
 		notify(
 			player,
 			if RiftRun.isGroup(run.Boss)
@@ -1362,6 +1372,10 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 				else "You're in the Rift alone. It gets hard fast: bring a friend if you can."
 		)
 	end
+	-- What to bring: its element, what protects you, what beats it.
+	local tips = DungeonRules.elementTips(run.Boss)
+	notify(player, tips.Lines[2])
+	notify(player, tips.Lines[3])
 	return reply(true, "", { Runners = #run.Members, Boss = run.Boss.Name })
 end
 
@@ -1435,6 +1449,10 @@ local function peek(player: Player, vein: any)
 				Threat = BossLoot.threat(boss),
 				Level = RiftRun.bossLevel(levels, boss),
 				Group = RiftRun.isGroup(boss),
+				-- (A first boss: recommended solo at its level.)
+				Starter = DungeonRules.starter(boss) ~= nil,
+				Weakness = boss.Weakness,
+				Tips = DungeonRules.elementTips(boss).Lines,
 				Loot = boss.Loot,
 				Unlocked = open,
 				Beaten = beaten[boss.Id] or 0,
