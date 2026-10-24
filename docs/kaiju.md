@@ -731,9 +731,12 @@ A gem's **power** is its rarity's, and its element matters:
 | Ultra Rare | 8 | 16 | 4 |
 | Legendary | 16 | 32 | 8 |
 
-- **Healing** a hurt kaiju: each point of power heals 7.5% of its health
-  (`Infuse.Mend`; it was 10%, a quarter more). A Common of its own element
-  is 15%. The HEAL tab shows each gem's share to the half (+7.5%).
+- **Healing** a hurt kaiju: Common and Uncommon gems heal 15% and 30% of
+  maximum health at level 1, before element bonuses. Divide those shares
+  by `1 + 0.05 * (level - 1)` as the kaiju levels up. At level 21 they heal
+  7.5% and 15%; at level 41, 5% and 10%. Matching elements double healing;
+  weakness elements halve it. Rare and higher healing is unchanged.
+  The HEAL preview, manual healing and auto-heal use the same calculation.
 - **Only out of danger** (`Kaiju.Danger`): not while any of your team out
   has fought in the last 4 seconds, and not with a critter or wild kaiju
   within 45 studs of you (`KaijuServer.inDanger`). HEAL says IN A FIGHT then
@@ -750,7 +753,7 @@ A gem's **power** is its rarity's, and its element matters:
 - **Back by itself** once its revive time is up: 60 seconds plus 8 a
   level (a level-11 kaiju waits 2:28), but **weak, at 15% of its health**
   (`Kaiju.Revive.Health`, `reviveSeconds`, `reviveIn`): heal it with gems.
-  From 15% that's 12 Commons of no element, or 6 of its own (gems heal
+  The gems needed depend on its level and their element (gems heal
   as much as they do any hurt kaiju). The server's upkeep wakes it ("Cryo
   Razorback is back on its feet, but weak: heal with gems before the next
   fight."), at home or out, and the time runs while you're offline too.
@@ -820,8 +823,9 @@ team by themselves (`Kaiju.AutoHeal.Tiers`, `Kaiju.autoHealPick`,
 - **Quiet**: the kaiju glows and the strip's count drops. Running out is
   said once ("Auto heal is out of spare Commons and Uncommons...").
 
-It's **off until you switch it on** (`Kaiju.AutoHeal.Default`), so no one's
-gems are spent without them choosing it.
+It's **on by default** (`Kaiju.AutoHeal.Default`) for new saves and saves
+without a preference. An explicit OFF choice stays off. Players can toggle
+it in the kaiju HUD; only spare Commons and Uncommons are consumed.
 
 ## The arena (phase 2)
 

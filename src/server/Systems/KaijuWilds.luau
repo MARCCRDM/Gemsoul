@@ -1900,7 +1900,7 @@ KaijuWilds._tally = tally
 local function payCoins(player: Player, amount: number)
 	local profile = PlayerData.get(player)
 	if not profile then
-		return
+		return 0
 	end
 	local bugs = tally(Kaiju.roster(profile))
 	local coins = math.min(amount, Kaiju.bugCoins(bugs, bugs.Day))
@@ -1908,6 +1908,7 @@ local function payCoins(player: Player, amount: number)
 		bugs.Coins += coins
 		PlayerData.addCoins(player, coins)
 	end
+	return coins
 end
 
 -- Wild kaiju ------------------------------------------------------------------------------------------
@@ -2731,7 +2732,10 @@ local function bugDied(enemy)
 		end
 	end
 	if best then
-		payCoins(best, Frontier.Coins[band] or Frontier.Coins.Fringe)
+		local coins = payCoins(best, rng:NextInteger(Frontier.CritterCoins.Min, Frontier.CritterCoins.Max))
+		if coins > 0 then
+			Remotes.CombatFx:FireAllClients("CritterCoins", enemy.Root.Position, best.UserId, coins)
+		end
 	end
 	KaijuWilds.done(enemy, true, totals)
 end

@@ -316,8 +316,11 @@ What one pays:
   from the Edge, a quarter after your first 150 critters of the day. A
   kaiju left at home earns nothing. (A swarm pays about what one critter
   used to.)
-- **Coins** for whoever did the most to it: 1 from the Fringe, 2 from the
-  Edge, up to 300 a day.
+- **Coins** for whoever did the most damage (including their kaiju): a
+  random 2–5 per critter, up to the existing 300-a-day cap. Gold coins pop
+  out, bounce, then fly toward that player; nearby players see the effect
+  too. The server awards the money once, independently of the animation.
+  Near the cap, only the remaining allowance is paid and displayed.
 
 ### What you do about them
 

@@ -1057,7 +1057,7 @@ local function healthAndInfusing()
 	for _, gem in table.clone(profiles[a].Gems) do
 		PlayerData.removeGem(a, gem.Id)
 	end
-	pet.Humanoid.Health = pet.Humanoid.MaxHealth * 0.8
+	pet.Humanoid.Health = pet.Humanoid.MaxHealth * (1 - Kaiju.infusePower({ Tier = "Common", Element = other }, record) * Kaiju.Infuse.Mend * 2.5)
 	local mendIds = {}
 	for i = 1, 5 do
 		stone("m" .. i, "Common", other)
@@ -1142,13 +1142,15 @@ local function autoHealing()
 		return count
 	end
 	check(registered.KaijuAutoHeal ~= nil, "KaijuAutoHeal isn't a request")
-	check(not Kaiju.autoHealOn(roster), "Auto heal on before it was switched on")
+	check(Kaiju.autoHealOn(roster), "Auto heal should be enabled by default")
+	check(registered.KaijuAutoHeal(a, false).Ok, "Cannot opt out of default auto heal")
 	for i = 1, 6 do
 		gem("ah" .. i, "Common")
 	end
 	gem("rare", "Rare")
 	local most = pet.Humanoid.MaxHealth
-	pet.Humanoid.Health = math.floor(most * 0.65)
+	local healShare = Kaiju.infusePower({ Tier = "Common", Element = plain }, record) * Kaiju.Infuse.Mend
+	pet.Humanoid.Health = most * (1 - healShare * 4.5)
 	pet.LastFight = now - 60
 	KaijuServer._autoHeal(a, now)
 	check(#profiles[a].Gems == 7 and pet.Humanoid.Health < most, "Healed with auto heal off")
@@ -1165,7 +1167,7 @@ local function autoHealing()
 	KaijuServer._autoHeal(a, now)
 	check(#profiles[a].Gems == 3 and has("rare"), "Auto heal didn't take four Commons alone: " .. #profiles[a].Gems .. " left")
 	check(
-		math.abs(pet.Humanoid.Health - (before + most * 0.3)) <= 1 and record.Health == pet.Humanoid.Health,
+		math.abs(pet.Humanoid.Health - (before + most * healShare * 4)) <= 1 and record.Health == pet.Humanoid.Health,
 		"Four Commons didn't heal 30%"
 	)
 	-- Not again straight away.
@@ -2618,7 +2620,23 @@ local coins = profiles[a].Coins
 local exp = expOf(Kaiju.active(roster))
 bugs[1].KaijuCredit = { [a] = 10 }
 Enemies.damage(bugs[1], 1e6)
-check(profiles[a].Coins == coins + Frontier.Coins.Edge, "An edge bug paid the wrong coins")
+do
+local awarded = profiles[a].Coins - coins
+check(awarded >= 2 and awarded <= 5, "A critter must roll 2-5 coins")
+local function coinEffects()
+	local found = {}
+	for _, fx in fxs do
+		if fx[1] == "CritterCoins" then table.insert(found, fx) end
+	end
+	return found
+end
+local drops = coinEffects()
+local lastDrop = drops[#drops]
+check(lastDrop[2] == bugs[1].Root.Position and lastDrop[3] == a.UserId and lastDrop[4] == awarded,
+	"The public coin drop must identify the credited player, death position and actual payout")
+Enemies.damage(bugs[1], 1e6)
+check(profiles[a].Coins == coins + awarded and #coinEffects() == #drops, "Repeated death paid or displayed twice")
+end
 check(expOf(Kaiju.active(roster)) - exp == Frontier.critterExp(10, "Edge", 0), "A kaiju that fought got the wrong EXP")
 check(roster.Bugs.Count == 1, "The day's critters weren't counted")
 -- After the day's first 60: a quarter.
@@ -2632,16 +2650,30 @@ exp = expOf(Kaiju.active(roster))
 coins = profiles[a].Coins
 Enemies.damage(bugs[3], 1e6, a)
 check(expOf(Kaiju.active(roster)) == exp, "A kaiju that never fought got EXP")
-check(profiles[a].Coins == coins + Frontier.Coins.Edge, "A pick's kill paid no coins")
+check(profiles[a].Coins - coins >= 2 and profiles[a].Coins - coins <= 5, "A pick's critter kill must pay 2-5 coins")
 -- The day's cap.
 roster.Bugs.Coins = Kaiju.Bug.DailyCoins - 1
 coins = profiles[a].Coins
 bugs[4].KaijuCredit = { [a] = 10 }
 Enemies.damage(bugs[4], 1e6)
 check(profiles[a].Coins == coins + 1, "The day's cap let more through")
+do
+local count = 0
+for _, fx in fxs do
+	if fx[1] == "CritterCoins" then
+		count += 1
+	end
+end
+check(fxs[#fxs][1] == "CritterCoins" and fxs[#fxs][4] == 1, "A capped reward must only display the coin actually paid")
 bugs[5].KaijuCredit = { [a] = 10 }
 Enemies.damage(bugs[5], 1e6)
 check(profiles[a].Coins == coins + 1, "Coins past the day's cap")
+local after = 0
+for _, fx in fxs do
+	if fx[1] == "CritterCoins" then after += 1 end
+end
+check(after == count, "A zero reward must not create collectible-looking coins")
+end
 
 -- The pick's bonk: a share of a critter's health, yours, back it goes,
 -- reeling; never on a wild kaiju.

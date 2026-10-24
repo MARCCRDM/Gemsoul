@@ -2462,6 +2462,7 @@ end
 -- (CritterFx; a gem raid, Shared.Frontier.Raid).
 handlers.CritterGiggle = require(script.Parent.Modules.CritterFx).giggle
 handlers.GemRecovered = require(script.Parent.Modules.CritterFx).recovered
+handlers.CritterCoins = require(script.Parent.Modules.CritterCoinFx).play
 -- (And the stone a snatcher runs off with, over its head: the gem itself.)
 require(script.Parent.Modules.CritterFx).start()
 

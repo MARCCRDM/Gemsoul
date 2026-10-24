@@ -729,14 +729,18 @@ end
 -- Healing (KaijuServer's "KaijuInfuse"): gems from your pouch heal a
 -- kaiju, never EXP. A gem's power by its rarity (Power), Same times for
 -- one of the kaiju's own element, Weak times for one of the element that
--- beats it; each point of power heals Mend of its health (7.5%: a
--- quarter less than the 10% it once was). Batch: gems it takes in one go.
+-- beats it; each point of power heals Mend of its health. Common and
+-- Uncommon power is doubled at level one, divided by 1 + .05*(level-1)
+-- as the kaiju grows. Higher rarities retain their full power.
+-- Batch: gems it takes in one go.
 -- One knocked out takes none (Revive).
 Kaiju.Infuse = {
 	Power = { Common = 1, Uncommon = 2, Rare = 4, UltraRare = 8, Legendary = 16 },
 	Same = 2,
 	Weak = 0.5,
 	Mend = 0.075,
+	LowTierBoost = 2,
+	LowTierLevelDecay = 0.05,
 	Batch = 25,
 }
 
@@ -863,6 +867,10 @@ function Kaiju.infusePower(gem, record): number
 	end
 	local infuse = Kaiju.Infuse
 	local power = infuse.Power[gem.Tier] or infuse.Power.Common
+	if gem.Tier == "Common" or gem.Tier == "Uncommon" then
+		local level = math.max(1, tonumber(record.Level) or 1)
+		power *= infuse.LowTierBoost / (1 + (level - 1) * infuse.LowTierLevelDecay)
+	end
 	if gem.Element == record.Element then
 		power *= infuse.Same
 	elseif gem.Element == ElementMatchup.weakTo(record.Element) then
@@ -900,9 +908,9 @@ end
 -- Commons have run out (autoHealPick). Never a rarer gem, never one a saved
 -- loadout names, never a Gemsoul. At most one round every Every seconds,
 -- and never a gem that would go to waste (healPick). It doesn't revive
--- (Revive). Off till you switch it on (Default), and kept in the roster
+-- (Revive). On by default; an explicit preference is kept in the roster
 -- (AutoHeal).
-Kaiju.AutoHeal = { Tiers = { "Common", "Uncommon" }, Every = 1.5, Default = false }
+Kaiju.AutoHeal = { Tiers = { "Common", "Uncommon" }, Every = 1.5, Default = true }
 
 function Kaiju.autoHealOn(roster): boolean
 	if roster and roster.AutoHeal ~= nil then

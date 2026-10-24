@@ -189,7 +189,9 @@ check(
 -- A stone's power by rarity, double of its own element, half of the one
 -- that beats it; it mends, never EXP; down, it takes its revive cost at
 -- once and comes back at half; only the stones it needs are used.
-local Infuse = Kaiju.Infuse
+local Infuse = table.clone(Kaiju.Infuse)
+-- Selection fixtures below use a level-five kaiju and common-gem units.
+Infuse.Mend *= Kaiju.Infuse.LowTierBoost / (1 + 4 * Kaiju.Infuse.LowTierLevelDecay)
 local function gem(tier, element, id)
 	return { Id = id or tier, Tier = tier, Element = element }
 end
@@ -202,7 +204,21 @@ for _, element in Kaiju.Elements do
 		neutral = element
 	end
 end
-check(Kaiju.infusePower(gem("Common", neutral), fireKaiju) == Infuse.Power.Common, "A common isn't worth its power")
+check(math.abs(Kaiju.infusePower(gem("Common", neutral), fireKaiju) * Kaiju.Infuse.Mend - 0.125) < 1e-8, "Level-five Common should heal 12.5%")
+do
+	for _, tier in { "Common", "Uncommon" } do
+		local last = math.huge
+		for _, level in { 1, 5, 10, 21, 40, 100 } do
+			local probe = { Element = "Fire", Level = level }
+			local power = Kaiju.infusePower(gem(tier, neutral), probe)
+			check(power > 0 and power < last, "Low-tier healing must decline as level rises")
+			check(Kaiju.infusePower(gem(tier, "Fire"), probe) == power * Infuse.Same, "Matching-element healing lost its bonus")
+			last = power
+		end
+	end
+	check(Kaiju.infusePower(gem("Common", neutral), { Element = "Fire", Level = 1 }) * Kaiju.Infuse.Mend == 0.15, "Starter Common healing")
+	check(Kaiju.infusePower(gem("Uncommon", neutral), { Element = "Fire", Level = 1 }) * Kaiju.Infuse.Mend == 0.3, "Starter Uncommon healing")
+end
 check(
 	Kaiju.infusePower(gem("Rare", "Fire"), fireKaiju) == Infuse.Power.Rare * Infuse.Same,
 	"Its own element isn't worth more"
@@ -292,7 +308,8 @@ fireKaiju.Down, fireKaiju.Health = true, 0
 check(#Kaiju.healPick(fireKaiju, batch(neutral, 200), true) == 0, "One that's down was picked gems")
 fireKaiju.Down, fireKaiju.Health = nil, nil
 -- Auto heal: off till switched on, kept in the roster; Commons only.
-check(not Kaiju.autoHealOn({ List = {} }) and Kaiju.autoHealOn({ List = {}, AutoHeal = true }), "Auto heal isn't off till it's switched on")
+check(Kaiju.autoHealOn({ List = {} }) and Kaiju.autoHealOn({ List = {}, AutoHeal = true }), "Auto heal must default on")
+check(not Kaiju.autoHealOn({ AutoHeal = false }), "Explicit auto-heal opt-out must persist")
 check(
 	Kaiju.AutoHeal.Tiers[1] == "Common" and Kaiju.AutoHeal.Tiers[2] == "Uncommon" and #Kaiju.AutoHeal.Tiers == 2,
 	"Auto heal doesn't take Commons, then Uncommons, and nothing rarer"
