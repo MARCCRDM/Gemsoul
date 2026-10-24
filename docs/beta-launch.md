@@ -65,7 +65,10 @@ one. With `MinerRoster = false`:
 - **1v1 rounds.** The 30-second counter-pick becomes a 10-second break
   (`Matchmaking.Rounds.Break`). The panel keeps the round result, what the
   opponent fought with and READY; the counter-pick row is gone. The reveal
-  shows no miner numbers.
+  shows no miner numbers. Every round then starts like the first: both
+  fighters go back in their pods while the reveal shows
+  (`Rounds.Reveal`), then drop onto the lanes (`ArenaDrop`), and the
+  countdown runs until they land.
 - **Dungeons.** A defeat no longer offers the next miner. Your run ends when
   you fall, and the squad's when everyone has.
 - **Menus.** The Inventory's miner buttons and roster cards, the Wardrobe's

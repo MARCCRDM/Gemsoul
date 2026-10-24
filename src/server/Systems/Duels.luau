@@ -728,17 +728,37 @@ local function reveal(match)
 			})
 		end
 	end
-	local countdown = Matchmaking.Rounds.Reveal + Matchmaking.Countdown
+	-- Every round starts like the first: back in the pods while the picks
+	-- show, then the drop onto the lanes (ArenaDrop), the countdown long
+	-- enough for it.
+	local entrants, audience = {}, {}
+	for _, team in match.Teams do
+		for _, member in team do
+			CombatServer.reset(member)
+			if alive(member) then
+				ArenaDrop.prepare(member)
+				table.insert(entrants, member.Character)
+				table.insert(audience, member)
+			end
+		end
+	end
+	local countdown = Matchmaking.Rounds.Reveal + math.max(Matchmaking.Countdown, ArenaDrop.duration(#entrants))
 	local now = os.clock()
 	match.State = "Countdown"
 	match.StartsAt = now + countdown
 	match.Ends = match.StartsAt + Matchmaking.Rounds.Time
-	for _, team in match.Teams do
-		for _, member in team do
-			CombatServer.reset(member)
-		end
-	end
 	stage(match)
+	local round = r.Played
+	task.delay(Matchmaking.Rounds.Reveal, function()
+		if match.State == "Countdown" and r.Played == round then
+			ArenaDrop.begin(entrants, audience)
+		else
+			-- Over before the drop (a forfeit, a leave): out of the pods.
+			for _, model in entrants do
+				ArenaDrop.cancel(model)
+			end
+		end
+	end)
 	local startsAt = serverNow() + countdown
 	tell(match, function(t)
 		return {

@@ -362,15 +362,28 @@ do
 	check(handlers.DuelPivot(gus, 1).Ok and m.State == "Pivot", "Winner's ready ended the window early")
 	check(not handlers.DuelPivot(gus, nil).Ok, "A locked pick changed")
 	check(profiles[hal].Miners.Active == 1, "Loser's pick applied before reveal")
+	table.clear(preparedDrops)
 	check(handlers.DuelPivot(hal, 2).Ok, "Loser couldn't counter-pick")
 	local revealed = last(hal, "Round")[2]
 	check(m.State == "Countdown" and revealed.Phase == "Reveal" and revealed.Round == 2, "No reveal after both locked")
 	check(profiles[hal].Miners.Active == 2 and profiles[gus].Miners.Active == 1, "Whole miner counter-pick failed")
 	check(revealed.Picks.Mine[1].Preset == "Miner 2" and revealed.Picks.Theirs[1].Preset == "Miner 1", "Wrong miners revealed")
 	check(hal.Humanoid.Health == hal.Humanoid.MaxHealth, "Hal wasn't healed for round 2")
+	-- Round 2 starts like round 1: both back in their pods while the picks
+	-- show, then dropped onto the lanes.
+	check(preparedDrops[gus] and preparedDrops[hal], "Round 2 didn't put them back in the pods")
+	local beganBefore = #dropBegins
+	advance(Matchmaking.Rounds.Reveal)
+	check(#dropBegins == beganBefore + 1, "Round 2 didn't drop them from the pods")
+	local dropped = dropBegins[#dropBegins]
+	check(
+		table.find(dropped, gus.Character) and table.find(dropped, hal.Character),
+		"Round 2's drop left a fighter in the pod"
+	)
+	check(m.State == "Countdown", "Round 2 started before the drop landed")
 	-- Round 2 times out even: a drawn round. Round 3: Hal wins it 1-1... then
 	-- the match is level after three rounds, a draw.
-	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	advance(Matchmaking.Countdown)
 	check(m.State == "Fight", "Round 2 didn't start")
 	advance(Matchmaking.Rounds.Time)
 	check(m.State == "Pivot" and m.Rounds.Played == 2, "Round 2's time didn't end it")
