@@ -420,6 +420,7 @@ local Server = (function()
 				ChatChannels = ChatChannels,
 				MineWall = MineWall,
 				MiningRolls = { publish = function() end },
+				KaijuServer = { mend = function(_, share) check(share == Rules.Heal.Kaiju, "Wrong kaiju healing"); return 1 end },
 				PlayerData = PlayerData,
 				Progress = Progress,
 				Shop = Shop,
@@ -526,7 +527,7 @@ for _, node in Server._nodes do
 	check((Rules.Zones[zone].Weights[node.Size] or 0) > 0, node.Size .. " grew on the " .. zone .. " ring")
 	local model = node.Model
 	check(
-		model:GetAttribute("Hp") == Rules.Sizes[node.Size].Hp and model.PrimaryPart ~= nil,
+		model:GetAttribute("Hp") == (if node.Healing then Rules.Heal.Hp else Rules.Sizes[node.Size].Hp) and model.PrimaryPart ~= nil,
 		"A rock without health or a body"
 	)
 	local prompt = model.PrimaryPart:FindFirstChildOfClass("ProximityPrompt")
@@ -547,7 +548,7 @@ do
 				break
 			end
 		end
-		if crystal and Frontier.Bands[zone] then
+		if crystal and Frontier.Bands[zone] and not node.Healing then
 			check(crystal.Color == Frontier.Bands[zone].Color, zone .. " crystals aren't its colour")
 			tints[zone] = true
 		end
@@ -894,7 +895,8 @@ handlers.OutpostEnter(ben)
 -- Pick a rock and stand by it.
 local target
 for _, node in Server._nodes do
-	if node.Size == "Boulder" then
+		if node.Healing then continue end
+	if node.Size == "Boulder" and not node.Healing then
 		target = node
 		break
 	end
@@ -1009,6 +1011,7 @@ end
 check(after == before + 1, "A mined rock never grew back")
 local regrown
 for _, node in Server._nodes do
+		if node.Healing then continue end
 	if node.Spot == target.Spot then
 		regrown = node
 	end
@@ -1019,6 +1022,7 @@ check(regrown and regrown.Zone == target.Zone, "A mined rock grew back somewhere
 local commonLuck = lastLuck
 local vein
 for _, node in Server._nodes do
+		if node.Healing then continue end
 	if node.Zone == "Vein" and node.Size == target.Size then
 		vein = node
 		break
@@ -1050,6 +1054,7 @@ end
 do
 	local plain
 	for _, node in Server._nodes do
+		if node.Healing then continue end
 		if node.Zone == target.Zone and node.Size == target.Size and node ~= vein then
 			plain = node
 			break
@@ -1072,6 +1077,7 @@ do
 	-- luckier by what the pack's rules say.
 	local held
 	for _, node in Server._nodes do
+		if node.Healing then continue end
 		if node.Zone == target.Zone and node.Size == target.Size and node ~= vein and node ~= plain then
 			held = node
 			break
@@ -1166,6 +1172,7 @@ do
 		local list = {}
 		for _, spot in veins[v].Spots do
 			for _, node in Server._nodes do
+		if node.Healing then continue end
 				if node.Spot == spot then
 					table.insert(list, node)
 				end
@@ -1262,7 +1269,8 @@ end
 
 -- A full gem pouch: no swinging (the rock would pay a gem with nowhere to
 -- go), and the pick isn't worn by trying.
-local nextRock = select(2, next(Server._nodes))
+local nextRock
+for _, node in Server._nodes do if not node.Healing then nextRock = node; break end end
 standBy(anaRoot, nextRock)
 advance(Rules.ClaimSeconds + 1)
 profiles[ana].Gems = table.create(200, {})
@@ -1356,6 +1364,43 @@ check(gemsAwarded > 0 and lootCalls == 0, "A Rare find was announced to the serv
 
 -- Mining counts toward Tasks (and the onboarding funnel's first rock).
 check(trained[ana] and (trained[ana].Mine or 0) > 0, "Popping rocks didn't count for Tasks")
+
+-- Healing remains usable with no swings and a full gem pouch.
+do
+	local healing
+	local count = 0
+	for _, node in Server._nodes do
+		if node.Healing then count += 1; healing = node end
+	end
+	check(count == Rules.Heal.Count, "Missing free healing sites")
+	local humanoid = R.Instance.new("Humanoid")
+	humanoid.MaxHealth = 100
+	humanoid.Health = 30
+	humanoid.Parent = ana.Character
+	local savedGems = profiles[ana].Gems
+	profiles[ana].Gems = table.create(200, {})
+	profiles[ana].Outpost.Picks.Survey = 0
+	standBy(anaRoot, healing)
+	advance(1)
+	local healed = handlers.OutpostHit(ana, healing.Id)
+	check(healed.Ok and healed.Healed == 7, "Free rock failed to heal with empty pick and full pouch")
+	check(profiles[ana].Outpost.Picks.Survey == 0, "Healing consumed or refilled swings")
+	check(healing.Model:GetAttribute("OutpostHeal") == true, "Healing request routed to the Rift")
+	for _ = 2, Rules.Heal.Hp do
+		advance(1)
+		healed = handlers.OutpostHit(ana, healing.Id)
+	end
+	check(healed.Broke and healed.Kaiju == 1 and humanoid.Health == 90, "Healing rock did not restore player and kaiju on break")
+	check(profiles[ana].Outpost.Picks.Survey == 0, "Breaking healing rock spent swings")
+	advance(Rules.Heal.Regrow + 1)
+	local regrown = false
+	for _, node in Server._nodes do
+		if node.Spot == healing.Spot and node.Healing and node.Hp == Rules.Heal.Hp then regrown = true end
+	end
+	check(regrown, "Healing rock failed to regrow")
+	profiles[ana].Gems = savedGems
+	humanoid:Destroy()
+end
 
 -- Leaving.
 check(handlers.OutpostLeave(ana).Ok and ana:GetAttribute("Outpost") == nil, "Couldn't leave")

@@ -34,6 +34,9 @@
 ]]
 local Outpost = {}
 
+-- Free healing boulders near the welcome field; no coins or gems.
+Outpost.Heal = { Count = 4, Hp = 5, Swing = 0.07, Pop = 0.25, Kaiju = 0.35, Regrow = 40 }
+
 -- The original moon quarry, with haul roads and the Shelter in the middle (its garage holds the mechs).
 Outpost.Location = CFrame.new(0, 0, 7000)
 -- The Shelter stands on landing legs, its floor ShelterLift studs over the

@@ -425,7 +425,7 @@ local function labelRock(model: Model)
 	local heal = model:GetAttribute("HealRock") == true
 	local tint = if heal then Color3.fromRGB(70, 240, 95) else sizeColor(size)
 	local name =
-		text(gui, if heal then "HEALING CRYSTAL" else spec.Name, 13, tint, IronUi.Bold, 0, top, 150, 16, Enum.TextXAlignment.Center)
+		text(gui, if heal then "HEALING - FREE" else spec.Name, 13, tint, IronUi.Bold, 0, top, 150, 16, Enum.TextXAlignment.Center)
 	name.TextStrokeTransparency = 0.3
 	local bar = new("Frame", {
 		Position = UDim2.fromOffset(25, 18 + top),
@@ -863,7 +863,7 @@ function OutpostScene.swing(nodeId: number?, walked: boolean?)
 	if model:GetAttribute("HealRock") then
 		-- A Rift's healing crystal: health back, never gems (RiftServer).
 		task.spawn(function()
-			local result = GemClient.request("RiftMine", id)
+			local result = GemClient.request(if model:GetAttribute("OutpostHeal") then "OutpostHit" else "RiftMine", id)
 			if not result.Ok then
 				if result.Message and result.Message ~= "" then
 					UiKit.toast(result.Message, P.Bad)

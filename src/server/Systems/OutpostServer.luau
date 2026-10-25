@@ -81,6 +81,8 @@ local OutpostServer = {}
 OutpostServer.Tag = "OutpostNode"
 
 local site = nil
+local healingSpots = {}
+local Heal = Rules.Heal
 local nodesFolder: Folder? = nil
 local nodes = {} -- [id] = { Id, Spot, Size, Hp, MaxHp, Model, ClaimedBy, ClaimUntil, Ready }
 local freeSpots: { [number]: boolean } = {}
@@ -364,7 +366,8 @@ local function spawnNode(field: boolean?, want: number?)
 	-- band's colour out along the trails (Shared.Frontier.Bands), its stone
 	-- its biome's (Shared.Frontier.Biomes).
 	local zone = site.Zones and site.Zones[index]
-	local size = Rules.rollSize(rng:NextNumber(), zone)
+	local healing = healingSpots[index] == true
+	local size = if healing then "Boulder" else Rules.rollSize(rng:NextNumber(), zone)
 	local spec = Rules.Sizes[size]
 	local band = zone and Frontier.Bands[zone]
 	local biome = Frontier.biomeAt(site.Spots[index].Position - Rules.Location.Position)
@@ -372,17 +375,20 @@ local function spawnNode(field: boolean?, want: number?)
 		size,
 		site.Spots[index],
 		rng,
-		if band then band.Color else nil,
-		if biome then biome.Stone else nil
+		if healing then Color3.fromRGB(70, 240, 95) elseif band then band.Color else nil,
+		if not healing and biome then biome.Stone else nil
 	)
+	local hp = if healing then Heal.Hp else spec.Hp
+	model:SetAttribute("HealRock", healing)
+	model:SetAttribute("OutpostHeal", healing)
 	model.Name = "Rock" .. nextId
 	model:SetAttribute("NodeId", nextId)
 	model:SetAttribute("Size", size)
 	model:SetAttribute("Zone", zone)
-	model:SetAttribute("Hp", spec.Hp)
-	model:SetAttribute("MaxHp", spec.Hp)
+	model:SetAttribute("Hp", hp)
+	model:SetAttribute("MaxHp", hp)
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Click to mine"
+	prompt.ActionText = if healing then "Click to heal - FREE" else "Click to mine"
 	prompt.ObjectText = ""
 	prompt.Style = Enum.ProximityPromptStyle.Custom
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
@@ -399,8 +405,9 @@ local function spawnNode(field: boolean?, want: number?)
 		Spot = index,
 		Size = size,
 		Zone = zone,
-		Hp = spec.Hp,
-		MaxHp = spec.Hp,
+		Hp = hp,
+		MaxHp = hp,
+		Healing = healing,
 		Model = model,
 		Ready = true,
 	}
@@ -433,7 +440,7 @@ local function popNode(node, player: Player)
 	-- Any other grows back where it was (an outcrop stays where it is): its
 	-- spot stays its own until then.
 	local epoch = spotEpoch[node.Spot]
-	task.delay(Rules.Sizes[node.Size].Respawn, function()
+	task.delay(if node.Healing then Heal.Regrow else Rules.Sizes[node.Size].Respawn, function()
 		if spotEpoch[node.Spot] ~= epoch then
 			return
 		end
@@ -649,6 +656,32 @@ local function hit(player: Player, nodeId: any)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return reply(false, "Your data is still loading.")
+	end
+	-- Healing has no gem payout or pick charge: usable even with an empty pick/full pouch.
+	if node.Healing then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if not humanoid or humanoid.Health <= 0 or Spar.isDown(player) then
+			return reply(false, "")
+		end
+		lastSwing[player] = now
+		node.Hp = math.max(0, node.Hp - 1)
+		local broke = node.Hp <= 0
+		local before = humanoid.Health
+		humanoid.Health = math.min(humanoid.MaxHealth, before + humanoid.MaxHealth * (Heal.Swing + (if broke then Heal.Pop else 0)))
+		node.Model:SetAttribute("LastHitBy", player.UserId)
+		node.Model:SetAttribute("LastCrit", false)
+		node.Model:SetAttribute("Hp", node.Hp)
+		local t = workspace:GetServerTimeNow()
+		character:SetAttribute("ActionKind", "Mine")
+		character:SetAttribute("ActionStart", t - 0.12)
+		character:SetAttribute("ActionAt", t + 0.05)
+		local mended = 0
+		if broke then
+			mended = require(script.Parent.KaijuServer).mend(player, Heal.Kaiju)
+			popNode(node, player)
+		end
+		return reply(true, "", { Healed = math.floor(humanoid.Health - before + 0.5), Broke = broke, Kaiju = mended, Hp = node.Hp, MaxHp = node.MaxHp })
 	end
 	-- Every rock pays a gem, so a full pouch would waste it: no swinging
 	-- (or spending the pick) until there's room.
@@ -1026,6 +1059,22 @@ function OutpostServer.start()
 			end
 		end
 	end)
+	-- Reserve four spaced, reachable mining sites around the welcome field.
+	local selected = {}
+	local candidates = table.clone(site.NearSpots or {})
+	for i in site.Spots do table.insert(candidates, i) end
+	for _, index in candidates do
+		if #selected >= Heal.Count then break end
+		local clear = not veinOf[index] and not healingSpots[index]
+		for _, previous in selected do
+			if (site.Spots[index].Position - site.Spots[previous].Position).Magnitude < 45 then clear = false end
+		end
+		if clear then
+			healingSpots[index] = true
+			table.insert(selected, index)
+			spawnNode(fieldSpots[index] == true, index)
+		end
+	end
 	for _ = 1, math.min(Rules.NodeCount, #site.Spots - #(site.FieldSpots or {})) do
 		spawnNode()
 	end
