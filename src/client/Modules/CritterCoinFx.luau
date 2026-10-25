@@ -2,11 +2,53 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
+local TweenService = game:GetService("TweenService")
 local CritterFx = require(script.Parent.CritterFx)
 
 local CoinFx = {}
 local active = 0
 local gold = Color3.fromRGB(255, 200, 55)
+
+-- Each coin lands with sparks; the final coin adds a short expanding pulse.
+local function collect(at: Vector3, final: boolean)
+	local flash = Instance.new("Part")
+	flash.Name = "CoinCollect"
+	flash.Shape = Enum.PartType.Ball
+	flash.Size = Vector3.one * 0.3
+	flash.Color = Color3.fromRGB(255, 230, 130)
+	flash.Material = Enum.Material.Neon
+	flash.Transparency = if final then 0.35 else 1
+	flash.Anchored = true
+	flash.CanCollide, flash.CanTouch, flash.CanQuery = false, false, false
+	flash.CastShadow = false
+	flash.CFrame = CFrame.new(at)
+	flash.Parent = workspace
+	Debris:AddItem(flash, 0.7)
+	local attachment = Instance.new("Attachment")
+	attachment.Parent = flash
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	sparks.Color = ColorSequence.new(Color3.fromRGB(255, 250, 210), gold)
+	sparks.LightEmission = 1
+	sparks.LightInfluence = 0
+	sparks.Rate = 0
+	sparks.Lifetime = NumberRange.new(0.2, 0.5)
+	sparks.Speed = NumberRange.new(4, 9)
+	sparks.Drag = 7
+	sparks.SpreadAngle = Vector2.new(180, 180)
+	sparks.Rotation = NumberRange.new(0, 360)
+	sparks.RotSpeed = NumberRange.new(-120, 120)
+	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
+	sparks.Transparency = NumberSequence.new(0, 1)
+	sparks.Parent = attachment
+	sparks:Emit(if final then 12 else 5)
+	if final then
+		TweenService:Create(flash, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = Vector3.one * 3.2,
+			Transparency = 1,
+		}):Play()
+	end
+end
 
 function CoinFx.play(origin: Vector3, userId: number, amount: number)
 	if typeof(origin) ~= "Vector3" or type(userId) ~= "number" or type(amount) ~= "number" then
@@ -91,6 +133,12 @@ function CoinFx.play(origin: Vector3, userId: number, amount: number)
 				local p = math.clamp((t - 0.7) / 0.45, 0, 1)
 				position = entry.Landing:Lerp(target, p * p) + Vector3.new(0, math.sin(p * math.pi) * 1.2, 0)
 				entry.Part.Transparency = if p >= 1 then 1 else 0
+				if p >= 1 and not entry.Collected then
+					entry.Collected = true
+					local glow = entry.Part:FindFirstChildOfClass("PointLight")
+					if glow then glow.Enabled = false end
+					collect(target, i == count)
+				end
 			end
 			entry.Part.CFrame = CFrame.new(position) * CFrame.Angles(0, t * 11 + i, math.rad(15))
 		end

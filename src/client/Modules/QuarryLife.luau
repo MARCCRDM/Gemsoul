@@ -14,7 +14,7 @@
 	  dust devils   three swirls of dust wandering the basin
 	  vents         vapour bursting out of cracks in four craters, in turn
 	  ore           crystal ore riding the conveyor from the drill rig
-	  spires        clusters of glowing crystal on the crater's top bench,
+	  spires        retired (no decorative crystal clusters),
 	                rose and violet like the Edge's richest rocks, so the
 	                rim catches the eye from the Shelter
 
@@ -68,7 +68,7 @@ QuarryLife.Vents = { V(200, 0, -260), V(-330, 0, 80), V(170, 0, 220), V(-150, 0,
 QuarryLife.VentEvery = 26
 QuarryLife.Conveyor = { V(64, 4.9, -124), V(46, 4.9, -112) } -- the rig's conveyor, along its top
 QuarryLife.Devils = 3
-QuarryLife.Spires = { Count = 12, Out = 467, Top = 15 } -- clusters round the top bench (OutpostWorld.benches)
+QuarryLife.Spires = { Count = 0 } -- decorative bench crystals removed
 
 -- A road's way out (radians round the middle: 0 east, a quarter turn south).
 local function roadAngle(road: number): number
@@ -394,29 +394,8 @@ function QuarryLife.build(at: CFrame): Life
 		)
 		table.insert(ore, chunk)
 	end
-	-- The crystal spires on the top bench: three shards a cluster, leaning
-	-- out of the rock, each with a sharper tip, between the bench's ramps.
+	-- Decorative bench crystals retired. Keep the empty list for scene consumers.
 	local spires = {}
-	local spec = QuarryLife.Spires
-	local tints = { Frontier.Bands.Edge.Color, Frontier.Bands.Vein.Color }
-	for c = 0, spec.Count - 1 do
-		local a = (c + 0.5) / spec.Count * math.pi * 2
-		local foot = V(math.cos(a) * spec.Out, spec.Top, math.sin(a) * spec.Out)
-		for k = 1, 3 do
-			local tall = 13 + ((c * 3 + k * 5) % 7) * 2
-			local wide = 2.4 + (k % 2) * 1.1
-			local lean = CFrame.Angles(math.rad(-12 + k * 9), a + k * 1.9, math.rad(-10 + ((c + k) % 3) * 9))
-			local base = CFrame.new(foot + V(math.cos(a + k * 2.1) * 2.6, 0, math.sin(a + k * 2.1) * 2.6)) * lean
-			local tint = tints[(c + k) % 2 + 1]
-			local shard = part(model, V(wide, tall, wide), tint, Enum.Material.Glass)
-			shard.Transparency = 0.15
-			shard.CFrame = at * base * CFrame.new(0, tall / 2 - 0.8, 0) * CFrame.Angles(0, math.rad(45), 0)
-			local tip = part(model, V(wide * 0.62, tall * 0.34, wide * 0.62), tint, Enum.Material.Neon)
-			tip.CFrame = at * base * CFrame.new(0, tall - 0.3, 0) * CFrame.Angles(0, math.rad(45), 0)
-			table.insert(spires, shard)
-			table.insert(spires, tip)
-		end
-	end
 	local life = {
 		Model = model,
 		At = at,

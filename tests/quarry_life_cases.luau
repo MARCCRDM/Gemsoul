@@ -412,34 +412,7 @@ for t = 0, 200, 0.5 do
 	check(bursting <= 1, "Vents bursting all at once")
 end
 
--- The crystal spires: on the crater's top bench (the server's), none on a
--- ramp up to it, none floating or sunk.
-do
-	local benchTop, ramps = nil, {}
-	for _, d in site.Model:FindFirstChild("Ground"):GetChildren() do
-		if d:IsA("BasePart") and d.CanCollide then
-			local low, high = box(d)
-			local r = flat((low + high) / 2).Magnitude
-			if d:IsA("WedgePart") then
-				table.insert(ramps, flat((low + high) / 2))
-			elseif r > Life.Spires.Out - 5 and r < Life.Spires.Out + 5 and high.Y < 40 then
-				benchTop = math.max(benchTop or 0, high.Y)
-			end
-		end
-	end
-	check(benchTop and math.abs(benchTop - Life.Spires.Top) < 0.01, "The spires aren't at the top bench's height")
-	check(#life.Spires == Life.Spires.Count * 6, "Not three shards in every spire cluster")
-	for i = 1, #life.Spires, 2 do
-		local shard = life.Spires[i]
-		local low, high = box(shard)
-		local r = flat((low + high) / 2).Magnitude
-		check(r > Life.Spires.Out - 9 and r < Life.Spires.Out + 7, "A spire off the top bench: " .. r)
-		check(low.Y < Life.Spires.Top + 0.1 and low.Y > Life.Spires.Top - 3, "A spire floats or sinks")
-		for _, ramp in ramps do
-			check((flat((low + high) / 2) - ramp).Magnitude > 20, "A spire on a ramp")
-		end
-	end
-end
+check(#life.Spires == 0 and Life.Spires.Count == 0, "Retired decorative crystals returned")
 
 -- The ore rides along the conveyor, between its ends.
 local a, b = Life.Conveyor[1], Life.Conveyor[2]

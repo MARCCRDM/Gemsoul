@@ -2744,7 +2744,7 @@ function InventoryV2.drawCompare()
 			)
 		else
 			textValue = if state.Tab == "Pieces"
-				then "Pick a spare piece to compare it with what you wear."
+				then "Pick a spare piece to compare. Drag gems from your bag onto equipment."
 				else "Pick a gem above, or drag one onto any piece."
 		end
 	end
@@ -2933,6 +2933,7 @@ local function drawDetail(loadout)
 		drawGrid(items, "No surge gems yet. Cut a gem at the Outpost to unlock its surge.")
 	else
 		local slot = target
+		state.Tab = "Pieces" -- gems are selected from the main bag, not duplicated here
 		local wornId = loadout[slot]
 		local wornGem = loadout[slot .. "Gem"]
 		-- A pick is tried on in place: its piece (with the slot's gem, which
@@ -3071,8 +3072,8 @@ local function drawDetail(loadout)
 			ui.PerkText.Text = "Nothing worn here. Pick a spare piece below."
 			ui.PerkValue.Text = ""
 		end
-		drawTabs({ { "Gems", "GEMS" }, { "Pieces", SLOT_NAME[slot] .. " PIECES" } })
-		drawFilters(state.Tab == "Gems")
+		drawTabs({ { "Pieces", SLOT_NAME[slot] .. " PIECES" } })
+		drawFilters(false)
 		local items = {}
 		if state.Tab == "Pieces" then
 			for _, spare in sparesFor(slot) do
@@ -3087,11 +3088,6 @@ local function drawDetail(loadout)
 				end)
 			end
 			drawGrid(items, "No spare " .. string.lower(SLOT_NAME[slot]) .. " pieces. Mine and trade for more.")
-		else
-			for _, g in gemsFor(false, state.Filter) do
-				table.insert(items, { Kind = "Gem", Gem = g })
-			end
-			drawGrid(items, "No cut gems yet. Mine the Outpost and cut what you find.")
 		end
 	end
 	InventoryV2.drawCompare()
