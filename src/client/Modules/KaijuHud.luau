@@ -3,7 +3,9 @@
 	docs/kaiju.md). Only in the Outpost.
 
 	  The team strip  your team out, a tile each, the lead first (edged in
-	                  gold): its portrait (the model itself), level, health,
+	                  gold), then your support (Shared.Kaiju.supportId), a
+	                  little apart and edged in green with a plus: its
+	                  portrait (the model itself), level, health,
 	                  and dots for its Q, E and R, lit when ready (hollow
 	                  while asleep); knocked out, DOWN and when it's back by
 	                  itself (tap it to revive it now). AUTO HEAL at
@@ -26,15 +28,19 @@
 	                  and your kaiju alone till you start on it, here or by
 	                  hitting it while you hunt.
 	  The panel       every kaiju you have: your team first (all of them
-	                  fight; the first leads), then the ones at home, each by
-	                  its name (Shared.Kaiju.nameOf). The one picked in full:
+	                  fight; the first leads), then your SUPPORT (it heals
+	                  you and the team), then the ones at home, each by its
+	                  name (Shared.Kaiju.nameOf) and tagged with its role.
+	                  The one picked in full:
 	                  its name and RENAME (type a name, SAVE: the server's
 	                  KaijuName, Roblox's filter; empty for no name), its kind,
 	                  role and level, its enchant's rarity, what it's strong
 	                  and weak against, its stats, its moves and when Q and R
 	                  wake; and what you can do with it: LEAD (to the front),
 	                  SEND OUT (one from home, in place of one of the team you
-	                  pick), HEAL (REVIVE when it's down). Its enchant's gem
+	                  pick; a support kind can't), SET AS SUPPORT (a support
+	                  kind at home, into the support slot), HEAL (REVIVE when
+	                  it's down). Its enchant's gem
 	                  sits on its portrait.
 	  ENCHANT         its enchant (Shared.Kaiju.canSocket: a gem of its own
 	                  element only): the one in it at the top (rarity, what it
@@ -84,6 +90,7 @@ local ContextActionService = game:GetService("ContextActionService")
 
 local Coupons = require(ReplicatedStorage.Shared.Coupons)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+local KaijuRoles = require(ReplicatedStorage.Shared.KaijuRoles)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
@@ -116,6 +123,17 @@ local TILE_BACK = Color3.fromRGB(20, 24, 38)
 local TAME_RANGE = Kaiju.Tame.Range
 -- Its own Q, E and R, and its gem surge (its enchant's E).
 local KEYS = { "Q", "E", "R", "Gem" }
+-- The support: its slot's colour (a mender's green), and each role's colour
+-- for the role tags on the panel's rows.
+local SUPPORT = Color3.fromRGB(96, 226, 170)
+local ROLE_COLORS = {
+	Tank = Color3.fromRGB(120, 172, 236),
+	Warrior = Color3.fromRGB(238, 124, 92),
+	Ranged = Color3.fromRGB(240, 202, 92),
+	Assassin = Color3.fromRGB(192, 126, 242),
+	Breaker = Color3.fromRGB(242, 152, 64),
+	Warden = SUPPORT,
+}
 local KEY_EVERY = { Q = Kaiju.QEvery, E = Kaiju.AbilityEvery, R = Kaiju.REvery, Gem = Kaiju.GemSurge.Every }
 local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", Gem = "KaijuGemAt" }
 
@@ -289,7 +307,8 @@ UiKit.round(card, 10)
 new("UIStroke", { Color = P.Edge, Thickness = 1.2, Transparency = 0.2 }, card)
 
 local tiles = {}
-for slot = 1, #Kaiju.SlotLevels do
+for slot = 1, #Kaiju.SlotLevels + 1 do
+	local support = slot == Kaiju.SupportSlot
 	local button = new("TextButton", {
 		Name = "KaijuTile" .. slot,
 		Text = "",
@@ -331,6 +350,20 @@ for slot = 1, #Kaiju.SlotLevels do
 	healthBack.AnchorPoint = Vector2.new(0, 1)
 	healthBack.Position, healthBack.Size = UDim2.new(0, 4, 1, -4), UDim2.new(1, -8, 0, 4)
 	healthBack.ZIndex, healthFill.ZIndex = 3, 3
+	if support then
+		-- The support's mark: a green plus above its health.
+		for _, size in { Vector2.new(9, 3), Vector2.new(3, 9) } do
+			local arm = new("Frame", {
+				Name = "SupportMark",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0, 9, 1, -15),
+				Size = UDim2.fromOffset(size.X, size.Y),
+				BackgroundColor3 = SUPPORT,
+				ZIndex = 4,
+			}, button)
+			UiKit.round(arm, 1)
+		end
+	end
 	-- Knocked out: a veil, DOWN and when it's back by itself.
 	local veil = new("Frame", {
 		BackgroundColor3 = INK,
@@ -451,7 +484,7 @@ local function layout()
 	local hunting = Spar.hunting(player)
 	-- (Beside the chat box's CHAT button on a small keyboard screen, while it's on.)
 	local spot = MobileLayout.kaiju(UserInputService.KeyboardEnabled and not ChatFeed.Enabled)
-	local w, h = if phone then spot.W else 368, if phone then spot.H else 62
+	local w, h = if phone then spot.W else 432, if phone then spot.H else 62
 	card.Size = UDim2.fromOffset(w, h)
 	tame.Size = UDim2.fromOffset(if phone then spot.TameW else 104, h)
 	local x, y
@@ -477,12 +510,14 @@ local function layout()
 	-- The tiles share what AUTO HEAL and CALL BACK leave.
 	local buttonW, gap = if phone then 54 else 68, if phone then 4 else 6
 	local th = h - 10
+	-- (The support's tile a gap further along: it isn't one of the three.)
 	local tw = math.min(
 		math.floor(th * 1.25),
-		math.floor((w - 10 - buttonW * 2 - gap - 8 - gap * (#tiles - 1)) / #tiles)
+		math.floor((w - 10 - buttonW * 2 - gap - 8 - gap * #tiles) / #tiles)
 	)
 	for slot, tile in tiles do
-		tile.Button.Position = UDim2.fromOffset(5 + (slot - 1) * (tw + gap), 5)
+		local apart = if slot == Kaiju.SupportSlot then gap else 0
+		tile.Button.Position = UDim2.fromOffset(5 + (slot - 1) * (tw + gap) + apart, 5)
 		tile.Button.Size = UDim2.fromOffset(tw, th)
 	end
 	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or OFF.
@@ -602,8 +637,9 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 		tile.Look = look
 		portrait(tile.View, modelFor("hud:" .. tile.Slot, record))
 	end
-	tile.Edge.Color = if lead then P.Gold else color:Lerp(P.Edge, 0.35)
-	tile.Edge.Thickness = if lead then 2 else 1.5
+	local support = tile.Slot == Kaiju.SupportSlot
+	tile.Edge.Color = if lead then P.Gold elseif support then SUPPORT else color:Lerp(P.Edge, 0.35)
+	tile.Edge.Thickness = if lead or support then 2 else 1.5
 	local level = (model and model:GetAttribute("KaijuLevel")) or record.Level
 	tile.Level.Text = string.format("Lv %d", level)
 	local share = healthShare(record, model)
@@ -641,7 +677,11 @@ local SHORT = UiKit.short()
 local W, H = if SHORT then 860 else 800, if SHORT then 340 else 512
 local window = IronUi.window("KaijuPanel", 11, W, H, "K", P.Gold)
 window.Title.Text = "YOUR KAIJU"
+<<<<<<< HEAD
 window.Subtitle.Text = "Choose a kaiju to inspect, heal, enchant, or swap into your team."
+=======
+window.Subtitle.Text = "Your team fights beside you; your support heals you. Pick one to see it."
+>>>>>>> 0e9d1d304de41cdbad83753cba8d2378909fed7c
 window.Close.Activated:Connect(function()
 	window.Gui.Enabled = false
 end)
@@ -1316,6 +1356,8 @@ end
 local function rowStatus(record, slot: number?): (string, Color3)
 	if record.Down then
 		return string.format("Lv %d  ·  DOWN: REVIVE IT", record.Level), P.Bad:Lerp(P.Text, 0.3)
+	elseif slot == Kaiju.SupportSlot then
+		return string.format("Lv %d  ·  HEALS YOU", record.Level), SUPPORT
 	elseif slot == 1 then
 		return string.format("Lv %d  ·  LEADER", record.Level), P.Gold
 	elseif slot then
@@ -1341,17 +1383,33 @@ local function kaijuRow(order: number, record, slot: number?, models)
 	UiKit.round(view, 8)
 	portrait(view, modelFor("row:" .. record.Id, record))
 	if slot then
-		-- Its place in the team: 1 leads.
+		-- Its place in the team: 1 leads; the support's a plus.
+		local support = slot == Kaiju.SupportSlot
 		local badge = new("Frame", {
 			Position = UDim2.fromOffset(2, 2),
 			Size = UDim2.fromOffset(16, 16),
-			BackgroundColor3 = if slot == 1 then P.Gold else P.Slot,
+			BackgroundColor3 = if slot == 1 then P.Gold elseif support then SUPPORT else P.Slot,
 			ZIndex = 3,
 		}, row)
 		UiKit.round(badge, 8)
-		local n = label(badge, tostring(slot), 10, if slot == 1 then INK else P.Text, Enum.Font.GothamBlack)
+		local n = label(badge, if support then "+" else tostring(slot), if support then 13 else 10, if slot == 1 or support then INK else P.Text, Enum.Font.GothamBlack)
 		n.Size, n.TextXAlignment, n.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
 	end
+	-- Its role, tagged in the role's colour (Shared.KaijuRoles).
+	local roleId = KaijuRoles.of(record.Species)
+	local roleColor = ROLE_COLORS[roleId] or P.Dim
+	local tag = new("Frame", {
+		Name = "Role",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -8, 0, 22),
+		Size = UDim2.fromOffset(62, 14),
+		BackgroundColor3 = roleColor:Lerp(INK, 0.78),
+		ZIndex = 3,
+	}, row)
+	UiKit.round(tag, 4)
+	new("UIStroke", { Color = roleColor, Thickness = 1, Transparency = 0.35 }, tag)
+	local roleText = label(tag, KaijuRoles.Roles[roleId] and KaijuRoles.Roles[roleId].Name or "", 9, roleColor, IronUi.Bold)
+	roleText.Size, roleText.TextXAlignment, roleText.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
 	if soulUi.upgrade(record, soulUi.Gems or {}) then
 		-- (A better gem of its element in your pouch: ENCHANT.)
 		local dot = new("Frame", {
@@ -1368,10 +1426,14 @@ local function kaijuRow(order: number, record, slot: number?, models)
 	name.Position, name.Size = UDim2.fromOffset(60, 6), UDim2.new(1, -66, 0, 16)
 	local statusText, statusColor = rowStatus(record, slot)
 	local status = label(row, statusText, 10, statusColor, IronUi.Bold)
+<<<<<<< HEAD
 	status.Position, status.Size = UDim2.fromOffset(60, 23), UDim2.new(1, -66, 0, 13)
 	local species = Kaiju.species(record.Species)
 	local identity = label(row, (species and species.Name or record.Species) .. " / " .. tostring(record.Element), 10, P.Dim, IronUi.Body)
 	identity.Position, identity.Size = UDim2.fromOffset(60, 37), UDim2.new(1, -66, 0, 13)
+=======
+	status.Position, status.Size = UDim2.fromOffset(60, 23), UDim2.new(1, -134, 0, 13)
+>>>>>>> 0e9d1d304de41cdbad83753cba8d2378909fed7c
 	local live = { Record = record, Slot = slot, Status = status }
 	if swapping and slot then
 		local cue = label(row, if record.Id == swapTarget then "REPLACING" else "TAP TO REPLACE", 9, P.Gold, IronUi.Bold)
@@ -1405,6 +1467,13 @@ local function drawList(data, team: { string })
 	for slot, id in team do
 		inTeam[id] = slot
 		kaijuRow(1 + slot, data.List[id], slot, models)
+	end
+	-- Your support: out with the team, healing you (Kaiju.supportId).
+	local supportId = Kaiju.supportId(data)
+	if supportId then
+		inTeam[supportId] = Kaiju.SupportSlot
+		heading(10, "SUPPORT", "HEALS YOU + TEAM")
+		kaijuRow(11, data.List[supportId], Kaiju.SupportSlot, models)
 	end
 	local home = {}
 	for id, record in (data and data.List) or {} do
@@ -1475,6 +1544,7 @@ local function drawActions(data, record, team: { string })
 		end
 	end
 	local slot = table.find(team, record.Id)
+<<<<<<< HEAD
 	if swapping and not slot then
 		local replacing = swapTarget and data.List[swapTarget]
 		local targetSlot = swapTarget and table.find(team, swapTarget)
@@ -1502,6 +1572,34 @@ local function drawActions(data, record, team: { string })
 					drawPanel()
 				end)
 			end)
+=======
+	local supportId = Kaiju.supportId(data)
+	local support = Kaiju.isSupport(record.Species)
+	if swapping and not slot and not support then
+		-- SEND OUT: in place of which of the team?
+		actionText.Text = "In place of:"
+		actionText.Size = UDim2.new(0, 80, 1, 0)
+		for i, id in team do
+			local other = data.List[id]
+			local species = other and Kaiju.species(other.Species)
+			actionButton(
+				i,
+				string.upper(species and species.Name or id),
+				elementColor(other and other.Element),
+				100,
+				function()
+					local ids = table.clone(team)
+					ids[i] = record.Id
+					act(function()
+						local result = GemClient.request("KaijuTeam", ids)
+						say(result)
+						if result and result.Ok then
+							swapping = false
+						end
+					end)
+				end
+			)
+>>>>>>> 0e9d1d304de41cdbad83753cba8d2378909fed7c
 		end
 		actionButton(2, "CANCEL", P.Edge, 90, function()
 			swapping, swapTarget = false, nil
@@ -1517,6 +1615,15 @@ local function drawActions(data, record, team: { string })
 		actionButton(1, "LEAD", P.Gold, 100, function()
 			act(function()
 				say(GemClient.request("KaijuActive", record.Id))
+			end)
+		end)
+	elseif record.Id == supportId then
+		actionText.Text = "Your support: it floats behind you and heals you and your team."
+	elseif support then
+		actionText.Text = "A support: it goes in the support slot, not the team."
+		actionButton(1, "SET AS SUPPORT", SUPPORT, 130, function()
+			act(function()
+				say(GemClient.request("KaijuSupport", record.Id))
 			end)
 		end)
 	else
@@ -1556,10 +1663,16 @@ local function drawDetail(data, record, team: { string })
 	heroTag.Text = string.format(
 		"%s%s  ·  %s %d  ·  %s",
 		if named then string.upper(Kaiju.title(record)) .. "  ·  " else "",
-		string.upper(species and species.Role or ""),
+		string.upper(
+			(species and KaijuRoles.Roles[species.Role] and KaijuRoles.Roles[species.Role].Name) or (species and species.Role) or ""
+		),
 		if named then "LV" else "LEVEL",
 		record.Level,
-		if record.Down then "DOWN" elseif slot == 1 then "LEADS" elseif slot then "OUT" else "AT HOME"
+		if record.Down then "DOWN"
+			elseif slot == 1 then "LEADS"
+			elseif slot then "OUT"
+			elseif Kaiju.supportId(data) == record.Id then "SUPPORT"
+			else "AT HOME"
 	)
 	local attuned = Kaiju.attuned(record)
 	pillText.Text = string.upper(GemConfig.TierLabels[tier] or tier)
@@ -2420,8 +2533,9 @@ local function refresh()
 		return
 	end
 	local models = petModels()
+	local supportId = Kaiju.supportId(data)
 	for slot, tile in tiles do
-		local id = team[slot]
+		local id = if slot == Kaiju.SupportSlot then supportId else team[slot]
 		local record = id and data.List[id]
 		tile.Button.Visible = record ~= nil
 		if record then

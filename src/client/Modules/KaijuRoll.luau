@@ -9,9 +9,10 @@
 	spot, then its E move rises out of it, ready. Under it go its name, its
 	kind, its health, damage and speed, what it's like, and its three moves
 	with their icons (E now, Q at level 5, R at level 10). The first stops,
-	then the next, then the last; click to land them all at once. START
-	claims them; the server keeps the roll till then, so leaving doesn't
-	reroll it.
+	then the next, then the last; click to land them all at once. Once
+	they're all down, the starter support (Shared.Kaiju.StarterSupport,
+	the fourth, given with them) is named under the cards. START claims
+	them; the server keeps the roll till then, so leaving doesn't reroll it.
 
 	  KaijuRoll.play(after)   the roll you're owed, then after() (at once if
 	                          there's none): in the intro after the gem roll,
@@ -52,6 +53,7 @@ local C = {
 	Good = Color3.fromRGB(90, 220, 150),
 	Night = Color3.fromRGB(16, 22, 42),
 }
+local SUPPORT = Color3.fromRGB(96, 226, 170) -- (the support's green, as Client.KaijuHud's)
 local RANKS = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 -- The gem roll's sizes (px), with a window wide enough for a kaiju: the
 -- board, a card and the step to the next, the window and one kaiju on the
@@ -835,6 +837,37 @@ function KaijuRoll.play(after: (() -> ())?)
 		finished = true
 		title.Text = "YOUR KAIJU ARE LOCKED IN"
 		LotterySound.play("Attune")
+		-- And the fourth, the starter support (Shared.Kaiju.StarterSupport),
+		-- named under the cards: it comes with them.
+		local starter = Kaiju.StarterSupport
+		local kind = Kaiju.species(starter.Species)
+		local support = frame(board, {
+			Name = "SupportNote",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, goY + 6),
+			Size = UDim2.fromOffset(660, 40),
+			BackgroundColor3 = C.Ink,
+			BackgroundTransparency = 1,
+			ZIndex = 44,
+		})
+		UiKit.round(support, 10)
+		local supportEdge = stroke(support, SUPPORT, 1, 1.5)
+		local supportText = label(
+			support,
+			string.format(
+				"+ SUPPORT  ·  %s %s joins you: it heals you and your team",
+				string.upper(GemConfig.ElementLabels[starter.Element] or starter.Element),
+				string.upper(kind and kind.Name or starter.Species)
+			),
+			14,
+			SUPPORT,
+			Enum.Font.GothamBlack
+		)
+		supportText.Size, supportText.TextXAlignment, supportText.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 45
+		supportText.TextTransparency = 1
+		tween(support, 0.35, { BackgroundTransparency = 0.15 })
+		tween(supportText, 0.35, { TextTransparency = 0 })
+		tween(supportEdge, 0.35, { Transparency = 0.2 })
 		-- (No button: a moment to see them, then on by itself. START only
 		-- comes back as a retry if the claim fails.)
 		task.delay(AUTO, function()

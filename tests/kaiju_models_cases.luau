@@ -48,7 +48,7 @@ local FIRST = { Bulwark = true, Razorback = true, Carapace = true, Scythe = true
 local LEGLESS = { Longcoil = true } -- a serpent on its coils
 local BUDGET = 90 -- parts in one kaiju (up to 3 per player, plus the wild ones)
 
-check(#SPECIES == 32, "Not 32 kinds")
+check(#SPECIES == 33, "Not 33 kinds")
 for _, kind in Roster.Order do
 	local hide = KaijuShapes.Hides[kind]
 	check(hide and hide[1] and hide[2], kind .. ": no hide")
@@ -305,7 +305,7 @@ check(math.abs(Motion.fight("Razorback", { Mood = "Nope", MoodAt = 100 }, 102).L
 
 print(
 	string.format(
-		"PASS: %d kaiju model checks (32 kinds x 4 elements, joints, ground, budget, motions, fight poses, moods)",
+		"PASS: %d kaiju model checks (33 kinds x 4 elements, joints, ground, budget, motions, fight poses, moods)",
 		checks
 	)
 )

@@ -1,6 +1,7 @@
 --[[
 	The roster's new kinds (docs/kaiju-roster-expansion.md: 28 of its first
-	thirty; Prisma and Clawtide were left out). Each is a silhouette
+	thirty; Prisma and Clawtide were left out; and Skyjelly, number 57 on
+	the second sheet, the starter support). Each is a silhouette
 	(Shared.KaijuModels), a role, a stat line, a fight style and three moves
 	of its own. Shared.Kaiju, Shared.KaijuRoles and Shared.KaijuFight merge
 	them in beside the first four kinds, so everything that reads those
@@ -64,6 +65,7 @@ Roster.Order = {
 	"Bladebrow",
 	"Lankshade",
 	"Voltfin",
+	"Skyjelly",
 }
 
 -- A shooter's volleys outside a battle (KaijuFight.Styles' Ranged): as a
@@ -776,11 +778,64 @@ Roster.Kinds = {
 			Ranged = volley("Scale Dust"),
 		},
 	},
+	-- The starter support (Kaiju.StarterSupport): everyone's fourth kaiju,
+	-- in the support slot from the start. Not wild (Kaiju.WildRoster).
+	Skyjelly = {
+		Name = "Skyjelly",
+		Role = "Warden",
+		Blurb = "A support: a glowing jelly that floats behind you. It mends you and your team and shields them.",
+		Health = 200,
+		Damage = 9,
+		Rate = 0.9,
+		Speed = 18,
+		Reach = 5.5,
+		Guard = 0,
+		Habitat = "Fringe",
+		Kit = { E = "K_PulseMend", Q = "K_StaticVeil", R = "K_BloomSurge" },
+		Voice = "Razorback",
+		Fight = {
+			Names = { Light = "Tendril Sting", Heavy = "Static Pulse", Punish = "Tendril Lash", Lunge = "Drift" },
+			Windup = 0.8,
+			Heavy = 1.5,
+			Combo = 2,
+			ComboChance = 0.6,
+			ComboGap = 0.4,
+			GuardMult = 0.4,
+			Hop = 1.4,
+			Ranged = volley("Static Spark"),
+		},
+	},
 }
 
 -- Their moves. Mult is the share the description quotes; Power the
 -- move's size in its blows (KaijuRoles.Kits' notes).
 Roster.Moves = {
+	-- Skyjelly (the support: its E is also its pulse, KaijuServer)
+	K_PulseMend = {
+		Name = "Pulse Mend",
+		Key = "E",
+		From = "Bio Regrowth",
+		IconSource = "LeechBloom",
+		Description = "A pulse of light: it, you and every ally near it heal 15% of their health over 3s.",
+		Plan = { Shape = "Mend", Heal = 0.15, Duration = 3, Team = true, Radius = 24, Power = 0 },
+	},
+	K_StaticVeil = {
+		Name = "Static Veil",
+		Key = "Q",
+		From = "Ice Armor",
+		IconSource = "SolarFlare",
+		Description = "A veil of static over its team: it and every ally near it take 30% less for 4s.",
+		Plan = { Shape = "Ward", Reduce = 0.3, Duration = 4, Team = true, Radius = 24, Power = 1 },
+	},
+	K_BloomSurge = {
+		Name = "Bloom Surge",
+		Key = "R",
+		From = "Bio Regrowth",
+		IconSource = "LeechBloom",
+		Description = "Hurt: it blooms bright, healing it, you and every ally near it 30% of their health over 4s and clearing their effects.",
+		Plan = { Shape = "Mend", Heal = 0.3, Duration = 4, Team = true, Radius = 26, Cleanse = true, Power = 0 },
+		When = "Half",
+	},
 	-- Ironhide
 	K_ThornHide = {
 		Name = "Thorn Hide",

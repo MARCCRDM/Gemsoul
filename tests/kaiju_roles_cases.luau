@@ -149,7 +149,7 @@ do
 	for _ in owner do
 		count += 1
 	end
-	check(count == 84, "Not 84 moves of their own")
+	check(count == 87, "Not 87 moves of their own")
 	-- The warden's team moves land on its friends too.
 	local team = 0
 	for _, key in { "Q", "E", "R" } do
@@ -714,7 +714,7 @@ print(string.format("  level 10: %d of the kits' 12 moves cast", seen))
 -- kind's teams win much more or much less than half (KaijuRoles' Power and
 -- the kinds' stats, tuned on this). All 32: too many teams for that, so
 -- each kind leads its share of seeded random three-on-threes against teams
--- drawn from all 32, and no kind's teams may win far more or far less
+-- drawn from every fighting kind, and no kind's teams may win far more or far less
 -- than half.
 do
 	local power = KaijuRoles.power
@@ -804,13 +804,20 @@ do
 		print(string.format("  level %d, %d battles: %s", level, #games, table.concat(line, ", ")))
 	end
 
-	-- All 32, sampled (a fixed seed: the same battles every run).
+	-- Every fighting kind, sampled (a fixed seed: the same battles every
+	-- run). Not the support kinds: they never take a fighting slot (they
+	-- come as a fourth, Kaiju.supportId).
 	local seed = 20261021
 	local function roll(n: number): number
 		seed = (seed * 16807) % 2147483647
 		return seed % n + 1
 	end
-	local all = Kaiju.Order
+	local all = {}
+	for _, kind in Kaiju.Order do
+		if not Kaiju.isSupport(kind) then
+			table.insert(all, kind)
+		end
+	end
 	local LEAD = 24 -- battles each kind leads (half on each side)
 	local BAND = { 0.28, 0.72 }
 	for _, level in { 1, 5, 10 } do
@@ -828,14 +835,14 @@ do
 			local s = share[species]
 			check(
 				s > BAND[1] and s < BAND[2],
-				string.format("Level %d (all 32): %s's teams win %.0f%%", level, species, s * 100)
+				string.format("Level %d (all %d): %s's teams win %.0f%%", level, #all, species, s * 100)
 			)
 			low, high = math.min(low, s), math.max(high, s)
 			table.insert(line, string.format("%s %.0f", species, s * 100))
 		end
 		print(
 			string.format(
-				"  level %d, all 32, %d battles (%.0f%% to %.0f%%): %s",
+				"  level %d, every fighter, %d battles (%.0f%% to %.0f%%): %s",
 				level,
 				#sampled,
 				low * 100,
@@ -874,5 +881,5 @@ end
 print(
 	"PASS: "
 		.. checks
-		.. " kaiju role checks (roles and kits, who it picks and where it stands, whole battles: no standing about, onto the next after a kill, 3 on 1, the shooter at the back, the tank's roar, the assassin's leap, inside the court; the roster's own kits; the balance at levels 1, 5 and 10, the first four and all 32; 1V1 + KAIJU's result)"
+		.. " kaiju role checks (roles and kits, who it picks and where it stands, whole battles: no standing about, onto the next after a kill, 3 on 1, the shooter at the back, the tank's roar, the assassin's leap, inside the court; the roster's own kits; the balance at levels 1, 5 and 10, the first four and every fighting kind; 1V1 + KAIJU's result)"
 )

@@ -43,7 +43,7 @@ the four Vein kinds.
 | Role | Where it stands | What it does |
 | --- | --- | --- |
 | **Breaker** (ROMPEDOR) | The front row | It goes for the foe with the toughest guard (the highest Guard; the nearest, if that's a tie), and stays on it. Its R comes when it's crowded, as a warrior's does. |
-| **Warden** (GUARDIÁN) | The back row, with the shooters | It shoots from range. Its moves look after its team: Moonmoth's Scale Storm wards it and every ally within 20 studs (35% less damage for 4 s), and its Silk Cocoon heals them all 20% of their health over 4 s. |
+| **Warden**, shown as **SUPPORT** (APOYO) | The back row, with the shooters; out of a battle, the support slot | It shoots from range. Its moves look after its team: Moonmoth's Scale Storm wards it and every ally within 20 studs (35% less damage for 4 s), and its Silk Cocoon heals them all 20% of their health over 4 s. Since Oct 25 a Warden kind goes only in the support slot, the fourth kaiju out, and Skyjelly is everyone's starter support: see [kaiju.md](kaiju.md#your-support-the-fourth-kaiju). |
 
 The proposal said a Breaker's blows would ignore half of a guard. That
 isn't in: a Breaker picks the toughest guard instead.

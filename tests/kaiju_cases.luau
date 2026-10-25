@@ -62,7 +62,7 @@ local GemTraits = shared("GemTraits")
 local ElementMatchup = shared("ElementMatchup")
 
 -- Species and stats ------------------------------------------------------------------------
-check(#Kaiju.Order == 32 and #Kaiju.Elements == 4, "Thirty-two species in four elements")
+check(#Kaiju.Order == 33 and #Kaiju.Elements == 4, "Thirty-three species in four elements")
 check(#Kaiju.Starters == 4, "Not four starters")
 for i, id in { "Bulwark", "Razorback", "Carapace", "Scythe" } do
 	check(Kaiju.Starters[i] == id and Kaiju.Order[i] == id, "The starters aren't the first four")
@@ -866,9 +866,53 @@ do
 	check(bombers / (2000 - lone) > 0.25, "Bombers no more common in their own biome")
 end
 
+-- The support slot: a support kind never takes a fighting slot; the one in
+-- the support slot is the one put there, else the best; it's out after the
+-- team, in SupportSlot; the starter support is owed once, after the roll.
+do
+	local function soul(element, n)
+		return Kaiju.rollSoul(Random.new(n), element, { Id = "ss" .. n, Time = 1 })
+	end
+	check(Kaiju.isSupport("Skyjelly") and Kaiju.isSupport("Moonmoth") and not Kaiju.isSupport("Bulwark"), "Who's a support")
+	check(shared("KaijuRoles").Roles[Kaiju.SupportRole].Name == "SUPPORT", "The support role isn't called SUPPORT")
+	local roster = { List = {}, Next = 1 }
+	local jelly = Kaiju.add(roster, "Skyjelly", soul("Shock", 1), 1)
+	local moth = Kaiju.add(roster, "Moonmoth", soul("Shock", 2), 4)
+	for i, kind in { "Bulwark", "Razorback", "Carapace", "Scythe" } do
+		Kaiju.add(roster, kind, soul("Fire", 10 + i), 1)
+	end
+	roster.Team = { jelly.Id, moth.Id }
+	local team = Kaiju.teamIds(roster)
+	check(#team == 3, "Not three fighters out")
+	for _, id in team do
+		check(not Kaiju.isSupport(roster.List[id].Species), "A support took a fighting slot")
+	end
+	check(Kaiju.supportId(roster) == moth.Id, "The best support isn't the one out")
+	check(Kaiju.setSupport(roster, jelly.Id) and Kaiju.supportId(roster) == jelly.Id, "The chosen support isn't out")
+	check(not Kaiju.setSupport(roster, team[1]), "A fighter went in the support slot")
+	local squad, slots = Kaiju.squadIds(roster)
+	check(#squad == 4 and squad[4] == jelly.Id and slots[jelly.Id] == Kaiju.SupportSlot, "The squad isn't team + support")
+	check(Kaiju.TeamSpots[Kaiju.SupportSlot] ~= nil, "No spot for the support")
+	check(Kaiju.supportId({ List = {}, Next = 1 }) == nil, "A support out of nowhere")
+	-- Owed once, after the roll, unless you have the kind.
+	local profile = { Kaiju = { List = {}, Next = 1 } }
+	check(not Kaiju.supportOwed(profile), "The support owed before the roll")
+	profile.KaijuRolled = Kaiju.RollVersion
+	check(Kaiju.supportOwed(profile), "The support not owed after the roll")
+	profile.KaijuSupport = Kaiju.SupportVersion
+	check(not Kaiju.supportOwed(profile), "The support owed twice")
+	-- One past a full roster, for the starter support only.
+	local full = { List = {}, Next = 1 }
+	for i = 1, Kaiju.MaxOwned do
+		Kaiju.add(full, "Bulwark", soul("Fire", 100 + i), 1)
+	end
+	check(Kaiju.add(full, "Skyjelly", soul("Shock", 3), 1) == nil, "Past a full roster")
+	check(Kaiju.add(full, "Skyjelly", soul("Shock", 3), 1, true) ~= nil, "The starter support refused on a full roster")
+end
+
 print(
 	string.format(
-		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), names, your team, the starter roll, fighting as a team, sizes)",
+		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), names, your team, the support slot, the starter roll, fighting as a team, sizes)",
 		checks
 	)
 )
