@@ -157,6 +157,8 @@ local function busy(player: Player): string?
 		return "is in an Arena session"
 	elseif player:GetAttribute("Expedition") then
 		return "is on an expedition"
+	elseif player:GetAttribute("DungeonId") or player:GetAttribute("DungeonQueue") then
+		return "is in a dungeon or dungeon queue"
 	elseif player:GetAttribute("RiftRun") then
 		return "is in the Rift"
 	elseif not alive(player) then
@@ -882,6 +884,30 @@ local function introJoin(player: Player)
 	return reply(true, "Finding your first opponent…")
 end
 
+-- Automatic returns search ranked, but cannot launch until the player accepts.
+local function autoReturn(player: Player)
+	if entryOf(player) then return reply(true, "Already searching.") end
+	local ready = AutoQueue.ready(function(name) return player:GetAttribute(name) end, false)
+	if not ready or busy(player) then return reply(false, "Return to the lobby first.") end
+	local entry = enqueue("1v1", { player }, 1)
+	entry.NeedsConsent = true
+	return reply(true, "Searching ranked 1v1. You will be asked before joining.")
+end
+
+local function askReturn(entry)
+	if not entry.NeedsConsent then return true end
+	if not entry.ConsentUntil then
+		local player = entry.Players[1]
+		entry.ConsentUntil = os.clock() + AutoQueue.AskSeconds
+		entry.Asked[player] = true
+		Remotes.Social:FireClient(player, "FillIn", {
+			Id = entry.Id, Mode = "1v1", Name = "Ranked 1v1", ReturnQueue = true,
+			Seconds = AutoQueue.AskSeconds, Bonus = 0,
+		})
+	end
+	return false
+end
+
 -- Auto queue (Shared.AutoQueue) ------------------------------------------------
 
 -- Free lobby players with invitations enabled. Never automatically matched.
@@ -946,6 +972,10 @@ end
 -- A lone 1v1 invites the lobby; only DuelFill acceptance starts a fill-in.
 -- An unanswered intro still falls back to the sparring rival on schedule.
 local function fill(entry, now: number)
+	if entry.NeedsConsent then
+		if now - entry.Since >= AutoQueue.CallAfter then askReturn(entry) end
+		return
+	end
 	if entry.Size ~= 1 then
 		return
 	end
@@ -1009,6 +1039,26 @@ local function fillRespond(player: Player, id: any, accept: any)
 	local entry = entryById(id)
 	if not entry then
 		return reply(false, "That queue has been filled already.")
+	end
+	if entry.NeedsConsent and entry.Players[1] == player then
+		if not entry.ConsentUntil or entry.ConsentUntil <= os.clock() then
+			dequeue(player)
+			return reply(false, "The invitation expired.")
+		end
+		if accept ~= true then
+			dequeue(player)
+			return reply(true, "Left the ranked queue.")
+		end
+		local ready = AutoQueue.ready(function(name)
+			return if name == "DuelQueue" then nil else player:GetAttribute(name)
+		end, false)
+		if not ready or busy(player) then
+			dequeue(player)
+			return reply(false, "Return to the lobby first.")
+		end
+		entry.NeedsConsent, entry.ConsentUntil = nil, nil
+		Remotes.Social:FireClient(player, "FillInOver", entry.Id)
+		return reply(true, "Ranked accepted. Matching you with an opponent.")
 	end
 	local expiry = entry.Offers and entry.Offers[player]
 	if not expiry or expiry <= os.clock() then
@@ -1093,6 +1143,8 @@ function Duels.pairUp()
 				return
 			end
 			local a, b = entries[pair[1]], entries[pair[2]]
+			local readyA, readyB = askReturn(a), askReturn(b)
+			if not readyA or not readyB then continue end
 			local kind = spec.Kind or "Ranked"
 			local ok, problem = startMatch(
 				mode,
@@ -1172,6 +1224,10 @@ end
 
 local function step()
 	local now = os.clock()
+	for _, entry in table.clone(queue) do
+		local player = entry.Players[1]
+		if busy(player) or (entry.ConsentUntil and now >= entry.ConsentUntil) then dequeue(player) end
+	end
 	Duels.pairUp()
 	-- Lone entries call the lobby (Shared.AutoQueue).
 	for _, entry in table.clone(queue) do
@@ -1239,6 +1295,7 @@ end
 
 function Duels.start()
 	Shop.register("DuelQueue", join)
+	Shop.register("DuelReturnQueue", autoReturn)
 	Shop.register("DuelCancel", function(player)
 		if not dequeue(player, player.DisplayName .. " left the duel queue.") then
 			return reply(false, "You're not in a queue.")
@@ -1261,6 +1318,28 @@ function Duels.start()
 		return reply(true, "You forfeited the duel.")
 	end)
 	local function watch(player: Player)
+		local wasDungeon = player:GetAttribute("DungeonId") or player:GetAttribute("RiftRun")
+		local pendingReturn = false
+		local function returned()
+			local inDungeon = player:GetAttribute("DungeonId") or player:GetAttribute("RiftRun")
+			if inDungeon then
+				wasDungeon = true
+				pendingReturn = false
+				dequeue(player)
+			elseif wasDungeon then
+				wasDungeon = false
+				pendingReturn = true
+			end
+			if pendingReturn then
+				task.defer(function()
+					if pendingReturn and player.Parent and autoReturn(player).Ok then pendingReturn = false end
+				end)
+			end
+		end
+		for _, attribute in { "DungeonId", "RiftRun", "Outpost", "CombatSession", "Spar", "SparDown" } do
+			player:GetAttributeChangedSignal(attribute):Connect(returned)
+		end
+		player.CharacterAdded:Connect(function() task.delay(1, returned) end)
 		-- Leaving the Arena session (the Leave button, walking out, respawning)
 		-- forfeits a duel in progress.
 		player:GetAttributeChangedSignal("CombatSession"):Connect(function()

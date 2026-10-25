@@ -2079,8 +2079,8 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 		end
 		fillCards[id] = prompt(
 			"⚔",
-			if a.Intro then "Help a new miner?" else "Join a 1v1?",
-			if a.Intro then string.format("%s is ready for their first fight.", tostring(a.Who))
+			if a.ReturnQueue then "Join ranked 1v1?" elseif a.Intro then "Help a new miner?" else "Join a 1v1?",
+			if a.ReturnQueue then "Ready for the ranked tournament? Accept to enter matchmaking, or decline to stay in the lobby." elseif a.Intro then string.format("%s is ready for their first fight.", tostring(a.Who))
 				else string.format("%s is waiting for a %s.", tostring(a.Who), tostring(a.Name)),
 			if type(a.Seconds) == "number" then a.Seconds else 15,
 			P.Gold,
@@ -2088,7 +2088,7 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 				fillCards[id] = nil
 				run("DuelFill", a.Id, accept)
 			end,
-			if (a.Bonus or 0) <= 0 then "First-fight bonus already claimed"
+			if a.ReturnQueue then "Ranked 1v1 · Cancel the queue anytime" elseif (a.Bonus or 0) <= 0 then "First-fight bonus already claimed"
 				elseif a.BonusUpfront then string.format("+%d coins when the match starts", a.Bonus)
 				else string.format("+%d bonus coins if you win", a.Bonus)
 		)

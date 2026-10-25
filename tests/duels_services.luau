@@ -279,7 +279,7 @@ local Party = {
 }
 
 local function makePlayer(id, name)
-	local p = { UserId = id, DisplayName = name, Parent = Players, Attributes = {}, Changed = {} }
+	local p = { UserId = id, DisplayName = name, Parent = Players, Attributes = {}, Changed = {}, CharacterAdded = signal() }
 	function p:GetAttribute(key)
 		return self.Attributes[key]
 	end

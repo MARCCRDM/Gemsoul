@@ -269,7 +269,7 @@ task.spawn(function()
 			break
 		end
 	end
-	-- Straight after the intro: into the 1v1 Casual queue, so the SEARCHING
+	-- Straight after the intro: into the ranked 1v1 queue, so the SEARCHING
 	-- card (SocialUI's banner, with CANCEL) is up while they look round the
 	-- Outpost. (A few tries: the server says no until they're back and
 	-- standing in the lobby.)
@@ -282,9 +282,9 @@ task.spawn(function()
 				if player:GetAttribute("DuelQueue") or player:GetAttribute("MatchId") then
 					break
 				end
-				local queued = GemClient.request("DuelQueue", "casual")
+				local queued = GemClient.request("DuelReturnQueue")
 				if queued and queued.Ok then
-					UiKit.toast("You're in the 1v1 queue: keep mining, you'll be called in when a match is found.", GOLD)
+					UiKit.toast("Searching ranked 1v1: keep mining. You'll be asked before joining.", GOLD)
 					break
 				end
 				task.wait(2)

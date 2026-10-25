@@ -777,3 +777,32 @@ do
 	-- Nobody is called while the Arena's lanes are full: the entry waits.
 	print("PASS: " .. (checks - before) .. " lobby invitation checks (explicit consent, muted invites, expiry, decline, forged requests, upfront intro bonus, no duplicate payment, normal PvP rewards unchanged, bot fallback)")
 end
+
+-- Automatic dungeon returns are ranked and require acceptance before pairing.
+do
+	local a, b = makePlayer(81, "ReturnWin"), makePlayer(82, "ReturnLoss")
+	for _, p in { a, b } do
+		p:SetAttribute("Outpost", true)
+		p:SetAttribute("DungeonId", "test-run")
+		check(not handlers.DuelReturnQueue(p).Ok, "Auto queued inside dungeon")
+		check(not handlers.DuelQueue(p, "1v1").Ok, "Manual queue allowed inside dungeon")
+		p:SetAttribute("DungeonId", nil)
+		check(p:GetAttribute("DuelQueue") == "1v1", "Dungeon return did not queue ranked")
+	end
+	Duels.pairUp()
+	check(not Duels.matchOf(a) and not Duels.matchOf(b), "Return queue pulled players without asking")
+	local offerA, offerB = last(a, "FillIn")[2], last(b, "FillIn")[2]
+	check(offerA.ReturnQueue and offerB.ReturnQueue, "Missing ranked return prompt")
+	check(handlers.DuelFill(a, offerA.Id, true).Ok, "Could not accept return queue")
+	Duels.pairUp()
+	check(not Duels.matchOf(a), "One acceptance pulled unconsenting opponent")
+	check(handlers.DuelFill(b, offerB.Id, false).Ok and not b:GetAttribute("DuelQueue"), "Decline did not cancel")
+	handlers.DuelCancel(a)
+	b:SetAttribute("RiftRun", "rift-test")
+	b:SetAttribute("RiftRun", nil)
+	check(b:GetAttribute("DuelQueue") == "1v1", "Rift return did not auto queue")
+	advance(AutoQueue.CallAfter + 1)
+	advance(AutoQueue.AskSeconds + 1)
+	check(not b:GetAttribute("DuelQueue") and not Duels.matchOf(b), "Unanswered prompt did not cancel safely")
+	print("PASS: ranked return queue, dungeon blocking, dual consent, decline and expiry")
+end
