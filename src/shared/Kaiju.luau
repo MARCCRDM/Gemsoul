@@ -327,8 +327,28 @@ Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 10, Bomber = 8, Finish 
 -- 10, a third at 20).
 Kaiju.SlotLevels = { 1, 1, 1 }
 -- Where each of the team walks beside you: studs to your right (left when
--- negative) and behind you.
-Kaiju.TeamSpots = { { 3, 5 }, { -3, 5 }, { 0, 8.5 } }
+-- negative) and behind you. The fourth is the support's (SupportSlot).
+Kaiju.TeamSpots = { { 3, 5 }, { -3, 5 }, { 0, 8.5 }, { 0, 3.5 } }
+
+-- The support slot: a fourth kaiju out beside the three, for a support kind
+-- only (KaijuRoles' Warden role, called SUPPORT: Moonmoth, Skyjelly). It
+-- hangs back just behind you, mends you and your team and wards them
+-- (KaijuServer's support pulse); a support kind never takes one of the
+-- three fighting slots. Everyone gets StarterSupport once (supportOwed):
+-- a new player with the starter roll, everyone else on their next visit.
+Kaiju.SupportRole = "Warden"
+Kaiju.SupportSlot = 4
+Kaiju.StarterSupport = { Species = "Skyjelly", Element = "Shock" }
+Kaiju.SupportVersion = 1
+-- Its pulse: every Every seconds while it's out, if you or one of the team
+-- near it (Radius studs) is under Below of their health, it casts its E.
+Kaiju.SupportPulse = { Every = 7, Below = 0.8, Radius = 24 }
+
+-- Whether a kind is a support kind (it goes in the support slot).
+function Kaiju.isSupport(species: string?): boolean
+	local s = species and Kaiju.Species[species]
+	return s ~= nil and s.Role == Kaiju.SupportRole
+end
 
 -- Its health is kept (record.Health) and never comes back on its own.
 -- Knocked out in a fight (record.Down), it's back in its Gemsoul, down,
@@ -1317,9 +1337,10 @@ function Kaiju.count(roster): number
 end
 
 -- Adds a kaiju (given its kind, Gemsoul and level) and returns its record,
--- or nil if the roster is full. The first one becomes the one out.
-function Kaiju.add(roster, speciesId: string, soul, level: number?)
-	if Kaiju.count(roster) >= Kaiju.MaxOwned or not Kaiju.Species[speciesId] then
+-- or nil if the roster is full (`over`: one past full, for the starter
+-- support). The first one becomes the one out.
+function Kaiju.add(roster, speciesId: string, soul, level: number?, over: boolean?)
+	if Kaiju.count(roster) >= Kaiju.MaxOwned + (if over then 1 else 0) or not Kaiju.Species[speciesId] then
 		return nil
 	end
 	local id = "k" .. roster.Next
@@ -1349,7 +1370,13 @@ function Kaiju.teamIds(roster): { string }
 	end
 	local slots = Kaiju.slots(roster)
 	local function take(id)
-		if #out < slots and type(id) == "string" and roster.List[id] and not seen[id] then
+		if
+			#out < slots
+			and type(id) == "string"
+			and roster.List[id]
+			and not seen[id]
+			and not Kaiju.isSupport(roster.List[id].Species) -- (its own slot: supportId)
+		then
 			seen[id] = true
 			table.insert(out, id)
 		end
@@ -1404,6 +1431,78 @@ end
 function Kaiju.active(roster)
 	local id = Kaiju.teamIds(roster)[1]
 	return if id then roster.List[id] else nil
+end
+
+-- Your support out (an id, nil if you own no support kind): the one you
+-- put there (roster.Support), else your best (on its feet, highest level,
+-- then oldest). One knocked out keeps the slot, down, like the team's.
+function Kaiju.supportId(roster): string?
+	if not roster or type(roster.List) ~= "table" then
+		return nil
+	end
+	local chosen = roster.Support
+	if type(chosen) == "string" and roster.List[chosen] and Kaiju.isSupport(roster.List[chosen].Species) then
+		return chosen
+	end
+	local best, bestRecord = nil, nil
+	for id, record in roster.List do
+		if Kaiju.isSupport(record.Species) then
+			local better = best == nil
+			if not better then
+				if (record.Down == true) ~= (bestRecord.Down == true) then
+					better = not record.Down
+				elseif (record.Level or 1) ~= (bestRecord.Level or 1) then
+					better = (record.Level or 1) > (bestRecord.Level or 1)
+				else
+					better = idNumber(id) < idNumber(best)
+				end
+			end
+			if better then
+				best, bestRecord = id, record
+			end
+		end
+	end
+	return best
+end
+
+-- Everyone out: the team in order, then the support (in SupportSlot).
+-- Returns the ids and, for each, its slot.
+function Kaiju.squadIds(roster): ({ string }, { [string]: number })
+	local ids, slots = Kaiju.teamIds(roster), {}
+	for slot, id in ids do
+		slots[id] = slot
+	end
+	local support = Kaiju.supportId(roster)
+	if support then
+		table.insert(ids, support)
+		slots[support] = Kaiju.SupportSlot
+	end
+	return ids, slots
+end
+
+-- Puts `id` (a support kind of yours) in the support slot. False if it isn't one.
+function Kaiju.setSupport(roster, id: string): boolean
+	local record = roster and roster.List and roster.List[id]
+	if not record or not Kaiju.isSupport(record.Species) then
+		return false
+	end
+	roster.Support = id
+	return true
+end
+
+-- Whether a profile is still owed the starter support (StarterSupport,
+-- once per SupportVersion): not before its starter roll is taken (that
+-- gives it), and not to one who already has that kind.
+function Kaiju.supportOwed(profile): boolean
+	if not profile or profile.KaijuSupport == Kaiju.SupportVersion or Kaiju.rollsOwed(profile) > 0 then
+		return false
+	end
+	for _, record in (profile.Kaiju and profile.Kaiju.List) or {} do
+		if record.Species == Kaiju.StarterSupport.Species then
+			return false
+		end
+	end
+	return true
 end
 
 -- How many starter kaiju a profile still has to roll: a full StarterTeam

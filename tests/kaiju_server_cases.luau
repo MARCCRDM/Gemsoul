@@ -886,8 +886,10 @@ end
 local outpost = Vector3.new(0, 5, 7000)
 local a, rootA = makePlayer(1, outpost)
 local b, rootB = makePlayer(2, outpost + Vector3.new(500, 0, 0))
-profiles[a] = { Gems = {}, Coins = 0, Milestones = {} }
-profiles[b] = { Gems = {}, Coins = 0, Milestones = {} }
+-- (These two were given their support already: the checks below follow the
+-- three fighters; the support has its own, "Your support", near the end.)
+profiles[a] = { Gems = {}, Coins = 0, Milestones = {}, KaijuSupport = Kaiju.SupportVersion }
+profiles[b] = { Gems = {}, Coins = 0, Milestones = {}, KaijuSupport = Kaiju.SupportVersion }
 KaijuServer.start()
 local keepOut = { { outpost + Vector3.new(-260, 0, 0), 60 } } -- (a building out there)
 KaijuWilds.start({
@@ -6158,6 +6160,77 @@ end)()
 	print("  claimed patches: a pack holds the seam, stirs on the third swing, and its rocks roll luckier")
 end)()
 
+-- Your support -------------------------------------------------------------------------------------------
+-- A new player's roll brings a fourth, the starter support, in the support
+-- slot just behind them; it never takes a fighting slot; it mends its owner
+-- and the team when one of them is hurt; only a support kind goes in its
+-- slot; an older save is given one on its next visit.
+;(function()
+	Kaiju.SlotLevels = { 1, 1, 1 }
+	local spot = outpost + Vector3.new(0, 0, 900)
+	local c, rootC = makePlayer(3, spot)
+	profiles[c] = { Gems = {}, Coins = 0, Milestones = {} }
+	check(not Kaiju.supportOwed(profiles[c]), "The support came before the roll")
+	registered.KaijuRoll(c)
+	check(registered.KaijuRollClaim(c).Ok, "Couldn't claim the roll")
+	local roster = Kaiju.roster(profiles[c])
+	local supportId = Kaiju.supportId(roster)
+	local support = supportId and roster.List[supportId]
+	check(Kaiju.count(roster) == 4 and support, "No support with the roll")
+	check(
+		support.Species == Kaiju.StarterSupport.Species and support.Element == Kaiju.StarterSupport.Element,
+		"The wrong starter support"
+	)
+	check(profiles[c].KaijuSupport == Kaiju.SupportVersion and not Kaiju.supportOwed(profiles[c]), "Owed a second")
+	check(noted(c, "your support"), "Nobody told them about their support")
+	check(#Kaiju.teamIds(roster) == 3 and not table.find(Kaiju.teamIds(roster), supportId), "The support took a fighting slot")
+	-- Out: four, the support in its own slot, just behind its owner.
+	KaijuServer._upkeep(c, now)
+	local out = KaijuServer.team(c)
+	local pet = nil
+	for _, member in out do
+		if member.Record == support then
+			pet = member
+		end
+	end
+	check(#out == 4 and pet and pet.Slot == Kaiju.SupportSlot, "The support isn't out in its slot")
+	check(KaijuServer.battleable(c) == 4, "The support doesn't come to a battle")
+	-- Its slot is for a support kind only.
+	local fighter = Kaiju.teamIds(roster)[1]
+	check(not registered.KaijuSupport(c, fighter).Ok, "A fighter went in the support slot")
+	check(registered.KaijuSupport(c, supportId).Ok, "Its own support refused")
+	-- You hurt: it mends you (and itself), never off after a creature.
+	local humanoid = c.Character:FindFirstChildOfClass("Humanoid")
+	humanoid.Health = 40
+	queued = {}
+	now += 10
+	KaijuServer._think(pet, now, 0.15)
+	check(pet.Target == nil, "The support went after a creature")
+	flush()
+	check(humanoid.Health > 40, "The support didn't mend its owner")
+	local after = humanoid.Health
+	KaijuServer._think(pet, now + 1, 0.15)
+	flush()
+	check(humanoid.Health == after, "It mended again before its pulse came round")
+	-- An older save (no support yet) is given one on its next visit.
+	profiles[c].KaijuSupport = nil
+	local held = Kaiju.count(roster)
+	for id, record in roster.List do
+		if record.Species == Kaiju.StarterSupport.Species then
+			roster.List[id] = nil
+		end
+	end
+	roster.Support = nil
+	KaijuServer._upkeep(c, now + 20)
+	check(Kaiju.count(roster) == held and Kaiju.supportId(roster) ~= nil, "An older save wasn't given its support")
+	KaijuServer._upkeep(c, now + 40)
+	check(Kaiju.count(roster) == held, "A second support given")
+	c:SetAttribute("Outpost", nil)
+	KaijuServer._upkeep(c, now + 41)
+	local _ = rootC
+	print("  your support: the fourth with the roll, its own slot, mends you, only a support kind, given to older saves")
+end)()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do
@@ -6172,7 +6245,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together, your support)",
 		checks
 	)
 )

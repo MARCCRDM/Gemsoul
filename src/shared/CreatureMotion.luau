@@ -340,6 +340,16 @@ F.Dreadcrown = like("Bulwark", {
 })
 -- Warden
 F.Moonmoth = FLYER
+F.Skyjelly = like("Razorback", {
+	-- Tendril Sting: bobs up on its tendrils, then drops onto it.
+	Light = { Wind = { Lift = 0.3, Pitch = 0.1 }, Hit = { Lift = -0.15, Pitch = -0.2, Push = 0.35 } },
+	-- Static Pulse: squeezed low, then swelling up bright.
+	Heavy = { Wind = { Lift = -0.3, Jaw = 0.3 }, Hit = { Lift = 0.35, Jaw = 0.8, Push = 0.2 } },
+	Lunge = { Wind = { Lift = 0.25 }, Hit = { Lift = 0.1, Push = 0.6 } },
+	-- A pulse: drawn in, then swelling as its light goes out.
+	Cast = { Wind = { Lift = -0.25, Jaw = 0.4 }, Hit = { Lift = 0.4, Jaw = 0.9 } },
+	Guard = { Lift = -0.2, Pitch = 0.1, Jaw = 0.2 },
+})
 
 -- (A counter swings as a quick blow; an E, aimed or round itself, is its cast.)
 local ALIASES = { Punish = "Light", Bolt = "Cast", Nova = "Cast" }

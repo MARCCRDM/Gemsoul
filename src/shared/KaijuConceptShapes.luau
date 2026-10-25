@@ -1131,6 +1131,40 @@ function Concepts.install(k)
 		)
 	end
 
+	-- Skyjelly: a glass jelly, its bell stepped up into a dome over a core of
+	-- its element's light cut like a gem, a lit rim round its hem, and six
+	-- tendrils it drifts on (its legs), banded in its element's colour, curling
+	-- out and back, each tipped in light; a soft mouth under the bell.
+	function B.Skyjelly(m, pal, H, H2)
+		local r = root(m, V(1.6, 1.6, 1.6), 2.0)
+		local bell = limb(m, r, "Bell", V(2.1, 0.95, 2.1), CF(0, 2.2, 0), V(0, 1.75, 0), "Body", 1, H)
+		bell.Material, bell.Transparency = Enum.Material.Glass, 0.55
+		for i, layer in { { 1.85, 0.42, 2.86 }, { 1.45, 0.34, 3.24 }, { 0.95, 0.26, 3.54 } } do
+			local step = make(m, bell, "Dome", V(layer[1], layer[2], layer[1]), CF(0, layer[3], 0), if i == 3 then H2 else H, Enum.Material.Glass)
+			step.Transparency = if i == 3 then 0.2 else 0.5
+		end
+		make(m, bell, "Core", V(0.95, 0.95, 0.95), CF(0, 2.5, 0) * A(rad(35), rad(45), 0), pal.Plate, Enum.Material.Neon)
+		for _, side in { -1, 1 } do
+			glow(m, bell, "Rim", V(2.2, 0.12, 0.12), CF(0, 1.74, side * 1.04), pal)
+			glow(m, bell, "Rim", V(0.12, 0.12, 2.2), CF(side * 1.04, 1.74, 0), pal)
+		end
+		limb(m, bell, "Jaw", V(1.1, 0.16, 1.1), CF(0, 1.62, 0), V(0, 1.7, 0), "Jaw", 1, H2)
+		for i = 0, 5 do
+			local turn = rad(i * 60 + 30)
+			local out = V(math.cos(turn), 0, math.sin(turn))
+			local side = if out.X < 0 then -1 else 1
+			local hip = V(0, 1.66, 0) + out * 0.75
+			local knee = V(0, 1.05, 0) + out * 1.15
+			local ankle = V(0, 0.5, 0) + out * 1.2
+			local tip = V(0, 0.14, 0) + out * 0.95
+			local upper = beam(m, bell, "Tendril", hip, knee, 0.24, 0.24, H, "Stride", side)
+			plate(m, upper, "Band", V(0.3, 0.1, 0.3), CF((hip + knee) / 2), pal)
+			beam(m, upper, "Tendril", knee, ankle, 0.19, 0.19, H)
+			beam(m, upper, "Tendril", ankle, tip, 0.15, 0.15, H2)
+			make(m, upper, "Tip", V(0.26, 0.26, 0.26), CF(tip) * A(rad(45), rad(45), 0), pal.Plate, Enum.Material.Neon)
+		end
+	end
+
 	return B
 end
 

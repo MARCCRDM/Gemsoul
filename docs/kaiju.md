@@ -259,8 +259,9 @@ studs). Your own moves and other players' are unchanged.
 
 ## Your team
 
-Three kaiju fight beside you at once. You can keep 12; the others wait at
-home. (The plan is a second slot when one of yours reaches level 10 and a
+Three kaiju fight beside you at once, and a fourth, your support, heals
+you (see [Your support](#your-support-the-fourth-kaiju)). You can keep 12;
+the others wait at home. (The plan is a second slot when one of yours reaches level 10 and a
 third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 
 ![The starter roll: three reels spinning, then your three locked in](kaiju/roll.png)
@@ -337,6 +338,71 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **Changing the team** (the panel): LEAD puts one at the front; SEND OUT
   puts one from home in place of one of the team. Not one that's fought in
   the last 3 seconds, and not twice in a moment.
+
+## Your support: the fourth kaiju
+
+Beside the three that fight, you have a fourth kaiju out: your
+**support**. It doesn't fight for creatures. It floats just behind you
+and keeps you and your team going.
+
+![Skyjelly, the starter support (offline render of the game's model; the stage overexposes its Ion-yellow core and tendril tips)](kaiju/skyjelly.jpg)
+
+- **The starter support is Skyjelly** (number 57 on the second concept
+  sheet, the one Warden left on it): a glass jelly with a core of its
+  element's light and six tendrils it drifts on. Everyone gets an Ion
+  Skyjelly once (`Kaiju.StarterSupport`, `Kaiju.supportOwed`). A new
+  player gets it with the starter roll, and the roll names it under the
+  three cards. Anyone from before is given one on their next visit to the
+  Outpost, even with a full roster of 12. It never spawns wild.
+- **The support slot** (`Kaiju.SupportSlot`, `Kaiju.supportId`) takes a
+  support kind only: the Warden role, now shown as **SUPPORT** (Moonmoth
+  and Skyjelly). A support kind never takes one of the three fighting
+  slots. If you own more than one, the one you set goes out
+  (`KaijuSupport`), else your best.
+- **Its pulse** (`Kaiju.SupportPulse`). Every 7 seconds, if you or one of
+  your team within 24 studs is under 80% health, it casts its E, a team
+  mend that **heals you too**. Its Q (from level 5) veils the team (30%
+  less damage for 4 s) when creatures are about you. Its R (from level 10)
+  blooms when one of you is under half health: 30% back over 4 s, and
+  burns, poisons and slows cleared. In the field it is the only thing that
+  heals you away from the Shelter.
+- **In a kaiju battle** it comes as a fourth piece (there are six cells a
+  side). It stands at the back with the shooters and mends and wards its
+  side, as a Warden does. 1V1 + KAIJU brings it too.
+
+| Skyjelly | |
+| --- | --- |
+| Role | SUPPORT (Warden) |
+| Level 1 | 200 health, 9 damage, speed 18 |
+| E · Pulse Mend | It, you and every ally within 24 studs heal 15% over 3 s |
+| Q · Static Veil (lv 5) | It and every ally within 24 studs take 30% less for 4 s |
+| R · Bloom Surge (lv 10) | Hurt: it, you and every ally within 26 studs heal 30% over 4 s, effects cleared |
+
+### The kaiju menu
+
+![Before: the team and the ones at home](kaiju/support-panel-before.jpg)
+
+![After: the team, then SUPPORT, then home, every row tagged with its role](kaiju/support-panel.jpg)
+
+- The list reads **YOUR TEAM**, then **SUPPORT** (marked with a green
+  plus, "HEALS YOU"), then **AT HOME**.
+- Every row has its role as a coloured tag (TANK, WARRIOR, RANGED,
+  ASSASSIN, BREAKER, SUPPORT), so you can see what the team is made of at
+  a glance.
+- The support's page says what it does. A support kind at home has **SET
+  AS SUPPORT** instead of SEND OUT.
+
+![The support's page](kaiju/support-detail.jpg)
+
+- **The strip** has a fourth tile after a small gap: your support, edged
+  in green with a plus. It is 432 px wide on a computer and 340 on a phone.
+
+![The strip on a phone, four tiles](kaiju/support-strip-phone.jpg)
+
+![The starter roll: the support named under the three cards](kaiju/support-roll.jpg)
+
+The renders are offline stand-ins drawn from the game's UI code, not
+Roblox screenshots; the 3D models show as gems.
 
 ## Fighting as a team
 

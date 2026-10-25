@@ -2,6 +2,12 @@
 	Your mini kaiju in the Outpost (Shared.Kaiju has the rules; see
 	docs/kaiju.md). Wild kaiju and moon bugs are KaijuWilds'.
 
+	  Your support a fourth kaiju out, a support kind (Kaiju.SupportRole),
+	               just behind you (Kaiju.SupportSlot): it takes no share
+	               of a fight; it mends you and the team when one of you
+	               is hurt (pulse, Kaiju.SupportPulse). Everyone is given
+	               Kaiju.StarterSupport once (giveSupport: with the starter
+	               roll, or on an older save's next visit).
 	  Your team    up to three kaiju out beside you whenever you're in the
 	               Outpost (in workspace.Kaiju), each at its own spot by you
 	               (Kaiju.TeamSpots). They follow you (jumping after you
@@ -41,6 +47,7 @@
 	  "KaijuRecall"         the team back to you, out of the fight for Kaiju.RecallSeconds
 	  "KaijuTeam", { id }   which of yours are out (the first leads)
 	  "KaijuActive", id     this one out, leading (in the lead's place if it wasn't out)
+	  "KaijuSupport", id    this support kind in the support slot (Kaiju.supportId)
 	  "KaijuInfuse", { gemId }, id?   heals one of yours with gems from your
 	                        pouch (the lead if no id; Kaiju.infusePlan: only
 	                        the gems it needs are used, and never a Gemsoul);
@@ -166,6 +173,8 @@ export type Pet = {
 	-- Jumping after its owner (Kaiju.Hop): when, and when it last did.
 	HopAt: number?,
 	HoppedAt: number?,
+	-- The support's pulse (pulse): when each of its moves is next ready.
+	PulseAt: { [string]: number }?,
 }
 
 -- The kaiju out, by player and kaiju id.
@@ -402,6 +411,7 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		DodgeUntil = 0,
 		Dots = {},
 		Slot = slot,
+		PulseAt = {},
 	}
 	pet.Fighter = KaijuFighter.new({
 		Model = model,
@@ -496,6 +506,36 @@ local function prepareRoll(profile)
 	return roll
 end
 
+-- The starter support (Kaiju.StarterSupport), once: added (past a full
+-- roster if it must be), put in the support slot. Returns it, or nil if
+-- it isn't owed.
+local function giveSupport(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile or not Kaiju.supportOwed(profile) then
+		return nil
+	end
+	local roster = Kaiju.roster(profile)
+	local starter = Kaiju.StarterSupport
+	local soul = Kaiju.rollSoul(
+		Gems.random(),
+		starter.Element,
+		{ Id = PlayerData.newGemId(), Time = os.time(), Species = starter.Species }
+	)
+	local record = Kaiju.add(roster, starter.Species, soul, Kaiju.StarterLevel, true)
+	;(profile :: any).KaijuSupport = Kaiju.SupportVersion
+	if record then
+		Kaiju.setSupport(roster, record.Id)
+	end
+	PlayerData.sync(player)
+	if record then
+		Remotes.Notify:FireClient(
+			player,
+			string.format("%s joins you: your support. It floats behind you and heals you and your team.", Kaiju.nameOf(record))
+		)
+	end
+	return record
+end
+
 -- Takes the roll: its kaiju join `player`. Returns the records added.
 local function claimRoll(player: Player): { any }
 	local profile = PlayerData.get(player)
@@ -521,6 +561,8 @@ local function claimRoll(player: Player): { any }
 	Kaiju.setTeam(roster, if #ids > 0 then ids else Kaiju.teamIds(roster))
 	owedSince[player] = nil
 	PlayerData.sync(player)
+	-- (And the support, the fourth, comes with them.)
+	giveSupport(player)
 	if #added > 0 then
 		local names = {}
 		for _, record in added do
@@ -573,6 +615,10 @@ local function upkeep(player: Player, now: number)
 			claimRoll(player)
 		end
 	end
+	-- The starter support, for one who has none yet (an older save).
+	if player:GetAttribute("Outpost") == true and Kaiju.supportOwed(profile) then
+		giveSupport(player)
+	end
 	local roster = profile.Kaiju
 	-- A battle's keep left behind (they left mid-battle, or the server
 	-- restarted): each kaiju back as it was before it (battleEnd comes back
@@ -607,10 +653,12 @@ local function upkeep(player: Player, now: number)
 	end
 	local want = {}
 	if roster and canBeOut(player) and not Kaiju.away(roster) then
-		for slot, id in Kaiju.teamIds(roster) do
+		-- (The team in its slots, the support in SupportSlot: Kaiju.squadIds.)
+		local ids, slots = Kaiju.squadIds(roster)
+		for _, id in ids do
 			-- (One knocked out keeps its place, down, till it's revived.)
 			if not roster.List[id].Down then
-				want[id] = slot
+				want[id] = slots[id]
 			end
 		end
 	end
@@ -819,7 +867,9 @@ function KaijuServer.caster(pet: Pet)
 			return spot
 		end,
 		Allies = function(center: Vector3, radius: number)
-			-- (Its side in a battle; else the rest of its team out.)
+			-- (Its side in a battle; else the rest of its team out, and, for
+			-- the support, its owner too: a mend heals them, a ward doesn't
+			-- sit on them.)
 			local battle = KaijuServer.battle(pet, os.clock())
 			local pool = if battle and battle.Allies then battle.Allies else teams[pet.Owner] or {}
 			local list = {}
@@ -827,6 +877,14 @@ function KaijuServer.caster(pet: Pet)
 				local up = other.Model.Parent ~= nil and other.Humanoid.Health > 0
 				if up and flat(other.Root.Position - center).Magnitude <= radius then
 					table.insert(list, { Root = other.Root, Body = other, Humanoid = other.Humanoid })
+				end
+			end
+			if not battle and Kaiju.isSupport(pet.Record.Species) then
+				local root = rootOf(pet.Owner)
+				local character = pet.Owner.Character
+				local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+				if root and humanoid and humanoid.Health > 0 and flat(root.Position - center).Magnitude <= radius then
+					table.insert(list, { Root = root, Humanoid = humanoid })
 				end
 			end
 			return list
@@ -973,7 +1031,14 @@ local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
 	for _, pet in petsOf(player) do
 		local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
 		local inRange = away <= Kaiju.Follow.Leash or (inFight(pet, player) and away <= Kaiju.Follow.Battle)
-		if pet.Model.Parent and pet.Humanoid.Health > 0 and now >= pet.RecallUntil and inRange then
+		-- (Not the support: it stays by its owner and mends: pulse.)
+		if
+			pet.Model.Parent
+			and pet.Humanoid.Health > 0
+			and now >= pet.RecallUntil
+			and inRange
+			and not Kaiju.isSupport(pet.Record.Species)
+		then
 			table.insert(fighters, pet)
 		end
 	end
@@ -1144,6 +1209,49 @@ local function follow(pet: Pet, ownerRoot: BasePart, recalled: boolean, now: num
 	end
 end
 
+-- The support's pulse (Kaiju.SupportPulse): you or one of the team near it
+-- under Below of their health, it casts its E (a team mend, you too:
+-- KaijuServer.caster's Allies); its Q (a team ward) once it's awake and
+-- creatures are about you; its R (a big mend) once it's awake and one of
+-- you is under half.
+local function pulse(pet: Pet, ownerRoot: BasePart, now: number)
+	local rules = Kaiju.SupportPulse
+	local lowest = 1
+	local function look(h: Humanoid?, at: Vector3)
+		if h and h.Health > 0 and flat(at - pet.Root.Position).Magnitude <= rules.Radius then
+			lowest = math.min(lowest, h.Health / math.max(1, h.MaxHealth))
+		end
+	end
+	local character = pet.Owner.Character
+	look(character and character:FindFirstChildOfClass("Humanoid"), ownerRoot.Position)
+	for _, other in petsOf(pet.Owner) do
+		if other.Model.Parent then
+			look(other.Humanoid, other.Root.Position)
+		end
+	end
+	local species, level = pet.Record.Species, pet.Record.Level or 1
+	local kit = KaijuRoles.kit(species)
+	local aim = { Root = pet.Root }
+	local function cast(key: string, wait: number): boolean
+		local id, awake = KaijuRoles.move(species, key, level)
+		if not id or not awake or now < (pet.PulseAt[key] or 0) then
+			return false
+		end
+		pet.PulseAt[key] = now + wait
+		return KaijuAbilities.cast(KaijuServer.caster(pet), aim, id)
+	end
+	pet.PulseAt = pet.PulseAt or {}
+	if lowest < 0.5 and kit.R and cast("R", KaijuRoles.REvery * 2) then
+		return
+	end
+	if lowest < rules.Below and cast("E", rules.Every) then
+		return
+	end
+	if #creaturesNear(ownerRoot.Position, Kaiju.Follow.Engage, pet.Owner) > 0 then
+		cast("Q", KaijuRoles.QEvery * 1.5)
+	end
+end
+
 local function think(pet: Pet, now: number, _dt: number)
 	local owner = pet.Owner
 	local ownerRoot = rootOf(owner)
@@ -1221,6 +1329,20 @@ local function think(pet: Pet, now: number, _dt: number)
 		return
 	end
 	local recalled = now < pet.RecallUntil
+	if Kaiju.isSupport(pet.Record.Species) then
+		-- The support: by you, mending (pulse), never off after a creature.
+		pet.Target = nil
+		KaijuFighter.calm(pet.Fighter)
+		if not recalled then
+			pulse(pet, ownerRoot, now)
+		end
+		if now < pet.StunUntil then
+			h:MoveTo(pet.Root.Position)
+		else
+			follow(pet, ownerRoot, recalled, now)
+		end
+		return
+	end
 	local target, flank = nil, nil
 	if not recalled and (away <= Kaiju.Follow.Leash or fighting) then
 		local targets, flanks = teamPlan(owner, ownerRoot, now)
@@ -1532,6 +1654,34 @@ local function setTeam(player: Player, ids: any)
 	return reply(ok, if ok then "Your team is out." else message)
 end
 
+-- `id` (a support kind of yours) in the support slot: not during a kaiju
+-- battle, nor with the one there now mid-fight.
+local function setSupport(player: Player, id: any)
+	local profile = PlayerData.get(player)
+	local roster = profile and Kaiju.roster(profile)
+	if not roster or type(id) ~= "string" or not roster.List[id] then
+		return reply(false, "That kaiju isn't yours.")
+	end
+	if not Kaiju.isSupport(roster.List[id].Species) then
+		return reply(false, "Only a support kaiju goes in the support slot.")
+	end
+	if Kaiju.supportId(roster) == id then
+		return reply(true, "")
+	end
+	if KaijuServer.battling(player) then
+		return reply(false, "Not during a kaiju battle.")
+	end
+	local now = os.clock()
+	if lastSwitch[player] and now - lastSwitch[player] < 3 then
+		return reply(false, "One moment.")
+	end
+	lastSwitch[player] = now
+	Kaiju.setSupport(roster, id)
+	PlayerData.sync(player)
+	upkeep(player, now)
+	return reply(true, string.format("%s is your support.", Kaiju.nameOf(roster.List[id])))
+end
+
 -- `id` out, leading: moved to the front, or into the lead's place if it
 -- wasn't out.
 local function setActive(player: Player, id: any)
@@ -1632,7 +1782,7 @@ function KaijuServer.battleStart(player: Player): number
 		end
 	end
 	local count = 0
-	for _, id in Kaiju.teamIds(roster) do
+	for _, id in (Kaiju.squadIds(roster)) do
 		local record = roster.List[id]
 		if record then
 			if not record.BattleKeep then
@@ -1693,7 +1843,7 @@ function KaijuServer.battleable(player: Player): number
 	if not roster or not canBeOut(player) or Kaiju.away(roster) then
 		return 0
 	end
-	return #Kaiju.teamIds(roster)
+	return #(Kaiju.squadIds(roster))
 end
 
 -- Your kaiju out healed `share` of their health (not the knocked out: a
@@ -1942,7 +2092,7 @@ local function autoHeal(player: Player, now: number)
 		pools[tier] = GemInventory.spare(profile, tier)
 	end
 	local healed, stuck = false, false
-	for _, id in Kaiju.teamIds(roster) do
+	for _, id in (Kaiju.squadIds(roster)) do
 		local record = roster.List[id]
 		local pet = teams[player] and teams[player][id]
 		if pet and pet.Record ~= record then
@@ -2052,6 +2202,7 @@ function KaijuServer.start()
 	Shop.register("KaijuCallBack", callBack)
 	Shop.register("KaijuRoll", rollRequest)
 	Shop.register("KaijuRollClaim", rollClaim)
+	Shop.register("KaijuSupport", setSupport)
 	Players.PlayerRemoving:Connect(left)
 	local thinkTimer, upkeepTimer = 0, 0
 	RunService.Heartbeat:Connect(function(dt)

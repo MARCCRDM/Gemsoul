@@ -13,8 +13,10 @@
 	  Breaker              (Shared.KaijuRoster: Triskull, Brightsteel,
 	                       Dreadcrown) mid-line: goes for the foe with the
 	                       toughest guard.
-	  Warden               (Moonmoth) stays back with the shooters; its E
-	                       and R shield and mend its team.
+	  Warden               (Moonmoth, Skyjelly) stays back with the
+	                       shooters; its E and R shield and mend its team.
+	                       Shown as SUPPORT: the kind that goes in the
+	                       support slot (Kaiju.SupportRole).
 
 	The roster's kinds (Shared.KaijuRoster) each have three moves of their
 	own; the first four share their role's.
@@ -112,8 +114,8 @@ KaijuRoles.Roles = {
 	},
 	Warden = {
 		Id = "Warden",
-		Name = "WARDEN",
-		Blurb = "Stays at the back and shields and mends its team.",
+		Name = "SUPPORT", -- (the support slot's: Kaiju.SupportRole)
+		Blurb = "Stays at the back and shields and mends its team, and you.",
 		Range = 14,
 		Keep = 6,
 		Windup = 0.4,

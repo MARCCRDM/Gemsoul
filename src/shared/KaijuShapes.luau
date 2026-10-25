@@ -1,5 +1,5 @@
 --[[
-	The roster's 28 new kinds (Shared.KaijuRoster), built from blocks like
+	The roster's new kinds (Shared.KaijuRoster), built from blocks like
 	the first four (Shared.KaijuModels): a hide of the kind's own colour (as
 	its concept render has it, docs/kaiju-concepts), plates in its element's
 	colour and glows in its element's light. Each faces -Z, stands on the
@@ -57,6 +57,7 @@ Shapes.Hides = {
 	Bladebrow = { C(150, 160, 180), C(124, 134, 156) },
 	Lankshade = { C(196, 206, 184), C(168, 178, 158) },
 	Voltfin = { C(42, 52, 78), C(200, 196, 180) },
+	Skyjelly = { C(176, 214, 236), C(120, 156, 186) },
 }
 
 Shapes.Hover = { Stormwing = 1.1, Moonmoth = 1.1, Nightwing = 0.9 }
