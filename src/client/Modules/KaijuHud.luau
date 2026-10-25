@@ -641,7 +641,7 @@ local SHORT = UiKit.short()
 local W, H = if SHORT then 860 else 800, if SHORT then 340 else 512
 local window = IronUi.window("KaijuPanel", 11, W, H, "K", P.Gold)
 window.Title.Text = "YOUR KAIJU"
-window.Subtitle.Text = "Your team fights beside you in the Outpost. Pick one to see it."
+window.Subtitle.Text = "Choose a kaiju to inspect, heal, enchant, or swap into your team."
 window.Close.Activated:Connect(function()
 	window.Gui.Enabled = false
 end)
@@ -1070,7 +1070,8 @@ soulUi.soulButton.TextSize = 16
 
 local tab = "Details"
 local selected: string? = nil
-local swapping = false -- choosing who a kaiju from home goes out in place of
+local swapping = false -- choose the exact deployed kaiju from its roster card
+local swapTarget: string? = nil
 -- HEAL's picks: how many of each stack. Made for you (pickFresh, a new
 -- kaiju, or its health changed while you hadn't touched them), else yours.
 local pickCounts: { [string]: number } = {}
@@ -1316,23 +1317,23 @@ local function rowStatus(record, slot: number?): (string, Color3)
 	if record.Down then
 		return string.format("Lv %d  ·  DOWN: REVIVE IT", record.Level), P.Bad:Lerp(P.Text, 0.3)
 	elseif slot == 1 then
-		return string.format("Lv %d  ·  LEADS", record.Level), P.Gold
+		return string.format("Lv %d  ·  LEADER", record.Level), P.Gold
 	elseif slot then
-		return string.format("Lv %d  ·  OUT", record.Level), P.Good
+		return string.format("Lv %d  ·  DEPLOYED", record.Level), P.Good
 	end
-	return string.format("Lv %d  ·  AT HOME", record.Level), P.Dim
+	return string.format("Lv %d  ·  RESERVE", record.Level), P.Dim
 end
 
 local function kaijuRow(order: number, record, slot: number?, models)
 	local color = elementColor(record.Element)
-	local chosen = record.Id == selected
+	local chosen = record.Id == selected or (swapping and record.Id == swapTarget)
 	local row = new("TextButton", {
 		Name = "Kaiju_" .. record.Id,
 		LayoutOrder = order,
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = if chosen then color:Lerp(INK, 0.72) else P.Inset,
-		Size = UDim2.new(1, -8, 0, 58),
+		Size = UDim2.new(1, -8, 0, 76),
 	}, listFrame)
 	UiKit.round(row, 8)
 	new("UIStroke", { Color = color, Thickness = 1.5, Transparency = if chosen then 0 else 1 }, row)
@@ -1368,19 +1369,30 @@ local function kaijuRow(order: number, record, slot: number?, models)
 	local statusText, statusColor = rowStatus(record, slot)
 	local status = label(row, statusText, 10, statusColor, IronUi.Bold)
 	status.Position, status.Size = UDim2.fromOffset(60, 23), UDim2.new(1, -66, 0, 13)
+	local species = Kaiju.species(record.Species)
+	local identity = label(row, (species and species.Name or record.Species) .. " / " .. tostring(record.Element), 10, P.Dim, IronUi.Body)
+	identity.Position, identity.Size = UDim2.fromOffset(60, 37), UDim2.new(1, -66, 0, 13)
 	local live = { Record = record, Slot = slot, Status = status }
+	if swapping and slot then
+		local cue = label(row, if record.Id == swapTarget then "REPLACING" else "TAP TO REPLACE", 9, P.Gold, IronUi.Bold)
+		cue.Position, cue.Size = UDim2.fromOffset(6, 57), UDim2.fromOffset(100, 13)
+	end
 	-- Its health, out or at home (kept: it never heals on its own).
 	local back, fill = bar(row, HEALTH)
-	back.Position, back.Size = UDim2.fromOffset(60, 40), UDim2.new(1, -72, 0, 5)
+	back.Position, back.Size = UDim2.fromOffset(112, 58), UDim2.new(1, -124, 0, 5)
 	fill.Size = UDim2.fromScale(healthShare(record, models[record.Id]), 1)
 	live.Health = fill
 	local expBar, expBarFill = bar(row, EXP)
-	expBar.Position, expBar.Size = UDim2.fromOffset(60, 48), UDim2.new(1, -72, 0, 3)
+	expBar.Position, expBar.Size = UDim2.fromOffset(112, 67), UDim2.new(1, -124, 0, 3)
 	expBarFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
 	rowLive[record.Id] = live
 	row.Activated:Connect(function()
-		selected = record.Id
-		swapping = false
+		if swapping and slot then
+			swapTarget = record.Id
+		else
+			selected = record.Id
+			swapping, swapTarget = false, nil
+		end
 		drawPanel()
 	end)
 end
@@ -1389,7 +1401,7 @@ local function drawList(data, team: { string })
 	clearList()
 	local models = petModels()
 	local inTeam = {}
-	heading(1, "YOUR TEAM", string.format("%d OUT", #team))
+	heading(1, if swapping then "CHOOSE REPLACEMENT" else "DEPLOYED TEAM", string.format("%d / %d", #team, Kaiju.slots(data)))
 	for slot, id in team do
 		inTeam[id] = slot
 		kaijuRow(1 + slot, data.List[id], slot, models)
@@ -1404,7 +1416,7 @@ local function drawList(data, team: { string })
 		return if a.Level ~= b.Level then a.Level > b.Level else a.Id < b.Id
 	end)
 	if #home > 0 then
-		heading(20, "AT HOME", tostring(#home))
+		heading(20, "RESERVES", tostring(#home))
 	end
 	for i, record in home do
 		kaijuRow(20 + i, record, nil, models)
@@ -1464,32 +1476,35 @@ local function drawActions(data, record, team: { string })
 	end
 	local slot = table.find(team, record.Id)
 	if swapping and not slot then
-		-- SEND OUT: in place of which of the team?
-		actionText.Text = "In place of:"
-		actionText.Size = UDim2.new(0, 80, 1, 0)
-		for i, id in team do
-			local other = data.List[id]
-			local species = other and Kaiju.species(other.Species)
-			actionButton(
-				i,
-				string.upper(species and species.Name or id),
-				elementColor(other and other.Element),
-				100,
-				function()
-					local ids = table.clone(team)
-					ids[i] = record.Id
-					act(function()
-						local result = GemClient.request("KaijuTeam", ids)
-						say(result)
-						if result and result.Ok then
-							swapping = false
-						end
-					end)
-				end
-			)
+		local replacing = swapTarget and data.List[swapTarget]
+		local targetSlot = swapTarget and table.find(team, swapTarget)
+		actionText.Size = UDim2.new(1, -206, 1, 0)
+		actionText.Text = if replacing and targetSlot
+			then string.format("%s replaces %s in slot %d.", Kaiju.nameOf(record), Kaiju.nameOf(replacing), targetSlot)
+			else "Choose the deployed kaiju to replace from the cards on the left."
+		if targetSlot then
+			actionButton(1, "CONFIRM", P.Gold, 100, function()
+				local incoming, outgoing = record.Id, swapTarget
+				act(function()
+					local current = roster()
+					local ids = Kaiju.teamIds(current)
+					local index = table.find(ids, outgoing)
+					if not index or table.find(ids, incoming) then
+						swapping, swapTarget = false, nil
+						UiKit.toast("Your team changed. Choose a replacement again.", P.Gold)
+						drawPanel()
+						return
+					end
+					ids[index] = incoming
+					local result = GemClient.request("KaijuTeam", ids)
+					say(result)
+					if result and result.Ok then swapping, swapTarget = false, nil end
+					drawPanel()
+				end)
+			end)
 		end
-		actionButton(9, "CANCEL", P.Edge, 80, function()
-			swapping = false
+		actionButton(2, "CANCEL", P.Edge, 90, function()
+			swapping, swapTarget = false, nil
 			drawPanel()
 		end)
 		return
@@ -1505,9 +1520,10 @@ local function drawActions(data, record, team: { string })
 			end)
 		end)
 	else
-		actionText.Text = "At home: send it out in place of one of your team."
-		actionButton(1, "SEND OUT", P.Teal, 100, function()
-			swapping = true
+		actionText.Text = "In reserve. Choose exactly who it replaces."
+		actionButton(1, "SWAP IN", P.Teal, 100, function()
+			swapping, swapTarget = true, nil
+			listFrame.CanvasPosition = Vector2.zero
 			drawPanel()
 		end)
 	end
