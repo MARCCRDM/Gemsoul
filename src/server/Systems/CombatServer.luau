@@ -1214,7 +1214,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		comboLanded(source, target, combo)
 	end
 	if damage <= 0 or target.Humanoid.Health <= 0 then
-		return damage > 0 and not guarded, guarded
+		return damage > 0 and not guarded, guarded, crit
 	end
 	if os.clock() < st.EchoUntil then
 		local previous = DamageLog.push("Resonance Echo", element)
@@ -1240,7 +1240,7 @@ local function strike(source, k, st, target, heavy, projectile, swing)
 		st.NextStagger = os.clock() + 1
 		applyCC(target, 0.2)
 	end
-	return not guarded, guarded
+	return not guarded, guarded, crit
 end
 local function attack(player, aim, heavy, swing)
 	local k = kit(player)
@@ -1278,15 +1278,22 @@ local function attack(player, aim, heavy, swing)
 		swing.Combo = Actions.combo(st.ComboSide, st.ComboCount, st.ComboAt, swing.Side, now)
 	end
 	local label = if k.Weapon.Attack.Kind == "Melee" then "Swing" else "Shot"
+	-- What the blade met (for the swinger's own feel of it: Contact).
+	local contacts, anyCrit, killed = {}, false, false
 	local function hit(target, projectile)
 		local previous = DamageLog.push(
 			if heavy then "Heavy " .. label else label,
 			k.Loadout.WeaponGem and k.Loadout.WeaponGem.Element
 		)
-		local success, guarded = strike(player, k, st, target, heavy, projectile, swing)
+		local success, guarded, crit = strike(player, k, st, target, heavy, projectile, swing)
 		DamageLog.pop(previous)
 		landed = landed or success == true
 		interrupted = interrupted or guarded == true
+		if not projectile and (success == true or guarded == true) and #contacts < 4 then
+			table.insert(contacts, { Model = target.Root.Parent, Position = target.Root.Position })
+			anyCrit = anyCrit or crit == true
+			killed = killed or target.Humanoid.Health <= 0
+		end
 	end
 	local a, color =
 		k.Weapon.Attack, GemConfig.ElementColors[k.Loadout.WeaponGem and k.Loadout.WeaponGem.Element] or WHITE
@@ -1326,6 +1333,19 @@ local function attack(player, aim, heavy, swing)
 			hit(nearest, true)
 		end
 		fx("Shot", player, origin, origin + ray * along, color, k.Weapon.Look)
+	end
+	if #contacts > 0 then
+		-- The swinger feels the blade connect (Combat: Contact): sent
+		-- straight to them, so the stop, the kick and the flash land with
+		-- their swing, not a beat later with everyone else's effects.
+		Remotes.CombatFx:FireClient(player, "Contact", contacts, {
+			Heavy = heavy == true,
+			Crit = anyCrit,
+			Blocked = interrupted and not landed,
+			Kill = killed,
+			Combo = swing and swing.Combo or 1,
+			Element = k.Loadout.WeaponGem and k.Loadout.WeaponGem.Element,
+		})
 	end
 	if landed then
 		CombatEvents.fire(player, if heavy then "Heavy" else "Hit")

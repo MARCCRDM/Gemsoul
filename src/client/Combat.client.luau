@@ -59,7 +59,24 @@ local beamKey, nextBeamUpdate = nil, 0 -- the surge key held to channel a beam
 local SURGE_KEYS = { "Q", "E", "R" }
 local ROMAN = { "I", "II", "III" }
 local techCooldowns = {} -- [cooldown key] = { Ready, Total }
-local hitUntil, hitCritical = 0, false
+-- Your own blade (one table: this script is near Luau's limit of locals).
+-- Its swing plays the moment you let go (the server's word follows):
+-- PredictedAt and Cut, when it began and how it cut, for the blade's
+-- contact to land with it; its damage numbers wait for the blade to bite
+-- (Contact): Hits, held since ConfirmAt, shown by Flush.
+local own = {
+	HitFlash = require(script.Parent.Modules.HitFlash),
+	SwordFeel = require(script.Parent.Modules.SwordFeel),
+	Haptics = game:GetService("HapticService"),
+	PredictedAt = -10,
+	Cut = { Side = "Right", Heavy = false },
+	ConfirmAt = -10,
+	Hits = {},
+	Flush = nil,
+	-- The hit marker at your crosshair (HitConfirm): until when, and gold for a crit.
+	HitUntil = 0,
+	HitCritical = false,
+}
 local incomingUntil, incomingOrigin = 0, nil
 local healthTrailRatio, targetTrailRatio, lastTarget = 1, 1, nil
 local cast = nil -- a wind-up in progress: { Name, Start, Duration, Color }
@@ -899,6 +916,35 @@ local function beginAttack(side)
 	attackSide = side or nextSide
 	input:FireServer("BeginAttack", attackSide)
 end
+-- The swing in your hands: a cut (or a shot), played at once, with its
+-- whoosh and the crescent it sweeps (as the server's Swing would draw them).
+function own.swing(side, heavy, local_: boolean?)
+	local loadout = GemClient.Profile and GemClient.Profile.Character
+	local weapon = loadout and Classes.weapon(loadout.Class, loadout.Weapon)
+	if weapon and weapon.Attack.Kind == "Shot" then
+		FirstPerson.fire()
+		return
+	end
+	FirstPerson.swing(side, heavy)
+	local root = rootPart()
+	if local_ and weapon and root then
+		local gem = loadout.WeaponGem
+		local color = GemConfig.ElementColors[gem and gem.Element] or Color3.new(1, 1, 1)
+		local look = root.CFrame.LookVector
+		CombatSound.play(if heavy then "HeavySwing" else "Swing", root.Position)
+		if not BladeTrails.cutsAt(root.Position) then
+			CombatVfx.slash(
+				root.Position,
+				Vector3.new(look.X, 0, look.Z),
+				weapon.Attack.Range,
+				weapon.Attack.Arc or 90,
+				color,
+				heavy == true,
+				if side == "Left" then -1 else 1
+			)
+		end
+	end
+end
 local function releaseAttack()
 	if not holding then
 		return
@@ -914,6 +960,10 @@ local function releaseAttack()
 	nextSide = if attackSide == "Right" then "Left" else "Right"
 	nextAttack = os.clock() + (if heavy then rules().HeavyCooldown else rules().BasicCooldown)
 	input:FireServer("ReleaseAttack", aim)
+	-- Swing now, not a round trip from now: a blow that waits on the
+	-- server feels like moving through mud.
+	own.PredictedAt, own.Cut = os.clock(), { Side = attackSide, Heavy = heavy }
+	own.swing(attackSide, heavy, true)
 end
 local function setBlock(held)
 	if held and (cursorFree or not canFight()) then
@@ -1388,7 +1438,7 @@ RunService.RenderStepped:Connect(function(dt)
 		if shown.Active then
 			-- (The view first: the camera and mouse are back whatever follows.)
 			FirstPerson.stop()
-			hitUntil, incomingUntil, incomingOrigin = 0, 0, nil
+			own.HitUntil, incomingUntil, incomingOrigin = 0, 0, nil
 			cancel()
 			CombatGuide.close()
 			AugmentTreeUI.close()
@@ -1614,9 +1664,9 @@ RunService.RenderStepped:Connect(function(dt)
 		nextBeamUpdate = os.clock() + 0.2
 	end
 	local now = os.clock()
-	hitMarker.Visible = now < hitUntil
-	hitMarker.TextColor3 = if hitCritical then P.Gold else P.Text
-	hitMarker.TextTransparency = math.clamp(1 - (hitUntil - now) / 0.18, 0, 1)
+	hitMarker.Visible = now < own.HitUntil
+	hitMarker.TextColor3 = if own.HitCritical then P.Gold else P.Text
+	hitMarker.TextTransparency = math.clamp(1 - (own.HitUntil - now) / 0.18, 0, 1)
 	incomingMarker.Visible = now < incomingUntil and incomingOrigin ~= nil
 	if incomingMarker.Visible then
 		local localDirection = camera.CFrame:VectorToObjectSpace(incomingOrigin - camera.CFrame.Position)
@@ -1861,7 +1911,7 @@ local function floorUnder(position: Vector3): Vector3
 end
 
 local numbers = 0
-local function damageNumber(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?)
+local function damageNumber(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?, mine: boolean?)
 	if numbers >= 24 then
 		return -- plenty on screen already
 	end
@@ -1886,15 +1936,16 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 				.. tostring(amount)
 				.. (if matchTag == "Weak" then " WEAK!" elseif matchTag == "Resist" then " RESIST" else "")
 		),
-		TextSize = if crit then 32 else 24,
+		-- (Your own blade's numbers come up bigger: they're the ones you're watching.)
+		TextSize = (if crit then 32 else 24) * (if mine then 1.3 else 1),
 		TextColor3 = if matchTag == "Resist"
 			then Color3.fromRGB(165, 168, 180)
 			elseif matchTag == "Weak" then Color3.fromRGB(255, 150, 60)
 			else color or Color3.new(1, 1, 1),
 		TextStrokeTransparency = 0.2,
 	}, board)
-	local punch = new("UIScale", { Scale = 1.35 }, label)
-	TweenService:Create(punch, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+	local punch = new("UIScale", { Scale = if mine then 1.8 else 1.35 }, label)
+	TweenService:Create(punch, TweenInfo.new(if mine then 0.18 else 0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
 		:Play()
 	TweenService:Create(board, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		StudsOffset = Vector3.new(0, 3, 0),
@@ -1928,7 +1979,8 @@ function handlers.Log(entry)
 	end
 end
 function handlers.HitConfirm(crit)
-	hitUntil, hitCritical = os.clock() + 0.18, crit == true
+	own.HitUntil, own.HitCritical = os.clock() + 0.18, crit == true
+	own.ConfirmAt = os.clock()
 end
 function handlers.IncomingDamage(origin, swordHit, heavy)
 	incomingOrigin, incomingUntil = origin, os.clock() + 0.65
@@ -2106,18 +2158,24 @@ function handlers.AttackTiming(stage, side, combo)
 		comboScale.Scale = 1.4
 		TweenService:Create(comboScale, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	end
-	local loadout = GemClient.Profile and GemClient.Profile.Character
-	local weapon = loadout and Classes.weapon(loadout.Class, loadout.Weapon)
-	if weapon and weapon.Attack.Kind == "Shot" then
-		FirstPerson.fire()
-	else
-		FirstPerson.swing(side, stage == "CHARGED" or stage == "PERFECT")
+	-- (Already swinging: it began as you let go.)
+	if os.clock() - own.PredictedAt > 0.6 then
+		own.Cut = { Side = side, Heavy = stage == "CHARGED" or stage == "PERFECT" }
+		own.swing(side, own.Cut.Heavy)
 	end
 end
 
-function handlers.Damage(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?)
-	damageNumber(position, amount, crit, color, matchTag)
+function own.show(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?, mine: boolean?)
+	damageNumber(position, amount, crit, color, matchTag, mine)
 	if amount <= 0 then
+		return
+	end
+	if mine then
+		-- Your blade's own contact already struck the spark and the sound:
+		-- just its element on top.
+		local element = CombatSound.elementOf(color)
+		CombatVfx.element(position - Vector3.new(0, 0.6, 0), element, if crit then 1.4 else 1)
+		CombatSound.element("Impact", element, position, { Volume = 0.5 })
 		return
 	end
 	-- Sparks in the hit's colour; crits burst bigger, ring out and shake a little.
@@ -2135,6 +2193,89 @@ function handlers.Damage(position: Vector3, amount: number, crit: boolean, color
 	end
 end
 
+-- Your own blade's numbers, shown as it bites (or, if no contact comes, a
+-- moment late anyway).
+function own.flush()
+	if own.Flush then
+		pcall(task.cancel, own.Flush)
+		own.Flush = nil
+	end
+	local hits = own.Hits
+	own.Hits = {}
+	for _, hit in hits do
+		own.show(hit[1], hit[2], hit[3], hit[4], hit[5], true)
+	end
+end
+
+function handlers.Damage(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?)
+	-- Just confirmed as yours, from a swing you just made: it waits for the blade.
+	if os.clock() - own.ConfirmAt < 0.05 and FirstPerson.swingAge() < 0.7 and amount > 0 and #own.Hits < 6 then
+		table.insert(own.Hits, { position, amount, crit, color, matchTag })
+		if not own.Flush then
+			own.Flush = task.delay(0.35, function()
+				own.Flush = nil
+				own.flush()
+			end)
+		end
+		return
+	end
+	own.show(position, amount, crit, color, matchTag, false)
+end
+
+-- Your blade meets its mark (the server's Contact, to you alone): the swing
+-- stops dead for a moment as it bites, your view jars with the cut, what you
+-- hit flashes, a white-hot spark rips along the cut, the thud lands and a
+-- controller rumbles; your damage numbers come up with it. Every step of a
+-- combo hits harder, a crit and a kill harder still (SwordFeel); a blow
+-- turned on a guard rings off it and bounces back.
+function own.rumble(strength: number, seconds: number)
+	if strength <= 0 or not UserInputService.GamepadEnabled then
+		return
+	end
+	pcall(function()
+		local pad = Enum.UserInputType.Gamepad1
+		if own.Haptics:IsVibrationSupported(pad) and own.Haptics:IsMotorSupported(pad, Enum.VibrationMotor.Small) then
+			own.Haptics:SetMotor(pad, Enum.VibrationMotor.Small, strength)
+			own.Haptics:SetMotor(pad, Enum.VibrationMotor.Large, strength * 0.6)
+			task.delay(seconds, function()
+				own.Haptics:SetMotor(pad, Enum.VibrationMotor.Small, 0)
+				own.Haptics:SetMotor(pad, Enum.VibrationMotor.Large, 0)
+			end)
+		end
+	end)
+end
+function handlers.Contact(contacts, info)
+	if type(contacts) ~= "table" or type(info) ~= "table" then
+		return
+	end
+	local feel = own.SwordFeel.tune(info, own.Cut.Side)
+	local blocked = info.Blocked == true
+	local color = GemConfig.ElementColors[info.Element] or Color3.fromRGB(255, 236, 200)
+	FirstPerson.contact(feel.Stop, feel.Strength, blocked, function()
+		CombatFx.kick(feel.Pitch, feel.Yaw, feel.Roll, feel.KickFor)
+		local camera = workspace.CurrentCamera
+		if camera then
+			local view = camera.CFrame
+			local cut = view.RightVector * feel.Cut.X + view.UpVector * feel.Cut.Y
+			for _, contact in contacts do
+				if typeof(contact.Position) == "Vector3" then
+					local at = CombatVfx.contactPoint(contact.Position, view.Position)
+					CombatVfx.contact(at, cut, color, feel.Power, blocked)
+				end
+				if feel.Flash > 0 and typeof(contact.Model) == "Instance" then
+					own.HitFlash.flash(contact.Model, color, feel.Flash)
+				end
+			end
+		end
+		CombatSound.play(feel.Sound, nil, { Pitch = feel.SoundPitch * (0.96 + math.random() * 0.08) })
+		if info.Kill then
+			CombatVfx.screen("Crit")
+		end
+		own.rumble(feel.Rumble, feel.RumbleFor)
+		own.flush()
+	end)
+end
+
 -- A swing. A fighter whose blade you can see draws its own slash along the
 -- blade's real path (BladeTrails), so it always matches the body; otherwise
 -- (your own sword in first person, a body without a blade) a crescent sweeps
@@ -2148,6 +2289,10 @@ function handlers.Swing(
 	color: Color3,
 	big: boolean
 )
+	-- (Your own swing drew itself as you let go: own.swing.)
+	if who == player and os.clock() - own.PredictedAt < 0.6 then
+		return
+	end
 	CombatSound.play(if big then "HeavySwing" else "Swing", origin)
 	if BladeTrails.cutsAt(origin) then
 		return

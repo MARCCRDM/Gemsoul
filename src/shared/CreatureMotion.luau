@@ -53,10 +53,15 @@ end
 --   Lift   its trunk up (+) or down (studs at scale 1), Push forward (+)
 --   Jaw    its jaw opening (+), Arm its arms reaching forward and up (+)
 --   ArmSide  the one arm a swipe uses (0: both), Tail its tail swinging
--- Each blow winds up into Wind (by its ActionAt), strikes into Hit, and
--- settles back. Yaw, Roll and Tail turn to the blow's side (ActionSide).
+-- Each blow winds up into Wind (by its ActionAt), strikes into Hit (a
+-- touch past it, then back: the blow has weight), holds there a beat as it
+-- lands, and settles back. Yaw, Roll and Tail turn to the blow's side
+-- (ActionSide). A cast trembles as it gathers; a heavy shivers at the top
+-- of its wind-up, just before it comes down.
 Motion.Strike = 0.1 -- seconds from its wind-up pose into the blow
-Motion.Settle = 0.35 -- and back to rest
+Motion.Hold = 0.06 -- held on the blow as it lands
+Motion.Settle = 0.3 -- and back to rest
+Motion.Overshoot = 1.7 -- how far past the blow it carries (a back-out ease's tension)
 
 Motion.Fight = {
 	Bulwark = {
@@ -373,6 +378,15 @@ local function ease(t: number): number
 	return t * t * (3 - 2 * t)
 end
 
+-- Out past 1 and back (0 -> ~1.1 -> 1): a blow carried through.
+local function backOut(t: number): number
+	t = math.clamp(t, 0, 1) - 1
+	local s = Motion.Overshoot
+	return 1 + t * t * ((s + 1) * t + s)
+end
+
+local CASTS = { Bolt = true, Nova = true, Cast = true }
+
 -- A wild kaiju's day (KaijuWilds: KaijuMood, from KaijuMoodAt): head down
 -- sniffing the ground, looking about, lying down, asleep (lower, curled),
 -- or a roar (rearing, jaws wide); and Bound, held by a tame, struggling
@@ -442,20 +456,42 @@ function Motion.fight(species: string?, a, now: number)
 	if type(kind) == "string" and type(start) == "number" and type(at) == "number" then
 		local key = keys[ALIASES[kind] or kind]
 		if key and key.Wind then
-			-- Into the wind-up, through the blow, and back.
+			-- Into the wind-up, through the blow (a touch past it), held as
+			-- it lands, and back.
 			local wind, hit = 0, 0
+			local landed = at + Motion.Strike + Motion.Hold
+			local building = -1
 			if now >= start and now < at then
-				wind = ease((now - start) / math.max(at - start, 0.01))
+				building = (now - start) / math.max(at - start, 0.01)
+				wind = ease(building)
 			elseif now >= at and now < at + Motion.Strike then
-				hit = (now - at) / Motion.Strike
-				wind = 1 - hit
-			elseif now >= at + Motion.Strike and now < at + Motion.Strike + Motion.Settle then
-				hit = 1 - ease((now - at - Motion.Strike) / Motion.Settle)
+				local p = (now - at) / Motion.Strike
+				hit = backOut(p)
+				wind = math.max(0, 1 - hit) -- (crossfaded: the two never stack)
+			elseif now >= at + Motion.Strike and now < landed then
+				hit = 1
+			elseif now >= landed and now < landed + Motion.Settle then
+				hit = 1 - ease((now - landed) / Motion.Settle)
 			end
 			add(pose, key.Wind, wind, side)
 			add(pose, key.Hit, hit, side)
 			if key.OneArm then
 				pose.ArmSide = side
+			end
+			if building >= 0 then
+				local cast = CASTS[ALIASES[kind] or kind] == true
+				if cast then
+					-- Gathering its power: a tremble that builds, swelling a little.
+					local k = building * building
+					pose.Roll += math.sin(now * 47) * 0.035 * k
+					pose.Pitch += math.sin(now * 39 + 1) * 0.025 * k
+					pose.Lift += 0.06 * k + math.sin(now * 31) * 0.015 * k
+				elseif kind == "Heavy" and building > 0.7 then
+					-- Coiled at the top, straining, just before it comes down.
+					local k = (building - 0.7) / 0.3
+					pose.Roll += math.sin(now * 55) * 0.03 * k
+					pose.Pitch += math.sin(now * 61 + 2) * 0.02 * k
+				end
 			end
 		elseif kind == "Dodge" then
 			-- A hop: up and leaning into it.
@@ -488,10 +524,35 @@ function Motion.fight(species: string?, a, now: number)
 	-- A flinch as a blow gets through.
 	local hurt = if type(a.HurtAt) == "number" then now - a.HurtAt else -1
 	if hurt >= 0 and hurt < 0.25 then
-		local k = 1 - hurt / 0.25
-		pose.Pitch += 0.12 * k
-		pose.Roll += 0.08 * (a.HurtSide or 1) * k
+		-- Snapped back at once, then easing out: the blow lands on it.
+		local k = if hurt < 0.03 then hurt / 0.03 else (1 - (hurt - 0.03) / 0.22) ^ 2
+		pose.Pitch += 0.16 * k
+		pose.Roll += 0.1 * (a.HurtSide or 1) * k
+		pose.Lift -= 0.06 * k
+		pose.Push -= 0.12 * k
 	end
+	return pose
+end
+
+-- How its whole body moves as it walks, on top of its pose (CreatureAnimation
+-- adds it each frame): its weight dips onto each foot as it lands and rolls
+-- from side to side, it leans into a run and twists against its stride,
+-- and it banks into a turn (`turn`: radians a second, + to its left). At
+-- rest it breathes and shifts its weight. `phase` and `amount` are its
+-- walk's (Motion.angles). Mutates and returns `pose`.
+function Motion.gait(pose, phase: number, amount: number, now: number, turn: number)
+	local step = math.abs(math.sin(phase)) -- 0 as a foot lands, 1 mid-stride
+	pose.Lift += (step - 0.55) * 0.14 * amount
+	pose.Roll += math.sin(phase) * 0.07 * amount
+	pose.Pitch -= 0.09 * amount + (1 - step) * 0.025 * amount
+	pose.Yaw += math.sin(phase) * 0.06 * amount
+	pose.Tail -= math.sin(phase) * 0.2 * amount
+	local bank = math.clamp(turn, -3, 3)
+	pose.Roll += bank * 0.07 * (0.35 + amount)
+	pose.Yaw += bank * 0.05
+	local still = 1 - amount
+	pose.Roll += math.sin(now * 0.7) * 0.02 * still
+	pose.Lift += math.sin(now * 2.1) * 0.015 * still
 	return pose
 end
 

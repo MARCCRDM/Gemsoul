@@ -131,6 +131,10 @@ local LEVEL = {
 	KaijuLevelUp = 0.9,
 	CallBack = 0.7,
 	Deploy = 0.75,
+	Stomp = 0.6,
+	Contact = 0.95,
+	HeavyContact = 1,
+	Deflect = 0.85,
 }
 
 -- Built-in stand-ins until a sound is uploaded: layers of { sound, speed,
@@ -177,6 +181,23 @@ local FALLBACK = {
 	Heal = { { S .. "electronicpingshort.wav", 1.3, 0.35 } },
 	Shield = { { S .. "electronicpingshort.wav", 0.8, 0.35 } },
 	Hurt = { { S .. "action_jump_land.mp3", 0.9, 0.6 } },
+	-- Your own blade connecting (Combat: Contact): a meaty thud under a
+	-- sharp crack, felt more than heard; a heavy's deeper; a blow turned
+	-- aside on a guard rings off it.
+	Contact = {
+		{ S .. "action_jump_land.mp3", 0.75, 0.75 },
+		{ S .. "swordslash.wav", 1.6, 0.35 },
+		{ S .. "clickfast.wav", 0.55, 0.35 },
+	},
+	HeavyContact = {
+		{ S .. "action_jump_land.mp3", 0.5, 0.95 },
+		{ S .. "swordlunge.wav", 0.45, 0.5 },
+		{ S .. "clickfast.wav", 0.4, 0.45 },
+		{ S .. "action_jump_land.mp3", 0.38, 0.5, 0.05 },
+	},
+	Deflect = { { S .. "unsheath.wav", 1.45, 0.6 }, { S .. "unsheath.wav", 1.9, 0.3, 0.02 } },
+	-- A kaiju's foot coming down (KaijuMotionFx): a dull thump.
+	Stomp = { { S .. "action_jump_land.mp3", 0.55, 0.5 } },
 	Stun = { { S .. "electronicpingshort.wav", 2.6, 0.25 }, { S .. "action_jump_land.mp3", 0.6, 0.5 } },
 	Winded = { { S .. "action_jump.mp3", 0.5, 0.35 } },
 	Combo = { { S .. "unsheath.wav", 2.4, 0.2 } },
@@ -242,6 +263,8 @@ local MIN_GAP = {
 	Warn = 0.4,
 	Hurt = 0.08,
 	Combo = 0.05,
+	Stomp = 0.09,
+	Contact = 0.04,
 	Giggle = 0.35, -- (a swarm giggling at once is one giggle, not a din)
 	Cackle = 0.6,
 }

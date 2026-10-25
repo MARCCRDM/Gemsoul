@@ -451,6 +451,10 @@ but never on top of each other.
 
 ## On screen
 
+How kaiju move and show their casts (the weight of a blow, the walk, the
+charge-up at the mouth before a cast, dust at each footfall, a flash when
+hit) is covered in [combat-feel.md](combat-feel.md).
+
 ![The team strip on a phone with AUTO HEAL on, and the HEAL tab](kaiju/hud.png)
 
 On a computer the strip sits at the bottom left; the CATCH prompt appears

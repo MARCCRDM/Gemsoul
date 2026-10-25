@@ -190,7 +190,7 @@ local slam = pose("Bulwark", "Heavy", 10.8, 10.9)
 check(wind.Pitch > 0.25 and wind.Arm > 1.5, "The brute doesn't rear up for its stomp")
 check(slam.Pitch < -0.15 and slam.Lift < 0, "The brute's stomp doesn't slam down")
 check(pose("Bulwark", "Heavy", 10.8, 10.4).Pitch < wind.Pitch, "A wind-up doesn't build")
-local rested = pose("Bulwark", "Heavy", 10.8, 10.8 + Motion.Strike + Motion.Settle + 0.01)
+local rested = pose("Bulwark", "Heavy", 10.8, 10.8 + Motion.Strike + Motion.Hold + Motion.Settle + 0.01)
 for field, value in rested do
 	check(value == 0 or field == "ArmSide", "A blow doesn't settle back: " .. field)
 end
@@ -230,6 +230,43 @@ check(hop.Lift > 0.4 and hop.Roll < -0.3, "A hop doesn't hop")
 check(pose("Razorback", "Dodge", 10, 10.5).Lift == 0, "A hop doesn't land")
 check(pose("Bulwark", "Stagger", 10, 10.1).Pitch > 0.25, "A stagger doesn't reel")
 check(Motion.fight("Bulwark", { HurtAt = 10 }, 10.05).Pitch > 0, "No flinch")
+-- A blow carries a touch past its pose, holds a beat as it lands, then settles.
+do
+	local key = Motion.Fight.Bulwark.Heavy.Hit
+	local through = pose("Bulwark", "Heavy", 10.8, 10.8 + Motion.Strike * 0.7)
+	check(through.Pitch < key.Pitch - 0.005, "A blow doesn't carry through")
+	local held = pose("Bulwark", "Heavy", 10.8, 10.8 + Motion.Strike + Motion.Hold * 0.5)
+	check(math.abs(held.Pitch - key.Pitch) < 1e-9 and math.abs(held.Lift - key.Lift) < 1e-9, "A blow isn't held as it lands")
+	check(pose("Bulwark", "Heavy", 10.8, 10.8 + Motion.Strike + Motion.Hold + Motion.Settle * 0.5).Pitch > key.Pitch, "A blow doesn't settle")
+	-- A cast trembles as it gathers; a heavy shivers at the top of its wind-up.
+	local shiver = {}
+	for i = 0, 6 do
+		shiver[i] = pose("Carapace", "Bolt", 10.7, 10.6 + i * 0.013).Roll
+	end
+	check(math.max(table.unpack(shiver)) - math.min(table.unpack(shiver)) > 0.02, "A cast doesn't tremble as it gathers")
+	check(math.abs(pose("Carapace", "Bolt", 10.7, 10.05).Roll) < 0.005, "A cast trembles from the start")
+end
+-- Walking (Motion.gait): its weight dips onto each foot and rolls side to
+-- side, it leans into a run and banks into a turn; standing, it barely moves.
+do
+	local function gait(phase, amount, turn)
+		return Motion.gait(Motion.rest(), phase, amount, 3, turn or 0)
+	end
+	local landing, stride = gait(0, 1), gait(math.pi / 2, 1)
+	check(stride.Lift - landing.Lift > 0.1, "Its weight doesn't dip as a foot lands")
+	check(gait(math.pi / 2, 1).Roll > 0.05 and gait(3 * math.pi / 2, 1).Roll < -0.05, "It doesn't roll from foot to foot")
+	check(gait(1, 1).Pitch < -0.08, "It doesn't lean into a run")
+	check(gait(0, 0.3, 2).Roll > gait(0, 0.3, -2).Roll + 0.15, "It doesn't bank into a turn")
+	local idle = gait(1.3, 0)
+	for field, value in idle do
+		check(math.abs(value) < 0.03, "Standing still it moves: " .. field)
+	end
+	for i = 0, 40 do
+		for field, value in gait(i / 6, (i % 5) / 4, (i % 7) - 3) do
+			check(value == value and math.abs(value) < 0.8, "A wild walk: " .. field)
+		end
+	end
+end
 -- On the joints: the trunk rears and moves; the legs stay upright under it.
 local x, _, _, lift = Motion.apply(wind, "Body", 1, 0, 0, 0)
 check(x == wind.Pitch and lift == wind.Lift, "The trunk doesn't take the pose")
@@ -305,7 +342,7 @@ check(math.abs(Motion.fight("Razorback", { Mood = "Nope", MoodAt = 100 }, 102).L
 
 print(
 	string.format(
-		"PASS: %d kaiju model checks (33 kinds x 4 elements, joints, ground, budget, motions, fight poses, moods)",
+		"PASS: %d kaiju model checks (33 kinds x 4 elements, joints, ground, budget, motions, fight poses, gait, moods)",
 		checks
 	)
 )

@@ -8,6 +8,8 @@
 	  shake(strength, seconds)  shakes the camera (strength in radians)
 	  shakeNear(position, strength, seconds, within)  a shake from something
 	      landing there: none past `within` studs of you, harder closer in
+	  kick(pitch, yaw, roll, seconds)  your view jarred one way and springing
+	      back (a blow you landed), riding along with any shake
 	  auras(now)  every frame: elemental auras on anyone with status effects
 	      (flames when Burning, frost mist and an ice tint when Frozen,
 	      sparks when Shocked, acid drips, a glowing outline when Shielded),
@@ -172,8 +174,72 @@ end
 -- Camera shake ---------------------------------------------------------------------------
 
 local shakeUntil, shakeTotal, shakeStrength = 0, 1, 0
+-- A kick: one sharp push of the view (radians: pitch, yaw, roll) that snaps
+-- in and springs back, the way a blow landing jars your hands.
+local kickAt, kickFor, kickPitch, kickYaw, kickRoll = 0, 0, 0, 0, 0
 local shaking = false
 local shakenCamera, baseFrame, shakenFrame = nil, nil, nil
+
+-- How much of a kick is on `t` seconds into it (pure): in fast, a little
+-- past the rest on the way back, and gone by `length`.
+function CombatFx.kickCurve(t: number, length: number): number
+	if t < 0 or t >= length then
+		return 0
+	end
+	local rise = math.min(0.035, length * 0.25)
+	if t < rise then
+		return t / rise
+	end
+	local p = (t - rise) / (length - rise)
+	return math.cos(p * math.pi * 1.25) * (1 - p) ^ 1.5
+end
+
+local function run()
+	if shaking then
+		return
+	end
+	shaking = true
+	RunService:BindToRenderStep("CombatShakeRestore", Enum.RenderPriority.Camera.Value - 1, function()
+		-- Remove our previous offset before the camera reads its last frame.
+		-- Respect camera changes made by another controller in the meantime.
+		if shakenCamera and shakenCamera.CFrame == shakenFrame then
+			shakenCamera.CFrame = baseFrame
+		end
+		shakenCamera, baseFrame, shakenFrame = nil, nil, nil
+	end)
+	-- After target-lock steering (+1), before first-person arms (+3).
+	RunService:BindToRenderStep("CombatShake", Enum.RenderPriority.Camera.Value + 2, function()
+		local now = os.clock()
+		local left = shakeUntil - now
+		local kickT = now - kickAt
+		if left <= 0 and kickT >= kickFor then
+			RunService:UnbindFromRenderStep("CombatShake")
+			RunService:UnbindFromRenderStep("CombatShakeRestore")
+			shaking = false
+			return
+		end
+		local camera = workspace.CurrentCamera
+		if not camera then return end
+		local x, y, z = 0, 0, 0
+		if left > 0 then
+			-- A brief, smooth impact pulse; sample time rather than random frames
+			-- so high refresh rates don't make the hit feel more frantic.
+			local k = shakeStrength * (left / shakeTotal)
+			local elapsed = shakeTotal - left
+			x += math.cos(elapsed * 48) * k * 0.5
+			y += math.sin(elapsed * 37) * k * 0.3
+			z += math.sin(elapsed * 43) * k * 0.16
+		end
+		local kick = CombatFx.kickCurve(kickT, kickFor)
+		x += kickPitch * kick
+		y += kickYaw * kick
+		z += kickRoll * kick
+		shakenCamera, baseFrame = camera, camera.CFrame
+		camera.CFrame = camera.CFrame * CFrame.Angles(x, y, z)
+		shakenFrame = camera.CFrame
+	end)
+end
+
 function CombatFx.shake(strength: number, seconds: number)
 	local k = FxSize.get()
 	strength *= k * k
@@ -185,41 +251,15 @@ function CombatFx.shake(strength: number, seconds: number)
 		return
 	end
 	shakeStrength, shakeTotal, shakeUntil = strength, seconds, now + seconds
-	if not shaking then
-		shaking = true
-		RunService:BindToRenderStep("CombatShakeRestore", Enum.RenderPriority.Camera.Value - 1, function()
-			-- Remove our previous offset before the camera reads its last frame.
-			-- Respect camera changes made by another controller in the meantime.
-			if shakenCamera and shakenCamera.CFrame == shakenFrame then
-				shakenCamera.CFrame = baseFrame
-			end
-			shakenCamera, baseFrame, shakenFrame = nil, nil, nil
-		end)
-		-- After target-lock steering (+1), before first-person arms (+3).
-		RunService:BindToRenderStep("CombatShake", Enum.RenderPriority.Camera.Value + 2, function()
-			local left = shakeUntil - os.clock()
-			if left <= 0 then
-				RunService:UnbindFromRenderStep("CombatShake")
-				RunService:UnbindFromRenderStep("CombatShakeRestore")
-				shaking = false
-				return
-			end
-			local k = shakeStrength * (left / shakeTotal)
-			local camera = workspace.CurrentCamera
-			if not camera then return end
-			-- A brief, smooth impact pulse; sample time rather than random frames
-			-- so high refresh rates don't make the hit feel more frantic.
-			local elapsed = shakeTotal - left
-			shakenCamera, baseFrame = camera, camera.CFrame
-			camera.CFrame = camera.CFrame
-				* CFrame.Angles(
-					math.cos(elapsed * 48) * k * 0.5,
-					math.sin(elapsed * 37) * k * 0.3,
-					math.sin(elapsed * 43) * k * 0.16
-				)
-			shakenFrame = camera.CFrame
-		end)
-	end
+	run()
+end
+
+-- Your view jarred one way (radians): a blow you landed (Combat: Contact).
+-- A new kick replaces the last.
+function CombatFx.kick(pitch: number, yaw: number, roll: number, seconds: number)
+	kickAt, kickFor = os.clock(), math.max(seconds, 0.05)
+	kickPitch, kickYaw, kickRoll = pitch, yaw, roll
+	run()
 end
 
 -- Only the damaged player's server-confirmed hit event calls this.

@@ -11,6 +11,11 @@
 	  impact(position, color, crit, heavy)
 	      a hit: a flash core, sparks, streaks flying out, a shockwave ring
 	      facing you, and for a crit a spinning gold star
+	  contact(position, cut, color, power, blocked)
+	      your own blade biting in (Combat: Contact): a white-hot streak laid
+	      along the cut, a hard flare and sparks thrown on along it; blocked,
+	      a glint and sparks thrown back at you
+	  contactPoint(target, from)  where on a body a blade from `from` meets it
 	  lightning(from, to, color)
 	      a jagged bolt with forks, white core in a coloured glow, flickering
 	  projectile(from, to, color, fireball)
@@ -246,6 +251,76 @@ function CombatVfx.impact(position: Vector3, color: Color3, crit: boolean?, heav
 		end
 		CombatFx.flash(position, GOLD, 5, 16, 0.25)
 	end
+end
+
+-- Contact: your own blade connecting -------------------------------------------------
+
+-- Where your blade meets a body: on the near side of it, at chest height
+-- (so the spark is in front of it, not inside it).
+function CombatVfx.contactPoint(target: Vector3, from: Vector3): Vector3
+	local offset = Vector3.new(from.X - target.X, 0, from.Z - target.Z)
+	local toward = if offset.Magnitude > 0.05 then offset.Unit else Vector3.zero
+	return target + Vector3.new(0, 1.1, 0) + toward * 1.1
+end
+
+-- The blade biting in, seen from behind it: a white-hot streak along the
+-- cut (`cut`, a direction across your view), a hard four-point flare, a
+-- spray of sparks thrown on along the cut and a pulse of light. `power`:
+-- 1 a cut, more for a heavy or a crit or a kill. Blocked: a short blue-white
+-- glint and sparks thrown back at you instead.
+function CombatVfx.contact(position: Vector3, cut: Vector3, color: Color3, power: number, blocked: boolean?)
+	local view = camera()
+	if not view then
+		return
+	end
+	local eye = view.CFrame.Position
+	local facing = CFrame.lookAt(position, eye)
+	if cut.Magnitude < 0.01 then
+		cut = view.CFrame.RightVector
+	end
+	cut = cut.Unit
+	local hot = color:Lerp(WHITE, 0.55)
+	if blocked then
+		local glint = neon(Vector3.new(0.06, 0.06, 1.6), CFrame.lookAt(position, position + cut), WHITE, 0)
+		fade(glint, 0.1, { Size = Vector3.new(0.02, 0.02, 2.6) })
+		local back = (eye - position).Unit
+		for _ = 1, 6 do
+			local out = (back + Vector3.new(math.random() - 0.5, math.random() * 0.6, math.random() - 0.5)).Unit
+			local streak = neon(Vector3.new(0.05, 0.05, 0.6), CFrame.lookAt(position, position + out), Color3.fromRGB(200, 225, 255), 0)
+			fade(streak, 0.14, { CFrame = CFrame.lookAt(position + out * 1.6, position + out * 2.4) })
+		end
+		CombatFx.flash(position, Color3.fromRGB(190, 220, 255), 3, 10, 0.12)
+		return
+	end
+	-- The streak: a long thin blade of light laid along the cut, stretching
+	-- on as it fades, with a softer glow in the weapon's colour round it.
+	local length = 3.2 * power
+	local along = CFrame.lookAt(position, position + cut)
+	local streak = neon(Vector3.new(0.09 * power, 0.09 * power, length), along, WHITE, 0)
+	fade(streak, 0.12, { Size = Vector3.new(0.02, 0.02, length * 1.5) })
+	local glow = neon(Vector3.new(0.35 * power, 0.35 * power, length * 0.8), along, color, 0.35)
+	fade(glow, 0.16, { Size = Vector3.new(0.05, 0.05, length * 1.3) })
+	-- The flare: four hard rays facing you, spinning open a touch.
+	for i, roll in { 0, 90, 45, 135 } do
+		local long = if i <= 2 then 2.4 else 1.3
+		local ray = neon(Vector3.new(0.1 * power, long * power, 0.04), facing * CFrame.Angles(0, 0, math.rad(roll)), hot, 0)
+		fade(ray, 0.11, {
+			CFrame = facing * CFrame.Angles(0, 0, math.rad(roll + 20)),
+			Size = Vector3.new(0.02, long * power * 1.7, 0.02),
+		})
+	end
+	local core = neon(Vector3.one * 0.5 * power, CFrame.new(position), WHITE, 0, Enum.PartType.Ball)
+	fade(core, 0.09, { Size = Vector3.one * 1.8 * power, Color = color })
+	-- Sparks thrown on the way the blade was going.
+	for _ = 1, math.floor(6 + 4 * power) do
+		local out = (cut * 1.2 + Vector3.new(math.random() - 0.5, math.random() - 0.3, math.random() - 0.5)).Unit
+		local spark = neon(Vector3.new(0.05, 0.05, 0.4 + math.random() * 0.6), CFrame.lookAt(position, position + out), hot, 0)
+		local reach = (1.6 + math.random() * 2.4) * power
+		fade(spark, 0.16 + math.random() * 0.1, {
+			CFrame = CFrame.lookAt(position + out * reach, position + out * (reach + 0.6)) - Vector3.new(0, 0.4, 0),
+		})
+	end
+	CombatFx.flash(position, hot, 3 + 2 * power, 10 + 4 * power, 0.14)
 end
 
 -- Element signature on a hit ---------------------------------------------------------

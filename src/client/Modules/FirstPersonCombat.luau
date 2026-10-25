@@ -13,6 +13,13 @@ local pieces, hidden = {}, {}
 local movedParts: { BasePart } = {} -- (reused each frame: no garbage)
 local movedFrames: { CFrame } = {}
 local raised, charge, swingAt, swingSide, swingHeavy = 0, 0, -10, "Right", false
+-- The swing's own clock (seconds into it): it stops dead for a moment as the
+-- blade connects (View.contact), so a hit has weight. `pendingStop` waits for
+-- the blade to reach the cut; `stopUntil` holds it there; `stopAt` and
+-- `stopStrength` drive the bite as it holds.
+local swingClock, lastClock = 10, os.clock()
+local pendingStop = nil
+local stopUntil, stopAt, stopStrength, stopBlocked = 0, -10, 0, false
 local cursorFree = false
 local fireAt, smoothedRaised, smoothedCharge = -10, 0, 0
 local dirty = true
@@ -425,6 +432,43 @@ end
 -- `heavy`: a charged blow, a bigger overhead chop.
 function View.swing(side, heavy)
 	swingAt, swingSide, swingHeavy = os.clock(), side or "Right", heavy == true
+	swingClock, pendingStop, stopUntil = 0, nil, 0
+end
+-- How long ago a swing began (os.clock seconds; huge when there's been none).
+function View.swingAge(): number
+	return os.clock() - swingAt
+end
+
+-- Where in a swing the blade meets what it cuts (seconds in): a light cut as
+-- it crosses the middle of your view, a heavy halfway down its chop.
+View.ContactAt = { Right = 0.13, Left = 0.13, Heavy = 0.18 }
+
+-- The blade connects: the swing stops dead for `stop` seconds as the blade
+-- bites (harder by `strength`; `blocked`, it rings off a guard and bounces
+-- back), and `fire` runs at that moment (the camera kick, the flash, the
+-- sound), so they all land together. Arriving before the blade has reached
+-- the cut, it waits for it; after, it stops it where it is. With no swing in
+-- view (third person, a swing long over), `fire` runs at once.
+function View.contact(stop: number, strength: number, blocked: boolean, fire: (() -> ())?)
+	local key = if swingHeavy then "Heavy" else swingSide
+	local at = View.ContactAt[key] or 0.13
+	local length = if swingHeavy then 0.62 else 0.46
+	if not saved or #pieces == 0 or swingClock >= length then
+		if fire then
+			task.spawn(fire)
+		end
+		return
+	end
+	local entry = { At = at, For = stop, Strength = strength, Blocked = blocked, Fire = fire }
+	if swingClock < at then
+		pendingStop = entry
+	else
+		pendingStop = nil
+		stopUntil, stopAt, stopStrength, stopBlocked = os.clock() + stop, os.clock(), strength, blocked
+		if fire then
+			task.spawn(fire)
+		end
+	end
 end
 
 local function ease(x)
@@ -659,6 +703,7 @@ function View.stop()
 	end
 	castAt = -10
 	fireAt, smoothedRaised, smoothedCharge, swingAt, swingHeavy = -10, 0, 0, -10, false
+	swingClock, pendingStop, stopUntil, stopBlocked = 10, nil, 0, false
 end
 function View.start()
 	shownParts, nextShownCheck = -1, 0
@@ -756,7 +801,34 @@ function View.start()
 		if not equipment and model then
 			clearModel()
 		end
-		local swingElapsed = os.clock() - swingAt
+		-- The swing's clock runs on, except held as a blade bites.
+		local clockNow = os.clock()
+		local tick = math.min(clockNow - lastClock, 0.1)
+		lastClock = clockNow
+		if clockNow >= stopUntil then
+			if stopBlocked and stopUntil > 0 and clockNow - stopUntil < tick + 1e-3 then
+				swingClock = math.max(0, swingClock - 0.07) -- (it rang off a guard: back it bounces)
+				stopBlocked = false
+			end
+			local before = swingClock
+			swingClock += tick
+			local waiting = pendingStop
+			if waiting and before < waiting.At and swingClock >= waiting.At then
+				swingClock = waiting.At
+				pendingStop = nil
+				stopUntil, stopAt, stopStrength, stopBlocked = clockNow + waiting.For, clockNow, waiting.Strength, waiting.Blocked
+				if waiting.Fire then
+					task.spawn(waiting.Fire)
+				end
+			end
+		end
+		local swingElapsed = swingClock
+		-- The bite: while it holds, the blade shudders, pressed into the cut.
+		local biting = if clockNow < stopUntil then 1 - (clockNow - stopAt) / math.max(stopUntil - stopAt, 0.01) else 0
+		local biteK = biting * stopStrength
+		local biteX = math.sin(clockNow * 95) * 0.014 * biteK
+		local biteY = math.cos(clockNow * 120) * 0.011 * biteK
+		local biteZ = 0.05 * biteK
 		-- How far a swing is under way (0..1..0): the shield leans into it.
 		local swingPose, swingWeight = nil, 0
 		if #pieces > 0 then
@@ -878,9 +950,9 @@ function View.start()
 					-1.35
 				) * CFrame.Angles(0, 0, math.rad(-12 + smoothedRaised * 25))
 				else CFrame.new(
-					casting * 0.12 - throw * 0.2 + strain,
-					breathe + casting * 0.08,
-					recoil * 0.18 + casting * 0.2 - throw * 0.35
+					casting * 0.12 - throw * 0.2 + strain + biteX,
+					breathe + casting * 0.08 + biteY,
+					recoil * 0.18 + casting * 0.2 - throw * 0.35 + biteZ
 				) * (swingPose or REST:Lerp(RAISED, ease(smoothedCharge))) * CFrame.Angles(
 					math.rad(-recoil * 9 + casting * 14 - throw * 22 + strain * 300),
 					0,

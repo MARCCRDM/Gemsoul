@@ -36,6 +36,10 @@ CAMERAS = {
     "KaijuBolt": ((14, 6, -2), (0, 2, -8), 58),
     "KaijuBomb": ((13, 8, 2), (0, 2, -5), 58),
     "KaijuSpine": ((14, 6, -2), (0, 2, -8), 58),
+    # Your blade biting in, from just behind it; a kaiju's cast and its steps.
+    "Contact": ((0.6, 4.6, -10), (0, 3.6, -16), 50),
+    "KaijuCharge": ((7, 5.5, -9), (0, 4.5, -2), 55),
+    "KaijuSteps": ((9, 6, 7), (0, 0.5, 0), 52),
 }
 
 def shape_mesh(shape, sx, sy, sz):

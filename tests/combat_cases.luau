@@ -70,6 +70,19 @@ check(feedbackCount("HitConfirm",a)==1,"Accepted hit did not confirm to attacker
 check(feedbackCount("HitConfirm",b)==0,"Victim received attack confirmation")
 check(feedbackCount("IncomingDamage",b)==1,"Victim missing directional feedback")
 check(feedbackCount("IncomingDamage",a)==0,"Attacker received victim feedback")
+-- The blade's contact goes to the swinger alone, with what it hit and how.
+-- (A global: the bundle is at Luau's 200-local limit.)
+function latestMessage(kind,recipient)
+ for i=#messages,1,-1 do
+  if messages[i][1]==kind and messages[i].Player==recipient then return messages[i] end
+ end
+end
+check(feedbackCount("Contact",a)==1 and feedbackCount("Contact",b)==0,"Blade contact not sent to the swinger alone")
+do
+ local contact=latestMessage("Contact",a)
+ check(type(contact[2])=="table" and #contact[2]==1 and contact[2][1].Position==rb.Position,"Contact lost what it hit")
+ check(contact[3].Heavy==false and contact[3].Blocked==false and contact[3].Combo>=1,"Light contact misclassified")
+end
 for _,message in messages do
  if message[1]=="IncomingDamage" and message.Player==b then
   check(message[2]==ra.Position,"Incoming indicator lost authoritative origin")
@@ -84,6 +97,7 @@ CombatServer._block(b,true,ra.Position)
 local before=hb.Health
 CombatServer._input(a,"Attack",rb.Position)
 check(close(before-hb.Health,damage*0.35),"Live timed high block")
+check(latestMessage("Contact",a)[3].Blocked==true,"A blow on a guard didn't ring off it")
 check(not CombatServer._attack(b,ra.Position,false),"Attacked while blocking")
 check(CombatServer._state(a).StunUntil>now,"High block failed to stagger attacker")
 local raisedAt=CombatServer._state(b).BlockRaisedAt

@@ -173,7 +173,7 @@ function MobileLayout.kaiju(chat: boolean?)
 	local health = MobileLayout.health()
 	-- (Wide enough for four tiles, the team's three and the support's, and
 	-- two buttons: AUTO HEAL and CALL BACK.)
-	local w = 340
+	local w = 316 -- (CATCH beside it still clears the teammates' cards on a 667-wide phone)
 	if chat then
 		-- Beside the CHAT button (under it, a short screen runs into the
 		-- dock), CATCH under the button.

@@ -1103,6 +1103,84 @@ scenarios.KaijuBomb = {
 	end,
 }
 
+-- Your blade connecting (CombatVfx.contact, with SwordFeel's numbers), seen
+-- from just behind your sword: a cut, a heavy chop, a crit, and a blow that
+-- rings off a guard.
+local SwordFeel = requireScript(client.Modules.SwordFeel)
+scenarios.Contact = {
+	Frames = { 0.02, 0.05, 0.08, 0.12, 0.17, 0.25 },
+	Rows = { "Cut", "Heavy", "Crit", "Guarded" },
+	Run = function(row, me, foe)
+		camera.CFrame = CF.lookAt(V3.new(0.6, 4.6, -10), V3.new(0, 3.6, -16))
+		local feel = SwordFeel.tune({ Heavy = row == "Heavy", Crit = row == "Crit", Blocked = row == "Guarded" }, "Right")
+		local view = camera.CFrame
+		local at = CombatVfx.contactPoint(foe:FindFirstChild("HumanoidRootPart").Position, view.Position)
+		local cut = view.RightVector * feel.Cut.X + view.UpVector * feel.Cut.Y
+		CombatVfx.contact(at, cut, GemConfig.ElementColors.Fire, feel.Power, row == "Guarded")
+	end,
+}
+-- A kaiju's cast (KaijuMotionFx): its element gathering at its mouth over
+-- the wind-up, then let go; and its feet landing as it walks.
+local KaijuMotionFx = requireScript(client.Modules.KaijuMotionFx)
+roblox.implementMethod("Model", "GetExtentsSize", function(model)
+	local lo, hi = nil, nil
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			local a, b = d.Position - d.Size / 2, d.Position + d.Size / 2
+			lo = if lo then lo:Min(a) else a
+			hi = if hi then hi:Max(b) else b
+		end
+	end
+	return if lo then hi - lo else V3.zero
+end)
+local function kaijuBody()
+	local model = Instance.new("Model")
+	model.Name = "Kaiju"
+	local body = Instance.new("Part")
+	body.Name = "Trunk" -- (drawn: the renderer skips a HumanoidRootPart)
+	body.Anchored = true
+	body.Size = V3.new(1.4, 4, 2.2) * WILD
+	body.Color = C3.fromRGB(60, 64, 80)
+	body.Material = roblox.Enum.Material.Metal
+	body.CFrame = CF.lookAt(V3.new(0, 2 * WILD, 0), V3.new(0, 2 * WILD, -10))
+	body.Position = body.CFrame.Position
+	body.Parent = model
+	model.Parent = workspace
+	return model, body
+end
+scenarios.KaijuCharge = {
+	Frames = { 0.25, 0.5, 0.75, 0.84, 0.9, 1.05 },
+	Rows = ELEMENTS,
+	Run = function(element, me, foe)
+		me.Parent, foe.Parent = nil, nil
+		local model, root = kaijuBody()
+		local rig = {}
+		local color = GemConfig.ElementColors[element]
+		for i = 0, 47 do
+			fakeTask.delay(i / 60, function()
+				KaijuMotionFx.charge(rig, model, root, i / 48, color)
+			end)
+		end
+		fakeTask.delay(0.8, function()
+			KaijuMotionFx.release(rig, model, root, color)
+		end)
+	end,
+}
+scenarios.KaijuSteps = {
+	Frames = { 0.05, 0.15, 0.3, 0.42, 0.55, 0.8 },
+	Rows = { "Walk" },
+	Run = function(_, me, foe)
+		me.Parent, foe.Parent = nil, nil
+		local model, root = kaijuBody()
+		local humanoid = { HipHeight = 0 }
+		for i = 0, 3 do
+			fakeTask.delay(i * 0.25, function()
+				KaijuMotionFx.footstep(model, root, humanoid :: any, if i % 2 == 0 then 1 else -1)
+			end)
+		end
+	end,
+}
+
 local only = process.args[3]
 local summary = {}
 for name, scenario in scenarios do
