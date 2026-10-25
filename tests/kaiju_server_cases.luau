@@ -1347,7 +1347,7 @@ for i, pack in packs do
 	for j, other in packs do
 		if j ~= i then
 			check((other.Den - pack.Den).Magnitude >= Kaiju.Wild.Apart, "Two dens side by side")
-			check(other.Species ~= pack.Species, "Two packs of one kind")
+			check(Kaiju.WildRoster[other.Species] and Kaiju.WildRoster[pack.Species], "Wild pack used a retired design")
 		end
 	end
 	for _, member in pack.Members do

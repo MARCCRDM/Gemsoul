@@ -269,13 +269,20 @@ wm.Attributes.KaijuWild = true
 inWorld = true
 BodyHealth.watch(wm)
 BodyHealth.step(Vector3.new(0, 0, 20))
+for _, o in made do
+	check(not (o.ClassName == "Highlight" and o.Adornee == wm and not o.Destroyed), "Wild kaiju must not have the green health outline")
+end
+-- Gem-carrying critters still need their recovery outline.
+wm.Attributes.KaijuWild = nil
+wm.Attributes.CarryingGem = true
+BodyHealth.step(Vector3.new(0, 0, 20))
 local ring
 for _, o in made do
 	if o.ClassName == "Highlight" then
 		ring = o
 	end
 end
-check(ring and ring.Adornee == wm and ring.Parent == wm, "A wild kaiju isn't outlined")
+check(ring and ring.Adornee == wm and ring.Parent == wm, "A gem-carrying critter lost its outline")
 check(ring.DepthMode == Enum.HighlightDepthMode.AlwaysOnTop, "A wild kaiju's outline doesn't show through rocks")
 check(near(ring.OutlineColor, O.Good), "A well wild kaiju's outline isn't green")
 hit(wh, 20)

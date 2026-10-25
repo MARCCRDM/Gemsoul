@@ -318,7 +318,7 @@ function BodyHealth.step(eye: Vector3)
 	local list = {}
 	for model, entry in entries do
 		local at = rootPosition(model)
-		if at and entry.Share > 0 then
+		if at and entry.Share > 0 and model:GetAttribute("KaijuWild") ~= true then
 			table.insert(list, {
 				Entry = entry,
 				-- (A wild kaiju, or a snatcher with a gem: seen through rocks.)
@@ -347,7 +347,7 @@ function BodyHealth.step(eye: Vector3)
 	end
 	-- (Gone from the list, down or without a body: no outline either.)
 	for model, entry in entries do
-		if entry.Outline and (entry.Share <= 0 or not rootPosition(model)) then
+		if entry.Outline and (entry.Share <= 0 or not rootPosition(model) or model:GetAttribute("KaijuWild") == true) then
 			entry.Outline:Destroy()
 			entry.Outline = nil
 		end

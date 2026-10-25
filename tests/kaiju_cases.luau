@@ -143,16 +143,16 @@ do
 		vein[id] = true
 	end
 	for _, id in Kaiju.Starters do
-		check(fringe[id] and edge[id] and not vein[id], id .. " doesn't roam the frontier")
+		check(not fringe[id] and not edge[id] and not vein[id], id .. " should remain owned/starter-only")
 	end
 	local counts = { Fringe = 0, Edge = 0, Vein = 0 }
 	for _, id in Roster.Order do
 		local habitat = Roster.Kinds[id].Habitat
 		check(counts[habitat], id .. ": no habitat")
 		counts[habitat] += 1
-		check(fringe[id] == (habitat == "Fringe" or nil), id .. ": wrong in the Fringe")
-		check(edge[id] == (habitat ~= "Vein" or nil), id .. ": wrong at the Edge")
-		check(vein[id] == (habitat == "Vein" or nil), id .. ": wrong as the guardian")
+		check(fringe[id] == (Kaiju.WildRoster[id] and habitat == "Fringe" or nil), id .. ": wrong in the Fringe")
+		check(edge[id] == (Kaiju.WildRoster[id] and habitat ~= "Vein" or nil), id .. ": wrong at the Edge")
+		check(vein[id] == (Kaiju.WildRoster[id] and habitat == "Vein" or nil), id .. ": wrong as the guardian")
 	end
 	check(counts.Fringe >= 4 and counts.Edge >= 10 and counts.Vein >= 2, "The habitats are lopsided")
 end

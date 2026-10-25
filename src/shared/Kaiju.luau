@@ -150,6 +150,12 @@ end
 -- the guarded Rift Vein's guardian): the first four and the roster's of
 -- Fringe anywhere out there, the roster's of Edge only at the Edge, the
 -- roster's of Vein only as the guardian (Shared.KaijuRoster's Habitat).
+-- Curated wild encounters; ownership, starters and existing pets are unaffected.
+Kaiju.WildRoster = {
+	Emberjaw = true, Stormwing = true, Sickleclaw = true, Mossback = true,
+	Hulkshell = true, Drillhorn = true, Triskull = true, Brightsteel = true,
+	Dreadcrown = true, Bladebrow = true, Starspine = true,
+}
 function Kaiju.wildKinds(band: string?): { string }
 	local out = {}
 	for _, id in Kaiju.Order do
@@ -157,7 +163,7 @@ function Kaiju.wildKinds(band: string?): { string }
 		local fits = if band == "Vein"
 			then habitat == "Vein"
 			else habitat == "Fringe" or (habitat == "Edge" and band == "Edge")
-		if fits then
+		if fits and Kaiju.WildRoster[id] then
 			table.insert(out, id)
 		end
 	end
