@@ -677,11 +677,7 @@ local SHORT = UiKit.short()
 local W, H = if SHORT then 860 else 800, if SHORT then 340 else 512
 local window = IronUi.window("KaijuPanel", 11, W, H, "K", P.Gold)
 window.Title.Text = "YOUR KAIJU"
-<<<<<<< HEAD
 window.Subtitle.Text = "Choose a kaiju to inspect, heal, enchant, or swap into your team."
-=======
-window.Subtitle.Text = "Your team fights beside you; your support heals you. Pick one to see it."
->>>>>>> 0e9d1d304de41cdbad83753cba8d2378909fed7c
 window.Close.Activated:Connect(function()
 	window.Gui.Enabled = false
 end)
@@ -1426,14 +1422,10 @@ local function kaijuRow(order: number, record, slot: number?, models)
 	name.Position, name.Size = UDim2.fromOffset(60, 6), UDim2.new(1, -66, 0, 16)
 	local statusText, statusColor = rowStatus(record, slot)
 	local status = label(row, statusText, 10, statusColor, IronUi.Bold)
-<<<<<<< HEAD
 	status.Position, status.Size = UDim2.fromOffset(60, 23), UDim2.new(1, -66, 0, 13)
 	local species = Kaiju.species(record.Species)
 	local identity = label(row, (species and species.Name or record.Species) .. " / " .. tostring(record.Element), 10, P.Dim, IronUi.Body)
 	identity.Position, identity.Size = UDim2.fromOffset(60, 37), UDim2.new(1, -66, 0, 13)
-=======
-	status.Position, status.Size = UDim2.fromOffset(60, 23), UDim2.new(1, -134, 0, 13)
->>>>>>> 0e9d1d304de41cdbad83753cba8d2378909fed7c
 	local live = { Record = record, Slot = slot, Status = status }
 	if swapping and slot then
 		local cue = label(row, if record.Id == swapTarget then "REPLACING" else "TAP TO REPLACE", 9, P.Gold, IronUi.Bold)
@@ -1544,8 +1536,10 @@ local function drawActions(data, record, team: { string })
 		end
 	end
 	local slot = table.find(team, record.Id)
-<<<<<<< HEAD
-	if swapping and not slot then
+	local supportId = Kaiju.supportId(data)
+	local support = Kaiju.isSupport(record.Species)
+	-- (A support goes in the support slot, never one of the team.)
+	if swapping and not slot and not support then
 		local replacing = swapTarget and data.List[swapTarget]
 		local targetSlot = swapTarget and table.find(team, swapTarget)
 		actionText.Size = UDim2.new(1, -206, 1, 0)
@@ -1572,34 +1566,6 @@ local function drawActions(data, record, team: { string })
 					drawPanel()
 				end)
 			end)
-=======
-	local supportId = Kaiju.supportId(data)
-	local support = Kaiju.isSupport(record.Species)
-	if swapping and not slot and not support then
-		-- SEND OUT: in place of which of the team?
-		actionText.Text = "In place of:"
-		actionText.Size = UDim2.new(0, 80, 1, 0)
-		for i, id in team do
-			local other = data.List[id]
-			local species = other and Kaiju.species(other.Species)
-			actionButton(
-				i,
-				string.upper(species and species.Name or id),
-				elementColor(other and other.Element),
-				100,
-				function()
-					local ids = table.clone(team)
-					ids[i] = record.Id
-					act(function()
-						local result = GemClient.request("KaijuTeam", ids)
-						say(result)
-						if result and result.Ok then
-							swapping = false
-						end
-					end)
-				end
-			)
->>>>>>> 0e9d1d304de41cdbad83753cba8d2378909fed7c
 		end
 		actionButton(2, "CANCEL", P.Edge, 90, function()
 			swapping, swapTarget = false, nil
