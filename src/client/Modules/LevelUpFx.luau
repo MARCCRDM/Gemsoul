@@ -11,9 +11,10 @@
 	                           miner's is amber; a kaiju's its element's
 	                           colour, at its size.
 	  banner(level, lines?, color?, name?)   yours (`name`: your kaiju's):
-	                           a card at the top of the screen, a medal
-	                           with the new level turning over, LEVEL UP!
-	                           (or its name) and what it brought
+	                           a slim pill at the top of the screen, a
+	                           small medal with the new level turning
+	                           over, LEVEL UP! (or its name) and what it
+	                           brought
 	  callBack(at, radius, color, to)   a kaiju called back: it folds into a
 	                           point of light, and a shard of it flies to you
 	  deploy(at, radius, color, from)   deployed: a shard flies out of you,
@@ -331,37 +332,36 @@ end
 
 -- Your level-up card ------------------------------------------------------------------------
 
--- Yours (or your kaiju's), at the top of the screen: a medal with the new
--- level (the old number rolls up out of it as the new one comes in), rays
--- turning behind it and sparks off it as it turns over, LEVEL UP! (or
--- your kaiju's name) and what it brought. A shine runs over it, and a line
--- along its foot runs down while it stays. One at a time; the next waits
--- its turn. Posed from one clock, like the light in the world.
+-- Yours (or your kaiju's): a slim pill at the top of the screen, out of
+-- the way: a small medal with the new level (the old number rolls up out
+-- of it as the new one comes in), LEVEL UP! (or your kaiju's name) and
+-- what it brought on one line under it. A line along its foot runs down
+-- while it stays. One at a time; the next waits its turn. Posed from one
+-- clock, like the light in the world.
 --
 --   cardLayout(screen, short) -> Layout   where it goes and how big (pure)
 --   card(level, lines, color, name?, layout) -> Card   at rest (pure)
 --   poseCard(card, t)                     t seconds in (pure)
-LevelUpFx.CardSeconds = 3.8
+LevelUpFx.CardSeconds = 2.8
 LevelUpFx.Card = {
-	-- A computer's: across the top middle.
-	W = 440,
-	H = 108,
-	Top = 70,
-	Badge = 80,
-	-- A phone's: in the top middle, between the pick card and the toasts;
-	-- side by side where there's room for it (Wide), else the medal over
-	-- its words; with not even Narrow between them (a small phone), it
-	-- drops a row, under the toasts, left of your health and loot cards.
+	-- A computer's: a pill across the top middle.
+	W = 340,
+	H = 46,
+	Top = 64,
+	Badge = 34,
+	-- A phone's: smaller, in the top middle between the pick card and the
+	-- toasts; with not even Narrow between them (a small phone), it drops
+	-- a row, under the toasts, left of your health and loot cards.
 	PhoneTop = 6,
-	Wide = 300,
+	PhoneW = 210,
+	PhoneH = 36,
+	PhoneBadge = 26,
 	Narrow = 150,
 }
 local DARK = Color3.fromRGB(13, 15, 24)
 local SOFT = Color3.fromRGB(190, 202, 222)
-local RAYS = 6 -- (each a bar through the middle: twice as many rays)
-local SPARKS = 10
 
-export type Layout = { X: number, Y: number, W: number, H: number, Badge: number, Stacked: boolean, Scale: number }
+export type Layout = { X: number, Y: number, W: number, H: number, Badge: number, Scale: number }
 
 function LevelUpFx.cardLayout(screen: Vector2, short: boolean): Layout
 	local spec = LevelUpFx.Card
@@ -373,7 +373,6 @@ function LevelUpFx.cardLayout(screen: Vector2, short: boolean): Layout
 			W = w,
 			H = spec.H,
 			Badge = spec.Badge,
-			Stacked = false,
 			Scale = 1,
 		}
 	end
@@ -387,28 +386,14 @@ function LevelUpFx.cardLayout(screen: Vector2, short: boolean): Layout
 		right = math.min(health.X, loot.X) - 8
 		top = toast.Y + toast.H + 6
 	end
-	local band = right - left
-	if band >= spec.Wide then
-		local w = math.min(band, 360)
-		return {
-			X = math.clamp(math.floor((screen.X - w) / 2), left, right - w),
-			Y = top,
-			W = w,
-			H = 72,
-			Badge = 54,
-			Stacked = false,
-			Scale = 0.68,
-		}
-	end
-	local w = math.max(band, spec.Narrow)
+	local w = math.max(math.min(right - left, spec.PhoneW), spec.Narrow)
 	return {
 		X = math.clamp(math.floor((screen.X - w) / 2), left, math.max(left, right - w)),
 		Y = top,
 		W = w,
-		H = 140,
-		Badge = 46,
-		Stacked = true,
-		Scale = 0.68,
+		H = spec.PhoneH,
+		Badge = spec.PhoneBadge,
+		Scale = 0.8,
 	}
 end
 
@@ -418,19 +403,14 @@ export type Card = {
 	Level: number,
 	Pop: UIScale,
 	Body: CanvasGroup,
-	Glow: Frame,
 	Edge: UIStroke,
-	Shine: Frame,
 	Timer: Frame,
 	Badge: Frame,
 	BadgePop: UIScale,
 	Ring: UIStroke,
 	Old: TextLabel,
 	Number: TextLabel,
-	Rays: { Frame },
-	Sparks: { Frame },
 	Fades: { { any } }, -- { instance, property, at rest }: faded in and out together
-	Center: Vector2, -- the medal's middle, on the card
 }
 
 local function make(class: string, props: { [string]: any }, parent: Instance?): any
@@ -448,7 +428,7 @@ function LevelUpFx.card(level: number, lines: { string }?, color: Color3, name: 
 	local L = layout
 	local s = L.Scale
 	local B = L.Badge
-	local pad = math.floor(16 * s + 0.5)
+	local pad = math.floor((L.H - B) / 2)
 	local fades = {}
 	local function fade(object: Instance, property: string)
 		table.insert(fades, { object, property, (object :: any)[property] })
@@ -460,204 +440,113 @@ function LevelUpFx.card(level: number, lines: { string }?, color: Color3, name: 
 		Size = UDim2.fromOffset(L.W, L.H),
 	})
 	local pop = make("UIScale", { Name = "Pop", Scale = 1 }, root)
-	-- A soft halo of its colour round it.
-	local glow = make("Frame", {
-		Name = "Glow",
-		BackgroundColor3 = color,
-		BackgroundTransparency = 0.84,
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(-6, -6),
-		Size = UDim2.new(1, 12, 1, 12),
-	}, root)
-	make("UICorner", { CornerRadius = UDim.new(0, 17) }, glow)
-	-- The card: dark glass washed with its colour from the medal's side.
+	-- The pill: dark glass, a touch of its colour behind the medal.
 	local body = make("CanvasGroup", {
 		Name = "Body",
 		BackgroundColor3 = DARK,
-		BackgroundTransparency = 0.04,
+		BackgroundTransparency = 0.12,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 		GroupTransparency = 1,
 	}, root)
-	make("UICorner", { CornerRadius = UDim.new(0, 12) }, body)
+	make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, body)
 	local wash = make("Frame", {
 		Name = "Wash",
 		BackgroundColor3 = color,
-		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 	}, body)
 	make("UIGradient", {
-		Rotation = if L.Stacked then 90 else 0,
 		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.62),
-			NumberSequenceKeypoint.new(0.55, 0.94),
+			NumberSequenceKeypoint.new(0, 0.72),
+			NumberSequenceKeypoint.new(0.35, 0.96),
 			NumberSequenceKeypoint.new(1, 1),
 		}),
 	}, wash)
-	local shine = make("Frame", {
-		Name = "Shine",
-		BackgroundColor3 = WHITE,
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(-140, 0),
-		Size = UDim2.new(0, 120, 1, 0),
-	}, body)
-	make("UIGradient", {
-		Rotation = 20,
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.38, 1),
-			NumberSequenceKeypoint.new(0.5, 0.7),
-			NumberSequenceKeypoint.new(0.62, 1),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-	}, shine)
-	-- The words: side by side with the medal, or under it.
-	local x0 = if L.Stacked then pad else pad + B + math.floor(pad * 1.2)
-	local textW = L.W - x0 - pad
-	local align = if L.Stacked then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
-	local top = if L.Stacked then pad + B + math.floor(6 * s) else math.floor(L.H * 0.15)
-	local function label(nameOf: string, text: string, size: number, y: number, rows: number, tint: Color3, font)
-		local object = make("TextLabel", {
+	-- The words, beside the medal: the headline, and under it what it
+	-- brought (or the level reached, when it brought nothing to say).
+	local x0 = pad + B + math.floor(10 * s)
+	local textW = L.W - x0 - math.floor(L.H / 2)
+	local headSize = math.floor(16 * s + 0.5)
+	local subSize = math.max(10, math.floor(11 * s + 0.5))
+	local gap = math.floor(2 * s)
+	local headY = math.floor((L.H - headSize - gap - subSize) / 2)
+	local function label(nameOf: string, text: string, size: number, y: number, tint: Color3, font)
+		return make("TextLabel", {
 			Name = nameOf,
 			BackgroundTransparency = 1,
 			Position = UDim2.fromOffset(x0, y),
-			Size = UDim2.fromOffset(textW, (size + 3) * rows),
+			Size = UDim2.fromOffset(textW, size + 2),
 			Font = font,
 			Text = text,
 			TextSize = size,
 			TextColor3 = tint,
-			TextWrapped = rows > 1,
-			TextTruncate = if rows > 1 then Enum.TextTruncate.None else Enum.TextTruncate.AtEnd,
-			TextXAlignment = align,
-			TextYAlignment = Enum.TextYAlignment.Top,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Center,
 		}, body)
-		return object
 	end
-	local kickSize = math.max(9, math.floor(12 * s + 0.5))
-	local headSize = math.floor((if L.Stacked then 26 else 30) * s + 0.5)
-	local detailSize = math.max(10, math.floor(13 * s + 0.5))
-	label(
-		"Kicker",
-		string.format(if name then "YOUR KAIJU REACHED LEVEL %d" else "YOU REACHED LEVEL %d", level),
-		kickSize,
-		top,
-		1,
-		color:Lerp(WHITE, 0.15),
-		Enum.Font.GothamBold
-	)
-	local headY = top + kickSize + math.floor(3 * s)
-	local headline = label("Headline", name or "LEVEL UP!", headSize, headY, 1, WHITE, Enum.Font.GothamBlack)
-	-- (A long name shrinks to fit.)
+	local headline = label("Headline", name or "LEVEL UP!", headSize, headY, WHITE, Enum.Font.GothamBlack)
 	headline.TextScaled = true
-	make("UITextSizeConstraint", { MaxTextSize = headSize, MinTextSize = math.floor(headSize * 0.55) }, headline)
+	make("UITextSizeConstraint", { MaxTextSize = headSize, MinTextSize = math.floor(headSize * 0.6) }, headline)
 	if name then
 		headline:SetAttribute("NoTranslate", true) -- (a kaiju's name)
 	end
 	local detail = (lines or {})[1]
+	local subY = headY + headSize + gap
 	if detail then
+		label("Detail", detail, subSize, subY, SOFT, Enum.Font.GothamMedium)
+	else
 		label(
-			"Detail",
-			detail,
-			detailSize,
-			headY + headSize + math.floor(6 * s),
-			if L.Stacked then 3 else 2,
-			SOFT,
-			Enum.Font.GothamMedium
+			"Kicker",
+			string.format(if name then "YOUR KAIJU REACHED LEVEL %d" else "YOU REACHED LEVEL %d", level),
+			subSize,
+			subY,
+			color:Lerp(WHITE, 0.2),
+			Enum.Font.GothamBold
 		)
 	end
-	-- Along its foot, a line that runs down while it stays.
-	local track = make("Frame", {
-		Name = "Track",
-		BackgroundColor3 = WHITE,
-		BackgroundTransparency = 0.9,
-		BorderSizePixel = 0,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, 0, 0, 3),
-	}, body)
+	-- Along its foot, a thin line that runs down while it stays.
 	local timer = make("Frame", {
 		Name = "Timer",
 		BackgroundColor3 = color,
+		BackgroundTransparency = 0.2,
 		BorderSizePixel = 0,
-		Size = UDim2.fromScale(1, 1),
-	}, track)
-	-- Its rim, in its colour.
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, x0, 1, -2),
+		Size = UDim2.fromOffset(textW, 2),
+	}, body)
+	-- Its rim, in its colour, faint.
 	local rim = make("Frame", {
 		Name = "Rim",
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 	}, root)
-	make("UICorner", { CornerRadius = UDim.new(0, 12) }, rim)
-	local edge = make("UIStroke", { Color = color, Thickness = 1.5, Transparency = 0.25 }, rim)
-	-- The medal, with rays behind it.
-	local cx = if L.Stacked then math.floor(L.W / 2) else pad + math.floor(B / 2)
-	local cy = if L.Stacked then pad + math.floor(B / 2) else math.floor(L.H / 2)
-	local rays = {}
-	for i = 1, RAYS do
-		local ray = make("Frame", {
-			Name = "Ray",
-			BackgroundColor3 = color:Lerp(WHITE, 0.35),
-			BackgroundTransparency = 0.45,
-			BorderSizePixel = 0,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromOffset(cx, cy),
-			Size = UDim2.fromOffset(math.max(3, math.floor(5 * s)), B * 2),
-			Rotation = (i - 1) * 180 / RAYS,
-		}, root)
-		make("UIGradient", {
-			Rotation = 90,
-			Transparency = NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 1),
-				NumberSequenceKeypoint.new(0.3, 0.2),
-				NumberSequenceKeypoint.new(0.5, 0),
-				NumberSequenceKeypoint.new(0.7, 0.2),
-				NumberSequenceKeypoint.new(1, 1),
-			}),
-		}, ray)
-		table.insert(rays, ray)
-	end
+	make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, rim)
+	local edge = make("UIStroke", { Color = color, Thickness = 1, Transparency = 0.45 }, rim)
+	-- The medal.
 	local badge = make("Frame", {
 		Name = "Badge",
 		BackgroundColor3 = Color3.fromRGB(24, 26, 40),
 		BorderSizePixel = 0,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(cx, cy),
+		Position = UDim2.fromOffset(pad + math.floor(B / 2), math.floor(L.H / 2)),
 		Size = UDim2.fromOffset(B, B),
 	}, root)
 	make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, badge)
 	make("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(color:Lerp(DARK, 0.45), DARK),
+		Color = ColorSequence.new(color:Lerp(DARK, 0.4), DARK),
 	}, badge)
-	local ring = make("UIStroke", { Color = color, Thickness = math.max(2, math.floor(3 * s + 0.5)) }, badge)
+	local ring = make("UIStroke", { Color = color, Thickness = 2 }, badge)
 	local badgePop = make("UIScale", { Name = "BadgePop", Scale = 0.4 }, badge)
-	local inner = make("Frame", {
-		Name = "Inner",
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(1, -math.floor(10 * s), 1, -math.floor(10 * s)),
-	}, badge)
-	make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, inner)
-	local innerRing = make("UIStroke", { Color = color:Lerp(WHITE, 0.4), Thickness = 1, Transparency = 0.55 }, inner)
-	local lv = make("TextLabel", {
-		Name = "Lv",
-		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0, 0.14),
-		Size = UDim2.fromScale(1, 0.18),
-		Font = Enum.Font.GothamBold,
-		Text = "LV",
-		TextScaled = true,
-		TextColor3 = color:Lerp(WHITE, 0.25),
-	}, badge)
 	-- (The numbers roll inside a window in the medal.)
 	local window = make("Frame", {
 		Name = "Window",
 		BackgroundTransparency = 1,
 		ClipsDescendants = true,
-		Position = UDim2.fromScale(0.1, 0.3),
-		Size = UDim2.fromScale(0.8, 0.52),
+		Position = UDim2.fromScale(0.14, 0.2),
+		Size = UDim2.fromScale(0.72, 0.6),
 	}, badge)
 	local function digits(nameOf: string, n: number)
 		return make("TextLabel", {
@@ -672,46 +561,23 @@ function LevelUpFx.card(level: number, lines: { string }?, color: Color3, name: 
 	end
 	local old = digits("Old", level - 1)
 	local number = digits("Number", level)
-	-- Sparks off the medal as it turns over.
-	local sparks = {}
-	for i = 1, SPARKS do
-		local spark = make("Frame", {
-			Name = "Spark",
-			BackgroundColor3 = if i % 3 == 0 then WHITE else color:Lerp(WHITE, 0.3),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromOffset(cx, cy),
-			Size = UDim2.fromOffset(math.max(4, math.floor(7 * s)), math.max(4, math.floor(7 * s))),
-			Rotation = 45,
-		}, root)
-		table.insert(sparks, spark)
-	end
-	fade(glow, "BackgroundTransparency")
 	fade(edge, "Transparency")
 	fade(badge, "BackgroundTransparency")
 	fade(ring, "Transparency")
-	fade(innerRing, "Transparency")
-	fade(lv, "TextTransparency")
 	return {
 		Root = root,
 		Layout = L,
 		Level = level,
 		Pop = pop,
 		Body = body,
-		Glow = glow,
 		Edge = edge,
-		Shine = shine,
 		Timer = timer,
 		Badge = badge,
 		BadgePop = badgePop,
 		Ring = ring,
 		Old = old,
 		Number = number,
-		Rays = rays,
-		Sparks = sparks,
 		Fades = fades,
-		Center = Vector2.new(cx, cy),
 	}
 end
 
@@ -721,64 +587,36 @@ local function backOut(x: number): number
 	return 1 + (c + 1) * (x - 1) ^ 3 + c * (x - 1) ^ 2
 end
 
--- Where everything on the card is `t` seconds in: in (down from above, a
--- little overshoot), the medal pops, the number turns over (the old one
--- rolls up out, the new one in) with a burst of sparks, the shine runs
--- over, the line runs down, and it lifts and fades at the end.
-LevelUpFx.Flip = 0.6 -- when the number turns over
+-- Where everything on the card is `t` seconds in: in (down a little from
+-- above), the medal pops, the number turns over (the old one rolls up out,
+-- the new one in), the line runs down, and it lifts and fades at the end.
+LevelUpFx.Flip = 0.5 -- when the number turns over
 function LevelUpFx.poseCard(card: Card, t: number)
 	local L = card.Layout
 	local total = LevelUpFx.CardSeconds
-	local shown = math.min(ease(t / 0.25), 1 - ease((t - (total - 0.4)) / 0.4))
-	local lift = if t < total - 0.4 then -18 * (1 - backOut(t / 0.45)) else -12 * ease((t - (total - 0.4)) / 0.4)
+	local shown = math.min(ease(t / 0.2), 1 - ease((t - (total - 0.35)) / 0.35))
+	local lift = if t < total - 0.35 then -10 * (1 - backOut(t / 0.35)) else -8 * ease((t - (total - 0.35)) / 0.35)
 	card.Root.Position = UDim2.fromOffset(L.X, L.Y + lift)
-	card.Pop.Scale = 0.92 + 0.08 * backOut(t / 0.45)
+	card.Pop.Scale = 0.95 + 0.05 * backOut(t / 0.35)
 	card.Body.GroupTransparency = 1 - shown
 	for _, entry in card.Fades do
 		local object, property, rest = entry[1], entry[2], entry[3]
 		object[property] = 1 - (1 - rest) * shown
 	end
-	-- The medal pops in, and again as it turns over.
+	-- The medal pops in, and a little again as it turns over.
 	local flip = LevelUpFx.Flip
-	local popIn = 0.4 + 0.6 * backOut((t - 0.08) / 0.4)
-	local bump = if t >= flip then 0.2 * (1 - ease((t - flip) / 0.3)) else 0
+	local popIn = 0.4 + 0.6 * backOut((t - 0.05) / 0.35)
+	local bump = if t >= flip then 0.12 * (1 - ease((t - flip) / 0.25)) else 0
 	card.BadgePop.Scale = popIn + bump
-	local roll = ease((t - flip + 0.05) / 0.25)
+	local roll = ease((t - flip + 0.05) / 0.22)
 	card.Old.Position = UDim2.fromScale(0, -roll)
 	card.Old.TextTransparency = 1 - (1 - roll) * shown
 	card.Number.Position = UDim2.fromScale(0, 1 - roll)
 	card.Number.TextTransparency = 1 - roll * shown
-	card.Ring.Thickness = math.max(2, math.floor(3 * L.Scale + 0.5)) + 2 * (bump / 0.2)
-	-- The rays turn behind it, longer as it turns over.
-	local rayShown = ease((t - 0.2) / 0.4) * shown
-	local length = L.Badge * (1.5 + 0.5 * ease((t - flip) / 0.4))
-	for i, ray in card.Rays do
-		ray.Rotation = (i - 1) * 180 / #card.Rays + t * 24
-		ray.Size = UDim2.fromOffset(ray.Size.X.Offset, math.floor(length))
-		ray.BackgroundTransparency = 1 - 0.55 * rayShown
-	end
-	-- Sparks fly off it as it turns over.
-	local since = t - flip
-	for i, spark in card.Sparks do
-		if since < 0 or since > 0.9 then
-			spark.BackgroundTransparency = 1
-		else
-			local k = since / 0.9
-			local angle = math.rad((i - 1) * 360 / #card.Sparks + 9 * i)
-			local far = L.Badge * (0.45 + (0.55 + 0.25 * ((i * 7) % 3) / 2) * ease(k))
-			spark.Position =
-				UDim2.fromOffset(card.Center.X + math.cos(angle) * far, card.Center.Y - math.sin(angle) * far)
-			spark.BackgroundTransparency = k ^ 1.5
-			spark.Rotation = 45 + 180 * k
-		end
-	end
-	-- The halo brightens as it turns over.
-	local glow = 0.84 - 0.24 * (1 - ease((t - flip) / 0.8)) * (if t >= flip then 1 else 0)
-	card.Glow.BackgroundTransparency = 1 - (1 - glow) * shown
-	-- The shine runs over, and the line runs down while it stays.
-	local sweep = ease((t - 0.75) / 0.6)
-	card.Shine.Position = UDim2.fromOffset(-140 + (L.W + 160) * sweep, 0)
-	card.Timer.Size = UDim2.fromScale(1 - math.clamp((t - 0.5) / (total - 0.9), 0, 1), 1)
+	card.Ring.Thickness = 2 + 1.5 * (bump / 0.12)
+	-- The line runs down while it stays.
+	local w = L.W - (math.floor((L.H - L.Badge) / 2) + L.Badge + math.floor(10 * L.Scale)) - math.floor(L.H / 2)
+	card.Timer.Size = UDim2.fromOffset(math.floor(w * (1 - math.clamp((t - 0.4) / (total - 0.8), 0, 1))), 2)
 end
 
 -- Yours: the card, one at a time; the next waits its turn. `name`: your

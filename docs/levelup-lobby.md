@@ -24,33 +24,34 @@ sees them:
 
 ### Your level-up card
 
-The old card was a flat dark strip with a thin line on top. The new one
-(`LevelUpFx.banner`, `cardLayout`, `card`, `poseCard`):
+It was too big: a 440 x 108 card with rays and sparks round it on a
+computer, and a third of a phone's height on small phones. Now it's a slim
+pill (`LevelUpFx.banner`, `cardLayout`, `card`, `poseCard`):
 
-- **A medal** on the left, with the new level in it. The old number rolls
-  up out of it as the new one comes in, the medal pops, and sparks fly off
-  it. Rays turn slowly behind it. It's amber for you and the element's
-  colour for a kaiju.
-- **The words:** YOU REACHED LEVEL 12 over **LEVEL UP!**. For a kaiju it's
-  YOUR KAIJU REACHED LEVEL 10 over its name (the name shrinks to fit, and
-  isn't translated). Under them goes what the level brought, on up to two
-  lines.
-- **The card:** dark glass washed with its colour from the medal's side,
-  a rim and a soft halo in that colour, rounded corners, a shine running
-  over it once. A line along its foot runs down while it stays.
-- **Timing:** it drops in from above with a little overshoot, stays about
-  3 seconds, then lifts and fades (3.8 s in all). One at a time, as before.
+- **A small medal** on the left with the new level in it. The old number
+  rolls up out of it as the new one comes in, and the medal pops a little.
+  It's amber for you and the element's colour for a kaiju.
+- **The words:** **LEVEL UP!** (or a kaiju's name, which shrinks to fit
+  and isn't translated), and under it what the level brought, on one line.
+  When the level brought nothing to say, it says YOU REACHED LEVEL 12 (or
+  YOUR KAIJU REACHED LEVEL 10) instead.
+- **The pill:** dark glass with a touch of its colour behind the medal, a
+  faint rim in that colour. A thin line under the words runs down while it
+  stays. No rays, sparks, halo or shine; about 15 pieces instead of 60.
+- **Size:** 340 x 46 on a computer, 64 down from the top; 210 x 36 on a
+  phone.
+- **Timing:** it drops in a little, stays about 2 seconds, then lifts and
+  fades (2.8 s in all, was 3.8). One at a time, as before.
 - **On a phone** it sits in the top middle, between the pick card and the
-  toasts, clear of the loot card. Where there's room (300 points: 812-wide
-  phones and up) it's side by side and 72 tall. On 667 and 736 it's the
-  medal over its words. While it's up, the live feed steps aside
+  toasts, clear of the loot card. On a phone too narrow for that, it drops
+  a row, under the toasts. While it's up, the live feed steps aside
   (`MobileLayout.claimTop`).
 
 ![Before (top) and after: yours and a kaiju's, on a computer](levelup-lobby/level-card.jpg)
 
-![On phones: a kaiju's at 844 x 390, yours at 667 x 375](levelup-lobby/level-card-phone.jpg)
+![On a phone (844 x 390): yours before and after, then a kaiju's before and after](levelup-lobby/level-card-phone.jpg)
 
-These are the client code drawn by the UI harness, 1.6 s in. They aren't
+These are the client code drawn by the UI harness, 1.2 s in. They aren't
 Roblox screenshots.
 
 ## Kaiju levelling, slower
