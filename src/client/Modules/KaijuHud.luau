@@ -17,9 +17,10 @@
 	                  danger (IN DANGER till then: Shared.Kaiju.away,
 	                  KaijuServer's KaijuDanger). Tap a tile for
 	                  the panel on that kaiju. One card, three by three:
-	                  the team's three across the top; the support, AUTO
-	                  HEAL and CALL BACK; the team's HYPERBEAM along the
-	                  bottom (KaijuBeamHud, in KaijuHud.beamSlot()).
+	                  the kaiju two by two (the team's three and the
+	                  support), AUTO HEAL over CALL BACK beside them, and
+	                  the team's HYPERBEAM along the bottom (KaijuBeamHud,
+	                  in KaijuHud.beamSlot()).
 	                  Computer: bottom left. Phone: right of your level and
 	                  coins, and at the top right while you hunt (the
 	                  fight's foe list has the top left then)
@@ -499,7 +500,7 @@ local function layout()
 	local phone = UiKit.short()
 	local hunting = Spar.hunting(player)
 	-- One card, three by three (MobileLayout.kaiju, kaijuDesk, kaijuCells):
-	-- the team's three; the support, AUTO HEAL and CALL BACK; the HYPERBEAM.
+	-- the kaiju two by two, AUTO HEAL over CALL BACK, the HYPERBEAM.
 	local spot = if phone then MobileLayout.kaiju(screen, hunting) else MobileLayout.kaijuDesk(screen)
 	card.Position = UDim2.fromOffset(spot.X, spot.Y)
 	card.Size = UDim2.fromOffset(spot.W, spot.H)

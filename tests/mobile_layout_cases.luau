@@ -154,6 +154,15 @@ for _, s in SCREENS do
 			end
 		end
 		check(cells.Beam.W > cells.Auto.W * 2.5, what .. ": the HYPERBEAM isn't the width of the card")
+		-- The kaiju two by two on the left (two rows of the same height), the
+		-- buttons stacked on the right, the HYPERBEAM under them all.
+		local f = cells.Fighters
+		check(f[1].Y == f[2].Y and f[3].Y == cells.Support.Y and f[3].Y > f[1].Y, what .. ": the kaiju aren't in two rows")
+		check(f[1].X == f[3].X and f[2].X == cells.Support.X and f[2].X > f[1].X, what .. ": the kaiju aren't in two columns")
+		check(f[1].H == f[3].H, what .. ": the kaiju rows aren't the same height")
+		check(cells.Auto.X > f[2].X and cells.Call.X == cells.Auto.X and cells.Auto.Y == f[1].Y and cells.Call.Y == f[3].Y,
+			what .. ": AUTO HEAL and CALL BACK aren't stacked beside the kaiju")
+		check(cells.Beam.Y > f[3].Y + f[3].H, what .. ": the HYPERBEAM isn't under the kaiju")
 		local near = {
 			["pick card"] = card,
 			coins = wallet,
@@ -284,5 +293,5 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, the kaiju card three by three with its HYPERBEAM, at 7 screen sizes)"
+		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, the kaiju card three by three (its kaiju two by two) with its HYPERBEAM, at 7 screen sizes)"
 )

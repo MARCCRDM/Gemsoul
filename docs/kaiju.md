@@ -470,8 +470,10 @@ above the combat HUD near the bottom center:
 
 - **The kaiju card:** one card, three across and three down
   (`MobileLayout.kaiju`, `kaijuDesk`, `kaijuCells`):
-  - **Top row:** your team's three, the lead first (edged in gold).
-  - **Middle row:** your support, AUTO HEAL and CALL BACK.
+  - **The kaiju, two by two on the left:** your team's three (the lead
+    first, edged in gold, then the second beside it and the third under
+    it), and your support beside the third.
+  - **On the right:** AUTO HEAL over CALL BACK.
   - **Bottom row:** the team's [HYPERBEAM](#hyperbeam), the full width of
     the card.
 
@@ -1048,7 +1050,7 @@ Proposed guardrails:
 | `SparServer` | `Hunt`: the kit out alone |
 | `Shared.KaijuBeam` | The HYPERBEAM's rules: mana (`Mana`, `gain`, `spend`, `team`), its timeline and phases, the formation and the leaps into it (`Leap`, `leap`, `leapHeight`, `arc`), the beam's reach (`hits`), the aim assist (`aim`) and its damage |
 | `KaijuBeamServer` | Mana on each kaiju's record (`KaijuCharge` and `KaijuSave` on you, `Mana` on each model), SAVE CHARGE (`KaijuSaveCharge`), the blast (`KaijuBeam`): the formation, holding them still, the pulses, letting go |
-| `KaijuHud` (client) | The kaiju card (three by three: the team, the support, AUTO HEAL, CALL BACK, and the HYPERBEAM's row), CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
+| `KaijuHud` (client) | The kaiju card (three by three: the team and the support two by two, AUTO HEAL over CALL BACK beside them, and the HYPERBEAM's row), CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
 | `KaijuBeamHud` (client) | The HYPERBEAM button: the charge, the pips, READY, SAVE, Z / tap |
 | `KaijuBeamFx` (client) | The blast on screen: the rune circle, each leap carried along its arc and slammed down, the roar, the auras, the streams and orb, the beam; your camera, roll call, letterbox, grade and bloom (`shot`, `flight`; `tools/vfx_sim.luau`'s Hyperbeam renders it) |

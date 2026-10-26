@@ -179,7 +179,7 @@ end
 -- list has the top left then), clear of the teammates' cards. TameX, TameY,
 -- TameW, TameH: where CATCH goes on a touch screen (the top right; left of
 -- the card while you hunt).
-MobileLayout.Kaiju = { W = 186, Pad = 4, Gap = 3, Max = 136, Split = { 0.37, 0.34 } }
+MobileLayout.Kaiju = { W = 186, Pad = 4, Gap = 3, Max = 136, Split = { 0.355, 0.355 } }
 function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 	local spec = MobileLayout.Kaiju
 	local x, y, room
@@ -213,7 +213,7 @@ end
 
 -- The same card on a computer: bottom left, a fixed size (ChatFeed keeps
 -- its bottom clear above it).
-MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 62, 54, 46 } }
+MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 58, 58, 46 } }
 function MobileLayout.kaijuDesk(screen: Vector2)
 	local spec = MobileLayout.KaijuDesk
 	local h = spec.Pad * 2 + spec.Gap * 2 + spec.Rows[1] + spec.Rows[2] + spec.Rows[3]
@@ -228,9 +228,10 @@ function MobileLayout.kaijuDesk(screen: Vector2)
 	}
 end
 
--- The card's cells, inside it (`card`: kaiju's or kaijuDesk's): the
--- team's three across the top (Fighters), then Support, Auto (AUTO HEAL)
--- and Call (CALL BACK), and Beam the width of the bottom row.
+-- The card's cells, inside it (`card`: kaiju's or kaijuDesk's): the kaiju
+-- two by two on the left (Fighters 1 and 2 on top, Fighter 3 and Support
+-- under them), Auto (AUTO HEAL) over Call (CALL BACK) on the right, and
+-- Beam the width of the bottom row.
 function MobileLayout.kaijuCells(card)
 	local pad, gap, rows = card.Pad, card.Gap, card.Rows
 	local cell = math.floor((card.W - pad * 2 - gap * 2) / 3)
@@ -240,9 +241,9 @@ function MobileLayout.kaijuCells(card)
 	local y2 = pad + rows[1] + gap
 	local y3 = y2 + rows[2] + gap
 	return {
-		Fighters = { at(1, pad, rows[1]), at(2, pad, rows[1]), at(3, pad, rows[1]) },
-		Support = at(1, y2, rows[2]),
-		Auto = at(2, y2, rows[2]),
+		Fighters = { at(1, pad, rows[1]), at(2, pad, rows[1]), at(1, y2, rows[2]) },
+		Support = at(2, y2, rows[2]),
+		Auto = at(3, pad, rows[1]),
 		Call = at(3, y2, rows[2]),
 		Beam = { X = pad, Y = y3, W = card.W - pad * 2, H = rows[3] },
 	}
