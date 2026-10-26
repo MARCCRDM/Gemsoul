@@ -1403,7 +1403,7 @@ return {
 	["Your armour in its own colours, as crafted."] = "Tu armadura en sus colores originales.",
 	["Your weapon in its own colours, as forged."] = "Tu arma en sus colores originales.",
 	["Your helmet as it was forged."] = "Tu casco tal como se forjó.",
-	["Your helmet's own visor, as it was rolled."] = "El visor original de tu casco.",
+	["Your helmet's standard visor."] = "El visor estándar de tu casco.",
 	["Your pick as it came from supply, in its own colour."] = "Tu pico tal como salió del almacén, en su color.",
 	["Your class glow in its own colour."] = "El brillo de tu clase en su color.",
 	["Nothing on your back."] = "Nada en tu espalda.",

@@ -33,6 +33,8 @@ fights = sys.argv[1] if len(sys.argv) > 1 else '16'
 source = read('tests/roblox_primitives.luau') + read('tests/combat_services.luau')
 for name, path in MODULES:
     source += module(name, path)
+# GearRolls' SuitTraits goes inside it: the chunk is near Luau's 200-local limit.
+source = source.replace('local GearRolls=(function()\n', 'local GearRolls=(function()\n' + module('SuitTraits', 'src/shared/SuitTraits.luau'), 1)
 source += read('tests/combat_players.luau')
 for name, path in [('DamageLog', 'src/server/Systems/DamageLog.luau'), ('CombatServer', 'src/server/Systems/CombatServer.luau'),
                    ('ArenaSessions', 'src/server/Systems/ArenaSessions.luau'), ('AugmentSystem', 'src/server/Systems/Augments.luau'),

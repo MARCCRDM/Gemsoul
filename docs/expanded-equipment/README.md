@@ -18,7 +18,7 @@ Each of the six equipment slots draws independently from its ten matrix entries.
 
 
 
-All starting items use Standard quality. Rarity-specific bonus stats, a visor treatment, finish, helmet variant and panel variant are saved on the item. Helmet visor treatment controls its actual glow color and is shown in inspection. Existing accounts keep their saved loadouts; rejoining does not reroll. Each slot remains independently enchantable and tradable.
+All starting items use Standard quality. Rarity-specific bonus stats, a visor treatment, finish, helmet variant and panel variant are saved on the item. The visor treatment no longer colours the helmet: every helmet wears the standard visor (`SuitTraits.DefaultVisor`), and a visor cosmetic is how a lens gets another colour. Existing accounts keep their saved loadouts; rejoining does not reroll. Each slot remains independently enchantable and tradable.
 
 
 

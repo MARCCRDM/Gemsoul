@@ -103,7 +103,7 @@ A palette can ask for more than one colour:
 
 A suit recolours the armour you wear (`repaint` in `Equipment.luau`, with `suit` set), but keeps it looking like armour:
 
-- **The visor stays as it is.** The builders mark visor parts (the glass, the dark well behind it, a bucket helm's slits) with a `Visor` attribute (`ArmorKits.visorPart`). The repaint skips them, so every suit keeps your armour's own visor colour.
+- **The visor stays as it is.** The builders mark visor parts (the glass, the dark well behind it, a bucket helm's slits) with a `Visor` attribute (`ArmorKits.visorPart`). The repaint skips them, so every suit keeps the standard visor (or your visor cosmetic).
 - **Light and shade are kept.** Each part takes the palette's colour at its own relative brightness, so a lighter edge stays lighter and a deep trim deeper, and the armour's detail still reads.
 - **Nothing blacks out.**
   - A part keeps at least 85% of its own brightness under the plates, and 55% on them.
@@ -181,9 +181,11 @@ Where the new ones come from:
 
 A visor restyles the lens of whatever helmet you wear. Like a suit, skin or
 pickaxe, each miner wears its own (`Cosmetics.MinerKinds`). The Wardrobe has
-a VISORS tab, and the Store has a Visors tab. Your helmet's own rolled visor
-(its colour, and any perk a Matrix visor carries) is the Wardrobe's
-"Standard": a visor cosmetic only changes how the lens looks.
+a VISORS tab, and the Store has a Visors tab. Without one, every helmet wears
+the same standard visor, one cyan (`SuitTraits.DefaultVisor`), whatever its
+roll: the Wardrobe's "Standard". Gear rolls still save a visor (and a Matrix
+visor's planned perk), but it no longer colours the lens, so a visor
+cosmetic is the only way to give it another look.
 
 ![Visors](skin-designs/visors_gallery.png)
 

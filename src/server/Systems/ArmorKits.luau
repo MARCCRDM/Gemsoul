@@ -10,6 +10,7 @@
 	`look` comes from Classes (e.g. "Plate", "Robe"), `accent` is the class colour.
 ]]
 local ArmorFamilies = require(game:GetService("ReplicatedStorage").Shared.ArmorFamilies)
+local SuitTraits = require(game:GetService("ReplicatedStorage").Shared.SuitTraits)
 local ArmorKits = {}
 
 -- A body segment: the part to weld to, where on it, and how big it is.
@@ -595,10 +596,9 @@ end
 local function bucketHelm(folder, head: Segment, kit: Kit)
 	local h = head.Size
 	box(folder, head, CFrame.new(0, h.Y * 0.1, 0), h * Vector3.new(1.2, 1.3, 1.22), kit.Metal, kit.Material)
-	visorFace(glow(folder, head, CFrame.new(0, h.Y * 0.12, -h.Z * 0.62), Vector3.new(h.X * 0.8, 0.1, 0.04), kit.Accent))
-	visorFace(
-		glow(folder, head, CFrame.new(0, -h.Y * 0.08, -h.Z * 0.62), Vector3.new(0.1, h.Y * 0.5, 0.04), kit.Accent)
-	)
+	local visor = SuitTraits.DefaultVisor
+	visorFace(glow(folder, head, CFrame.new(0, h.Y * 0.12, -h.Z * 0.62), Vector3.new(h.X * 0.8, 0.1, 0.04), visor))
+	visorFace(glow(folder, head, CFrame.new(0, -h.Y * 0.08, -h.Z * 0.62), Vector3.new(0.1, h.Y * 0.5, 0.04), visor))
 	cylinder(
 		folder,
 		head,
@@ -774,7 +774,7 @@ local function helmet(folder, head: Segment, kit: Kit, style: Suit)
 			head,
 			CFrame.new(0, h.Y * 0.1, -h.Z * 0.64),
 			h * Vector3.new(0.74, 0.38, 0.03),
-			if kit.Traits then kit.Traits.VisorColor else Color3.fromRGB(20, 139, 184),
+			if kit.Traits then kit.Traits.VisorColor else SuitTraits.DefaultVisor,
 			SMOOTH
 		)
 	)
@@ -1574,7 +1574,7 @@ local function frontierSuit(family: number)
 		local helmetVariant = math.clamp(kit.Traits and kit.Traits.Helmet or 1, 1, 5)
 		-- Catalog identity is stable across saved cosmetic rolls.
 		local design = kit.HelmetDesign or helmetVariant
-		local visor = kit.Traits and kit.Traits.VisorColor or Color3.fromRGB(238, 174, 57)
+		local visor = kit.Traits and kit.Traits.VisorColor or SuitTraits.DefaultVisor
 		local RECESS = Color3.fromRGB(8, 20, 30) -- the dark well the visor sits in
 		local function block(seg, x, y, z, sx, sy, sz, color, tilt)
 			local detail = box(

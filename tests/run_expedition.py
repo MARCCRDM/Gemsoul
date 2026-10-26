@@ -20,6 +20,7 @@ for name, path in [
     ("ExpandedTraits", "src/shared/ExpandedItemTraits.luau"),
     ("Slots", "src/shared/EquipmentSlots.luau"),
     ("Crafting", "src/shared/Crafting.luau"),
+    ("SuitTraits", "src/shared/SuitTraits.luau"),
     ("GearRolls", "src/shared/GearRolls.luau"),
     ("Classes", "src/shared/Classes.luau"),
     ("Economy", "src/shared/ExpeditionEconomy.luau"),

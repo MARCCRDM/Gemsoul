@@ -7,7 +7,7 @@ def module(name,p):
  s=re.sub(r'^local \w+ = require\([^\n]+\)\n','',read(p),flags=re.M)
  return 'local '+name+'=(function()\n'+s+'\nend)()\n'
 s=read('tests/roblox_primitives.luau')
-for name,path in [('EquipmentBalance','src/shared/EquipmentBalance.luau'),('ExpeditionEconomy','src/shared/ExpeditionEconomy.luau'),('CrowdControl','src/shared/CrowdControl.luau'),('GemConfig','src/shared/GemConfig.luau'),('ArmorFamilies','src/shared/ArmorFamilies.luau'),('ArmorKits','src/server/Systems/ArmorKits.luau')]:s+=module(name,path)
+for name,path in [('EquipmentBalance','src/shared/EquipmentBalance.luau'),('ExpeditionEconomy','src/shared/ExpeditionEconomy.luau'),('CrowdControl','src/shared/CrowdControl.luau'),('GemConfig','src/shared/GemConfig.luau'),('ArmorFamilies','src/shared/ArmorFamilies.luau'),('SuitTraits','src/shared/SuitTraits.luau'),('ArmorKits','src/server/Systems/ArmorKits.luau')]:s+=module(name,path)
 equipment=read('tests/equipment_cases.luau')
 s+=equipment[equipment.index('local function rig(r15)'):equipment.index('local builds = 0')]
 s+=read('tests/armor_articulation_cases.luau')

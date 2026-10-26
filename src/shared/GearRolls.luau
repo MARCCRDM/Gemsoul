@@ -3,6 +3,7 @@ local Slots = require(script.Parent.EquipmentSlots)
 local ExpandedTraits = require(script.Parent.ExpandedItemTraits)
 local ArmorFamilies = require(script.Parent.ArmorFamilies)
 local ArmorSignatures = require(script.Parent.ArmorSignatures)
+local SuitTraits = require(script.Parent.SuitTraits)
 local GearRolls = {}
 GearRolls.Rarities = {
 	{ Name = "Common", Weight = 40, Color = Color3.fromRGB(205, 216, 225) },
@@ -18,16 +19,11 @@ local colors = {
 	Color3.fromRGB(145, 111, 192),
 	Color3.fromRGB(211, 176, 84),
 }
-local visors = {
-	Color3.fromRGB(80, 211, 247),
-	Color3.fromRGB(240, 160, 68),
-	Color3.fromRGB(129, 154, 248),
-	Color3.fromRGB(237, 102, 198),
-	Color3.fromRGB(100, 235, 174),
-}
 -- Each roll's look, by name, so players can tell (and trade for) them.
 GearRolls.FinishNames = { "Ember Copper", "Polar Steel", "Lagoon Teal", "Nebula Violet", "Solar Gold" }
-GearRolls.VisorNames = { "Arctic Visor", "Amber Visor", "Periwinkle Visor", "Rose Visor", "Mint Visor" }
+-- A roll's visor (Visor, MatrixVisor) is kept on saved gear but no longer
+-- shows: every helmet wears the standard visor (SuitTraits.DefaultVisor).
+GearRolls.VisorName = "Standard"
 -- About 1 in 100 rolls comes out Prismatic: its finish shimmers through every colour.
 GearRolls.PrismaticChance = 0.01
 -- Ultra Rare and Legendary finds are numbered (#12 of everything found).
@@ -130,16 +126,12 @@ function GearRolls.appearance(roll)
 		Helmet = roll.Helmet,
 		HelmetName = "Variant " .. roll.Helmet,
 		HelmetRarity = GearRolls.Rarities[roll.Rarity].Name,
-		VisorColor = if roll.MatrixVisor
-			then (ExpandedTraits.Visors[roll.MatrixVisor] or {}).Color or visors[roll.Visor]
-			else visors[roll.Visor],
+		VisorColor = SuitTraits.DefaultVisor,
 		FinishColor = colors[roll.Finish],
 		FinishName = GearRolls.FinishNames[roll.Finish],
 		Prismatic = roll.Prismatic == true,
 		Variant = roll.Variant,
-		VisorName = if roll.MatrixVisor
-			then ExpandedTraits.Visors[roll.MatrixVisor].Name
-			else GearRolls.VisorNames[roll.Visor],
+		VisorName = GearRolls.VisorName,
 	}
 end
 function GearRolls.ensure(profile, rng)

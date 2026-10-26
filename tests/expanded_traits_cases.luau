@@ -76,6 +76,15 @@ for _ = 1, 20000 do
 		prismatic += 1
 	end
 end
+-- Every helmet wears the standard visor, whatever its roll (old matrix
+-- visors included): only a visor cosmetic gives a lens another look.
+for visor = 1, 5 do
+	for _, matrix in { 0, 2, 10 } do
+		local look = GearRolls.appearance({ Rarity = 3, Helmet = 1, Visor = visor, Finish = 1, Variant = 1, MatrixVisor = if matrix > 0 then matrix else nil })
+		assert(look.VisorColor == SuitTraits.DefaultVisor, "A rolled visor changed the visor's colour")
+	end
+	assert(SuitTraits.forSuit(visor * 977, "SuitScrap").VisorColor == SuitTraits.DefaultVisor, "A suit rolled its own visor colour")
+end
 assert(prismatic > 120 and prismatic < 290, "Prismatic isn't about 1 in 100: " .. prismatic .. " of 20000")
 local identity = GearRolls.identity({ Finish = 5, Prismatic = true, Serial = 12, FoundBy = "Marc" })
 assert(identity == "Solar Gold finish  ·  ✦ PRISMATIC  ·  #12  ·  Original owner: Marc", "Identity line wrong: " .. identity)
