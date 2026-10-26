@@ -1181,6 +1181,126 @@ scenarios.KaijuSteps = {
 	end,
 }
 
+-- The team's HYPERBEAM (KaijuBeamFx), seen from off to one side: three
+-- kaiju and the support leap into formation one after another, roar, charge
+-- and fire.
+roblox.implementMethod("Workspace", "GetServerTimeNow", function()
+	return now
+end)
+roblox.implementMethod("Model", "GetPivot", function(model)
+	local root = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+	return if root then root.CFrame else CF.new()
+end)
+roblox.implementMethod("Model", "PivotTo", function(model, frame)
+	local root = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+	if not root then
+		return
+	end
+	local delta = frame * root.CFrame:Inverse()
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CFrame = delta * d.CFrame
+			d.Position = d.CFrame.Position
+		end
+	end
+end)
+local KaijuBeam = requireScript(shared.KaijuBeam)
+local KaijuBeamFx = requireScript(client.Modules.KaijuBeamFx)
+local KaijuModels = requireScript(shared.KaijuModels)
+-- A kaiju for the show: its real model if it builds here, else a stand-in
+-- (a body, a head and a tail in its element's colours).
+local function teamKaiju(kind, element, at)
+	local ok, model = pcall(KaijuModels.build, kind, element)
+	if ok and model and model.PrimaryPart then
+		-- (Held together here by anchoring: the harness runs no welds.)
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.Anchored = true
+			end
+		end
+		model.Parent = workspace
+		model:PivotTo(CF.new(at + V3.new(0, 3, 0)))
+		return model
+	end
+	model = Instance.new("Model")
+	model.Name = kind
+	local color = GemConfig.ElementColors[element]
+	local function add(name, size, offset, tint)
+		local p = Instance.new("Part")
+		p.Name, p.Anchored, p.Size, p.Color = name, true, size, tint
+		p.Material = roblox.Enum.Material.SmoothPlastic
+		p.CFrame = CF.new(at) * offset
+		p.Position = p.CFrame.Position
+		p.Parent = model
+		return p
+	end
+	local root = add("HumanoidRootPart", V3.new(2.6, 2.6, 4), CF.new(0, 2.6, 0), color)
+	root.Transparency = 1
+	add("Trunk", V3.new(2.6, 2.6, 4), CF.new(0, 2.6, 0), color:Lerp(C3.new(0.1, 0.1, 0.12), 0.45))
+	add("Head", V3.new(1.8, 1.6, 1.8), CF.new(0, 3.8, -2.4), color)
+	add("Tail", V3.new(0.8, 0.8, 3), CF.new(0, 2.2, 3.2), color:Lerp(C3.new(0, 0, 0), 0.3))
+	for _, x in { -0.9, 0.9 } do
+		for _, z in { -1.3, 1.3 } do
+			add("Leg", V3.new(0.7, 1.4, 0.7), CF.new(x, 0.7, z), color:Lerp(C3.new(0, 0, 0), 0.5))
+		end
+	end
+	local h = Instance.new("Humanoid")
+	h.HipHeight = 1.3
+	h.Parent = model
+	model.PrimaryPart = root
+	model.Parent = workspace
+	return model
+end
+scenarios.Hyperbeam = {
+	Frames = { 0.2, 0.45, 0.8, 1.35, 2.6, 3.4, 3.7, 4.3 },
+	Rows = { "Team" },
+	Run = function(_, me, foe)
+		foe.Parent = nil
+		local folder = Instance.new("Folder")
+		folder.Name = "Kaiju"
+		folder.Parent = workspace
+		local origin = V3.new(0, 3, 0)
+		local forward = V3.new(0, 0, -1)
+		local right = forward:Cross(V3.new(0, 1, 0))
+		local team = {
+			{ "Bulwark", "Fire", V3.new(-7, 0, 9) },
+			{ "Razorback", "Frost", V3.new(9, 0, 5) },
+			{ "Carapace", "Poison", V3.new(-12, 0, -3) },
+			{ "Skyjelly", "Shock", V3.new(4, 0, 12) },
+		}
+		local spots = KaijuBeam.formation(3, true)
+		local models, elements, places, froms, ends, leaps = {}, {}, {}, {}, {}, {}
+		for i, entry in team do
+			local model = teamKaiju(entry[1], entry[2], entry[3])
+			model.Parent = folder
+			local spot = spots[i]
+			local place = V3.new(0, spot.Up or 0, 0) + right * spot.Side - forward * spot.Back
+			local root = model.PrimaryPart
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			local lift = (if humanoid then humanoid.HipHeight else 1) + root.Size.Y / 2
+			local landAt = V3.new(place.X, lift, place.Z)
+			table.insert(models, model)
+			table.insert(elements, entry[2])
+			table.insert(places, place)
+			table.insert(froms, model:GetPivot())
+			table.insert(ends, CF.lookAt(landAt, landAt + forward))
+			table.insert(leaps, (KaijuBeam.leap(i)))
+		end
+		KaijuBeamFx._play({
+			Start = 0,
+			Origin = origin,
+			Forward = forward,
+			Focus = V3.new(0, 0, 0) + forward * 7 + V3.new(0, 3, 0),
+			Models = models,
+			Elements = elements,
+			Places = places,
+			Froms = froms,
+			Ends = ends,
+			Leaps = leaps,
+		})
+	end,
+}
+
 local only = process.args[3]
 local summary = {}
 for name, scenario in scenarios do

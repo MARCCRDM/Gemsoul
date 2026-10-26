@@ -294,7 +294,9 @@ function KaijuServer.ground(point: Vector3, ignore: { Instance }?): Vector3
 end
 
 -- Stands a body on the ground at `point`, facing `look`.
-function KaijuServer.place(model: Model, point: Vector3, look: Vector3?)
+-- Where place puts it (its pivot), not moving it (the team's hyperbeam
+-- sends its landing to clients ahead).
+function KaijuServer.spot(model: Model, point: Vector3, look: Vector3?): CFrame
 	local root = model.PrimaryPart :: BasePart
 	local floor = KaijuServer.ground(point)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
@@ -303,7 +305,11 @@ function KaijuServer.place(model: Model, point: Vector3, look: Vector3?)
 	local facing = if look and flat(look - at).Magnitude > 0.1
 		then Vector3.new(look.X, at.Y, look.Z)
 		else at + Vector3.new(0, 0, -1)
-	model:PivotTo(CFrame.lookAt(at, facing))
+	return CFrame.lookAt(at, facing)
+end
+
+function KaijuServer.place(model: Model, point: Vector3, look: Vector3?)
+	model:PivotTo(KaijuServer.spot(model, point, look))
 end
 
 -- Its health kept on its record (saved: it never comes back on its own).

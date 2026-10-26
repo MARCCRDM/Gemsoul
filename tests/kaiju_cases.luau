@@ -985,6 +985,22 @@ do
 	dx, dz = Beam.aim(0, -1, { { X = 3, Z = -30 }, { X = -1, Z = -10 } })
 	check(dx < 0, "Not the nearest of them")
 
+	-- Into formation: one after another, a beat apart, all down well before
+	-- the roar, and the roar before the charge.
+	local first, firstDown = Beam.leap(1)
+	local second = Beam.leap(2)
+	local _, lastDown = Beam.leap(Kaiju.StarterTeam + 1) -- (a full team: three and the support)
+	check(first == 0 and second > first and firstDown - first == Beam.Leap.Air, "The leaps' order or timing")
+	check(lastDown < Beam.Leap.Roar and Beam.Leap.Roar < at.Charge, "Not all down before the roar, or the roar after the charge")
+	check(Beam.leapHeight(0) == Beam.Leap.Height and Beam.leapHeight(30) > Beam.leapHeight(5), "A longer leap isn't higher")
+	check(Beam.leapHeight(1000) == Beam.Leap.Top, "A leap goes up out of sight")
+	local a0, h0 = Beam.arc(0, 6)
+	local a5, h5 = Beam.arc(0.5, 6)
+	local a1, h1 = Beam.arc(1, 6)
+	check(a0 == 0 and h0 == 0 and a1 == 1 and h1 == 0, "A leap doesn't start and end on the ground")
+	check(math.abs(a5 - 0.5) < 1e-9 and math.abs(h5 - 6) < 1e-9, "A leap isn't at its height halfway")
+	check(Beam.arc(-1, 6) == 0 and Beam.arc(2, 6) == 1, "A leap past its ends")
+
 	local pulse = Beam.damage({ 10, 20, -5 })
 	check(math.abs(pulse * Beam.Beam.Pulses - 30 * Beam.Beam.Power) < 1e-9, "The beam's damage")
 	check(Beam.damage({}) == 0, "Damage with no one")

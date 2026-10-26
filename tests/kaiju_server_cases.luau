@@ -4153,23 +4153,44 @@ local function teamFights()
 		check(res.Ok, "A full team's HYPERBEAM didn't fire: " .. tostring(res.Message))
 		check(drew("KaijuBeam") ~= nil, "Nobody sees the HYPERBEAM")
 		check(a:GetAttribute("KaijuBeamAt") ~= nil and a:GetAttribute("KaijuCharge") == 0, "The HUD doesn't know it fired")
-		for _, pet in team do
+		local shown = (drew("KaijuBeam") or {})[2] or {}
+		local stood = {}
+		for i, pet in team do
 			check(pet.Record.Mana == 0 and pet.BeamUntil ~= nil, "A kaiju's charge not spent on its HYPERBEAM")
 			check(pet.Model:GetAttribute("ActionName") == "HYPERBEAM", "No charge-up on a kaiju for its HYPERBEAM")
+			-- Into formation: held where it stands, its leap and the team's
+			-- roar on its model, its cast's wind-up not till the Charge.
+			check(pet.Root.Anchored == true, "A kaiju not held for its leap")
+			local takeoff, land = KaijuBeam.leap(i)
+			local leapAt, landAt = pet.Model:GetAttribute("BeamLeapAt"), pet.Model:GetAttribute("BeamLandAt")
+			check(type(leapAt) == "number" and type(landAt) == "number" and math.abs((landAt - leapAt) - (land - takeoff)) < 1e-6, "A kaiju's leap not posed")
+			check(pet.Model:GetAttribute("KaijuMood") == "Roar" and pet.Model:GetAttribute("ActionKind") == nil, "No roar together before the charge")
+			check(shown and typeof(shown.Ends and shown.Ends[i]) == "CFrame" and typeof(shown.Froms and shown.Froms[i]) == "CFrame", "Clients don't know where a leap goes")
+			stood[i] = pet.Root.Position
 		end
+		check(KaijuBeam.leap(2) > KaijuBeam.leap(1), "They all leap at once")
 		check(not Beam._fire(a, { X = 0, Z = 1 }, start + 0.1).Ok, "A second HYPERBEAM under way")
 		local at = KaijuBeam.timeline()
-		-- Gathering: their own thinking waits (no foe taken up).
-		Beam._step(start + 0.2)
-		KaijuServer._think(team[1], start + 0.2, 0.15)
+		-- Gathering: their own thinking waits (no foe taken up); each stays
+		-- put till it lands, then it's in its place.
+		Beam._step(start + 0.05)
+		KaijuServer._think(team[1], start + 0.05, 0.15)
 		check(team[1].Target == nil, "A kaiju went after a foe mid-HYPERBEAM")
 		check(ahead.Humanoid.Health == before[1], "The beam hit before it fired")
+		local _, firstDown = KaijuBeam.leap(1)
+		local _, lastDown = KaijuBeam.leap(#team)
+		check((team[#team].Root.Position - stood[#team]).Magnitude < 0.01, "A kaiju moved before its leap")
+		Beam._step(start + firstDown + 0.01)
+		check((team[1].Root.Position - shown.Ends[1].Position).Magnitude < 0.01, "The first down isn't in its place")
+		check(#team < 2 or (team[#team].Root.Position - stood[#team]).Magnitude < 0.01, "The last one down before its turn")
+		check(lastDown < at.Charge and KaijuBeam.Leap.Roar > lastDown and KaijuBeam.Leap.Roar < at.Charge, "The roar isn't once they're all down")
 		-- Charging: in their places, facing your aim, held still.
 		Beam._step(start + at.Charge + 0.05)
 		local forward = Vector3.new(0, 0, 1)
 		local right = forward:Cross(Vector3.new(0, 1, 0))
 		for i, pet in team do
 			check(pet.Root.Anchored == true, "A kaiju not held still as it charges")
+			check(pet.Model:GetAttribute("ActionKind") == "Bolt", "No charge-up at its mouth as it charges")
 			local spotOf = KaijuBeam.formation(#team, false)[i]
 			local want = spot + right * spotOf.Side - forward * spotOf.Back
 			local off = pet.Root.Position - want
@@ -4190,9 +4211,10 @@ local function teamFights()
 		for _, pet in team do
 			check(pet.BeamUntil == nil and pet.Root.Anchored ~= true, "A kaiju not let go after its HYPERBEAM")
 			check(pet.Model:GetAttribute("ActionName") == nil, "A HYPERBEAM's charge-up left on a kaiju")
+			check(pet.Model:GetAttribute("BeamLeapAt") == nil and pet.Model:GetAttribute("KaijuMood") ~= "Roar", "A HYPERBEAM's leap or roar left on a kaiju")
 		end
 		check(a:GetAttribute("KaijuBeamAt") == nil, "The HUD thinks it's still firing")
-		print("  your HYPERBEAM: mana, blows and moves, SAVE CHARGE, full to fire, the formation, the beam's reach, let go after")
+		print("  your HYPERBEAM: mana, blows and moves, SAVE CHARGE, full to fire, leaping into formation one by one, the roar, the beam's reach, let go after")
 	end)()
 
 	clearCritters()

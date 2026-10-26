@@ -40,6 +40,9 @@ CAMERAS = {
     "Contact": ((0.6, 4.6, -10), (0, 3.6, -16), 50),
     "KaijuCharge": ((7, 5.5, -9), (0, 4.5, -2), 55),
     "KaijuSteps": ((9, 6, 7), (0, 0.5, 0), 52),
+    # The team's HYPERBEAM: off to one side and up, the formation and the
+    # beam leaving it.
+    "Hyperbeam": ((19, 9, 13), (0, 2.5, -7), 64),
 }
 
 def shape_mesh(shape, sx, sy, sz):

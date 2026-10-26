@@ -1,13 +1,15 @@
 --[[
 	The team's HYPERBEAM (KaijuBeamServer runs it; Client.KaijuBeamHud is its
 	button, Client.KaijuBeamFx the show): every kaiju you have out builds up
-	mana, and once all of them are full you can call the blast. They run into
+	mana, and once all of them are full you can call the blast. They leap into
 	formation round you (Formation: a V either side of you, the support hung
 	up behind), all face where you aim, each pours its element into one
 	point in front of you (their cast's charge-up at their mouths) and the
 	beam fires from it: a long, wide blast that hits every creature in it,
 	a few pulses over a second and a half. Pure rules (numbers and plain
-	vectors), shared so the client shows what the server does.
+	vectors), shared so the client shows what the server does. Into
+	formation they leap, one after another, and roar together once they're
+	all down (Leap).
 
 	Mana (Mana): out of a fight a kaiju gains Trickle a second (so it fills
 	while you mine, with or without a fight), in one Fight a second more,
@@ -22,10 +24,16 @@
 	                                                   emptiest, 0..1
 	  KaijuBeam.timeline() -> { Charge, Fire, Stop, Done }   seconds from
 	                                                   the call
-	  KaijuBeam.phase(t) -> phase?, progress           "Gather" (running
+	  KaijuBeam.phase(t) -> phase?, progress           "Gather" (leaping
 	                                                   into formation),
 	                                                   "Charge", "Fire",
 	                                                   "Recover"; nil after
+	  KaijuBeam.leap(i) -> takeoff, land               the `i`th into formation:
+	                                                   its leap, seconds from
+	                                                   the call
+	  KaijuBeam.leapHeight(distance) -> studs          how high a leap that far
+	  KaijuBeam.arc(p, height) -> along, up            a leap `p` of the way
+	                                                   through
 	  KaijuBeam.formation(fighters, support) -> spots  each kaiju's place,
 	                                                   { Side, Back, Up } in
 	                                                   studs from you, facing
@@ -58,8 +66,8 @@ KaijuBeam.Mana = {
 -- The blast, in seconds and studs: gathering into formation, the charge
 -- (their streams pouring into the focus), the beam, and a beat to recover.
 KaijuBeam.Beam = {
-	Gather = 1.1,
-	Charge = 1.3,
+	Gather = 1.8,
+	Charge = 1.5,
 	Fire = 1.5,
 	Recover = 0.6,
 	Length = 90,
@@ -70,7 +78,19 @@ KaijuBeam.Beam = {
 	Assist = math.rad(35), -- this far off your aim, it turns onto them
 	Focus = 7, -- the focus this far ahead of you
 	FocusUp = 3, -- and this high
-	Far = 40, -- a kaiju further than this from its spot is put there
+}
+
+-- Into formation: one after another (the V's first, then outwards, the
+-- support last) each leaps from where it was to its place, Stagger apart,
+-- Air seconds in the air, as high as a hop over its distance (Height plus
+-- Rise a stud, up to Top); once they're all down, they roar together at Roar.
+KaijuBeam.Leap = {
+	Stagger = 0.16,
+	Air = 0.62,
+	Height = 3.5,
+	Rise = 0.22,
+	Top = 14,
+	Roar = 1.25,
 }
 
 -- Their places, in a V either side of you facing your aim: the first on
@@ -148,6 +168,28 @@ function KaijuBeam.formation(fighters: number, support: boolean?): { { Side: num
 		table.insert(spots, table.clone(KaijuBeam.Support))
 	end
 	return spots
+end
+
+-- The `i`th to leap's take-off and landing, seconds from the call.
+function KaijuBeam.leap(i: number): (number, number)
+	local l = KaijuBeam.Leap
+	local takeoff = math.max(0, i - 1) * l.Stagger
+	return takeoff, takeoff + l.Air
+end
+
+-- How high a leap of `distance` studs goes.
+function KaijuBeam.leapHeight(distance: number): number
+	local l = KaijuBeam.Leap
+	return math.min(l.Top, l.Height + math.max(0, distance) * l.Rise)
+end
+
+-- A leap `p` (0..1) of the way through: how far along it is (eased: it
+-- springs off and settles in) and how high above the line from its start
+-- to its place.
+function KaijuBeam.arc(p: number, height: number): (number, number)
+	p = math.clamp(p, 0, 1)
+	local along = p * p * (3 - 2 * p)
+	return along, 4 * height * p * (1 - p)
 end
 
 function KaijuBeam.focus(): (number, number)

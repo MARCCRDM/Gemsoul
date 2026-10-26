@@ -12,8 +12,10 @@
 	when the team's put away.
 
 	The blast ("KaijuBeam", { X, Z }: where you aim): with every kaiju out
-	full, they're yours for KaijuBeam.timeline().Done: they run into
-	formation round you (Gather; one too far is put there), stand facing
+	full, they're yours for KaijuBeam.timeline().Done: they leap into
+	formation round you one after another (Gather: held where they stand
+	till their turn, clients draw the leap, KaijuBeam.Leap, and each is put
+	in its place as it lands), roar together, stand facing
 	your aim and pour their element into the focus (Charge: each one's cast
 	charge-up at its mouth, ActionKind "Bolt" on its model, released as the
 	beam fires), and the beam fires from the focus (Fire: Pulses pulses on
@@ -213,22 +215,36 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 		Damage = 0,
 		Units = {},
 	}
-	local damages, models, elements, places = {}, {}, {}, {}
+	local damages, models, elements, places, froms, ends, leaps = {}, {}, {}, {}, {}, {}, {}
 	for i, pet in order do
 		local place = placeOf(ground, forward, spots[i])
+		local takeoff, land = KaijuBeam.leap(i)
+		local from = pet.Root.CFrame -- (its pivot)
 		pet.Record.Mana = 0
 		pet.BeamUntil = now + at.Done
 		pet.Target = nil
-		table.insert(cast.Units, { Pet = pet, Place = place })
+		-- Held where it stands till its turn to leap; clients draw the leap
+		-- (KaijuBeamFx) and it's put in its place as it lands (_step).
+		table.insert(cast.Units, { Pet = pet, Place = place, Land = land, WasAnchored = pet.Root.Anchored == true })
+		pet.Root.Anchored = true
 		table.insert(damages, pet.Stats.Damage)
 		table.insert(models, pet.Model)
 		table.insert(elements, pet.Element)
 		table.insert(places, place)
-		-- Its cast's charge-up at its mouth over the Charge, let go as the
-		-- beam fires (CreatureAnimation, KaijuMotionFx); and its name on its
-		-- cast bar.
+		table.insert(froms, from)
+		table.insert(ends, KaijuServer.spot(pet.Model, place, place + forward))
+		table.insert(leaps, takeoff)
+		-- Its leap and landing posed (CreatureAnimation: BeamLeapAt,
+		-- BeamLandAt), the team's roar together once they're all down (a
+		-- breath apart, so it's a chorus), its cast's charge-up at its mouth
+		-- over the Charge (ActionKind, set as it starts: a mood waits for no
+		-- move) let go as the beam fires, and its name on its cast bar.
 		local model = pet.Model
-		model:SetAttribute("ActionKind", "Bolt")
+		model:SetAttribute("BeamLeapAt", start + takeoff)
+		model:SetAttribute("BeamLandAt", start + land)
+		model:SetAttribute("KaijuMood", "Roar")
+		model:SetAttribute("KaijuMoodAt", start + KaijuBeam.Leap.Roar + 0.05 * (i - 1))
+		model:SetAttribute("ActionKind", nil)
 		model:SetAttribute("ActionStart", start + at.Charge)
 		model:SetAttribute("ActionAt", start + at.Fire)
 		model:SetAttribute("ActionName", "HYPERBEAM")
@@ -248,6 +264,9 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 		Models = models,
 		Elements = elements,
 		Places = places,
+		Froms = froms,
+		Ends = ends,
+		Leaps = leaps,
 	})
 	return reply(true, "", { Start = start })
 end
@@ -265,6 +284,11 @@ local function release(cast)
 			model:SetAttribute("ActionKind", nil)
 			model:SetAttribute("ActionName", nil)
 			model:SetAttribute("ActionElement", nil)
+			model:SetAttribute("BeamLeapAt", nil)
+			model:SetAttribute("BeamLandAt", nil)
+			if model:GetAttribute("KaijuMood") == "Roar" then
+				model:SetAttribute("KaijuMood", nil)
+			end
 		end
 	end
 	if cast.Player:GetAttribute("KaijuBeamAt") then
@@ -303,26 +327,28 @@ function KaijuBeamServer._step(now: number)
 		local t = now - cast.Start
 		local phase, progress = KaijuBeam.phase(t)
 		if phase == "Gather" then
+			-- Each one down in its place, facing your aim, as its leap lands.
 			for _, unit in cast.Units do
 				local pet = unit.Pet
-				if up(pet) then
-					if (pet.Root.Position - unit.Place).Magnitude > KaijuBeam.Beam.Far then
-						KaijuServer.place(pet.Model, unit.Place, unit.Place + cast.Forward)
-					else
-						pet.Humanoid:MoveTo(unit.Place)
-					end
+				if not unit.Landed and t >= unit.Land and up(pet) then
+					unit.Landed = true
+					KaijuServer.place(pet.Model, unit.Place, unit.Place + cast.Forward)
 				end
 			end
 		elseif phase == "Charge" or phase == "Fire" then
 			if not cast.Charged then
-				-- In their places, facing your aim, held still.
+				-- All in their places (any still in the air too), held still,
+				-- winding up their charge.
 				cast.Charged = true
 				for _, unit in cast.Units do
 					local pet = unit.Pet
 					if up(pet) then
-						KaijuServer.place(pet.Model, unit.Place, unit.Place + cast.Forward)
-						unit.WasAnchored = pet.Root.Anchored == true
+						if not unit.Landed then
+							unit.Landed = true
+							KaijuServer.place(pet.Model, unit.Place, unit.Place + cast.Forward)
+						end
 						pet.Root.Anchored = true
+						pet.Model:SetAttribute("ActionKind", "Bolt")
 					end
 				end
 			end

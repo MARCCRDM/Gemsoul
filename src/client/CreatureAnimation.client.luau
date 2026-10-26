@@ -213,6 +213,13 @@ RunService.PreSimulation:Connect(function(dt)
 					end
 				end
 			end
+			-- Leaping into its team's HYPERBEAM formation (KaijuBeamServer:
+			-- BeamLeapAt, BeamLandAt; KaijuBeamFx carries it through the air
+			-- and slams it down): the same crouch, spring, tuck and landing.
+			local leapAt, landAt = model:GetAttribute("BeamLeapAt"), model:GetAttribute("BeamLandAt")
+			if type(leapAt) == "number" and type(landAt) == "number" then
+				pose = Motion.hop(pose, now - leapAt, math.max(landAt - leapAt, 0.1))
+			end
 		end
 		for i = #rig.Joints, 1, -1 do
 			local entry = rig.Joints[i]
