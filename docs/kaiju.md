@@ -331,6 +331,13 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   crouches, springs up nose-first with its legs tucked, tips forward and
   lands with a squash and a puff of dust (`CreatureMotion`'s `Motion.hop`,
   posed from the `KaijuHopAt` take-off time the server puts on its model).
+  **Every jump, however fast you jump again**: your own client tells the
+  server each time you jump (`KaijuJump.client.luau`, `Remotes.KaijuJump`),
+  as well as the server watching you rise, so none is missed; a jump seen
+  both ways counts once (`Kaiju.newJump`, none within 0.35 s of the last).
+  A kaiju is ready to jump again 0.5 s after it last did (just over its
+  time in the air), so holding jump, they keep jumping with you; one still
+  waiting its turn when you jump again goes once more right after.
 - **Levelling is slower** than it was: `Kaiju.ExpCurve` and less EXP per
   rock and kill (`docs/levelup-lobby.md`).
 - **They don't heal on their own.** A kaiju keeps the health it ends a fight

@@ -240,6 +240,14 @@ local function noted(player, text)
 	return false
 end
 local Remotes = {
+	-- (Your client saying you jumped: KaijuServer listens.)
+	KaijuJump = {
+		OnServerEvent = {
+			Connect = function(self, fn)
+				self.Owner.Handler = fn
+			end,
+		},
+	},
 	Notify = {
 		FireClient = function(_, player, text)
 			table.insert(notes, { player, text })
@@ -261,6 +269,7 @@ local Remotes = {
 		end,
 	},
 }
+Remotes.KaijuJump.OnServerEvent.Owner = Remotes.KaijuJump
 local registered = {}
 local Shop = {
 	register = function(name, fn)
@@ -3491,6 +3500,48 @@ local function teamFights()
 		end
 		rootA.AssemblyLinearVelocity = Vector3.zero
 		check(Kaiju.leapt(nil, 50) and not Kaiju.leapt(40, 50) and not Kaiju.leapt(0, 5), "Kaiju.leapt")
+
+		-- Your client saying you jumped (Remotes.KaijuJump) is a jump too, even
+		-- when the server never saw you rise; seen both ways, it's one jump.
+		-- And jumping again and again (hold jump: one every 0.55 s), they keep
+		-- jumping with you, every one of them, the whole way.
+		check(Remotes.KaijuJump.Handler ~= nil, "Nothing listens for your client saying you jumped")
+		for _, p in team do
+			p.Target, p.HopAt, p.HoppedAt, p.HopAgain = nil, nil, nil, nil
+			p.Humanoid.Jump = false
+		end
+		t += 2
+		KaijuServer._hops(a, t)
+		local hopsBy = {}
+		local nextJump, jumps = t, 0
+		for _ = 1, 60 * 6 do
+			t += 1 / 60
+			if t >= nextJump and jumps < 10 then
+				jumps += 1
+				nextJump = t + 0.55
+				Remotes.KaijuJump.Handler(a)
+				if jumps == 1 then
+					-- (The same jump seen rising on the server a moment later.)
+					KaijuServer._hops(a, t)
+					rootA.AssemblyLinearVelocity = Vector3.new(0, 50, 0)
+					t += 1 / 60
+				end
+			end
+			KaijuServer._hops(a, t)
+			rootA.AssemblyLinearVelocity = Vector3.zero
+			for _, p in team do
+				if p.Humanoid.Jump then
+					hopsBy[p] = (hopsBy[p] or 0) + 1
+					p.Humanoid.Jump = false
+					p.Root.AssemblyLinearVelocity = Vector3.zero -- (landed)
+				end
+			end
+		end
+		for _, p in team do
+			check((hopsBy[p] or 0) >= 9, "Jumping again and again, your kaiju in slot " .. p.Slot .. " stopped jumping with you: " .. (hopsBy[p] or 0) .. " of 10")
+			check((hopsBy[p] or 0) <= 10, "One jump of yours, seen twice, made your kaiju in slot " .. p.Slot .. " jump twice")
+		end
+		check(Kaiju.newJump(nil, 5) and not Kaiju.newJump(5, 5 + Kaiju.Hop.Again * 0.5) and Kaiju.newJump(5, 5 + Kaiju.Hop.Again * 1.01), "Kaiju.newJump")
 	end)()
 
 	local bugs = {}

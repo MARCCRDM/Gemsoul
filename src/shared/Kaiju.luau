@@ -303,8 +303,18 @@ Kaiju.Follow = { Engage = 28, Leash = 45, Battle = 150, Teleport = 90, Gap = 5 }
 -- the leader: the one at the head of your line (nearest where you jumped)
 -- First seconds after you, then each one behind it Stagger seconds after
 -- the one before (in line, so no gap for an empty slot), each Height studs
--- up and not again within Rest. One fighting stays at it and isn't counted.
-Kaiju.Hop = { Rise = 24, Settle = 8, First = 0.14, Stagger = 0.26, Height = 6, Rest = 0.6 }
+-- up and not again within Rest (just over the time it's in the air, so it
+-- keeps up with you jumping again and again). Your own client says when you
+-- jump too (Remotes.KaijuJump), so none is missed; seen both ways, a jump
+-- is counted once (none within Again of the last). One fighting stays at
+-- it and isn't counted.
+Kaiju.Hop = { Rise = 24, Settle = 8, First = 0.14, Stagger = 0.26, Height = 6, Rest = 0.5, Again = 0.35 }
+
+-- Whether a jump of yours seen at `now` is a new one: not within Again of
+-- the last one counted (`last`), however it was seen.
+function Kaiju.newJump(last: number?, now: number): boolean
+	return last == nil or now - last >= Kaiju.Hop.Again
+end
 
 -- Whether you've just jumped: rising fast now from not rising before.
 function Kaiju.leapt(before: number?, rise: number): boolean

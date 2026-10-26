@@ -208,8 +208,12 @@ local rng = Random.new()
 -- When a player owing a starter roll was first seen in the Outpost.
 local owedSince: { [Player]: number } = {}
 local lastSwitch: { [Player]: number } = {}
--- How fast each owner was rising last frame (to see them jump: Kaiju.leapt).
+-- How fast each owner was rising last frame (to see them jump: Kaiju.leapt),
+-- when their client last said they jumped (Remotes.KaijuJump), and when the
+-- last jump of theirs was counted (Kaiju.newJump).
 local rising: { [Player]: number } = {}
+local saidJump: { [Player]: number } = {}
+local lastJump: { [Player]: number } = {}
 local folder: Folder
 
 local function serverNow(): number
@@ -1462,11 +1466,16 @@ local function hops(player: Player, now: number)
 	local out = teams[player]
 	local ownerRoot = rootOf(player)
 	if not out or not next(out) or not ownerRoot then
-		rising[player] = nil
+		rising[player], saidJump[player] = nil, nil
 		return
 	end
 	local rise = ownerRoot.AssemblyLinearVelocity.Y
-	if Kaiju.leapt(rising[player], rise) then
+	-- (Seen rising here, or told by your client, which never misses one:
+	-- either way, counted once.)
+	local said = saidJump[player]
+	saidJump[player] = nil
+	if (Kaiju.leapt(rising[player], rise) or said ~= nil) and Kaiju.newJump(lastJump[player], now) then
+		lastJump[player] = now
 		-- Every jump of yours is followed: one still waiting its turn for
 		-- your last jumps once more after it (HopAgain), and one that's only
 		-- just landed waits out its Rest rather than sitting this one out.
@@ -1519,6 +1528,13 @@ local function hops(player: Player, now: number)
 				pet.Model:SetAttribute("KaijuHopAt", workspace:GetServerTimeNow() + Kaiju.Hop.Rest)
 			end
 		end
+	end
+end
+
+-- Your client saying you jumped (Remotes.KaijuJump): counted next frame.
+local function jumped(player: Player)
+	if teams[player] then
+		saidJump[player] = os.clock()
 	end
 end
 
@@ -2312,6 +2328,7 @@ end
 local function left(player: Player)
 	despawn(player)
 	teams[player], lastSwitch[player], owedSince[player], rising[player] = nil, nil, nil, nil
+	saidJump[player], lastJump[player] = nil, nil
 	healAt[player], toldEmpty[player] = nil, nil
 end
 
@@ -2331,6 +2348,7 @@ function KaijuServer.start()
 	Shop.register("KaijuRollClaim", rollClaim)
 	Shop.register("KaijuSupport", setSupport)
 	Players.PlayerRemoving:Connect(left)
+	Remotes.KaijuJump.OnServerEvent:Connect(jumped)
 	local thinkTimer, upkeepTimer = 0, 0
 	RunService.Heartbeat:Connect(function(dt)
 		thinkTimer += dt
@@ -2381,7 +2399,7 @@ end
 KaijuServer._upkeep, KaijuServer._think, KaijuServer._infuse = upkeep, think, infuse
 KaijuServer._autoHeal, KaijuServer._socketSoul = autoHeal, socketSoul
 KaijuServer._recall, KaijuServer._setActive, KaijuServer._setTeam = recall, setActive, setTeam
-KaijuServer._callBack, KaijuServer._hops = callBack, hops
+KaijuServer._callBack, KaijuServer._hops, KaijuServer._jumped = callBack, hops, jumped
 KaijuServer._despawn, KaijuServer._fair = despawn, fair
 KaijuServer._prepareRoll, KaijuServer._claimRoll = prepareRoll, claimRoll
 

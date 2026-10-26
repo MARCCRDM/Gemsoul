@@ -33,6 +33,7 @@ local Remotes = {
 	MechExit = Instance.new("RemoteEvent"),
 	Funnel = Instance.new("RemoteEvent"), -- client -> server: an onboarding step in its menus (Systems/Funnel)
 	Challenges = Instance.new("RemoteEvent"), -- server -> client: daily challenge progress (Shared.DailyChallenges)
+	KaijuJump = Instance.new("RemoteEvent"), -- client -> server: you jumped (your kaiju jump after you: KaijuServer)
 }
 for name, remote in Remotes do
 	remote.Name = name
