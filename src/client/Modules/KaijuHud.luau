@@ -360,14 +360,14 @@ for slot = 1, #Kaiju.SlotLevels + 1 do
 	local roleMark = new("Frame", {
 		Name = "RoleMark",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0, 11, 1, -17),
-		Size = UDim2.fromOffset(16, 16),
+		Position = UDim2.new(0, 12, 1, -18),
+		Size = UDim2.fromOffset(18, 18),
 		BackgroundColor3 = INK,
 		BackgroundTransparency = 0.3,
 		Visible = false,
 		ZIndex = 4,
 	}, button)
-	UiKit.round(roleMark, 8)
+	UiKit.round(roleMark, 9)
 	-- Knocked out: a veil, DOWN and when it's back by itself.
 	local veil = new("Frame", {
 		BackgroundColor3 = INK,
@@ -664,8 +664,8 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 		tile.Role = roleId
 		local RoleIcons = require(script.Parent.RoleIcons) -- (here: the module's top is at Luau's 200 locals)
 		tile.RoleMark:ClearAllChildren()
-		UiKit.round(tile.RoleMark, 8)
-		local icon = RoleIcons.draw(tile.RoleMark, roleId, 10, ROLE_COLORS[roleId] or P.Dim, 5)
+		UiKit.round(tile.RoleMark, 9)
+		local icon = RoleIcons.draw(tile.RoleMark, roleId, 12, ROLE_COLORS[roleId] or P.Dim, 5)
 		icon.AnchorPoint, icon.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
 		tile.RoleMark.Visible = RoleIcons.has(roleId)
 	end
@@ -1437,7 +1437,7 @@ local function kaijuRow(order: number, record, slot: number?, models)
 	UiKit.round(tag, 4)
 	new("UIStroke", { Color = roleColor, Thickness = 1, Transparency = 0.35 }, tag)
 	-- (Its symbol at the front, as on its HUD tile: RoleIcons.)
-	local roleIcon = require(script.Parent.RoleIcons).draw(tag, roleId, 9, roleColor, 4)
+	local roleIcon = require(script.Parent.RoleIcons).draw(tag, roleId, 10, roleColor, 4)
 	roleIcon.AnchorPoint, roleIcon.Position = Vector2.new(0, 0.5), UDim2.new(0, 5, 0.5, 0)
 	local roleText = label(tag, KaijuRoles.Roles[roleId] and KaijuRoles.Roles[roleId].Name or "", 9, roleColor, IronUi.Bold)
 	roleText.Position, roleText.Size = UDim2.fromOffset(14, 0), UDim2.new(1, -16, 1, 0)

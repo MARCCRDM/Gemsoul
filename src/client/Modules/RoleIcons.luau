@@ -36,8 +36,11 @@ end
 -- Each role's drawing, in a unit box.
 local DRAW = {
 	Tank = function(box, color, _size)
-		piece(box, 0.5, 0.34, 0.74, 0.48, color, 0, 0.15)
-		piece(box, 0.5, 0.56, 0.53, 0.53, color, 45, 0.1)
+		-- (A heater shield: a broad flat top, the sides running down to a
+		-- point, split down the middle by a dark line.)
+		piece(box, 0.5, 0.29, 0.86, 0.42, color, 0, 0.12)
+		piece(box, 0.5, 0.5, 0.61, 0.61, color, 45, 0.08)
+		piece(box, 0.5, 0.48, 0.12, 0.62, color:Lerp(Color3.new(0, 0, 0), 0.6))
 	end,
 	Warrior = function(box, color, _size)
 		-- (Blades from the bottom corners up to the top ones, each with a
