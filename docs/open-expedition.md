@@ -12,7 +12,7 @@ Both dungeon layouts retain boss loot decisions in normal rewarded runs. Open-wo
 
 ## Boss loot
 
-After the boss falls, remaining actors are removed and every survivor gets a boss cache of their own (no Claim, Roll or Pass): the boss's elemental Ultra Rare/Legendary Tier IV, Rank III gem and six pieces of gear to keep three of, rolled and picked like an Arena Cache, the rest to the Market from the Rift Vault (see [arena-streaks.md](arena-streaks.md#boss-caches)). That's on top of the 300-coin completion reward; the run ends five seconds later. Test runs give no rewards.
+After the boss falls, remaining actors are removed and every survivor gets a boss cache of their own (no Claim, Roll or Pass): two pieces of gear to keep one of, like every reward, the other to the Market from the Rift Vault (see [arena-streaks.md](arena-streaks.md#boss-caches)). That's on top of the 300-coin completion reward; the run ends five seconds later. Test runs give no rewards.
 
 Loot choices are validated against the run and eligible roster; repeat submissions and outside-party claims are rejected. Reward resolution runs once, and the instance closes five seconds afterward. The time limit does not interrupt an active loot decision.
 

@@ -27,6 +27,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
 local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local BossLoot = require(ReplicatedStorage.Shared.BossLoot)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -92,19 +93,23 @@ local function drawLauncher()
 	if not launcher then
 		return
 	end
-	local count, bosses = #state.Caches, 0
+	local count, bosses, wins = #state.Caches, 0, 0
 	for _, cache in state.Caches do
 		if cache.Kind == "Boss" then
 			bosses += 1
+		elseif cache.Kind == "Win" then
+			wins += 1
 		end
 	end
 	launcher.Visible = count > 0 and screen == nil
 	launcher.Text = if count == 1 and bosses == 1
 		then "🏆  BOSS CACHE READY"
+		elseif count == 1 and wins == 1 then "🏆  WIN REWARD READY"
 		elseif count == 1 then "🏆  ARENA CACHE READY"
 		elseif bosses == count then string.format("🏆  %d BOSS CACHES READY", count)
-		elseif bosses == 0 then string.format("🏆  %d ARENA CACHES READY", count)
-		else string.format("🏆  %d CACHES READY", count)
+		elseif wins == count then string.format("🏆  %d WIN REWARDS READY", count)
+		elseif bosses == 0 and wins == 0 then string.format("🏆  %d ARENA CACHES READY", count)
+		else string.format("🏆  %d REWARDS READY", count)
 end
 
 function StreakRewards.isOpen(): boolean
@@ -476,6 +481,7 @@ function StreakRewards.open(id: string?)
 		shown:GetPropertyChangedSignal("AbsoluteSize"):Connect(scale)
 
 		local boss = cache.Kind == "Boss"
+		local win = cache.Kind == "Win"
 		local kicker = label(
 			board,
 			(if cache.Dev then "DEV TEST  ·  " else "")
@@ -485,6 +491,7 @@ function StreakRewards.open(id: string?)
 						BOSS_FROM[cache.Source] or "BOSS DEFEATED",
 						BossLoot.numeral(cache.Threat or 2)
 					)
+					elseif win then "1V1 WON"
 					else string.format("%d RANKED WINS IN A ROW", cache.Wins),
 			14,
 			GOLD,
@@ -493,7 +500,8 @@ function StreakRewards.open(id: string?)
 		kicker.Size = UDim2.new(1, 0, 0, 18)
 		local title = label(
 			board,
-			(if boss then "BOSS CACHE  ·  " else "ARENA CACHE  ·  ") .. string.upper(cache.Boss or cache.Name or ""),
+			if win then "WIN REWARD"
+				else (if boss then "BOSS CACHE  ·  " else "ARENA CACHE  ·  ") .. string.upper(cache.Boss or cache.Name or ""),
 			34,
 			TEXT,
 			Enum.Font.GothamBlack
@@ -507,9 +515,22 @@ function StreakRewards.open(id: string?)
 			table.insert(extras, "a new title")
 		end
 		local focus = cache.Focus and Slots.Definitions[Slots.ByKind[cache.Focus]]
+		-- (A reward rolled on the ladder: how much you'd played 1v1, and
+		-- what that's worth: RewardRoll.)
+		local ladder = nil
+		if cache.Plays then
+			local band, _, nextBand = RewardRoll.band(cache.Plays)
+			ladder = string.format("Rolled at %s: %d 1v1s played", string.upper(band.Name), cache.Plays)
+				.. if nextBand
+					then string.format("  ·  %s at %d: rarer rolls", string.upper(nextBand.Name), nextBand.Plays)
+					else "  ·  the top of the ladder"
+		end
 		local sub = label(
 			board,
-			if boss
+			if ladder and boss and focus then ladder .. "  ·  Its favourite gear: " .. focus.Label
+				elseif ladder and #extras > 0 and not cache.Dev then ladder .. "  ·  Already yours: " .. table.concat(extras, " and ") .. "."
+				elseif ladder then ladder
+				elseif boss
 				then "All its gems are "
 					.. GemConfig.elementName(cache.Element or "")
 					.. (if focus then "  ·  Its favourite gear: " .. focus.Label else "")
@@ -553,6 +574,10 @@ function StreakRewards.open(id: string?)
 		heading(
 			if cache.Dev
 				then string.format("PICK %d OF %d", picks, #gearEntries)
+				elseif picks == 1 and #gearEntries == 2 then string.format(
+					"PICK ONE  ·  THE OTHER GOES TO THE MARKET: YOU GET %d%% OF ITS SALE",
+					math.floor(ArenaStreak.Commission * 100 + 0.5)
+				)
 				else string.format(
 					"PICK %d OF %d  ·  THE OTHER %d GO TO THE MARKET: YOU GET %d%% OF EACH SALE",
 					picks,
@@ -574,7 +599,9 @@ function StreakRewards.open(id: string?)
 			local n = #order
 			claim.Text = if rolling
 				then "ROLLING  ·  TAP TO REVEAL"
+				elseif n == picks and picks == 1 then "CLAIM IT"
 				elseif n == picks then "CLAIM THESE " .. picks
+				elseif picks == 1 then "PICK ONE"
 				else string.format("PICK %d MORE", picks - n)
 			claim.BackgroundColor3 = if n == picks and not rolling then GOLD else Color3.fromRGB(70, 74, 90)
 		end
@@ -728,10 +755,10 @@ function StreakRewards.start()
 	end)
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
 	remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: any)
-		if kind == "StreakReward" or kind == "BossCache" then
+		if kind == "StreakReward" or kind == "BossCache" or kind == "WinReward" then
 			-- Fetch the new cache, then show it (after the match result, or
 			-- the boss's fall).
-			task.delay(if kind == "BossCache" then 3 else 2.5, function()
+			task.delay(if kind == "BossCache" then 3 elseif kind == "WinReward" then 3.5 else 2.5, function()
 				local result = GemClient.request("StreakCaches")
 				if result.Ok then
 					state = result

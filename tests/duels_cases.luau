@@ -152,6 +152,14 @@ check(
 	"A loss's tournament line"
 )
 check(#restoresGiven == 1 and restoresGiven[1].Player == ana and restoresGiven[1].Share == SwingRestore.Streak[1], "Restores given")
+-- Rewards (Shared.RewardRoll): both played one more 1v1; the winner's win
+-- reward (two pieces, keep one) over the one beaten, and said with the result.
+check(
+	RewardRoll.plays(profiles[ana].Duel) >= 1 and RewardRoll.plays(profiles[ben].Duel) >= 1,
+	"A 1v1 played didn't count toward the rewards' ladder"
+)
+check(#winRewards == 1 and winRewards[1].Player == ana and winRewards[1].Foe == ben.UserId, "The winner got no win reward")
+check(won.WinReward == true and lost.WinReward == false and won.Plays == RewardRoll.plays(profiles[ana].Duel), "The result doesn't say the win reward")
 check(ana:GetAttribute("DuelRating") == 1016, "Public rating not updated")
 check(
 	last(ana, "Feed") ~= nil and string.find(last(ana, "Feed")[2], "Ana defeated Ben", 1, true),

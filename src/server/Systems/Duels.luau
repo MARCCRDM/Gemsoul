@@ -85,6 +85,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Progress = require(script.Parent.Progress)
 local ArenaStreaks = require(script.Parent.ArenaStreaks)
+local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
 local Restores = require(script.Parent.Restores)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
@@ -408,6 +409,16 @@ function finish(match, winner: number?, reason: string)
 				-- Every finished duel counts toward the lobby's unlocks.
 				(record :: any).Played = ((record :: any).Played or 0) + 1
 			end
+			-- Rewards (Shared.RewardRoll): every 1v1 played makes your rolls
+			-- rarer, and a queued 1v1 won (Ranked or Casual) pays a win
+			-- reward: two pieces, keep one, the other to the Market.
+			local winReward = nil
+			if record and solo and not match.Intro then
+				RewardRoll.count(record)
+				if won and match.Rules.Kind ~= "Challenge" and member.Parent then
+					winReward = ArenaStreaks.winReward(member, foe and foe.UserId)
+				end
+			end
 			local bonus = if winner ~= nil and not match.Intro then AutoQueue.bonus(match.Called[member], won) else 0
 			local coins = (if winner == nil then 0 elseif won then rewards.Win else rewards.Loss) + bonus
 			if member.Parent then
@@ -438,6 +449,8 @@ function finish(match, winner: number?, reason: string)
 					Rules = { Name = match.Rules.Name, Stats = match.Rules.Stats },
 					Streak = rankedStreak,
 					Tournament = tournament,
+					WinReward = winReward ~= nil,
+					Plays = if record then RewardRoll.plays(record) else nil,
 					Rounds = if match.Rounds
 						then { Mine = match.Rounds.Wins[t], Theirs = match.Rounds.Wins[if t == 1 then 2 else 1] }
 						else nil,

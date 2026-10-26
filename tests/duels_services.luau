@@ -213,10 +213,16 @@ local Progress = {
 -- Ranked win streaks (Systems/ArenaStreaks has its own suite): each
 -- Ranked 1v1 result, recorded.
 local streakResults = {}
+-- Win rewards (ArenaStreaks.winReward): each one asked for, recorded.
+local winRewards = {}
 local ArenaStreaks = {
 	onRankedResult = function(p, won, foe)
 		table.insert(streakResults, { Player = p, Won = won, Foe = foe })
 		return if won then 1 else 0
+	end,
+	winReward = function(p, foe)
+		table.insert(winRewards, { Player = p, Foe = foe })
+		return { Id = "win" .. #winRewards }
 	end,
 }
 -- Swing restores (Systems/Restores): each share given, recorded; the pick

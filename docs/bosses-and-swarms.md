@@ -24,10 +24,9 @@ Saga Runeblade, Omega Greatblade). It never rolls a gun, hammer, axe,
 cleaver, lance or twin blades (`ExpandedItemTraits.rollable`). The rest is
 shields, helmets, armour, gloves and boots.
 
-A cache holds at most one sword (`ArenaStreak.MaxWeapons`). You keep three
-of the six, so at least two of the three left over are armour or a shield.
-They go up on the Market from the Arena Vault, and you get 25% when one
-sells. The DEV panel's test caches now do this too. Before, their leftovers
+A reward holds at most one sword (`ArenaStreak.MaxWeapons`). You keep one
+of the two; the other goes up on the Market from the Arena Vault, and you
+get 25% when it sells (see [arena-streaks.md](arena-streaks.md)). The DEV panel's test caches now do this too. Before, their leftovers
 were dropped, so a test cache never showed anything reaching the Market.
 
 ## Knock-downs only in the lobby

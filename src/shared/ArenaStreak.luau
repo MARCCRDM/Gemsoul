@@ -1,15 +1,13 @@
 --[[
 	ArenaStreak: rewards for a run of Ranked 1v1 wins in a row.
 
-	Every milestone (10, 20 ... 100, 150, 200 wins) opens an Arena Cache:
-	  - gems, free: every one is yours (Rare, then Ultra-Rare from 50 wins,
-	    Flawless from 100: every metric maxed, the surge at its top rank);
-	  - six pieces of gear, Rare and Ultra-Rare, rolled to choose from: you
-	    keep three. The other three go up on the Market from the Arena Vault,
-	    and when one sells you get a 25% commission on its price.
-	Higher milestones offer more Ultra-Rare gear (all six from 150), more
-	and better gems, gear at higher quality, more coins, and a title at the
-	big ones.
+	Every milestone (10, 20 ... 100, 150, 200 wins) opens an Arena Cache,
+	a reward like every other (Shared.RewardRoll): two pieces of gear
+	rolled, you keep one, the other goes up on the Market from the Arena
+	Vault and you get a 25% commission on its price when it sells. Their
+	rarity goes by how much you've played 1v1 (RewardRoll's ladder), at
+	least the milestone's Floor (Rare, Ultra-Rare from 50, Legendary from
+	150). Its coins and title (at the big ones) are paid at once.
 
 	The streak counts Ranked 1v1 wins only; a loss resets it; beating the
 	same player twice in a row doesn't add to it (no trading wins with a
@@ -27,8 +25,9 @@
 ]]
 local ArenaStreak = {}
 
-ArenaStreak.GearOffered = 6 -- pieces of gear to choose from
-ArenaStreak.Picks = 3 -- of which you keep
+ArenaStreak.GearOffered = 2 -- pieces of gear to choose from (RewardRoll.Offered)
+ArenaStreak.Picks = 1 -- of which you keep (RewardRoll.Picks)
+ArenaStreak.LegacyPicks = 3 -- a cache saved before (six pieces, keep three)
 ArenaStreak.MaxWeapons = 1 -- swords at most among them (the rest armor and shields)
 ArenaStreak.Commission = 0.25 -- your cut of a leftover's Market price
 
@@ -36,7 +35,10 @@ ArenaStreak.Commission = 0.25 -- your cut of a leftover's Market price
 -- UltraRare: how many of the six pieces of gear are Ultra-Rare (the rest
 -- Rare). Quality: the gear's quality roll (1-4). Flawless: gems with every
 -- metric at 10 and the surge at its top rank. Coins: paid at once.
--- Title: a cosmetic title (Shared.Cosmetics, Exclusive "Ranked").
+-- Title: a cosmetic title (Shared.Cosmetics, Exclusive "Ranked"). (Gems,
+-- GemTier, UltraRare and Flawless were the old six-piece cache's; a cache
+-- now rolls its two pieces by RewardRoll, at least the milestone's floor:
+-- ArenaStreak.floor.)
 ArenaStreak.Milestones = {
 	{ Wins = 10, Name = "Contender", Gems = 1, GemTier = "Rare", UltraRare = 1, Quality = 2, Coins = 2500 },
 	{ Wins = 20, Name = "Challenger", Gems = 1, GemTier = "Rare", UltraRare = 1, Quality = 2, Coins = 5000 },
@@ -100,18 +102,28 @@ ArenaStreak.Milestones = {
 	},
 }
 
--- The two rarities a cache draws from (GemConfig tier names), and the gear
+-- The rarities a cache draws from (GemConfig tier names), and the gear
 -- RarityTier each one is.
-ArenaStreak.Rarities = { "Rare", "UltraRare" }
-ArenaStreak.GearTier = { Rare = 3, UltraRare = 4 }
+ArenaStreak.Rarities = { "Common", "Uncommon", "Rare", "UltraRare", "Legendary" }
+ArenaStreak.GearTier = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 
 -- What a leftover costs on the Market: gear at a flat price by rarity and
 -- quality, gems at three times their worth (never under their rarity's floor).
 ArenaStreak.VaultGear = {
-	Rare = { 4000, 5000, 6000, 7500 }, -- by quality 1-4
+	Common = { 600, 800, 1000, 1200 }, -- by quality 1-4
+	Uncommon = { 1500, 2000, 2500, 3000 },
+	Rare = { 4000, 5000, 6000, 7500 },
 	UltraRare = { 8000, 10000, 12000, 15000 },
+	Legendary = { 20000, 25000, 30000, 40000 },
 }
-ArenaStreak.VaultGemFloor = { Rare = 4000, UltraRare = 8000 }
+ArenaStreak.VaultGemFloor = { Common = 600, Uncommon = 1500, Rare = 4000, UltraRare = 8000, Legendary = 20000 }
+
+-- The least a milestone's cache rolls: Rare, Ultra-Rare from 50 wins,
+-- Legendary from 150.
+function ArenaStreak.floor(m): string
+	local wins = tonumber(m and m.Wins) or 0
+	return if wins >= 150 then "Legendary" elseif wins >= 50 then "UltraRare" else "Rare"
+end
 ArenaStreak.VaultGemMultiplier = 3
 ArenaStreak.VaultName = "Arena Vault"
 
@@ -156,7 +168,7 @@ end
 -- `gemValue` a gem's worth (GemConfig.value), passed in to keep this pure.
 function ArenaStreak.vaultPrice(item, gemValue: number?, rarity: string?): number
 	local tier = rarity or (item.Gem and item.Gem.Tier)
-	tier = if tier == "UltraRare" then "UltraRare" else "Rare"
+	tier = if ArenaStreak.VaultGear[tier] then tier else "Rare"
 	if item.Kind == "Gem" then
 		return math.max(ArenaStreak.VaultGemFloor[tier], math.floor((gemValue or 0) * ArenaStreak.VaultGemMultiplier))
 	end

@@ -1653,6 +1653,11 @@ for i = 1, SwingRestore.Tournament do
 	tag.Size = UDim2.fromScale(1, 1)
 	pips[i] = { Frame = pip, Stroke = stroke }
 end
+-- The rewards' ladder (Shared.RewardRoll): every 1v1 played makes your
+-- rolls rarer; a win's reward is waiting.
+local ladderLine = text(result, "", 13, P.Dim, BOLD)
+ladderLine.AutomaticSize, ladderLine.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
+ladderLine.Size, ladderLine.Visible = UDim2.new(1, -32, 0, 18), false
 local tourneyLine = text(tourney, "", 13, P.Gold, BOLD)
 tourneyLine.AutomaticSize, tourneyLine.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
 tourneyLine.Position, tourneyLine.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, 20)
@@ -1901,7 +1906,20 @@ local function showResult(info)
 	-- The arena tournament: this run's wins, and the swings it restored.
 	local t = info.Tournament
 	tourney.Visible = t ~= nil
-	result.Size = UDim2.fromOffset(460, if t then 224 else 190)
+	local ladderAt = if t then 176 else 122
+	ladderLine.Visible = info.Plays ~= nil
+	if info.Plays then
+		local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
+		local band, _, nextBand = RewardRoll.band(info.Plays)
+		ladderLine.Position = UDim2.fromOffset(16, ladderAt)
+		ladderLine.TextColor3 = if info.WinReward then P.Gold else P.Dim
+		ladderLine.Text = (if info.WinReward then "WIN REWARD: PICK ONE OF TWO  ·  " else "")
+			.. string.format("%s  ·  %d 1v1s played", string.upper(band.Name), info.Plays)
+			.. if nextBand
+				then string.format("  ·  %s at %d: rarer rolls", string.upper(nextBand.Name), nextBand.Plays)
+				else ""
+	end
+	result.Size = UDim2.fromOffset(460, (if t then 224 else 190) + (if info.Plays then 20 else 0))
 	if t then
 		local wins = t.Win
 		for i, pip in pips do

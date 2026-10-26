@@ -1,4 +1,13 @@
 --[[
+	Rewards (Shared.RewardRoll): every one is two pieces of gear rolled; you
+	keep one, the other goes up on the Market from a vault with your cut of
+	its sale. How rare they are goes by how much you've played 1v1 (the
+	ladder: RewardRoll.Bands), at least the reward's floor. They come from
+	every 1v1 win (ArenaStreaks.winReward: a WIN REWARD), Ranked win
+	streaks (Arena Caches, below) and bosses beaten (boss caches, below).
+	A cache saved before this (six pieces, keep three; free gems) still
+	opens and claims as it was.
+
 	Ranked win streaks and their Arena Caches (Shared.ArenaStreak has the
 	milestones and rules).
 
@@ -42,6 +51,7 @@ local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Market = require(ReplicatedStorage.Shared.Market)
+local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
 local Season = require(ReplicatedStorage.Shared.Season)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemGenerator = require(script.Parent.GemGenerator)
@@ -111,8 +121,13 @@ end
 -- for the Market). A boss's (BossLoot.spec) also has its own gem first
 -- (m.FreeGems), its gems of its element (m.Element), and m.FocusCount of
 -- its gear its favourite kind (m.Focus; a sword boss's two swords).
+-- A reward's (m.Gear: its rarities, RewardRoll.rarities) has no free gems:
+-- its pieces at those rarities, each at least its rarity's quality.
 function ArenaStreaks.rollCache(m)
 	local gemTiers, gearTiers = ArenaStreak.rarities(m)
+	if m.Gear then
+		gemTiers, gearTiers = {}, m.Gear
+	end
 	local items = {}
 	for _, gem in m.FreeGems or {} do
 		table.insert(items, {
@@ -179,7 +194,7 @@ function ArenaStreaks.rollCache(m)
 					Kind = "Gear",
 					Slot = Slots.ByKind[piece.Kind],
 					Id = piece.Id,
-					Quality = m.Quality,
+					Quality = if m.Gear then RewardRoll.quality(rarity, m.Quality) else m.Quality,
 					Roll = GearRolls.roll(rng, piece.Def.RarityTier, piece.Def),
 				},
 				Name = piece.Name,
@@ -196,7 +211,15 @@ function ArenaStreaks.rollCache(m)
 		Name = m.Name,
 		Items = items,
 		At = os.time(),
+		Picks = if m.Gear then RewardRoll.Picks else nil,
+		Plays = m.Plays,
 	}
+end
+
+-- A reward's two rarities for `duel` (its 1v1s played), at least `floor`.
+local function rolled(duel, floor: string?)
+	local plays = RewardRoll.plays(duel)
+	return RewardRoll.rarities(plays, floor, rng), plays
 end
 
 local function seasonKey(): string
@@ -221,9 +244,9 @@ local bossRolls = 0 -- (so every boss cache has its own id)
 -- A boss cache from `boss` (a Shared.DungeonRules.Bosses entry), beaten in
 -- `source` ("Rift", "Dungeon"), with `gem` (Dungeons.bossGem) its own free
 -- gem.
-local function rollBossCache(boss, gem, source: string?)
+local function rollBossCache(boss, _gem, source: string?, duel)
 	local m = BossLoot.spec(boss)
-	m.FreeGems = if gem then { gem } else nil
+	m.Gear, m.Plays = rolled(duel, m.Floor)
 	local cache = ArenaStreaks.rollCache(m)
 	bossRolls += 1
 	cache.Id = string.format("boss%d_%s_%d", bossRolls, tostring(boss.Id), os.time())
@@ -242,7 +265,7 @@ function ArenaStreaks.bossCache(player: Player, boss, gem, source: string?)
 	if not duel or type(boss) ~= "table" then
 		return nil
 	end
-	local cache = rollBossCache(boss, gem, source)
+	local cache = rollBossCache(boss, gem, source, duel)
 	table.insert(duel.StreakCaches, cache)
 	Remotes.Social:FireClient(player, "BossCache", { Id = cache.Id, Boss = boss.Name, Source = source })
 	return cache
@@ -263,7 +286,9 @@ local function reward(player: Player, duel, profile, m)
 	if title then
 		profile.Cosmetics.Owned[title.Id] = true
 	end
-	table.insert(duel.StreakCaches, ArenaStreaks.rollCache(m))
+	local spec = table.clone(m)
+	spec.Gear, spec.Plays = rolled(duel, ArenaStreak.floor(m))
+	table.insert(duel.StreakCaches, ArenaStreaks.rollCache(spec))
 	Remotes.Social:FireClient(player, "StreakReward", {
 		Wins = m.Wins,
 		Name = m.Name,
@@ -308,6 +333,40 @@ function ArenaStreaks.onRankedResult(player: Player, won: boolean, opponentId: n
 	return duel.RankedStreak
 end
 
+-- A 1v1 won (queued, Ranked or Casual) over `opponentId`: its WIN REWARD,
+-- two pieces rolled by how much you've played 1v1, to claim whenever you
+-- like (the client opens it after the match). Not over the same player
+-- twice running, and not past RewardRoll.Waiting unclaimed. (Duels counts
+-- the match played first: RewardRoll.count.)
+function ArenaStreaks.winReward(player: Player, opponentId: number?)
+	local duel = record(player)
+	if not duel or not RewardRoll.pays(duel, opponentId) then
+		return nil
+	end
+	local waiting = 0
+	for _, cache in duel.StreakCaches do
+		if cache.Kind == "Win" then
+			waiting += 1
+		end
+	end
+	if waiting >= RewardRoll.Waiting then
+		Remotes.Notify:FireClient(
+			player,
+			string.format("%d win rewards are waiting: claim some to get more.", waiting)
+		)
+		return nil
+	end
+	duel.RewardLastBeaten = opponentId
+	local gear, plays = rolled(duel)
+	local cache = ArenaStreaks.rollCache({ Wins = 0, Name = "Win Reward", Gear = gear, Plays = plays })
+	duel.WinRewards = (duel.WinRewards or 0) + 1
+	cache.Id = string.format("win%d_%d", duel.WinRewards, os.time())
+	cache.Kind = "Win"
+	table.insert(duel.StreakCaches, cache)
+	Remotes.Social:FireClient(player, "WinReward", { Id = cache.Id })
+	return cache
+end
+
 -- Leftovers onto the Market; any it couldn't take wait for next time.
 local function vault(player: Player, duel, leftovers)
 	local MarketBoard = require(script.Parent.MarketBoard)
@@ -349,7 +408,8 @@ local function view(duel)
 			Wins = cache.Wins,
 			Name = cache.Name,
 			Items = items,
-			Picks = ArenaStreak.Picks,
+			Picks = cache.Picks or ArenaStreak.LegacyPicks,
+			Plays = cache.Plays,
 			Dev = cache.Dev,
 			Kind = cache.Kind,
 			Boss = cache.Boss,
@@ -360,11 +420,19 @@ local function view(duel)
 		})
 	end
 	local nextUp = ArenaStreak.next(duel.RankedStreak)
+	-- Where you are on the rewards' ladder (RewardRoll): your 1v1s played,
+	-- your band, the next one, and your odds.
+	local plays = RewardRoll.plays(duel)
+	local band, _, nextBand = RewardRoll.band(plays)
 	return {
 		Caches = caches,
 		Streak = duel.RankedStreak,
 		Best = duel.BestRankedStreak,
 		Next = nextUp and nextUp.Wins,
+		Plays = plays,
+		Band = band.Name,
+		NextBand = nextBand and { Name = nextBand.Name, Plays = nextBand.Plays },
+		Odds = RewardRoll.odds(plays),
 	}
 end
 
@@ -397,7 +465,7 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 			offered += 1
 		end
 	end
-	local want = math.min(ArenaStreak.Picks, offered)
+	local want = math.min(cache.Picks or ArenaStreak.LegacyPicks, offered)
 	if type(picks) ~= "table" then
 		return Shop.reply(false, string.format("Pick %d to keep.", want))
 	end
@@ -444,6 +512,7 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 				Rarity = entry.Rarity,
 				Label = if cache.Kind == "Boss"
 					then string.format("%s · %s's %s cache", BossLoot.VaultName, player.DisplayName, cache.Boss or "boss")
+					elseif cache.Kind == "Win" then string.format("%s · %s's win reward", ArenaStreak.VaultName, player.DisplayName)
 					else nil,
 			})
 		end
@@ -456,10 +525,11 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 	return Shop.reply(
 		true,
 		string.format(
-			"Claimed! The other %d went to the Market from the %s: you get %d%% of each sale.",
-			#leftovers,
+			"Claimed! %s went to the Market from the %s: you get %d%% of %s.",
+			if #leftovers == 1 then "The other" else string.format("The other %d", #leftovers),
 			if cache.Kind == "Boss" then BossLoot.VaultName else ArenaStreak.VaultName,
-			math.floor(ArenaStreak.Commission * 100 + 0.5)
+			math.floor(ArenaStreak.Commission * 100 + 0.5),
+			if #leftovers == 1 then "its sale" else "each sale"
 		),
 		view(duel)
 	)
@@ -510,7 +580,9 @@ function ArenaStreaks.devCache(player: Player, wins: any)
 			table.remove(duel.StreakCaches, i)
 		end
 	end
-	local cache = ArenaStreaks.rollCache(m)
+	local spec = table.clone(m)
+	spec.Gear, spec.Plays = rolled(duel, ArenaStreak.floor(m))
+	local cache = ArenaStreaks.rollCache(spec)
 	devRolls += 1
 	cache.Id, cache.Dev = string.format("dev%d_%s", devRolls, cache.Id), true
 	table.insert(duel.StreakCaches, 1, cache)
@@ -545,7 +617,7 @@ function ArenaStreaks.devBossCache(player: Player, threat: any)
 	end
 	local boss = bosses[rng:NextInteger(1, #bosses)]
 	local Dungeons = require(script.Parent.Dungeons)
-	local cache = rollBossCache(boss, Dungeons.bossGem(boss.Element, 4), "Dev")
+	local cache = rollBossCache(boss, Dungeons.bossGem(boss.Element, 4), "Dev", duel)
 	devRolls += 1
 	cache.Id, cache.Dev = string.format("dev%d_%s", devRolls, cache.Id), true
 	table.insert(duel.StreakCaches, 1, cache)

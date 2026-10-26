@@ -268,10 +268,11 @@ do
 		)
 	end
 	check(seen[1] and seen[2] and seen[3], "Not every threat has a boss")
+	local RewardTier = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 	for t = 2, #BossLoot.Threats do
 		local lo, hi = BossLoot.Threats[t - 1], BossLoot.Threats[t]
 		check(
-			hi.Health > lo.Health and hi.UltraRare > lo.UltraRare and hi.Gems >= lo.Gems and hi.Quality >= lo.Quality,
+			hi.Health > lo.Health and RewardTier[hi.Floor] > RewardTier[lo.Floor] and hi.Quality >= lo.Quality,
 			"Threat " .. t .. " isn't tougher and richer"
 		)
 	end
