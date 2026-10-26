@@ -749,6 +749,24 @@ do
 	for _, tip in Vendors.Tips do
 		spanish(tip)
 	end
+	-- The rest of the crew: each has its own tips about its station ("Give
+	-- me a tip": RoleTip), and every line of theirs is in Spanish too.
+	for id in OG do
+		local member = Vendors[id]
+		if id ~= "InfoBot" then
+			check(#(member.Tips or {}) >= 5, OG[id] .. " is short of tips about their station")
+			local offers = false
+			for _, option in member.Options do
+				offers = offers or option.Action == "RoleTip"
+			end
+			check(offers, OG[id] .. " doesn't offer a tip")
+			spanish(member.Greeting)
+			lines(member.Options)
+			for _, tip in member.Tips or {} do
+				spanish(tip)
+			end
+		end
+	end
 	-- COACH-4, the Kaiju Arena's guide downstairs (Server.KaijuPitServer
 	-- builds it): the same shape of dialogue, its tips, all in Spanish.
 	local coach = Vendors.ArenaGuide

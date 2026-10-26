@@ -94,3 +94,28 @@ were taken out. The scene stays under its part budget (3,833 of 4,000;
   under the roof, bays in the garage facing the lane, no rock in the
   Shelter, roads from its walls, the part budget) and `outpost_cases`
   (station prompts, spawn and bays).
+
+## The crew's tips (2026-10-26)
+
+Every one of the Shelter's crew (Ilsa, Brutus, Marlo, Tamsin, Borin and
+Garrick) now has **Give me a tip**: tips about their own station, one at a
+time from a random start (`Vendors.<id>.Tips`, the dialogue's `RoleTip`).
+Their questions sit under one topic (Ilsa's **Gems and prices**, Brutus's
+**Duels and rewards**, Garrick's **The quarry**) so the menu stays short.
+
+- **Ilsa:** which gems to keep (Commons for AUTO HEAL, your kaiju's
+  elements), how gems are priced, when to check the Market first.
+- **Brutus:** win rewards (two pieces, keep one; rarer the more 1v1 you
+  play), win streaks and Arena Caches, best of three, Casual for trying
+  loadouts, parrying, 1v1 + Kaiju.
+- **Marlo:** threat I to III, what boss caches roll, favourite gear,
+  biome elements, the 20 seconds home, the HYPERBEAM on a boss.
+- **Tamsin:** six listings for 48 hours, the 5% cut, escrow, empty
+  sockets, vault leftovers and your quarter.
+- **Borin:** skins never change stats, standard visors and visor skins,
+  the stands' 40-second turn, pick skins, the Season Path.
+- **Garrick:** never alone past the Core, Rift Veins, Rift Charged, what
+  can be stolen, healing only at the Shelter, refills first.
+
+INFO-9's old tip that health refills anywhere in the Outpost now says it
+refills back at the Shelter. Every line is in Spanish.

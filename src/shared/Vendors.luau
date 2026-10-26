@@ -19,6 +19,7 @@ export type Vendor = {
 	Visor: boolean?, -- a visor slit in its colour on its screen, in place of a Face
 	Greeting: string,
 	Options: { Option },
+	Tips: { string }?, -- its own tips about its station, one at a time ("RoleTip")
 }
 
 local Vendors: { [string]: Vendor } = {
@@ -153,7 +154,10 @@ local Vendors: { [string]: Vendor } = {
 -- same as the bar on its signs: Server OutpostWorld's STATION). They talk like staff on a working
 -- base: short, plain and exact, no jokes and no exclamation marks.
 local UNIFORM = Color3.fromRGB(52, 56, 64)
-local function crew(from: string, role: string, color: Color3, greeting: string, options: { Option }): Vendor
+-- Each has tips of its own about what it does (Tips, "Give me a tip":
+-- the dialogue's RoleTip), and its questions under one topic, so its
+-- menu stays short.
+local function crew(from: string, role: string, color: Color3, greeting: string, options: { Option }, tips: { string }?): Vendor
 	return {
 		Name = Vendors[from].Name,
 		Role = role,
@@ -163,8 +167,10 @@ local function crew(from: string, role: string, color: Color3, greeting: string,
 		Visor = true,
 		Greeting = greeting,
 		Options = options,
+		Tips = tips,
 	}
 end
+local TIP = { Text = "Give me a tip", Action = "RoleTip" }
 
 Vendors.GemBuyer = crew(
 	"Cutting",
@@ -175,13 +181,31 @@ Vendors.GemBuyer = crew(
 		{ Text = "Appraise my spare gems", Action = "Appraise" },
 		{ Text = "Sell a specific gem", Action = "SellGems" },
 		{
-			Text = "How are gems valued?",
-			Reply = "Rarity sets the base: one Legendary outweighs a pouch of Commons. Size, Clarity and Cut are each graded 1 to 10, and every point raises the price.",
+			Text = "Gems and prices",
+			Options = {
+				{
+					Text = "How are gems valued?",
+					Reply = "Rarity sets the base: one Legendary outweighs a pouch of Commons. Size, Clarity and Cut are each graded 1 to 10, and every point raises the price.",
+				},
+				{
+					Text = "Which gems do you buy?",
+					Reply = "Any loose gem in your pouch. An appraisal only counts spares: gems used by any of your loadouts are left out.",
+				},
+				{
+					Text = "Which gems should I keep?",
+					Reply = "A few Commons for your kaiju: AUTO HEAL spends them first. Gems of your kaiju's elements, to heal and enchant them. Anything rarer you might socket. Sell the rest.",
+				},
+			},
 		},
-		{
-			Text = "Which gems do you buy?",
-			Reply = "Any loose gem in your pouch. An appraisal only counts spares: gems used by any of your loadouts are left out.",
-		},
+		TIP,
+	},
+	{
+		"Keep a few spare Commons. AUTO HEAL spends them first to heal your kaiju.",
+		"A gem of your kaiju's own element heals it twice as much. Keep some of each element your team uses.",
+		"A kaiju takes an enchant only from a gem of its own element. Bring me the ones that don't fit your team.",
+		"Two gems of the same rarity can be worth very different amounts. Every point of Size, Clarity and Cut raises my offer.",
+		"Gems your loadouts use are never part of my offer, so selling everything I appraise is safe.",
+		"Check the Market before you sell me a Legendary. Another miner may pay more than I do.",
 	}
 )
 Vendors.ArenaMaster = crew(
@@ -192,17 +216,36 @@ Vendors.ArenaMaster = crew(
 	{
 		{ Text = "Find me a duel", Action = "Duels" },
 		{
-			Text = "How do duels work?",
-			Reply = "Ranked puts your rating on the line, best of three rounds. Casual is the same fight with nothing at stake. 1v1 + Kaiju: you duel while your kaiju fight theirs. Queue at my counter and I'll match you.",
+			Text = "Duels and rewards",
+			Options = {
+				{
+					Text = "How do duels work?",
+					Reply = "Ranked puts your rating on the line, best of three rounds. Casual is the same fight with nothing at stake. 1v1 + Kaiju: you duel while your kaiju fight theirs. Queue at my counter and I'll match you.",
+				},
+				{
+					Text = "What do I get for winning?",
+					Reply = "Every 1v1 you win from the queue pays a win reward: two pieces of gear, you keep one. The other goes to the Market and you get a quarter of its sale. The more 1v1s you play, the rarer the rolls.",
+				},
+				{
+					Text = "What does a win streak pay?",
+					Reply = "Ranked wins in a row. At 10, 20 and on up to 200 it opens an Arena Cache and pays coins, with titles at 30, 50, 100, 150 and 200. Your first, fifth and tenth wins of a run also restore swings. A loss ends the run.",
+				},
+				{
+					Text = "Where are the bounties?",
+					Reply = "Marlo's office, east wall, under the posters. Every boss behind the Rift Gates is up there.",
+				},
+			},
 		},
-		{
-			Text = "What does a win streak pay?",
-			Reply = "First win: a tenth of your swings restored. Fifth: a quarter. Tenth: half, and the tournament title. A loss ends the run.",
-		},
-		{
-			Text = "Where are the bounties?",
-			Reply = "Marlo's office, east wall, under the posters. Every boss behind the Rift Gates is up there.",
-		},
+		TIP,
+	},
+	{
+		"Every 1v1 you finish counts toward your reward rolls, win or lose. At 10 you're a Regular, at 25 a Veteran, at 50 Elite.",
+		"Beating the same player twice in a row pays nothing the second time. Find new opponents.",
+		"Win rewards wait until you claim them, up to twelve. Claim them so the next ones can come.",
+		"Ranked is best of three. Between rounds you get 30 seconds to swap your loadouts.",
+		"Casual has no rating at stake. Try a new loadout there before you take it into Ranked.",
+		"Raise your guard just before a hit lands to parry: you take far less damage and stun your opponent.",
+		"In 1v1 + Kaiju, your kaiju fight theirs while you duel. Get knocked down and you're out; your side loses once your kaiju are down too.",
 	}
 )
 Vendors.BountyClerk = {
@@ -223,6 +266,16 @@ Vendors.BountyClerk = {
 			Text = "Which one should I take first?",
 			Reply = "The first on any ladder is built for one. The last on each is built for a party. Start where your gear is strongest against the biome's element.",
 		},
+		TIP,
+	},
+	Tips = {
+		"Threat I bosses are built for one miner. Threat III is built for two to four of you.",
+		"A boss cache is two pieces of gear: keep one, the other goes to the Market with your cut. Higher threats roll rarer: Uncommon at least on threat I, Rare on II, Ultra-Rare on III.",
+		"Every boss has a favourite kind of gear. One of the two pieces in its cache is always that kind.",
+		"Each biome has its own element. Socket gems that resist it before you go through.",
+		"Everyone still standing when the boss falls gets a cache of their own. Bring your party.",
+		"Once the boss falls you have 20 seconds to reach a way home, and nothing attacks you on the way.",
+		"Your kaiju come with you. In a boss fight their HYPERBEAM goes into the boss alone.",
 	},
 }
 Vendors.Broker = crew(
@@ -240,6 +293,15 @@ Vendors.Broker = crew(
 			Text = "Where do I get coins?",
 			Reply = "Sell spare gems to Ilsa at the Gem Gallery, complete your daily challenges, or sell on this board.",
 		},
+		TIP,
+	},
+	{
+		"You can have six listings up at once. Each stays up for 48 hours, then comes back to you.",
+		"The board keeps 5% of the price when something sells.",
+		"A listed item leaves your bag at once and waits safely until it sells or comes back. Nothing can be sold twice.",
+		"Gear goes up with an empty socket. Its gem comes back to your pouch first.",
+		"The piece you don't keep from a reward goes up from the Arena Vault or the Rift Vault. When it sells, a quarter of the price is yours.",
+		"Set a trade listing to ask for gear, gems or anything Rare or better, and let other miners make you offers.",
 	}
 )
 Vendors.Outfitter = crew(
@@ -253,6 +315,19 @@ Vendors.Outfitter = crew(
 			Text = "Do skins change my stats?",
 			Reply = "No. Everything here is cosmetic. Your gear's rolls and socketed gems stay exactly as they are.",
 		},
+		{
+			Text = "What's on the stands?",
+			Reply = "Suits, helmets, visors, picks and weapon skins, a few at a time. The stands change every 40 seconds.",
+		},
+		TIP,
+	},
+	{
+		"Skins never change stats. Wear what you like.",
+		"Every helmet's visor comes in the same standard colour. A visor skin is how you change it.",
+		"The stands change every 40 seconds. Wait a few minutes to see everything on sale.",
+		"A pick skin changes how your pick and its hits look. Your swings stay the same.",
+		"The Season Path's free track gives skins just for playing.",
+		"Animated skins move everywhere: in first person, in your Inventory and in the Store.",
 	}
 )
 Vendors.Foreman = crew(
@@ -263,17 +338,31 @@ Vendors.Foreman = crew(
 	{
 		{ Text = "Buy swing refills", Action = "Exchange" },
 		{
-			Text = "Where is the best ground?",
-			Reply = "Yield improves with distance. The Fringe starts 150 studs out, the Edge at 300. Three Rift Veins surface by the crater walls; one of them is guarded.",
+			Text = "The quarry",
+			Options = {
+				{
+					Text = "Where is the best ground?",
+					Reply = "Yield improves with distance. The Fringe starts 150 studs out, the Edge at 300. Three Rift Veins surface by the crater walls; one of them is guarded.",
+				},
+				{
+					Text = "What are those critters?",
+					Reply = "Rift critters. Activity rises the longer you work outside the Core. Keep your kaiju close: if your whole team goes down out there, the critters come for your gems.",
+				},
+				{
+					Text = "My swings ran out",
+					Reply = "Your pick recharges a swing every 24 seconds. I keep refills in stock, and ranked 1v1 win streaks restore swings.",
+				},
+			},
 		},
-		{
-			Text = "What are those critters?",
-			Reply = "Rift critters. Activity rises the longer you work outside the Core. Keep your kaiju close: if your whole team goes down out there, the critters come for your gems.",
-		},
-		{
-			Text = "My swings ran out",
-			Reply = "Your pick recharges a swing every 24 seconds. I keep refills in stock, and ranked 1v1 win streaks restore swings.",
-		},
+		TIP,
+	},
+	{
+		"Don't work past the Core with no kaiju out. Alone, the critters come at you harder.",
+		"Rift Veins move from time to time. Their rocks are the luckiest in the quarry.",
+		"Clear a wandering rift and everyone who helped is Rift Charged: luckier gems for 60 seconds.",
+		"Only gems from this trip can be stolen. Get back to the Core and they're safe.",
+		"Out in the quarry nothing mends. Come back to the Shelter when you're hurt.",
+		"Refills you buy are used before your free charge.",
 	}
 )
 
@@ -378,7 +467,7 @@ Vendors.Tips = {
 	"If your whole kaiju team goes down beyond the Core, critters raid your gems. Hit a thief before it reaches its rift to get the gem back.",
 	"Only loose gems from your current trip can be stolen. Gems socketed in your gear are always safe.",
 	"Gems from your trip are safe again once you're back in the Core.",
-	"In the Outpost your health refills on its own a few seconds after your last hit.",
+	"Back at the Shelter your health refills on its own a few seconds after your last hit. Out in the quarry nothing mends.",
 	"A creature's outline shows its health: green is healthy, amber is worn down, red is nearly done.",
 	"Wild kaiju and gem thieves stay outlined through rocks and walls, so you can track them.",
 	-- Kaiju

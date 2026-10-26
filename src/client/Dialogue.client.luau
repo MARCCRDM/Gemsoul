@@ -404,6 +404,19 @@ function actions.Tip()
 	say(Vendors.Tips[tipAt])
 end
 
+-- A crew member's own tips about their station (its Tips), the same way.
+local roleTipAt = {}
+function actions.RoleTip()
+	local vendor = current and current.vendor
+	local tips = vendor and vendor.Tips
+	if not tips or #tips == 0 then
+		return
+	end
+	local at = (roleTipAt[vendor] or math.random(1, #tips) - 1) % #tips + 1
+	roleTipAt[vendor] = at
+	say(tips[at])
+end
+
 -- COACH-4's battle tips downstairs, the same way.
 local arenaTipAt = math.random(1, #Vendors.ArenaTips) - 1
 function actions.ArenaTip()
