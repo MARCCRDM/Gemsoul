@@ -463,30 +463,56 @@ local beamSlot = new("Frame", {
 	ZIndex = 10, -- (over the card's outline, the HYPERBEAM's meter)
 }, card)
 
--- CATCH: beside the strip, when there's a wild kaiju to catch.
+-- CATCH: beside the strip, when there's a wild kaiju to catch. A slim
+-- pill: a gold disc (the key on a computer, a target on a touch screen),
+-- CATCH and the chance on top, its name and the tries left under them.
 local tame = new("TextButton", {
 	Name = "Tame",
 	Text = "",
 	AutoButtonColor = true,
-	BackgroundColor3 = Color3.fromRGB(70, 52, 14),
-	Size = UDim2.fromOffset(104, 60),
+	BackgroundColor3 = Color3.fromRGB(16, 18, 28),
+	BackgroundTransparency = 0.08,
+	Size = UDim2.fromOffset(210, 42),
 	Visible = false,
 }, gui)
-UiKit.round(tame, 10)
-local catchStroke = new("UIStroke", { Color = P.Gold, Thickness = 2 }, tame)
-local tameTitle = label(tame, "CATCH", 18, P.Gold, Enum.Font.GothamBlack)
-tameTitle.Position, tameTitle.Size = UDim2.fromOffset(0, 6), UDim2.new(1, 0, 0, 22)
-tameTitle.TextXAlignment = Enum.TextXAlignment.Center
-local tameOdds = label(tame, "", 11, P.Text, IronUi.Bold)
-tameOdds.Position, tameOdds.Size = UDim2.fromOffset(0, 50), UDim2.new(1, 0, 0, 16)
-tameOdds.TextXAlignment = Enum.TextXAlignment.Center
+UiKit.round(tame, 21)
+local catchStroke = new("UIStroke", { Color = P.Gold, Thickness = 1.5 }, tame)
+do
+	-- (The disc: gold, with the key in it, or a target's ring and dot.)
+	local disc = new("Frame", {
+		Name = "Disc",
+		BackgroundColor3 = P.Gold,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 5, 0.5, 0),
+		Size = UDim2.fromOffset(32, 32),
+	}, tame)
+	UiKit.round(disc, 16)
+	local key = label(disc, "C", 16, Color3.fromRGB(28, 22, 8), Enum.Font.GothamBlack)
+	key.Name, key.Size, key.TextXAlignment = "Key", UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	local ring = new("Frame", {
+		Name = "Ring",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.62, 0.62),
+		Visible = false,
+	}, disc)
+	UiKit.round(ring, 99)
+	new("UIStroke", { Color = Color3.fromRGB(28, 22, 8), Thickness = 2 }, ring)
+	local dot = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(28, 22, 8),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.3, 0.3),
+	}, ring)
+	UiKit.round(dot, 99)
+end
+local tameTitle = label(tame, "CATCH", 13, P.Gold, Enum.Font.GothamBlack)
+local tameOdds = label(tame, "", 13, P.Text, Enum.Font.GothamBlack)
+tameOdds.TextXAlignment = Enum.TextXAlignment.Right
 local tameTries = label(tame, "", 10, P.Dim, IronUi.Body)
-tameTries.Position, tameTries.Size = UDim2.fromOffset(0, 68), UDim2.new(1, 0, 0, 14)
-tameTries.TextXAlignment = Enum.TextXAlignment.Center
-local catchName = label(tame, "READY TO CATCH", 12, P.Text, IronUi.Bold)
-catchName.Position, catchName.Size = UDim2.fromOffset(8, 30), UDim2.new(1, -16, 0, 18)
-catchName.TextXAlignment = Enum.TextXAlignment.Center
-catchName.TextTruncate = Enum.TextTruncate.AtEnd
+tameTries.TextXAlignment = Enum.TextXAlignment.Right
+local catchName = nameLabel(tame, "", 11, P.Text, IronUi.Bold)
 
 -- Where the card and TAME go: see the header.
 local function layout()
@@ -535,10 +561,25 @@ local function layout()
 		tame.Size = UDim2.fromOffset(at.TameW, at.TameH)
 		tame.Position = UDim2.fromOffset(at.TameX, at.TameY)
 	else
-		tame.Size = UDim2.fromOffset(260, 90)
-		tame.Position = UDim2.fromOffset((screen.X - 260) / 2, math.max(12, screen.Y - 225))
+		tame.Size = UDim2.fromOffset(210, 42)
+		tame.Position = UDim2.fromOffset(math.floor((screen.X - 210) / 2), math.max(12, screen.Y - 196))
 	end
-	tameTitle.Text = if touch then "TAP TO CATCH" else "[ C ]  CATCH"
+	do
+		-- (Inside: the disc, then two rows: CATCH and the chance, its name
+		-- and the tries left.)
+		local h = tame.Size.Y.Offset
+		local d = h - 10
+		local disc = tame:FindFirstChild("Disc") :: Frame
+		disc.Size = UDim2.fromOffset(d, d)
+		disc.Key.Visible, disc.Ring.Visible = not touch, touch
+		disc.Key.TextSize = math.floor(d * 0.5)
+		local x0, right = d + 13, 14
+		local top = math.floor((h - 26) / 2)
+		tameTitle.Position, tameTitle.Size = UDim2.fromOffset(x0, top), UDim2.new(0, 60, 0, 14)
+		tameOdds.Position, tameOdds.Size = UDim2.new(1, -right - 50, 0, top), UDim2.fromOffset(50, 14)
+		catchName.Position, catchName.Size = UDim2.fromOffset(x0, top + 14), UDim2.new(1, -x0 - right - 50, 0, 12)
+		tameTries.Position, tameTries.Size = UDim2.new(1, -right - 50, 0, top + 14), UDim2.fromOffset(50, 12)
+	end
 	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or
 	-- OFF (on a short row two lines: the gem, then AUTO ON); CALL BACK: its
 	-- gem mark, then its name, and IN DANGER when it can't.
@@ -2565,7 +2606,7 @@ local function refresh()
 	if target then
 		catchName.Text = target:GetAttribute("KaijuName") or target.Name
 		catchStroke.Transparency = 0.1 + 0.25 * (0.5 + 0.5 * math.sin(os.clock() * 4))
-		tameOdds.Text = string.format("%d%% chance", math.floor(chance * 100 + 0.5))
+		tameOdds.Text = string.format("%d%%", math.floor(chance * 100 + 0.5))
 		local left = Kaiju.TameTries - (target:GetAttribute("KaijuTries") or 0)
 		tameTries.Text = string.format("%d tr%s left", left, if left == 1 then "y" else "ies")
 	end

@@ -213,7 +213,7 @@ function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 	-- (Under the rows, room for the pill's upper half: it covers none of them.)
 	local inner = h - pad - gap - MobileLayout.under(spec.Notch)
 	local r = math.floor(inner / 2)
-	local tameW = math.min(210, screen.X - 24)
+	local tameW = math.min(176, screen.X - 24)
 	local loot = MobileLayout.loot(screen)
 	local card = MobileLayout.card()
 	return {
@@ -228,7 +228,7 @@ function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 		TameX = if hunting then x - 8 - tameW else loot.X - 8 - tameW,
 		TameY = if hunting then y else card.Y + card.H + 8,
 		TameW = tameW,
-		TameH = 90,
+		TameH = 38,
 	}
 end
 

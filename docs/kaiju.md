@@ -861,9 +861,11 @@ ready to be caught, it **glows gold** (a pulsing outline you can see
 through rocks) with **READY TO CATCH** and the chance over it. Anyone within
 140 studs sees that.
 
-Press **C** on desktop or tap **TAP TO CATCH** on mobile. A gold prompt
-shows the target, odds and remaining attempts only when an eligible kaiju
-is within range. Desktop C takes priority over the character-menu shortcut
+Press **C** on desktop or tap the **CATCH** pill on mobile. It's a slim
+dark pill with a gold rim (210 x 42 on a computer, 176 x 38 on a phone): a
+gold disc (the C key, or a target on a touch screen), CATCH and the chance
+on top, the kaiju's name and the tries left under them. It shows only when
+an eligible kaiju is within range. Desktop C takes priority over the character-menu shortcut
 while the prompt is visible, but not while typing. The prompt hides during
 the cast, retry cooldown, menus, or when capacity/attempts are exhausted.
 Catching is a **cast** of 2.5 seconds (`Kaiju.Tame`):
