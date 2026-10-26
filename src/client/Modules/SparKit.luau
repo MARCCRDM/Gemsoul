@@ -619,16 +619,12 @@ local banner = new("TextLabel", {
 }, flashGui)
 local bannerScale = new("UIScale", { Scale = 1 }, banner)
 local bannerId = 0
--- (`by`: what tripped them, when it wasn't a player: a gem snatcher.)
-local function knockedDown(victimId: number, attackerId: number, by: string?)
+local function knockedDown(victimId: number, attackerId: number)
 	local victim = Players:GetPlayerByUserId(victimId)
 	local attacker = Players:GetPlayerByUserId(attackerId)
 	if victim == player then
 		lastAttacker = attacker and attacker.DisplayName or nil
-		downBy.Text = if lastAttacker
-			then "by " .. lastAttacker
-			elseif by == "Snatcher" then "Tripped by a gem snatcher! Get up and bonk it."
-			else ""
+		downBy.Text = if lastAttacker then "by " .. lastAttacker else ""
 		local from = attacker and attacker.Character and attacker.Character:FindFirstChild("HumanoidRootPart")
 		fall(if from then (from :: BasePart).Position else nil)
 	elseif attacker == player and victim then
@@ -758,9 +754,9 @@ function SparKit.start()
 	end)
 	task.spawn(function()
 		local fx = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CombatFx")
-		fx.OnClientEvent:Connect(function(kind, a, b, c)
+		fx.OnClientEvent:Connect(function(kind, a, b)
 			if kind == "SparKO" and type(a) == "number" and type(b) == "number" then
-				knockedDown(a, b, if type(c) == "string" then c else nil)
+				knockedDown(a, b)
 			end
 		end)
 	end)

@@ -79,12 +79,12 @@
 	  Snatchers   in a gem raid (FrontierServer: your team all knocked out
 	              out past the core; Shared.Frontier.Raid) every critter out
 	              for you is a snatcher (Raider, on its model too): it goes
-	              for you before any kaiju, winds up a TRIP at your legs
-	              (its cast bar) and, landing it, knocks you down
-	              (KaijuWilds.knockDown: SparServer's). You down, snatchers
-	              run in, and each grabs one of this trip's gems
-	              (KaijuWilds.steal: FrontierServer's haul; Snatch.Max a
-	              knock-down), holds it up over its head (the very stone it
+	              for you before any kaiju and winds up a LUNGE (its cast
+	              bar): a hard hit, never a knock-down (in the Outpost you're
+	              killed or you're not). Killed, snatchers run in, and each
+	              grabs one of this trip's gems (KaijuWilds.steal:
+	              FrontierServer's haul; Snatch.Max a death), holds it up
+	              over its head (the very stone it
 	              took, drawn by each client: CarryingGem and CarriedGem* on
 	              its model, its arms up),
 	              cackles and runs for a rift that tears open Carry.Away
@@ -136,7 +136,7 @@
 	  KaijuWilds.raid(enemy)                    a critter out turns snatcher
 	  KaijuWilds.rob(player, robbery, near) -> count   the critters near rob a knocked-out player
 	  KaijuWilds.unrob(robbery)                 that robbery's over
-	  KaijuWilds.knockDown, steal, recover, lost, escape   a gem raid's hooks
+	  KaijuWilds.steal, recover, lost, escape   a gem raid's hooks
 	                                            (Main and FrontierServer set them)
 ]]
 local Players = game:GetService("Players")
@@ -1015,8 +1015,8 @@ KaijuWilds._wander = wander
 -- A critter in a fight ----------------------------------------------------------------------------------
 
 local RAID = Frontier.Raid
-local giggle, trippable -- (a gem raid's: below)
-local tripped: { [Player]: number } = {} -- when each player was last tripped (os.clock)
+local giggle, lungeable -- (a gem raid's: below)
+local lunged: { [Player]: number } = {} -- when each player was last lunged at
 
 -- What its body is doing, for every client to pose (BodyPoses: a bite is a
 -- Slash) and, for a named move, the cast bar (FoeCastBar).
@@ -1267,8 +1267,8 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 			root.AssemblyLinearVelocity = -dir * rules.HopBack * 4 + Vector3.new(0, 8, 0)
 			e.RecoverUntil = now + rules.Recover * (if wary then rules.Wary else 1)
 			e.Circle = if rng:NextNumber() < 0.5 then 1 else -1
-		elseif action.Kind == "Trip" then
-			-- A snatcher's trip: a lunge at the legs; landed, its player's down.
+		elseif action.Kind == "Lunge" then
+			-- A snatcher's lunge: a hard hit, never a knock-down.
 			enemy.LastAttack = now
 			root.AssemblyLinearVelocity = dir * math.min(50, distance * 6) + Vector3.new(0, 6, 0)
 			e.RecoverUntil = now + rules.Recover
@@ -1276,15 +1276,10 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 			if not player or distance > reach + 2.5 then
 				return -- (it lunged at nothing)
 			end
-			local amount = alonePlayer(wild, player, kind.Damage * RAID.Trip.Damage * (1 - Enemies.weakness(enemy)))
+			local amount = alonePlayer(wild, player, kind.Damage * RAID.Lunge.Damage * (1 - Enemies.weakness(enemy)))
 			local dealt, guarded = Enemies.hitPlayer(player, amount, wild.Element, enemy, true)
-			if
-				not guarded
-				and (dealt or 0) > 0
-				and trippable(player, now)
-				and KaijuWilds.knockDown(player, RAID.Trip.Down, "Snatcher")
-			then
-				tripped[player] = now
+			lunged[player] = now
+			if not guarded and (dealt or 0) > 0 then
 				giggle(enemy, "Cackle")
 			end
 		elseif action.Kind == "Lob" then
@@ -1368,15 +1363,15 @@ local function critterFight(enemy, wild: Wild, victim, now: number)
 		lookAt(root, victim.Root.Position)
 		return
 	end
-	-- A snatcher's trip at its player's legs, wound up on its cast bar (TRIP:
-	-- step out of reach, or bonk it): landed, they're down for the snatching.
+	-- A snatcher's lunge at its player, wound up on its cast bar (LUNGE:
+	-- step out of reach, or bonk it): a hard hit, never a knock-down.
 	if wild.Raider and not wild.Robbery and victim.Player and not ranged then
-		e.NextTrip = e.NextTrip or now + rng:NextNumber(1, 2.5)
-		if distance <= RAID.Trip.Range and now >= e.NextTrip and trippable(victim.Player, now) then
-			e.NextTrip = now + rng:NextNumber(RAID.Trip.Every[1], RAID.Trip.Every[2])
-			e.Action = { Kind = "Trip", At = now + RAID.Trip.Windup }
-			e.Windup = { At = now + RAID.Trip.Windup, Heavy = true }
-			act(enemy, "Lunge", RAID.Trip.Windup, nil, "Trip")
+		e.NextLunge = e.NextLunge or now + rng:NextNumber(1, 2.5)
+		if distance <= RAID.Lunge.Range and now >= e.NextLunge and lungeable(victim.Player, now) then
+			e.NextLunge = now + rng:NextNumber(RAID.Lunge.Every[1], RAID.Lunge.Every[2])
+			e.Action = { Kind = "Lunge", At = now + RAID.Lunge.Windup }
+			e.Windup = { At = now + RAID.Lunge.Windup, Heavy = true }
+			act(enemy, "Lunge", RAID.Lunge.Windup, nil, "Lunge")
 			humanoid:MoveTo(root.Position)
 			lookAt(root, victim.Root.Position)
 			return
@@ -1438,10 +1433,6 @@ end
 
 -- Gem raids --------------------------------------------------------------------------------------------
 
--- Knocks `player` down for `seconds`, `by` what (Main sets it: SparServer.knockDown).
-KaijuWilds.knockDown = function(_player: Player, _seconds: number, _by: string?): boolean
-	return false
-end
 -- The newest gem of `player`'s haul, out of their pouch (FrontierServer sets it).
 KaijuWilds.steal = function(_player: Player): any
 	return nil
@@ -1456,7 +1447,7 @@ KaijuWilds.escape = function(_at: Vector3, _facing: Vector3, _wait: number, _hel
 	return nil
 end
 
-local snatched: { [Player]: { Down: number, Count: number } } = {} -- gems taken this knock-down
+local snatched: { [Player]: { Down: number, Count: number } } = {} -- gems taken while they're down (killed)
 
 -- A giggle (or a cackle) for everyone near to hear, "hee hee!" over it.
 function giggle(enemy, kind: string?)
@@ -1513,9 +1504,9 @@ function KaijuWilds.unrob(robbery)
 	end
 end
 
--- Whether `player` can be tripped now: not down, and not too soon after the last.
-function trippable(player: Player, now: number): boolean
-	return now - (tripped[player] or -math.huge) >= RAID.Trip.Gap and not Spar.isDown(player)
+-- Whether a snatcher may lunge at `player` now: not down, and not too soon after the last.
+function lungeable(player: Player, now: number): boolean
+	return now - (lunged[player] or -math.huge) >= RAID.Lunge.Gap and not Spar.isDown(player)
 end
 
 -- How many more gems snatchers may take from `player` this knock-down (a
@@ -2087,7 +2078,8 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 	challenge.Name = "ChallengePrompt"
 	challenge.ActionText = "Challenge"
 	challenge.ObjectText = string.format("%s · Lv %d", title, level)
-	challenge.KeyboardKeyCode = Enum.KeyCode.E
+	-- (F, not E: in first person E is your ability.)
+	challenge.KeyboardKeyCode = Enum.KeyCode.F
 	challenge.HoldDuration = 0.5
 	challenge.MaxActivationDistance = 16
 	challenge.RequiresLineOfSight = false
@@ -2977,7 +2969,7 @@ end
 -- For tests.
 KaijuWilds._tame, KaijuWilds._brain, KaijuWilds._wilds = tame, brain, wilds
 KaijuWilds._challenge = challenge
-KaijuWilds._snatched, KaijuWilds._tripped = snatched, tripped
+KaijuWilds._snatched, KaijuWilds._lunged = snatched, lunged
 KaijuWilds._rushes = rushes
 KaijuWilds._spawnWild, KaijuWilds._packs = spawnWild, packs
 KaijuWilds._packAt = packAt

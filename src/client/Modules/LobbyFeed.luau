@@ -514,7 +514,7 @@ function LobbyFeed.mount(gui: ScreenGui)
 	}, gui)
 	UiKit.list(stack, 4, false)
 	MobileLayout.onTop(function()
-		stack.Visible = not (compact and MobileLayout.topClaimed())
+		stack.Visible = stack:GetAttribute("Narrow") ~= true and not (compact and MobileLayout.topClaimed())
 	end)
 	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 	local roll = remotes and remotes:FindFirstChild("MiningRoll")
@@ -537,6 +537,9 @@ function LobbyFeed.setCompact(on: boolean, span: { X: number, W: number }?)
 	compact = on
 	if stack then
 		local width = if compact then 300 else 380
+		-- (A phone too narrow for it between the pick card and the toasts'
+		-- place: no feed there.)
+		local narrow = span ~= nil and span.W < 160
 		if span then
 			width = math.min(width, math.max(160, span.W))
 			stack.Position = UDim2.new(0, span.X + span.W / 2, 0, 12)
@@ -544,7 +547,8 @@ function LobbyFeed.setCompact(on: boolean, span: { X: number, W: number }?)
 			stack.Position = UDim2.new(0.5, 0, 0, 12)
 		end
 		stack.Size = UDim2.fromOffset(width, 3 * 30)
-		stack.Visible = not (compact and MobileLayout.topClaimed())
+		stack:SetAttribute("Narrow", narrow)
+		stack.Visible = not narrow and not (compact and MobileLayout.topClaimed())
 	end
 end
 

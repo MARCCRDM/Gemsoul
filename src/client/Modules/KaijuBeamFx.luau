@@ -22,15 +22,13 @@
 	            trail; screens shake near it.
 	  Recover   it all fades.
 
-	  The cinematic (yours): letterbox bars and a hotter grade, your kaiju's
-	  names called as each lands, HYPERBEAM! as it fires, a white flash;
-	  the camera wide and low as they leap in, a low hero shot of the
-	  line-up as they roar, round the focus as it charges, side-on as the
-	  beam leaves it and then from over your shoulder, and back to you.
+	  No cinematic: your camera stays yours (first person or not) and it
+	  all happens in front of you. Yours gets a hotter grade, your kaiju's
+	  names called as each lands, HYPERBEAM! as it fires and a light flash.
+	  The beam turns as the server's does (Targets, in turn: KaijuBeam.
+	  direction), from the biggest threat onto each of the rest, smoothly.
 
 	  KaijuBeamFx.start()            once, from Lobby.client
-	  KaijuBeamFx.shot(t, origin, forward, focus) -> CFrame, fov   the
-	                                 cinematic's camera at `t` (pure: tests)
 	  KaijuBeamFx.flight(t, from, to, takeoff, land, height, forward, flip)
 	                                 -> CFrame?   a kaiju's pivot in its leap
 	                                 at `t` (nil before it's off; pure: tests)
@@ -60,7 +58,6 @@ local GOLD = Color3.fromRGB(255, 226, 120)
 local ROCK = Color3.fromRGB(70, 62, 58)
 local SCORCH = Color3.fromRGB(30, 20, 18)
 local UP = Vector3.new(0, 1, 0)
-local BIND = "KaijuHyperbeamCam"
 local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
 local FLAT = CFrame.Angles(0, 0, math.rad(90)) -- (a cylinder lying flat: a disc on the ground)
 
@@ -109,42 +106,6 @@ end
 local function smooth(t: number): number
 	t = math.clamp(t, 0, 1)
 	return t * t * (3 - 2 * t)
-end
-
--- The cinematic's camera `t` seconds in: wide and low from out in front as
--- they leap in (craning up as they land), a low hero shot of the line-up
--- as they roar, round the focus as it charges (closing in), side-on as the
--- beam leaves the focus, then over your shoulder down it.
-function KaijuBeamFx.shot(t: number, origin: Vector3, forward: Vector3, focus: Vector3): (CFrame, number)
-	local at = KaijuBeam.timeline()
-	local roar = KaijuBeam.Leap.Roar
-	local right = forward:Cross(UP)
-	if t < roar then
-		local k = smooth(t / roar)
-		local eye = origin + forward * (22 - 4 * k) + right * (10 - 3 * k) + UP * (2 + 3 * k)
-		return CFrame.lookAt(eye, origin + UP * (2 + k)), 68 - 6 * k
-	end
-	if t < at.Charge then
-		local k = smooth((t - roar) / math.max(at.Charge - roar, 0.05))
-		local eye = origin + forward * (14 - 2.5 * k) + right * 0.6 + UP * 0.8
-		return CFrame.lookAt(eye, origin + UP * (4.5 + 0.5 * k)), 56 - 4 * k
-	end
-	if t < at.Fire then
-		local k = (t - at.Charge) / (at.Fire - at.Charge)
-		local angle = math.rad(70 - 100 * k)
-		local around = right * math.cos(angle) + forward * math.sin(angle)
-		local eye = focus + around * (13 - 4 * k) + UP * (2.5 + k)
-		return CFrame.lookAt(eye, focus), 60 - 10 * k
-	end
-	local s = t - at.Fire
-	if s < 0.4 then
-		local k = s / 0.4
-		local eye = focus + forward * (12 + 4 * k) + right * 26 + UP * 5
-		return CFrame.lookAt(eye, focus + forward * (18 + 4 * k)), 74
-	end
-	local k = math.clamp(s / (at.Stop - at.Fire), 0, 1)
-	local eye = origin - forward * (12 + 4 * k) + UP * (6 + k) + right * 3.5
-	return CFrame.lookAt(eye, origin + forward * 40 + UP * 2), 82
 end
 
 -- A kaiju's pivot `t` seconds in, leaping from `from` to `to` (pivots),
@@ -224,23 +185,9 @@ local function placeRing(bars, center: Vector3, radius: number, spin: number, tr
 	end
 end
 
--- The cinematic's overlay: letterbox bars, the roll call, the title and a flash.
+-- Yours, over your own view: the roll call, the title and a flash.
 local function overlay(calls: { { Name: string, Color: Color3 } }, palette: { Color3 })
 	local gui = UiKit.gui("KaijuBeamCinematic", 40)
-	local top = new("Frame", {
-		BackgroundColor3 = Color3.new(0, 0, 0),
-		BorderSizePixel = 0,
-		Size = UDim2.new(1, 0, 0, 0),
-		ZIndex = 2,
-	}, gui)
-	local bottom = new("Frame", {
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		BackgroundColor3 = Color3.new(0, 0, 0),
-		BorderSizePixel = 0,
-		Size = UDim2.new(1, 0, 0, 0),
-		ZIndex = 2,
-	}, gui)
 	local flash = new("Frame", {
 		BackgroundColor3 = WHITE,
 		BackgroundTransparency = 1,
@@ -307,11 +254,6 @@ local function overlay(calls: { { Name: string, Color: Color3 } }, palette: { Co
 	end
 	return {
 		Gui = gui,
-		Show = function(bar: number)
-			local info = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			TweenService:Create(top, info, { Size = UDim2.new(1, 0, bar, 0) }):Play()
-			TweenService:Create(bottom, info, { Size = UDim2.new(1, 0, bar, 0) }):Play()
-		end,
 		Call = function(i: number)
 			local name = names[i]
 			if not name then
@@ -344,8 +286,6 @@ local function overlay(calls: { { Name: string, Color: Color3 } }, palette: { Co
 		end,
 		Hide = function()
 			local info = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-			TweenService:Create(top, info, { Size = UDim2.new(1, 0, 0, 0) }):Play()
-			TweenService:Create(bottom, info, { Size = UDim2.new(1, 0, 0, 0) }):Play()
 			TweenService:Create(title, info, { TextTransparency = 1 }):Play()
 			TweenService:Create(stroke, info, { Transparency = 1 }):Play()
 			for _, name in names do
@@ -359,43 +299,29 @@ local function overlay(calls: { { Name: string, Color: Color3 } }, palette: { Co
 	}
 end
 
--- The camera, held for the cinematic and handed back after.
-local held = nil -- { Camera, Type, Subject, Fov, From }
-local function holdCamera()
-	local camera = workspace.CurrentCamera
-	if not camera or held then
-		return
-	end
-	held = {
-		Camera = camera,
-		Type = camera.CameraType,
-		Subject = camera.CameraSubject,
-		Fov = camera.FieldOfView,
-		From = camera.CFrame,
-	}
-end
-local function releaseCamera()
-	RunService:UnbindFromRenderStep(BIND)
-	local was = held
-	held = nil
-	if not was then
-		return
-	end
-	local camera = was.Camera
-	if camera and camera.Parent then
-		camera.CameraType = if was.Type == Enum.CameraType.Scriptable then Enum.CameraType.Custom else was.Type
-		camera.FieldOfView = was.Fov
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		camera.CameraSubject = if was.Subject and was.Subject.Parent then was.Subject else humanoid
-	end
-end
-
 local function play(data)
 	if type(data) ~= "table" or typeof(data.Origin) ~= "Vector3" or typeof(data.Forward) ~= "Vector3" then
 		return
 	end
 	local origin, forward, focus = data.Origin, data.Forward, data.Focus or data.Origin
+	-- What it takes, in turn (each where it is, or where it was last seen).
+	local targets = {}
+	for _, root in (if type(data.Targets) == "table" then data.Targets else {}) do
+		if typeof(root) == "Instance" and root:IsA("BasePart") then
+			table.insert(targets, { Root = root, At = root.Position })
+		end
+	end
+	local function aimedAt(p: number): Vector3
+		local points = {}
+		for _, target in targets do
+			if target.Root.Parent then
+				target.At = target.Root.Position
+			end
+			table.insert(points, { X = target.At.X, Z = target.At.Z })
+		end
+		local dx, dz = KaijuBeam.direction(p, focus.X, focus.Z, forward.X, forward.Z, points)
+		return Vector3.new(dx, 0, dz)
+	end
 	local start = tonumber(data.Start) or workspace:GetServerTimeNow()
 	local models, elements, places = data.Models or {}, data.Elements or {}, data.Places or {}
 	local froms, ends, leaps = data.Froms or {}, data.Ends or {}, data.Leaps or {}
@@ -415,13 +341,13 @@ local function play(data)
 	if #palette == 0 then
 		palette = { GOLD }
 	end
-	local right = forward:Cross(UP)
 	local made = {}
 	local function keep(instance)
 		table.insert(made, instance)
 		return instance
 	end
 	local ground = origin - UP * 2.8
+	local under = Vector3.new(focus.X, ground.Y, focus.Z) -- (the ground under the focus: the scorch runs from it)
 
 	-- Your team, each with its leap: from where it stands to its place.
 	local units, calls = {}, {}
@@ -573,17 +499,15 @@ local function play(data)
 	end
 	local blaze = keep(part(Vector3.one, CFrame.new(focus + forward * length), palette[1], Enum.PartType.Ball))
 	blaze.Transparency = 1
-	local scorch = keep(part(Vector3.new(b.Width * 0.7, 0.08, 0.1), CFrame.lookAt(ground, ground + forward), SCORCH, nil, Enum.Material.SmoothPlastic))
+	local scorch = keep(part(Vector3.new(b.Width * 0.7, 0.08, 0.1), CFrame.lookAt(under, under + forward), SCORCH, nil, Enum.Material.SmoothPlastic))
 	scorch.Transparency = 1
 
-	-- Yours: the cinematic.
+	-- Yours: the names and title over your own view, a hotter grade (your
+	-- camera stays yours).
 	local over = nil
 	local grade, bloom = nil, nil
-	local punchAt = -10 -- (a jolt of the view: the beam firing)
 	if mine then
 		over = overlay(calls, palette)
-		over.Show(0.1)
-		holdCamera()
 		grade = keep(Instance.new("ColorCorrectionEffect"))
 		grade.Name = "KaijuBeamGrade"
 		grade.Parent = Lighting
@@ -591,36 +515,6 @@ local function play(data)
 		bloom.Name = "KaijuBeamBloom"
 		bloom.Intensity, bloom.Size, bloom.Threshold = 0, 32, 0.9
 		bloom.Parent = Lighting
-		RunService:BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 6, function()
-			local cam = workspace.CurrentCamera
-			local state = held
-			if not cam or not state then
-				return
-			end
-			local t = workspace:GetServerTimeNow() - start
-			local view, fov = KaijuBeamFx.shot(t, origin, forward, focus)
-			-- The ground trembles as it charges, and jolts as it fires.
-			local phase, k = KaijuBeam.phase(t)
-			local shake = if phase == "Charge" then 0.05 * k * k else 0
-			local jolt = t - punchAt
-			if jolt >= 0 and jolt < 0.6 then
-				shake += 0.5 * (1 - jolt / 0.6) ^ 2
-				fov += 10 * (1 - jolt / 0.6) ^ 2
-			end
-			if shake > 0 then
-				local n = os.clock()
-				view *= CFrame.new(math.sin(n * 47) * shake, math.sin(n * 59 + 1) * shake, 0)
-					* CFrame.Angles(0, 0, math.sin(n * 37) * shake * 0.04)
-			end
-			cam.CameraType = Enum.CameraType.Scriptable
-			local ease = smooth(t / 0.45)
-			if ease < 1 then
-				view = state.From:Lerp(view, ease)
-				fov = state.Fov + (fov - state.Fov) * ease
-			end
-			cam.CFrame = view
-			cam.FieldOfView = fov
-		end)
 	end
 	CombatSound.play("Cast", origin, { Volume = 1.3, Pitch = 0.7 })
 
@@ -898,7 +792,6 @@ local function play(data)
 		elseif phase == "Fire" then
 			if not fired then
 				fired = true
-				punchAt = t
 				for _, unit in units do
 					unit.Flow.Width0, unit.Flow.Width1 = 0, 0
 					unit.Thread.Width0, unit.Thread.Width1 = 0, 0
@@ -938,14 +831,20 @@ local function play(data)
 				end
 				if over then
 					over.Title()
-					over.Flash(0.75)
+					over.Flash(0.35)
 				end
 				scorch.Transparency = 0.25
 				blaze.Transparency = 0.1
 			end
-			-- The beam: out to its length at once, its sleeve breathing in the
-			-- team's colours, each colour's ribbon twisting round it, rings
-			-- racing down it, rock flung up along it.
+			-- The beam: turned onto what it's taking (the biggest threat,
+			-- then each of the rest in turn), out to its length at once, its
+			-- sleeve breathing in the team's colours, each colour's ribbon
+			-- twisting round it, rings racing down it, rock flung up along it.
+			local way = aimedAt(k)
+			axis = CFrame.lookAt(focus, focus + way)
+			local beamAlong = axis * CFrame.new(0, 0, -length / 2) * CFrame.Angles(0, math.rad(90), 0)
+			beamCore.CFrame, sleeve.CFrame = beamAlong, beamAlong
+			local side = way:Cross(UP)
 			local fade = if k > 0.8 then (k - 0.8) / 0.2 else 0
 			local grow = math.min(1, k * 8)
 			local w = b.Width * (0.55 + 0.08 * math.sin(now * 40)) * grow
@@ -978,7 +877,7 @@ local function play(data)
 				spike.CFrame = axis * CFrame.Angles(0, 0, angle) * CFrame.new(0, long / 2, 0) * CFrame.Angles(math.rad(90), 0, 0)
 				spike.Transparency = 0.35 + 0.65 * fade
 			end
-			blaze.CFrame = CFrame.new(focus + forward * length * grow)
+			blaze.CFrame = CFrame.new(focus + way * length * grow)
 			blaze.Size = Vector3.one * w * (1.6 + 0.3 * math.sin(now * 25))
 			blaze.Color = palette[1 + math.floor(now * 8) % #palette]
 			blaze.Transparency = 0.1 + 0.9 * fade
@@ -986,12 +885,12 @@ local function play(data)
 			core.Size = Vector3.one * (2.8 * (1 - fade))
 			light.Brightness = 10 * (1 - fade)
 			scorch.Size = Vector3.new(b.Width * 0.7, 0.08, math.max(0.1, length * grow))
-			scorch.CFrame = CFrame.lookAt(ground, ground + forward) * CFrame.new(0, 0, -scorch.Size.Z / 2)
+			scorch.CFrame = CFrame.lookAt(under, under + way) * CFrame.new(0, 0, -scorch.Size.Z / 2)
 			if fade < 0.5 and now >= debrisAt then
 				debrisAt = now + 0.05
-				local where = ground + forward * (math.random() * length * grow) + right * ((math.random() - 0.5) * b.Width)
+				local where = under + way * (math.random() * length * grow) + side * ((math.random() - 0.5) * b.Width)
 				local chunk = part(Vector3.new(0.5, 0.4, 0.6) * (0.8 + math.random()), CFrame.new(where), ROCK, nil, Enum.Material.Slate)
-				local rise = where + UP * (3 + math.random() * 5) + right * ((math.random() - 0.5) * 4)
+				local rise = where + UP * (3 + math.random() * 5) + side * ((math.random() - 0.5) * 4)
 				tween(chunk, 0.45, {
 					CFrame = CFrame.new(rise) * CFrame.Angles(math.random() * 6, math.random() * 6, math.random() * 6),
 				}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -1027,9 +926,6 @@ local function play(data)
 					over.Hide()
 					over = nil
 				end
-				if mine then
-					releaseCamera()
-				end
 				if grade then
 					tween(grade, 0.4, { Brightness = 0, Contrast = 0, Saturation = 0, TintColor = WHITE })
 				end
@@ -1041,9 +937,6 @@ local function play(data)
 			connection:Disconnect()
 			if over then
 				over.Hide()
-			end
-			if mine then
-				releaseCamera()
 			end
 			task.delay(2.6, function()
 				for _, instance in made do
@@ -1070,16 +963,9 @@ function KaijuBeamFx.start()
 				local ok, err = pcall(play, data)
 				if not ok then
 					warn("[KaijuBeamFx]", err)
-					releaseCamera()
 				end
 			end
 		end)
-	end)
-	-- (Respawned mid-blast: your camera back.)
-	player.CharacterAdded:Connect(function()
-		if held then
-			releaseCamera()
-		end
 	end)
 end
 

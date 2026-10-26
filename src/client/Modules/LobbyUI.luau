@@ -680,8 +680,8 @@ local function healthBar(parent: Instance, name: string): { Frame: Frame, Fill: 
 end
 local health = healthBar(bar, "Health")
 
--- On a phone: level and coins in a pill at the top left, under the pick
--- card (MobileLayout.wallet).
+-- On a phone: level and coins in a pill at the top right, your health
+-- under it (MobileLayout.wallet, health).
 local walletPill = new("Frame", {
 	Name = "Wallet",
 	BackgroundColor3 = Color3.fromRGB(12, 16, 24),
@@ -890,12 +890,12 @@ local function fitDock()
 		playCaption.TextSize = 20
 		playCaption.Position, playCaption.Size = UDim2.fromOffset(0, 0), UDim2.fromScale(1, 1)
 		playSub.Visible = false
-		-- Level and coins up at the top left; nothing either side of PLAY.
-		local wallet = MobileLayout.wallet()
+		-- Level and coins up at the top right; nothing either side of PLAY.
+		local wallet = MobileLayout.wallet(size)
 		walletPill.AnchorPoint, walletPill.Position = Vector2.zero, UDim2.fromOffset(wallet.X, wallet.Y)
 		walletPill.Size = UDim2.fromOffset(wallet.W, wallet.H)
 		-- Your health just under it, as wide.
-		local hp = MobileLayout.health()
+		local hp = MobileLayout.health(size)
 		phoneHealth.Frame.Position = UDim2.fromOffset(hp.X, hp.Y)
 		phoneHealth.Frame.Size = UDim2.fromOffset(hp.W, hp.H)
 		tiles.AnchorPoint, tiles.Position = Vector2.new(0, 0), UDim2.fromOffset(0, tilesTop)

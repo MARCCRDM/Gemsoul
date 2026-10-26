@@ -1,27 +1,34 @@
 --[[
 	The team's HYPERBEAM (KaijuBeamServer runs it; Client.KaijuBeamHud is its
-	button, Client.KaijuBeamFx the show): every kaiju you have out builds up
-	mana, and once all of them are full you can call the blast. They leap into
-	formation round you (Formation: a V either side of you, the support hung
-	up behind), all face where you aim, each pours its element into one
-	point in front of you (their cast's charge-up at their mouths) and the
-	beam fires from it: a long, wide blast that hits every creature in it,
-	a few pulses over a second and a half. Pure rules (numbers and plain
-	vectors), shared so the client shows what the server does. Into
-	formation they leap, one after another, and roar together once they're
-	all down (Leap).
+	button, Client.KaijuBeamFx the show): your team builds up a charge of its
+	own while it's out, and once it's full you can call the blast. It all
+	happens in front of you, seen from your own view (no cinematic camera):
+	they leap into formation in front of you (Formation: a V opening ahead
+	of you, the support hung up over it), all face where you aim, each pours
+	its element into one point ahead of them (their cast's charge-up at
+	their mouths) and the beam fires from it: a long, wide blast that hits
+	every creature in it, Pulses pulses over Fire seconds. It aims at the
+	biggest threat first (threat: the toughest, and the ones already in a
+	fight with you, bigger still), holds on it for Dwell of the blast, then
+	swings smoothly onto each of the others in reach or in a fight with
+	your team in turn (order, sweep, direction), never more than Swing off
+	your aim. Pure rules (numbers and plain vectors), shared so the client
+	shows what the server does. Into formation they leap, one after
+	another, and roar together once they're all down (Leap).
 
-	Mana (Mana): out of a fight a kaiju gains Trickle a second (so it fills
-	while you mine, with or without a fight), in one Fight a second more,
-	and Hit for every blow of its that lands (Heavy times that for a heavy).
-	Each of its Q / E / R costs Cast. SAVE CHARGE (your switch, kept on your
-	profile): your kaiju fight with blows alone, casting none of their moves,
-	and gain Save times as fast; the support's heals still go out.
+	The charge (Charge): one meter for the whole team, its own, apart from
+	anything a kaiju spends on its moves (their Q, E and R cost it nothing).
+	With your team out it gains Trickle a second (so it fills while you
+	mine), Fight a second more while any of them fights, and Hit for every
+	blow of theirs that lands (Heavy times that for a heavy). It's a long
+	charge: about five and a half minutes from empty following you about,
+	a minute or so of steady fighting. SAVE CHARGE (your switch, kept on
+	your profile): your kaiju fight with blows alone, casting none of their
+	moves, and it fills Save times as fast; the support's heals still go
+	out.
 
-	  KaijuBeam.gain(mana, amount, saving) -> mana     clamped to 0..Max
-	  KaijuBeam.spend(mana) -> mana                    a Q / E / R's cost
-	  KaijuBeam.team(manas) -> ready, least            all full? and the
-	                                                   emptiest, 0..1
+	  KaijuBeam.gain(charge, amount, saving) -> charge   clamped to 0..Max
+	  KaijuBeam.ready(charge) -> ready, share             full? and how full, 0..1
 	  KaijuBeam.timeline() -> { Charge, Fire, Stop, Done }   seconds from
 	                                                   the call
 	  KaijuBeam.phase(t) -> phase?, progress           "Gather" (leaping
@@ -38,7 +45,8 @@
 	                                                   { Side, Back, Up } in
 	                                                   studs from you, facing
 	                                                   your aim (+Side: your
-	                                                   right; +Back: behind)
+	                                                   right; +Back: behind,
+	                                                   so negative is ahead)
 	  KaijuBeam.focus() -> ahead, up                   where their streams
 	                                                   meet, and the beam
 	                                                   starts
@@ -48,18 +56,31 @@
 	  KaijuBeam.aim(dx, dz, foes) -> dx, dz            your aim, turned onto
 	                                                   the nearest creature
 	                                                   in Assist of it
+	  KaijuBeam.threat(foe) -> number                  how big a threat
+	                                                   { Health, Engaged } is
+	  KaijuBeam.order(foes, dx, dz) -> { index }       what the beam takes in
+	                                                   turn: the biggest
+	                                                   threat, then round
+	                                                   the rest (Most of them)
+	  KaijuBeam.sweep(p, n) -> i, j, blend             `p` of the way through
+	                                                   the blast over `n`:
+	                                                   from the `i`th onto
+	                                                   the `j`th, `blend` there
+	  KaijuBeam.direction(p, ox, oz, dx, dz, points) -> dx, dz   the beam's
+	                                                   way from the focus
+	                                                   (o) at `p`, swinging
+	                                                   over `points` in order
 	  KaijuBeam.damage(damages) -> number              each pulse, on each
 	                                                   creature in the beam
 ]]
 local KaijuBeam = {}
 
-KaijuBeam.Mana = {
+KaijuBeam.Charge = {
 	Max = 100,
-	Trickle = 0.6, -- a second, out of a fight (about three minutes from empty)
-	Fight = 0.3, -- a second more, in one
-	Hit = 2.4, -- a blow of its that lands
+	Trickle = 0.3, -- a second, your team out (about five and a half minutes from empty)
+	Fight = 0.15, -- a second more, while any of them fights
+	Hit = 0.6, -- a blow of any of theirs that lands
 	Heavy = 1.6, -- times that for a heavy
-	Cast = 8, -- a Q, E or R
 	Save = 1.6, -- times as fast, saving its charge
 }
 
@@ -67,17 +88,22 @@ KaijuBeam.Mana = {
 -- (their streams pouring into the focus), the beam, and a beat to recover.
 KaijuBeam.Beam = {
 	Gather = 1.8,
-	Charge = 1.5,
-	Fire = 1.5,
-	Recover = 0.6,
+	Charge = 1.2,
+	Fire = 2.6,
+	Recover = 0.5,
 	Length = 90,
 	Width = 10,
-	Pulses = 6,
+	Pulses = 13,
 	Power = 7, -- the team's Damage, added up, times this over the whole beam
-	Reach = 60, -- creatures this near count for the aim assist
+	Reach = 60, -- creatures this near are taken (and count for the aim assist)
 	Assist = math.rad(35), -- this far off your aim, it turns onto them
-	Focus = 7, -- the focus this far ahead of you
+	Focus = 16, -- the focus this far ahead of you
 	FocusUp = 3, -- and this high
+	Most = 5, -- creatures it swings onto, the biggest threat first
+	Dwell = 0.4, -- the share of the blast it holds on the biggest threat
+	Turn = 0.4, -- the share of each swing after that spent turning (the rest held)
+	Swing = math.rad(80), -- never further than this off your aim
+	Engaged = 1.5, -- a creature in a fight with you or your team: this much more a threat
 }
 
 -- Into formation: one after another (the V's first, then outwards, the
@@ -93,38 +119,29 @@ KaijuBeam.Leap = {
 	Roar = 1.25,
 }
 
--- Their places, in a V either side of you facing your aim: the first on
--- your right, the next on your left, then further out and back; the
--- support hung up behind you.
+-- Their places, in a V opening ahead of you, facing your aim, wide of the
+-- middle so your view down it stays clear: the first ahead on your right,
+-- the next ahead on your left, then further out and nearer you; the
+-- support hung up high over the V.
 KaijuBeam.Formation = {
-	{ Side = 4.5, Back = 1.2, Up = 0 },
-	{ Side = -4.5, Back = 1.2, Up = 0 },
-	{ Side = 8.5, Back = 3.4, Up = 0 },
-	{ Side = -8.5, Back = 3.4, Up = 0 },
+	{ Side = 8, Back = -7, Up = 0 },
+	{ Side = -8, Back = -7, Up = 0 },
+	{ Side = 13, Back = -3, Up = 0 },
+	{ Side = -13, Back = -3, Up = 0 },
 }
-KaijuBeam.Support = { Side = 0, Back = 5, Up = 5 }
+KaijuBeam.Support = { Side = 0, Back = -6, Up = 9 }
 
-function KaijuBeam.gain(mana: number?, amount: number, saving: boolean?): number
-	local rules = KaijuBeam.Mana
+function KaijuBeam.gain(charge: number?, amount: number, saving: boolean?): number
+	local rules = KaijuBeam.Charge
 	local scaled = if saving and amount > 0 then amount * rules.Save else amount
-	return math.clamp((tonumber(mana) or 0) + scaled, 0, rules.Max)
+	return math.clamp((tonumber(charge) or 0) + scaled, 0, rules.Max)
 end
 
-function KaijuBeam.spend(mana: number?): number
-	return math.max(0, (tonumber(mana) or 0) - KaijuBeam.Mana.Cast)
-end
-
--- All full (and at least one)? And the emptiest of them, 0..1.
-function KaijuBeam.team(manas: { number }): (boolean, number)
-	local least = math.huge
-	for _, mana in manas do
-		least = math.min(least, tonumber(mana) or 0)
-	end
-	if least == math.huge then
-		return false, 0
-	end
-	local max = KaijuBeam.Mana.Max
-	return least >= max, math.clamp(least / max, 0, 1)
+-- Full? And how full, 0..1.
+function KaijuBeam.ready(charge: number?): (boolean, number)
+	local max = KaijuBeam.Charge.Max
+	local value = tonumber(charge) or 0
+	return value >= max, math.clamp(value / max, 0, 1)
 end
 
 function KaijuBeam.timeline()
@@ -160,7 +177,7 @@ function KaijuBeam.formation(fighters: number, support: boolean?): { { Side: num
 		if not spot then
 			local rank = math.ceil(i / 2)
 			local side = if i % 2 == 1 then 1 else -1
-			spot = { Side = side * (4.5 + (rank - 1) * 4), Back = 1.2 + (rank - 1) * 2.2, Up = 0 }
+			spot = { Side = side * (8 + (rank - 1) * 5), Back = -7 + (rank - 1) * 4, Up = 0 }
 		end
 		table.insert(spots, table.clone(spot))
 	end
@@ -227,6 +244,102 @@ function KaijuBeam.aim(dx: number, dz: number, foes: { { X: number, Z: number } 
 		end
 	end
 	return bestX, bestZ
+end
+
+-- How big a threat a creature is: its health (the toughest first: a boss,
+-- a wild kaiju over a critter), Engaged times that if it's in a fight with
+-- you or your team.
+function KaijuBeam.threat(foe): number
+	local most = math.max(tonumber(foe.MaxHealth) or 0, tonumber(foe.Health) or 0, 1)
+	return most * (if foe.Engaged then KaijuBeam.Beam.Engaged else 1)
+end
+
+local function heading(x: number, z: number): number
+	return math.atan2(z, x)
+end
+local function between(a: number, b: number): number
+	return (b - a + math.pi) % (2 * math.pi) - math.pi
+end
+
+-- What the beam takes, in turn (`foes`: each { X, Z, Health?, MaxHealth?,
+-- Engaged? }, its offset from you): the biggest threat first, then from
+-- each the nearest round from it, up to Most of them, never one further
+-- than Swing off your aim (dx, dz). Indices into `foes`.
+function KaijuBeam.order(foes: { any }, dx: number, dz: number): { number }
+	local b = KaijuBeam.Beam
+	local aim = heading(dx, dz)
+	local left = {}
+	for i, foe in foes do
+		local x, z = tonumber(foe.X) or 0, tonumber(foe.Z) or 0
+		if x * x + z * z > 1e-6 and math.abs(between(aim, heading(x, z))) <= b.Swing then
+			table.insert(left, i)
+		end
+	end
+	local order = {}
+	if #left == 0 then
+		return order
+	end
+	local best, bestAt = -math.huge, 1
+	for at, i in left do
+		local threat = KaijuBeam.threat(foes[i])
+		if threat > best then
+			best, bestAt = threat, at
+		end
+	end
+	table.insert(order, table.remove(left, bestAt))
+	while #left > 0 and #order < b.Most do
+		local last = foes[order[#order]]
+		local from = heading(last.X, last.Z)
+		local near, nearAt = math.huge, 1
+		for at, i in left do
+			local off = math.abs(between(from, heading(foes[i].X, foes[i].Z)))
+			if off < near then
+				near, nearAt = off, at
+			end
+		end
+		table.insert(order, table.remove(left, nearAt))
+	end
+	return order
+end
+
+-- `p` (0..1) of the way through the blast, over `n` taken in turn: from
+-- the `i`th onto the `j`th, `blend` (eased) of the way. It holds on the
+-- first for Dwell of it, then shares the rest out, each swing turning for
+-- Turn of its share and holding on the next for the rest.
+function KaijuBeam.sweep(p: number, n: number): (number, number, number)
+	local b = KaijuBeam.Beam
+	if n <= 1 or p <= b.Dwell then
+		return 1, 1, 0
+	end
+	local legs = n - 1
+	local s = math.clamp((p - b.Dwell) / (1 - b.Dwell), 0, 1) * legs
+	local leg = math.min(legs, math.floor(s) + 1)
+	local turn = math.clamp((s - (leg - 1)) / b.Turn, 0, 1)
+	return leg, leg + 1, turn * turn * (3 - 2 * turn)
+end
+
+-- The beam's way (a unit dx, dz) from the focus at (ox, oz), `p` of the
+-- way through the blast: swinging over `points` (each { X, Z }, where each
+-- taken is, in turn) by sweep, never further than Swing off your aim
+-- (dx, dz); your aim if there are none.
+function KaijuBeam.direction(p: number, ox: number, oz: number, dx: number, dz: number, points: { any }?): (number, number)
+	local n = if points then #points else 0
+	if n == 0 then
+		return dx, dz
+	end
+	local b = KaijuBeam.Beam
+	local aim = heading(dx, dz)
+	local function toward(point): number
+		local x, z = (tonumber(point.X) or 0) - ox, (tonumber(point.Z) or 0) - oz
+		if x * x + z * z < 1e-6 then
+			return aim
+		end
+		return aim + math.clamp(between(aim, heading(x, z)), -b.Swing, b.Swing)
+	end
+	local i, j, blend = KaijuBeam.sweep(p, n)
+	local from = toward((points :: any)[i])
+	local angle = from + between(from, toward((points :: any)[j])) * blend
+	return math.cos(angle), math.sin(angle)
 end
 
 -- Each pulse, on each creature in the beam: the team's Damage (each kaiju

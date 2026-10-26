@@ -923,28 +923,28 @@ do
 	check(Kaiju.hopDelay(4) < 1.2, "The back of a full line jumps long after you")
 end
 
--- The HYPERBEAM: mana in, a cast out, full to fire; its phases, the V, the
--- beam's reach, the aim assist and the damage.
+-- The HYPERBEAM: its own charge, full to fire; its phases, the V in front
+-- of you, the beam's reach, the aim assist, the biggest threat first and
+-- the sweep over the rest, and the damage.
 do
 	local Beam = shared("KaijuBeam")
-	local M = Beam.Mana
-	check(Beam.gain(nil, 5) == 5 and Beam.gain(M.Max - 1, 5) == M.Max and Beam.gain(2, -9) == 0, "Mana not clamped to 0..Max")
+	local M = Beam.Charge
+	check(Beam.gain(nil, 5) == 5 and Beam.gain(M.Max - 1, 5) == M.Max and Beam.gain(2, -9) == 0, "The charge not clamped to 0..Max")
 	check(math.abs(Beam.gain(0, 10, true) - 10 * M.Save) < 1e-9 and M.Save > 1, "SAVE CHARGE doesn't fill faster")
 	check(Beam.gain(10, -4, true) == 6, "SAVE CHARGE scales what's taken off too")
-	check(Beam.spend(M.Cast + 1) == 1 and Beam.spend(1) == 0, "A cast's cost")
-	local ready, least = Beam.team({ M.Max, M.Max, M.Max })
-	check(ready and least == 1, "A full team not ready")
-	ready, least = Beam.team({ M.Max, M.Max / 2 })
-	check(not ready and least == 0.5, "Ready with one half charged")
-	ready, least = Beam.team({})
-	check(not ready and least == 0, "Ready with nobody out")
-	-- About three minutes from empty out of a fight; a fight fills it faster.
+	local ready, share = Beam.ready(M.Max)
+	check(ready and share == 1, "A full charge not ready")
+	ready, share = Beam.ready(M.Max / 2)
+	check(not ready and share == 0.5, "Ready half charged")
+	ready, share = Beam.ready(nil)
+	check(not ready and share == 0, "Ready with no charge")
+	-- A long charge: minutes from empty out of a fight; a fight fills it faster.
 	local fill = M.Max / M.Trickle
-	check(fill > 90 and fill < 300, "The trickle fills too fast or too slow")
+	check(fill >= 300, "The trickle fills too fast")
 	check(M.Hit * 20 < M.Max, "A handful of blows fill it")
 
 	local at = Beam.timeline()
-	check(at.Charge < at.Fire and at.Fire < at.Stop and at.Stop < at.Done and at.Done < 6, "The blast's timeline")
+	check(at.Charge < at.Fire and at.Fire < at.Stop and at.Stop < at.Done and at.Done < 7, "The blast's timeline")
 	check(Beam.phase(-0.1) == nil and Beam.phase(0) == "Gather" and Beam.phase(at.Charge) == "Charge", "The phases (start)")
 	check(Beam.phase(at.Fire + 0.01) == "Fire" and Beam.phase(at.Stop) == "Recover" and Beam.phase(at.Done) == nil, "The phases (end)")
 	local _, half = Beam.phase(at.Fire + Beam.Beam.Fire / 2)
@@ -956,8 +956,9 @@ do
 		check(spots[i].Side == -spots[i + 1].Side and spots[i].Back == spots[i + 1].Back, "The V isn't even either side")
 		check(spots[i].Side > 0, "The first of a pair not on your right")
 	end
-	check(spots[3].Back > spots[1].Back and math.abs(spots[3].Side) > math.abs(spots[1].Side), "The V doesn't open out behind")
-	check(spots[5].Side == 0 and spots[5].Up > 0 and spots[5].Back > 0, "The support not hung up behind you")
+	check(spots[1].Back < 0 and spots[3].Back < 0, "The V not in front of you")
+	check(spots[3].Back > spots[1].Back and math.abs(spots[3].Side) > math.abs(spots[1].Side), "The V doesn't open out ahead")
+	check(spots[5].Side == 0 and spots[5].Up > 0 and spots[5].Back < 0, "The support not hung up in front of you")
 	local many = Beam.formation(6)
 	check(#many == 6 and many[5].Side > many[3].Side and many[6].Side == -many[5].Side, "Past the four, further out")
 	spots[1].Side = 99
@@ -965,6 +966,7 @@ do
 
 	local ahead, up = Beam.focus()
 	check(ahead > 0 and up > 0, "The focus not ahead of you and up")
+	check(ahead > -spots[1].Back, "The focus not ahead of the V")
 	local L, W = Beam.Beam.Length, Beam.Beam.Width
 	check(Beam.hits(0, 0, 0, -1, 0, -L / 2, 0), "Something in the middle of the beam missed")
 	check(Beam.hits(0, 0, 0, -1, W / 2 - 0.1, -10, 0) and not Beam.hits(0, 0, 0, -1, W / 2 + 0.5, -10, 0), "The beam's width")
@@ -1000,6 +1002,55 @@ do
 	check(a0 == 0 and h0 == 0 and a1 == 1 and h1 == 0, "A leap doesn't start and end on the ground")
 	check(math.abs(a5 - 0.5) < 1e-9 and math.abs(h5 - 6) < 1e-9, "A leap isn't at its height halfway")
 	check(Beam.arc(-1, 6) == 0 and Beam.arc(2, 6) == 1, "A leap past its ends")
+
+	-- The biggest threat first (the toughest; one in a fight with you
+	-- bigger still), then round the rest from it; none behind you.
+	check(Beam.threat({ MaxHealth = 400 }) > Beam.threat({ MaxHealth = 100 }), "A tougher one not a bigger threat")
+	check(Beam.threat({ MaxHealth = 100, Engaged = true }) > Beam.threat({ MaxHealth = 100 }), "One in a fight with you not a bigger threat")
+	local foes = {
+		{ X = -20, Z = -20, MaxHealth = 100 }, -- (ahead on your left)
+		{ X = 20, Z = -25, MaxHealth = 900 }, -- (ahead on your right: the boss)
+		{ X = 0, Z = -30, MaxHealth = 100 }, -- (dead ahead)
+		{ X = 0, Z = 30, MaxHealth = 5000 }, -- (behind you: never)
+		{ X = 25, Z = -20, MaxHealth = 100, Engaged = true }, -- (beside the boss)
+	}
+	local order = Beam.order(foes, 0, -1)
+	check(#order == 4 and order[1] == 2, "The biggest threat isn't first: " .. tostring(order[1]))
+	check(not table.find(order, 4), "It swung onto one behind you")
+	check(order[2] == 5 and order[3] == 3 and order[4] == 1, "Not round the rest from the first, nearest first")
+	check(#Beam.order({}, 0, -1) == 0, "Something to take with no one about")
+	local crowd = {}
+	for i = 1, Beam.Beam.Most + 3 do
+		table.insert(crowd, { X = i, Z = -20, MaxHealth = 50 })
+	end
+	check(#Beam.order(crowd, 0, -1) == Beam.Beam.Most, "It takes more than Most")
+	-- The sweep: held on the first for Dwell, then each in turn, eased.
+	check(select(1, Beam.sweep(0.2, 3)) == 1 and select(3, Beam.sweep(0.2, 3)) == 0, "Not held on the first")
+	local i, j, blend = Beam.sweep(Beam.Beam.Dwell + 0.001, 3)
+	check(i == 1 and j == 2 and blend < 0.01, "The swing to the second doesn't start from the first")
+	i, j, blend = Beam.sweep(1, 3)
+	check(i == 2 and j == 3 and blend == 1, "Not on the last at the end")
+	check(select(1, Beam.sweep(0.9, 1)) == 1, "One alone: not held on it")
+	-- Its way: onto each in turn, smoothly (no jump frame to frame), never
+	-- behind you, your aim with none.
+	local points = { { X = 20, Z = -25 }, { X = -20, Z = -20 } }
+	local ax, az = Beam.direction(0.1, 0, 0, 0, -1, points)
+	check(ax > 0.5 and az < 0, "Not aimed at the first")
+	local bx, bz = Beam.direction(1, 0, 0, 0, -1, points)
+	check(bx < -0.5 and bz < 0, "Not on the last at the end")
+	local px, pz = Beam.direction(0, 0, 0, 0, -1, points)
+	local jump = 0
+	for step = 1, 200 do
+		local nx, nz = Beam.direction(step / 200, 0, 0, 0, -1, points)
+		jump = math.max(jump, math.acos(math.clamp(nx * px + nz * pz, -1, 1)))
+		check(math.abs(nx * nx + nz * nz - 1) < 1e-6, "Its way isn't a unit")
+		px, pz = nx, nz
+	end
+	check(jump < math.rad(4), "The beam jumps instead of swinging: " .. math.deg(jump))
+	local cx, cz = Beam.direction(0.1, 0, 0, 0, -1, { { X = 0, Z = 40 } })
+	check(cz <= -math.cos(Beam.Beam.Swing) + 1e-6 or math.abs(math.atan2(cx, -cz)) <= Beam.Beam.Swing + 1e-6, "It swung behind you")
+	local nx, nz = Beam.direction(0.5, 0, 0, 0, -1, {})
+	check(nx == 0 and nz == -1, "Not your aim with no one to take")
 
 	local pulse = Beam.damage({ 10, 20, -5 })
 	check(math.abs(pulse * Beam.Beam.Pulses - 30 * Beam.Beam.Power) < 1e-9, "The beam's damage")

@@ -778,7 +778,10 @@ do
 	print("PASS: " .. (checks - before) .. " lobby invitation checks (explicit consent, muted invites, expiry, decline, forged requests, upfront intro bonus, no duplicate payment, normal PvP rewards unchanged, bot fallback)")
 end
 
--- Automatic dungeon returns are ranked and require acceptance before pairing.
+-- Auto queue: back in the lobby (from a dungeon or the Rift, or arriving),
+-- you're searching ranked 1v1 without being asked, and two searching are
+-- paired. No question for that; only a fill-in is asked (above). Off, no
+-- search; switched off while searching, out of the queue.
 do
 	local a, b = makePlayer(81, "ReturnWin"), makePlayer(82, "ReturnLoss")
 	for _, p in { a, b } do
@@ -789,20 +792,15 @@ do
 		p:SetAttribute("DungeonId", nil)
 		check(p:GetAttribute("DuelQueue") == "1v1", "Dungeon return did not queue ranked")
 	end
+	check(last(a, "FillIn") == nil and last(b, "FillIn") == nil, "Asked before auto queuing")
 	Duels.pairUp()
-	check(not Duels.matchOf(a) and not Duels.matchOf(b), "Return queue pulled players without asking")
-	local offerA, offerB = last(a, "FillIn")[2], last(b, "FillIn")[2]
-	check(offerA.ReturnQueue and offerB.ReturnQueue, "Missing ranked return prompt")
-	check(handlers.DuelFill(a, offerA.Id, true).Ok, "Could not accept return queue")
-	Duels.pairUp()
-	check(not Duels.matchOf(a), "One acceptance pulled unconsenting opponent")
-	check(handlers.DuelFill(b, offerB.Id, false).Ok and not b:GetAttribute("DuelQueue"), "Decline did not cancel")
-	handlers.DuelCancel(a)
-	b:SetAttribute("RiftRun", "rift-test")
-	b:SetAttribute("RiftRun", nil)
-	check(b:GetAttribute("DuelQueue") == "1v1", "Rift return did not auto queue")
-	advance(AutoQueue.CallAfter + 1)
-	advance(AutoQueue.AskSeconds + 1)
-	check(not b:GetAttribute("DuelQueue") and not Duels.matchOf(b), "Unanswered prompt did not cancel safely")
-	print("PASS: ranked return queue, dungeon blocking, dual consent, decline and expiry")
+	check(Duels.matchOf(a) ~= nil and Duels.matchOf(a) == Duels.matchOf(b), "Two auto-queued players weren't paired")
+	-- Off: no search; switching it off leaves the queue, on joins it.
+	local c = makePlayer(83, "QuietMiner")
+	c:SetAttribute("Outpost", true)
+	check(handlers.DuelAuto(c, false).Ok, "Couldn't turn auto queue off")
+	check(not handlers.DuelReturnQueue(c).Ok and c:GetAttribute("DuelQueue") == nil, "Auto queued with it off")
+	check(handlers.DuelAuto(c, true).Ok and handlers.DuelReturnQueue(c).Ok and c:GetAttribute("DuelQueue") == "1v1", "Back on, no search")
+	check(handlers.DuelAuto(c, false).Ok and c:GetAttribute("DuelQueue") == nil, "Turning auto queue off left them searching")
+	print("PASS: auto queue without asking (dungeon blocking, back from a dungeon, paired), off means no search")
 end

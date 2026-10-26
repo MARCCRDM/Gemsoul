@@ -1,4 +1,4 @@
-"""Brainrot Crusaders propaganda posters (assets/images/propaganda). Run from that folder: python3 ../../../tools/make_propaganda_posters.py; then render each SVG to PNG (800x1200)."""
+"""Propaganda posters (Brainrot Crusaders, then the Saga Miners recruitment drive) (assets/images/propaganda). Run from that folder: python3 ../../../tools/make_propaganda_posters.py; then render each SVG to PNG (800x1200)."""
 import math
 W,H=800,1200
 def rays(cx,cy,n,c1,c2,r=1600):
@@ -61,6 +61,63 @@ posters["hold_the_line"]=svg(rays(400,1250,30,RED,"#a51d22")+
   banner(900,110,CREAM,"FIRST TO TWO. NO RETREAT.",RED,52)+
   text("RANKED DUELS  ·  GLORY AWAITS THE WORTHY",1075,30,CREAM,None,3)+
   text("BRAINROT CRUSADERS",1135,26,GOLD,None,8)+frame(CREAM)+grain())
+# --- The recruitment drive (2026-10): Saga Miners wants you. ---------------
+VIOLET="#7a3df0"; ROT="#7bc043"; BONE="#e8dcc0"
+def rot_face(cx,cy,s,crossed=True):
+    # a brainrot log-head (Tung Tung Sahur's kin): a stump, two eyes, a grin, a bat
+    g=(f'<g transform="translate({cx} {cy}) scale({s})">'
+       f'<rect x="-110" y="-170" width="220" height="340" rx="40" fill="#8a5a2b"/>'
+       f'<ellipse cx="0" cy="-170" rx="110" ry="26" fill="#b07a42"/>'
+       f'<ellipse cx="0" cy="-170" rx="70" ry="14" fill="#8a5a2b"/>'
+       f'<circle cx="-45" cy="-60" r="30" fill="{BONE}"/><circle cx="45" cy="-60" r="30" fill="{BONE}"/>'
+       f'<circle cx="-38" cy="-55" r="13" fill="{INK}"/><circle cx="52" cy="-55" r="13" fill="{INK}"/>'
+       f'<path d="M-60,30 Q0,90 60,30" stroke="{INK}" stroke-width="14" fill="none"/>'
+       f'<rect x="120" y="-40" width="34" height="230" rx="14" fill="#6b4220" transform="rotate(20 137 75)"/>')
+    if crossed:
+        g+=(f'<circle cx="0" cy="0" r="250" fill="none" stroke="{RED}" stroke-width="34"/>'
+            f'<path d="M-177,-177 L177,177" stroke="{RED}" stroke-width="34"/>')
+    return g+'</g>'
+def miner_point(x,y):
+    # a miner in a helmet, pointing straight out at you
+    return (f'<g transform="translate({x} {y})">'
+      f'<path d="M-170,420 L-150,120 Q0,60 150,120 L170,420Z" fill="{INK}"/>'
+      f'<path d="M-95,40 Q-100,-110 0,-120 Q100,-110 95,40 L60,90 L-60,90Z" fill="{INK}"/>'
+      f'<path d="M-80,-20 L80,-20 L70,20 L-70,20Z" fill="{TEAL}"/>'
+      f'<rect x="-14" y="-160" width="28" height="44" fill="{GOLD}"/>'
+      f'<circle cx="0" cy="-168" r="22" fill="{GOLD}"/>'
+      # a gem badge on the chest, crossed picks behind it
+      f'<rect x="-10" y="140" width="20" height="200" fill="{GOLD}" transform="rotate(35 0 240)"/>'
+      f'<rect x="-10" y="140" width="20" height="200" fill="{GOLD}" transform="rotate(-35 0 240)"/>'
+      f'<path d="M-60,215 L-35,180 L35,180 L60,215 L0,290Z" fill="{VIOLET}" stroke="{BONE}" stroke-width="6"/>'
+      f'<path d="M-35,180 L-15,215 L15,215 L35,180Z" fill="#b48cff"/>'
+      '</g>')
+posters["we_need_you"]=svg(rays(400,560,30,RED,"#a91f24")+
+  banner(60,140,INK,"WE NEED YOU",CREAM,104)+
+  miner_point(400,470)+
+  banner(880,150,CREAM,"DEFEND OUR MINES",RED,84)+
+  text("ENLIST AT THE SHELTER  ·  BRING YOUR KAIJU",1085,30,CREAM,None,3)+
+  text("SAGA MINERS",1140,30,GOLD,None,10)+frame(CREAM)+grain())
+posters["kill_the_rot"]=svg(rays(400,560,36,INK,"#221a17")+
+  text("KILL",210,190,RED,INK,16)+text("THE ROT",380,150,CREAM,INK,12)+
+  rot_face(400,700,0.95)+
+  banner(950,110,RED,"IT WANTS YOUR GEMS",CREAM,64)+
+  text("NO DEALS. NO MERCY. NO ROT.",1105,32,CREAM,None,4)+
+  text("SAGA MINERS",1150,28,GOLD,None,10)+frame(RED)+grain())
+table=(f'<rect x="170" y="700" width="460" height="26" fill="{INK}"/>'
+       f'<rect x="200" y="726" width="20" height="160" fill="{INK}"/><rect x="580" y="726" width="20" height="160" fill="{INK}"/>'
+       f'<path d="M370,690 L430,690 L445,700 L355,700Z" fill="{VIOLET}"/>'
+       f'<path d="M385,650 L415,650 L432,690 L368,690Z" fill="#b48cff"/>'
+       # the chairs, back to back across the table
+       f'<rect x="40" y="560" width="22" height="330" fill="{INK}"/><rect x="40" y="740" width="130" height="20" fill="{INK}"/><rect x="150" y="760" width="18" height="130" fill="{INK}"/>'
+       f'<rect x="738" y="560" width="22" height="330" fill="{INK}"/><rect x="630" y="740" width="130" height="20" fill="{INK}"/><rect x="632" y="760" width="18" height="130" fill="{INK}"/>')
+posters["the_rot_wants_your_gems"]=svg(rays(400,520,28,GOLD,"#f6cf6a")+
+  banner(60,130,INK,"THE ROT WANTS",CREAM,88)+text("YOUR GEMS",330,130,RED,INK,10)+
+  '<g transform="translate(-10 0)">'+miner_point(150,560).replace('translate(150 560)','translate(150 560) scale(0.62)')+'</g>'+
+  rot_face(668,662,0.45,False)+table+
+  banner(920,110,RED,"DON’T NEGOTIATE",CREAM,64)+
+  text("ALL IT WANTS IS YOUR RESOURCES. GIVE IT NOTHING.",1080,26,INK,None,2)+
+  text("SAGA MINERS",1140,30,RED,None,10)+frame(INK)+grain())
+
 import sys
 for k,v in posters.items(): open(f"{k}.svg","w").write(v)
 print("ok")

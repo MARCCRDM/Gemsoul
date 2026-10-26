@@ -7,9 +7,13 @@
 
 	A tear is a ragged rip in the air, never the same shape twice and never
 	symmetrical (Shared.Frontier.tear): its two glowing lips, the other
-	side's violet dark between them and a brighter heart inside that, hair
-	cracks running off its lips, the other side's stars seeping out, and its
-	glow on the ground. It splits open from a hair crack, crackling (with
+	side's glowing violet between them and a white-hot heart inside that,
+	all of it pulsing (Pulse: the lips swelling and whitening, the heart
+	flaring, its light and its glow on the ground breathing with it), hair
+	cracks running off its lips, the other side's stars seeping out. Bright,
+	never a dark hole. Every critter portal, in the Outpost or in the Rift,
+	wears the same violets (Palettes.Rift); only a vein's Rift Gate (a
+	dormant one) burns the critters' world's colours (Palettes.Hell). It splits open from a hair crack, crackling (with
 	its critter's own cue, so you know what's coming: CritterCues), flashes
 	as the critter hops out, lingers, and seals with a snap. A dormant one
 	only breathes, half open.
@@ -28,9 +32,12 @@ local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local RiftTear = {}
 
 RiftTear.Near = 220 -- studs: further off, a tear isn't animated
+-- Its pulse: Rate beats a second; the lips Swell that much thicker and
+-- whiten by Whiten at the top of it.
+RiftTear.Pulse = { Rate = 0.9, Swell = 0.35, Whiten = 0.22 }
 RiftTear.DormantRate = 15 -- times a second a dormant one breathes (an open one moves every frame)
-local DEEP = Color3.fromRGB(34, 6, 62)
-local VIOLET = Color3.fromRGB(150, 70, 255)
+local DEEP = Color3.fromRGB(110, 40, 210)
+local VIOLET = Color3.fromRGB(180, 100, 255)
 local MAGENTA = Color3.fromRGB(255, 70, 210)
 local CYAN = Color3.fromRGB(80, 235, 255)
 local WHITE = Color3.fromRGB(240, 235, 255)
@@ -40,7 +47,7 @@ local LIPS = { MAGENTA, VIOLET, CYAN, MAGENTA, WHITE, VIOLET, MAGENTA }
 RiftTear.Palettes = {
 	Rift = { Deep = DEEP, Heart = VIOLET, Lips = LIPS, Spark = WHITE, Stars = { MAGENTA, CYAN } },
 	Hell = {
-		Deep = Color3.fromRGB(36, 4, 2),
+		Deep = Color3.fromRGB(150, 30, 8),
 		Heart = Color3.fromRGB(255, 70, 20),
 		Lips = {
 			Color3.fromRGB(255, 120, 30),
@@ -138,7 +145,10 @@ end
 function RiftTear.pieces(shape, open: number, plane: CFrame, now: number, crackle: number?, palette: any?)
 	local colors = palette or RiftTear.Palettes.Rift
 	local lips = RiftTear.layout(shape, open)
-	local thick = math.max(0.06, 0.035 * shape.Height) * (0.6 + 0.4 * open)
+	local pulse = RiftTear.Pulse
+	local beat = 0.5 + 0.5 * math.sin(now * pulse.Rate * math.pi * 2)
+	local thick = math.max(0.08, 0.05 * shape.Height) * (0.6 + 0.4 * open) * (1 + pulse.Swell * beat)
+	local white = pulse.Whiten * beat
 	local hidden = open < 0.02
 	local shake = crackle or 0
 	local function jitter(v: Vector2): Vector2
@@ -155,14 +165,14 @@ function RiftTear.pieces(shape, open: number, plane: CFrame, now: number, crackl
 		local l1, l2 = jitter(lips.Left[i]), jitter(lips.Left[i + 1])
 		local r1, r2 = jitter(lips.Right[i]), jitter(lips.Right[i + 1])
 		local cf, size = bar(plane, l1, l2, thick, -0.06)
-		add(cf, size, colors.Lips[(i - 1) % #colors.Lips + 1], if hidden then 1 else 0)
+		add(cf, size, colors.Lips[(i - 1) % #colors.Lips + 1]:Lerp(WHITE, white), if hidden then 1 else 0)
 		cf, size = bar(plane, r1, r2, thick, -0.06)
-		add(cf, size, colors.Lips[(i + 2) % #colors.Lips + 1], if hidden then 1 else 0)
+		add(cf, size, colors.Lips[(i + 2) % #colors.Lips + 1]:Lerp(WHITE, white), if hidden then 1 else 0)
 		cf, size = band(plane, l1, r1, l2, r2, 0.98, 0)
-		add(cf, size, colors.Deep, if hidden then 1 else 0.05)
-		-- (Its heart flickers.)
-		cf, size = band(plane, l1, r1, l2, r2, 0.32, -0.03)
-		add(cf, size, colors.Heart, if hidden then 1 else 0.2 + 0.25 * math.abs(math.sin(now * 9 + i)))
+		add(cf, size, colors.Deep:Lerp(colors.Heart, 0.25 * beat), if hidden then 1 else 0.05 + 0.12 * (1 - beat))
+		-- (Its heart flares with the pulse, and flickers.)
+		cf, size = band(plane, l1, r1, l2, r2, 0.36 + 0.12 * beat, -0.03)
+		add(cf, size, colors.Heart:Lerp(WHITE, 0.1 + 0.3 * beat), if hidden then 1 else 0.1 * math.abs(math.sin(now * 9 + i)))
 	end
 	for _, branch in shape.Branches do
 		-- (Running off its lip, growing as it opens; now and then a flicker.)
@@ -185,13 +195,16 @@ local function build(anchor: BasePart)
 	local shape = Frontier.tear(seed, height)
 	local model = Instance.new("Model")
 	model.Name = "RiftTear"
-	local palette = if anchor:GetAttribute("Hell") then RiftTear.Palettes.Hell else RiftTear.Palettes.Rift
+	-- (Every critter portal in the same violets, the Rift's too; only a
+	-- vein's Rift Gate, dormant, burns the critters' world's colours.)
+	local dormant = anchor:GetAttribute("Dormant") == true
+	local palette = if dormant and anchor:GetAttribute("Hell") then RiftTear.Palettes.Hell else RiftTear.Palettes.Rift
 	local tear = {
 		Anchor = anchor,
 		Model = model,
 		Shape = shape,
 		Palette = palette,
-		Dormant = anchor:GetAttribute("Dormant") == true,
+		Dormant = dormant,
 		Parts = {},
 		Flashed = false,
 		Snapped = false,
@@ -208,7 +221,7 @@ local function build(anchor: BasePart)
 	tear.Floor.CFrame = CFrame.new(foot) * CFrame.Angles(0, 0, math.pi / 2)
 	local light = Instance.new("PointLight")
 	light.Color = palette.Heart
-	light.Range = height * 1.7
+	light.Range = height * 2.2
 	light.Brightness = 0
 	light.Shadows = false
 	light.Parent = tear.Parts[math.max(1, (math.ceil(#shape.Spine / 2) - 1) * 4 + 3)]
@@ -311,13 +324,12 @@ local function animate(tear, now: number)
 		local part = tear.Parts[k]
 		part.Size, part.CFrame, part.Transparency = spec.Size, spec.CFrame, spec.Transparency
 	end
-	tear.Floor.Transparency = 1 - 0.35 * open
-	-- (A light changing every frame is costly to draw: a dormant one's holds still.)
-	local glow = if tear.Dormant then 0.65 else 1.6 * open
-	if tear.Light.Brightness ~= glow then
-		tear.Light.Brightness = glow
-	end
-	local rate = if tear.Dormant then 6 else 40 * open
+	-- Its glow on the ground and its light breathe with its pulse.
+	local beat = 0.5 + 0.5 * math.sin(now * RiftTear.Pulse.Rate * math.pi * 2)
+	tear.Floor.Transparency = 1 - (0.4 + 0.25 * beat) * open
+	local glow = (if tear.Dormant then 1.6 else 3 * open) * (0.7 + 0.6 * beat)
+	tear.Light.Brightness = glow
+	local rate = if tear.Dormant then 12 else 50 * open
 	if tear.Stars.Rate ~= rate then
 		tear.Stars.Rate = rate
 	end

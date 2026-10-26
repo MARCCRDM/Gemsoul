@@ -113,6 +113,17 @@ is in [kaiju.md](kaiju.md#the-vein-guardian).
 
 ![Six rifts: no two the same shape](frontier/rifts.png)
 
+**Bright and pulsing** (since 2026-10-26, `RiftTear.Pulse`): a tear is
+never a dark hole. Between its lips the other side glows violet, its
+heart white-hot; about once a second the whole tear pulses: its lips
+swell and whiten, its heart flares, and its light and the glow on the
+ground breathe with it. Every critter portal wears the same violets, in
+the Outpost and in the Rift alike (`RiftTear.Palettes.Rift`); only a
+vein's Rift Gate (the dormant tear at a vein) keeps the critters' world's
+reds (`Palettes.Hell`).
+
+![Rift tears before and after: brighter, pulsing (peak and low of a pulse). Offline render of the tear's own geometry, not a Roblox screenshot](frontier/rift-pulse.png)
+
 Critters come in swarms through rifts: ragged tears in the air, never
 symmetrical and never the same shape twice. A swarm trickles in rather than
 landing all at once: each critter comes through a tear of its own
@@ -245,7 +256,7 @@ harder.", not more than once a minute), and a red **ALONE · NO KAIJU WITH
 YOU** tag sits at the right of the screen while you are. The server sets
 `FrontierAlone` on you each half second (out past the core with
 `KaijuServer.team` empty); the encounter rules read it, and so does
-`KaijuWilds` for a critter's bite or a snatcher's trip.
+`KaijuWilds` for a critter's bite or a snatcher's lunge.
 
 ![Out alone and hurt: the ALONE and HEAL AT THE SHELTER tags on the right (HUD rendered from the game's code; the world is a stand-in)](frontier/alone-tags.png)
 
@@ -350,17 +361,18 @@ your gems (`Frontier.Raid`; `FrontierServer.raid`, from
   coming through for the next minute, turns **gem snatcher**. You're told:
   "Your kaiju are down... the critters smell your gems!" and you hear them
   cackle.
-- **They trip you.** A snatcher within 6.5 studs winds up a **TRIP** at your
-  legs (0.75 s, on its cast bar: step out of reach, or bonk it to cut it
-  short). Landed, you're knocked down for 4 seconds, your health untouched,
-  "Tripped by a gem snatcher!" on your screen. Each snatcher trips every 5
-  to 8 seconds, and never twice within 3 seconds of the last trip on you.
-  Being beaten down the usual way counts too.
+- **They lunge at you.** A snatcher within 6.5 studs winds up a **LUNGE**
+  (0.75 s, on its cast bar: step out of reach, or bonk it to cut it short),
+  a hard hit. *2026-10-26:* it no longer knocks you down. Nothing knocks a
+  miner down in the Outpost any more: you're killed or you're not (the old
+  TRIP, which put you on the floor for 4 seconds, is gone, and so is
+  `SparServer.knockDown`). Each snatcher lunges every 5 to 8 seconds, and
+  never twice within 3 seconds of the last lunge on you.
 - **They snatch your haul.** Your haul is the gems you mined this trip out:
   every gem from a rock past the core, the newest 12. Back in the core it's
-  safe, and a new trip starts a new haul. With you down, snatchers run in,
-  and each grabs the newest gem still loose in your pouch (never one on
-  your gear), at most 3 a knock-down. Nothing left to take, a snatcher
+  safe, and a new trip starts a new haul. With you killed, snatchers run
+  in, and each grabs the newest gem still loose in your pouch (never one on
+  your gear), at most 3 a death. Nothing left to take, a snatcher
   giggles and slips away.
 - **They run off with it.** A snatcher holds the gem up over its head (a
   glowing stone in its colour, its arms up), cackles, and runs for a rift
@@ -374,9 +386,9 @@ your gems (`Frontier.Raid`; `FrontierServer.raid`, from
 
 ### Killed: robbed, then home
 
-A trip (above) knocks you down for a moment and you can chase. Beaten down
-to nothing in the Outpost by a critter or a wild kaiju (kit out or not; not
-in a spar with another player) is worse: **you're killed**
+Nothing knocks you down in the Outpost. Beaten down to nothing by a
+critter or a wild kaiju (kit out or not; not in a spar with another player),
+**you're killed**
 (`FrontierServer.knockedOut`, from `SparServer.onKnockedOut`, marks you
 `Killed`). You don't get up where you fell; you lie there, then you're back
 at base. In the core that's all: you lie dead for 4 seconds

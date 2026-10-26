@@ -21,9 +21,10 @@
 	                  support), AUTO HEAL over CALL BACK beside them, and
 	                  the team's HYPERBEAM along the bottom (KaijuBeamHud,
 	                  in KaijuHud.beamSlot()).
-	                  Computer: bottom left. Phone: right of your level and
-	                  coins, and at the top right while you hunt (the
-	                  fight's foe list has the top left then)
+	                  Computer: bottom left. Phone: on the left under the
+	                  pick card (your level and coins are at the top right),
+	                  and on the right under your health while you hunt
+	                  (the fight's foe list has the top left then)
 	                  (MobileLayout.kaiju, kaijuDesk, kaijuCells).
 	  TAME            beside the strip when a wild kaiju near you is down to
 	                  half its health (it glows gold then: KaijuTaming): the

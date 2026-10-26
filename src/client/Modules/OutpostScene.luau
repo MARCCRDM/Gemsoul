@@ -1570,9 +1570,13 @@ ProximityPromptService.PromptButtonHoldEnded:Connect(function(prompt)
 	end
 end)
 
--- A small, clickable instruction instead of Roblox's large E + rock-name panel.
+-- A small, clickable instruction instead of Roblox's large E + rock-name
+-- panel: only for your first stones (Rules.MineButton.Training). After that
+-- there's no button: tap or click to swing, or walk into the rock.
 ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	if prompt:GetAttribute("PromptKind") ~= "Mine" then return end
+	local stats = GemClient.Profile and GemClient.Profile.Stats
+	if ((stats and tonumber(stats.GemsMined)) or 0) >= Rules.MineButton.Training then return end
 	if miningPrompts[prompt] then miningPrompts[prompt]:Destroy() end
 	local promptGui = new("BillboardGui", {
 		Name = "ClickToMine", Adornee = prompt.Parent, AlwaysOnTop = true, Active = true,

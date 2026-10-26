@@ -884,28 +884,20 @@ local function introJoin(player: Player)
 	return reply(true, "Finding your first opponent…")
 end
 
--- Automatic returns search ranked, but cannot launch until the player accepts.
+-- Auto queue: everyone with it on (the default) searches ranked 1v1 while
+-- they're in the lobby, without being asked (arriving there, and back from
+-- a dungeon or the Rift); CANCEL on the SEARCHING card leaves it. Only a
+-- fill-in, pulled into someone else's match, is asked first (FillIn).
 local function autoReturn(player: Player)
 	if entryOf(player) then return reply(true, "Already searching.") end
 	local ready = AutoQueue.ready(function(name) return player:GetAttribute(name) end, false)
 	if not ready or busy(player) then return reply(false, "Return to the lobby first.") end
-	local entry = enqueue("1v1", { player }, 1)
-	entry.NeedsConsent = true
-	return reply(true, "Searching ranked 1v1. You will be asked before joining.")
-end
-
-local function askReturn(entry)
-	if not entry.NeedsConsent then return true end
-	if not entry.ConsentUntil then
-		local player = entry.Players[1]
-		entry.ConsentUntil = os.clock() + AutoQueue.AskSeconds
-		entry.Asked[player] = true
-		Remotes.Social:FireClient(player, "FillIn", {
-			Id = entry.Id, Mode = "1v1", Name = "Ranked 1v1", ReturnQueue = true,
-			Seconds = AutoQueue.AskSeconds, Bonus = 0,
-		})
+	local record = Duels.record(player)
+	if not record or not AutoQueue.setting(record) then
+		return reply(false, "Auto queue is off.")
 	end
-	return false
+	enqueue("1v1", { player }, 1)
+	return reply(true, "Searching ranked 1v1 while you mine. Cancel anytime.")
 end
 
 -- Auto queue (Shared.AutoQueue) ------------------------------------------------
@@ -972,10 +964,6 @@ end
 -- A lone 1v1 invites the lobby; only DuelFill acceptance starts a fill-in.
 -- An unanswered intro still falls back to the sparring rival on schedule.
 local function fill(entry, now: number)
-	if entry.NeedsConsent then
-		if now - entry.Since >= AutoQueue.CallAfter then askReturn(entry) end
-		return
-	end
 	if entry.Size ~= 1 then
 		return
 	end
@@ -1027,11 +1015,19 @@ local function setAuto(player: Player, on: any)
 	(record :: any).AutoQueue = on ~= false
 	publish(player)
 	PlayerData.sync(player)
+	-- Off: out of the queue (on, you're searching again next time you're
+	-- back in the lobby).
+	if on == false then
+		local entry = entryOf(player)
+		if entry and entry.Mode == "1v1" and entry.Size == 1 then
+			dequeue(player)
+		end
+	end
 	return reply(
 		true,
 		if on ~= false
-			then "Match invitations on: you choose whether to join each match."
-			else "Match invitations off: you won't receive lobby fill-in requests."
+			then "Auto queue on: you search for 1v1s while you mine. You're only asked when a match needs a fill-in."
+			else "Auto queue off: no 1v1 search and no fill-in requests."
 	)
 end
 
@@ -1039,26 +1035,6 @@ local function fillRespond(player: Player, id: any, accept: any)
 	local entry = entryById(id)
 	if not entry then
 		return reply(false, "That queue has been filled already.")
-	end
-	if entry.NeedsConsent and entry.Players[1] == player then
-		if not entry.ConsentUntil or entry.ConsentUntil <= os.clock() then
-			dequeue(player)
-			return reply(false, "The invitation expired.")
-		end
-		if accept ~= true then
-			dequeue(player)
-			return reply(true, "Left the ranked queue.")
-		end
-		local ready = AutoQueue.ready(function(name)
-			return if name == "DuelQueue" then nil else player:GetAttribute(name)
-		end, false)
-		if not ready or busy(player) then
-			dequeue(player)
-			return reply(false, "Return to the lobby first.")
-		end
-		entry.NeedsConsent, entry.ConsentUntil = nil, nil
-		Remotes.Social:FireClient(player, "FillInOver", entry.Id)
-		return reply(true, "Ranked accepted. Matching you with an opponent.")
 	end
 	local expiry = entry.Offers and entry.Offers[player]
 	if not expiry or expiry <= os.clock() then
@@ -1143,8 +1119,6 @@ function Duels.pairUp()
 				return
 			end
 			local a, b = entries[pair[1]], entries[pair[2]]
-			local readyA, readyB = askReturn(a), askReturn(b)
-			if not readyA or not readyB then continue end
 			local kind = spec.Kind or "Ranked"
 			local ok, problem = startMatch(
 				mode,
@@ -1226,7 +1200,7 @@ local function step()
 	local now = os.clock()
 	for _, entry in table.clone(queue) do
 		local player = entry.Players[1]
-		if busy(player) or (entry.ConsentUntil and now >= entry.ConsentUntil) then dequeue(player) end
+		if busy(player) then dequeue(player) end
 	end
 	Duels.pairUp()
 	-- Lone entries call the lobby (Shared.AutoQueue).

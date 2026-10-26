@@ -39,7 +39,7 @@ for _, s in SCREENS do
 	local label = s[1] .. "x" .. s[2]
 	local card, dock, party = MobileLayout.card(), MobileLayout.dock(screen, TILES), MobileLayout.party(screen)
 	local closed, open = MobileLayout.chat(screen, false), MobileLayout.chat(screen, true)
-	local wallet = MobileLayout.wallet()
+	local wallet = MobileLayout.wallet(screen)
 	local function inside(r)
 		return r.X >= 0 and r.Y >= 0 and r.X + r.W <= screen.X and r.Y + r.H <= screen.Y
 	end
@@ -58,13 +58,18 @@ for _, s in SCREENS do
 	do
 		check(inside(r), label .. ": the " .. name .. " runs off the screen")
 	end
-	-- A toast at the top right, and the loot card (with its row) under it,
-	-- right-aligned with it: clear of everything round them, of Roblox's
-	-- slim tab on the right edge (about 24 points), and of each other.
+	-- Your level and coins at the top right with your health under them; a
+	-- toast on the top row just left of them; the loot card (with its row)
+	-- under your health, right-aligned with it: clear of everything round
+	-- them, of Roblox's slim tab on the right edge (about 24 points), and of
+	-- each other.
+	local hp = MobileLayout.health(screen)
 	local row = { X = loot.X, Y = if loot.RowsBelow then loot.Y + loot.H + MobileLayout.Loot.Gap else loot.Y, W = loot.W, H = MobileLayout.Loot.Row }
+	check(wallet.Y <= 12 and wallet.X + wallet.W >= screen.X - 40, label .. ": your level and coins aren't at the top right")
 	check(toast.H <= 30 and toast.W <= 260, label .. ": a toast's place is too big")
-	check(loot.Y >= toast.Y + toast.H, label .. ": the loot card isn't under the toast")
-	check(loot.X + loot.W == toast.X + toast.W, label .. ": the loot card isn't right-aligned with the toast")
+	check(toast.Y == wallet.Y and toast.X + toast.W <= wallet.X - 4, label .. ": the toast isn't on the top row, left of your coins")
+	check(loot.Y >= hp.Y + hp.H, label .. ": the loot card isn't under your health")
+	check(loot.X + loot.W == hp.X + hp.W, label .. ": the loot card isn't right-aligned with your health")
 	check(loot.W < toast.W, label .. ": the loot card is wider than a toast")
 	for name, r in { toast = toast, ["loot card"] = loot, ["loot row"] = row } do
 		check(r.X + r.W <= screen.X - 24, label .. ": the " .. name .. " runs under Roblox's tab on the right")
@@ -72,6 +77,7 @@ for _, s in SCREENS do
 			{
 				["pick card"] = card,
 				coins = wallet,
+				health = hp,
 				dock = dock,
 				["teammates' cards"] = party,
 			}
@@ -108,7 +114,7 @@ for _, s in SCREENS do
 	check(MobileLayout.Stick.Knob < MobileLayout.Stick.Size, label .. ": the stick's knob is bigger than the stick")
 	check(not MobileLayout.overlaps(card, wallet), label .. ": the coins overlap the pick card")
 	-- Your health under the coins, clear of everything else.
-	local health = MobileLayout.health()
+	local health = MobileLayout.health(screen)
 	check(inside(health), label .. ": the health bar runs off the screen")
 	for name, r in { coins = wallet, ["pick card"] = card, dock = dock, ["CHAT button"] = closed, ["teammates' cards"] = party } do
 		check(not MobileLayout.overlaps(health, r), label .. ": the health bar overlaps the " .. name)
@@ -143,7 +149,7 @@ for _, s in SCREENS do
 		local tame = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.TameH }
 		local what = label .. (if hunting then " (hunting)" else "")
 		check(inside(k) and inside(tame), what .. ": the kaiju card or CATCH runs off the screen")
-		check(k.H >= 100, what .. ": the kaiju card is squashed: " .. k.H)
+		check(k.H >= 94, what .. ": the kaiju card is squashed: " .. k.H) -- (every row still big enough to tap: below)
 		local cells = MobileLayout.kaijuCells(k)
 		local all = { cells.Fighters[1], cells.Fighters[2], cells.Fighters[3], cells.Support, cells.Auto, cells.Call, cells.Beam }
 		for i, cell in all do
@@ -175,6 +181,10 @@ for _, s in SCREENS do
 		}
 		if not hunting then
 			near["loot card"], near.toast = loot, toast
+		else
+			-- (Out hunting, the teammates' cards hide: PartyUI. The card
+			-- has their place under your health.)
+			near["teammates' cards"] = nil
 		end
 		for name, r in near do
 			check(not MobileLayout.overlaps(k, r), what .. ": the kaiju card overlaps the " .. name)
@@ -256,7 +266,7 @@ for _, s in SCREENS do
 			["teammates' cards"] = party,
 			["pick card"] = card,
 			coins = wallet,
-			health = MobileLayout.health(),
+			health = MobileLayout.health(screen),
 			["kaiju card"] = k,
 			CATCH = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.TameH },
 		}

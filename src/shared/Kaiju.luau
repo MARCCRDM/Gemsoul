@@ -345,13 +345,15 @@ Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 10, Bomber = 8, Finish 
 -- slots from the start (the plan: a second when one of yours reaches level
 -- 10, a third at 20).
 Kaiju.SlotLevels = { 1, 1, 1 }
--- Where each of the team walks beside you: studs to your right (left when
--- negative) and behind you. The fourth is the support's (SupportSlot).
-Kaiju.TeamSpots = { { 3, 5 }, { -3, 5 }, { 0, 8.5 }, { 0, 3.5 } }
+-- Where each of the team walks with you: studs to your right (left when
+-- negative) and behind you (negative: ahead). They lead the way: the first
+-- out in front, the other two side by side behind it, and the fourth, the
+-- support's (SupportSlot), in the middle of the three.
+Kaiju.TeamSpots = { { 0, -10 }, { 4.5, -5.5 }, { -4.5, -5.5 }, { 0, -7 } }
 
 -- The support slot: a fourth kaiju out beside the three, for a support kind
 -- only (KaijuRoles' Warden role, called SUPPORT: Moonmoth, Skyjelly). It
--- hangs back just behind you, mends you and your team and wards them
+-- floats in the middle of the three, ahead of you, mends you and your team and wards them
 -- (KaijuServer's support pulse); a support kind never takes one of the
 -- three fighting slots. Everyone gets StarterSupport once (supportOwed):
 -- a new player with the starter roll, everyone else on their next visit.
@@ -359,8 +361,10 @@ Kaiju.SupportRole = "Warden"
 Kaiju.SupportSlot = 4
 Kaiju.StarterSupport = { Species = "Skyjelly", Element = "Shock" }
 Kaiju.SupportVersion = 1
--- Its pulse: every Every seconds while it's out, if you or one of the team
--- near it (Radius studs) is under Below of their health, it casts its E.
+-- Its pulse: every Every seconds while it's out and you're in a fight (in
+-- danger: Kaiju.Danger), if you or one of the team near it (Radius studs)
+-- is under Below of their health, it casts its E. Out of a fight it mends
+-- nobody: that's for gems.
 Kaiju.SupportPulse = { Every = 7, Below = 0.8, Radius = 24 }
 
 -- Whether a kind is a support kind (it goes in the support slot).
@@ -815,9 +819,9 @@ function Kaiju.reviveIn(record, now: number): number
 	return math.max(0, untilTime - now)
 end
 
--- Healing waits until you're out of danger (KaijuServer): none of your
--- team out has fought for Calm seconds, and no creature they'd fight is
--- within Radius of you.
+-- Healing with gems waits until you're out of danger (KaijuServer): none of
+-- your team out has fought for Calm seconds, and no creature they'd fight
+-- is within Radius of you. The support mends only while you're in it.
 Kaiju.Danger = { Calm = 4, Radius = 45 }
 
 -- The starter roll: everyone starts with a team of StarterTeam kaiju,

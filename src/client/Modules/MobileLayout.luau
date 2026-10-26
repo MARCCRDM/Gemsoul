@@ -3,44 +3,46 @@
 	onto each other (tests/mobile_layout_cases checks every phone size):
 
 	  top left      the pick card (OutpostScene), drawn at CardScale, and
-	                your level and coins (LobbyUI) in a pill under it. On a
-	                small screen with a keyboard, the CHAT button goes under
-	                that; opened, the chat is a column down the left that
-	                stops above the dock (and the card steps aside while it's
-	                open). Phones and tablets use Roblox's own chat instead
+	                your kaiju's card (KaijuHud) under it. On a small screen
+	                with a keyboard, the CHAT button goes under that; opened,
+	                the chat is a column down the left that stops above the
+	                dock. Phones and tablets use Roblox's own chat instead
 	                (ChatFrame).
 	  top middle    the live feed (LobbyFeed), between the pick card and
-	                the toasts' place
-	  top right     a toast (UiKit.toast), one line here, as wide as its
-	                words; under it, right-aligned with it, your loot card
-	                (MinerLoot), slim, and one row under that (a toast that
-	                wraps to more lines pushes it down while it's up). Both
-	                keep clear of the slim tab Roblox puts on a phone's
-	                right edge. The live feed steps aside while the loot
-	                card is up (claimTop). Under them, teammates' health
-	                (PartyUI), hidden in a fight. Nothing else: tasks and
-	                the day's challenges open from the dock's TASKS tile,
-	                and the lobby's board isn't shown
+	                the toasts' place (gone on a screen too narrow for it)
+	  top right     your level and coins (LobbyUI) in a pill, your health
+	                under it; a toast (UiKit.toast) just left of them, one
+	                line here, as wide as its words; under your health,
+	                right-aligned with it, your loot card (MinerLoot), slim,
+	                and one row under that. All keep clear of the slim tab
+	                Roblox puts on a phone's right edge. The live feed steps
+	                aside while the loot card is up (claimTop). Under them,
+	                teammates' health (PartyUI), hidden in a fight. Nothing
+	                else: tasks and the day's challenges open from the
+	                dock's TASKS tile, and the lobby's board isn't shown
 	  bottom middle the dock (LobbyUI): PLAY, and a row of tiles under it
 
 	Rects are { X, Y, W, H } in the ScreenGui's space (below the top bar).
 
 	  MobileLayout.card()                  the pick card
-	  MobileLayout.wallet()                level and coins
+	  MobileLayout.wallet(screen)          level and coins (top right);
+	                                       health(screen) just under it
 	  MobileLayout.chat(screen, open)      the chat box: CHAT button, or opened
 	  MobileLayout.dock(screen, tiles)     the dock, its PLAY and tile size
 	  MobileLayout.party(screen)           the teammates' cards
-	  MobileLayout.toast(screen)           a toast's place: top right, Toast.W
-	                                       at most, one line (Toast.H)
-	  MobileLayout.loot(screen)            your loot card: under the toast,
+	  MobileLayout.toast(screen)           a toast's place: top right, left of
+	                                       your coins, Toast.W at most, one
+	                                       line (Toast.H)
+	  MobileLayout.loot(screen)            your loot card: under your health,
 	                                       right-aligned with it
 	  MobileLayout.claimTop(owner, on)     something has the top (a
 	                                       loot card); topClaimed(except?)
 	                                       says if anything else does, and
 	                                       onTop(fn) hears when that changes
 	  MobileLayout.kaiju(screen, hunting)  your kaiju's card (KaijuHud), three
-	                                       by three, right of your coins (top
-	                                       right while you hunt), and CATCH;
+	                                       by three, on the left under the
+	                                       pick card (on the right under your
+	                                       health while you hunt), and CATCH;
 	                                       kaijuDesk(screen) on a computer,
 	                                       kaijuCells(card) its cells
 	  MobileLayout.Drive                   a mech's HOP OUT button (VehicleDrive),
@@ -68,8 +70,10 @@ MobileLayout.CardScale = 0.7
 MobileLayout.Margin = 12
 MobileLayout.Drive = { W = 160, H = 38, Bottom = 62 }
 MobileLayout.Stick = { Size = 112, Knob = 46, Left = 20, Bottom = 16 }
--- (Right: from the screen's right edge, clear of Roblox's tab there.)
-MobileLayout.Toast = { W = 240, H = 28, Top = 8, Right = 30 }
+-- (Right: from the screen's right edge, clear of Roblox's tab there. The
+-- toast's: left of your coins, Wallet.W and a gap further in.)
+MobileLayout.Wallet = { W = 150, H = 30, Top = 8, Right = 30 }
+MobileLayout.Toast = { W = 240, H = 28, Top = 8, Right = 30 + 150 + 8 }
 MobileLayout.Loot = { W = 232, H = 72, Row = 24, Gap = 6 }
 
 function MobileLayout.card()
@@ -81,9 +85,11 @@ function MobileLayout.stick(screen: Vector2)
 	return { X = stick.Left, Y = screen.Y - stick.Bottom - stick.Size, W = stick.Size, H = stick.Size }
 end
 
-function MobileLayout.wallet()
-	local card = MobileLayout.card()
-	return { X = 12, Y = card.Y + card.H + 8, W = 150, H = 30 }
+-- Your level and coins: the top right (as the user's phone layout has it),
+-- clear of Roblox's tab on the right edge.
+function MobileLayout.wallet(screen: Vector2)
+	local w = MobileLayout.Wallet
+	return { X = screen.X - w.Right - w.W, Y = w.Top, W = w.W, H = w.H }
 end
 
 function MobileLayout.dock(screen: Vector2, tiles: number)
@@ -106,9 +112,9 @@ function MobileLayout.dock(screen: Vector2, tiles: number)
 end
 
 function MobileLayout.chat(screen: Vector2, open: boolean)
-	local health = MobileLayout.health()
 	if not open then
-		return { X = 12, Y = health.Y + health.H + 6, W = 76, H = 44 }
+		local k = MobileLayout.kaiju(screen, false)
+		return { X = 12, Y = k.Y + k.H + 6, W = 76, H = 44 }
 	end
 	local dock = MobileLayout.dock(screen, 5)
 	local width = math.floor(math.clamp(screen.X * 0.38, 240, 340))
@@ -121,8 +127,11 @@ function MobileLayout.chat(screen: Vector2, open: boolean)
 	return { X = 12, Y = 12, W = width, H = math.max(120, bottom - 12) }
 end
 
+-- Teammates' cards: under your loot card's place on the right.
 function MobileLayout.party(screen: Vector2)
-	return { X = screen.X - 16 - 220, Y = 132, W = 220, H = 40 }
+	local health = MobileLayout.health(screen)
+	local l = MobileLayout.Loot
+	return { X = screen.X - 16 - 220, Y = health.Y + health.H + l.Gap + l.H + 8, W = 220, H = 40 }
 end
 
 function MobileLayout.toast(screen: Vector2)
@@ -130,11 +139,11 @@ function MobileLayout.toast(screen: Vector2)
 	return { X = screen.X - t.Right - t.W, Y = t.Top, W = t.W, H = t.H }
 end
 
--- Under the toast's place, right-aligned with it.
+-- Under your health, right-aligned with it.
 function MobileLayout.loot(screen: Vector2)
-	local l, toast = MobileLayout.Loot, MobileLayout.toast(screen)
-	local y = toast.Y + toast.H + l.Gap
-	return { X = toast.X + toast.W - l.W, Y = y, W = l.W, H = l.H,
+	local l, health = MobileLayout.Loot, MobileLayout.health(screen)
+	local y = health.Y + health.H + l.Gap
+	return { X = health.X + health.W - l.W, Y = y, W = l.W, H = l.H,
 		RowsBelow = y + l.H + l.Gap + l.Row <= math.min(screen.Y * 0.42, MobileLayout.party(screen).Y - 6) }
 end
 
@@ -166,46 +175,54 @@ function MobileLayout.onTop(listener: () -> ())
 end
 
 -- Your health, just under your level and coins (LobbyUI), as wide.
-function MobileLayout.health()
-	local wallet = MobileLayout.wallet()
+function MobileLayout.health(screen: Vector2)
+	local wallet = MobileLayout.wallet(screen)
 	return { X = wallet.X, Y = wallet.Y + wallet.H + 4, W = wallet.W, H = 20 }
 end
 
--- Your kaiju's card (KaijuHud): one card, three across and three down: the
--- team's three on top, then the support beside AUTO HEAL and CALL BACK, and
--- the team's HYPERBEAM (KaijuBeamHud) along the bottom. On a phone it sits
--- right of your coins and health, as tall as there's room for above the
--- dock (down to Max); while you hunt, up at the top right (the fight's foe
--- list has the top left then), clear of the teammates' cards. TameX, TameY,
--- TameW, TameH: where CATCH goes on a touch screen (the top right; left of
--- the card while you hunt).
-MobileLayout.Kaiju = { W = 172, Pad = 4, Gap = 3, Max = 124, Split = { 0.36, 0.36 } }
+-- Your kaiju's card (KaijuHud): one card, three by three: the kaiju two
+-- by two, AUTO HEAL over CALL BACK beside them, and the team's HYPERBEAM
+-- (KaijuBeamHud) along the bottom. On a phone it sits on the left under the
+-- pick card (where your level and coins were: they're at the top right
+-- now), as tall as there's room for above Roblox's thumbstick (down to
+-- Max); while you hunt (the fight's foe list has the top left then), on the
+-- right under your health, above the jump button. Pad and Gap shrink on a
+-- short screen, and the HYPERBEAM's row keeps MinRow at least. TameX, TameY,
+-- TameW, TameH: where CATCH goes on a touch screen (left of your loot
+-- card's place; left of the card while you hunt).
+MobileLayout.Kaiju = { W = 172, Pad = 4, Gap = 3, Max = 124, Split = { 0.36, 0.36 }, MinRow = 28 }
 function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 	local spec = MobileLayout.Kaiju
 	local x, y, room
 	if hunting then
-		x, y = screen.X - 12 - spec.W, 12
-		room = MobileLayout.party(screen).Y - 6 - y
+		local health = MobileLayout.health(screen)
+		x, y = health.X + health.W - spec.W, health.Y + health.H + 6
+		room = screen.Y - 125 - 6 - y -- (above the jump button)
 	else
-		local wallet = MobileLayout.wallet()
-		x, y = wallet.X + wallet.W + 8, wallet.Y
-		room = MobileLayout.dock(screen, 5).Y - 6 - y
+		local card = MobileLayout.card()
+		x, y = card.X, card.Y + card.H + 6
+		room = MobileLayout.stick(screen).Y - 6 - y
 	end
 	local h = math.min(spec.Max, room)
-	local inner = h - spec.Pad * 2 - spec.Gap * 2
-	local r1 = math.floor(inner * spec.Split[1])
-	local r2 = math.floor(inner * spec.Split[2])
+	local pad, gap = spec.Pad, spec.Gap
+	if h < 110 then
+		pad, gap = 3, 2 -- (a short screen: every point to the rows)
+	end
+	local inner = h - pad * 2 - gap * 2
+	local r = math.min(math.floor(inner * spec.Split[1]), math.floor((inner - spec.MinRow) / 2))
 	local tameW = math.min(210, screen.X - 24)
+	local loot = MobileLayout.loot(screen)
+	local card = MobileLayout.card()
 	return {
 		X = x,
 		Y = y,
 		W = spec.W,
 		H = h,
-		Pad = spec.Pad,
-		Gap = spec.Gap,
-		Rows = { r1, r2, inner - r1 - r2 },
-		TameX = if hunting then x - 8 - tameW else screen.X - 12 - tameW,
-		TameY = if hunting then 12 else 52,
+		Pad = pad,
+		Gap = gap,
+		Rows = { r, r, inner - r * 2 },
+		TameX = if hunting then x - 8 - tameW else loot.X - 8 - tameW,
+		TameY = if hunting then y else card.Y + card.H + 8,
 		TameW = tameW,
 		TameH = 90,
 	}

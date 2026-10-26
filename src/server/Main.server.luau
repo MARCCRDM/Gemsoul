@@ -140,10 +140,9 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			-- Swings out past the core draw critters; a pick bonks them.
 			OutpostServer.onSwing = FrontierServer.swing
 			OutpostServer.bonker = KaijuWilds
-			-- Gem raids: the gems mined out there are a trip's haul, and a
-			-- snatcher's trip knocks you down as a spar's blow would.
+			-- Gem raids: the gems mined out there are a trip's haul (no
+			-- knock-downs in the Outpost: you're killed or you're not).
 			OutpostServer.onGemMined = FrontierServer.mined
-			KaijuWilds.knockDown = SparServer.knockDown
 			-- Knocked out out there, the critters come to rob you (Server.Robbery).
 			SparServer.onKnockedOut = FrontierServer.knockedOut
 			-- ...and back at base, it's your pick that's out (miner mode).

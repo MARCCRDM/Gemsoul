@@ -86,6 +86,14 @@ middle. Rocks stay at least 12 studs apart.
 
 ![The view from the landing pad, before and now](mining/from-the-pad.png)
 
+## No mining button (after your first 50 stones)
+
+*2026-10-26.* The small **Tap to mine / Click to mine** button over a rock
+in reach only shows while you're learning: your first 50 stones
+(`Outpost.MineButton.Training`, counted by `profile.Stats.GemsMined`). After
+that there's no button, as in other mining games: tap or click anywhere to
+swing at the rock in reach, or walk into it (below).
+
 ## Walk into a rock to mine it
 
 Walking into a rock mines it, as a click or a tap on it does: on foot and

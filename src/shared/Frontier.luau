@@ -63,11 +63,11 @@
 	Gem raids (Raid): your whole team knocked out while you're out past
 	the core, the critters smell your gems. More come through for you at
 	once (raidSize), and every critter out for you turns gem snatcher: it
-	winds up a TRIP at your legs (on its cast bar: step away or bonk it)
-	and, landing it, knocks you down. Down (tripped, or beaten down), the
-	snatchers run in and each grabs one of the gems you mined this trip
-	out (your haul: the newest first, never one on your gear; at most
-	Snatch.Max a knock-down), holds it over its head, giggling, and runs
+	winds up a LUNGE (on its cast bar: step away or bonk it), a hard hit.
+	Nothing knocks you down in the Outpost: you're killed or you're not.
+	Killed, the snatchers run in and each grabs one of the gems you mined
+	this trip out (your haul: the newest first, never one on your gear; at
+	most Snatch.Max a death), holds it over its head, giggling, and runs
 	for a rift that tears open a little way off (escapeSpot), waiting
 	there for it (Carry.Wait). Bonk it or knock it out before it hops in
 	and the gem's yours again; let it hop in and it's gone. Back in the
@@ -429,10 +429,12 @@ Frontier.Charged = { Luck = 0.1, Seconds = 60 }
 Frontier.Bonk = { Share = 0.12, Cooldown = 0.6, Knock = 10, Reach = 8, Offer = 6 }
 -- Gem raids: your team all knocked out out there. Size critters through
 -- (StirBonus more, stirred right up), no sooner than Gap seconds after the
--- last. Trip: from Range studs, a Windup on its cast bar, then you're down
--- for Down seconds (Damage: a share of its bite); each critter every Every
--- seconds, and Gap seconds at least between two trips on you. Snatch:
--- Max gems a knock-down, grabbed from Reach studs after Windup. Haul: the
+-- last. Lunge: from Range studs, a Windup on its cast bar, then a hard
+-- lunge (Damage: a share of its bite); each critter every Every seconds,
+-- and Gap seconds at least between two lunges on you. It never knocks you
+-- down: in the Outpost you're killed or you're not, and killed out past
+-- the core you're robbed (Rob, below). Snatch: Max gems a player down
+-- (killed), grabbed from Reach studs after Windup. Haul: the
 -- last Keep gems you mined this trip out. Carry: a snatcher runs at Speed
 -- for a rift Away studs off, which waits Wait seconds for it, giggling
 -- every Giggle seconds.
@@ -440,7 +442,7 @@ Frontier.Raid = {
 	Size = 4,
 	StirBonus = 2,
 	Gap = 75,
-	Trip = { Range = 6.5, Windup = 0.75, Every = { 5, 8 }, Gap = 3, Down = 4, Damage = 0.4 },
+	Lunge = { Range = 6.5, Windup = 0.75, Every = { 5, 8 }, Gap = 3, Damage = 0.4 },
 	Snatch = { Max = 3, Reach = 5, Windup = 0.5, Rush = 45 },
 	Haul = { Keep = 12 },
 	Carry = { Speed = 13, Away = { 26, 38 }, Wait = 6, Giggle = { 1.3, 2.4 } },

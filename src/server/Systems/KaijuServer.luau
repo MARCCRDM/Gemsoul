@@ -3,14 +3,17 @@
 	docs/kaiju.md). Wild kaiju and moon bugs are KaijuWilds'.
 
 	  Your support a fourth kaiju out, a support kind (Kaiju.SupportRole),
-	               just behind you (Kaiju.SupportSlot): it takes no share
-	               of a fight; it mends you and the team when one of you
-	               is hurt (pulse, Kaiju.SupportPulse). Everyone is given
+	               in the middle of the team out ahead of you
+	               (Kaiju.SupportSlot): it takes no share
+	               of a fight; in one (in danger) it mends you and the
+	               team when one of you is hurt (pulse, Kaiju.SupportPulse);
+	               out of one, healing is the gems'. Everyone is given
 	               Kaiju.StarterSupport once (giveSupport: with the starter
 	               roll, or on an older save's next visit).
-	  Your team    up to three kaiju out beside you whenever you're in the
-	               Outpost (in workspace.Kaiju), each at its own spot by you
-	               (Kaiju.TeamSpots). They follow you (jumping after you
+	  Your team    up to three kaiju out with you whenever you're in the
+	               Outpost (in workspace.Kaiju), each at its own spot,
+	               leading the way out in front of you (Kaiju.TeamSpots:
+	               one ahead, two side by side behind it). They follow you (jumping after you
 	               when you jump, one after another: Kaiju.Hop) and take on any
 	               creature that comes near you (wild kaiju and moon bugs),
 	               fighting as the Arena's duellist does (KaijuFighter):
@@ -173,6 +176,7 @@ export type Pet = {
 	-- Jumping after its owner (Kaiju.Hop): when, and when it last did.
 	HopAt: number?,
 	HoppedAt: number?,
+	HopAgain: boolean?, -- (another jump of yours came while it waited its turn)
 	-- The support's pulse (pulse): when each of its moves is next ready.
 	PulseAt: { [string]: number }?,
 	-- In the team's hyperbeam (KaijuBeamServer): its own thinking waits till then.
@@ -546,7 +550,7 @@ local function giveSupport(player: Player)
 	if record then
 		Remotes.Notify:FireClient(
 			player,
-			string.format("%s joins you: your support. It floats behind you and heals you and your team.", Kaiju.nameOf(record))
+			string.format("%s joins you: your support. It floats in the middle of your team and heals you and your team.", Kaiju.nameOf(record))
 		)
 	end
 	return record
@@ -1231,13 +1235,17 @@ local function follow(pet: Pet, ownerRoot: BasePart, recalled: boolean, now: num
 	end
 end
 
--- The support's pulse (Kaiju.SupportPulse): you or one of the team near it
--- under Below of their health, it casts its E (a team mend, you too:
--- KaijuServer.caster's Allies); its Q (a team ward) once it's awake and
--- creatures are about you; its R (a big mend) once it's awake and one of
--- you is under half.
+-- The support's pulse (Kaiju.SupportPulse), only in a fight (in danger,
+-- Kaiju.Danger: out of one, healing is the gems'): you or one of the team
+-- near it under Below of their health, it casts its E (a team mend, you
+-- too: KaijuServer.caster's Allies); its Q (a team ward) once it's awake
+-- and creatures are about you; its R (a big mend) once it's awake and one
+-- of you is under half.
 local function pulse(pet: Pet, ownerRoot: BasePart, now: number)
 	local rules = Kaiju.SupportPulse
+	if not KaijuServer.inDanger(pet.Owner, now) then
+		return
+	end
 	local lowest = 1
 	local function look(h: Humanoid?, at: Vector3)
 		if h and h.Health > 0 and flat(at - pet.Root.Position).Magnitude <= rules.Radius then
@@ -1420,20 +1428,27 @@ local function hops(player: Player, now: number)
 	end
 	local rise = ownerRoot.AssemblyLinearVelocity.Y
 	if Kaiju.leapt(rising[player], rise) then
+		-- Every jump of yours is followed: one still waiting its turn for
+		-- your last jumps once more after it (HopAgain), and one that's only
+		-- just landed waits out its Rest rather than sitting this one out.
 		local line, distances, slots = {}, {}, {}
 		for _, pet in out do
-			if not pet.HopAt and (not pet.HoppedAt or now - pet.HoppedAt >= Kaiju.Hop.Rest) and canHop(pet, now) then
-				table.insert(line, pet)
-				table.insert(distances, (pet.Root.Position - ownerRoot.Position).Magnitude)
-				table.insert(slots, pet.Slot)
+			if canHop(pet, now) then
+				if pet.HopAt then
+					pet.HopAgain = true
+				else
+					table.insert(line, pet)
+					table.insert(distances, (pet.Root.Position - ownerRoot.Position).Magnitude)
+					table.insert(slots, pet.Slot)
+				end
 			end
 		end
 		local serverNow = workspace:GetServerTimeNow()
 		for place, i in Kaiju.hopLine(distances, slots) do
 			local pet = line[i]
-			local delay = Kaiju.hopDelay(place)
-			pet.HopAt = now + delay
-			pet.Model:SetAttribute("KaijuHopAt", serverNow + delay)
+			local at = math.max(now + Kaiju.hopDelay(place), (pet.HoppedAt or -math.huge) + Kaiju.Hop.Rest)
+			pet.HopAt = at
+			pet.Model:SetAttribute("KaijuHopAt", serverNow + (at - now))
 		end
 	end
 	rising[player] = rise
@@ -1443,8 +1458,26 @@ local function hops(player: Player, now: number)
 			if canHop(pet, now) then
 				pet.HoppedAt = now
 				pet.Humanoid.Jump = true
+				-- (Its body is the server's: one anchored and let go since, by
+				-- the HYPERBEAM's formation, falls to a nearby client, which
+				-- ignores a jump asked for here. And a lift of its own, so a
+				-- humanoid that doesn't take the jump, mid-stride or on a
+				-- slope, still goes up: every jump of yours, not just one.)
+				pcall(pet.Root.SetNetworkOwner, pet.Root, nil)
+				local v = pet.Root.AssemblyLinearVelocity or Vector3.zero
+				local lift = math.sqrt(2 * (tonumber(workspace.Gravity) or 196.2) * Kaiju.Hop.Height)
+				if v.Y < lift * 0.5 then
+					pet.Root.AssemblyLinearVelocity = Vector3.new(v.X, lift, v.Z)
+				end
 			elseif pet.Model.Parent then
+				pet.HopAgain = nil
 				pet.Model:SetAttribute("KaijuHopAt", nil) -- (pulled into a fight: no jump to pose)
+			end
+			-- (Your next jump came while it waited for this one: once more.)
+			if pet.HopAgain and pet.HoppedAt == now then
+				pet.HopAgain = nil
+				pet.HopAt = now + Kaiju.Hop.Rest
+				pet.Model:SetAttribute("KaijuHopAt", workspace:GetServerTimeNow() + Kaiju.Hop.Rest)
 			end
 		end
 	end
@@ -1970,9 +2003,10 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 	end
 	if pet then
 		keepHealth(pet)
-		if KaijuServer.inDanger(player) then
-			return reply(false, "Not in the middle of a fight: get clear of the critters first.", { Danger = true })
-		end
+	end
+	-- (Gems heal only out of a fight: not one of yours, out or home, mid-fight.)
+	if KaijuServer.inDanger(player) then
+		return reply(false, "Not in the middle of a fight: get clear of the critters first.", { Danger = true })
 	end
 	local health, most = Kaiju.health(record)
 	if health >= most then

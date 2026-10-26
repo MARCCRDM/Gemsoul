@@ -1,13 +1,17 @@
 --[[
-	Lobby invitations: every match needs an explicit acceptance.
+	Auto queue. On (the default), you're in the ranked 1v1 queue whenever
+	you're in the lobby, without being asked (arriving there, after your
+	first fight, back from a dungeon or the Rift: Systems/Duels'
+	DuelReturnQueue); CANCEL on the SEARCHING card leaves it, and turning
+	auto queue off leaves it too. Two of you searching are paired.
 
-	Someone queues for a 1v1 and nobody else is searching. Instead of
-	waiting on an empty queue, matchmaking calls a player from the lobby:
+	The one question: someone queues for a 1v1 and nobody else is
+	searching. Instead of waiting on an empty queue, matchmaking calls a
+	player from the lobby, and that's asked first:
 
 	  On (the default)       free players receive a timed Join / Not now card.
-	                         The first to accept steps in. Saved AutoQueue=true
-	                         is permission to receive invitations, never teleport.
-	  Off                    no unsolicited lobby invitations.
+	                         The first to accept steps in.
+	  Off                    no search, no lobby invitations.
 	  First fight            +FillBonus coins at successful entry, once per
 	                         newcomer's first fight, never paid again at its end.
 	  Other 1v1s             keep the existing win bonus and rating protection.

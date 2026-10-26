@@ -1181,9 +1181,10 @@ scenarios.KaijuSteps = {
 	end,
 }
 
--- The team's HYPERBEAM (KaijuBeamFx), seen from off to one side: three
--- kaiju and the support leap into formation one after another, roar, charge
--- and fire.
+-- The team's HYPERBEAM (KaijuBeamFx), seen as you see it, from your own
+-- eyes: three kaiju and the support leap into formation in front of you one
+-- after another, roar, charge and fire, onto the biggest threat (ahead on
+-- the right) first, then swinging onto the other.
 roblox.implementMethod("Workspace", "GetServerTimeNow", function()
 	return now
 end)
@@ -1252,7 +1253,7 @@ local function teamKaiju(kind, element, at)
 	return model
 end
 scenarios.Hyperbeam = {
-	Frames = { 0.2, 0.45, 0.8, 1.35, 2.6, 3.4, 3.7, 4.3 },
+	Frames = { 0.45, 1.35, 2.5, 3.15, 3.7, 4.5, 5.0, 5.45 },
 	Rows = { "Team" },
 	Run = function(_, me, foe)
 		foe.Parent = nil
@@ -1278,7 +1279,7 @@ scenarios.Hyperbeam = {
 			local root = model.PrimaryPart
 			local humanoid = model:FindFirstChildOfClass("Humanoid")
 			local lift = (if humanoid then humanoid.HipHeight else 1) + root.Size.Y / 2
-			local landAt = V3.new(place.X, lift, place.Z)
+			local landAt = V3.new(place.X, lift + (spot.Up or 0), place.Z)
 			table.insert(models, model)
 			table.insert(elements, entry[2])
 			table.insert(places, place)
@@ -1286,11 +1287,26 @@ scenarios.Hyperbeam = {
 			table.insert(ends, CF.lookAt(landAt, landAt + forward))
 			table.insert(leaps, (KaijuBeam.leap(i)))
 		end
+		-- What it takes: a big one ahead on the right, a small one ahead on the left.
+		local function threat(at, size)
+			local p = Instance.new("Part")
+			p.Name, p.Anchored, p.Size = "Threat", true, V3.new(size, size, size)
+			p.Color = C3.new(0.55, 0.2, 0.75)
+			p.Material = roblox.Enum.Material.SmoothPlastic
+			p.CFrame = CF.new(at + V3.new(0, size / 2, 0))
+			p.Position = p.CFrame.Position
+			p.Parent = folder
+			return p
+		end
+		local big = threat(V3.new(22, 0, -34), 7)
+		local small = threat(V3.new(-14, 0, -42), 3)
+		local ahead, up = KaijuBeam.focus()
 		KaijuBeamFx._play({
 			Start = 0,
 			Origin = origin,
 			Forward = forward,
-			Focus = V3.new(0, 0, 0) + forward * 7 + V3.new(0, 3, 0),
+			Focus = V3.new(0, 0, 0) + forward * ahead + V3.new(0, up, 0),
+			Targets = { big, small },
 			Models = models,
 			Elements = elements,
 			Places = places,

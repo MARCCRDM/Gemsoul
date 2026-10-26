@@ -231,12 +231,16 @@ for _, size in { { 667, 339 }, { 736, 378 }, { 812, 317 }, { 844, 332 }, { 896, 
 	local L = Fx.cardLayout(screen, true)
 	local what = size[1] .. "x" .. size[2]
 	check(inside(L, screen), what .. ": the card runs off the screen")
-	check(L.Y <= 8 and L.H <= screen.Y * 0.45, what .. ": the card isn't at the top, or is too tall")
+	-- (At the top; on a small phone, a row down, under the toasts.)
+	local toastRow = MobileLayout.toast(screen)
+	check(L.Y <= toastRow.Y + toastRow.H + 8 and L.H <= screen.Y * 0.45, what .. ": the card isn't at the top, or is too tall")
 	for name, r in
 		{
 			["pick card"] = MobileLayout.card(),
 			toast = MobileLayout.toast(screen),
 			["loot card"] = MobileLayout.loot(screen),
+			["health card"] = MobileLayout.health(screen),
+			wallet = MobileLayout.wallet(screen),
 		}
 	do
 		check(not MobileLayout.overlaps(L, r), what .. ": the card covers the " .. name)

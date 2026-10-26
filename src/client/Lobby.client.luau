@@ -257,13 +257,10 @@ task.spawn(function()
 	-- or straight after the fast start's pick (not for saves that skipped it).
 	local intro = GemClient.Profile.Intro
 	local fresh = duelsPlayed() == 0 and not veteran()
-	local hadFirstDuel = false
 	if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled and fresh and not GemClient.Profile.Tutorial then
 		firstDuel()
-		hadFirstDuel = true
 	elseif FastStart.Enabled and fresh and not (intro and intro.Skipped) then
 		firstDuel()
-		hadFirstDuel = true
 	end
 	for _ = 1, 5 do
 		if OutpostScene.isActive() then
@@ -274,11 +271,13 @@ task.spawn(function()
 			break
 		end
 	end
-	-- Straight after the intro: into the ranked 1v1 queue, so the SEARCHING
-	-- card (SocialUI's banner, with CANCEL) is up while they look round the
-	-- Outpost. (A few tries: the server says no until they're back and
-	-- standing in the lobby.)
-	if hadFirstDuel then
+	-- Auto queue (Shared.AutoQueue, on unless you turn it off): into the
+	-- ranked 1v1 queue on arriving in the lobby (straight after the intro
+	-- too), no question asked, so the SEARCHING card (SocialUI's banner,
+	-- with CANCEL) is up while you mine. You're only asked when you're
+	-- pulled in to fill someone else's match. (A few tries: the server says
+	-- no until you're back and standing in the lobby.)
+	do
 		task.spawn(function()
 			waitFor(function()
 				return player:GetAttribute("Outpost") == true
@@ -289,7 +288,9 @@ task.spawn(function()
 				end
 				local queued = GemClient.request("DuelReturnQueue")
 				if queued and queued.Ok then
-					UiKit.toast("Searching ranked 1v1: keep mining. You'll be asked before joining.", GOLD)
+					UiKit.toast("Searching ranked 1v1 while you mine. Cancel anytime.", GOLD)
+					break
+				elseif queued and queued.Message == "Auto queue is off." then
 					break
 				end
 				task.wait(2)

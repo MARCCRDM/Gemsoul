@@ -350,9 +350,11 @@ LevelUpFx.Card = {
 	Badge = 80,
 	-- A phone's: in the top middle, between the pick card and the toasts;
 	-- side by side where there's room for it (Wide), else the medal over
-	-- its words.
+	-- its words; with not even Narrow between them (a small phone), it
+	-- drops a row, under the toasts, left of your health and loot cards.
 	PhoneTop = 6,
 	Wide = 300,
+	Narrow = 150,
 }
 local DARK = Color3.fromRGB(13, 15, 24)
 local SOFT = Color3.fromRGB(190, 202, 222)
@@ -378,12 +380,19 @@ function LevelUpFx.cardLayout(screen: Vector2, short: boolean): Layout
 	local MobileLayout = require(script.Parent.MobileLayout)
 	local pick, toast = MobileLayout.card(), MobileLayout.toast(screen)
 	local left, right = pick.X + pick.W + 8, toast.X - 8
+	local top = spec.PhoneTop
+	if right - left < spec.Narrow then
+		-- (No room beside the toasts: a row down, left of health and loot.)
+		local health, loot = MobileLayout.health(screen), MobileLayout.loot(screen)
+		right = math.min(health.X, loot.X) - 8
+		top = toast.Y + toast.H + 6
+	end
 	local band = right - left
 	if band >= spec.Wide then
 		local w = math.min(band, 360)
 		return {
 			X = math.clamp(math.floor((screen.X - w) / 2), left, right - w),
-			Y = spec.PhoneTop,
+			Y = top,
 			W = w,
 			H = 72,
 			Badge = 54,
@@ -391,10 +400,10 @@ function LevelUpFx.cardLayout(screen: Vector2, short: boolean): Layout
 			Scale = 0.68,
 		}
 	end
-	local w = math.max(band, 150)
+	local w = math.max(band, spec.Narrow)
 	return {
 		X = math.clamp(math.floor((screen.X - w) / 2), left, math.max(left, right - w)),
-		Y = spec.PhoneTop,
+		Y = top,
 		W = w,
 		H = 140,
 		Badge = 46,

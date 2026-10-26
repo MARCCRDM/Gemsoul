@@ -344,7 +344,7 @@ Vendors.InfoBot = {
 				},
 				{
 					Text = "What is a gem raid?",
-					Reply = "If your whole kaiju team is knocked out beyond the Core, critters trip you and steal the newest gems from your trip. Hit a thief before it reaches its rift and the gem comes back. Back in the Core, your gems are safe.",
+					Reply = "If your whole kaiju team is knocked out beyond the Core, more critters come for you. They never knock you down: you're killed or you're not. Killed out there, they rob the newest gems from your trip. Hit a thief before it reaches its rift and the gem comes back. Back in the Core, your gems are safe.",
 				},
 				{
 					Text = "How do I recover health?",
@@ -384,6 +384,7 @@ Vendors.Tips = {
 	-- Kaiju
 	"Kaiju don't heal on their own. Give them gems once you're clear of danger.",
 	"A gem of a kaiju's own element heals it twice as much.",
+	"Your support kaiju mends you and your team only during a fight. Between fights, gems do the healing.",
 	"AUTO HEAL spends spare Commons first, then Uncommons. It never uses a rarer gem or one your loadouts use.",
 	"Kaiju gain experience by fighting. Your mining levels you, not them.",
 	"You level fastest by beating bosses and other players, more for ones above your level. Mining gives less the more you mine.",

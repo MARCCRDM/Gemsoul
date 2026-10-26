@@ -343,9 +343,8 @@ end
 -- Knock-downs ---------------------------------------------------------------------------------------------
 
 -- Back on your feet: full health, a moment's guard. (`miner`: downed out
--- of a spar, by a rift's critter in the Outpost; `tripped`: only tripped,
--- so their health is what it was.)
-local function getUp(player: Player, humanoid: Humanoid, miner: boolean?, tripped: boolean?)
+-- of a spar, in the Outpost.)
+local function getUp(player: Player, humanoid: Humanoid, miner: boolean?)
 	-- (Gone, or a new body since: nothing to do. Down at a Rift boss, they
 	-- stay down till they choose: Server.RiftServer gets them up; being
 	-- robbed, till it's over: Server.Robbery.)
@@ -362,9 +361,7 @@ local function getUp(player: Player, humanoid: Humanoid, miner: boolean?, trippe
 	-- already, and need no guard. A miner still in the Outpost gets up
 	-- whole, too.)
 	if humanoid.Health > 0 and (Spar.sparring(player) or (miner and Spar.knocksDown(player))) then
-		if not tripped then
-			humanoid.Health = humanoid.MaxHealth
-		end
+		humanoid.Health = humanoid.MaxHealth
 		local guard = Instance.new("ForceField")
 		guard.Name = "SparGuard"
 		guard.Visible = false
@@ -373,31 +370,24 @@ local function getUp(player: Player, humanoid: Humanoid, miner: boolean?, trippe
 	end
 end
 
--- A blow that would finish a sparring player: down instead. (`trip`: a
--- rift critter's trip, { Seconds, By }: down that long, their health
--- untouched, "by" whatever tripped them.)
-local function knockOut(player: Player, humanoid: Humanoid, source: Player?, trip: any?): boolean
+-- A blow that would finish a sparring player: down instead. (Nothing else
+-- knocks anyone down: in the Outpost a creature's finishing blow kills,
+-- below, and its other blows only hurt.)
+local function knockOut(player: Player, humanoid: Humanoid, source: Player?): boolean
 	if Spar.isDown(player) then
 		return true
 	end
-	local seconds = if trip then trip.Seconds or Spar.DownSeconds else Spar.DownSeconds
-	if not trip then
-		humanoid.Health = math.max(1, math.min(humanoid.Health, 1))
-	end
+	local seconds = Spar.DownSeconds
+	humanoid.Health = math.max(1, math.min(humanoid.Health, 1))
 	CombatServer.reset(player)
 	player:SetAttribute("Blocking", false)
 	-- (A fresh knock-down: whether it's a kill is FrontierServer's to say.)
 	player:SetAttribute("Killed", nil)
 	player:SetAttribute("SparDown", workspace:GetServerTimeNow() + seconds)
-	Remotes.CombatFx:FireAllClients(
-		"SparKO",
-		player.UserId,
-		if source then source.UserId else 0,
-		if trip then trip.By else nil
-	)
+	Remotes.CombatFx:FireAllClients("SparKO", player.UserId, if source then source.UserId else 0)
 	-- Knocked down in a battle's duel: out of it (KaijuBattles), so no
 	-- getting up into it; a moment down, then the duel's over for both.
-	if not trip and player:GetAttribute("SparWith") ~= nil and SparServer.onSparDown(player, source) then
+	if player:GetAttribute("SparWith") ~= nil and SparServer.onSparDown(player, source) then
 		task.delay(seconds, function()
 			if humanoidOf(player) == humanoid and humanoid.Health > 0 then
 				humanoid.Health = humanoid.MaxHealth
@@ -406,11 +396,10 @@ local function knockOut(player: Player, humanoid: Humanoid, source: Player?, tri
 		end)
 		return true
 	end
-	task.delay(seconds, getUp, player, humanoid, not Spar.sparring(player), trip ~= nil)
-	-- Knocked out by a creature (not tripped, not in a spar with someone):
-	-- killed, in the Outpost, and robbed past its core (FrontierServer:
-	-- Server.Robbery).
-	if not trip and player:GetAttribute("SparWith") == nil then
+	task.delay(seconds, getUp, player, humanoid, not Spar.sparring(player))
+	-- Knocked out by a creature (not in a spar with someone): killed, in
+	-- the Outpost, and robbed past its core (FrontierServer: Server.Robbery).
+	if player:GetAttribute("SparWith") == nil then
 		task.spawn(SparServer.onKnockedOut, player)
 	end
 	return true
@@ -472,23 +461,6 @@ function SparServer.riftKit(player: Player, on: boolean)
 	CombatServer.reset(player)
 	player:SetAttribute("Hunt", true)
 	player:SetAttribute("Spar", true)
-end
-
--- Tripped by a rift critter in the Outpost (a gem raid: Shared.Frontier.Raid):
--- down for `seconds`, health untouched, then up with a moment's guard.
--- Not in a spar with someone or a match, not down already, not guarded.
-function SparServer.knockDown(player: Player, seconds: number, by: string?): boolean
-	local humanoid = humanoidOf(player)
-	if not humanoid or humanoid.Health <= 0 or Spar.isDown(player) then
-		return false
-	end
-	if player:GetAttribute("SparWith") ~= nil or not Spar.knocksDown(player) then
-		return false
-	end
-	if player.Character and player.Character:FindFirstChild("SparGuard") then
-		return false -- (just back up: a moment's grace)
-	end
-	return knockOut(player, humanoid, nil, { Seconds = seconds, By = by })
 end
 
 -- Hit in a spar: it can't end for a moment (Spar.SheatheLock).

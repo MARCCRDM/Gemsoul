@@ -6,7 +6,7 @@
 	its buttons.
 
 	One bar, the row's width: it fills left to right in your team's
-	colours (the emptiest kaiju's mana: all must be full).
+	colours (the team's charge, a meter of its own: KaijuCharge).
 
 	  Charging   HYPERBEAM and its percent (CHARGING 42% on a computer).
 	  Ready      the bar full and bright, its colours flowing, a glow that

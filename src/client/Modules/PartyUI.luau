@@ -15,6 +15,7 @@ local RunService = game:GetService("RunService")
 
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
+local MobileLayout = require(script.Parent.MobileLayout)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
@@ -277,7 +278,8 @@ local hudGui = UiKit.gui("PartyHud", 2)
 local hudList = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -16, 0, 132),
+	-- (On a phone under your loot card's place at the top right: MobileLayout.party.)
+	Position = UDim2.new(1, -16, 0, if UiKit.short() then MobileLayout.party(Vector2.new(844, 332)).Y else 132),
 	Size = UDim2.fromOffset(220, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 }, hudGui)
@@ -286,11 +288,15 @@ local hudBars: { [number]: Frame } = {}
 -- In a fight the fight HUD has the bars that matter, and on a phone the
 -- teammates' cards sat right on the DODGE and HEAVY buttons: hidden until
 -- the fight's over.
+-- On a phone your kaiju's card has their place while you hunt
+-- (MobileLayout.kaiju): hidden then too.
 local function fitPartyHud()
-	hudGui.Enabled = player:GetAttribute("CombatSession") == nil and player:GetAttribute("MatchId") == nil
+	local hunting = UiKit.short() and player:GetAttribute("Hunt") == true
+	hudGui.Enabled = player:GetAttribute("CombatSession") == nil and player:GetAttribute("MatchId") == nil and not hunting
 end
 player:GetAttributeChangedSignal("CombatSession"):Connect(fitPartyHud)
 player:GetAttributeChangedSignal("MatchId"):Connect(fitPartyHud)
+player:GetAttributeChangedSignal("Hunt"):Connect(fitPartyHud)
 fitPartyHud()
 
 local markers: { [number]: BillboardGui } = {}

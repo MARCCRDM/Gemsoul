@@ -934,7 +934,7 @@ do
 	check(#team == 3, "Not three out: " .. #team)
 	for slot, member in team do
 		check(member.Slot == slot and member.Model:GetAttribute("KaijuSlot") == slot, "The team's places are wrong")
-		check((member.Root.Position - rootA.Position).Magnitude < 12, "One came out far from its owner")
+		check((member.Root.Position - rootA.Position).Magnitude < 13, "One came out far from its owner")
 	end
 	check(#KaijuServer.all() == 3 and KaijuServer.pets()[a] == team[1], "all() or the lead is wrong")
 end
@@ -950,7 +950,7 @@ check(pet and pet.Model.Parent == kaijuFolder, "The kaiju isn't out")
 check(pet.Model:GetAttribute("KaijuOwner") == 1 and pet.Model:GetAttribute("KaijuLevel") == 1, "Its attributes")
 check(pet.Record == starter, "The lead isn't the one out")
 check(pet.Humanoid.MaxHealth == Kaiju.stats(starter.Species, 1, starter.Soul.Tier).Health, "Its health")
-check((pet.Root.Position - rootA.Position).Magnitude < 10, "It came out far from its owner")
+check((pet.Root.Position - rootA.Position).Magnitude < 13, "It came out far from its owner") -- (the lead walks 10 ahead: Kaiju.TeamSpots)
 check(KaijuServer.petOf(pet.Model) == pet, "petOf doesn't find it")
 
 -- Out of the Outpost: away; back: out again, as hurt as it was.
@@ -1414,6 +1414,7 @@ check(Challenge ~= nil, "No way to challenge a wild kaiju")
 check(enemy.Root:FindFirstChild("ChallengePrompt") ~= nil, "A wild kaiju has no Challenge prompt")
 -- (Its prompt shows only while nobody's in a fight with it.)
 local challengePrompt = enemy.Root:FindFirstChild("ChallengePrompt")
+check(challengePrompt.KeyboardKeyCode == roblox.Enum.KeyCode.F, "Challenge is on E, your ability's key in first person")
 KaijuWilds._brain(enemy, now)
 check(challengePrompt.Enabled, "A calm wild kaiju's Challenge prompt is off")
 rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(40, 0, 0))
@@ -2950,7 +2951,8 @@ local function petPotters()
 	pet.RecallUntil, pet.StunUntil, pet.Target = 0, 0, nil
 	pet.Plan, pet.IdleSpot = nil, nil
 	rootA.CFrame = CFrame.new(center2)
-	pet.Root.CFrame = CFrame.new(center2 + Vector3.new(3, 0, 5))
+	local slot = Kaiju.TeamSpots[pet.Slot] or Kaiju.TeamSpots[1]
+	pet.Root.CFrame = CFrame.new(center2 + Vector3.new(slot[1], 0, slot[2])) -- (at its spot: you face -Z)
 	local pottered = {}
 	for _ = 1, 120 do
 		now += 0.15
@@ -3455,6 +3457,33 @@ local function teamFights()
 		for _, p in team do
 			p.Target, p.HopAt = nil, nil
 			p.Humanoid.Jump = false
+		end
+		-- Every jump of yours, not just the first: three in a row, each one
+		-- followed by all of them, each with a lift of its own (the jump
+		-- goes up even if the humanoid doesn't take it).
+		for jump = 1, 3 do
+			rootA.AssemblyLinearVelocity = Vector3.zero
+			KaijuServer._hops(a, t)
+			rootA.AssemblyLinearVelocity = Vector3.new(0, 50, 0)
+			local lifted = {}
+			for frame = 1, 70 do
+				t += 1 / 60
+				if frame > 20 then
+					rootA.AssemblyLinearVelocity = Vector3.new(0, -20, 0)
+				end
+				KaijuServer._hops(a, t)
+				for _, p in team do
+					if p.Humanoid.Jump then
+						lifted[p] = (p.Root.AssemblyLinearVelocity or Vector3.zero).Y
+						p.Humanoid.Jump = false
+						p.Root.AssemblyLinearVelocity = Vector3.zero -- (landed)
+					end
+				end
+			end
+			for _, p in team do
+				check(lifted[p] ~= nil, "Jump " .. jump .. " of yours: your kaiju in slot " .. p.Slot .. " didn't follow")
+				check((lifted[p] or 0) > 5, "Jump " .. jump .. ": no lift under your kaiju in slot " .. p.Slot)
+			end
 		end
 		rootA.AssemblyLinearVelocity = Vector3.zero
 		check(Kaiju.leapt(nil, 50) and not Kaiju.leapt(40, 50) and not Kaiju.leapt(0, 5), "Kaiju.leapt")
@@ -4082,64 +4111,73 @@ local function teamFights()
 		w.Fighter.Flank, w.Fighter.Apart = nil, nil
 		KaijuFighter.calm(w.Fighter)
 	end
-	-- The team's HYPERBEAM (KaijuBeamServer): mana from following you and
-	-- from blows landing, a move's cost, SAVE CHARGE (blows alone, faster,
-	-- moves held), and the blast: only with all of them full, the team in
-	-- formation facing your aim, every creature in the beam hit and none
-	-- outside it, their own thinking held till it's over, then let go.
+	-- The team's HYPERBEAM (KaijuBeamServer): one charge for the whole team,
+	-- its own, from following you and from blows landing (their moves cost
+	-- it nothing), SAVE CHARGE (blows alone, faster, moves held), and the
+	-- blast: only with it full, the team in formation facing your aim,
+	-- every creature in the beam hit and none outside it, their own
+	-- thinking held till it's over, then let go.
 	;(function()
 		local Beam = serverModule("KaijuBeamServer")
 		local KaijuBeam = shared("KaijuBeam")
-		local mana = KaijuBeam.Mana
+		local rules = KaijuBeam.Charge
+		local roster = Kaiju.roster(profiles[a])
 		Beam.start()
 		reset()
 		rootA.CFrame = CFrame.new(spot)
-		-- Charging: a trickle out of a fight, shown on the HUD and each kaiju.
+		check(KaijuBeam.Mana == nil and KaijuBeam.spend == nil, "The HYPERBEAM still runs on each kaiju's mana")
+		-- Charging: a trickle with the team out, on your profile and the HUD.
+		roster.BeamCharge = 0
 		for _, pet in team do
-			pet.Record.Mana, pet.Target = 0, nil
+			pet.Target = nil
 		end
 		Beam._charge(10)
-		check(math.abs(team[1].Record.Mana - mana.Trickle * 10) < 1e-6, "A kaiju out doesn't charge as it follows you")
-		check(a:GetAttribute("KaijuCharge") == math.floor(mana.Trickle * 10), "The HUD's charge isn't the team's")
-		check(team[2].Model:GetAttribute("Mana") == math.floor(mana.Trickle * 10), "A kaiju's own mana isn't on it")
+		check(math.abs(roster.BeamCharge - rules.Trickle * 10) < 1e-6, "Your team out doesn't charge it as it follows you")
+		check(a:GetAttribute("KaijuCharge") == math.floor(rules.Trickle * 10), "The HUD's charge isn't the team's")
 		local res = Beam._fire(a, { X = 0, Z = 1 }, now)
 		check(not res.Ok and string.find(res.Message, "charged") ~= nil, "A HYPERBEAM half charged")
-		-- A blow landing adds to it; a heavy more; a move costs.
+		-- A long charge: minutes following you about, not seconds.
+		check(rules.Max / rules.Trickle >= 300, "The HYPERBEAM charges too fast following you about")
+		-- In a fight, a little more.
+		roster.BeamCharge = 0
+		team[1].Target = { Root = team[1].Root }
+		Beam._charge(10)
+		team[1].Target = nil
+		check(math.abs(roster.BeamCharge - (rules.Trickle + rules.Fight) * 10) < 1e-6, "A fight doesn't charge it faster")
+		-- A blow landing adds to it; a move costs nothing.
 		local dummy = bugAt(spot + Vector3.new(40, 0, 40))
-		team[1].Record.Mana = 0
+		roster.BeamCharge = 0
 		local landed = KaijuServer.strike(team[1], dummy, 1, nil, false)
 		if landed == "Hit" or landed == "Broken" then
-			check(math.abs(team[1].Record.Mana - mana.Hit) < 1e-6, "A blow landing doesn't charge it")
+			check(math.abs(roster.BeamCharge - rules.Hit) < 1e-6, "A blow landing doesn't charge it")
 		end
-		team[1].Record.Mana = 50
+		roster.BeamCharge = 50
 		KaijuServer.caster(team[1])
-		check(team[1].Record.Mana == 50 - mana.Cast, "A move costs nothing")
-		-- SAVE CHARGE: kept on your profile; moves free and held, faster.
+		check(roster.BeamCharge == 50, "A kaiju's move took from the HYPERBEAM's charge")
+		-- SAVE CHARGE: kept on your profile; moves held, faster.
 		local saved = registered.KaijuSaveCharge(a, true)
-		check(saved.Ok and Kaiju.roster(profiles[a]).SaveCharge == true and a:GetAttribute("KaijuSave") == true, "SAVE CHARGE didn't switch on")
+		check(saved.Ok and roster.SaveCharge == true and a:GetAttribute("KaijuSave") == true, "SAVE CHARGE didn't switch on")
 		check(not registered.KaijuSaveCharge(a, "yes").Ok, "SAVE CHARGE took a word")
 		check(KaijuServer.holding(team[1]), "Saving, a fighter still casts")
 		local f = team[1].Fighter
 		f.NextQ, f.NextR, f.NextSurge, f.NextGem = 0, 0, 0, 0
 		KaijuFighter.hold(f, now)
 		check(f.NextQ > now and f.NextR > now and f.NextSurge > now and f.NextGem > now, "Saving, its moves are still due")
-		team[1].Record.Mana = 50
-		KaijuServer.caster(team[1])
-		check(team[1].Record.Mana == 50, "Saving, a move still costs")
-		team[1].Record.Mana = 0
+		roster.BeamCharge = 0
 		Beam._charge(10)
-		check(math.abs(team[1].Record.Mana - mana.Trickle * 10 * mana.Save) < 1e-6, "Saving doesn't charge faster")
+		check(math.abs(roster.BeamCharge - rules.Trickle * 10 * rules.Save) < 1e-6, "Saving doesn't charge faster")
 		registered.KaijuSaveCharge(a, false)
 		check(not KaijuServer.holding(team[1]) and a:GetAttribute("KaijuSave") == nil, "SAVE CHARGE didn't switch off")
-		-- Full: the blast. One creature in front, one behind, one off to the side.
+		-- Full: the blast. One creature in front, one behind, one off to the
+		-- side and tougher: the biggest threat.
 		reset()
 		rootA.CFrame = CFrame.new(spot)
-		for _, pet in team do
-			pet.Record.Mana = mana.Max
-		end
+		roster.BeamCharge = rules.Max
 		local ahead = bugAt(spot + Vector3.new(0, 0, 30))
 		local behind = bugAt(spot + Vector3.new(0, 0, -30))
 		local aside = bugAt(spot + Vector3.new(40, 0, 25))
+		aside.Humanoid.MaxHealth *= 3
+		aside.Humanoid.Health = aside.Humanoid.MaxHealth
 		local before = { ahead.Humanoid.Health, behind.Humanoid.Health, aside.Humanoid.Health }
 		local battling = KaijuServer.battling
 		KaijuServer.battling = function()
@@ -4154,9 +4192,21 @@ local function teamFights()
 		check(drew("KaijuBeam") ~= nil, "Nobody sees the HYPERBEAM")
 		check(a:GetAttribute("KaijuBeamAt") ~= nil and a:GetAttribute("KaijuCharge") == 0, "The HUD doesn't know it fired")
 		local shown = (drew("KaijuBeam") or {})[2] or {}
+		-- Its targets: the biggest threat first, then the one ahead; never
+		-- the one behind you. It turns from the first onto the next.
+		local targets = shown.Targets or {}
+		check(#targets == 2 and targets[1] == aside.Root and targets[2] == ahead.Root, "Not the biggest threat first, then the rest")
+		local cast = Beam._casts and Beam._casts[a]
+		check(cast ~= nil, "No blast under way")
+		local first = Beam._aimed(cast, 0.1)
+		local toAside = (aside.Root.Position - cast.Focus) * Vector3.new(1, 0, 1)
+		check(first:Dot(toAside.Unit) > 0.99, "The beam doesn't start on the biggest threat")
+		local last = Beam._aimed(cast, 1)
+		local toAhead = (ahead.Root.Position - cast.Focus) * Vector3.new(1, 0, 1)
+		check(last:Dot(toAhead.Unit) > 0.99, "The beam doesn't end on the next")
 		local stood = {}
 		for i, pet in team do
-			check(pet.Record.Mana == 0 and pet.BeamUntil ~= nil, "A kaiju's charge not spent on its HYPERBEAM")
+			check(roster.BeamCharge == 0 and pet.BeamUntil ~= nil, "The team's charge not spent on its HYPERBEAM")
 			check(pet.Model:GetAttribute("ActionName") == "HYPERBEAM", "No charge-up on a kaiju for its HYPERBEAM")
 			-- Into formation: held where it stands, its leap and the team's
 			-- roar on its model, its cast's wind-up not till the Charge.
@@ -4186,7 +4236,7 @@ local function teamFights()
 		check(lastDown < at.Charge and KaijuBeam.Leap.Roar > lastDown and KaijuBeam.Leap.Roar < at.Charge, "The roar isn't once they're all down")
 		-- Charging: in their places, facing your aim, held still.
 		Beam._step(start + at.Charge + 0.05)
-		local forward = Vector3.new(0, 0, 1)
+		local forward = cast.Forward -- (your aim, as it was: no longer turned onto the nearest)
 		local right = forward:Cross(Vector3.new(0, 1, 0))
 		for i, pet in team do
 			check(pet.Root.Anchored == true, "A kaiju not held still as it charges")
@@ -4196,16 +4246,18 @@ local function teamFights()
 			local off = pet.Root.Position - want
 			check(Vector3.new(off.X, 0, off.Z).Magnitude < 2.5, "A kaiju out of its place in the formation: " .. i)
 		end
-		-- Firing: the one in front hit by every pulse; the others untouched.
+		-- Firing: both it swings onto hit; the one behind untouched.
 		local t = at.Fire + 0.01
 		while t < at.Stop do
 			Beam._step(start + t)
 			t += 0.05
 		end
 		check(ahead.Humanoid.Health < before[1], "The creature in the beam wasn't hit")
-		check(behind.Humanoid.Health == before[2] and aside.Humanoid.Health == before[3], "The beam hit outside itself")
+		check(aside.Humanoid.Health < aside.Humanoid.MaxHealth, "The biggest threat wasn't hit")
+		check(behind.Humanoid.Health == before[2], "The beam hit outside itself")
 		-- (Blows don't charge them in the blast itself.)
-		check(team[1].Record.Mana == 0, "Charged during its own HYPERBEAM")
+		Beam._charge(1)
+		check(roster.BeamCharge == 0, "Charged during its own HYPERBEAM")
 		-- Over: let go.
 		Beam._step(start + at.Done + 0.1)
 		for _, pet in team do
@@ -4214,7 +4266,7 @@ local function teamFights()
 			check(pet.Model:GetAttribute("BeamLeapAt") == nil and pet.Model:GetAttribute("KaijuMood") ~= "Roar", "A HYPERBEAM's leap or roar left on a kaiju")
 		end
 		check(a:GetAttribute("KaijuBeamAt") == nil, "The HUD thinks it's still firing")
-		print("  your HYPERBEAM: mana, blows and moves, SAVE CHARGE, full to fire, leaping into formation one by one, the roar, the beam's reach, let go after")
+		print("  your HYPERBEAM: one charge of its own, long, blows (moves free), SAVE CHARGE, full to fire, leaping into formation in front of you one by one, the roar, the biggest threat first then the rest, the beam's reach, let go after")
 	end)()
 
 	clearCritters()
@@ -5056,12 +5108,7 @@ end)()
 	table.clear(fxs)
 	b:SetAttribute("SparDown", nil)
 	local Raid = Frontier.Raid
-	local downs = {}
-	KaijuWilds.knockDown = function(player, seconds, by)
-		table.insert(downs, { player, seconds, by })
-		player:SetAttribute("SparDown", now + seconds)
-		return true
-	end
+	check(KaijuWilds.knockDown == nil and Raid.Trip == nil, "A snatcher can still trip a miner down")
 	check(KaijuServer.onTeamDown == FrontierServer.raid, "A team all down doesn't start a raid")
 	local profile = profiles[b]
 	profile.Gems = {}
@@ -5122,19 +5169,24 @@ end)()
 	local function near(enemy)
 		enemy.Root.CFrame = CFrame.new(rootB.Position + Vector3.new(3, 0, 0))
 	end
-	-- The trip: wound up on its cast bar, then they're down.
+	-- The lunge: wound up on its cast bar, then a hard hit; never a
+	-- knock-down (in the Outpost you're killed or you're not).
 	local thief = melee[1]
 	near(thief)
-	thief.NextTrip, thief.NextMove, thief.LastAttack = 0, now + 60, now
+	thief.NextLunge, thief.NextMove, thief.LastAttack = 0, now + 60, now
 	KaijuWilds._brain(thief, now)
-	check(thief.Model:GetAttribute("ActionName") == "Trip", "No trip wound up on the cast bar")
-	check(#downs == 0, "Tripped before the wind-up was over")
-	now += Raid.Trip.Windup + 0.05
+	check(thief.Model:GetAttribute("ActionName") == "Lunge", "No lunge wound up on the cast bar")
+	now += Raid.Lunge.Windup + 0.05
 	near(thief)
 	KaijuWilds._brain(thief, now)
-	check(#downs == 1 and downs[1][1] == b and downs[1][3] == "Snatcher", "The trip didn't knock them down")
-	check(downs[1][2] == Raid.Trip.Down, "Down for the wrong time")
-	-- Down: it goes in for a grab, and off with the newest gem of the haul.
+	check(KaijuWilds._lunged[b] == now, "The lunge never landed")
+	check(b:GetAttribute("SparDown") == nil, "A snatcher's lunge knocked them down")
+	near(thief)
+	KaijuWilds._brain(thief, now)
+	check(thief.Model:GetAttribute("ActionName") ~= "Snatch", "A grab at a player on their feet")
+	-- Killed (down for good): it goes in for a grab, and off with the
+	-- newest gem of the haul.
+	b:SetAttribute("SparDown", now + 10)
 	near(thief)
 	KaijuWilds._brain(thief, now)
 	check(thief.Model:GetAttribute("ActionName") == "Snatch", "No grab at a player down")
@@ -6348,15 +6400,28 @@ end)()
 	local fighter = Kaiju.teamIds(roster)[1]
 	check(not registered.KaijuSupport(c, fighter).Ok, "A fighter went in the support slot")
 	check(registered.KaijuSupport(c, supportId).Ok, "Its own support refused")
-	-- You hurt: it mends you (and itself), never off after a creature.
+	-- You hurt out of a fight: it doesn't mend (that's for gems).
 	local humanoid = c.Character:FindFirstChildOfClass("Humanoid")
 	humanoid.Health = 40
 	queued = {}
 	now += 10
+	check(not KaijuServer.inDanger(c, now), "In danger with nothing about")
+	KaijuServer._think(pet, now, 0.15)
+	flush()
+	check(humanoid.Health == 40, "The support mended out of a fight")
+	-- In a fight (one of the team fighting): it mends you (and itself),
+	-- never off after a creature.
+	for _, member in out do
+		if member ~= pet then
+			member.LastFight = now
+			break
+		end
+	end
+	check(KaijuServer.inDanger(c, now), "Not in danger with the team fighting")
 	KaijuServer._think(pet, now, 0.15)
 	check(pet.Target == nil, "The support went after a creature")
 	flush()
-	check(humanoid.Health > 40, "The support didn't mend its owner")
+	check(humanoid.Health > 40, "The support didn't mend its owner in a fight")
 	local after = humanoid.Health
 	KaijuServer._think(pet, now + 1, 0.15)
 	flush()
@@ -6377,7 +6442,7 @@ end)()
 	c:SetAttribute("Outpost", nil)
 	KaijuServer._upkeep(c, now + 41)
 	local _ = rootC
-	print("  your support: the fourth with the roll, its own slot, mends you, only a support kind, given to older saves")
+	print("  your support: the fourth with the roll, its own slot, mends you only in a fight, only a support kind, given to older saves")
 end)()
 
 -- The rules' moods: the same roll, the same mood, and every one reachable.
