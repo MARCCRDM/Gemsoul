@@ -178,6 +178,10 @@ function LobbyFeed.welcome()
 	shownWelcome = true
 	-- (The Tasks window stays shut while it's up: TrainingRewards.client.)
 	root:SetAttribute("WelcomeOpen", true)
+	-- Its own layer, over the whole HUD (the kaiju card, FIGHT, the toasts'
+	-- neighbours): it dims everything under it, not just the lobby's.
+	local layer = UiKit.gui("Welcome", 45)
+	layer.IgnoreGuiInset = true
 	local shade = new("TextButton", {
 		Name = "Welcome",
 		Text = "",
@@ -186,7 +190,7 @@ function LobbyFeed.welcome()
 		BackgroundTransparency = 0.45,
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 40,
-	}, root)
+	}, layer)
 	-- The week's track: every day's coins, today lit, the days behind ticked,
 	-- and day 7 holding (it pays the same every day after, while the streak
 	-- lasts). A missed day starts it again at day 1 (PlayerData.claimDaily).
@@ -215,10 +219,28 @@ function LobbyFeed.welcome()
 		}),
 	}, accent)
 	local scale = new("UIScale", { Scale = 0.8 }, banner)
-	local screen = root.AbsoluteSize
-	local fit = math.min(1, (screen.X - 24) / W, (screen.Y - 24) / H)
+	-- Fitted to the whole screen, and clear of Roblox's buttons and DEV up
+	-- in the top bar's strip (the layer draws over it).
+	local fit, open = 1, false
+	local function place()
+		local screen = layer.AbsoluteSize
+		if screen.Y <= 0 then
+			screen = root.AbsoluteSize
+		end
+		local s = math.min(1, (screen.X - 24) / W, (screen.Y - 24) / H)
+		local room, at = UiKit.clearTopbar(screen, Vector2.new(W * s, H * s))
+		fit = s * room
+		banner.Position = at
+		if open then
+			scale.Scale = fit
+		end
+	end
+	place()
+	layer:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
+	local stopTopbar = UiKit.onTopbar(place)
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = fit })
 		:Play()
+	open = true
 	local function line(
 		parent: Instance,
 		value: string,
@@ -461,10 +483,12 @@ function LobbyFeed.welcome()
 		end
 		closing = true
 		root:SetAttribute("WelcomeOpen", nil)
+		open = false
+		stopTopbar()
 		TweenService:Create(scale, TweenInfo.new(0.2), { Scale = fit * 0.9 }):Play()
 		local fade = TweenService:Create(shade, TweenInfo.new(0.2), { BackgroundTransparency = 1 })
 		fade.Completed:Connect(function()
-			shade:Destroy()
+			layer:Destroy()
 		end)
 		fade:Play()
 		banner.Visible = false

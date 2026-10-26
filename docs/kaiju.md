@@ -468,19 +468,32 @@ On a computer the strip sits at the bottom left; the CATCH prompt appears
 above the combat HUD near the bottom center:
 [the lobby on a computer](kaiju/hud-desktop.png).
 
-- **The team strip:** a tile for each of your team, the lead first (edged in
-  gold): its portrait, level and health, and three dots down its right edge
-  for Q, E and R, lit when the move is ready, faint while it recharges and
-  hollow while it's still asleep. Knocked out, its tile is veiled and says
-  DOWN until you revive it. On a computer it sits at the bottom left; on a phone under your
-  level and coins, and at the top right while you hunt. Tap a tile for the
-  kaiju panel on that kaiju (a tile that's DOWN opens HEAL).
-  - **AUTO HEAL**, at the strip's end, in place of RECALL and HUNT: the gem
+- **The kaiju card:** one card, three across and three down
+  (`MobileLayout.kaiju`, `kaijuDesk`, `kaijuCells`):
+  - **Top row:** your team's three, the lead first (edged in gold).
+  - **Middle row:** your support, AUTO HEAL and CALL BACK.
+  - **Bottom row:** the team's [HYPERBEAM](#hyperbeam), the full width of
+    the card.
+
+  Each kaiju tile shows its portrait, level and health, and dots down its
+  right edge for Q, E and R: lit when the move is ready, faint while it
+  recharges, hollow while it's still asleep. Knocked out, its tile is
+  veiled and says DOWN until you revive it. Tap a tile for the kaiju panel
+  on that kaiju (a tile that's DOWN opens HEAL).
+
+  Where it sits:
+  - On a computer: the bottom left. The chat feed keeps clear above it.
+  - On a phone: right of your level, coins and health. It's as tall as the
+    space above the PLAY dock allows, clear of the thumbstick.
+  - While you hunt: the top right, because the fight's foe list takes the
+    top left.
+  - **AUTO HEAL**, in the middle row, in place of RECALL and HUNT: the gem
     it takes next (a Common of your lead's element; an Uncommon once the
     Commons are gone), how many spare Commons and Uncommons you have, and
     ON or OFF. Tap it to switch. On, your spare Commons, then your spare
     Uncommons, heal your team by themselves (see [Healing](#healing)).
-- **CATCH**, beside the strip, when a wild kaiju near you is down to half its
+- **CATCH**, at the top right on a phone (left of the card while you
+  hunt), when a wild kaiju near you is down to half its
   health: the chance right now and the tries left. It starts the catch
   (see [Catching](#catching)), and hides while it's under way.
 - **The kaiju panel:** on the left every kaiju you have: YOUR TEAM (numbered,
@@ -527,10 +540,10 @@ your team's blast together. It works the same in mining and in fights.
   (`KaijuSaveCharge`). While it's on, your fighters cast none of their Q, E
   or R moves (`KaijuFighter.hold`). They fight with blows alone and charge
   1.6 times as fast. The support's heals still go out.
-- **The button** (`KaijuBeamHud`): a pill by the kaiju strip. On a computer
-  it sits in the row above the strip. On a phone it sits beside your coins
-  and health bar, clear of the strip, CATCH, the thumbstick and the dock
-  (`MobileLayout.beam`). It shows:
+- **The button** (`KaijuBeamHud`): the kaiju card's bottom row
+  (`KaijuHud.beamSlot`), under the team, its support and the two buttons.
+  On a phone's shorter row, the title and SAVE share one line, with the
+  charge and the pips on the next. It shows:
   - **Charging:** a dark core filling in your team's colours, by the
     emptiest kaiju (all of them must be full), with CHARGING and a
     percentage. Each kaiju gets a pip showing its own mana in its
@@ -542,9 +555,9 @@ your team's blast together. It works the same in mining and in fights.
 
   **Z**, the gamepad's d-pad down, or a tap fires it.
 
-  ![The button charging, saving, ready and blasting, above the kaiju strip. Offline render of the game's UI code, not a Roblox screenshot](kaiju/hyperbeam-states.png)
+  ![The kaiju card's HYPERBEAM row charging, saving, ready and blasting. Offline render of the game's UI code, not a Roblox screenshot](kaiju/hyperbeam-states.png)
 
-  ![On a phone, beside your coins and health bar. Offline render, not a Roblox screenshot](kaiju/hyperbeam-phone.png)
+  ![On a phone, the card sits right of your level and health bar, clear of PLAY and the dock. Offline render, not a Roblox screenshot](kaiju/hyperbeam-phone.png)
 - **The blast** (`KaijuBeamServer`, 5.4 seconds, `KaijuBeam.timeline`):
   1. **Gather (1.8 s): the formation.** Each kaiju is held where it stands
      until its turn. Then they leap one after another, 0.16 s apart, into
@@ -1035,7 +1048,7 @@ Proposed guardrails:
 | `SparServer` | `Hunt`: the kit out alone |
 | `Shared.KaijuBeam` | The HYPERBEAM's rules: mana (`Mana`, `gain`, `spend`, `team`), its timeline and phases, the formation and the leaps into it (`Leap`, `leap`, `leapHeight`, `arc`), the beam's reach (`hits`), the aim assist (`aim`) and its damage |
 | `KaijuBeamServer` | Mana on each kaiju's record (`KaijuCharge` and `KaijuSave` on you, `Mana` on each model), SAVE CHARGE (`KaijuSaveCharge`), the blast (`KaijuBeam`): the formation, holding them still, the pulses, letting go |
-| `KaijuHud` (client) | The team strip, AUTO HEAL, CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
+| `KaijuHud` (client) | The kaiju card (three by three: the team, the support, AUTO HEAL, CALL BACK, and the HYPERBEAM's row), CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
 | `KaijuBeamHud` (client) | The HYPERBEAM button: the charge, the pips, READY, SAVE, Z / tap |
 | `KaijuBeamFx` (client) | The blast on screen: the rune circle, each leap carried along its arc and slammed down, the roar, the auras, the streams and orb, the beam; your camera, roll call, letterbox, grade and bloom (`shot`, `flight`; `tools/vfx_sim.luau`'s Hyperbeam renders it) |

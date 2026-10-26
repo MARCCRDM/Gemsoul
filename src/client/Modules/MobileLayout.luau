@@ -38,9 +38,11 @@
 	                                       loot card); topClaimed(except?)
 	                                       says if anything else does, and
 	                                       onTop(fn) hears when that changes
-	  MobileLayout.kaiju(chat)             your kaiju's card (KaijuHud), under
-	                                       the coins (beside the CHAT button,
-	                                       if there is one), TAME beside it
+	  MobileLayout.kaiju(screen, hunting)  your kaiju's card (KaijuHud), three
+	                                       by three, right of your coins (top
+	                                       right while you hunt), and CATCH;
+	                                       kaijuDesk(screen) on a computer,
+	                                       kaijuCells(card) its cells
 	  MobileLayout.Drive                   a mech's HOP OUT button (VehicleDrive),
 	                                       bottom middle on every screen, in
 	                                       PLAY's place on a phone (PLAY hides
@@ -169,44 +171,81 @@ function MobileLayout.health()
 	return { X = wallet.X, Y = wallet.Y + wallet.H + 4, W = wallet.W, H = 20 }
 end
 
-function MobileLayout.kaiju(chat: boolean?)
-	local health = MobileLayout.health()
-	-- (Wide enough for four tiles, the team's three and the support's, and
-	-- two buttons: AUTO HEAL and CALL BACK.)
-	local w = 316 -- (CATCH beside it still clears the teammates' cards on a 667-wide phone)
-	if chat then
-		-- Beside the CHAT button (under it, a short screen runs into the
-		-- dock), CATCH under the button.
-		local button = MobileLayout.chat(Vector2.zero, false)
-		local x = button.X + button.W + 8
-		return {
-			X = x,
-			Y = button.Y,
-			W = w,
-			H = 50,
-			TameX = button.X,
-			TameY = button.Y + button.H + 6,
-			TameW = button.W,
-		}
+-- Your kaiju's card (KaijuHud): one card, three across and three down: the
+-- team's three on top, then the support beside AUTO HEAL and CALL BACK, and
+-- the team's HYPERBEAM (KaijuBeamHud) along the bottom. On a phone it sits
+-- right of your coins and health, as tall as there's room for above the
+-- dock (down to Max); while you hunt, up at the top right (the fight's foe
+-- list has the top left then), clear of the teammates' cards. TameX, TameY,
+-- TameW, TameH: where CATCH goes on a touch screen (the top right; left of
+-- the card while you hunt).
+MobileLayout.Kaiju = { W = 186, Pad = 4, Gap = 3, Max = 136, Split = { 0.37, 0.34 } }
+function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
+	local spec = MobileLayout.Kaiju
+	local x, y, room
+	if hunting then
+		x, y = screen.X - 12 - spec.W, 12
+		room = MobileLayout.party(screen).Y - 6 - y
+	else
+		local wallet = MobileLayout.wallet()
+		x, y = wallet.X + wallet.W + 8, wallet.Y
+		room = MobileLayout.dock(screen, 5).Y - 6 - y
 	end
-	local x, y = 12, health.Y + health.H + 6
-	return { X = x, Y = y, W = w, H = 50, TameX = x + w + 8, TameY = y, TameW = 86 }
+	local h = math.min(spec.Max, room)
+	local inner = h - spec.Pad * 2 - spec.Gap * 2
+	local r1 = math.floor(inner * spec.Split[1])
+	local r2 = math.floor(inner * spec.Split[2])
+	local tameW = math.min(210, screen.X - 24)
+	return {
+		X = x,
+		Y = y,
+		W = spec.W,
+		H = h,
+		Pad = spec.Pad,
+		Gap = spec.Gap,
+		Rows = { r1, r2, inner - r1 - r2 },
+		TameX = if hunting then x - 8 - tameW else screen.X - 12 - tameW,
+		TameY = if hunting then 12 else 52,
+		TameW = tameW,
+		TameH = 90,
+	}
 end
 
--- The team's HYPERBEAM button (Client.KaijuBeamHud). On a computer it takes
--- the row the chat keeps clear above the kaiju strip (ChatFeed's BOTTOM
--- leaves it), left-aligned with it. On a phone it sits up by your coins and
--- health bar, right of them: under the strip there's Roblox's thumbstick
--- (and on a short screen the dock), and it stays put while you hunt, the
--- strip gone up to the top right.
-MobileLayout.Beam = { W = 262, H = 62, PhoneW = 150, PhoneH = 46 }
-function MobileLayout.beam(screen: Vector2, phone: boolean)
-	local spec = MobileLayout.Beam
-	if not phone then
-		return { X = 24, Y = screen.Y - 24 - 62 - 8 - spec.H, W = spec.W, H = spec.H }
+-- The same card on a computer: bottom left, a fixed size (ChatFeed keeps
+-- its bottom clear above it).
+MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 62, 54, 46 } }
+function MobileLayout.kaijuDesk(screen: Vector2)
+	local spec = MobileLayout.KaijuDesk
+	local h = spec.Pad * 2 + spec.Gap * 2 + spec.Rows[1] + spec.Rows[2] + spec.Rows[3]
+	return {
+		X = 24,
+		Y = screen.Y - 24 - h,
+		W = spec.W,
+		H = h,
+		Pad = spec.Pad,
+		Gap = spec.Gap,
+		Rows = table.clone(spec.Rows),
+	}
+end
+
+-- The card's cells, inside it (`card`: kaiju's or kaijuDesk's): the
+-- team's three across the top (Fighters), then Support, Auto (AUTO HEAL)
+-- and Call (CALL BACK), and Beam the width of the bottom row.
+function MobileLayout.kaijuCells(card)
+	local pad, gap, rows = card.Pad, card.Gap, card.Rows
+	local cell = math.floor((card.W - pad * 2 - gap * 2) / 3)
+	local function at(column: number, y: number, h: number)
+		return { X = pad + (column - 1) * (cell + gap), Y = y, W = cell, H = h }
 	end
-	local wallet = MobileLayout.wallet()
-	return { X = wallet.X + wallet.W + 8, Y = wallet.Y, W = spec.PhoneW, H = spec.PhoneH }
+	local y2 = pad + rows[1] + gap
+	local y3 = y2 + rows[2] + gap
+	return {
+		Fighters = { at(1, pad, rows[1]), at(2, pad, rows[1]), at(3, pad, rows[1]) },
+		Support = at(1, y2, rows[2]),
+		Auto = at(2, y2, rows[2]),
+		Call = at(3, y2, rows[2]),
+		Beam = { X = pad, Y = y3, W = card.W - pad * 2, H = rows[3] },
+	}
 end
 
 -- The fight's ring of buttons on a touch screen (Client.Combat): ATTACK in

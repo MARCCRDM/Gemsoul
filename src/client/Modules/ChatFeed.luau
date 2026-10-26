@@ -38,9 +38,9 @@ local handheld = UserInputService.TouchEnabled and not UserInputService.Keyboard
 
 local WIDTH = 420
 local LEFT = 24
--- Its bottom sits above the kaiju card (62 tall, 24 up) and TAME over it
--- (62 more, 8 apart): KaijuHud's computer layout.
-local BOTTOM = 24 + 62 + 8 + 62 + 12
+-- Its bottom sits above the kaiju card (24 up: KaijuHud's computer layout,
+-- MobileLayout.kaijuDesk), its team, buttons and HYPERBEAM.
+local BOTTOM = 24 + MobileLayout.kaijuDesk(Vector2.zero).H + 12
 -- Its top stays under the lobby's PLAY stack (LobbyUI: from 54 down, 272
 -- tall on a computer).
 local STACK_BOTTOM = 340

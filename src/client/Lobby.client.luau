@@ -48,9 +48,11 @@ require(script.Parent.Modules.EdgeDome).start()
 
 -- Your mini kaiju: its card, RECALL, HUNT and TAME, and the kaiju panel.
 if Config.Features == nil or Config.Features.Kaiju ~= false then
-	require(script.Parent.Modules.KaijuHud).start()
-	-- The team's HYPERBEAM: its button by the strip, and the blast itself.
-	require(script.Parent.Modules.KaijuBeamHud).start()
+	local KaijuHud = require(script.Parent.Modules.KaijuHud)
+	KaijuHud.start()
+	-- The team's HYPERBEAM: its button along the kaiju card's bottom, and
+	-- the blast itself.
+	require(script.Parent.Modules.KaijuBeamHud).start(KaijuHud.beamSlot())
 	require(script.Parent.Modules.KaijuBeamFx).start()
 	-- Kaiju battles: the formation board, the battle bar and the result.
 	require(script.Parent.Modules.KaijuBattleUI).start()

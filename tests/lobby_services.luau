@@ -199,7 +199,18 @@ local IronUi = {
 	juice = function() end,
 	outline = function() end,
 }
+-- (Its own ScreenGuis, e.g. the welcome banner's layer, land here.)
+local playerGui = new("Folder", { Name = "PlayerGui" })
 local UiKit = {
+	gui = function(name, order)
+		return new("ScreenGui", { Name = name, DisplayOrder = order or 0, AbsoluteSize = Vector2.new(1366, 768) }, playerGui)
+	end,
+	clearTopbar = function(_, _)
+		return 1, UDim2.fromScale(0.5, 0.5)
+	end,
+	onTopbar = function()
+		return function() end
+	end,
 	round = function() end,
 	list = function(parent)
 		return new("UIListLayout", {}, parent)

@@ -274,14 +274,20 @@ LobbyFeed.setCompact(false)
 check(stack.Visible == true, "A computer's feed hid for a phone's loot card")
 MobileLayout.claimTop("MinerLoot", false)
 
--- The welcome banner: only with a reward paid this session, and only once.
+-- The welcome banner: only with a reward paid this session, and only once,
+-- in its own layer over the whole HUD (the kaiju card, FIGHT, the kit switch).
+local function welcomeLayer()
+	return playerGui:FindFirstChild("Welcome")
+end
 LobbyFeed.welcome()
-check(gui:FindFirstChild("Welcome") == nil, "A banner without a reward")
+check(welcomeLayer() == nil and gui:FindFirstChild("Welcome") == nil, "A banner without a reward")
 player:SetAttribute("DailyReward", 125)
 player:SetAttribute("DailyStreak", 3)
 LobbyFeed.welcome()
-local banner = gui:FindFirstChild("Welcome")
-check(banner ~= nil, "No welcome banner")
+local layer = welcomeLayer()
+local banner = layer and layer:FindFirstChild("Welcome")
+check(banner ~= nil and gui:FindFirstChild("Welcome") == nil, "No welcome banner in its own layer")
+check(layer ~= nil and layer.DisplayOrder > 8 and layer.IgnoreGuiInset == true, "The banner's layer isn't over the HUD")
 check(gui:GetAttribute("WelcomeOpen") == true, "The Tasks button wasn't told to step aside")
 local words = {}
 for _, d in banner:GetDescendants() do
@@ -323,9 +329,9 @@ for _, d in banner:GetDescendants() do
 	end
 end
 check(gui:GetAttribute("WelcomeOpen") == nil, "Closing the banner didn't bring the Tasks button back")
-banner:Destroy()
+check(welcomeLayer() == nil, "Closing the banner left its layer up")
 LobbyFeed.welcome()
-check(gui:FindFirstChild("Welcome") == nil, "The banner showed twice")
+check(welcomeLayer() == nil, "The banner showed twice")
 print(
 	"PASS: "
 		.. (checks - feedChecks)

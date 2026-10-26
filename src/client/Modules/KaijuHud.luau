@@ -16,10 +16,14 @@
 	                  AWAY); then DEPLOY brings it out again, only out of
 	                  danger (IN DANGER till then: Shared.Kaiju.away,
 	                  KaijuServer's KaijuDanger). Tap a tile for
-	                  the panel on that kaiju. Computer:
-	                  bottom left. Phone: under your level and coins, and at
-	                  the top right while you hunt (the fight's foe list has
-	                  the top left then).
+	                  the panel on that kaiju. One card, three by three:
+	                  the team's three across the top; the support, AUTO
+	                  HEAL and CALL BACK; the team's HYPERBEAM along the
+	                  bottom (KaijuBeamHud, in KaijuHud.beamSlot()).
+	                  Computer: bottom left. Phone: right of your level and
+	                  coins, and at the top right while you hunt (the
+	                  fight's foe list has the top left then)
+	                  (MobileLayout.kaiju, kaijuDesk, kaijuCells).
 	  TAME            beside the strip when a wild kaiju near you is down to
 	                  half its health (it glows gold then: KaijuTaming): the
 	                  chance now, and the tries left. It casts the tame
@@ -101,7 +105,6 @@ local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local KaijuRoll = require(script.Parent.KaijuRoll)
 local KaijuTaming = require(script.Parent.KaijuTaming)
-local ChatFeed = require(script.Parent.ChatFeed)
 local LoadingFlow = require(script.Parent.LoadingFlow)
 local MobileLayout = require(script.Parent.MobileLayout)
 local BodyHealth = require(script.Parent.BodyHealth)
@@ -449,6 +452,14 @@ local callState = label(callButton, "", 8, P.Dim, IronUi.Bold)
 callState.TextXAlignment = Enum.TextXAlignment.Center
 local callWant: boolean? = nil -- (pressed here, till the roster says so)
 
+-- The team's HYPERBEAM, along the card's bottom row (KaijuBeamHud draws it
+-- in here: KaijuHud.beamSlot()).
+local beamSlot = new("Frame", {
+	Name = "BeamSlot",
+	BackgroundTransparency = 1,
+	ZIndex = 2,
+}, card)
+
 -- CATCH: beside the strip, when there's a wild kaiju to catch.
 local tame = new("TextButton", {
 	Name = "Tame",
@@ -474,73 +485,76 @@ catchName.Position, catchName.Size = UDim2.fromOffset(8, 30), UDim2.new(1, -16, 
 catchName.TextXAlignment = Enum.TextXAlignment.Center
 catchName.TextTruncate = Enum.TextTruncate.AtEnd
 
--- Where the strip and TAME go: see the header.
+-- Where the card and TAME go: see the header.
 local function layout()
 	local screen = gui.AbsoluteSize
 	if screen.X <= 0 then
 		return
 	end
+	local function place(frame: GuiObject, rect)
+		frame.AnchorPoint = Vector2.zero
+		frame.Position = UDim2.fromOffset(rect.X, rect.Y)
+		frame.Size = UDim2.fromOffset(rect.W, rect.H)
+	end
 	local phone = UiKit.short()
 	local hunting = Spar.hunting(player)
-	-- (Beside the chat box's CHAT button on a small keyboard screen, while it's on.)
-	local spot = MobileLayout.kaiju(UserInputService.KeyboardEnabled and not ChatFeed.Enabled)
-	local w, h = if phone then spot.W else 432, if phone then spot.H else 62
-	card.Size = UDim2.fromOffset(w, h)
-	tame.Size = UDim2.fromOffset(if phone then spot.TameW else 104, h)
-	local x, y
-	if not phone then
-		x, y = 24, screen.Y - 24 - h
-		tame.Position = UDim2.fromOffset(x, y - h - 8)
-	elseif hunting then
-		x, y = screen.X - 12 - w, 12
-		tame.Position = UDim2.fromOffset(screen.X - 12 - tame.Size.X.Offset, y + h + 6)
-	else
-		x, y = spot.X, spot.Y
-		tame.Position = UDim2.fromOffset(spot.TameX, spot.TameY or y)
-	end
-	card.Position = UDim2.fromOffset(x, y)
-	-- A readable, non-modal prompt: above the pet strip on touch, above the
-	-- combat HUD at center on desktop. No extra mobile action when unavailable.
-	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	tame.Size = UDim2.fromOffset(if touch then math.min(210, screen.X - 24) else 260, 90)
-	tame.Position = if touch
-		then UDim2.fromOffset(screen.X - tame.Size.X.Offset - 12, if hunting then y + h + 8 else math.max(12, y - 98))
-		else UDim2.fromOffset((screen.X - 260) / 2, math.max(12, screen.Y - 225))
-	tameTitle.Text = if touch then "TAP TO CATCH" else "[ C ]  CATCH"
-	-- The tiles share what AUTO HEAL and CALL BACK leave.
-	local buttonW, gap = if phone then 54 else 68, if phone then 4 else 6
-	local th = h - 10
-	-- (The support's tile a gap further along: it isn't one of the three.)
-	local tw = math.min(
-		math.floor(th * 1.25),
-		math.floor((w - 10 - buttonW * 2 - gap - 8 - gap * #tiles) / #tiles)
-	)
+	-- One card, three by three (MobileLayout.kaiju, kaijuDesk, kaijuCells):
+	-- the team's three; the support, AUTO HEAL and CALL BACK; the HYPERBEAM.
+	local spot = if phone then MobileLayout.kaiju(screen, hunting) else MobileLayout.kaijuDesk(screen)
+	card.Position = UDim2.fromOffset(spot.X, spot.Y)
+	card.Size = UDim2.fromOffset(spot.W, spot.H)
+	local cells = MobileLayout.kaijuCells(spot)
 	for slot, tile in tiles do
-		local apart = if slot == Kaiju.SupportSlot then gap else 0
-		tile.Button.Position = UDim2.fromOffset(5 + (slot - 1) * (tw + gap) + apart, 5)
-		tile.Button.Size = UDim2.fromOffset(tw, th)
+		local rect = if slot == Kaiju.SupportSlot then cells.Support else cells.Fighters[slot]
+		if rect then
+			place(tile.Button, rect)
+			-- Q, E, R and its gem surge down the right edge, spaced to fit.
+			local step = math.clamp(math.floor((rect.H - 12) / 4), 5, 9)
+			for i, key in KEYS do
+				local gem = key == "Gem"
+				local size = math.min(if gem then 6 else 7, step - 1)
+				local dot = tile.Dots[key].Frame
+				dot.Size = UDim2.fromOffset(size, size)
+				dot.Position = UDim2.new(1, if gem then -5 else -4, 0, 3 + (i - 1) * step + (if gem then 1 else 0))
+			end
+		end
 	end
-	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or OFF.
-	local gemSize, gemY = if phone then 13 else 18, if phone then 3 else 4
-	autoButton.Size = UDim2.fromOffset(buttonW, th)
-	autoButton.Position = UDim2.new(1, -5 - buttonW - gap, 0.5, 0)
-	-- CALL BACK: its gem mark, then its name, and IN DANGER when it can't.
-	callButton.Size = UDim2.fromOffset(buttonW, th)
-	local mark = if phone then 10 else 12
-	callMark.Size = UDim2.fromOffset(mark, mark)
-	callMark.Position = UDim2.new(0.5, 0, 0, if phone then 6 else 8)
-	callTitle.Position = UDim2.new(0, 0, 0, if phone then 19 else 24)
-	callTitle.Size, callTitle.TextSize = UDim2.new(1, 0, 0, 11), if phone then 8 else 9
-	callState.Position = UDim2.new(0, 0, 1, -(if phone then 12 else 15))
-	callState.Size, callState.TextSize = UDim2.new(1, 0, 0, 10), if phone then 7 else 8
-	autoGem.Position, autoGem.Size = UDim2.fromOffset(6, gemY), UDim2.fromOffset(gemSize, gemSize)
-	autoCount.Position, autoCount.Size = UDim2.fromOffset(9 + gemSize, gemY), UDim2.new(1, -13 - gemSize, 0, gemSize)
-	autoCount.TextSize = if phone then 11 else 12
+	place(autoButton, cells.Auto)
+	place(callButton, cells.Call)
+	place(beamSlot, cells.Beam)
+	-- CATCH: a readable, non-modal prompt, at the top right on touch (under
+	-- the card while you hunt), above the combat HUD at center on a computer.
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	if touch then
+		local at = MobileLayout.kaiju(screen, hunting)
+		tame.Size = UDim2.fromOffset(at.TameW, at.TameH)
+		tame.Position = UDim2.fromOffset(at.TameX, at.TameY)
+	else
+		tame.Size = UDim2.fromOffset(260, 90)
+		tame.Position = UDim2.fromOffset((screen.X - 260) / 2, math.max(12, screen.Y - 225))
+	end
+	tameTitle.Text = if touch then "TAP TO CATCH" else "[ C ]  CATCH"
+	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or
+	-- OFF; CALL BACK: its gem mark, then its name, and IN DANGER when it
+	-- can't. (Smaller on a short row.)
+	local th = cells.Auto.H
+	local small = th < 46
+	local gemSize, gemY = if small then 11 else 16, if small then 2 else 4
+	autoGem.Position, autoGem.Size = UDim2.fromOffset(5, gemY), UDim2.fromOffset(gemSize, gemSize)
+	autoCount.Position, autoCount.Size = UDim2.fromOffset(8 + gemSize, gemY), UDim2.new(1, -12 - gemSize, 0, gemSize)
+	autoCount.TextSize = if small then 10 else 12
 	autoTitle.Position = UDim2.fromOffset(0, gemY + gemSize + 1)
-	autoTitle.Size, autoTitle.TextSize = UDim2.new(1, 0, 0, if phone then 9 else 11), if phone then 8 else 9
-	local stateH = if phone then 11 else 14
-	autoState.Position = UDim2.new(0, 0, 1, -(if phone then 2 else 3) - stateH)
-	autoState.Size, autoState.TextSize = UDim2.new(1, 0, 0, stateH), if phone then 11 else 13
+	autoTitle.Size, autoTitle.TextSize = UDim2.new(1, 0, 0, if small then 9 else 11), if small then 7 else 9
+	local stateH = if small then 10 else 14
+	autoState.Position = UDim2.new(0, 0, 1, -1 - stateH)
+	autoState.Size, autoState.TextSize = UDim2.new(1, 0, 0, stateH), if small then 10 else 13
+	local mark = if small then 8 else 12
+	callMark.Size = UDim2.fromOffset(mark, mark)
+	callMark.Position = UDim2.new(0.5, 0, 0, if small then 4 else 8)
+	callTitle.Position = UDim2.new(0, 0, 0, if small then 14 else 24)
+	callTitle.Size, callTitle.TextSize = UDim2.new(1, 0, 0, if small then 10 else 11), if small then 7 else 9
+	callState.Position = UDim2.new(0, 0, 1, -(if small then 10 else 15))
+	callState.Size, callState.TextSize = UDim2.new(1, 0, 0, if small then 9 else 10), if small then 7 else 8
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 player:GetAttributeChangedSignal("Hunt"):Connect(layout)
@@ -2614,6 +2628,11 @@ end
 tame.Activated:Connect(catchReady)
 
 local started = false
+-- Where the team's HYPERBEAM goes: the card's bottom row (KaijuBeamHud).
+function KaijuHud.beamSlot(): Frame
+	return beamSlot
+end
+
 function KaijuHud.start()
 	if started then
 		return

@@ -113,8 +113,8 @@ for _, s in SCREENS do
 	for name, r in { coins = wallet, ["pick card"] = card, dock = dock, ["CHAT button"] = closed, ["teammates' cards"] = party } do
 		check(not MobileLayout.overlaps(health, r), label .. ": the health bar overlaps the " .. name)
 	end
-	for _, chat in { false, true } do
-		check(not MobileLayout.overlaps(health, MobileLayout.kaiju(chat)), label .. ": the kaiju card covers the health bar")
+	for _, hunting in { false, true } do
+		check(not MobileLayout.overlaps(health, MobileLayout.kaiju(screen, hunting)), label .. ": the kaiju card covers the health bar")
 	end
 	check(not MobileLayout.overlaps(wallet, closed), label .. ": the CHAT button overlaps the coins")
 	check(not MobileLayout.overlaps(wallet, dock), label .. ": the coins overlap the dock")
@@ -132,58 +132,48 @@ for _, s in SCREENS do
 	check(dock.TileWidth * TILES + dock.Gap * (TILES - 1) <= dock.W, label .. ": the tiles spill off the dock")
 	check(dock.TileWidth >= 44 and dock.TileHeight >= 44, label .. ": tiles too small to tap")
 	check(open.H >= 120 and open.W >= 240, label .. ": the open chat is too small to read")
-	-- Your kaiju's card and CATCH, with and without the CHAT button above.
-	for _, chat in { false, true } do
-		local k = MobileLayout.kaiju(chat)
-		local tame = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.H }
-		local what = label .. (if chat then " (with CHAT)" else "")
-		check(inside(k) and inside(tame), what .. ": the kaiju card runs off the screen")
-		for name, r in
-			{
-				["pick card"] = card,
-				coins = wallet,
-				dock = dock,
-				["teammates' cards"] = party,
-				jump = jump,
-				["loot card"] = loot,
-				toast = toast,
-			}
-		do
+	-- Your kaiju's card (one card, three by three: the team's three, the
+	-- support with AUTO HEAL and CALL BACK, the HYPERBEAM along the bottom)
+	-- and CATCH: right of your coins, or up at the top right while you hunt.
+	-- On the screen, every cell big enough to tap and inside the card, clear
+	-- of everything round it. (Out hunting you aren't mining: no loot card,
+	-- and a toast may pass over it.)
+	for _, hunting in { false, true } do
+		local k = MobileLayout.kaiju(screen, hunting)
+		local tame = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.TameH }
+		local what = label .. (if hunting then " (hunting)" else "")
+		check(inside(k) and inside(tame), what .. ": the kaiju card or CATCH runs off the screen")
+		check(k.H >= 100, what .. ": the kaiju card is squashed: " .. k.H)
+		local cells = MobileLayout.kaijuCells(k)
+		local all = { cells.Fighters[1], cells.Fighters[2], cells.Fighters[3], cells.Support, cells.Auto, cells.Call, cells.Beam }
+		for i, cell in all do
+			check(cell.X >= 0 and cell.Y >= 0 and cell.X + cell.W <= k.W and cell.Y + cell.H <= k.H, what .. ": a cell spills out of the card: " .. i)
+			check(cell.W >= 50 and cell.H >= 28, what .. ": a cell too small to tap: " .. i)
+			for j = i + 1, #all do
+				check(not MobileLayout.overlaps(cell, all[j]), what .. ": two of the card's cells overlap: " .. i .. ", " .. j)
+			end
+		end
+		check(cells.Beam.W > cells.Auto.W * 2.5, what .. ": the HYPERBEAM isn't the width of the card")
+		local near = {
+			["pick card"] = card,
+			coins = wallet,
+			health = health,
+			dock = dock,
+			["teammates' cards"] = party,
+			jump = jump,
+			["CHAT button"] = closed,
+			thumbstick = MobileLayout.stick(screen),
+		}
+		if not hunting then
+			near["loot card"], near.toast = loot, toast
+		end
+		for name, r in near do
 			check(not MobileLayout.overlaps(k, r), what .. ": the kaiju card overlaps the " .. name)
+		end
+		check(not MobileLayout.overlaps(k, tame), what .. ": CATCH overlaps the kaiju card")
+		for name, r in { dock = dock, jump = jump, coins = wallet, ["pick card"] = card, thumbstick = MobileLayout.stick(screen) } do
 			check(not MobileLayout.overlaps(tame, r), what .. ": CATCH overlaps the " .. name)
 		end
-		if chat then
-			check(not MobileLayout.overlaps(k, closed), what .. ": the kaiju card overlaps the CHAT button")
-		end
-	end
-	-- The HYPERBEAM button (Client.KaijuBeamHud): up right of your coins and
-	-- health bar, the same hunting or not; on the screen, big enough to tap,
-	-- clear of everything round it: the kaiju card and CATCH (with and
-	-- without CHAT, and up at the top right while you hunt), the dock, the
-	-- thumbstick, the toast and loot card.
-	local beam = MobileLayout.beam(screen, true)
-	check(inside(beam) and beam.W >= 80 and beam.H >= 40, label .. ": the HYPERBEAM button runs off the screen or is too small")
-	local near = {
-		["pick card"] = card,
-		coins = wallet,
-		["health bar"] = MobileLayout.health(),
-		dock = dock,
-		["teammates' cards"] = party,
-		jump = jump,
-		["loot card"] = loot,
-		toast = toast,
-		["CHAT button"] = closed,
-		thumbstick = MobileLayout.stick(screen),
-	}
-	for _, chat in { false, true } do
-		local k = MobileLayout.kaiju(chat)
-		near["kaiju card" .. (if chat then " (with CHAT)" else "")] = k
-		near["CATCH" .. (if chat then " (with CHAT)" else "")] = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.H }
-	end
-	near["kaiju card (hunting)"] = { X = screen.X - 12 - 316, Y = 12, W = 316, H = 50 }
-	near["CATCH (hunting)"] = { X = screen.X - 12 - 210, Y = 12 + 50 + 8, W = 210, H = 90 }
-	for name, r in near do
-		check(not MobileLayout.overlaps(beam, r), label .. ": the HYPERBEAM button overlaps the " .. name)
 	end
 	-- The kit switch (pick or combat kit): just left of PLAY and level with
 	-- it, big enough to tap, on the screen, clear of PLAY, the tiles under
@@ -246,7 +236,7 @@ for _, s in SCREENS do
 	)
 	for _, chat in { false, true } do
 		local what = label .. (if chat then " (with CHAT)" else "")
-		local k = MobileLayout.kaiju(chat)
+		local k = MobileLayout.kaiju(screen, false)
 		local others = {
 			jump = jump,
 			PLAY = playRect,
@@ -259,7 +249,7 @@ for _, s in SCREENS do
 			coins = wallet,
 			health = MobileLayout.health(),
 			["kaiju card"] = k,
-			CATCH = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.H },
+			CATCH = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.TameH },
 		}
 		if chat then
 			others.CHAT = closed
@@ -294,5 +284,5 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, the HYPERBEAM button, at 7 screen sizes)"
+		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, the kaiju card three by three with its HYPERBEAM, at 7 screen sizes)"
 )

@@ -1,9 +1,9 @@
 --[[
 	The team's HYPERBEAM button (Server.KaijuBeamServer runs it; rules:
 	Shared.KaijuBeam; the show: KaijuBeamFx). Shown with the kaiju strip
-	(KaijuHud's) while your team's out, in mining and in fights alike, by
-	MobileLayout.beam: on a computer in the row above the strip, on a phone
-	up by your coins and health bar.
+	(KaijuHud's) while your team's out, in mining and in fights alike: the
+	bottom row of the kaiju card (KaijuHud.beamSlot()), under the team and
+	its buttons.
 
 	  Charging   a dark core filling with your team's colours (the emptiest
 	             of them: all must be full), CHARGING and its percent, and a
@@ -17,7 +17,8 @@
 	  SAVE       the switch at its corner: ON, your kaiju fight with blows
 	             alone and charge faster (the server's KaijuSaveCharge).
 
-	  KaijuBeamHud.start()   once, from Lobby.client
+	  KaijuBeamHud.start(slot)   once, from Lobby.client, with the card's
+	                             row to draw in (KaijuHud.beamSlot())
 	  KaijuBeamHud.aim() -> { X, Z }   where you're looking, flat (the
 	                                   camera's look, else your facing)
 ]]
@@ -32,7 +33,6 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local CombatSound = require(script.Parent.CombatSound)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
-local MobileLayout = require(script.Parent.MobileLayout)
 local UiKit = require(script.Parent.UiKit)
 
 local player = Players.LocalPlayer
@@ -46,8 +46,7 @@ local WHITE = Color3.new(1, 1, 1)
 local CHARGE = Color3.fromRGB(120, 196, 255) -- (a team with no colours yet)
 local READY_GOLD = Color3.fromRGB(255, 226, 120)
 
-local gui = UiKit.gui("KaijuBeam", 7)
-gui.Enabled = false
+local shownNow = false -- (with the kaiju card, while your team's out)
 
 -- The pill: a glow behind, the core (charge and ring), its words, the pips
 -- and the SAVE switch.
@@ -58,7 +57,7 @@ local button = new("TextButton", {
 	BackgroundColor3 = INK,
 	BackgroundTransparency = 0.08,
 	ZIndex = 3,
-}, gui)
+}, nil)
 UiKit.round(button, 14)
 local stroke = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.2 }, button)
 local scale = new("UIScale", { Scale = 1 }, button)
@@ -175,56 +174,52 @@ local busy = false
 local wasReady = false
 local colors = { CHARGE }
 
-local function phone(): boolean
-	return UiKit.short()
-end
-
 local function touch(): boolean
 	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 end
 
 local function layout()
-	local screen = gui.AbsoluteSize
-	if screen.X <= 0 then
+	local size = button.AbsoluteSize
+	if size.X <= 0 or size.Y <= 0 then
 		return
 	end
-	local small = phone()
-	local rect = MobileLayout.beam(screen, small)
-	button.Position = UDim2.fromOffset(rect.X, rect.Y)
-	button.Size = UDim2.fromOffset(rect.W, rect.H)
-	local core = rect.H - (if small then 8 else 12)
-	local left = if small then 4 else 6
+	-- (A short row, a phone's: title and SAVE on one line, the charge and
+	-- the pips on the next.)
+	local compact = size.Y < 40
+	local core = size.Y - (if compact then 6 else 10)
+	local left = if compact then 4 else 6
 	ring.Size = UDim2.fromOffset(core + 6, core + 6)
-	ring.Position = UDim2.fromOffset(left + core / 2, rect.H / 2)
+	ring.Position = UDim2.fromOffset(left + core / 2, size.Y / 2)
 	well.Size = UDim2.fromOffset(core, core)
 	well.Position = ring.Position
 	heart.Size = UDim2.fromOffset(math.floor(core * 0.32), math.floor(core * 0.32))
-	local textX = left + core + (if small then 6 else 10)
-	local textW = rect.W - textX - 6
-	local saveW, saveH = if small then 34 else 46, if small then 15 else 22
-	-- (SAVE: on a phone down in the bottom right, by the pips; on a
-	-- computer at the right, the words left of it.)
-	local wordsW, pipsW = textW, textW
-	if small then
-		saveH = 13
-		save.Position = UDim2.new(1, -saveW - 4, 1, -saveH - 3)
-		pipsW = textW - saveW - 6
+	local textX = left + core + (if compact then 6 else 10)
+	local textW = size.X - textX - 6
+	local saveW, saveH = if compact then 36 else 46, if compact then 13 else 20
+	save.Size = UDim2.fromOffset(saveW, saveH)
+	save.TextSize = if compact then 8 else 10
+	if compact then
+		local line = math.floor((size.Y - 4) / 2)
+		save.Position = UDim2.new(1, -saveW - 4, 0, 2)
+		title.Position, title.Size = UDim2.fromOffset(textX, 2), UDim2.fromOffset(textW - saveW - 6, line)
+		title.TextSize = math.min(12, line)
+		local stateW = math.min(80, textW - 40)
+		state.Position, state.Size = UDim2.fromOffset(textX, 2 + line), UDim2.fromOffset(stateW, line)
+		state.TextSize = math.min(9, line)
+		pipRow.Position = UDim2.fromOffset(textX + stateW + 4, 2 + line + math.floor((line - 5) / 2))
+		pipRow.Size = UDim2.fromOffset(textW - stateW - 4, 5)
 	else
 		save.Position = UDim2.new(1, -saveW - 8, 0.5, -saveH / 2)
-		wordsW = textW - saveW - 8
+		local wordsW = textW - saveW - 8
+		title.Position, title.Size = UDim2.fromOffset(textX, 4), UDim2.fromOffset(wordsW, 18)
+		title.TextSize = 15
+		state.Position, state.Size = UDim2.fromOffset(textX, 22), UDim2.fromOffset(wordsW, 12)
+		state.TextSize = 10
+		pipRow.Position = UDim2.fromOffset(textX, size.Y - 9)
+		pipRow.Size = UDim2.fromOffset(textW, 5)
 	end
-	title.Size = UDim2.fromOffset(wordsW, if small then 14 else 20)
-	save.Size = UDim2.fromOffset(saveW, saveH)
-	save.TextSize = if small then 8 else 10
-	title.Position = UDim2.fromOffset(textX, if small then 4 else 7)
-	title.TextSize = if small then 12 else 17
-	state.Position = UDim2.fromOffset(textX, if small then 18 else 27)
-	state.Size = UDim2.fromOffset(wordsW, if small then 12 else 14)
-	state.TextSize = if small then 9 else 11
-	pipRow.Position = UDim2.fromOffset(textX, rect.H - (if small then 10 else 14))
-	pipRow.Size = UDim2.fromOffset(pipsW, if small then 5 else 6)
 end
-gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
+
 
 -- Your kaiju out, in their slots' order: { Model, Color, Mana }.
 local function team()
@@ -307,7 +302,8 @@ local function refresh()
 	local hud = player.PlayerGui:FindFirstChild("KaijuHud")
 	local charge = player:GetAttribute("KaijuCharge")
 	local shown = hud ~= nil and hud:IsA("ScreenGui") and hud.Enabled and type(charge) == "number"
-	gui.Enabled = shown
+	shownNow = shown
+	button.Visible = shown
 	if not shown then
 		wasReady = false
 		return
@@ -374,7 +370,7 @@ function KaijuBeamHud.aim(): { X: number, Z: number }
 end
 
 local function fire()
-	if busy or not gui.Enabled then
+	if busy or not shownNow then
 		return
 	end
 	local charge = player:GetAttribute("KaijuCharge")
@@ -412,15 +408,20 @@ local function toggleSave()
 end
 
 local started = false
-function KaijuBeamHud.start()
+function KaijuBeamHud.start(slot: GuiObject)
 	if started then
 		return
 	end
 	started = true
+	-- In the kaiju card's bottom row, filling it.
+	button.Size = UDim2.fromScale(1, 1)
+	button.Position = UDim2.fromScale(0, 0)
+	button.Parent = slot
+	button:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 	button.Activated:Connect(fire)
 	save.Activated:Connect(toggleSave)
 	ContextActionService:BindActionAtPriority("KaijuHyperbeam", function(_, inputState)
-		if UserInputService:GetFocusedTextBox() or not gui.Enabled then
+		if UserInputService:GetFocusedTextBox() or not shownNow then
 			return Enum.ContextActionResult.Pass
 		end
 		if inputState == Enum.UserInputState.Begin then
