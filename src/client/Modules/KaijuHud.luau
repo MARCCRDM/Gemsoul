@@ -355,20 +355,19 @@ for slot = 1, #Kaiju.SlotLevels + 1 do
 	healthBack.AnchorPoint = Vector2.new(0, 1)
 	healthBack.Position, healthBack.Size = UDim2.new(0, 4, 1, -4), UDim2.new(1, -8, 0, 4)
 	healthBack.ZIndex, healthFill.ZIndex = 3, 3
-	if support then
-		-- The support's mark: a green plus above its health.
-		for _, size in { Vector2.new(9, 3), Vector2.new(3, 9) } do
-			local arm = new("Frame", {
-				Name = "SupportMark",
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(0, 9, 1, -15),
-				Size = UDim2.fromOffset(size.X, size.Y),
-				BackgroundColor3 = SUPPORT,
-				ZIndex = 4,
-			}, button)
-			UiKit.round(arm, 1)
-		end
-	end
+	-- Its role's symbol above its health, bottom left (RoleIcons: drawn
+	-- for whichever kaiju is in the slot, drawTile).
+	local roleMark = new("Frame", {
+		Name = "RoleMark",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, 11, 1, -17),
+		Size = UDim2.fromOffset(16, 16),
+		BackgroundColor3 = INK,
+		BackgroundTransparency = 0.3,
+		Visible = false,
+		ZIndex = 4,
+	}, button)
+	UiKit.round(roleMark, 8)
 	-- Knocked out: a veil, DOWN and when it's back by itself.
 	local veil = new("Frame", {
 		BackgroundColor3 = INK,
@@ -388,6 +387,8 @@ for slot = 1, #Kaiju.SlotLevels + 1 do
 		Level = level,
 		Dots = dots,
 		HealthFill = healthFill,
+		RoleMark = roleMark,
+		Role = nil :: string?,
 		Veil = veil,
 		VeilText = veilText,
 		Id = nil :: string?,
@@ -658,6 +659,16 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 		portrait(tile.View, modelFor("hud:" .. tile.Slot, record))
 	end
 	local support = tile.Slot == Kaiju.SupportSlot
+	local roleId = KaijuRoles.of(record.Species)
+	if tile.Role ~= roleId then
+		tile.Role = roleId
+		local RoleIcons = require(script.Parent.RoleIcons) -- (here: the module's top is at Luau's 200 locals)
+		tile.RoleMark:ClearAllChildren()
+		UiKit.round(tile.RoleMark, 8)
+		local icon = RoleIcons.draw(tile.RoleMark, roleId, 10, ROLE_COLORS[roleId] or P.Dim, 5)
+		icon.AnchorPoint, icon.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
+		tile.RoleMark.Visible = RoleIcons.has(roleId)
+	end
 	tile.Edge.Color = if lead then P.Gold elseif support then SUPPORT else color:Lerp(P.Edge, 0.35)
 	tile.Edge.Thickness = if lead or support then 2 else 1.5
 	local level = (model and model:GetAttribute("KaijuLevel")) or record.Level
@@ -1419,14 +1430,18 @@ local function kaijuRow(order: number, record, slot: number?, models)
 		Name = "Role",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -8, 0, 22),
-		Size = UDim2.fromOffset(62, 14),
+		Size = UDim2.fromOffset(76, 14),
 		BackgroundColor3 = roleColor:Lerp(INK, 0.78),
 		ZIndex = 3,
 	}, row)
 	UiKit.round(tag, 4)
 	new("UIStroke", { Color = roleColor, Thickness = 1, Transparency = 0.35 }, tag)
+	-- (Its symbol at the front, as on its HUD tile: RoleIcons.)
+	local roleIcon = require(script.Parent.RoleIcons).draw(tag, roleId, 9, roleColor, 4)
+	roleIcon.AnchorPoint, roleIcon.Position = Vector2.new(0, 0.5), UDim2.new(0, 5, 0.5, 0)
 	local roleText = label(tag, KaijuRoles.Roles[roleId] and KaijuRoles.Roles[roleId].Name or "", 9, roleColor, IronUi.Bold)
-	roleText.Size, roleText.TextXAlignment, roleText.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 4
+	roleText.Position, roleText.Size = UDim2.fromOffset(14, 0), UDim2.new(1, -16, 1, 0)
+	roleText.TextXAlignment, roleText.ZIndex = Enum.TextXAlignment.Center, 4
 	if soulUi.upgrade(record, soulUi.Gems or {}) then
 		-- (A better gem of its element in your pouch: ENCHANT.)
 		local dot = new("Frame", {

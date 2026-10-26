@@ -445,7 +445,12 @@ still or turning on the spot, they line up ahead of where you look.
   plus, "HEALS YOU"), then **AT HOME**.
 - Every row has its role as a coloured tag (TANK, WARRIOR, RANGED,
   ASSASSIN, BREAKER, SUPPORT), so you can see what the team is made of at
-  a glance.
+  a glance. Each role also has a symbol, in its colour, at the front of
+  its tag and on the kaiju's HUD tile (bottom left, above its health):
+  a shield (tank), crossed swords (warrior), a crosshair (ranged), a
+  dagger (assassin), a hammer (breaker) and a plus (support). They're drawn
+  from plain frames (`RoleIcons.luau`), not font glyphs, so they never
+  show as boxes.
 - The support's page says what it does. A support kind at home has **SET
   AS SUPPORT** instead of SEND OUT.
 
