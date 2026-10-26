@@ -423,6 +423,12 @@ Kaiju.SupportPulse = {
 	Gaps = { Mend = 6, BigMend = 18, Ward = 9, Strike = 2.5, Guard = 14 },
 }
 
+-- A support can't fight for its charge (it has no gem surge to build), so
+-- it charges off its team: every blow a teammate lands takes PerHit
+-- seconds off each of its waits (its gem R's, its mends' and its ward's),
+-- never below ready. The harder they fight, the sooner it's back.
+Kaiju.SupportCharge = { PerHit = 0.5 }
+
 -- What the support casts now (nil: nothing called for). `view`:
 --   Healths  { share }  you and the team in its reach, each 0..1
 --   Owner    share?     yours, 0..1

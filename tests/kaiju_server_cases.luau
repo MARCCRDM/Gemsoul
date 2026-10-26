@@ -6560,6 +6560,32 @@ end)()
 		check(#Enemies.shields == 1 and Enemies.shields[1].Player == c and Enemies.shields[1].Amount > 0, "Its gem R put no shield on you")
 		check(guarded, "Its gem R didn't guard itself too")
 	end
+	-- It can't fight for its charge: every blow a teammate lands takes
+	-- Kaiju.SupportCharge.PerHit off its waits (its own don't count).
+	do
+		local waitFor = pet.PulseAt[guardId]
+		local shown = pet.Model:GetAttribute("KaijuGemAt")
+		local fighterPet = nil
+		for _, member in out do
+			if member ~= pet then
+				fighterPet = member
+				break
+			end
+		end
+		local target = KaijuWilds.spawnBug(fighterPet.Root.Position + Vector3.new(4, 0, 0), { Prey = c, Band = "Fringe", Level = 1 })
+		target.Humanoid.MaxHealth, target.Humanoid.Health = 1e6, 1e6
+		local landed = 0
+		for _ = 1, 6 do
+			local outcome = KaijuServer.strike(fighterPet, target, 1, nil, false)
+			landed += if outcome == "Hit" or outcome == "Broken" then 1 else 0
+		end
+		local charged = landed * Kaiju.SupportCharge.PerHit
+		check(landed > 0 and math.abs((waitFor - pet.PulseAt[guardId]) - charged) < 1e-6, "A teammate's blows didn't charge the support's gem R")
+		check(math.abs((shown - pet.Model:GetAttribute("KaijuGemAt")) - charged) < 1e-6, "The HUD doesn't show the support charged")
+		local before = pet.PulseAt[guardId]
+		KaijuServer.strike(pet, target, 1, nil, false)
+		check(pet.PulseAt[guardId] == before, "The support's own blow charged itself")
+	end
 	end
 	-- An older save (no support yet) is given one on its next visit.
 	profiles[c].KaijuSupport = nil

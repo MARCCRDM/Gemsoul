@@ -405,7 +405,16 @@ still or turning on the spot, they line up ahead of where you look.
   | its **attack** (Static Bolt, 90% damage with its element's effect) | nobody needs it, and a foe within 30 studs (the team's foe first) |
 
   Each no sooner than its own gap after the last (big mend 18 s, gem R
-  14 s, mend 6 s, ward 9 s, attack 2.5 s). Moonmoth works the same way: Silk Cocoon
+  14 s, mend 6 s, ward 9 s, attack 2.5 s).
+- **It charges off its team** (*2026-10-26*, `Kaiju.SupportCharge`,
+  `KaijuServer.chargeSupport`). A support can't fight for its charge, so
+  every blow one of your fighting kaiju lands takes **0.5 s** off each of
+  its waits: its gem R, its mends and its ward. A team of three hitting
+  hard gets its gem R back in a few seconds instead of 14. Its own blows
+  don't count, and a blow that's parried, dodged or guarded doesn't
+  either. The gem dot on its HUD tile fills faster to match.
+
+  Moonmoth works the same way: Silk Cocoon
   is its mend, Scale Storm its ward, Antenna Beam its attack. In the field
   it is the only thing that heals you away from the Shelter, and only
   mid-fight.

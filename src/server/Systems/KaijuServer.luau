@@ -774,6 +774,23 @@ local function afflict(enemy, status: string?, amount: number, element: string)
 	end
 end
 
+-- `seconds` off each of `owner`'s support's waits (Kaiju.SupportCharge):
+-- its pulse's, and its gem R's as the HUD shows it (KaijuGemAt). (Past
+-- ready it banks nothing: a cast sets its wait afresh.)
+function KaijuServer.chargeSupport(owner: Player, seconds: number)
+	for _, pet in petsOf(owner) do
+		if pet.Slot == Kaiju.SupportSlot and pet.Model.Parent then
+			for id, at in pet.PulseAt or {} do
+				pet.PulseAt[id] = at - seconds
+			end
+			local shown = pet.Model:GetAttribute("KaijuGemAt")
+			if type(shown) == "number" then
+				pet.Model:SetAttribute("KaijuGemAt", shown - seconds)
+			end
+		end
+	end
+end
+
 -- A blow (or an E) from `pet` landing on a creature. Credited to its owner
 -- (for the kill's rewards), without the owner's own hit sounds. `heavy` is
 -- true or false for its blows (a wild kaiju's guard meets them as a
@@ -816,6 +833,10 @@ local function strike(pet: Pet, enemy, amount: number, status: string?, heavy: b
 	end
 	if enemy.Alive and (outcome == "Hit" or outcome == "Broken") then
 		afflict(enemy, status, amount, pet.Element)
+	end
+	-- A teammate's blow landing charges the support (Kaiju.SupportCharge).
+	if (outcome == "Hit" or outcome == "Broken") and not Kaiju.isSupport(pet.Record.Species) then
+		KaijuServer.chargeSupport(pet.Owner, Kaiju.SupportCharge.PerHit)
 	end
 	KaijuServer.onStrike(pet, outcome, heavy)
 	return outcome
