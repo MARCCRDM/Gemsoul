@@ -606,6 +606,9 @@ end
 -- Deals damage. `color` tints the floating number (element hits, crits).
 -- Set by CombatServer: stuns a player whose swing was parried.
 Enemies.parryPlayer = function(_player: Player, _seconds: number) end
+-- A shield on a player (a support kaiju's gem R): soaks `amount` of the
+-- blows they take for `seconds` (CombatServer fills it in).
+Enemies.shieldPlayer = function(_player: Player, _amount: number, _seconds: number) end
 Enemies.ParryWindow = 0.22 -- a swing landing this soon after the guard goes up is parried
 Enemies.GuardBreakSeconds = 0.9
 

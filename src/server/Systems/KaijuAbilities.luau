@@ -7,6 +7,11 @@
 
 	  KaijuAbilities.cast(caster, aim, id?) -> boolean   false if it can't
 	                        (id: the move, else its E)
+	  KaijuAbilities.guard(caster, id, owner) -> boolean   a support's gem R
+	                        (Kaiju.supportGuard), on its owner and itself:
+	                        its shell or ward on itself and a shield as
+	                        strong on its owner (owner.Shield), its mend on
+	                        them both, its ring round its owner
 	  KaijuAbilities.soak(body, amount) -> amount   a blow on it, less what
 	                        its R's shell or ward takes (KaijuServer.hurt,
 	                        Enemies.damage)
@@ -329,6 +334,45 @@ local function defend(caster, id: string, plan, damage: number): boolean
 		caster.Recharge(plan.Recharge)
 	end
 	aura(caster, plan, damage, seconds)
+	return true
+end
+
+-- A support's gem R (Kaiju.supportGuard), adjusted to its role: on its
+-- owner and on itself, not just itself. `owner` = { Root, Humanoid,
+-- Shield(amount, seconds) }. A shell or a ward: on itself as ever, and on
+-- its owner a shield as strong (a shell's Absorb, a ward's Reduce, of the
+-- owner's health) for as long; a mend heals them both; a ring goes off
+-- round its owner, knocking back what's on them.
+function KaijuAbilities.guard(caster, id: string, owner): boolean
+	local plan = Kaiju.AbilityPlans[id]
+	if not plan or not caster.Root or not owner or not owner.Root then
+		return false
+	end
+	caster.Model:SetAttribute(CAST_AT.Gem, workspace:GetServerTimeNow())
+	local damage = if caster.DamageOf then caster.DamageOf(id) else caster.Damage
+	local fx = sender(caster)
+	local seconds = plan.Duration or 4
+	if plan.Shape == "Mend" then
+		mend(caster, { Root = caster.Root, Body = caster.Body, Humanoid = caster.Humanoid }, id, plan)
+		return mend(caster, { Root = owner.Root, Humanoid = owner.Humanoid }, id, plan)
+	elseif plan.Shape == "Shell" or plan.Shape == "Ward" then
+		defend(caster, id, plan, damage)
+		local h = owner.Humanoid
+		local share = if plan.Shape == "Shell" then plan.Absorb else plan.Reduce
+		if h and share and owner.Shield then
+			owner.Shield(h.MaxHealth * math.min(share, 0.5), seconds)
+			KaijuAbilities.fx("TriadAura", owner.Root, id, caster.Element, if plan.Shape == "Shell" then "Shield" else "Armor", seconds)
+		end
+		return true
+	end
+	-- A ring: round its owner.
+	local color = GemConfig.ElementColors[caster.Element] or Color3.new(1, 1, 1)
+	local radius = (plan.Radius or 7) * math.max(caster.Size or 1, 0.75)
+	local center = owner.Root.Position
+	fx("Nova", center, radius, color, 0)
+	each(caster, center, radius, function(victim)
+		caster.Hit(victim, damage * (plan.Mult or 0.6), elementStatus(caster, plan.Status))
+	end)
 	return true
 end
 

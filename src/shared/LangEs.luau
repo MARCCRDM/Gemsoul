@@ -3110,6 +3110,13 @@ return {
 	["Hurt: it blooms bright, healing it, you and every ally near it {1}% of their health over {2}s and clearing their effects."] = "Herido: brilla con fuerza y se cura a sí mismo, a ti y a cada aliado cercano un {1}% de su vida durante {2} s, y les quita sus efectos.",
 	-- A kaiju's gem surge, its enchant's E, beside its own moves (KaijuHud's panel, KaijuRoll's cards).
 	["GEM SURGE"] = "DESCARGA DE GEMA",
+	-- A support's gem move: its enchant's R, on you and itself (KaijuHud's panel, Kaiju.supportGuard).
+	["GEM R"] = "R DE GEMA",
+	["Gem R: {=}"] = "R de gema: {=}",
+	["No gem R"] = "Sin R de gema",
+	["On you and on itself, when you're worn in a fight: a shield or ward on you both, a mend for you both, or a ring round you."] = "Sobre ti y sobre sí mismo, cuando estás desgastado en un combate: un escudo o una guarda sobre los dos, una cura para los dos o un anillo a tu alrededor.",
+	["{=} is enchanted with a {*} {*} gem. Gem R: {=}."] = "{=} lleva ahora un encantamiento {*3} {*2}. R de gema: {=4}.",
+	["{=} is enchanted with an {*} {*} gem. Gem R: {=}."] = "{=} lleva ahora un encantamiento {*3} {*2}. R de gema: {=4}.",
 	["GEM"] = "GEMA",
 	-- A kaiju's enchant: only a gem of its own element (KaijuHud's ENCHANT tab, KaijuServer.socketSoul).
 	["ATTUNED"] = "SINTONIZADA",

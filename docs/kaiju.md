@@ -63,7 +63,10 @@ when it's down to 60% health or a heavy blow or a cast is coming (at most
 every 14 seconds).
 
 **Its gem surge is its enchant's E** (`Kaiju.gemSurge`), cast beside its
-own moves from level 1, everywhere it fights:
+own moves from level 1, everywhere it fights. *2026-10-26:* a support
+has no gem surge. Its gem gives it its R instead, cast on you and on
+itself ([Your support](#your-support-the-fourth-kaiju)). The rest of
+this section is about the fighters:
 
 - **Its own element.** An enchant is rolled in its kaiju's element, and only
   a gem of its own element can enchant it (below), so a Thermal kaiju's gem
@@ -349,18 +352,20 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 ## Your support: the fourth kaiju
 
 Beside the three that fight, you have a fourth kaiju out: your
-**support**. It doesn't fight for creatures. It floats in the middle of
-your team and keeps you and your team going.
+**support**. It doesn't fight for creatures. It stays at your shoulder
+and keeps you and your team going.
 
 **They lead the way** (since 2026-10-26, `Kaiju.TeamSpots`,
-`Kaiju.leadSpot`): your team walks out in front of you, not behind. The
-first of the three leads, 16 studs ahead; the other two walk side by side
-behind it, 10 ahead and 5 to either side; the support floats in the
-middle of the three, 12.5 ahead. **They read where you're going**
-(`Kaiju.Lead`): on the move they face the way you're heading, not the way
-you look, and walk where you'll be 0.8 s from now (up to 14 studs
-further out), so they're already there when you arrive. Standing still
-or turning on the spot, they line up ahead of where you look.
+`Kaiju.leadSpot`): your team walks out in front of you, not behind, close
+in. The first of the three leads, 11 studs ahead; the other two walk side
+by side behind it, 7 ahead and 4 to either side (closer since the second
+pass on 2026-10-26: 16, 10 and 5 before). **The support stays at your
+shoulder**, 2.5 ahead and 2.5 to your right (it was 12.5 out in front).
+**They read where you're going** (`Kaiju.Lead`): on the move the three
+face the way you're heading, not the way you look, and walk where you'll
+be 0.6 s from now (up to 9 studs further out), so they're already there
+when you arrive. The support doesn't run ahead: it keeps to you. Standing
+still or turning on the spot, they line up ahead of where you look.
 
 ![Skyjelly, the starter support (offline render of the game's model; the stage overexposes its Ion-yellow core and tendril tips)](kaiju/skyjelly.jpg)
 
@@ -387,15 +392,30 @@ or turning on the spot, they line up ahead of where you look.
   | It casts | When |
   |---|---|
   | its **big mend** (Skyjelly: Bloom Surge, 30% over 4 s, effects cleared) | one of you under 35%, or the average under 50% |
+  | its **gem R**, on you and itself (below) | with foes about: you under 75%, or the average under 75% |
   | its **mend** (Pulse Mend, 15% over 3 s, heals you too) | one of you under 55%, two or more under 75%, or the average under 75% |
   | its **ward** (Static Veil, 30% less damage for 4 s) | with foes about: one of you under 80%, or the average under 90% (someone's taking the hits) |
   | its **attack** (Static Bolt, 90% damage with its element's effect) | nobody needs it, and a foe within 30 studs (the team's foe first) |
 
-  Each no sooner than its own gap after the last (big mend 18 s, mend
-  6 s, ward 9 s, attack 2.5 s). Moonmoth works the same way: Silk Cocoon
+  Each no sooner than its own gap after the last (big mend 18 s, gem R
+  14 s, mend 6 s, ward 9 s, attack 2.5 s). Moonmoth works the same way: Silk Cocoon
   is its mend, Scale Storm its ward, Antenna Beam its attack. In the field
   it is the only thing that heals you away from the Shelter, and only
   mid-fight.
+- **Its gem: its R, not a gem surge** (*2026-10-26*, `Kaiju.supportGuard`,
+  `Kaiju.gemMove`, `KaijuAbilities.guard`). A support casts no gem surge
+  (its enchant's E). Instead its enchant gives it its **R**, from level 1,
+  adjusted for a support: it goes **on you and on itself**, not just on
+  itself.
+  - A shell or a ward: on itself as ever, and on you a shield as strong
+    (a shell's share, or a ward's, of your health; up to half) for as long
+    (`Enemies.shieldPlayer`, CombatServer's shield).
+  - A mend: it heals you both.
+  - A ring: it goes off round you, hitting what's on you.
+
+  Ion Skyjelly's R is Ion Shield, Capacitor or Tesla Fence, as its gem
+  rolled. On the HUD tile it is the gem dot; the panel names it GEM R.
+  An enchant shows "Gem R: …" for a support.
 - **In a kaiju battle** it comes as a fourth piece (there are six cells a
   side). It stands at the back with the shooters and mends and wards its
   side, as a Warden does. 1V1 + KAIJU brings it too.

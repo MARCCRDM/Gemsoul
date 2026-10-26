@@ -2748,6 +2748,17 @@ function CombatServer.start()
 	Enemies.hitPlayer = function(player, amount, element, enemy, heavy, crit, swordHit)
 		return CombatServer.hurt(player, amount, element, enemy, heavy, crit, swordHit)
 	end
+	-- A support kaiju's gem R on you: a shield (the larger of it and any you
+	-- have, for the longer).
+	Enemies.shieldPlayer = function(player, amount, seconds)
+		if type(amount) ~= "number" or amount <= 0 or type(seconds) ~= "number" or seconds <= 0 then
+			return
+		end
+		local st = state(player)
+		local now = os.clock()
+		st.Shield = math.max(if now < st.ShieldUntil then st.Shield else 0, amount)
+		st.ShieldUntil = math.max(st.ShieldUntil, now + seconds)
+	end
 	-- A rival parried your swing: you're left open for a moment.
 	Enemies.parryPlayer = function(player, seconds)
 		local st = state(player)

@@ -346,14 +346,16 @@ Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 10, Bomber = 8, Finish 
 -- 10, a third at 20).
 Kaiju.SlotLevels = { 1, 1, 1 }
 -- Where each of the team walks with you: studs to your right (left when
--- negative) and behind you (negative: ahead). They lead the way: the first
--- well out in front, the other two side by side behind it, and the
--- fourth, the support's (SupportSlot), in the middle of the three.
-Kaiju.TeamSpots = { { 0, -16 }, { 5, -10 }, { -5, -10 }, { 0, -12.5 } }
+-- negative) and behind you (negative: ahead). They lead the way, close in:
+-- the first out in front, the other two side by side behind it. The
+-- fourth, the support's (SupportSlot), stays at your shoulder, just ahead
+-- on your right.
+Kaiju.TeamSpots = { { 0, -11 }, { 4, -7 }, { -4, -7 }, { 2.5, -2.5 } }
 -- Leading, they read where you're going: on the move (faster than Moving
 -- studs a second) they face the way you're heading, not the way you look,
 -- and walk where you'll be Seconds from now (no further than Max ahead).
-Kaiju.Lead = { Moving = 3, Seconds = 0.8, Max = 14 }
+-- The support doesn't run ahead: it keeps to you.
+Kaiju.Lead = { Moving = 3, Seconds = 0.6, Max = 9 }
 
 -- Where the one in `slot` walks: you at `position`, looking along `look`,
 -- moving at `velocity` (Lead).
@@ -365,7 +367,9 @@ function Kaiju.leadSpot(position: Vector3, look: Vector3, velocity: Vector3?, sl
 	local ahead = position
 	if moving.Magnitude > lead.Moving then
 		heading = moving.Unit
-		ahead = position + moving.Unit * math.min(moving.Magnitude * lead.Seconds, lead.Max)
+		if slot ~= Kaiju.SupportSlot then
+			ahead = position + moving.Unit * math.min(moving.Magnitude * lead.Seconds, lead.Max)
+		end
 	end
 	heading = if heading.Magnitude > 1e-3 then heading.Unit else Vector3.new(0, 0, -1)
 	local right = heading:Cross(Vector3.new(0, 1, 0))
@@ -406,13 +410,15 @@ Kaiju.SupportPulse = {
 	WardOne = 0.8,
 	WardAverage = 0.9,
 	StrikeRange = 30,
-	Gaps = { Mend = 6, BigMend = 18, Ward = 9, Strike = 2.5 },
+	Gaps = { Mend = 6, BigMend = 18, Ward = 9, Strike = 2.5, Guard = 14 },
 }
 
 -- What the support casts now (nil: nothing called for). `view`:
 --   Healths  { share }  you and the team in its reach, each 0..1
+--   Owner    share?     yours, 0..1
 --   Foes     number     foes in its StrikeRange
---   Ready    { Mend?, BigMend?, Ward?, Strike? }  which it has and can cast
+--   Ready    { Mend?, BigMend?, Ward?, Strike?, Guard? }  which it has and
+--            can cast (Guard: its gem's R, on you and itself: supportGuard)
 function Kaiju.supportChoice(view): string?
 	local rules = Kaiju.SupportPulse
 	local healths, ready = view.Healths or {}, view.Ready or {}
@@ -428,11 +434,16 @@ function Kaiju.supportChoice(view): string?
 	if (lowest < rules.Critical or average < rules.LowAverage) and ready.BigMend then
 		return "BigMend"
 	end
+	local foes = (view.Foes or 0) > 0
+	-- Its gem's R, on you and itself: in a fight once you're worn, or the
+	-- team is on average.
+	if foes and ready.Guard and ((view.Owner or 1) < rules.Worn or average < rules.Average) then
+		return "Guard"
+	end
 	local hurt = lowest < rules.Hurt or worn >= 2 or average < rules.Average
 	if hurt and ready.Mend then
 		return "Mend"
 	end
-	local foes = (view.Foes or 0) > 0
 	if foes and (lowest < rules.WardOne or average < rules.WardAverage) and ready.Ward then
 		return "Ward"
 	end
@@ -1287,8 +1298,8 @@ end
 -- one a kaiju can't cast (a dash, a "while ready" bonus), its element's
 -- first (Kaiju.Abilities).
 function Kaiju.recordSurge(record): string?
-	if not Kaiju.attuned(record) then
-		return nil
+	if not Kaiju.attuned(record) or Kaiju.isSupport(record.Species) then
+		return nil -- (a support casts none: its gem gives it its R, supportGuard)
 	end
 	local id = GemTraits.traitFor(record.Soul, "E")
 	if id and Kaiju.AbilityPlans[id] then
@@ -1300,6 +1311,33 @@ function Kaiju.recordSurge(record): string?
 		end
 	end
 	return nil
+end
+
+-- A support's gem move: no gem surge (recordSurge), but its Gemsoul's R,
+-- cast on you and on itself (KaijuAbilities.guard: a shell or ward on it
+-- and a shield as strong on you, a mend on you both, a ring round you),
+-- from the start; one it can't cast, its element's first.
+function Kaiju.supportGuard(record): string?
+	if not record or not Kaiju.isSupport(record.Species) or not Kaiju.isSoul(record.Soul) then
+		return nil
+	end
+	local id = GemTraits.traitFor(record.Soul, "R")
+	if id and Kaiju.AbilityPlans[id] then
+		return id
+	end
+	local lanes = GemTraits.SoulMoves[record.Element or record.Soul.Element]
+	for _, other in (lanes and lanes.Defense) or {} do
+		if Kaiju.AbilityPlans[other] then
+			return other
+		end
+	end
+	return nil
+end
+
+-- Its gem's move, whichever it casts: a fighter's gem surge (its E), a
+-- support's R (supportGuard).
+function Kaiju.gemMove(record): string?
+	return if record and Kaiju.isSupport(record.Species) then Kaiju.supportGuard(record) else Kaiju.recordSurge(record)
 end
 
 -- Whether `gem` (a gem from the pouch) can enchant `record`, and why not:
@@ -1328,7 +1366,8 @@ function Kaiju.article(word: string): string
 end
 
 -- How `record` would stand enchanted with `gem`: { Stats, Surge, Tier,
--- Attuned } (recordStats and recordSurge of it with that gem in).
+-- Attuned } (recordStats and gemMove of it with that gem in: a support's
+-- Surge is its gem's R).
 function Kaiju.enchanted(record, gem)
 	if not record then
 		return nil
@@ -1337,7 +1376,7 @@ function Kaiju.enchanted(record, gem)
 	trial.Soul = gem
 	return {
 		Stats = Kaiju.recordStats(trial),
-		Surge = Kaiju.recordSurge(trial),
+		Surge = Kaiju.gemMove(trial),
 		Tier = gem and gem.Tier or "Common",
 		Attuned = Kaiju.attuned(trial),
 	}

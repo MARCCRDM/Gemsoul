@@ -338,6 +338,10 @@ local PlayerData = {
 local enemies = {}
 local playerHits = {}
 local Enemies = {}
+Enemies.shields = {} -- (a support's gem R on its owner)
+function Enemies.shieldPlayer(player, amount, seconds)
+	table.insert(Enemies.shields, { Player = player, Amount = amount, Seconds = seconds })
+end
 function Enemies.adopt(model, kind, opts)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	humanoid.MaxHealth, humanoid.Health = kind.Health, kind.Health
@@ -6455,6 +6459,28 @@ end)()
 	flush()
 	check(pet.LastPulse == "Strike", "Everyone whole and a foe by it: it didn't attack (" .. tostring(pet.LastPulse) .. ")")
 	check(foe.Humanoid.Health < foeHealth, "Its attack didn't land")
+	-- No gem surge for a support: its gem gives it its R, on you and itself,
+	-- once you're worn in a fight (a shell or ward on it and a shield on
+	-- you; a mend on you both; a ring round you).
+	check(pet.GemSurge == nil, "The support still has a gem surge")
+	do
+	local guardId = Kaiju.supportGuard(support)
+	check(guardId ~= nil and pet.Model:GetAttribute("KaijuGemSurge") == guardId, "The support's gem R isn't shown as its gem move")
+	humanoid.Health = humanoid.MaxHealth * 0.6
+	table.clear(Enemies.shields)
+	pet.LastPulse, pet.Defense = nil, nil
+	pet.Model:SetAttribute("KaijuGemAt", nil)
+	KaijuServer._think(pet, now + 3, 0.15)
+	local guarded = pet.Defense ~= nil -- (before it runs out: flush plays it all through)
+	flush()
+	check(pet.LastPulse == "Guard", "You worn in a fight: no gem R (" .. tostring(pet.LastPulse) .. ")")
+	check(pet.Model:GetAttribute("KaijuGemAt") ~= nil, "Its gem R isn't shown cast")
+	local guardPlan = Kaiju.AbilityPlans[guardId]
+	if guardPlan.Shape == "Shell" or guardPlan.Shape == "Ward" then
+		check(#Enemies.shields == 1 and Enemies.shields[1].Player == c and Enemies.shields[1].Amount > 0, "Its gem R put no shield on you")
+		check(guarded, "Its gem R didn't guard itself too")
+	end
+	end
 	-- An older save (no support yet) is given one on its next visit.
 	profiles[c].KaijuSupport = nil
 	local held = Kaiju.count(roster)

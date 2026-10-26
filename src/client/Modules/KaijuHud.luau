@@ -669,9 +669,10 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 	-- hollow asleep (skipped where they're hidden: a phone).
 	local now = workspace:GetServerTimeNow()
 	for key, dot in if tile.Dots.Q.Frame.Visible then tile.Dots else {} do
-		local awake = if key == "Gem"
-			then Kaiju.gemSurge(record.Soul) ~= nil
-			else select(2, Kaiju.kitMove(record.Species, key, level))
+		local awake = if key ~= "Gem"
+			then select(2, Kaiju.kitMove(record.Species, key, level))
+			elseif Kaiju.isSupport(record.Species) then Kaiju.supportGuard(record) ~= nil
+			else Kaiju.gemSurge(record.Soul) ~= nil
 		local at = model and model:GetAttribute(CAST_AT[key])
 		local ready = awake and model ~= nil and (type(at) ~= "number" or now - at >= KEY_EVERY[key])
 		dot.Frame.BackgroundColor3, dot.Stroke.Color = color, color
@@ -1718,18 +1719,20 @@ local function drawDetail(data, record, team: { string })
 		else string.format("EXP %d / %d", record.Exp or 0, need)
 	expFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
 	for key, row in moveRows do
-		-- (Its own moves, its role's: Kaiju.kitMove. And its gem surge, its
-		-- enchant's E, from the start: Kaiju.gemSurge.)
+		-- (Its own moves, its role's: Kaiju.kitMove. And its gem's move from
+		-- the start: a fighter's gem surge, its enchant's E; a support's, its
+		-- enchant's R, on you and itself: Kaiju.gemMove.)
 		local gem = key == "Gem"
+		local support = Kaiju.isSupport(record.Species)
 		local id, awake
 		if gem then
-			id = Kaiju.recordSurge(record)
+			id = Kaiju.gemMove(record)
 			awake = id ~= nil
 		else
 			id, awake = Kaiju.kitMove(record.Species, key, record.Level)
 		end
 		local move = Kaiju.moveInfo(id)
-		row.Name.Text = if gem and not id then "No gem surge" else moveName(id)
+		row.Name.Text = if gem and not id then (if support then "No gem R" else "No gem surge") else moveName(id)
 		row.Name.TextColor3 = if awake then P.Text else P.Dim
 		row.About.Text = if gem and not id
 			then string.format(
@@ -1737,6 +1740,7 @@ local function drawDetail(data, record, team: { string })
 				Kaiju.article(GemConfig.elementName(record.Element)),
 				GemConfig.elementName(record.Element)
 			)
+			elseif gem and support then "On you and on itself, when you're worn in a fight: a shield or ward on you both, a mend for you both, or a ring round you."
 			else move and move.Description or ""
 		row.Chip.BackgroundColor3 = if awake then color else INK
 		row.ChipEdge.Transparency = if awake then 1 else 0
@@ -1754,8 +1758,9 @@ local function drawDetail(data, record, team: { string })
 		row.Edge.Color = if awake then color else P.Edge
 		row.Edge.Transparency = if awake then 0.45 else 0.7
 		row.Frame.BackgroundColor3 = if awake then color:Lerp(INK, 0.82) else P.Inset
-		row.State.Text = if gem
-			then "GEM SURGE"
+		row.State.Text = if gem and support
+			then "GEM R"
+			elseif gem then "GEM SURGE"
 			elseif awake then "READY"
 			else string.format("WAKES AT LV %d", Kaiju.MoveLevels[key] or 1)
 		row.State.TextSize = if awake then 10 else 9
@@ -2167,9 +2172,16 @@ function soulUi.drawSoul(record)
 	)
 	soulUi.soulHeadName.TextColor3 = tierColor
 	soulUi.soulHeadEdge.Color = if attuned then color else P.Gold
-	local surge = Kaiju.recordSurge(record)
+	local surge = Kaiju.gemMove(record)
 	soulUi.soulHeadLine.Text = if attuned
-		then string.format("+%d%% stats  ·  +%d%% damage  ·  Gem surge: %s", soulUi.bonus(tier), percent, moveName(surge))
+		then string.format(
+			if Kaiju.isSupport(record.Species)
+				then "+%d%% stats  ·  +%d%% damage  ·  Gem R: %s"
+				else "+%d%% stats  ·  +%d%% damage  ·  Gem surge: %s",
+			soulUi.bonus(tier),
+			percent,
+			moveName(surge)
+		)
 		else string.format("Not its element: no gem surge. Enchant it with %s %s gem.", Kaiju.article(own), own)
 	soulUi.soulHeadLine.TextColor3 = if attuned then P.Good else P.Gold
 	local stats = Kaiju.recordStats(record)
@@ -2226,7 +2238,7 @@ function soulUi.drawSoul(record)
 			have += 1
 			local would = Kaiju.enchanted(record, row.Gem)
 			c.Sub.Text = string.format(
-				"×%d  ·  +%d%% stats  ·  Surge: %s",
+				if Kaiju.isSupport(record.Species) then "×%d  ·  +%d%% stats  ·  Gem R: %s" else "×%d  ·  +%d%% stats  ·  Surge: %s",
 				row.Count,
 				soulUi.bonus(row.Tier),
 				moveName(would and would.Surge)

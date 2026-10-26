@@ -340,13 +340,14 @@ local function refresh(pet: Pet)
 	KaijuFighter.setMoves(pet.Fighter, moves)
 	model:SetAttribute("KaijuQ", moves.Q)
 	model:SetAttribute("KaijuR", moves.R)
-	-- Its gem surge, attuned (a new Gemsoul may give or take it).
+	-- Its gem surge, attuned (a new Gemsoul may give or take it); a
+	-- support's gem move is its R instead (Kaiju.gemMove, cast by its pulse).
 	local surge = Kaiju.recordSurge(record)
 	if surge ~= pet.GemSurge then
 		pet.GemSurge = surge
 		KaijuFighter.setGemSurge(pet.Fighter, surge)
-		model:SetAttribute("KaijuGemSurge", surge)
 	end
+	model:SetAttribute("KaijuGemSurge", Kaiju.gemMove(record))
 	model:SetAttribute("KaijuLevel", record.Level)
 	model:SetAttribute("KaijuExp", record.Exp or 0)
 	local next = Kaiju.expToNext(record.Level)
@@ -407,9 +408,10 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 	model:SetAttribute("KaijuName", Kaiju.nameOf(record))
 	local ability = Kaiju.kitMoves(record.Species, record.Level).E
 	model:SetAttribute("KaijuAbility", ability)
-	-- Beside its own moves, its gem surge (its Gemsoul's E, attuned).
+	-- Beside its own moves, its gem surge (its Gemsoul's E, attuned; a
+	-- support has none, its gem's R instead: Kaiju.gemMove).
 	local gem = Kaiju.recordSurge(record)
-	model:SetAttribute("KaijuGemSurge", gem)
+	model:SetAttribute("KaijuGemSurge", Kaiju.gemMove(record))
 	local pet: Pet = {
 		Owner = player,
 		Record = record,
@@ -912,7 +914,7 @@ function KaijuServer.caster(pet: Pet)
 				local root = rootOf(pet.Owner)
 				local character = pet.Owner.Character
 				local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-				-- (You, as far as its pulse reaches: it leads out ahead of you.)
+				-- (You, as far as its pulse reaches.)
 				local reach = math.max(radius, Kaiju.SupportPulse.Radius)
 				if root and humanoid and humanoid.Health > 0 and flat(root.Position - center).Magnitude <= reach then
 					table.insert(list, { Root = root, Humanoid = humanoid })
@@ -1248,9 +1250,11 @@ end
 -- Kaiju.Danger: out of one, healing is the gems'). It reads the health of
 -- you and of every one of the team in its reach, each and on average, and
 -- casts what that calls for (Kaiju.supportChoice): a big mend for someone
--- nearly down or a team in a bad way, a mend for the hurt, a ward when
--- someone's taking the hits, and when nobody needs it, its attack on the
--- nearest foe (KaijuRoles.supportMoves; all its own from level 1).
+-- nearly down or a team in a bad way, its gem's R on you and itself once
+-- you're worn (Kaiju.supportGuard, KaijuAbilities.guard), a mend for the
+-- hurt, a ward when someone's taking the hits, and when nobody needs it,
+-- its attack on the nearest foe (KaijuRoles.supportMoves; all its own from
+-- level 1).
 local function pulse(pet: Pet, ownerRoot: BasePart, now: number)
 	local rules = Kaiju.SupportPulse
 	if not KaijuServer.inDanger(pet.Owner, now) then
@@ -1263,7 +1267,8 @@ local function pulse(pet: Pet, ownerRoot: BasePart, now: number)
 		end
 	end
 	local character = pet.Owner.Character
-	look(character and character:FindFirstChildOfClass("Humanoid"), ownerRoot.Position)
+	local ownerHumanoid = character and character:FindFirstChildOfClass("Humanoid")
+	look(ownerHumanoid, ownerRoot.Position)
 	for _, other in petsOf(pet.Owner) do
 		if other.Model.Parent then
 			look(other.Humanoid, other.Root.Position)
@@ -1284,18 +1289,33 @@ local function pulse(pet: Pet, ownerRoot: BasePart, now: number)
 		end
 	end
 	pet.PulseAt = pet.PulseAt or {}
-	local moves = KaijuRoles.supportMoves(pet.Record.Species)
+	local moves = table.clone(KaijuRoles.supportMoves(pet.Record.Species))
+	moves.Guard = Kaiju.supportGuard(pet.Record)
 	local ready = {}
 	for use, id in moves do
 		ready[use] = now >= (pet.PulseAt[id] or 0)
 	end
-	local use = Kaiju.supportChoice({ Healths = healths, Foes = if foe then 1 else 0, Ready = ready })
+	local owner = if ownerHumanoid then ownerHumanoid.Health / math.max(1, ownerHumanoid.MaxHealth) else nil
+	local use = Kaiju.supportChoice({ Healths = healths, Owner = owner, Foes = if foe then 1 else 0, Ready = ready })
 	local id = use and moves[use]
 	if not id then
 		return
 	end
-	local aim = if use == "Strike" then foe else { Root = pet.Root }
-	if aim and KaijuAbilities.cast(KaijuServer.caster(pet), aim, id) then
+	local cast
+	if use == "Guard" then
+		local player = pet.Owner
+		cast = KaijuAbilities.guard(KaijuServer.caster(pet), id, {
+			Root = ownerRoot,
+			Humanoid = ownerHumanoid,
+			Shield = function(amount: number, seconds: number)
+				Enemies.shieldPlayer(player, amount, seconds)
+			end,
+		})
+	else
+		local aim = if use == "Strike" then foe else { Root = pet.Root }
+		cast = aim ~= nil and KaijuAbilities.cast(KaijuServer.caster(pet), aim, id)
+	end
+	if cast then
 		pet.PulseAt[id] = now + (rules.Gaps[use] or rules.Every)
 		pet.LastPulse = use
 	end
@@ -2108,12 +2128,14 @@ local function socketSoul(player: Player, kaijuId: any, gemId: any)
 	end
 	PlayerData.sync(player)
 	local tier = GemConfig.TierLabels[gem.Tier] or gem.Tier
-	local surge = Kaiju.recordSurge(record)
+	local surge = Kaiju.gemMove(record)
 	local move = surge and Kaiju.moveInfo(surge)
 	return reply(
 		true,
 		string.format(
-			"%s is enchanted with %s %s %s gem. Gem surge: %s.",
+			if Kaiju.isSupport(record.Species)
+				then "%s is enchanted with %s %s %s gem. Gem R: %s."
+				else "%s is enchanted with %s %s %s gem. Gem surge: %s.",
 			Kaiju.nameOf(record),
 			Kaiju.article(tier),
 			tier,
