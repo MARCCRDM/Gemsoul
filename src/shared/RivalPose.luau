@@ -815,6 +815,44 @@ local function stageCast(kind, windup, strike)
 	end
 end
 
+-- A player holding a blow (from BeginAttack until release; the server
+-- poses it as "Charge"): the arm draws back like a slash, then, once the
+-- hold passes a heavy's charge, rises overhead into the heavy's wind-up on
+-- planted, bent legs, straining harder up to the perfect moment, so whoever
+-- faces it sees the heavy coming. Held too long (overcharged) the arms sag.
+-- Seconds, as Shared.CombatActions has them (Heavy.Charge, PerfectAt,
+-- OverchargeAt).
+RivalPose.Charge = { Heavy = 0.45, Full = 0.75, Over = 1.15 }
+RivalPose.PrimedLead = 0.06 -- seconds from a seen hold's release to the slam
+local CHARGE_BRACE = {
+	Waist = { 0.12, 0, 0 },
+	RightHip = { 0.32, 0, 0 },
+	LeftHip = { 0.16, 0, 0 },
+	RightKnee = { -0.5, 0, 0 },
+	LeftKnee = { -0.32, 0, 0 },
+}
+local function chargePose(a, elapsed: number, t: number, base, shield: boolean)
+	local c = RivalPose.Charge
+	local side = if a.ActionSide == -1 then -1 else 1
+	local draw = frames("Slash", side, shield)
+	local raise = frames("Heavy", side, shield)
+	if elapsed < c.Heavy then
+		return lerp(base, draw, ease(elapsed / c.Heavy)), 16
+	end
+	local rise = ease((elapsed - c.Heavy) / (c.Full - c.Heavy))
+	local pose = add(lerp(draw, raise, rise), CHARGE_BRACE, rise)
+	local strain = 0.02 + 0.05 * rise
+	if elapsed >= c.Over then
+		pose, strain = lerp(pose, draw, 0.35), 0.02
+	end
+	local shake = strain * math.sin(t * 47)
+	return add(pose, {
+		RightShoulder = { shake, 0, 0 },
+		LeftShoulder = { -shake * 0.6, 0, 0 },
+		Waist = { 0, shake * 0.4, 0 },
+	}, 1), 22
+end
+
 -- The action itself: the pose and how snappily the joints follow it.
 local function actionPose(a, t: number, base)
 	local kind, start, at = a.ActionKind, a.ActionStart, a.ActionAt
@@ -822,6 +860,12 @@ local function actionPose(a, t: number, base)
 		return nil, 0
 	end
 	local shield = not a.WeaponBlock
+	if kind == "Charge" then
+		if t >= at then
+			return nil, 0 -- (held past the server's cap: it lets go)
+		end
+		return chargePose(a, t - start, t, base, shield)
+	end
 	local windup, strike = frames(kind, if a.ActionSide == -1 then -1 else 1, shield)
 	if not windup then
 		return nil, 0
@@ -847,6 +891,10 @@ local function actionPose(a, t: number, base)
 		-- Ease into the wind-up, then coil a little past it just before the
 		-- release (the anticipation that sells the blow). A heavy trembles
 		-- with the strain.
+		if a.Primed and kind == "Heavy" then
+			-- Released from a hold already seen raised: it comes straight down.
+			return add(windup, CHARGE_BRACE, 1), 30
+		end
 		local length = math.max(0.05, at - start)
 		local p = (t - start) / length
 		local pose = lerp(base, windup, ease(p * 1.4) * (1 + 0.12 * ease((p - 0.75) / 0.25)))
@@ -1182,6 +1230,12 @@ function RivalPose.update(
 	-- behind a short wind-up. (The hit itself is the server's; only the
 	-- body is a moment behind. The rival announces its wind-ups ahead.)
 	local start, at = attrs.ActionStart, attrs.ActionAt
+	-- A held blow is shown as it charges (RivalPose.Charge); a heavy let go
+	-- from a hold seen raised here comes down from it at once, not behind a
+	-- fresh wind-up.
+	if attrs.ActionKind == "Charge" and type(start) == "number" then
+		rig.HeldFrom, rig.HeldSeen = start, now
+	end
 	if
 		(attrs.ActionKind == "Slash" or attrs.ActionKind == "Heavy")
 		and type(start) == "number"
@@ -1189,10 +1243,16 @@ function RivalPose.update(
 		and at - start < 0.05
 	then
 		if rig.SeenStart ~= start then
+			local held = rig.HeldSeen ~= nil
+				and now - rig.HeldSeen < 0.5
+				and rig.HeldSeen - rig.HeldFrom >= RivalPose.Charge.Heavy * 0.8
 			rig.SeenStart, rig.SeenAt = start, math.min(now, at + 1)
+			rig.SeenPrimed = attrs.ActionKind == "Heavy" and held
+			rig.HeldSeen = nil
 		end
-		local lead = if attrs.ActionKind == "Heavy" then 0.3 else 0.18
+		local lead = if rig.SeenPrimed then RivalPose.PrimedLead elseif attrs.ActionKind == "Heavy" then 0.3 else 0.18
 		attrs.ActionStart, attrs.ActionAt = rig.SeenAt, rig.SeenAt + lead
+		attrs.Primed = rig.SeenPrimed
 	end
 	local target, speed = RivalPose.pose(attrs, now, rest)
 	rig.Updates += 1

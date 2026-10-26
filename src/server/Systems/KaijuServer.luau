@@ -179,6 +179,7 @@ export type Pet = {
 	HopAgain: boolean?, -- (another jump of yours came while it waited its turn)
 	-- The support's pulse (pulse): when each of its moves is next ready.
 	PulseAt: { [string]: number }?,
+	LastPulse: string?, -- (the support: what it cast last, Kaiju.supportChoice)
 	-- In the team's hyperbeam (KaijuBeamServer): its own thinking waits till then.
 	BeamUntil: number?,
 }
@@ -297,14 +298,15 @@ function KaijuServer.ground(point: Vector3, ignore: { Instance }?): Vector3
 	return if hit then hit.Position else point
 end
 
--- Stands a body on the ground at `point`, facing `look`.
+-- Stands a body on the ground at `point`, facing `look` (`lift` studs up
+-- off it: the team's hyperbeam, fired from the air).
 -- Where place puts it (its pivot), not moving it (the team's hyperbeam
 -- sends its landing to clients ahead).
-function KaijuServer.spot(model: Model, point: Vector3, look: Vector3?): CFrame
+function KaijuServer.spot(model: Model, point: Vector3, look: Vector3?, lift: number?): CFrame
 	local root = model.PrimaryPart :: BasePart
 	local floor = KaijuServer.ground(point)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	local up = (if humanoid then humanoid.HipHeight else 1) + root.Size.Y / 2
+	local up = (if humanoid then humanoid.HipHeight else 1) + root.Size.Y / 2 + (lift or 0)
 	local at = floor + Vector3.new(0, up, 0)
 	local facing = if look and flat(look - at).Magnitude > 0.1
 		then Vector3.new(look.X, at.Y, look.Z)
@@ -312,8 +314,8 @@ function KaijuServer.spot(model: Model, point: Vector3, look: Vector3?): CFrame
 	return CFrame.lookAt(at, facing)
 end
 
-function KaijuServer.place(model: Model, point: Vector3, look: Vector3?)
-	model:PivotTo(KaijuServer.spot(model, point, look))
+function KaijuServer.place(model: Model, point: Vector3, look: Vector3?, lift: number?)
+	model:PivotTo(KaijuServer.spot(model, point, look, lift))
 end
 
 -- Its health kept on its record (saved: it never comes back on its own).
@@ -383,10 +385,11 @@ local function despawn(player: Player, id: string?)
 	end
 end
 
--- Where a kaiju in `slot` walks beside `root` (Kaiju.TeamSpots).
+-- Where a kaiju in `slot` walks, leading `root` the way it's going
+-- (Kaiju.TeamSpots, Kaiju.leadSpot).
 local function spotBy(root: BasePart, slot: number): Vector3
-	local spot = Kaiju.TeamSpots[slot] or Kaiju.TeamSpots[1]
-	return root.Position + root.CFrame.RightVector * spot[1] - root.CFrame.LookVector * spot[2]
+	local moving = root.AssemblyLinearVelocity or Vector3.zero
+	return Kaiju.leadSpot(root.Position, root.CFrame.LookVector, moving, slot)
 end
 
 local creaturesNear -- (the creatures about a point: below)
@@ -909,7 +912,9 @@ function KaijuServer.caster(pet: Pet)
 				local root = rootOf(pet.Owner)
 				local character = pet.Owner.Character
 				local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-				if root and humanoid and humanoid.Health > 0 and flat(root.Position - center).Magnitude <= radius then
+				-- (You, as far as its pulse reaches: it leads out ahead of you.)
+				local reach = math.max(radius, Kaiju.SupportPulse.Radius)
+				if root and humanoid and humanoid.Health > 0 and flat(root.Position - center).Magnitude <= reach then
 					table.insert(list, { Root = root, Humanoid = humanoid })
 				end
 			end
@@ -975,6 +980,10 @@ function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: st
 		return "Missed"
 	end
 	local now = os.clock()
+	-- (In its HYPERBEAM, from its leap till it's let go: nothing hurts it.)
+	if pet.BeamUntil and now < pet.BeamUntil then
+		return "Missed"
+	end
 	pet.LastFight = now
 	local model = pet.Model
 	local outcome, share = KaijuFight.resolve(pet, heavy, now)
@@ -1236,20 +1245,21 @@ local function follow(pet: Pet, ownerRoot: BasePart, recalled: boolean, now: num
 end
 
 -- The support's pulse (Kaiju.SupportPulse), only in a fight (in danger,
--- Kaiju.Danger: out of one, healing is the gems'): you or one of the team
--- near it under Below of their health, it casts its E (a team mend, you
--- too: KaijuServer.caster's Allies); its Q (a team ward) once it's awake
--- and creatures are about you; its R (a big mend) once it's awake and one
--- of you is under half.
+-- Kaiju.Danger: out of one, healing is the gems'). It reads the health of
+-- you and of every one of the team in its reach, each and on average, and
+-- casts what that calls for (Kaiju.supportChoice): a big mend for someone
+-- nearly down or a team in a bad way, a mend for the hurt, a ward when
+-- someone's taking the hits, and when nobody needs it, its attack on the
+-- nearest foe (KaijuRoles.supportMoves; all its own from level 1).
 local function pulse(pet: Pet, ownerRoot: BasePart, now: number)
 	local rules = Kaiju.SupportPulse
 	if not KaijuServer.inDanger(pet.Owner, now) then
 		return
 	end
-	local lowest = 1
+	local healths = {}
 	local function look(h: Humanoid?, at: Vector3)
 		if h and h.Health > 0 and flat(at - pet.Root.Position).Magnitude <= rules.Radius then
-			lowest = math.min(lowest, h.Health / math.max(1, h.MaxHealth))
+			table.insert(healths, h.Health / math.max(1, h.MaxHealth))
 		end
 	end
 	local character = pet.Owner.Character
@@ -1259,26 +1269,35 @@ local function pulse(pet: Pet, ownerRoot: BasePart, now: number)
 			look(other.Humanoid, other.Root.Position)
 		end
 	end
-	local species, level = pet.Record.Species, pet.Record.Level or 1
-	local kit = KaijuRoles.kit(species)
-	local aim = { Root = pet.Root }
-	local function cast(key: string, wait: number): boolean
-		local id, awake = KaijuRoles.move(species, key, level)
-		if not id or not awake or now < (pet.PulseAt[key] or 0) then
-			return false
+	-- Its foes: the nearest creature in its reach (the team's foe first).
+	local foe, near = nil, math.huge
+	for _, victim in creaturesNear(pet.Root.Position, rules.StrikeRange, pet.Owner) do
+		local d = flat(victim.Root.Position - pet.Root.Position).Magnitude
+		for _, other in petsOf(pet.Owner) do
+			if other.Target and other.Target.Enemy == victim.Enemy then
+				d -= 1000 -- (the one the team's on)
+				break
+			end
 		end
-		pet.PulseAt[key] = now + wait
-		return KaijuAbilities.cast(KaijuServer.caster(pet), aim, id)
+		if d < near then
+			foe, near = victim, d
+		end
 	end
 	pet.PulseAt = pet.PulseAt or {}
-	if lowest < 0.5 and kit.R and cast("R", KaijuRoles.REvery * 2) then
+	local moves = KaijuRoles.supportMoves(pet.Record.Species)
+	local ready = {}
+	for use, id in moves do
+		ready[use] = now >= (pet.PulseAt[id] or 0)
+	end
+	local use = Kaiju.supportChoice({ Healths = healths, Foes = if foe then 1 else 0, Ready = ready })
+	local id = use and moves[use]
+	if not id then
 		return
 	end
-	if lowest < rules.Below and cast("E", rules.Every) then
-		return
-	end
-	if #creaturesNear(ownerRoot.Position, Kaiju.Follow.Engage, pet.Owner) > 0 then
-		cast("Q", KaijuRoles.QEvery * 1.5)
+	local aim = if use == "Strike" then foe else { Root = pet.Root }
+	if aim and KaijuAbilities.cast(KaijuServer.caster(pet), aim, id) then
+		pet.PulseAt[id] = now + (rules.Gaps[use] or rules.Every)
+		pet.LastPulse = use
 	end
 end
 

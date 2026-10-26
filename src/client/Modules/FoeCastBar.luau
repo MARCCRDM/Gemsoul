@@ -14,11 +14,13 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Actions = require(ReplicatedStorage.Shared.CombatActions)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 
 local FoeCastBar = {}
 
 FoeCastBar.Gold = Color3.fromRGB(255, 190, 80)
+FoeCastBar.Heavy = Color3.fromRGB(255, 120, 70) -- a player's heavy, charging
 -- How to get out of each kind of cast (RivalPose kinds).
 FoeCastBar.Hints = {
 	Nova = "ROLL OUT OF THE RING",
@@ -43,6 +45,25 @@ function FoeCastBar.read(model: Instance?, serverNow: number)
 	end
 	if not humanoid or humanoid.Health <= 0 then
 		return nil
+	end
+	if kind == "Charge" then
+		-- A player holding a blow (the server poses it "Charge"): a bar once
+		-- it's longer than a tap, filling to a heavy, then flashing while the
+		-- heavy is ready to come down. Held too long it's a weak blow: none.
+		local held, heavy = serverNow - start, Actions.Base.Heavy.Charge
+		if held < heavy * 0.6 or held >= Actions.OverchargeAt or serverNow >= at then
+			return nil
+		end
+		return {
+			Name = name,
+			Kind = "Heavy",
+			Color = FoeCastBar.Heavy,
+			Left = math.max(0, heavy - held),
+			Progress = math.clamp(held / heavy, 0, 1),
+			Channel = false,
+			Hint = FoeCastBar.Hints.Heavy,
+			Threat = true,
+		}
 	end
 	local channel = type(hold) == "number" and serverNow >= at and serverNow < hold
 	if not channel and (at - start < FoeCastBar.MinWindup or serverNow >= at + 0.08) then

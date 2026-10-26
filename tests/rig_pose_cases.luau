@@ -127,6 +127,45 @@ do
 	local swung = armDown(shoulder)
 	check((swung - raised).Magnitude > 0.5, "A late swing didn't cut through")
 end
+-- A held blow (the server poses it "Charge" from BeginAttack): the arm
+-- draws back first, then once the hold is a heavy it's raised overhead,
+-- straining; held too long it sags. Its timings are the combat rules'.
+do
+	local source = fs.readFile(ROOT .. "/src/shared/CombatActions.luau")
+	local c = RivalPose.Charge
+	check(tonumber(source:match("Charge = ([%d%.]+),")) == c.Heavy, "Charge.Heavy isn't the heavy's charge")
+	check(tonumber(source:match("Actions.PerfectAt = ([%d%.]+)")) == c.Full, "Charge.Full isn't PerfectAt")
+	check(tonumber(source:match("Actions.OverchargeAt = ([%d%.]+)")) == c.Over, "Charge.Over isn't OverchargeAt")
+	local hold = { ActionKind = "Charge", ActionStart = 0, ActionAt = 3, ActionSide = 1 }
+	local early = RivalPose.pose(hold, 0.3, true).RightShoulder[1]
+	local heavy = RivalPose.pose(hold, c.Full, true)
+	check(early < 2.2, "A short hold already showed a heavy (" .. early .. ")")
+	check(heavy.RightShoulder[1] > 2.25 and heavy.RightShoulder[1] > early + 0.5, "A heavy's hold isn't raised overhead (" .. heavy.RightShoulder[1] .. ")")
+	check(heavy.RightKnee[1] < -0.4, "A heavy's hold isn't braced on bent legs")
+	check(RivalPose.pose(hold, 1.5, true).RightShoulder[1] < heavy.RightShoulder[1] - 0.1, "An overcharged hold doesn't sag")
+	check(next((RivalPose.pose(hold, 3.1, true))) == nil, "A hold past the server's cap still shows")
+end
+-- Seen held, then let go: the heavy comes down at once from the raised
+-- hold; seen cold, it shows a wind-up first.
+do
+	local function body()
+		local model = r15(false)
+		local torso = model.UpperTorso
+		local arm = part(model, "RightUpperArm", Vector3.new(1, 1.2, 1), Vector3.new(1.5, 0.85, 0))
+		motor("RightShoulder", torso, arm, Vector3.new(1.5, 1.35, 0)).Parent = arm
+		return model, arm.RightShoulder
+	end
+	local held, heldArm = body()
+	run(held, { ActionKind = "Charge", ActionStart = 100, ActionAt = 103, ActionSide = 1 }, 100, 100.8)
+	local raised = armDown(heldArm)
+	check(raised.Y > 0.3, "Held as a heavy, the arm isn't up (" .. raised.Y .. ")")
+	run(held, { ActionKind = "Heavy", ActionStart = 100.85, ActionAt = 100.85 }, 100.8, 101.02)
+	local chopped = armDown(heldArm)
+	check(chopped.Y < raised.Y - 0.5, "A heavy from a seen hold didn't come straight down")
+	local cold, coldArm = body()
+	run(cold, { ActionKind = "Heavy", ActionStart = 100.85, ActionAt = 100.85, ActionSide = 1 }, 100.85, 101.02)
+	check(armDown(coldArm).Y > chopped.Y + 0.3, "A heavy seen cold skipped its wind-up")
+end
 -- Eye to eye: given a foe's head (lookAt), the head turns to it, up or down,
 -- left or right, within the neck's reach; without one it comes back.
 do

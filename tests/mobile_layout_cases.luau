@@ -138,9 +138,9 @@ for _, s in SCREENS do
 	check(dock.TileWidth * TILES + dock.Gap * (TILES - 1) <= dock.W, label .. ": the tiles spill off the dock")
 	check(dock.TileWidth >= 44 and dock.TileHeight >= 44, label .. ": tiles too small to tap")
 	check(open.H >= 120 and open.W >= 240, label .. ": the open chat is too small to read")
-	-- Your kaiju's card (one card, three by three: the team's three, the
-	-- support with AUTO HEAL and CALL BACK, the HYPERBEAM along the bottom)
-	-- and CATCH: right of your coins, or up at the top right while you hunt.
+	-- Your kaiju's card (one card, three by two: the team's three, the
+	-- support with AUTO HEAL and CALL BACK; the HYPERBEAM its outline, its
+	-- pill on the bottom edge) and CATCH: right of your coins, or up at the top right while you hunt.
 	-- On the screen, every cell big enough to tap and inside the card, clear
 	-- of everything round it. (Out hunting you aren't mining: no loot card,
 	-- and a toast may pass over it.)
@@ -149,9 +149,9 @@ for _, s in SCREENS do
 		local tame = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.TameH }
 		local what = label .. (if hunting then " (hunting)" else "")
 		check(inside(k) and inside(tame), what .. ": the kaiju card or CATCH runs off the screen")
-		check(k.H >= 94, what .. ": the kaiju card is squashed: " .. k.H) -- (every row still big enough to tap: below)
+		check(k.H >= 80 and k.H <= 100, what .. ": the kaiju card is squashed or too big: " .. k.H) -- (every row still big enough to tap: below)
 		local cells = MobileLayout.kaijuCells(k)
-		local all = { cells.Fighters[1], cells.Fighters[2], cells.Fighters[3], cells.Support, cells.Auto, cells.Call, cells.Beam }
+		local all = { cells.Fighters[1], cells.Fighters[2], cells.Fighters[3], cells.Support, cells.Auto, cells.Call }
 		for i, cell in all do
 			check(cell.X >= 0 and cell.Y >= 0 and cell.X + cell.W <= k.W and cell.Y + cell.H <= k.H, what .. ": a cell spills out of the card: " .. i)
 			check(cell.W >= 50 and cell.H >= 28, what .. ": a cell too small to tap: " .. i)
@@ -159,7 +159,17 @@ for _, s in SCREENS do
 				check(not MobileLayout.overlaps(cell, all[j]), what .. ": two of the card's cells overlap: " .. i .. ", " .. j)
 			end
 		end
-		check(cells.Beam.W > cells.Auto.W * 2.5, what .. ": the HYPERBEAM isn't the width of the card")
+		-- The HYPERBEAM's pill: across the middle of the card's bottom edge,
+		-- big enough to tap, over none of the cells, its lower half (below the
+		-- card) on the screen.
+		local beam = cells.Beam
+		check(beam.W >= k.W * 0.7 and beam.H >= 20, what .. ": the HYPERBEAM's pill is too small to tap")
+		check(math.abs(beam.Y + beam.H / 2 - k.H) <= 1, what .. ": the HYPERBEAM's pill isn't on the card's bottom edge")
+		check(math.abs(beam.X + beam.W / 2 - k.W / 2) <= 1, what .. ": the HYPERBEAM's pill isn't centred")
+		for i, cell in all do
+			check(not MobileLayout.overlaps(cell, beam), what .. ": the HYPERBEAM's pill covers a cell: " .. i)
+		end
+		check(inside({ X = k.X + beam.X, Y = k.Y + beam.Y, W = beam.W, H = beam.H }), what .. ": the HYPERBEAM's pill runs off the screen")
 		-- The kaiju two by two on the left (two rows of the same height), the
 		-- buttons stacked on the right, the HYPERBEAM under them all.
 		local f = cells.Fighters
@@ -168,7 +178,7 @@ for _, s in SCREENS do
 		check(f[1].H == f[3].H, what .. ": the kaiju rows aren't the same height")
 		check(cells.Auto.X > f[2].X and cells.Call.X == cells.Auto.X and cells.Auto.Y == f[1].Y and cells.Call.Y == f[3].Y,
 			what .. ": AUTO HEAL and CALL BACK aren't stacked beside the kaiju")
-		check(cells.Beam.Y > f[3].Y + f[3].H, what .. ": the HYPERBEAM isn't under the kaiju")
+		check(cells.Beam.Y >= f[3].Y + f[3].H, what .. ": the HYPERBEAM isn't under the kaiju")
 		local near = {
 			["pick card"] = card,
 			coins = wallet,
@@ -186,10 +196,12 @@ for _, s in SCREENS do
 			-- has their place under your health.)
 			near["teammates' cards"] = nil
 		end
+		-- (The card with the pill's lower half hanging under it.)
+		local whole = { X = k.X, Y = k.Y, W = k.W, H = k.H + k.Notch / 2 }
 		for name, r in near do
-			check(not MobileLayout.overlaps(k, r), what .. ": the kaiju card overlaps the " .. name)
+			check(not MobileLayout.overlaps(whole, r), what .. ": the kaiju card overlaps the " .. name)
 		end
-		check(not MobileLayout.overlaps(k, tame), what .. ": CATCH overlaps the kaiju card")
+		check(not MobileLayout.overlaps(whole, tame), what .. ": CATCH overlaps the kaiju card")
 		for name, r in { dock = dock, jump = jump, coins = wallet, ["pick card"] = card, thumbstick = MobileLayout.stick(screen) } do
 			check(not MobileLayout.overlaps(tame, r), what .. ": CATCH overlaps the " .. name)
 		end
@@ -303,5 +315,5 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, the kaiju card three by three (its kaiju two by two) with its HYPERBEAM, at 7 screen sizes)"
+		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, the kaiju card three by two (its kaiju two by two) with its HYPERBEAM pill on the edge, at 7 screen sizes)"
 )

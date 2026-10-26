@@ -40,7 +40,7 @@
 	                                       says if anything else does, and
 	                                       onTop(fn) hears when that changes
 	  MobileLayout.kaiju(screen, hunting)  your kaiju's card (KaijuHud), three
-	                                       by three, on the left under the
+	                                       by two, on the left under the
 	                                       pick card (on the right under your
 	                                       health while you hunt), and CATCH;
 	                                       kaijuDesk(screen) on a computer,
@@ -114,7 +114,7 @@ end
 function MobileLayout.chat(screen: Vector2, open: boolean)
 	if not open then
 		local k = MobileLayout.kaiju(screen, false)
-		return { X = 12, Y = k.Y + k.H + 6, W = 76, H = 44 }
+		return { X = 12, Y = k.Y + k.H + k.Notch / 2 + 6, W = 76, H = 44 }
 	end
 	local dock = MobileLayout.dock(screen, 5)
 	local width = math.floor(math.clamp(screen.X * 0.38, 240, 340))
@@ -180,17 +180,18 @@ function MobileLayout.health(screen: Vector2)
 	return { X = wallet.X, Y = wallet.Y + wallet.H + 4, W = wallet.W, H = 20 }
 end
 
--- Your kaiju's card (KaijuHud): one card, three by three: the kaiju two
--- by two, AUTO HEAL over CALL BACK beside them, and the team's HYPERBEAM
--- (KaijuBeamHud) along the bottom. On a phone it sits on the left under the
--- pick card (where your level and coins were: they're at the top right
--- now), as tall as there's room for above Roblox's thumbstick (down to
--- Max); while you hunt (the fight's foe list has the top left then), on the
--- right under your health, above the jump button. Pad and Gap shrink on a
--- short screen, and the HYPERBEAM's row keeps MinRow at least. TameX, TameY,
--- TameW, TameH: where CATCH goes on a touch screen (left of your loot
--- card's place; left of the card while you hunt).
-MobileLayout.Kaiju = { W = 172, Pad = 4, Gap = 3, Max = 124, Split = { 0.36, 0.36 }, MinRow = 28 }
+-- Your kaiju's card (KaijuHud): one card, three by two: the kaiju two by
+-- two, AUTO HEAL over CALL BACK beside them. The team's HYPERBEAM
+-- (KaijuBeamHud) is the card's own outline, its pill (Notch tall) set on
+-- the card's bottom edge, half over it. On a phone it sits on the left
+-- under the pick card (where your level and coins were: they're at the top
+-- right now), as tall as there's room for above Roblox's thumbstick (down
+-- to Max, the pill's lower half kept clear above it); while you hunt (the
+-- fight's foe list has the top left then), on the right under your health,
+-- above the jump button. Pad and Gap shrink on a short screen. TameX,
+-- TameY, TameW, TameH: where CATCH goes on a touch screen (left of your
+-- loot card's place; left of the card while you hunt).
+MobileLayout.Kaiju = { W = 172, Pad = 4, Gap = 3, Max = 100, Notch = 22 }
 function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 	local spec = MobileLayout.Kaiju
 	local x, y, room
@@ -203,13 +204,15 @@ function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 		x, y = card.X, card.Y + card.H + 6
 		room = MobileLayout.stick(screen).Y - 6 - y
 	end
+	room -= spec.Notch / 2 -- (the pill hangs below the card's edge)
 	local h = math.min(spec.Max, room)
 	local pad, gap = spec.Pad, spec.Gap
-	if h < 110 then
+	if h < 96 then
 		pad, gap = 3, 2 -- (a short screen: every point to the rows)
 	end
-	local inner = h - pad * 2 - gap * 2
-	local r = math.min(math.floor(inner * spec.Split[1]), math.floor((inner - spec.MinRow) / 2))
+	-- (Under the rows, room for the pill's upper half: it covers none of them.)
+	local inner = h - pad - gap - MobileLayout.under(spec.Notch)
+	local r = math.floor(inner / 2)
 	local tameW = math.min(210, screen.X - 24)
 	local loot = MobileLayout.loot(screen)
 	local card = MobileLayout.card()
@@ -220,7 +223,8 @@ function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 		H = h,
 		Pad = pad,
 		Gap = gap,
-		Rows = { r, r, inner - r * 2 },
+		Rows = { r, r },
+		Notch = spec.Notch,
 		TameX = if hunting then x - 8 - tameW else loot.X - 8 - tameW,
 		TameY = if hunting then y else card.Y + card.H + 8,
 		TameW = tameW,
@@ -228,27 +232,34 @@ function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 	}
 end
 
--- The same card on a computer: bottom left, a fixed size (ChatFeed keeps
--- its bottom clear above it).
-MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 58, 58, 46 } }
+-- The same card on a computer: bottom left, a fixed size, the pill's
+-- lower half clear above the screen's edge (ChatFeed keeps its bottom
+-- clear above it).
+MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 58, 58 }, Notch = 24 }
+-- The card's strip under its rows: the pill's upper half and a little air.
+function MobileLayout.under(notch: number): number
+	return math.floor(notch / 2) + 3
+end
 function MobileLayout.kaijuDesk(screen: Vector2)
 	local spec = MobileLayout.KaijuDesk
-	local h = spec.Pad * 2 + spec.Gap * 2 + spec.Rows[1] + spec.Rows[2] + spec.Rows[3]
+	local h = spec.Pad + spec.Gap + spec.Rows[1] + spec.Rows[2] + MobileLayout.under(spec.Notch)
 	return {
 		X = 24,
-		Y = screen.Y - 24 - h,
+		Y = screen.Y - 24 - spec.Notch / 2 - h,
 		W = spec.W,
 		H = h,
 		Pad = spec.Pad,
 		Gap = spec.Gap,
 		Rows = table.clone(spec.Rows),
+		Notch = spec.Notch,
 	}
 end
 
 -- The card's cells, inside it (`card`: kaiju's or kaijuDesk's): the kaiju
 -- two by two on the left (Fighters 1 and 2 on top, Fighter 3 and Support
 -- under them), Auto (AUTO HEAL) over Call (CALL BACK) on the right, and
--- Beam the width of the bottom row.
+-- Beam, the HYPERBEAM's pill, across the middle of the card's bottom edge
+-- (half below it).
 function MobileLayout.kaijuCells(card)
 	local pad, gap, rows = card.Pad, card.Gap, card.Rows
 	local cell = math.floor((card.W - pad * 2 - gap * 2) / 3)
@@ -256,13 +267,14 @@ function MobileLayout.kaijuCells(card)
 		return { X = pad + (column - 1) * (cell + gap), Y = y, W = cell, H = h }
 	end
 	local y2 = pad + rows[1] + gap
-	local y3 = y2 + rows[2] + gap
+	local notch = card.Notch or 22
+	local beamW = math.floor(card.W * 0.78)
 	return {
 		Fighters = { at(1, pad, rows[1]), at(2, pad, rows[1]), at(1, y2, rows[2]) },
 		Support = at(2, y2, rows[2]),
 		Auto = at(3, pad, rows[1]),
 		Call = at(3, y2, rows[2]),
-		Beam = { X = pad, Y = y3, W = card.W - pad * 2, H = rows[3] },
+		Beam = { X = math.floor((card.W - beamW) / 2), Y = card.H - math.floor(notch / 2), W = beamW, H = notch },
 	}
 end
 

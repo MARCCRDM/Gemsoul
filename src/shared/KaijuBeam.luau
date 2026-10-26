@@ -3,11 +3,14 @@
 	button, Client.KaijuBeamFx the show): your team builds up a charge of its
 	own while it's out, and once it's full you can call the blast. It all
 	happens in front of you, seen from your own view (no cinematic camera):
-	they leap into formation in front of you (Formation: a V opening ahead
-	of you, the support hung up over it), all face where you aim, each pours
+	they leap up into formation in the air in front of you (Formation: a V
+	opening ahead of you, Hover studs up, the support hung higher over it),
+	every creature about backing off, cowed, till it fires (KaijuWilds'
+	cower), all face where you aim, each pours
 	its element into one point ahead of them (their cast's charge-up at
 	their mouths) and the beam fires from it: a long, wide blast that hits
-	every creature in it, Pulses pulses over Fire seconds. It aims at the
+	every creature in it, and every one in a fight with you or your team
+	wherever it is, Pulses pulses over Fire seconds. It aims at the
 	biggest threat first (threat: the toughest, and the ones already in a
 	fight with you, bigger still), holds on it for Dwell of the blast, then
 	swings smoothly onto each of the others in reach or in a fight with
@@ -98,7 +101,7 @@ KaijuBeam.Beam = {
 	Reach = 60, -- creatures this near are taken (and count for the aim assist)
 	Assist = math.rad(35), -- this far off your aim, it turns onto them
 	Focus = 16, -- the focus this far ahead of you
-	FocusUp = 3, -- and this high
+	FocusUp = 6, -- and this high (level with the team, up in the air)
 	Most = 5, -- creatures it swings onto, the biggest threat first
 	Dwell = 0.4, -- the share of the blast it holds on the biggest threat
 	Turn = 0.4, -- the share of each swing after that spent turning (the rest held)
@@ -120,16 +123,18 @@ KaijuBeam.Leap = {
 }
 
 -- Their places, in a V opening ahead of you, facing your aim, wide of the
--- middle so your view down it stays clear: the first ahead on your right,
--- the next ahead on your left, then further out and nearer you; the
--- support hung up high over the V.
+-- middle so your view down it stays clear, all held up in the air (Hover
+-- studs off the ground): the first ahead on your right, the next ahead on
+-- your left, then further out and nearer you; the support hung higher
+-- still over the V.
+KaijuBeam.Hover = 6
 KaijuBeam.Formation = {
-	{ Side = 8, Back = -7, Up = 0 },
-	{ Side = -8, Back = -7, Up = 0 },
-	{ Side = 13, Back = -3, Up = 0 },
-	{ Side = -13, Back = -3, Up = 0 },
+	{ Side = 8, Back = -7, Up = KaijuBeam.Hover },
+	{ Side = -8, Back = -7, Up = KaijuBeam.Hover },
+	{ Side = 13, Back = -3, Up = KaijuBeam.Hover },
+	{ Side = -13, Back = -3, Up = KaijuBeam.Hover },
 }
-KaijuBeam.Support = { Side = 0, Back = -6, Up = 9 }
+KaijuBeam.Support = { Side = 0, Back = -6, Up = 13 }
 
 function KaijuBeam.gain(charge: number?, amount: number, saving: boolean?): number
 	local rules = KaijuBeam.Charge
@@ -177,7 +182,7 @@ function KaijuBeam.formation(fighters: number, support: boolean?): { { Side: num
 		if not spot then
 			local rank = math.ceil(i / 2)
 			local side = if i % 2 == 1 then 1 else -1
-			spot = { Side = side * (8 + (rank - 1) * 5), Back = -7 + (rank - 1) * 4, Up = 0 }
+			spot = { Side = side * (8 + (rank - 1) * 5), Back = -7 + (rank - 1) * 4, Up = KaijuBeam.Hover }
 		end
 		table.insert(spots, table.clone(spot))
 	end

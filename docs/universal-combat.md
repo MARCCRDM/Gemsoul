@@ -22,6 +22,12 @@ The HUD shows opponent name and health above the encounter, a center reticle and
 - Successful alternating hits within **1.8s** build a three-hit combo: +0%, +10%, then +20% damage. Repeating a side restarts the chain. A miss or guarded hit clears it; the server advances it once per swing, not once per victim.
 - Raising guard opens a **0.3s high-block window** against frontal non-heavy melee attacks: 75% PvE / 65% PvP reduction and a brief counter opening (0.5s enemy stun / 0.25s player stun, subject to PvP diminishing returns). Each raise can parry once, and high block can refresh only every 1.5s. Held guard packets never restart that window. Heavy remains the guard-breaking counter.
 
+### Seeing a heavy coming (2026-10-26)
+
+- **Your opponent's body.** From the moment you start holding a blow, the server poses your body as "Charge" (`posePlayer`, `RivalPose.Charge`), and every client shows it. For the first 0.45s the arm draws back as for a slash. Once the hold is a heavy, it rises overhead into the heavy's wind-up on planted, bent legs, straining harder up to the perfect moment (0.75s). Held into overcharge (1.15s), the arms sag. A heavy let go from a hold that was seen raised comes straight down (`RivalPose.PrimedLead`, 0.06s) instead of replaying a fresh wind-up 0.3s behind. Before, a player's heavy showed only after it had landed.
+- **A warning bar.** Over a player charging a heavy there's a **HEAVY BLOW** bar (`FoeCastBar`, the same bar a rival's casts get). It appears once the hold is longer than a tap, fills up to the heavy and then flashes red with **DODGE · BREAKS GUARD**. The HUD's warning under the target frame shows it for the nearest such player and sounds its cue. An overcharged hold drops the bar, since that blow is weak.
+- **Your own view.** Holding draws the blade higher over your shoulder, all the way up by the perfect moment, and it trembles harder once the hold is a heavy. The heavy heaves back once more, chops down through the middle of the view and buries itself lower, and your view rides the chop down (`CombatFx.kick`). A landed blow's jar replaces that.
+
 All timing and combo damage are server-derived. The client submits an attack side and aim, never a charge strength or critical claim. Saga's timings are its own tuning. Alternating swings and reactive blocking follow the combat principles described in Bethesda's [Blades Arena guide](https://elderscrolls.bethesda.net/en-US/news/6k35P5RS5vdln7ZY1lZpqG/blades-arena-beginners-guide).
 
 ## Armor enhancements

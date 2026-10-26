@@ -38,9 +38,10 @@ local handheld = UserInputService.TouchEnabled and not UserInputService.Keyboard
 
 local WIDTH = 420
 local LEFT = 24
--- Its bottom sits above the kaiju card (24 up: KaijuHud's computer layout,
--- MobileLayout.kaijuDesk), its team, buttons and HYPERBEAM.
-local BOTTOM = 24 + MobileLayout.kaijuDesk(Vector2.zero).H + 12
+-- Its bottom sits above the kaiju card (KaijuHud's computer layout,
+-- MobileLayout.kaijuDesk: its team and buttons, the HYPERBEAM's pill
+-- hanging off its bottom edge).
+local BOTTOM = -MobileLayout.kaijuDesk(Vector2.zero).Y + 12
 -- Its top stays under the lobby's PLAY stack (LobbyUI: from 54 down, 272
 -- tall on a computer).
 local STACK_BOTTOM = 340

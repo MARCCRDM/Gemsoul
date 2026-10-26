@@ -389,7 +389,8 @@ local CASTS = { Bolt = true, Nova = true, Cast = true }
 
 -- A wild kaiju's day (KaijuWilds: KaijuMood, from KaijuMoodAt): head down
 -- sniffing the ground, looking about, lying down, asleep (lower, curled),
--- or a roar (rearing, jaws wide); and Bound, held by a tame, struggling
+-- or a roar (rearing, jaws wide); Cower, backing off from a HYPERBEAM
+-- winding up; and Bound, held by a tame, struggling
 -- against it. Each settles in over a moment.
 Motion.Moods = {
 	Sniff = function(pose, t, k)
@@ -427,6 +428,16 @@ Motion.Moods = {
 		pose.Jaw += (0.15 + math.max(0, math.sin(t * 9)) * 0.45) * strain
 		pose.Arm += math.sin(t * 7) * 0.25 * strain
 		pose.Tail += math.sin(t * 10) * 0.4 * strain
+	end,
+	Cower = function(pose, t, k)
+		-- Cowed by a HYPERBEAM winding up: crouched low, head down and
+		-- drawn back, tail tucked, shaking.
+		pose.Lift -= 0.3 * k
+		pose.Pitch -= 0.2 * k
+		pose.Tail -= 0.45 * k
+		pose.Arm -= 0.15 * k
+		pose.Yaw += math.sin(t * 23) * 0.05 * k
+		pose.Roll += math.sin(t * 29 + 1) * 0.04 * k
 	end,
 	Roar = function(pose, t, _k)
 		-- Rears back over a third of a second, holds it, and settles.

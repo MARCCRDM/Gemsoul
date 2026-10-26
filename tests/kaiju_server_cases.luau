@@ -753,7 +753,7 @@ for id, plan in Kaiju.AbilityPlans do
 	end
 	local roleMove = shared("KaijuRoles").Moves[id]
 	-- (A gem's E, cast by a kaiju, is its gem surge.)
-	local at = ({ Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", G = "KaijuGemAt" })[if roleMove
+	local at = ({ Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", G = "KaijuGemAt", Strike = "KaijuAbilityAt" })[if roleMove
 		then roleMove.Key
 		elseif string.sub(id, 1, 2) == "E_" then "G"
 		else string.sub(id, 1, 1)]
@@ -934,7 +934,7 @@ do
 	check(#team == 3, "Not three out: " .. #team)
 	for slot, member in team do
 		check(member.Slot == slot and member.Model:GetAttribute("KaijuSlot") == slot, "The team's places are wrong")
-		check((member.Root.Position - rootA.Position).Magnitude < 13, "One came out far from its owner")
+		check((member.Root.Position - rootA.Position).Magnitude < 19, "One came out far from its owner")
 	end
 	check(#KaijuServer.all() == 3 and KaijuServer.pets()[a] == team[1], "all() or the lead is wrong")
 end
@@ -950,7 +950,7 @@ check(pet and pet.Model.Parent == kaijuFolder, "The kaiju isn't out")
 check(pet.Model:GetAttribute("KaijuOwner") == 1 and pet.Model:GetAttribute("KaijuLevel") == 1, "Its attributes")
 check(pet.Record == starter, "The lead isn't the one out")
 check(pet.Humanoid.MaxHealth == Kaiju.stats(starter.Species, 1, starter.Soul.Tier).Health, "Its health")
-check((pet.Root.Position - rootA.Position).Magnitude < 13, "It came out far from its owner") -- (the lead walks 10 ahead: Kaiju.TeamSpots)
+check((pet.Root.Position - rootA.Position).Magnitude < 19, "It came out far from its owner") -- (the lead walks 16 ahead: Kaiju.TeamSpots)
 check(KaijuServer.petOf(pet.Model) == pet, "petOf doesn't find it")
 
 -- Out of the Outpost: away; back: out again, as hurt as it was.
@@ -4178,6 +4178,10 @@ local function teamFights()
 		local aside = bugAt(spot + Vector3.new(40, 0, 25))
 		aside.Humanoid.MaxHealth *= 3
 		aside.Humanoid.Health = aside.Humanoid.MaxHealth
+		-- And one behind you that's after you: in the fight, so blasted too.
+		local hunter = bugAt(spot + Vector3.new(-20, 0, -25));
+		(hunter :: any).Foe = a
+		local hunterWhole = hunter.Humanoid.Health
 		local before = { ahead.Humanoid.Health, behind.Humanoid.Health, aside.Humanoid.Health }
 		local battling = KaijuServer.battling
 		KaijuServer.battling = function()
@@ -4191,6 +4195,14 @@ local function teamFights()
 		check(res.Ok, "A full team's HYPERBEAM didn't fire: " .. tostring(res.Message))
 		check(drew("KaijuBeam") ~= nil, "Nobody sees the HYPERBEAM")
 		check(a:GetAttribute("KaijuBeamAt") ~= nil and a:GetAttribute("KaijuCharge") == 0, "The HUD doesn't know it fired")
+		-- Everything about backs off, cowed, till it fires.
+		for _, bug in { ahead, behind, aside, hunter } do
+			local e = bug :: any
+			check(
+				type(e.CowedUntil) == "number" and math.abs(e.CowedUntil - (start + KaijuBeam.timeline().Fire)) < 1e-6 and typeof(e.CowedFrom) == "Vector3",
+				"A creature about wasn't cowed by the HYPERBEAM"
+			)
+		end
 		local shown = (drew("KaijuBeam") or {})[2] or {}
 		-- Its targets: the biggest threat first, then the one ahead; never
 		-- the one behind you. It turns from the first onto the next.
@@ -4237,9 +4249,13 @@ local function teamFights()
 		-- Charging: in their places, facing your aim, held still.
 		Beam._step(start + at.Charge + 0.05)
 		local forward = cast.Forward -- (your aim, as it was: no longer turned onto the nearest)
+		-- Nothing hurts them in their HYPERBEAM.
+		local whole = team[1].Humanoid.Health
+		check(KaijuServer.hurt(team[1], 50, "Fire") == "Missed" and team[1].Humanoid.Health == whole, "A kaiju took damage mid-HYPERBEAM")
 		local right = forward:Cross(Vector3.new(0, 1, 0))
 		for i, pet in team do
 			check(pet.Root.Anchored == true, "A kaiju not held still as it charges")
+			check(pet.Root.Position.Y - spot.Y >= KaijuBeam.Hover, "A kaiju isn't up in the air for its HYPERBEAM")
 			check(pet.Model:GetAttribute("ActionKind") == "Bolt", "No charge-up at its mouth as it charges")
 			local spotOf = KaijuBeam.formation(#team, false)[i]
 			local want = spot + right * spotOf.Side - forward * spotOf.Back
@@ -4255,6 +4271,7 @@ local function teamFights()
 		check(ahead.Humanoid.Health < before[1], "The creature in the beam wasn't hit")
 		check(aside.Humanoid.Health < aside.Humanoid.MaxHealth, "The biggest threat wasn't hit")
 		check(behind.Humanoid.Health == before[2], "The beam hit outside itself")
+		check(hunter.Humanoid.Health < hunterWhole, "One in a fight with you wasn't blasted")
 		-- (Blows don't charge them in the blast itself.)
 		Beam._charge(1)
 		check(roster.BeamCharge == 0, "Charged during its own HYPERBEAM")
@@ -4266,7 +4283,7 @@ local function teamFights()
 			check(pet.Model:GetAttribute("BeamLeapAt") == nil and pet.Model:GetAttribute("KaijuMood") ~= "Roar", "A HYPERBEAM's leap or roar left on a kaiju")
 		end
 		check(a:GetAttribute("KaijuBeamAt") == nil, "The HUD thinks it's still firing")
-		print("  your HYPERBEAM: one charge of its own, long, blows (moves free), SAVE CHARGE, full to fire, leaping into formation in front of you one by one, the roar, the biggest threat first then the rest, the beam's reach, let go after")
+		print("  your HYPERBEAM: one charge of its own, long, blows (moves free), SAVE CHARGE, full to fire, leaping into formation in front of you one by one, the roar, the biggest threat first then the rest, up in the air, everything about cowed, everything in the fight blasted, the beam's reach, let go after")
 	end)()
 
 	clearCritters()
@@ -6426,6 +6443,18 @@ end)()
 	KaijuServer._think(pet, now + 1, 0.15)
 	flush()
 	check(humanoid.Health == after, "It mended again before its pulse came round")
+	-- Everyone whole, a foe in reach: it attacks it (no mend wasted).
+	humanoid.Health = humanoid.MaxHealth
+	for _, member in out do
+		member.Humanoid.Health = member.Humanoid.MaxHealth
+	end
+	local foe = KaijuWilds.spawnBug(pet.Root.Position + Vector3.new(8, 0, 0), { Prey = c, Band = "Fringe", Level = 1 })
+	local foeHealth = foe.Humanoid.Health
+	pet.LastPulse = nil
+	KaijuServer._think(pet, now + 2, 0.15)
+	flush()
+	check(pet.LastPulse == "Strike", "Everyone whole and a foe by it: it didn't attack (" .. tostring(pet.LastPulse) .. ")")
+	check(foe.Humanoid.Health < foeHealth, "Its attack didn't land")
 	-- An older save (no support yet) is given one on its next visit.
 	profiles[c].KaijuSupport = nil
 	local held = Kaiju.count(roster)

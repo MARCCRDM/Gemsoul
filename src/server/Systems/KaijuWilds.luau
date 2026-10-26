@@ -1726,6 +1726,31 @@ end
 -- rift's critter slips back through a rift).
 local tameStep -- (a tame's tick: Taming, below)
 
+-- Cowed by a team's HYPERBEAM winding up (KaijuBeamServer sets CowedUntil
+-- and CowedFrom on it, os.clock): it drops whatever it was winding up and
+-- backs off from the beam's owner, low and trembling, till the beam fires.
+local function cower(enemy, wild: Wild)
+	local e = enemy :: any
+	local root, humanoid = enemy.Root, enemy.Humanoid
+	if e.Action then
+		e.Action, e.Windup = nil, nil
+	end
+	local fighter = wild.Fighter
+	if fighter and fighter.Action then
+		fighter.Action = nil
+		fighter.Humanoid.AutoRotate = true
+	end
+	if enemy.Model:GetAttribute("ActionKind") ~= nil then
+		enemy.Model:SetAttribute("ActionKind", nil)
+		enemy.Model:SetAttribute("ActionName", nil)
+	end
+	setMood(wild, "Cower")
+	local away = flat(root.Position - e.CowedFrom)
+	local dir = if away.Magnitude > 0.1 then away.Unit else -root.CFrame.LookVector
+	humanoid.WalkSpeed = enemy.Kind.Speed * 0.55
+	humanoid:MoveTo(root.Position + dir * 6)
+end
+
 local function brain(enemy, now: number)
 	local wild = wilds[enemy]
 	if not wild then
@@ -1745,6 +1770,16 @@ local function brain(enemy, now: number)
 		e.FoeVictim, e.Foe = nil, nil
 		tameStep(enemy, wild, now)
 		return
+	end
+	if e.CowedUntil then
+		if now < e.CowedUntil and typeof(e.CowedFrom) == "Vector3" then
+			cower(enemy, wild)
+			return
+		end
+		e.CowedUntil, e.CowedFrom = nil, nil
+		if enemy.Model:GetAttribute("KaijuMood") == "Cower" then
+			setMood(wild, nil)
+		end
 	end
 	if now < enemy.StunUntil and not fighter then
 		humanoid:MoveTo(root.Position)

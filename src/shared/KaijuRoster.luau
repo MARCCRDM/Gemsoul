@@ -15,6 +15,8 @@
 	                             (the Edge only) or Vein (the guarded Rift
 	                             Vein's guardian only)
 	  Kit                        its own E, Q and R (Moves below)
+	  Strike?                    a support's attack beside its kit (Key
+	                             "Strike"; KaijuRoles.supportMoves)
 	  Fight                      its fight style outside a battle
 	                             (KaijuFight.Styles: blow names, timings,
 	                             a heavy's share and arc, its guard)
@@ -783,7 +785,7 @@ Roster.Kinds = {
 	Skyjelly = {
 		Name = "Skyjelly",
 		Role = "Warden",
-		Blurb = "A support: a glowing jelly that floats behind you. It mends you and your team and shields them.",
+		Blurb = "A support: a glowing jelly that floats in the middle of your team. In a fight it mends and shields whoever needs it, and zaps your foes when nobody does.",
 		Health = 200,
 		Damage = 9,
 		Rate = 0.9,
@@ -792,6 +794,7 @@ Roster.Kinds = {
 		Guard = 0,
 		Habitat = "Fringe",
 		Kit = { E = "K_PulseMend", Q = "K_StaticVeil", R = "K_BloomSurge" },
+		Strike = "K_StaticBolt", -- (a support's attack, beside its kit: KaijuRoles.supportMoves)
 		Voice = "Razorback",
 		Fight = {
 			Names = { Light = "Tendril Sting", Heavy = "Static Pulse", Punish = "Tendril Lash", Lunge = "Drift" },
@@ -818,6 +821,14 @@ Roster.Moves = {
 		IconSource = "LeechBloom",
 		Description = "A pulse of light: it, you and every ally near it heal 15% of their health over 3s.",
 		Plan = { Shape = "Mend", Heal = 0.15, Duration = 3, Team = true, Radius = 24, Power = 0 },
+	},
+	K_StaticBolt = {
+		Name = "Static Bolt",
+		Key = "Strike",
+		From = "Ion Spark",
+		IconSource = "IonCannon",
+		Description = "A bolt of static from its tendrils at your team's foe: 90% damage, with its element's effect.",
+		Plan = { Shape = "Bolt", Mult = 0.9, Status = "Element", Power = 1 },
 	},
 	K_StaticVeil = {
 		Name = "Static Veil",

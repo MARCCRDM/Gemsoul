@@ -1,18 +1,19 @@
 --[[
-	The team's HYPERBEAM button (Server.KaijuBeamServer runs it; rules:
-	Shared.KaijuBeam; the show: KaijuBeamFx). Shown with the kaiju strip
-	(KaijuHud's) while your team's out, in mining and in fights alike: the
-	bottom row of the kaiju card (KaijuHud.beamSlot()), under the team and
-	its buttons.
+	The team's HYPERBEAM (Server.KaijuBeamServer runs it; rules:
+	Shared.KaijuBeam; the show: KaijuBeamFx). Shown with the kaiju card
+	(KaijuHud's) while your team's out, in mining and in fights alike.
 
-	One bar, the row's width: it fills left to right in your team's
-	colours (the team's charge, a meter of its own: KaijuCharge).
+	The card's own outline is its meter: it fills left to right round the
+	card in your team's colours (the team's charge, a meter of its own:
+	KaijuCharge), over the card's dim edge. Its button, a pill on the
+	card's bottom edge (KaijuHud.beamSlot(): its cell, the card its
+	parent), says how far along it is and holds SAVE.
 
-	  Charging   HYPERBEAM and its percent (CHARGING 42% on a computer).
-	  Ready      the bar full and bright, its colours flowing, a glow that
-	             breathes, a band of light sweeping across, READY! (and its
-	             key on a computer: Z; on a pad, the d-pad's down). It pops
-	             and chimes the moment it's ready.
+	  Charging   HYPERBEAM and its percent.
+	  Ready      the outline full and bright, its colours flowing round it,
+	             a glow that breathes about the card, READY! on the pill
+	             (and its key on a computer: Z; on a pad, the d-pad's down).
+	             It pops and chimes the moment it's ready.
 	  Blasting   BLASTING! while the blast is under way.
 	  SAVE       the switch at its end: on (green), your kaiju fight with
 	             blows alone and charge faster (the server's KaijuSaveCharge).
@@ -20,8 +21,11 @@
 	(Light to run: it redraws only when what it shows changes, and moves
 	only while it's ready.)
 
-	  KaijuBeamHud.start(slot)   once, from Lobby.client, with the card's
-	                             row to draw in (KaijuHud.beamSlot())
+	  KaijuBeamHud.start(slot)   once, from Lobby.client, with the pill's
+	                             cell on the card (KaijuHud.beamSlot())
+	  KaijuBeamHud.fillLevel(share) -> NumberSequence   the outline's
+	                             see-through along the card for a charge
+	                             `share` (0..1) of the way: lit up to it
 	  KaijuBeamHud.aim() -> { X, Z }   where you're looking, flat (the
 	                                   camera's look, else your facing)
 ]]
@@ -51,8 +55,7 @@ local READY_GOLD = Color3.fromRGB(255, 226, 120)
 
 local shownNow = false -- (with the kaiju card, while your team's out)
 
--- The bar: a glow behind, the charge filling it, its words and the SAVE
--- switch.
+-- The pill: a glow behind, its words and the SAVE switch.
 local button = new("TextButton", {
 	Name = "Hyperbeam",
 	AutoButtonColor = false,
@@ -61,7 +64,7 @@ local button = new("TextButton", {
 	BackgroundTransparency = 0.08,
 	ZIndex = 3,
 }, nil)
-UiKit.round(button, 10)
+UiKit.round(button, 999)
 local stroke = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.2 }, button)
 local scale = new("UIScale", { Scale = 1 }, button)
 local glow = new("Frame", {
@@ -73,24 +76,28 @@ local glow = new("Frame", {
 	BackgroundTransparency = 1,
 	ZIndex = 2,
 }, button)
-UiKit.round(glow, 14)
-local clip = new("Frame", {
-	Name = "Track",
+UiKit.round(glow, 999)
+-- The meter: the card's outline (set round the card by start), and the
+-- glow about it once it's ready.
+local ring = new("Frame", {
+	Name = "HyperbeamRing",
 	BackgroundTransparency = 1,
-	ClipsDescendants = true,
 	Size = UDim2.fromScale(1, 1),
-	ZIndex = 3,
-}, button)
-UiKit.round(clip, 10)
-local fill = new("Frame", {
-	Name = "Charge",
-	Size = UDim2.fromScale(0, 1),
-	BackgroundColor3 = WHITE,
-	BackgroundTransparency = 0.45,
-	BorderSizePixel = 0,
-	ZIndex = 3,
-}, clip)
-local fillGradient = new("UIGradient", {}, fill)
+	ZIndex = 2, -- (under the pill)
+}, nil)
+UiKit.round(ring, 10)
+local ringStroke = new("UIStroke", { Color = WHITE, Thickness = 3, Transparency = 0 }, ring)
+local fillGradient = new("UIGradient", {}, ringStroke)
+local halo = new("Frame", {
+	Name = "HyperbeamGlow",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.new(1, 6, 1, 6),
+	BackgroundTransparency = 1,
+	ZIndex = 1,
+}, nil)
+UiKit.round(halo, 13)
+local haloStroke = new("UIStroke", { Color = READY_GOLD, Thickness = 4, Transparency = 1 }, halo)
 local flash = new("Frame", {
 	Name = "Flash",
 	Size = UDim2.fromScale(1, 1),
@@ -98,7 +105,7 @@ local flash = new("Frame", {
 	BackgroundTransparency = 1,
 	ZIndex = 9,
 }, button)
-UiKit.round(flash, 10)
+UiKit.round(flash, 999)
 
 local function words(name: string, font: Enum.Font, align: Enum.TextXAlignment): TextLabel
 	local text = new("TextLabel", {
@@ -135,7 +142,7 @@ local save = new("TextButton", {
 	BackgroundColor3 = Color3.fromRGB(28, 32, 50),
 	ZIndex = 8,
 }, button)
-UiKit.round(save, 6)
+UiKit.round(save, 999)
 local saveStroke = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.3 }, save)
 IronUi.juice(button, 1.03, 0.96)
 IronUi.shine(button, 2.2)
@@ -151,19 +158,39 @@ local function touch(): boolean
 	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 end
 
+-- The outline lit up to `share` of the way along the card, left to
+-- right (0: see-through; 1: see-through nowhere).
+function KaijuBeamHud.fillLevel(share: number): NumberSequence
+	local p = math.clamp(share, 0, 1)
+	if p <= 0.001 then
+		return NumberSequence.new(1)
+	elseif p >= 0.999 then
+		return NumberSequence.new(0)
+	end
+	local edge = math.min(0.02, p, 1 - p) -- (a soft front)
+	return NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(p - edge, 0),
+		NumberSequenceKeypoint.new(p + edge, 1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+end
+
 local function layout()
 	local size = button.AbsoluteSize
 	if size.X <= 0 or size.Y <= 0 then
 		return
 	end
 	-- HYPERBEAM on the left, its state on the right, SAVE at the end.
-	compact = size.Y < 40
-	local pad = if compact then 6 else 10
-	local saveW, saveH = if compact then 32 else 46, if compact then 15 else 20
+	compact = size.X < 170
+	local pad = if compact then 6 else 9
+	local saveH = math.max(12, size.Y - 6)
+	local saveW = if compact then 32 else 44
 	save.Size = UDim2.fromOffset(saveW, saveH)
-	save.Position = UDim2.new(1, -saveW - pad + 2, 0.5, -saveH / 2)
-	save.TextSize = if compact then 8 else 10
-	local textH = math.min(size.Y - 8, if compact then 14 else 18)
+	save.Position = UDim2.new(1, -saveW - 3, 0.5, -saveH / 2)
+	save.TextSize = if compact then 8 else 9
+	ringStroke.Thickness = if compact then 2.5 else 3
+	local textH = math.min(size.Y - 6, if compact then 13 else 15)
 	local room = size.X - pad * 2 - saveW - 4
 	local stateW = math.floor(room * (if compact then 0.38 else 0.45))
 	title.Position = UDim2.new(0, pad, 0.5, -textH / 2)
@@ -195,7 +222,7 @@ local function palette(): { Color3 }
 	return if #colors > 0 then colors else { CHARGE }
 end
 
--- A sequence of the team's colours, round (for the bar).
+-- A sequence of the team's colours, round (for the outline).
 local function sequence(list: { Color3 }): ColorSequence
 	if #list == 1 then
 		return ColorSequence.new(list[1], list[1]:Lerp(WHITE, 0.4))
@@ -225,6 +252,7 @@ local function refresh()
 	local shown = hud ~= nil and hud:IsA("ScreenGui") and hud.Enabled and type(charge) == "number"
 	shownNow = shown
 	button.Visible = shown
+	ring.Visible, halo.Visible = shown, shown
 	if not shown then
 		wasReady = false
 		return
@@ -248,8 +276,8 @@ local function refresh()
 		return
 	end
 	drawn = look
-	fill.Size = UDim2.fromScale(math.clamp(charge / 100, 0, 1), 1)
-	fill.BackgroundTransparency = if ready then 0.1 else 0.45
+	fillGradient.Transparency = KaijuBeamHud.fillLevel(charge / 100)
+	ringStroke.Transparency = if ready or blasting then 0 else 0.15
 	-- Its words.
 	if blasting then
 		state.Text = "BLASTING!"
@@ -271,12 +299,13 @@ local function refresh()
 		shineClip.Visible = ready
 	end
 	stroke.Color = if ready then READY_GOLD elseif saving then P.Good else P.Edge
-	stroke.Thickness = if ready then 2.5 else 1.5
+	stroke.Thickness = if ready then 2 else 1.2
 	if ready and not wasReady then
 		pop()
 	end
 	if not ready then
 		glow.BackgroundTransparency = 1
+		haloStroke.Transparency = 1
 		fillGradient.Offset = Vector2.zero
 	end
 	wasReady = ready
@@ -338,10 +367,13 @@ function KaijuBeamHud.start(slot: GuiObject)
 		return
 	end
 	started = true
-	-- In the kaiju card's bottom row, filling it.
+	-- The pill in its cell on the card's bottom edge; the meter round the
+	-- card itself (the cell's parent).
 	button.Size = UDim2.fromScale(1, 1)
 	button.Position = UDim2.fromScale(0, 0)
 	button.Parent = slot
+	local card = slot.Parent
+	ring.Parent, halo.Parent = card, card
 	button:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 	button.Activated:Connect(fire)
 	save.Activated:Connect(toggleSave)
@@ -354,15 +386,19 @@ function KaijuBeamHud.start(slot: GuiObject)
 		end
 		return Enum.ContextActionResult.Sink
 	end, false, 3000, Enum.KeyCode.Z, Enum.KeyCode.DPadDown)
-	-- Ready: its colours flow, the glow breathes, the title shimmers
-	-- (nothing moves while it charges).
+	-- Ready: its colours flow round the outline, the glow about the card
+	-- and the pill breathes, the title shimmers (nothing moves while it
+	-- charges).
 	IronUi.animate(glow, function(now: number)
 		if not wasReady then
 			return
 		end
 		fillGradient.Offset = Vector2.new(((now * 0.35) % 2) - 1, 0)
-		glow.BackgroundColor3 = colors[1 + math.floor(now * 1.5) % #colors]:Lerp(READY_GOLD, 0.35)
+		local tint = colors[1 + math.floor(now * 1.5) % #colors]:Lerp(READY_GOLD, 0.35)
+		glow.BackgroundColor3 = tint
 		glow.BackgroundTransparency = 0.62 + 0.18 * math.sin(now * 5)
+		haloStroke.Color = tint
+		haloStroke.Transparency = 0.45 + 0.25 * math.sin(now * 5)
 		titleGradient.Offset = Vector2.new(((now * 0.8) % 2) - 1, 0)
 	end)
 	layout()

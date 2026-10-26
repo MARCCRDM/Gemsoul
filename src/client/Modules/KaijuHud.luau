@@ -16,11 +16,11 @@
 	                  AWAY); then DEPLOY brings it out again, only out of
 	                  danger (IN DANGER till then: Shared.Kaiju.away,
 	                  KaijuServer's KaijuDanger). Tap a tile for
-	                  the panel on that kaiju. One card, three by three:
+	                  the panel on that kaiju. One card, three by two:
 	                  the kaiju two by two (the team's three and the
-	                  support), AUTO HEAL over CALL BACK beside them, and
-	                  the team's HYPERBEAM along the bottom (KaijuBeamHud,
-	                  in KaijuHud.beamSlot()).
+	                  support), AUTO HEAL over CALL BACK beside them; the
+	                  team's HYPERBEAM is its outline, its pill on the
+	                  bottom edge (KaijuBeamHud, in KaijuHud.beamSlot()).
 	                  Computer: bottom left. Phone: on the left under the
 	                  pick card (your level and coins are at the top right),
 	                  and on the right under your health while you hunt
@@ -454,12 +454,12 @@ local callState = label(callButton, "", 8, P.Dim, IronUi.Bold)
 callState.TextXAlignment = Enum.TextXAlignment.Center
 local callWant: boolean? = nil -- (pressed here, till the roster says so)
 
--- The team's HYPERBEAM, along the card's bottom row (KaijuBeamHud draws it
--- in here: KaijuHud.beamSlot()).
+-- The team's HYPERBEAM's pill, on the card's bottom edge (KaijuBeamHud
+-- draws it in here, and its meter round the card: KaijuHud.beamSlot()).
 local beamSlot = new("Frame", {
 	Name = "BeamSlot",
 	BackgroundTransparency = 1,
-	ZIndex = 2,
+	ZIndex = 10, -- (over the card's outline, the HYPERBEAM's meter)
 }, card)
 
 -- CATCH: beside the strip, when there's a wild kaiju to catch.
@@ -2634,7 +2634,8 @@ end
 tame.Activated:Connect(catchReady)
 
 local started = false
--- Where the team's HYPERBEAM goes: the card's bottom row (KaijuBeamHud).
+-- Where the team's HYPERBEAM's pill goes: on the card's bottom edge
+-- (KaijuBeamHud; the card, its parent, carries its meter).
 function KaijuHud.beamSlot(): Frame
 	return beamSlot
 end

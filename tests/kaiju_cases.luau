@@ -405,6 +405,26 @@ check(Kaiju.slots({ List = { a = { Level = 3 }, b = { Level = 10 } } }) == 2, "N
 check(Kaiju.slots({ List = { a = { Level = 30 } } }) == 3, "More than three slots, or none at 20")
 Kaiju.SlotLevels = betaSlots
 check(#Kaiju.TeamSpots >= #Kaiju.SlotLevels, "A team slot with nowhere to walk")
+-- They lead the way: standing, out ahead of where you look (the first
+-- furthest, the two behind it side by side); on the move, ahead of where
+-- you're going, not where you look, and further out the faster you go.
+do
+	local V3 = roblox.Vector3.new
+	local here, look = V3(0, 0, 0), V3(0, 0, -1)
+	local lead = Kaiju.leadSpot(here, look, nil, 1)
+	local left, right = Kaiju.leadSpot(here, look, nil, 3), Kaiju.leadSpot(here, look, nil, 2)
+	check(lead.Z < -12 and math.abs(lead.X) < 0.01, "The leader isn't well out in front")
+	check(right.X > 0 and left.X < 0 and math.abs(left.Z - right.Z) < 0.01 and right.Z > lead.Z, "The two aren't side by side behind the leader")
+	local support = Kaiju.leadSpot(here, look, nil, Kaiju.SupportSlot)
+	check(support.Z < right.Z and support.Z > lead.Z and math.abs(support.X) < 0.01, "The support isn't in the middle of the three")
+	-- Running east, looking north: they're out ahead to the east.
+	local running = Kaiju.leadSpot(here, look, V3(16, 0, 0), 1)
+	check(running.X > 16 and math.abs(running.Z) < 0.01, "Not leading the way you're going: " .. tostring(running))
+	local sprint = Kaiju.leadSpot(here, look, V3(40, 0, 0), 1)
+	check(sprint.X > running.X and sprint.X <= -Kaiju.TeamSpots[1][2] + Kaiju.Lead.Max + 0.01, "The lead doesn't grow with your speed, or runs off")
+	-- Barely moving (turning on the spot): where you look.
+	check((Kaiju.leadSpot(here, look, V3(1, 0, 0), 1) - lead).Magnitude < 0.01, "A shuffle swung them round")
+end
 
 -- Gemsouls ---------------------------------------------------------------------------------
 for _, element in Kaiju.Elements do
@@ -893,6 +913,25 @@ do
 	local squad, slots = Kaiju.squadIds(roster)
 	check(#squad == 4 and squad[4] == jelly.Id and slots[jelly.Id] == Kaiju.SupportSlot, "The squad isn't team + support")
 	check(Kaiju.TeamSpots[Kaiju.SupportSlot] ~= nil, "No spot for the support")
+	-- The support casts what the team's health calls for, not what's ready.
+	do
+		local all = { Mend = true, BigMend = true, Ward = true, Strike = true }
+		local choose = function(healths, foes, ready)
+			return Kaiju.supportChoice({ Healths = healths, Foes = foes, Ready = ready or all })
+		end
+		check(choose({ 1, 1, 1, 1 }, 0) == nil, "It cast with everyone whole and nothing about")
+		check(choose({ 1, 1, 1, 1 }, 2) == "Strike", "It didn't attack with everyone whole")
+		check(choose({ 0.3, 1, 1, 1 }, 2) == "BigMend", "One nearly down, no big mend")
+		check(choose({ 0.4, 0.45, 0.5, 0.45 }, 2) == "BigMend", "The whole team in a bad way, no big mend")
+		check(choose({ 0.5, 1, 1, 1 }, 2) == "Mend", "One hurt, no mend")
+		check(choose({ 0.7, 0.7, 1, 1 }, 2) == "Mend", "Two worn, no mend")
+		check(choose({ 0.78, 1, 1, 1 }, 2) == "Ward", "One taking the hits, no ward")
+		check(choose({ 0.78, 1, 1, 1 }, 0) == nil, "A ward with nothing about")
+		check(choose({ 0.5, 1, 1, 1 }, 2, { Ward = true, Strike = true }) == "Ward", "One hurt and its mend not back: no ward")
+		check(choose({ 0.5, 1, 1, 1 }, 2, { Strike = true }) == nil, "It attacked with one of you hurt and its mend not back")
+		check(choose({ 0.3, 1, 1, 1 }, 2, { Mend = true, Strike = true }) == "Mend", "Nearly down and the big mend not back: not even a mend")
+		check(choose({}, 1) == "Strike", "On its own (nobody in reach), it didn't attack")
+	end
 	check(Kaiju.supportId({ List = {}, Next = 1 }) == nil, "A support out of nowhere")
 	-- Owed once, after the roll, unless you have the kind.
 	local profile = { Kaiju = { List = {}, Next = 1 } }

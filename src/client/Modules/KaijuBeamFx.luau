@@ -325,6 +325,7 @@ local function play(data)
 	local start = tonumber(data.Start) or workspace:GetServerTimeNow()
 	local models, elements, places = data.Models or {}, data.Elements or {}, data.Places or {}
 	local froms, ends, leaps = data.Froms or {}, data.Ends or {}, data.Leaps or {}
+	local hovers = if type(data.Hovers) == "table" then data.Hovers else {}
 	local mine = data.Owner == player
 	local camera = workspace.CurrentCamera
 	-- Too far off to see: nothing (the server's done the work).
@@ -368,6 +369,7 @@ local function play(data)
 		end
 		local lift = if humanoid and root then humanoid.HipHeight + root.Size.Y / 2 else 2
 		local takeoff = tonumber(leaps[i]) or (KaijuBeam.leap(#units + 1))
+		local hover = math.max(0, tonumber(hovers[i]) or 0)
 		local unit = {
 			Index = i,
 			Model = model,
@@ -377,7 +379,8 @@ local function play(data)
 			Color = palette[i] or GOLD,
 			From = from,
 			To = to,
-			Feet = to.Position - UP * lift, -- (where it stands, on the ground)
+			Feet = to.Position - UP * (lift + hover), -- (the ground under it: it hangs Hover up in the air)
+			Hover = hover,
 			Takeoff = takeoff,
 			Land = takeoff + leapRules.Air,
 			Height = KaijuBeam.leapHeight((to.Position - from.Position).Magnitude),
@@ -556,6 +559,13 @@ local function play(data)
 		if unit.Mark then
 			unit.Mark.Transparency = 0.1
 			tween(unit.Mark, 0.6, { Transparency = 0.65, Size = Vector3.new(0.12, 5.5, 5.5) })
+		end
+		if unit.Hover > 0 then
+			-- Caught up in the air: a ring of its colour bursts round it.
+			local halo = part(Vector3.new(0.15, 2, 2), CFrame.new(unit.To.Position) * FLAT, unit.Color:Lerp(WHITE, 0.25), Enum.PartType.Cylinder)
+			halo.Transparency = 0.1
+			flare(halo, 0.45, { Size = Vector3.new(0.05, reach * 1.6, reach * 1.6) })
+			CombatFx.burst(unit.To.Position, unit.Color, "Sparks", 1.2)
 		end
 		CombatFx.burst(feet + UP * 0.4, unit.Color, "Sparks", 1.4)
 		CombatFx.burst(feet + UP * 0.2, ROCK, "Smoke", 1.1)

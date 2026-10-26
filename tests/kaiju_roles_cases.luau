@@ -117,6 +117,17 @@ for _, role in KaijuRoles.Order do
 		wholeKit(KaijuRoles.Kits[role], role, role)
 	end
 end
+-- A support's moves by what they're for: Skyjelly mends small and big,
+-- wards, and zaps (Static Bolt, beside its kit); Moonmoth's one mend is
+-- both, its Antenna Beam its attack.
+do
+	local sky = KaijuRoles.supportMoves("Skyjelly")
+	check(sky.Mend == "K_PulseMend" and sky.BigMend == "K_BloomSurge" and sky.Ward == "K_StaticVeil" and sky.Strike == "K_StaticBolt", "Skyjelly's support moves")
+	local moth = KaijuRoles.supportMoves("Moonmoth")
+	check(moth.Mend == "K_SilkCocoon" and moth.BigMend == "K_SilkCocoon" and moth.Ward == "K_ScaleStorm" and moth.Strike == "K_AntennaBeam", "Moonmoth's support moves")
+	local bolt = KaijuRoles.Moves.K_StaticBolt
+	check(bolt and bolt.Key == "Strike" and bolt.Kind == "Skyjelly" and Kaiju.AbilityPlans.K_StaticBolt == bolt.Plan, "Static Bolt can't be cast")
+end
 -- The roster's kinds: three moves of their own each, in their role, no
 -- other kind's; an assassin's E is how it gets in (a leap or a vanish).
 do

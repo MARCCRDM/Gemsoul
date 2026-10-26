@@ -347,9 +347,30 @@ Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 10, Bomber = 8, Finish 
 Kaiju.SlotLevels = { 1, 1, 1 }
 -- Where each of the team walks with you: studs to your right (left when
 -- negative) and behind you (negative: ahead). They lead the way: the first
--- out in front, the other two side by side behind it, and the fourth, the
--- support's (SupportSlot), in the middle of the three.
-Kaiju.TeamSpots = { { 0, -10 }, { 4.5, -5.5 }, { -4.5, -5.5 }, { 0, -7 } }
+-- well out in front, the other two side by side behind it, and the
+-- fourth, the support's (SupportSlot), in the middle of the three.
+Kaiju.TeamSpots = { { 0, -16 }, { 5, -10 }, { -5, -10 }, { 0, -12.5 } }
+-- Leading, they read where you're going: on the move (faster than Moving
+-- studs a second) they face the way you're heading, not the way you look,
+-- and walk where you'll be Seconds from now (no further than Max ahead).
+Kaiju.Lead = { Moving = 3, Seconds = 0.8, Max = 14 }
+
+-- Where the one in `slot` walks: you at `position`, looking along `look`,
+-- moving at `velocity` (Lead).
+function Kaiju.leadSpot(position: Vector3, look: Vector3, velocity: Vector3?, slot: number): Vector3
+	local spot = Kaiju.TeamSpots[slot] or Kaiju.TeamSpots[1]
+	local lead = Kaiju.Lead
+	local moving = if velocity then Vector3.new(velocity.X, 0, velocity.Z) else Vector3.new(0, 0, 0)
+	local heading = Vector3.new(look.X, 0, look.Z)
+	local ahead = position
+	if moving.Magnitude > lead.Moving then
+		heading = moving.Unit
+		ahead = position + moving.Unit * math.min(moving.Magnitude * lead.Seconds, lead.Max)
+	end
+	heading = if heading.Magnitude > 1e-3 then heading.Unit else Vector3.new(0, 0, -1)
+	local right = heading:Cross(Vector3.new(0, 1, 0))
+	return ahead + right * spot[1] - heading * spot[2]
+end
 
 -- The support slot: a fourth kaiju out beside the three, for a support kind
 -- only (KaijuRoles' Warden role, called SUPPORT: Moonmoth, Skyjelly). It
@@ -361,11 +382,65 @@ Kaiju.SupportRole = "Warden"
 Kaiju.SupportSlot = 4
 Kaiju.StarterSupport = { Species = "Skyjelly", Element = "Shock" }
 Kaiju.SupportVersion = 1
--- Its pulse: every Every seconds while it's out and you're in a fight (in
--- danger: Kaiju.Danger), if you or one of the team near it (Radius studs)
--- is under Below of their health, it casts its E. Out of a fight it mends
--- nobody: that's for gems.
-Kaiju.SupportPulse = { Every = 7, Below = 0.8, Radius = 24 }
+-- Its pulse: only while you're in a fight (in danger: Kaiju.Danger; out of
+-- one it mends nobody, that's for gems), it reads the health of you and
+-- every one of the team within Radius studs of it, each and on average,
+-- and casts what that calls for (Kaiju.supportChoice), never just because
+-- a move is ready:
+--   BigMend  one of you under Critical, or the average under LowAverage
+--   Mend     one of you under Hurt, two or more under Worn, or the average
+--            under Average
+--   Ward     with foes about: one of you under WardOne, or the average
+--            under WardAverage (someone's taking the hits)
+--   Strike   nobody needs it: a foe in StrikeRange of it gets its attack
+-- each no sooner than Every[that] seconds after its last (Every stays the
+-- Mend's, the rules' old name).
+Kaiju.SupportPulse = {
+	Every = 6,
+	Radius = 24,
+	Critical = 0.35,
+	LowAverage = 0.5,
+	Hurt = 0.55,
+	Worn = 0.75,
+	Average = 0.75,
+	WardOne = 0.8,
+	WardAverage = 0.9,
+	StrikeRange = 30,
+	Gaps = { Mend = 6, BigMend = 18, Ward = 9, Strike = 2.5 },
+}
+
+-- What the support casts now (nil: nothing called for). `view`:
+--   Healths  { share }  you and the team in its reach, each 0..1
+--   Foes     number     foes in its StrikeRange
+--   Ready    { Mend?, BigMend?, Ward?, Strike? }  which it has and can cast
+function Kaiju.supportChoice(view): string?
+	local rules = Kaiju.SupportPulse
+	local healths, ready = view.Healths or {}, view.Ready or {}
+	local lowest, total, worn = 1, 0, 0
+	for _, share in healths do
+		lowest = math.min(lowest, share)
+		total += share
+		if share < rules.Worn then
+			worn += 1
+		end
+	end
+	local average = if #healths > 0 then total / #healths else 1
+	if (lowest < rules.Critical or average < rules.LowAverage) and ready.BigMend then
+		return "BigMend"
+	end
+	local hurt = lowest < rules.Hurt or worn >= 2 or average < rules.Average
+	if hurt and ready.Mend then
+		return "Mend"
+	end
+	local foes = (view.Foes or 0) > 0
+	if foes and (lowest < rules.WardOne or average < rules.WardAverage) and ready.Ward then
+		return "Ward"
+	end
+	if foes and not hurt and ready.Strike then
+		return "Strike"
+	end
+	return nil
+end
 
 -- Whether a kind is a support kind (it goes in the support slot).
 function Kaiju.isSupport(species: string?): boolean

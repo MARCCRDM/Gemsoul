@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Motion = require(game:GetService("ReplicatedStorage").Shared.InsertionMotion)
+local Actions = require(game:GetService("ReplicatedStorage").Shared.CombatActions)
 local ViewGrip = require(script.Parent.ViewGrip)
 local LiveLooks = require(script.Parent.LiveLooks)
 local ThirdPerson = require(script.Parent.ThirdPerson)
@@ -452,7 +453,7 @@ View.ContactAt = { Right = 0.13, Left = 0.13, Heavy = 0.18 }
 function View.contact(stop: number, strength: number, blocked: boolean, fire: (() -> ())?)
 	local key = if swingHeavy then "Heavy" else swingSide
 	local at = View.ContactAt[key] or 0.13
-	local length = if swingHeavy then 0.62 else 0.46
+	local length = if swingHeavy then 0.7 else 0.46
 	if not saved or #pieces == 0 or swingClock >= length then
 		if fire then
 			task.spawn(fire)
@@ -485,15 +486,16 @@ local function keyframes()
 		return
 	end
 	REST = CFrame.new(0.83, -0.78, -1.25) * CFrame.Angles(0, 0, math.rad(12))
-	RAISED = CFrame.new(0.62, -0.2, -1.1) * CFrame.Angles(math.rad(38), math.rad(-8), math.rad(-6))
+	RAISED = CFrame.new(0.56, -0.04, -1.05) * CFrame.Angles(math.rad(54), math.rad(-10), math.rad(-8))
 	local function pose(x, y, z, pitch, yaw, roll)
 		return CFrame.new(x, y, z) * CFrame.Angles(math.rad(pitch), math.rad(yaw), math.rad(roll))
 	end
 	-- A swing: { time, pose } keys, eased from one to the next. A light cut
 	-- winds up over the shoulder, cuts across the middle of the view with the
 	-- tip leading, follows through low on the far side and comes back; the
-	-- backhand mirrors it. A heavy starts from the raised charge and chops
-	-- straight down through the centre.
+	-- backhand mirrors it. A heavy starts from the raised charge, heaves
+	-- back one last bit, then chops straight down through the centre and
+	-- buries itself low before it comes back up.
 	SWINGS = {
 		Right = {
 			{ 0, REST },
@@ -511,11 +513,11 @@ local function keyframes()
 		},
 		Heavy = {
 			{ 0, RAISED },
-			{ 0.05, RAISED * CFrame.new(0, 0.06, 0.05) * CFrame.Angles(math.rad(8), 0, 0) },
-			{ 0.12, pose(0.3, 0.0, -1.25, 12, -4, 14) },
-			{ 0.21, pose(0.2, -0.55, -1.2, -36, 0, 22) },
-			{ 0.34, pose(0.26, -0.78, -1.2, -48, 4, 26) },
-			{ 0.62, REST },
+			{ 0.06, RAISED * CFrame.new(0, 0.1, 0.08) * CFrame.Angles(math.rad(14), 0, 0) },
+			{ 0.13, pose(0.28, 0.04, -1.3, 10, -4, 14) },
+			{ 0.21, pose(0.16, -0.66, -1.25, -46, 0, 22) },
+			{ 0.38, pose(0.2, -0.96, -1.2, -60, 4, 26) },
+			{ 0.7, REST },
 		},
 	}
 end
@@ -870,8 +872,15 @@ function View.start()
 		local jolt = impulse(if type(blockedAt) == "number" then serverNow - blockedAt else nil, 0.24)
 		local hurt = impulse(if type(hurtAt) == "number" then serverNow - hurtAt else nil, 0.3)
 		local hurtSide = if character and character:GetAttribute("HurtSide") == -1 then -1 else 1
-		-- A charged heavy strains: the blade trembles near full charge.
-		local strain = if smoothedCharge > 0.8 then math.sin(os.clock() * 50) * 0.006 else 0
+		-- Holding a blow draws the blade up over your shoulder, all the way
+		-- by the perfect moment; once it's a heavy it strains, the tremble
+		-- growing to the perfect moment. (`charge` runs to overcharge.)
+		local heavyAt = Actions.Base.Heavy.Charge / Actions.OverchargeAt
+		local fullAt = Actions.PerfectAt / Actions.OverchargeAt
+		local raise = ease(smoothedCharge / fullAt)
+		local strain = if smoothedCharge > heavyAt
+			then math.sin(os.clock() * 50) * (0.004 + 0.008 * ease((smoothedCharge - heavyAt) / (fullAt - heavyAt)))
+			else 0
 		local flinch = if #pieces > 0
 			then CFrame.new(0.05 * hurtSide * hurt + bobX, -0.1 * hurt - bobY, 0.14 * hurt) * CFrame.Angles(
 				math.rad(-7 * hurt),
@@ -953,7 +962,7 @@ function View.start()
 					casting * 0.12 - throw * 0.2 + strain + biteX,
 					breathe + casting * 0.08 + biteY,
 					recoil * 0.18 + casting * 0.2 - throw * 0.35 + biteZ
-				) * (swingPose or REST:Lerp(RAISED, ease(smoothedCharge))) * CFrame.Angles(
+				) * (swingPose or REST:Lerp(RAISED, raise)) * CFrame.Angles(
 					math.rad(-recoil * 9 + casting * 14 - throw * 22 + strain * 300),
 					0,
 					0

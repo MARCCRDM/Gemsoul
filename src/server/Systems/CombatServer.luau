@@ -2257,8 +2257,10 @@ local function onInput(player, action, a, b)
 		then
 			st.ChargeStarted = now
 			st.ChargeSide = Actions.side(a)
-			-- The arm draws back while the blow charges.
-			posePlayer(player, "Slash", 3)
+			-- The arm draws back while the blow charges, then rises overhead
+			-- once it's a heavy (RivalPose.Charge), with a "Heavy Blow" bar
+			-- over you for whoever you face (Client.FoeCastBar).
+			posePlayer(player, "Charge", 3, "Heavy Blow")
 			if player.Character then
 				player.Character:SetAttribute("ActionSide", if st.ChargeSide == "Left" then -1 else 1)
 			end
@@ -2266,10 +2268,14 @@ local function onInput(player, action, a, b)
 	elseif action == "ReleaseAttack" and Actions.finiteVector(a) then
 		local started = st.ChargeStarted
 		st.ChargeStarted = nil
+		local swung = false
 		if started and now - started <= 3 then
 			local swing = Actions.charge(now - started)
 			swing.Side = st.ChargeSide or "Right"
-			attack(player, a, swing.Heavy, swing)
+			swung = attack(player, a, swing.Heavy, swing) ~= false
+		end
+		if started and not swung then
+			posePlayer(player, nil, 0) -- (let go of a hold that didn't swing)
 		end
 	elseif action == "Attack" and Actions.finiteVector(a) then
 		st.ChargeStarted = nil
@@ -2576,6 +2582,7 @@ local function tick(dt)
 		end
 		if st.ChargeStarted and now - st.ChargeStarted > 3 then
 			st.ChargeStarted = nil
+			posePlayer(player, nil, 0)
 		end
 		player:SetAttribute("Blocking", blocking(st, now))
 		-- The shield comes up for everyone to see, as the rival's does. (On the

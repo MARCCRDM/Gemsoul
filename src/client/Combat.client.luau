@@ -932,6 +932,10 @@ function own.swing(side, heavy, local_: boolean?)
 		local color = GemConfig.ElementColors[gem and gem.Element] or Color3.new(1, 1, 1)
 		local look = root.CFrame.LookVector
 		CombatSound.play(if heavy then "HeavySwing" else "Swing", root.Position)
+		if heavy then
+			-- Your view rides the chop down (a landed blow's jar replaces it).
+			CombatFx.kick(-0.02, 0, 0, 0.32)
+		end
 		if not BladeTrails.cutsAt(root.Position) then
 			CombatVfx.slash(
 				root.Position,

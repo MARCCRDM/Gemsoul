@@ -26,7 +26,8 @@
 	and the ones in a fight with you or your team (Engaged), the biggest
 	threat first (KaijuBeam.order), holds on it, then swings onto the rest
 	in turn (KaijuBeam.direction: each pulse hits along where it's turned
-	then); with nothing in front of you it turns to face the biggest. Not
+	then); with nothing in front of you it fires straight ahead. They
+	can't be hurt from their leap till they're let go (KaijuServer.hurt). Not
 	in a kaiju battle, nor with the team put away. Everyone near sees it
 	(CombatFx "KaijuBeam", with its Targets in turn), from their own view:
 	no cinematic camera.
@@ -173,10 +174,10 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	if not ready then
 		return reply(false, string.format("Your kaiju aren't charged yet: %d%%.", math.floor(share * 100)))
 	end
-	-- Where: in front of you, along your aim (else where you face). What: the
-	-- creatures in reach and the ones in a fight with you or your team, the
-	-- biggest threat first, then round the rest (KaijuBeam.order); with
-	-- all of them off behind you, it turns to face the biggest.
+	-- Where: always in front of you, along your aim (else where you face).
+	-- What: the creatures in reach and the ones in a fight with you or your
+	-- team, the biggest threat first, then round the rest (KaijuBeam.order);
+	-- none in front of you, it fires straight ahead.
 	local dx, dz = 0, 0
 	if type(aim) == "table" then
 		dx, dz = tonumber(aim.X) or 0, tonumber(aim.Z) or 0
@@ -191,12 +192,22 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	dx, dz = dx / length, dz / length
 	local origin = root.Position
 	local b = KaijuBeam.Beam
-	local engaged = {}
+	local engaged, mine = {}, {}
 	for _, pet in team do
+		mine[pet] = true
 		local target = pet.Target
 		if type(target) == "table" and target.Enemy then
 			engaged[target.Enemy] = true
 		end
+	end
+	-- In a fight with you or your team: one your team's on, one that's after
+	-- you or one of them, or a wild kaiju you've started on.
+	local function inFight(enemy): boolean
+		local e = enemy :: any
+		return engaged[enemy] == true
+			or e.Foe == player
+			or (e.Foe ~= nil and mine[e.Foe] == true)
+			or (type(e.Engaged) == "table" and e.Engaged[player] ~= nil)
 	end
 	local candidates, foes = {}, {}
 	local function take(foe, fighting: boolean)
@@ -214,7 +225,7 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 			Z = offset.Z,
 			Health = humanoid and humanoid.Health,
 			MaxHealth = humanoid and humanoid.MaxHealth,
-			Engaged = fighting or engaged[foe.Enemy] == true or (type(enemy.Engaged) == "table" and enemy.Engaged[player] ~= nil),
+			Engaged = fighting or inFight(enemy),
 		})
 	end
 	for _, foe in KaijuServer.creaturesNear(origin, b.Reach, player) do
@@ -222,23 +233,22 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	end
 	-- (In a fight with your team further off, up to the beam's length.)
 	for _, foe in KaijuServer.creaturesNear(origin, b.Length, player) do
-		if engaged[foe.Enemy] then
+		if inFight(foe.Enemy) then
 			take(foe, true)
 		end
 	end
-	local order = KaijuBeam.order(foes, dx, dz)
-	if #order == 0 and #foes > 0 then
-		local best, top = -math.huge, nil
-		for _, foe in foes do
-			local threat = KaijuBeam.threat(foe)
-			if threat > best then
-				best, top = threat, foe
-			end
+	-- All of them back off from you, cowed, till it fires (KaijuWilds'
+	-- cower); and every one in a fight with you or your team is blasted by
+	-- every pulse, wherever the beam's turned (Marked).
+	local marked = {}
+	for i, foe in candidates do
+		local e = foe.Enemy :: any
+		e.CowedUntil, e.CowedFrom = now + KaijuBeam.timeline().Fire, origin
+		if foes[i].Engaged then
+			table.insert(marked, foe.Enemy)
 		end
-		local reach = math.sqrt(top.X * top.X + top.Z * top.Z)
-		dx, dz = top.X / reach, top.Z / reach
-		order = KaijuBeam.order(foes, dx, dz)
 	end
+	local order = KaijuBeam.order(foes, dx, dz)
 	local targets = {}
 	for _, index in order do
 		local foe = candidates[index]
@@ -267,12 +277,13 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 		Forward = forward,
 		Focus = focus,
 		Targets = targets,
+		Marked = marked,
 		Pulses = 0,
 		Charged = false,
 		Damage = 0,
 		Units = {},
 	}
-	local damages, models, elements, places, froms, ends, leaps = {}, {}, {}, {}, {}, {}, {}
+	local damages, models, elements, places, froms, ends, leaps, hovers = {}, {}, {}, {}, {}, {}, {}, {}
 	for i, pet in order do
 		local place = placeOf(ground, forward, spots[i])
 		local takeoff, land = KaijuBeam.leap(i)
@@ -281,15 +292,17 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 		pet.Target = nil
 		-- Held where it stands till its turn to leap; clients draw the leap
 		-- (KaijuBeamFx) and it's put in its place as it lands (_step).
-		table.insert(cast.Units, { Pet = pet, Place = place, Land = land, WasAnchored = pet.Root.Anchored == true })
+		local hover = spots[i].Up or 0
+		table.insert(cast.Units, { Pet = pet, Place = place, Hover = hover, Land = land, WasAnchored = pet.Root.Anchored == true })
 		pet.Root.Anchored = true
 		table.insert(damages, pet.Stats.Damage)
 		table.insert(models, pet.Model)
 		table.insert(elements, pet.Element)
 		table.insert(places, place)
 		table.insert(froms, from)
-		table.insert(ends, KaijuServer.spot(pet.Model, place, place + forward))
+		table.insert(ends, KaijuServer.spot(pet.Model, place, place + forward, hover))
 		table.insert(leaps, takeoff)
+		table.insert(hovers, hover)
 		-- Its leap and landing posed (CreatureAnimation: BeamLeapAt,
 		-- BeamLandAt), the team's roar together once they're all down (a
 		-- breath apart, so it's a chorus), its cast's charge-up at its mouth
@@ -327,6 +340,7 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 		Froms = froms,
 		Ends = ends,
 		Leaps = leaps,
+		Hovers = hovers,
 		Targets = roots,
 	})
 	return reply(true, "", { Start = start })
@@ -392,11 +406,26 @@ local function pulse(cast, p: number)
 	local focus = cast.Focus
 	local forward = aimed(cast, p)
 	local middle = focus + forward * (b.Length / 2)
+	local struck = {}
 	for _, foe in KaijuServer.creaturesNear(middle, b.Length / 2 + b.Width, cast.Player) do
 		local at = foe.Root.Position
 		local radius = math.max(foe.Root.Size.X, foe.Root.Size.Z) / 2
 		if KaijuBeam.hits(focus.X, focus.Z, forward.X, forward.Z, at.X, at.Z, radius) then
+			struck[foe.Enemy] = true
 			KaijuServer.strike(dealer, foe.Enemy, cast.Damage, nil, true)
+		end
+	end
+	-- Every one in a fight with you or your team, wherever it is (still in
+	-- the beam's reach of you).
+	for _, enemy in cast.Marked or {} do
+		if
+			not struck[enemy]
+			and enemy.Alive
+			and enemy.Root.Parent
+			and (enemy.Root.Position - cast.Origin).Magnitude <= b.Length + b.Width
+		then
+			struck[enemy] = true
+			KaijuServer.strike(dealer, enemy, cast.Damage, nil, true)
 		end
 	end
 end
@@ -412,7 +441,7 @@ function KaijuBeamServer._step(now: number)
 				local pet = unit.Pet
 				if not unit.Landed and t >= unit.Land and up(pet) then
 					unit.Landed = true
-					KaijuServer.place(pet.Model, unit.Place, unit.Place + cast.Forward)
+					KaijuServer.place(pet.Model, unit.Place, unit.Place + cast.Forward, unit.Hover)
 				end
 			end
 		elseif phase == "Charge" or phase == "Fire" then
@@ -425,7 +454,7 @@ function KaijuBeamServer._step(now: number)
 					if up(pet) then
 						if not unit.Landed then
 							unit.Landed = true
-							KaijuServer.place(pet.Model, unit.Place, unit.Place + cast.Forward)
+							KaijuServer.place(pet.Model, unit.Place, unit.Place + cast.Forward, unit.Hover)
 						end
 						pet.Root.Anchored = true
 						pet.Model:SetAttribute("ActionKind", "Bolt")

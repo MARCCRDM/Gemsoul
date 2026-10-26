@@ -352,10 +352,15 @@ Beside the three that fight, you have a fourth kaiju out: your
 **support**. It doesn't fight for creatures. It floats in the middle of
 your team and keeps you and your team going.
 
-**They lead the way** (since 2026-10-26, `Kaiju.TeamSpots`): your team
-walks out in front of you, not behind. The first of the three leads, 10
-studs ahead; the other two walk side by side behind it, 5.5 studs ahead
-and 4.5 to either side; the support floats in the middle of the three.
+**They lead the way** (since 2026-10-26, `Kaiju.TeamSpots`,
+`Kaiju.leadSpot`): your team walks out in front of you, not behind. The
+first of the three leads, 16 studs ahead; the other two walk side by side
+behind it, 10 ahead and 5 to either side; the support floats in the
+middle of the three, 12.5 ahead. **They read where you're going**
+(`Kaiju.Lead`): on the move they face the way you're heading, not the way
+you look, and walk where you'll be 0.8 s from now (up to 14 studs
+further out), so they're already there when you arrive. Standing still
+or turning on the spot, they line up ahead of where you look.
 
 ![Skyjelly, the starter support (offline render of the game's model; the stage overexposes its Ion-yellow core and tendril tips)](kaiju/skyjelly.jpg)
 
@@ -373,13 +378,24 @@ and 4.5 to either side; the support floats in the middle of the three.
   (`KaijuSupport`), else your best.
 - **Its pulse** (`Kaiju.SupportPulse`), **only in a fight** (in danger,
   `Kaiju.Danger`, as above; since 2026-10-26). Out of one it mends nobody:
-  between fights, gems do the healing. Every 7 seconds, if you or one of
-  your team within 24 studs is under 80% health, it casts its E, a team
-  mend that **heals you too**. Its Q (from level 5) veils the team (30%
-  less damage for 4 s) when creatures are about you. Its R (from level 10)
-  blooms when one of you is under half health: 30% back over 4 s, and
-  burns, poisons and slows cleared. In the field it is the only thing that
-  heals you away from the Shelter, and only mid-fight.
+  between fights, gems do the healing. In a fight it reads the health of
+  you and every one of the team within 24 studs of it, **each and on
+  average**, and casts what that calls for, never just because a move is
+  ready (`Kaiju.supportChoice`, its moves sorted by what they're for:
+  `KaijuRoles.supportMoves`; all its own from level 1):
+
+  | It casts | When |
+  |---|---|
+  | its **big mend** (Skyjelly: Bloom Surge, 30% over 4 s, effects cleared) | one of you under 35%, or the average under 50% |
+  | its **mend** (Pulse Mend, 15% over 3 s, heals you too) | one of you under 55%, two or more under 75%, or the average under 75% |
+  | its **ward** (Static Veil, 30% less damage for 4 s) | with foes about: one of you under 80%, or the average under 90% (someone's taking the hits) |
+  | its **attack** (Static Bolt, 90% damage with its element's effect) | nobody needs it, and a foe within 30 studs (the team's foe first) |
+
+  Each no sooner than its own gap after the last (big mend 18 s, mend
+  6 s, ward 9 s, attack 2.5 s). Moonmoth works the same way: Silk Cocoon
+  is its mend, Scale Storm its ward, Antenna Beam its attack. In the field
+  it is the only thing that heals you away from the Shelter, and only
+  mid-fight.
 - **In a kaiju battle** it comes as a fourth piece (there are six cells a
   side). It stands at the back with the shooters and mends and wards its
   side, as a Warden does. 1V1 + KAIJU brings it too.
@@ -475,14 +491,16 @@ On a computer the strip sits at the bottom left; the CATCH prompt appears
 above the combat HUD near the bottom center:
 [the lobby on a computer](kaiju/hud-desktop.png).
 
-- **The kaiju card:** one card, three across and three down
+- **The kaiju card:** one card, three across and two down
   (`MobileLayout.kaiju`, `kaijuDesk`, `kaijuCells`):
   - **The kaiju, two by two on the left:** your team's three (the lead
     first, edged in gold, then the second beside it and the third under
     it), and your support beside the third.
   - **On the right:** AUTO HEAL over CALL BACK.
-  - **Bottom row:** the team's [HYPERBEAM](#hyperbeam), the full width of
-    the card.
+  - **Its outline:** the team's [HYPERBEAM](#hyperbeam) meter, with its
+    pill on the card's bottom edge. *2026-10-26:* this replaced the
+    full-width bottom row, so the card is shorter (143 px tall on a
+    computer, was 186; at most 100 on a phone, was 124).
 
   Each kaiju tile shows its portrait, level and health. On a computer it
   also has dots down its right edge for Q, E and R: lit when the move is
@@ -557,17 +575,19 @@ blast together. It works the same in mining and in fights.
   (`KaijuSaveCharge`). While it's on, your fighters cast none of their Q, E
   or R moves (`KaijuFighter.hold`). They fight with blows alone and charge
   1.6 times as fast. The support's heals still go out.
-- **The button** (`KaijuBeamHud`): the kaiju card's bottom row
-  (`KaijuHud.beamSlot`), under the team, its support and the two buttons.
-  One bar the row's width: it fills left to right in your team's colours,
-  by the team's charge, with HYPERBEAM on the
-  left, its state on the right and SAVE at the end (green while it's on).
-  It shows:
+- **The meter and its button** (`KaijuBeamHud`). *2026-10-26:* the kaiju
+  card's own outline is the meter. It fills left to right round the card in
+  your team's colours, by the team's charge, over the card's dim edge
+  (`KaijuBeamHud.fillLevel`). Its button is a pill set on the middle of the
+  card's bottom edge, half over it (`KaijuHud.beamSlot`,
+  `MobileLayout.kaijuCells`' `Beam`), clear of every tile. It has HYPERBEAM
+  on the left, its state on the right and SAVE at the end (green while
+  it's on). It shows:
   - **Charging:** the percentage (CHARGING 42% on a computer).
-  - **Ready:** the bar full and bright, its colours flowing, a glow
-    breathing round it, the HYPERBEAM title shimmering and glinting; it
-    pops with a sound. It reads **READY! [ Z ]** on a computer and
-    **READY!** on a phone.
+  - **Ready:** the outline full and bright, its colours flowing round the
+    card, a glow breathing about the card and the pill, the HYPERBEAM title
+    shimmering; it pops with a sound. It reads **READY! [ Z ]** on a
+    computer and **READY!** on a phone.
   - **Blasting:** BLASTING!
 
   It's light to run: it redraws only when what it shows changes, and moves
@@ -575,29 +595,38 @@ blast together. It works the same in mining and in fights.
 
   **Z**, the gamepad's d-pad down, or a tap fires it.
 
-  ![The kaiju card's HYPERBEAM row charging, saving, ready and blasting. Offline render of the game's UI code, not a Roblox screenshot](kaiju/hyperbeam-states.png)
+  ![The kaiju card with its outline as the HYPERBEAM meter: charging, saving, ready and blasting, its pill on the bottom edge. Offline render of the game's UI code, not a Roblox screenshot](kaiju/hyperbeam-states.png)
 
-  ![On a phone, the card sits right of your level and health bar, clear of PLAY and the dock. Offline render, not a Roblox screenshot](kaiju/hyperbeam-phone.png)
+  ![On a phone: the card on the left, its outline lit and READY! on its pill, clear of PLAY and the dock. Offline render, not a Roblox screenshot](kaiju/hyperbeam-phone.png)
 - **The blast** (`KaijuBeamServer`, 6.1 seconds, `KaijuBeam.timeline`).
   Since 2026-10-26 it all happens in front of you, seen from your own
   view: no cinematic camera.
-  1. **Gather (1.8 s): the formation.** Each kaiju is held where it stands
-     until its turn. Then they leap one after another, 0.16 s apart, into
-     a V opening ahead of you, wide of the middle so your view stays clear
-     (8 studs either side 7 ahead, then 13 either side 3 ahead), facing
-     where you aim (`KaijuBeam.Formation`, `KaijuBeam.Leap`); the support
-     goes up high over the V. Each leap takes
+  1. **Gather (1.8 s): the formation, in the air.** Each kaiju is held
+     where it stands until its turn. Then they leap one after another,
+     0.16 s apart, up into a V in the air ahead of you, 6 studs off the
+     ground (*2026-10-26*, `KaijuBeam.Hover`), wide of the middle so your
+     view stays clear (8 studs either side 7 ahead, then 13 either side 3
+     ahead), facing where you aim (`KaijuBeam.Formation`,
+     `KaijuBeam.Leap`); the support goes higher still over the V, 13 studs
+     up. They hang there, held still, till the blast is over, then drop
+     back down. Nothing can hurt them from their leap till they're let go
+     (`KaijuServer.hurt`). **Everything about backs off**: every creature
+     in reach or in the fight drops what it was winding up and backs away
+     from you, crouched low and trembling (`KaijuMood` "Cower"), till the
+     beam fires (`CowedUntil`, KaijuWilds' `cower`). Each leap takes
      0.62 s, and the further it goes the higher it arcs (up to 14 studs).
      A fighter does a front flip; the support spins. A streak of its colour
-     trails behind it, and it slams down with a shockwave, cracks, a pillar
-     of light and dust. The server puts it in its exact spot as it lands
+     trails behind it, and as it arrives a ring of its colour bursts round
+     it in the air while a shockwave, cracks, a pillar of light and dust
+     hit the ground under it. The server puts it in its exact spot as it lands
      (`KaijuServer.spot`, sent ahead to clients as `Ends`), so there's no
      pop. Once they're all down (1.25 s), they roar together, a breath
      apart: pillars of their colours shoot up and lines of light join them
      to each other and to you.
   2. **Charge (1.2 s).** They stand still and their auras flare: a
      shimmering shell, sparks rising and motes spiralling into their
-     mouths. Each pours its element into one point 16 studs ahead of you.
+     mouths. Each pours its element into one point 16 studs ahead of you,
+     level with them (6 studs up).
      The orb there swells, crackles with lightning and pulls rings of light
      into itself.
   3. **Fire (2.6 s).** The beam fires from that point: 90 studs long and 10
@@ -609,9 +638,12 @@ blast together. It works the same in mining and in fights.
      smoothly onto each of the rest in turn, nearest round first
      (`KaijuBeam.order`, `sweep`, `direction`; up to 5). It takes the
      creatures within 60 studs and any your team is fighting (up to the
-     beam's length), never one more than 80° off your aim; with all of
-     them behind you it turns to face the biggest. It lands 13 pulses,
-     each on every creature in the beam where it's turned then.
+     beam's length), never one more than 80° off your aim; with none in
+     front of you it fires straight ahead. It lands 13 pulses, each on
+     every creature in the beam where it's turned then **and on every one
+     in a fight with you or your team, wherever it is** (*2026-10-26*:
+     one your team's on, one after you or one of them, a wild kaiju you
+     started on; still within the beam's 90 studs of you).
      Altogether it deals 7 times your team's damage, added up
      (`KaijuBeam.damage`).
   4. **Recover (0.5 s).** They're let go and back to following you.
@@ -1078,9 +1110,9 @@ Proposed guardrails:
 | `SparServer` | `Hunt`: the kit out alone |
 | `Shared.KaijuBeam` | The HYPERBEAM's rules: its charge (`Charge`, `gain`, `ready`), its timeline and phases, the formation and the leaps into it (`Leap`, `leap`, `leapHeight`, `arc`), the beam's reach (`hits`), the aim assist (`aim`), what it takes and how it swings (`threat`, `order`, `sweep`, `direction`) and its damage |
 | `KaijuBeamServer` | The team's charge on your profile (`BeamCharge`; `KaijuCharge` and `KaijuSave` on you), SAVE CHARGE (`KaijuSaveCharge`), the blast (`KaijuBeam`): the formation, holding them still, the pulses, letting go |
-| `KaijuHud` (client) | The kaiju card (three by three: the team and the support two by two, AUTO HEAL over CALL BACK beside them, and the HYPERBEAM's row), CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
+| `KaijuHud` (client) | The kaiju card (three by two: the team and the support two by two, AUTO HEAL over CALL BACK beside them; the HYPERBEAM its outline, its pill on the bottom edge), CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
-| `KaijuBeamHud` (client) | The HYPERBEAM button: the charge, the pips, READY, SAVE, Z / tap |
+| `KaijuBeamHud` (client) | The HYPERBEAM: the card's outline as its meter, its pill on the card's bottom edge (the charge, READY, SAVE), Z / tap |
 | `KaijuBeamFx` (client) | The blast on screen: the rune circle, each leap carried along its arc and slammed down, the roar, the auras, the streams and orb, the beam turning onto its targets in turn; your roll call, grade and bloom, no camera takeover (`flight`; `tools/vfx_sim.luau`'s Hyperbeam renders it from your eyes) |
 | `KaijuTaming` (client) | The gold glow and READY TO CATCH on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
 | `CritterFx` (client) | A gem raid's snatchers on screen: their giggles and cackles with "hee hee!" over them, and a dropped gem flying back ("GOT IT BACK!") |

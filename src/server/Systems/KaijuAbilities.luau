@@ -83,7 +83,7 @@ end
 
 -- The HUD's attribute for when each key last went off (Gem: its gem
 -- surge, its Gemsoul's E).
-local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", Gem = "KaijuGemAt" }
+local CAST_AT = { Q = "KaijuQAt", E = "KaijuAbilityAt", R = "KaijuRAt", Gem = "KaijuGemAt", Strike = "KaijuAbilityAt" }
 
 local function flat(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)

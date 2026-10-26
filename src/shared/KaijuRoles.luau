@@ -32,6 +32,8 @@
 	  KaijuRoles.of(species) -> role id ("Tank", ...)
 	  KaijuRoles.kit(species) -> { E, Q, R }   its moves
 	  KaijuRoles.move(species, key, level) -> (id, awake)
+	  KaijuRoles.supportMoves(species) -> { Mend, BigMend, Ward, Strike }
+	                         a support's moves by what they're for
 	  KaijuRoles.Moves[id]   the moves, as the gem surges' catalog has them
 	                         (Name, Description, IconSource) and their Plan
 	  KaijuRoles.target(unit, foes, now) -> foe?   who it fights now
@@ -292,6 +294,11 @@ for id, kind in KaijuRoster.Kinds do
 		move.Role, move.Kind = kind.Role, id
 		KaijuRoles.Moves[moveId] = move
 	end
+	if kind.Strike then
+		local move = KaijuRoster.Moves[kind.Strike]
+		move.Role, move.Kind = kind.Role, id
+		KaijuRoles.Moves[kind.Strike] = move
+	end
 end
 for id, move in KaijuRoles.Moves do
 	move.Id = id
@@ -314,6 +321,49 @@ end
 function KaijuRoles.move(species: string?, key: string, level: number?): (string?, boolean)
 	local id = KaijuRoles.kit(species)[key]
 	return id, id ~= nil and (level or 1) >= (KaijuRoles.MoveLevels[key] or math.huge)
+end
+
+-- A support's moves by what they're for (its kit and its Strike, sorted by
+-- their plans): Mend (its smaller team mend), BigMend (its bigger: the
+-- same as Mend with only one), Ward (a team ward or shell) and Strike (an
+-- attack). Any it hasn't is nil. A support's moves are all its own from
+-- level 1: mending and shielding are its job.
+function KaijuRoles.supportMoves(species: string?): { Mend: string?, BigMend: string?, Ward: string?, Strike: string? }
+	local found = { Mend = nil, BigMend = nil, Ward = nil, Strike = nil }
+	local kind = KaijuRoster.Kinds[species or ""]
+	local ids = {}
+	for _, id in KaijuRoles.kit(species) do
+		table.insert(ids, id)
+	end
+	if kind and kind.Strike then
+		table.insert(ids, kind.Strike)
+	end
+	table.sort(ids)
+	local least, most = math.huge, -math.huge
+	for _, id in ids do
+		local move = KaijuRoles.Moves[id]
+		local plan = move and move.Plan
+		if not plan then
+			continue
+		end
+		if plan.Shape == "Mend" then
+			local heal = plan.Heal or 0
+			if heal < least then
+				least, found.Mend = heal, id
+			end
+			if heal > most then
+				most, found.BigMend = heal, id
+			end
+		elseif plan.Shape == "Ward" or plan.Shape == "Shell" then
+			found.Ward = found.Ward or id
+		elseif (plan.Mult or 0) > 0 and not found.Strike then
+			found.Strike = id
+		end
+	end
+	if kind and kind.Strike then
+		found.Strike = kind.Strike
+	end
+	return found
 end
 
 -- Mana from one attack (`attacked`) and from `lost` (a share, 0 to 1) of
