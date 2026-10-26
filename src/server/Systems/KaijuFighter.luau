@@ -18,6 +18,9 @@
 	  KaijuFighter.of(model) -> Fighter?     the fighter a model is
 	  KaijuFighter.forget(fighter)           it's gone
 	  KaijuFighter.setMoves(fighter, moves)  its Q and R awake (a level)
+	  KaijuFighter.hold(fighter, now)        saving its charge (the team's
+	                                         hyperbeam): its moves wait a
+	                                         beat more, blows alone
 
 	spec = {
 	  Model, Root, Humanoid, Species, Element, Scale (its size)
@@ -528,6 +531,16 @@ local function gemReady(f, view, distance: number, now: number): boolean
 		return distance <= (plan.Radius or 6) * (f.Size or 1)
 	end
 	return view.Distance <= Brain.SurgeRange
+end
+
+-- Saving its charge (KaijuBeamServer): its E, Q, R and gem surge held off
+-- (each due no sooner than a beat from now), so it fights with blows alone.
+function KaijuFighter.hold(f, now: number)
+	local soon = now + 0.5
+	f.NextSurge = math.max(f.NextSurge or 0, soon)
+	f.NextQ = math.max(f.NextQ or 0, soon)
+	f.NextR = math.max(f.NextR or 0, soon)
+	f.NextGem = math.max(f.NextGem or 0, soon)
 end
 
 function KaijuFighter.step(f, foe, now: number)

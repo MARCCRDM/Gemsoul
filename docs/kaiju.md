@@ -513,6 +513,63 @@ hurt, it flashes white on every blow, and below 30% it smokes. Glowing parts
 keep their light. Your own team's health is on the team strip. See
 [play-screen.md](play-screen.md#health-on-the-body).
 
+## HYPERBEAM
+
+Once every kaiju you have out is fully charged, you can call a HYPERBEAM:
+your team's blast together. It works the same in mining and in fights.
+
+- **Mana.** Each kaiju has its own mana, 0 to 100, kept on its record. Out
+  of a fight it gains 0.6 a second, so it fills in about three minutes of
+  mining. In a fight it gains 0.3 a second more, plus 2.4 for every blow of
+  its that lands (1.6 times that for a heavy blow). Each Q, E or R it casts
+  costs 8 (`KaijuBeam.Mana`).
+- **SAVE CHARGE.** The button's SAVE switch, kept on your profile
+  (`KaijuSaveCharge`). While it's on, your fighters cast none of their Q, E
+  or R moves (`KaijuFighter.hold`). They fight with blows alone and charge
+  1.6 times as fast. The support's heals still go out.
+- **The button** (`KaijuBeamHud`): a pill by the kaiju strip. On a computer
+  it sits in the row above the strip. On a phone it sits beside your coins
+  and health bar, clear of the strip, CATCH, the thumbstick and the dock
+  (`MobileLayout.beam`). It shows:
+  - **Charging:** a dark core filling in your team's colours, by the
+    emptiest kaiju (all of them must be full), with CHARGING and a
+    percentage. Each kaiju gets a pip showing its own mana in its
+    element's colour.
+  - **Ready:** the core lights up, a ring of your team's colours spins
+    round it, the HYPERBEAM title shimmers and glints, and the pill pops
+    with a sound. It reads **READY! [ Z ]**, or **READY! TAP** on a phone.
+  - **Blasting:** BLASTING!
+
+  **Z**, the gamepad's d-pad down, or a tap fires it.
+
+  ![The button charging, saving, ready and blasting, above the kaiju strip. Offline render of the game's UI code, not a Roblox screenshot](kaiju/hyperbeam-states.png)
+
+  ![On a phone, beside your coins and health bar. Offline render, not a Roblox screenshot](kaiju/hyperbeam-phone.png)
+- **The blast** (`KaijuBeamServer`, 4.5 seconds, `KaijuBeam.timeline`):
+  1. **Gather (1.1 s).** They run into a V either side of you, facing where
+     you aim (`KaijuBeam.Formation`), with the support hung up behind you.
+     Your aim snaps onto the nearest creature within 35° of it, up to 60
+     studs away.
+  2. **Charge (1.3 s).** They stand still, and each pours its element into
+     one point 7 studs ahead of you.
+  3. **Fire (1.5 s).** The beam fires from that point: 90 studs long and 10
+     wide. It lands 6 pulses on every creature inside it. Altogether it
+     deals 7 times your team's damage, added up (`KaijuBeam.damage`).
+  4. **Recover (0.6 s).** They're let go and back to following you.
+
+  Their mana goes to zero when the blast starts. Blows landed during the
+  blast don't charge it again.
+- **The show** (`KaijuBeamFx`, for everyone in range): a sigil on the
+  ground with a ring at each kaiju's place, streams of each element into a
+  growing orb, then the beam with racers, a shockwave, a flash, screen
+  shake and a scorch mark. For you only, the camera takes over: a hero
+  shot of the team, an orbit and then over your shoulder. There's a
+  letterbox with **HYPERBEAM!** and your kaiju's names, and a colour grade.
+  You get the camera back at Recover.
+- **Not** without your team out, while it's still charging (it tells you
+  the percentage), mid-blast, or in a kaiju battle. The beam doesn't break
+  rocks, so it can't be used to skip the swings.
+
 ## Hunting
 
 Your kaiju fights whether or not you do. Hunting puts your own combat kit
@@ -953,8 +1010,12 @@ Proposed guardrails:
 | `FrontierServer` | Where and when rifts open and moon bugs come through ([frontier.md](frontier.md)) |
 | `KaijuAbilities` | Every move a kaiju casts: where it lands, on whom, and its look, all at its caster's size (`Size`; effects sent `"Sized"`); its R's shell, ward or mend (`soak`, applied by `KaijuServer.hurt` and, through `Soak`, `Enemies.damage`) |
 | `SparServer` | `Hunt`: the kit out alone |
+| `Shared.KaijuBeam` | The HYPERBEAM's rules: mana (`Mana`, `gain`, `spend`, `team`), its timeline and phases, the formation, the beam's reach (`hits`), the aim assist (`aim`) and its damage |
+| `KaijuBeamServer` | Mana on each kaiju's record (`KaijuCharge` and `KaijuSave` on you, `Mana` on each model), SAVE CHARGE (`KaijuSaveCharge`), the blast (`KaijuBeam`): the formation, holding them still, the pulses, letting go |
 | `KaijuHud` (client) | The team strip, AUTO HEAL, CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
+| `KaijuBeamHud` (client) | The HYPERBEAM button: the charge, the pips, READY, SAVE, Z / tap |
+| `KaijuBeamFx` (client) | The blast on screen: the sigil, the streams, the beam; your camera, letterbox and grade |
 | `KaijuTaming` (client) | The gold glow and READY TO CATCH on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
 | `CritterFx` (client) | A gem raid's snatchers on screen: their giggles and cackles with "hee hee!" over them, and a dropped gem flying back ("GOT IT BACK!") |
 | `FxSize` (client) | How big the effect being drawn is: a creature's size, held while its effect draws (`run`), kept through its delays and frame loops (`keep`); `CombatFx`, `CombatSound`, `CombatVfx`, `MoveVfx`, `TriadVfx` and `ElementalDeath` draw at it |

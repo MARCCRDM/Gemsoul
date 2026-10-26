@@ -128,6 +128,8 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			-- Revives for Robux (the KaijuRevive product) and Revive coupons.
 			StoreServer.reviveKaiju = KaijuServer.reviveAll
 			CouponServer.reviveKaiju = KaijuServer.reviveAll
+			-- The team's HYPERBEAM: their mana, SAVE CHARGE and the blast.
+			require(script.Parent.Systems.KaijuBeamServer).start()
 			-- Kaiju battles: two players' teams placed in a formation, then
 			-- fighting it out by themselves.
 			require(script.Parent.Systems.KaijuBattles).start()

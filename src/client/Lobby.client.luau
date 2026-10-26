@@ -49,6 +49,9 @@ require(script.Parent.Modules.EdgeDome).start()
 -- Your mini kaiju: its card, RECALL, HUNT and TAME, and the kaiju panel.
 if Config.Features == nil or Config.Features.Kaiju ~= false then
 	require(script.Parent.Modules.KaijuHud).start()
+	-- The team's HYPERBEAM: its button by the strip, and the blast itself.
+	require(script.Parent.Modules.KaijuBeamHud).start()
+	require(script.Parent.Modules.KaijuBeamFx).start()
 	-- Kaiju battles: the formation board, the battle bar and the result.
 	require(script.Parent.Modules.KaijuBattleUI).start()
 	-- Each kaiju in a battle on a ring in its side's colour (BLUE or RED).

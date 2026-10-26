@@ -156,6 +156,35 @@ for _, s in SCREENS do
 			check(not MobileLayout.overlaps(k, closed), what .. ": the kaiju card overlaps the CHAT button")
 		end
 	end
+	-- The HYPERBEAM button (Client.KaijuBeamHud): up right of your coins and
+	-- health bar, the same hunting or not; on the screen, big enough to tap,
+	-- clear of everything round it: the kaiju card and CATCH (with and
+	-- without CHAT, and up at the top right while you hunt), the dock, the
+	-- thumbstick, the toast and loot card.
+	local beam = MobileLayout.beam(screen, true)
+	check(inside(beam) and beam.W >= 80 and beam.H >= 40, label .. ": the HYPERBEAM button runs off the screen or is too small")
+	local near = {
+		["pick card"] = card,
+		coins = wallet,
+		["health bar"] = MobileLayout.health(),
+		dock = dock,
+		["teammates' cards"] = party,
+		jump = jump,
+		["loot card"] = loot,
+		toast = toast,
+		["CHAT button"] = closed,
+		thumbstick = MobileLayout.stick(screen),
+	}
+	for _, chat in { false, true } do
+		local k = MobileLayout.kaiju(chat)
+		near["kaiju card" .. (if chat then " (with CHAT)" else "")] = k
+		near["CATCH" .. (if chat then " (with CHAT)" else "")] = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.H }
+	end
+	near["kaiju card (hunting)"] = { X = screen.X - 12 - 316, Y = 12, W = 316, H = 50 }
+	near["CATCH (hunting)"] = { X = screen.X - 12 - 210, Y = 12 + 50 + 8, W = 210, H = 90 }
+	for name, r in near do
+		check(not MobileLayout.overlaps(beam, r), label .. ": the HYPERBEAM button overlaps the " .. name)
+	end
 	-- The kit switch (pick or combat kit): just left of PLAY and level with
 	-- it, big enough to tap, on the screen, clear of PLAY, the tiles under
 	-- it, Roblox's thumbstick, the fight's ring (ATTACK, the surges, GUARD,
@@ -265,5 +294,5 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, at 7 screen sizes)"
+		.. " mobile layout checks (pick card, coins, chat, dock with TASKS, teammates, kaiju, loot card, clear top right, the kit switch by PLAY and clear of the fight's ring and vitals, the HYPERBEAM button, at 7 screen sizes)"
 )

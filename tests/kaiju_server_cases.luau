@@ -4082,6 +4082,119 @@ local function teamFights()
 		w.Fighter.Flank, w.Fighter.Apart = nil, nil
 		KaijuFighter.calm(w.Fighter)
 	end
+	-- The team's HYPERBEAM (KaijuBeamServer): mana from following you and
+	-- from blows landing, a move's cost, SAVE CHARGE (blows alone, faster,
+	-- moves held), and the blast: only with all of them full, the team in
+	-- formation facing your aim, every creature in the beam hit and none
+	-- outside it, their own thinking held till it's over, then let go.
+	;(function()
+		local Beam = serverModule("KaijuBeamServer")
+		local KaijuBeam = shared("KaijuBeam")
+		local mana = KaijuBeam.Mana
+		Beam.start()
+		reset()
+		rootA.CFrame = CFrame.new(spot)
+		-- Charging: a trickle out of a fight, shown on the HUD and each kaiju.
+		for _, pet in team do
+			pet.Record.Mana, pet.Target = 0, nil
+		end
+		Beam._charge(10)
+		check(math.abs(team[1].Record.Mana - mana.Trickle * 10) < 1e-6, "A kaiju out doesn't charge as it follows you")
+		check(a:GetAttribute("KaijuCharge") == math.floor(mana.Trickle * 10), "The HUD's charge isn't the team's")
+		check(team[2].Model:GetAttribute("Mana") == math.floor(mana.Trickle * 10), "A kaiju's own mana isn't on it")
+		local res = Beam._fire(a, { X = 0, Z = 1 }, now)
+		check(not res.Ok and string.find(res.Message, "charged") ~= nil, "A HYPERBEAM half charged")
+		-- A blow landing adds to it; a heavy more; a move costs.
+		local dummy = bugAt(spot + Vector3.new(40, 0, 40))
+		team[1].Record.Mana = 0
+		local landed = KaijuServer.strike(team[1], dummy, 1, nil, false)
+		if landed == "Hit" or landed == "Broken" then
+			check(math.abs(team[1].Record.Mana - mana.Hit) < 1e-6, "A blow landing doesn't charge it")
+		end
+		team[1].Record.Mana = 50
+		KaijuServer.caster(team[1])
+		check(team[1].Record.Mana == 50 - mana.Cast, "A move costs nothing")
+		-- SAVE CHARGE: kept on your profile; moves free and held, faster.
+		local saved = registered.KaijuSaveCharge(a, true)
+		check(saved.Ok and Kaiju.roster(profiles[a]).SaveCharge == true and a:GetAttribute("KaijuSave") == true, "SAVE CHARGE didn't switch on")
+		check(not registered.KaijuSaveCharge(a, "yes").Ok, "SAVE CHARGE took a word")
+		check(KaijuServer.holding(team[1]), "Saving, a fighter still casts")
+		local f = team[1].Fighter
+		f.NextQ, f.NextR, f.NextSurge, f.NextGem = 0, 0, 0, 0
+		KaijuFighter.hold(f, now)
+		check(f.NextQ > now and f.NextR > now and f.NextSurge > now and f.NextGem > now, "Saving, its moves are still due")
+		team[1].Record.Mana = 50
+		KaijuServer.caster(team[1])
+		check(team[1].Record.Mana == 50, "Saving, a move still costs")
+		team[1].Record.Mana = 0
+		Beam._charge(10)
+		check(math.abs(team[1].Record.Mana - mana.Trickle * 10 * mana.Save) < 1e-6, "Saving doesn't charge faster")
+		registered.KaijuSaveCharge(a, false)
+		check(not KaijuServer.holding(team[1]) and a:GetAttribute("KaijuSave") == nil, "SAVE CHARGE didn't switch off")
+		-- Full: the blast. One creature in front, one behind, one off to the side.
+		reset()
+		rootA.CFrame = CFrame.new(spot)
+		for _, pet in team do
+			pet.Record.Mana = mana.Max
+		end
+		local ahead = bugAt(spot + Vector3.new(0, 0, 30))
+		local behind = bugAt(spot + Vector3.new(0, 0, -30))
+		local aside = bugAt(spot + Vector3.new(40, 0, 25))
+		local before = { ahead.Humanoid.Health, behind.Humanoid.Health, aside.Humanoid.Health }
+		local battling = KaijuServer.battling
+		KaijuServer.battling = function()
+			return true
+		end
+		check(not Beam._fire(a, { X = 0, Z = 1 }, now).Ok, "A HYPERBEAM in a kaiju battle")
+		KaijuServer.battling = battling
+		table.clear(fxs)
+		local start = now
+		res = Beam._fire(a, { X = 0.2, Z = 1 }, start)
+		check(res.Ok, "A full team's HYPERBEAM didn't fire: " .. tostring(res.Message))
+		check(drew("KaijuBeam") ~= nil, "Nobody sees the HYPERBEAM")
+		check(a:GetAttribute("KaijuBeamAt") ~= nil and a:GetAttribute("KaijuCharge") == 0, "The HUD doesn't know it fired")
+		for _, pet in team do
+			check(pet.Record.Mana == 0 and pet.BeamUntil ~= nil, "A kaiju's charge not spent on its HYPERBEAM")
+			check(pet.Model:GetAttribute("ActionName") == "HYPERBEAM", "No charge-up on a kaiju for its HYPERBEAM")
+		end
+		check(not Beam._fire(a, { X = 0, Z = 1 }, start + 0.1).Ok, "A second HYPERBEAM under way")
+		local at = KaijuBeam.timeline()
+		-- Gathering: their own thinking waits (no foe taken up).
+		Beam._step(start + 0.2)
+		KaijuServer._think(team[1], start + 0.2, 0.15)
+		check(team[1].Target == nil, "A kaiju went after a foe mid-HYPERBEAM")
+		check(ahead.Humanoid.Health == before[1], "The beam hit before it fired")
+		-- Charging: in their places, facing your aim, held still.
+		Beam._step(start + at.Charge + 0.05)
+		local forward = Vector3.new(0, 0, 1)
+		local right = forward:Cross(Vector3.new(0, 1, 0))
+		for i, pet in team do
+			check(pet.Root.Anchored == true, "A kaiju not held still as it charges")
+			local spotOf = KaijuBeam.formation(#team, false)[i]
+			local want = spot + right * spotOf.Side - forward * spotOf.Back
+			local off = pet.Root.Position - want
+			check(Vector3.new(off.X, 0, off.Z).Magnitude < 2.5, "A kaiju out of its place in the formation: " .. i)
+		end
+		-- Firing: the one in front hit by every pulse; the others untouched.
+		local t = at.Fire + 0.01
+		while t < at.Stop do
+			Beam._step(start + t)
+			t += 0.05
+		end
+		check(ahead.Humanoid.Health < before[1], "The creature in the beam wasn't hit")
+		check(behind.Humanoid.Health == before[2] and aside.Humanoid.Health == before[3], "The beam hit outside itself")
+		-- (Blows don't charge them in the blast itself.)
+		check(team[1].Record.Mana == 0, "Charged during its own HYPERBEAM")
+		-- Over: let go.
+		Beam._step(start + at.Done + 0.1)
+		for _, pet in team do
+			check(pet.BeamUntil == nil and pet.Root.Anchored ~= true, "A kaiju not let go after its HYPERBEAM")
+			check(pet.Model:GetAttribute("ActionName") == nil, "A HYPERBEAM's charge-up left on a kaiju")
+		end
+		check(a:GetAttribute("KaijuBeamAt") == nil, "The HUD thinks it's still firing")
+		print("  your HYPERBEAM: mana, blows and moves, SAVE CHARGE, full to fire, the formation, the beam's reach, let go after")
+	end)()
+
 	clearCritters()
 	for i, p in team do
 		p.Target, p.Fighter.Flank, p.Fighter.Apart = nil, nil, nil

@@ -523,6 +523,12 @@ for healing, not gems:
   and your kaiju feel stronger."). It grows back in 40 seconds.
 - Not while you're down, and only from 10 studs.
 
+The Outpost has them too: 8 of its rocks are healing crystals
+(`Outpost.Heal`: `Count` 8, at least `Apart` 38 studs from each other).
+They're picked from the welcome field first, then out across the quarry,
+so there's one near wherever you're mining. They heal by the same numbers
+as the caves' crystals.
+
 ## Your kit and your pick
 
 Your combat kit is out when you go in, but you can put it away: **1** on a

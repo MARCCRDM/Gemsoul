@@ -175,6 +175,8 @@ export type Pet = {
 	HoppedAt: number?,
 	-- The support's pulse (pulse): when each of its moves is next ready.
 	PulseAt: { [string]: number }?,
+	-- In the team's hyperbeam (KaijuBeamServer): its own thinking waits till then.
+	BeamUntil: number?,
 }
 
 -- The kaiju out, by player and kaiju id.
@@ -186,6 +188,14 @@ KaijuServer.battle = function(_pet, _now): any
 end
 -- The whole team out knocked out (FrontierServer sets it: a gem raid).
 KaijuServer.onTeamDown = function(_player: Player) end
+-- The team's hyperbeam (KaijuBeamServer sets these): a blow of a pet's
+-- landing (its mana), a pet casting one of its moves (that costs mana),
+-- and whether its owner is saving its charge (it casts nothing then).
+KaijuServer.onStrike = function(_pet, _outcome: string, _heavy: boolean?) end
+KaijuServer.onCast = function(_pet) end
+KaijuServer.holding = function(_pet): boolean
+	return false
+end
 KaijuServer.battling = function(_player: Player): boolean
 	return false
 end
@@ -718,6 +728,10 @@ function creaturesNear(center: Vector3, radius: number, owner: Player): { any }
 	end
 	return list
 end
+-- (The team's hyperbeam finds what it hits with this: KaijuBeamServer.)
+KaijuServer.creaturesNear = function(center: Vector3, radius: number, owner: Player)
+	return creaturesNear(center, radius, owner)
+end
 
 -- What a hit of its element leaves on a creature.
 local function afflict(enemy, status: string?, amount: number, element: string)
@@ -784,6 +798,7 @@ local function strike(pet: Pet, enemy, amount: number, status: string?, heavy: b
 	if enemy.Alive and (outcome == "Hit" or outcome == "Broken") then
 		afflict(enemy, status, amount, pet.Element)
 	end
+	KaijuServer.onStrike(pet, outcome, heavy)
 	return outcome
 end
 KaijuServer.strike = strike
@@ -791,6 +806,7 @@ KaijuServer.strike = strike
 -- Its caster for its moves (KaijuAbilities.cast): its foes are the
 -- creatures near; its R's shell sits on the pet.
 function KaijuServer.caster(pet: Pet)
+	KaijuServer.onCast(pet)
 	local soul = pet.Record.Soul
 	return {
 		Model = pet.Model,
@@ -1274,6 +1290,10 @@ local function think(pet: Pet, now: number, _dt: number)
 			end
 		end
 	end
+	-- In the team's hyperbeam: KaijuBeamServer has it till that's over.
+	if pet.BeamUntil and now < pet.BeamUntil then
+		return
+	end
 	-- In a kaiju battle: at its place in the formation, or fighting the
 	-- other side's kaiju (KaijuBattles).
 	local battle = KaijuServer.battle(pet, now)
@@ -1357,6 +1377,9 @@ local function think(pet: Pet, now: number, _dt: number)
 		pet.IdleSpot = nil
 		local fighter = pet.Fighter
 		fighter.Flank, fighter.Apart = flank, spacing(pet)
+		if KaijuServer.holding(pet) then
+			KaijuFighter.hold(fighter, now) -- (saving its charge: blows alone)
+		end
 		KaijuFighter.step(fighter, { Root = target.Root, Enemy = target }, now)
 		return
 	end
@@ -1375,7 +1398,11 @@ end
 -- KaijuHopAt (server time) so clients pose its crouch, spring and landing.
 -- Run every frame, so the beats land where they should.
 local function canHop(pet: Pet, now: number): boolean
-	return pet.Model.Parent ~= nil and not pet.Target and now >= pet.StunUntil and not KaijuServer.battle(pet, now)
+	return pet.Model.Parent ~= nil
+		and not pet.Target
+		and now >= pet.StunUntil
+		and not (pet.BeamUntil and now < pet.BeamUntil)
+		and not KaijuServer.battle(pet, now)
 end
 
 local function hops(player: Player, now: number)

@@ -3256,4 +3256,19 @@ return {
 	["Hard pressed or crowded: channels its crown into a ward, taking {1}% less damage for {2}s."] = "En apuros o rodeado: canaliza su corona en un escudo y recibe un {1}% menos de daño durante {2} s.",
 	["Crown Crush"] = "Golpe de corona",
 	["Drives its brow blade through a short path in front of it: {1}% damage, leaving foes hit Vulnerable."] = "Clava la cuchilla de su frente en un tramo corto delante de él: {1}% de daño, dejando Vulnerables a los enemigos alcanzados.",
+
+	-- The team's HYPERBEAM (Client.KaijuBeamHud's button, Client.KaijuBeamFx, KaijuBeamServer).
+	["CHARGING  {1}%"] = "CARGANDO  {1}%",
+	["READY!  TAP"] = "¡LISTO!  TOCA",
+	["READY!  [ Z ]"] = "¡LISTO!  [ Z ]",
+	["BLASTING!"] = "¡DISPARANDO!",
+	["SAVE"] = "AHORRAR",
+	["SAVE ON"] = "AHORRANDO",
+	["Your kaiju are already blasting!"] = "¡Tus kaiju ya están disparando!",
+	["Not in a kaiju battle."] = "No durante una batalla de kaiju.",
+	["You need your kaiju out for a HYPERBEAM."] = "Necesitas a tus kaiju fuera para un HYPERBEAM.",
+	["Your kaiju aren't charged yet: {1}%."] = "Tus kaiju aún no están cargados: {1}%.",
+	["Your profile is still loading."] = "Tu perfil aún se está cargando.",
+	["Saving charge: your kaiju fight with blows alone and charge their HYPERBEAM faster."] = "Ahorrando carga: tus kaiju luchan solo con golpes y cargan su HYPERBEAM más rápido.",
+	["Your kaiju use their moves again."] = "Tus kaiju vuelven a usar sus movimientos.",
 }

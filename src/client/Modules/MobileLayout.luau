@@ -193,6 +193,22 @@ function MobileLayout.kaiju(chat: boolean?)
 	return { X = x, Y = y, W = w, H = 50, TameX = x + w + 8, TameY = y, TameW = 86 }
 end
 
+-- The team's HYPERBEAM button (Client.KaijuBeamHud). On a computer it takes
+-- the row the chat keeps clear above the kaiju strip (ChatFeed's BOTTOM
+-- leaves it), left-aligned with it. On a phone it sits up by your coins and
+-- health bar, right of them: under the strip there's Roblox's thumbstick
+-- (and on a short screen the dock), and it stays put while you hunt, the
+-- strip gone up to the top right.
+MobileLayout.Beam = { W = 262, H = 62, PhoneW = 150, PhoneH = 46 }
+function MobileLayout.beam(screen: Vector2, phone: boolean)
+	local spec = MobileLayout.Beam
+	if not phone then
+		return { X = 24, Y = screen.Y - 24 - 62 - 8 - spec.H, W = spec.W, H = spec.H }
+	end
+	local wallet = MobileLayout.wallet()
+	return { X = wallet.X + wallet.W + 8, Y = wallet.Y, W = spec.PhoneW, H = spec.PhoneH }
+end
+
 -- The fight's ring of buttons on a touch screen (Client.Combat): ATTACK in
 -- the bottom-right corner, the three surges round it (at Ring.Surges
 -- degrees), GUARD and DODGE on an outer arc (Ring.Guard, Ring.Dodge); sized

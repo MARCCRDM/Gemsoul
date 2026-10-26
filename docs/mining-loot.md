@@ -120,3 +120,16 @@ full").
     top);
   - `tests/run_world_mining.py`: now also checks that your own find is
     never drawn over your head, while others still get it.
+
+## Every element at every rarity
+
+Each element rolls every rarity at the same odds: the gem's rarity is
+rolled first (`GemRoller`), then its element, evenly. The reels used to
+make it look otherwise. Each one showed one preview gem per rarity, with
+a fixed element per rarity, so every Legendary going past was Fire and
+every Ultra Rare was Poison. Now the reels' gems get a random element too
+(`GemRoller.reelGem`, `MiningRoll.elements`, seeded from the roll). The
+loot card, the world billboard, the menu reveal and the cache lottery
+build a gem look for each rarity and element as it's needed, and keep it.
+`tests/frontier_cases.luau` rolls a large batch and checks every element
+at every rarity, at the odds.

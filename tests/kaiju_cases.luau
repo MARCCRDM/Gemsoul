@@ -923,9 +923,76 @@ do
 	check(Kaiju.hopDelay(4) < 1.2, "The back of a full line jumps long after you")
 end
 
+-- The HYPERBEAM: mana in, a cast out, full to fire; its phases, the V, the
+-- beam's reach, the aim assist and the damage.
+do
+	local Beam = shared("KaijuBeam")
+	local M = Beam.Mana
+	check(Beam.gain(nil, 5) == 5 and Beam.gain(M.Max - 1, 5) == M.Max and Beam.gain(2, -9) == 0, "Mana not clamped to 0..Max")
+	check(math.abs(Beam.gain(0, 10, true) - 10 * M.Save) < 1e-9 and M.Save > 1, "SAVE CHARGE doesn't fill faster")
+	check(Beam.gain(10, -4, true) == 6, "SAVE CHARGE scales what's taken off too")
+	check(Beam.spend(M.Cast + 1) == 1 and Beam.spend(1) == 0, "A cast's cost")
+	local ready, least = Beam.team({ M.Max, M.Max, M.Max })
+	check(ready and least == 1, "A full team not ready")
+	ready, least = Beam.team({ M.Max, M.Max / 2 })
+	check(not ready and least == 0.5, "Ready with one half charged")
+	ready, least = Beam.team({})
+	check(not ready and least == 0, "Ready with nobody out")
+	-- About three minutes from empty out of a fight; a fight fills it faster.
+	local fill = M.Max / M.Trickle
+	check(fill > 90 and fill < 300, "The trickle fills too fast or too slow")
+	check(M.Hit * 20 < M.Max, "A handful of blows fill it")
+
+	local at = Beam.timeline()
+	check(at.Charge < at.Fire and at.Fire < at.Stop and at.Stop < at.Done and at.Done < 6, "The blast's timeline")
+	check(Beam.phase(-0.1) == nil and Beam.phase(0) == "Gather" and Beam.phase(at.Charge) == "Charge", "The phases (start)")
+	check(Beam.phase(at.Fire + 0.01) == "Fire" and Beam.phase(at.Stop) == "Recover" and Beam.phase(at.Done) == nil, "The phases (end)")
+	local _, half = Beam.phase(at.Fire + Beam.Beam.Fire / 2)
+	check(math.abs(half - 0.5) < 1e-9, "A phase's progress")
+
+	local spots = Beam.formation(4, true)
+	check(#spots == 5, "Four in the V and the support")
+	for i = 1, 4, 2 do
+		check(spots[i].Side == -spots[i + 1].Side and spots[i].Back == spots[i + 1].Back, "The V isn't even either side")
+		check(spots[i].Side > 0, "The first of a pair not on your right")
+	end
+	check(spots[3].Back > spots[1].Back and math.abs(spots[3].Side) > math.abs(spots[1].Side), "The V doesn't open out behind")
+	check(spots[5].Side == 0 and spots[5].Up > 0 and spots[5].Back > 0, "The support not hung up behind you")
+	local many = Beam.formation(6)
+	check(#many == 6 and many[5].Side > many[3].Side and many[6].Side == -many[5].Side, "Past the four, further out")
+	spots[1].Side = 99
+	check(Beam.Formation[1].Side ~= 99, "The V handed out to be changed")
+
+	local ahead, up = Beam.focus()
+	check(ahead > 0 and up > 0, "The focus not ahead of you and up")
+	local L, W = Beam.Beam.Length, Beam.Beam.Width
+	check(Beam.hits(0, 0, 0, -1, 0, -L / 2, 0), "Something in the middle of the beam missed")
+	check(Beam.hits(0, 0, 0, -1, W / 2 - 0.1, -10, 0) and not Beam.hits(0, 0, 0, -1, W / 2 + 0.5, -10, 0), "The beam's width")
+	check(Beam.hits(0, 0, 0, -1, W / 2 + 0.5, -10, 1), "A big creature at its edge missed")
+	check(not Beam.hits(0, 0, 0, -1, 0, 3, 0) and not Beam.hits(0, 0, 0, -1, 0, -L - 2, 0), "Behind it or past its end hit")
+	check(Beam.hits(0, 0, 1, 0, L - 1, 0, 0) and not Beam.hits(0, 0, 1, 0, 0, -10, 0), "Aimed another way")
+
+	local dx, dz = Beam.aim(0, -2, {})
+	check(dx == 0 and dz == -1, "No one about, the aim isn't left as it was")
+	dx, dz = Beam.aim(0, 0, nil)
+	check(dz == -1, "No aim at all")
+	local off = math.tan(Beam.Beam.Assist / 2) * 20
+	dx, dz = Beam.aim(0, -1, { { X = off, Z = -20 }, { X = 0, Z = 30 }, { X = -1, Z = -Beam.Beam.Reach - 5 } })
+	check(dx > 0.05 and math.abs(dx * dx + dz * dz - 1) < 1e-6, "Not turned onto a creature just off your aim")
+	local wide = math.tan(Beam.Beam.Assist * 1.5) * 20
+	dx, dz = Beam.aim(0, -1, { { X = wide, Z = -20 } })
+	check(dx == 0, "Turned onto a creature far off your aim")
+	dx, dz = Beam.aim(0, -1, { { X = 3, Z = -30 }, { X = -1, Z = -10 } })
+	check(dx < 0, "Not the nearest of them")
+
+	local pulse = Beam.damage({ 10, 20, -5 })
+	check(math.abs(pulse * Beam.Beam.Pulses - 30 * Beam.Beam.Power) < 1e-9, "The beam's damage")
+	check(Beam.damage({}) == 0, "Damage with no one")
+end
+
 print(
 	string.format(
-		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), names, your team, the support slot, the starter roll, fighting as a team, sizes, follow-the-leader jumps)",
+		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), names, your team, the support slot, the starter roll, fighting as a team, sizes, follow-the-leader jumps, the HYPERBEAM)",
 		checks
 	)
 )
