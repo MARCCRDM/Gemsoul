@@ -3391,14 +3391,17 @@ local function teamFights()
 	local team = KaijuServer.team(a)
 	check(#team == 3, "Not three out for the team fights")
 
-	-- You jump, they jump: one after another in team order, a beat apart (and
-	-- not again while you're still going up); one fighting stays at it.
+	-- You jump, they jump, follow the leader: one after another down your
+	-- line, nearest you first, a beat apart (and not again while you're
+	-- still going up); one fighting stays at it.
 	;(function()
 		local team = KaijuServer.team(a)
 		check(#team >= 2, "Not a team to jump after you")
-		for _, p in team do
+		for i, p in team do
 			p.Target, p.StunUntil, p.HopAt, p.HoppedAt = nil, 0, nil, nil
 			p.Humanoid.Jump = false
+			-- Strung out behind you, the first in your team at the back.
+			p.Root.CFrame = CFrame.new(rootA.Position + Vector3.new(0, 0, 3 + 3 * ((i - 2) % #team)))
 		end
 		local t = now
 		rootA.AssemblyLinearVelocity = Vector3.zero
@@ -3419,14 +3422,25 @@ local function teamFights()
 				end
 			end
 		end
-		for i, p in team do
+		-- Follow the leader: the head of your line (nearest you) first, then
+		-- each one behind it a beat apart, with no gap left for an empty slot.
+		local line = table.clone(team)
+		table.sort(line, function(x, y)
+			return jumpedAt[x] < jumpedAt[y]
+		end)
+		for i, p in line do
 			check(jumpedAt[p] ~= nil, "Your kaiju in slot " .. p.Slot .. " didn't jump after you")
+			check(type(p.Model:GetAttribute("KaijuHopAt")) == "number", "A kaiju's take-off isn't on its model for the jump pose")
 			if i > 1 then
-				local gap = jumpedAt[p] - jumpedAt[team[i - 1]]
-				check(gap > Kaiju.Hop.Stagger * 0.8, "Your kaiju jumped all at once, not one after another: " .. gap)
+				local gap = jumpedAt[p] - jumpedAt[line[i - 1]]
+				check(gap > Kaiju.Hop.Stagger * 0.8 and gap < Kaiju.Hop.Stagger * 1.3, "Your kaiju didn't jump one after another, a beat apart: " .. gap)
+				local d = (p.Root.Position - rootA.Position).Magnitude
+				local before = (line[i - 1].Root.Position - rootA.Position).Magnitude
+				check(d >= before - 0.5, "One further back in your line jumped before one nearer you")
 			end
 		end
-		check(jumpedAt[team[1]] >= Kaiju.Hop.First * 0.8, "Your kaiju jumped before you did")
+		check(jumpedAt[line[1]] >= Kaiju.Hop.First * 0.8, "Your kaiju jumped before you did")
+		check(line[#line] == team[1], "The one at the back of your line didn't jump last")
 		-- Landed and jumping again: so do they; one in a fight doesn't.
 		rootA.AssemblyLinearVelocity = Vector3.zero
 		KaijuServer._hops(a, t)

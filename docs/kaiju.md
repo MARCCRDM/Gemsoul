@@ -320,7 +320,14 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **CALL BACK / DEPLOY.** Beside AUTO HEAL: CALL BACK puts the whole team
   away (they fold into light and fly to you); DEPLOY brings them out again,
   only once you're out of danger (`KaijuCallBack`; `docs/levelup-lobby.md`).
-- **They jump with you.** Jump and your team hops after you, one by one.
+- **They jump with you, follow the leader.** Jump and your team jumps
+  after you one by one, down your line: the one nearest you first (0.14 s
+  after you), then each one behind it 0.26 s after the one before
+  (`Kaiju.Hop`, `Kaiju.hopLine`). Only the kaiju actually following you
+  count, so an empty slot or one busy in a fight leaves no gap. Each one
+  crouches, springs up nose-first with its legs tucked, tips forward and
+  lands with a squash and a puff of dust (`CreatureMotion`'s `Motion.hop`,
+  posed from the `KaijuHopAt` take-off time the server puts on its model).
 - **Levelling is slower** than it was: `Kaiju.ExpCurve` and less EXP per
   rock and kill (`docs/levelup-lobby.md`).
 - **They don't heal on their own.** A kaiju keeps the health it ends a fight

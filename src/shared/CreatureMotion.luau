@@ -596,4 +596,41 @@ function Motion.apply(pose, kind: string, side: number, x: number, y: number, z:
 	return x, y, z, 0, 0
 end
 
+--- A jump after its owner (KaijuServer's follow-the-leader hops), on top of
+--- its pose: `t` seconds from take-off (negative while it's still crouching
+--- for it), `air` seconds in the air. It crouches, springs up stretched with
+--- its nose up and its legs tucked, tips forward to come down, and squashes
+--- as it lands. Mutates and returns `pose`.
+Motion.Jump = { Crouch = 0.12, Spring = 0.05, Land = 0.22 }
+
+function Motion.hop(pose, t: number, air: number)
+	local jump = Motion.Jump
+	if t < -jump.Crouch or t >= air + jump.Land then
+		return pose
+	end
+	local crouch = 0
+	if t < 0 then
+		crouch = (1 + t / jump.Crouch) ^ 2
+	elseif t < jump.Spring then
+		crouch = 1 - t / jump.Spring -- (springing out of it)
+	end
+	pose.Lift -= 0.3 * crouch
+	pose.Pitch -= 0.1 * crouch
+	pose.Tail += 0.2 * crouch
+	if t >= 0 and t < air then
+		local p = t / air
+		local up = math.min(1, t / jump.Spring)
+		local arc = math.sin(p * math.pi)
+		pose.Lift += 0.15 * up * math.max(0, 1 - p / 0.35)
+		pose.Pitch += up * (0.28 * (1 - p) - 0.18 * p)
+		pose.Arm += 0.7 * arc
+		pose.Tail -= 0.35 * arc
+	elseif t >= air then
+		local k = (1 - (t - air) / jump.Land) ^ 2
+		pose.Lift -= 0.28 * k
+		pose.Pitch -= 0.18 * k
+	end
+	return pose
+end
+
 return Motion

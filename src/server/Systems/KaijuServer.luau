@@ -1368,9 +1368,16 @@ local function think(pet: Pet, now: number, _dt: number)
 	end
 end
 
--- You jump, they jump: each kaiju following you (not fighting, reeling or in
--- a kaiju battle) jumps after you in team order, a beat apart (Kaiju.Hop).
+-- You jump, they jump, follow the leader: the kaiju following you (not
+-- fighting, reeling or in a kaiju battle) jump after you one after another,
+-- the head of your line (nearest where you jumped) first, a beat apart
+-- (Kaiju.Hop, Kaiju.hopLine). Each one's take-off goes on its model as
+-- KaijuHopAt (server time) so clients pose its crouch, spring and landing.
 -- Run every frame, so the beats land where they should.
+local function canHop(pet: Pet, now: number): boolean
+	return pet.Model.Parent ~= nil and not pet.Target and now >= pet.StunUntil and not KaijuServer.battle(pet, now)
+end
+
 local function hops(player: Player, now: number)
 	local out = teams[player]
 	local ownerRoot = rootOf(player)
@@ -1380,19 +1387,31 @@ local function hops(player: Player, now: number)
 	end
 	local rise = ownerRoot.AssemblyLinearVelocity.Y
 	if Kaiju.leapt(rising[player], rise) then
+		local line, distances, slots = {}, {}, {}
 		for _, pet in out do
-			if not pet.HopAt and (not pet.HoppedAt or now - pet.HoppedAt >= Kaiju.Hop.Rest) then
-				pet.HopAt = now + Kaiju.hopDelay(pet.Slot)
+			if not pet.HopAt and (not pet.HoppedAt or now - pet.HoppedAt >= Kaiju.Hop.Rest) and canHop(pet, now) then
+				table.insert(line, pet)
+				table.insert(distances, (pet.Root.Position - ownerRoot.Position).Magnitude)
+				table.insert(slots, pet.Slot)
 			end
+		end
+		local serverNow = workspace:GetServerTimeNow()
+		for place, i in Kaiju.hopLine(distances, slots) do
+			local pet = line[i]
+			local delay = Kaiju.hopDelay(place)
+			pet.HopAt = now + delay
+			pet.Model:SetAttribute("KaijuHopAt", serverNow + delay)
 		end
 	end
 	rising[player] = rise
 	for _, pet in out do
 		if pet.HopAt and now >= pet.HopAt then
 			pet.HopAt = nil
-			if pet.Model.Parent and not pet.Target and now >= pet.StunUntil and not KaijuServer.battle(pet, now) then
+			if canHop(pet, now) then
 				pet.HoppedAt = now
 				pet.Humanoid.Jump = true
+			elseif pet.Model.Parent then
+				pet.Model:SetAttribute("KaijuHopAt", nil) -- (pulled into a fight: no jump to pose)
 			end
 		end
 	end

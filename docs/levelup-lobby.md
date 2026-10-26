@@ -122,7 +122,8 @@ the stone sits beside the details.
 - **Critters carry the real gem**: a thief holds the very gem it took over
   its head, drawn like the gem art, and drops that stone when you hit it.
 - **Kaiju jump with you**: when you jump, your team hops after you one by
-  one (0.1 s, then 0.16 s apart).
+  one (0.1 s, then 0.16 s apart). (Since reworked into a follow-the-leader
+  line, nearest first and further apart: see `docs/kaiju.md`.)
 - **The Rift Veins' beams** are replaced by Rift Gates (`docs/rift.md`).
 
 ## Tests

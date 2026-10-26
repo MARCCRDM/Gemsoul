@@ -200,6 +200,19 @@ RunService.PreSimulation:Connect(function(dt)
 			end
 			rig.Shown = shown
 			pose = Motion.gait(shown, rig.Phase, rig.Amount, now, turning(rig, step))
+			-- Jumping after its owner, in line (KaijuServer's hops): it
+			-- crouches, springs, tucks and lands with a thud and a puff of dust.
+			local hopAt = model:GetAttribute("KaijuHopAt")
+			if type(hopAt) == "number" then
+				local air = 2 * math.sqrt(2 * Kaiju.Hop.Height / math.max(workspace.Gravity, 1))
+				pose = Motion.hop(pose, now - hopAt, air)
+				if rig.LandedFrom ~= hopAt and now - hopAt >= air then
+					rig.LandedFrom = hopAt
+					if now - hopAt < air + 0.3 and (rig.Root.Position - camera.CFrame.Position).Magnitude < STEP_FAR then
+						KaijuMotionFx.footstep(model, rig.Root, rig.Humanoid, 0)
+					end
+				end
+			end
 		end
 		for i = #rig.Joints, 1, -1 do
 			local entry = rig.Joints[i]

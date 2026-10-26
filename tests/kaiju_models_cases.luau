@@ -340,6 +340,35 @@ check(math.max(table.unpack(looks)) > 0.2 and math.min(table.unpack(looks)) < -0
 check(moodPose("Sleep", 2, "Light").Lift > -0.2, "Its mood shows in a fight")
 check(math.abs(Motion.fight("Razorback", { Mood = "Nope", MoodAt = 100 }, 102).Lift) < 1e-9, "An unknown mood poses")
 
+-- Jumping after its owner (Motion.hop): a crouch before take-off, up and
+-- stretched with its nose up and legs tucked, tipping forward to land, a
+-- squash as it lands, and nothing outside the jump.
+;(function()
+	local air = 0.5
+	local function at(t)
+		return Motion.hop(Motion.rest(), t, air)
+	end
+	local rest = Motion.rest()
+	local crouch, rising, falling, landing = at(-0.01), at(0.08), at(air * 0.85), at(air + 0.03)
+	check(crouch.Lift < -0.2, "No crouch before it jumps")
+	check(rising.Pitch > 0.15 and rising.Arm > 0.1, "Not nose-up and tucked as it leaves the ground")
+	check(falling.Pitch < 0, "Not tipping forward to come down")
+	check(landing.Lift < -0.15, "No squash as it lands")
+	for _, t in { -1, -Motion.Jump.Crouch - 0.01, air + Motion.Jump.Land + 0.01, 5 } do
+		local pose = at(t)
+		for field, value in rest do
+			check(pose[field] == value, "A jump pose outside the jump: " .. field .. " at " .. t)
+		end
+	end
+	local before = at(-0.001)
+	local after = at(Motion.Jump.Spring)
+	check(math.abs(after.Lift - before.Lift) < 0.5, "The spring pops")
+	for t = -0.12, air + 0.25, 0.01 do
+		local pose = at(t)
+		check(math.abs(pose.Lift) < 0.4 and math.abs(pose.Pitch) < 0.4 and pose.Arm < 0.8, "A wild jump pose at " .. t)
+	end
+end)()
+
 print(
 	string.format(
 		"PASS: %d kaiju model checks (33 kinds x 4 elements, joints, ground, budget, motions, fight poses, gait, moods)",

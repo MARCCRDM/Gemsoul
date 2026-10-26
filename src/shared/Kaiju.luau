@@ -299,19 +299,38 @@ end
 Kaiju.Follow = { Engage = 28, Leash = 45, Battle = 150, Teleport = 90, Gap = 5 }
 
 -- Jumping after you: when you jump (your root rising faster than Rise studs
--- a second, from under Settle), the team following you jumps too, one after
--- another in team order, Stagger seconds apart (the first First after you),
--- each Height studs up and not again within Rest. One fighting stays at it.
-Kaiju.Hop = { Rise = 24, Settle = 8, First = 0.1, Stagger = 0.16, Height = 6, Rest = 0.6 }
+-- a second, from under Settle), the team following you jumps too, follow
+-- the leader: the one at the head of your line (nearest where you jumped)
+-- First seconds after you, then each one behind it Stagger seconds after
+-- the one before (in line, so no gap for an empty slot), each Height studs
+-- up and not again within Rest. One fighting stays at it and isn't counted.
+Kaiju.Hop = { Rise = 24, Settle = 8, First = 0.14, Stagger = 0.26, Height = 6, Rest = 0.6 }
 
 -- Whether you've just jumped: rising fast now from not rising before.
 function Kaiju.leapt(before: number?, rise: number): boolean
 	return rise >= Kaiju.Hop.Rise and (before == nil or before < Kaiju.Hop.Settle)
 end
 
--- How long after you the one in team slot `slot` jumps.
-function Kaiju.hopDelay(slot: number): number
-	return Kaiju.Hop.First + (slot - 1) * Kaiju.Hop.Stagger
+-- How long after you the one `place`th in your line jumps (1 = the head).
+function Kaiju.hopDelay(place: number): number
+	return Kaiju.Hop.First + (place - 1) * Kaiju.Hop.Stagger
+end
+
+-- Your line for a jump: `distances` (one per kaiju, how far it is from where
+-- you jumped) -> the order they go in, nearest first (ties by team slot,
+-- `slots`). Returns the indices into `distances` in jumping order.
+function Kaiju.hopLine(distances: { number }, slots: { number }?): { number }
+	local order = {}
+	for i in distances do
+		table.insert(order, i)
+	end
+	table.sort(order, function(a, b)
+		if math.abs(distances[a] - distances[b]) > 0.5 then
+			return distances[a] < distances[b]
+		end
+		return (slots and slots[a] or a) < (slots and slots[b] or b)
+	end)
+	return order
 end
 
 -- Fighting as a team (Shared.Squad): your kaiju share out the creatures (each

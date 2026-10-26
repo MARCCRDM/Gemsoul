@@ -910,9 +910,22 @@ do
 	check(Kaiju.add(full, "Skyjelly", soul("Shock", 3), 1, true) ~= nil, "The starter support refused on a full roster")
 end
 
+-- Follow the leader: your line jumps nearest first (ties by team slot), a
+-- beat apart, the head of it a moment after you.
+do
+	local order = Kaiju.hopLine({ 9, 3, 6, 3.2 }, { 1, 2, 3, 4 })
+	check(order[1] == 2 and order[2] == 4 and order[3] == 3 and order[4] == 1, "Your line doesn't jump nearest first")
+	order = Kaiju.hopLine({ 5.8, 5.8 }, { 2, 1 })
+	check(order[1] == 2, "A tie isn't broken by team slot")
+	check(#Kaiju.hopLine({}) == 0, "An empty line")
+	check(Kaiju.hopDelay(1) == Kaiju.Hop.First and Kaiju.hopDelay(1) > 0.08, "The head of your line jumps with you, not after")
+	check(Kaiju.hopDelay(3) - Kaiju.hopDelay(2) >= 0.2, "The jumps blur together, not one after another")
+	check(Kaiju.hopDelay(4) < 1.2, "The back of a full line jumps long after you")
+end
+
 print(
 	string.format(
-		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), names, your team, the support slot, the starter roll, fighting as a team, sizes)",
+		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), names, your team, the support slot, the starter roll, fighting as a team, sizes, follow-the-leader jumps)",
 		checks
 	)
 )
