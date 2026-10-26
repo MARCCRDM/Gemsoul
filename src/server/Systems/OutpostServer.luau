@@ -1059,7 +1059,8 @@ function OutpostServer.start()
 			end
 		end
 	end)
-	-- Reserve four spaced, reachable mining sites around the welcome field.
+	-- Reserve spaced, reachable mining sites for the healing boulders: round
+	-- the welcome field first, then out across the quarry (Outpost.Heal).
 	local selected = {}
 	local candidates = table.clone(site.NearSpots or {})
 	for i in site.Spots do table.insert(candidates, i) end
@@ -1067,7 +1068,7 @@ function OutpostServer.start()
 		if #selected >= Heal.Count then break end
 		local clear = not veinOf[index] and not healingSpots[index]
 		for _, previous in selected do
-			if (site.Spots[index].Position - site.Spots[previous].Position).Magnitude < 45 then clear = false end
+			if (site.Spots[index].Position - site.Spots[previous].Position).Magnitude < Heal.Apart then clear = false end
 		end
 		if clear then
 			healingSpots[index] = true

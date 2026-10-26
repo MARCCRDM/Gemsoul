@@ -119,14 +119,16 @@ local function prepare(model, radius)
 	end
 	return model
 end
-local function template(tier)
-	if not templates[tier] then
-		local rank = GemConfig.TierRank[tier] or 1
-		local gem = { Id = "world-preview-" .. tier, Tier = tier, Element = GemConfig.Elements[(rank - 1) % #GemConfig.Elements + 1], Size = 6, Clarity = 7, Cut = 6 }
+-- A reel gem's model: each rarity in each element, built the first time it's
+-- needed (every element turns up at every rarity, as in real finds).
+local function template(tier, element)
+	local key = tier .. "/" .. (element or "Fire")
+	if not templates[key] then
+		local gem = { Id = "world-preview-" .. key, Tier = tier, Element = element or "Fire", Size = 6, Clarity = 7, Cut = 6 }
 		local model, radius = GemArt.model(gem, false)
-		templates[tier] = prepare(model, radius)
+		templates[key] = prepare(model, radius)
 	end
-	return templates[tier]
+	return templates[key]
 end
 local function destroy(entry)
 	restoreNames(entry)
@@ -240,7 +242,7 @@ local function step()
 					if at == Roll.Target and entry.Packet.Gem then
 						local model, radius = GemArt.model(entry.Packet.Gem, false)
 						cell.Model = prepare(model, radius)
-					elseif tier ~= "Empty" then cell.Model = template(tier):Clone() end
+					elseif tier ~= "Empty" then cell.Model = template(tier, entry.Elements[at]):Clone() end
 					if cell.Model then cell.Model.Parent = entry.Viewport end
 				end
 				if cell.Model then
@@ -337,7 +339,7 @@ function Reveal.receive(packet)
 	extras.Position, extras.Size = UDim2.fromScale(0.04, 0.88), UDim2.fromScale(0.92, 0.07)
 	local light = Instance.new("PointLight")
 	light.Range, light.Brightness, light.Color, light.Parent = 10, 0.6, WHITE, anchor
-	active[packet.Id] = { Packet = packet, Sequence = Roll.sequence(packet), Root = root, Anchor = anchor, Light = light,
+	active[packet.Id] = { Packet = packet, Sequence = Roll.sequence(packet), Elements = Roll.elements(packet), Root = root, Anchor = anchor, Light = light,
 		Board = board, Box = box, Camera = camera, Selection = selection, Miner = miner, Rarity = rarity, Edge = border, Accent = accent, Well = well, Viewport = viewport, SelectionEdge = selectionEdge, Center = center,
 		Heading = heading, Detail = detail, Stats = stats, Extras = extras, Labels = {miner, heading, rarity, detail, stats, extras}, Cells = {{},{},{}} }
 	if not connection then connection = RunService.RenderStepped:Connect(step) end

@@ -335,29 +335,33 @@ function CacheLottery.new(cache, options)
 	local gemTemplates = nil
 	local gearTemplates = nil
 
+	-- One gem of each rarity for a reel, each in any of the four elements
+	-- (every element turns up at every rarity, as in real finds); each
+	-- rarity's art in each element is built once and copied.
 	local function gems()
-		if gemTemplates then
-			return gemTemplates
-		end
-		gemTemplates = {}
-		local offset = rng:NextInteger(0, #GemConfig.Elements - 1)
-		for i, tier in GemConfig.TierOrder do
-			local element = GemConfig.Elements[(i + offset - 1) % #GemConfig.Elements + 1]
-			local shade = GemConfig.shade({ Element = element, Tier = tier })
-			table.insert(gemTemplates, {
-				View = CacheLottery.gemView({
-					Id = "cache-preview-" .. tier,
+		gemTemplates = gemTemplates or {}
+		local list = {}
+		for _, tier in GemConfig.TierOrder do
+			local element = GemConfig.Elements[rng:NextInteger(1, #GemConfig.Elements)]
+			local key = tier .. "/" .. element
+			if not gemTemplates[key] then
+				local shade = GemConfig.shade({ Element = element, Tier = tier })
+				gemTemplates[key] = {
+					View = CacheLottery.gemView({
+						Id = "cache-preview-" .. key,
+						Tier = tier,
+						Element = element,
+						Size = 6,
+						Clarity = 7,
+						Cut = 6,
+					}, folder),
 					Tier = tier,
-					Element = element,
-					Size = 6,
-					Clarity = 7,
-					Cut = 6,
-				}, folder),
-				Tier = tier,
-				Name = shade and shade.Name or GemConfig.TierLabels[tier] or tier,
-			})
+					Name = shade and shade.Name or GemConfig.TierLabels[tier] or tier,
+				}
+			end
+			table.insert(list, gemTemplates[key])
 		end
-		return gemTemplates
+		return list
 	end
 	-- (Built when the gear's turn comes, so the reels roll its 3D previews.)
 	local function gear()

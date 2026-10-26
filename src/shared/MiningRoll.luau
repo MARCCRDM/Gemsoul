@@ -41,4 +41,16 @@ function Roll.sequence(packet)
 	sequence[Roll.Target] = packet.Gem and packet.Gem.Tier or "Empty"
 	return sequence
 end
+-- Each reel gem's element, from the same seed (so every onlooker sees the
+-- same reel): any of the four alike, so every element shows at every rarity
+-- (as GemRoller.reelGem); the found gem's own at Target.
+function Roll.elements(packet)
+	local rng, elements = Random.new((packet.Seed or 0) + 7919), {}
+	local kinds = GemRoller.Elements
+	for index = -1, Roll.Target + 2 do
+		elements[index] = kinds[math.min(#kinds, 1 + math.floor(rng:NextNumber() * #kinds))]
+	end
+	elements[Roll.Target] = packet.Gem and packet.Gem.Element or nil
+	return elements
+end
 return Roll

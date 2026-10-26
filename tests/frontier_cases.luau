@@ -896,6 +896,42 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 	end
 	check(math.abs(mined.Frost / 8000 - Frontier.Biome.Bias) < 0.02, "Gems mined in Rimefrost aren't mostly Cryo")
 	check(GemRoller.roll(Random.new(5), 0).Element == GemRoller.roll(Random.new(5), 0).Element, "A plain roll isn't what it was")
+	-- No element is tied to a rarity: each one rolls every rarity at the
+	-- mining odds (in a biome or not), and so do the gems a reveal reel rolls
+	-- past (GemRoller.reelGem), so the reel never shows an element only ever
+	-- as a Legendary (or as a Common).
+	local weights, total = GemRoller.MiningWeights, 0
+	for _, w in weights do
+		total += w
+	end
+	for _, home in { false, "Fire", "Shock" } do
+		local grid = {}
+		local n = 60000
+		for _ = 1, n do
+			local gem = GemRoller.roll(rng, 0, nil, weights, home or nil, if home then Frontier.Biome.Bias else nil)
+			grid[gem.Element] = grid[gem.Element] or { All = 0 }
+			grid[gem.Element][gem.Tier] = (grid[gem.Element][gem.Tier] or 0) + 1
+			grid[gem.Element].All += 1
+		end
+		for _, element in GemRoller.Elements do
+			local row = grid[element]
+			for i, rarity in GemRoller.Rarities do
+				local got = (row[rarity.Name] or 0) / row.All
+				check(got > 0, element .. " never rolls " .. rarity.Name)
+				check(math.abs(got - weights[i] / total) < math.max(0.006, weights[i] / total * 0.25), element .. "'s " .. rarity.Name .. " odds are off: " .. got)
+			end
+		end
+	end
+	local seen = {}
+	for _ = 1, 40000 do
+		local passing = GemRoller.reelGem(rng)
+		seen[passing.Tier .. "/" .. passing.Element] = true
+	end
+	for _, element in GemRoller.Elements do
+		for _, rarity in GemRoller.Rarities do
+			check(seen[rarity.Name .. "/" .. element], "A reel never shows a " .. rarity.Name .. " " .. element .. " gem")
+		end
+	end
 end)()
 
 -- No title card as you cross into a band or a biome (THE FRINGE, STORMGLASS

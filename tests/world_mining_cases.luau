@@ -32,6 +32,15 @@ for rank,tier in GemConfig.TierOrder do
 	local a,b=Roll.sequence(packet),Roll.sequence(packet)
 	for i=-1,Roll.Target+2 do check(a[i]==b[i],"Observers see different reel sequence") end
 	check(a[Roll.Target]==tier,"Sequence did not end on awarded rarity")
+	local ea,eb=Roll.elements(packet),Roll.elements(packet)
+	for i=-1,Roll.Target+2 do check(ea[i]==eb[i],"Observers see different reel elements") end
+	check(ea[Roll.Target]==packet.Gem.Element,"Reel did not end on the awarded gem's element")
+	local kinds={}
+	for seed=1,40 do
+		local e=Roll.elements({Seed=seed,Gem=packet.Gem})
+		for i=-1,Roll.Target-1 do kinds[e[i]]=true end
+	end
+	check(kinds.Fire and kinds.Frost and kinds.Shock and kinds.Poison,"Reel gems aren't any of the four elements")
 	for _=1,10 do step(.25) end
 	check(#live("AwardedGem")==0,"Roll ended early")
 	step(.31)
@@ -98,7 +107,8 @@ check(#live("RollAnchor")==0,"Expired result replayed")
 -- Multiple nearby miners get separate boxes, with a bounded number of reels.
 for i=1,Roll.MaxActive+5 do MiningRolls.publish({UserId=1000+i,DisplayName="Miner "..i},Vector3.new(i,0,0),reward("Rare")) end
 check(#live("RollAnchor")==Roll.MaxActive,"Concurrent reels exceeded visual budget")
-check(#liveClass("Model")<=Roll.MaxActive*4+6,"Reel geometry allocation unbounded")
+-- (the reels' cells, plus one template a rarity in each element: every element shows at every rarity)
+check(#liveClass("Model")<=Roll.MaxActive*4+6+#GemConfig.TierOrder*(#GemConfig.Elements-1),"Reel geometry allocation unbounded")
 step(Roll.Duration+.1)
 check(#live("AwardedGem")==Roll.MaxActive,"Concurrent finds overwrote winners")
 player:SetAttribute("CombatSession","Rival")

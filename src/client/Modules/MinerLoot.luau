@@ -124,7 +124,7 @@ local stack = LootStack.new()
 local cardUi = nil
 local rows = {}
 local connection: RBXScriptConnection? = nil
-local views = nil -- a viewport per rarity, cloned onto the reel
+local views = nil -- a viewport per rarity and element, cloned onto the reel
 local maxRows = 2
 local rowsWait = false -- (no room for a row beside the card: it waits until the card's gone)
 local blocked = false
@@ -352,22 +352,24 @@ end
 
 -- The card ------------------------------------------------------------------------------------------
 
-local function rarityViews()
-	if views then
-		return views
+-- A reel gem's art: each rarity in each element, built the first time the
+-- reel needs it (every element turns up at every rarity, as in real finds).
+local function rarityView(tier: string, element: string)
+	if not views then
+		views = { Folder = Instance.new("Folder") }
 	end
-	views = { Folder = Instance.new("Folder") }
-	for i, tier in GemConfig.TierOrder do
-		views[tier] = GemArt.viewport(views.Folder, {
-			Id = "loot-preview-" .. tier,
+	local key = tier .. "/" .. element
+	if not views[key] then
+		views[key] = GemArt.viewport(views.Folder, {
+			Id = "loot-preview-" .. key,
 			Tier = tier,
-			Element = GemConfig.Elements[(i - 1) % #GemConfig.Elements + 1],
+			Element = element,
 			Size = 6,
 			Clarity = 7,
 			Cut = 6,
 		}, false)
 	end
-	return views
+	return views[key]
 end
 
 local function buildCard(item)
@@ -495,12 +497,13 @@ local function buildCard(item)
 	-- The reel: rarities rolled like real finds (with made-up stats for the
 	-- bars to flicker through), and the found gem at TARGET.
 	local rng = Random.new()
-	local sequence, teases = {}, {}
+	local sequence, elements, teases = {}, {}, {}
 	for i = 0, TARGET + 3 do
-		sequence[i] = GemRoller.rollRarity(rng, 0, GemRoller.MiningWeights)
+		local passing = GemRoller.reelGem(rng, GemRoller.MiningWeights)
+		sequence[i], elements[i] = passing.Tier, passing.Element
 		teases[i] = { Size = rng:NextInteger(2, 9), Clarity = rng:NextInteger(2, 9), Cut = rng:NextInteger(2, 9) }
 	end
-	sequence[TARGET] = gem.Tier
+	sequence[TARGET], elements[TARGET] = gem.Tier, gem.Element
 	local folder = Instance.new("Folder")
 	local winner = GemArt.viewport(folder, gem, true)
 	frame.Destroying:Once(function()
@@ -525,6 +528,7 @@ local function buildCard(item)
 		Bars = bars,
 		Width = w,
 		Sequence = sequence,
+		Elements = elements,
 		Teases = teases,
 		Winner = winner,
 		Index = -1,
@@ -564,7 +568,9 @@ local function roll(ui, position: number, strength: number)
 		if cell.Index ~= index then
 			cell.Index = index
 			cell.Art:ClearAllChildren()
-			local source = if index == TARGET then ui.Winner else rarityViews()[ui.Sequence[index] or "Common"]
+			local source = if index == TARGET
+				then ui.Winner
+				else rarityView(ui.Sequence[index] or "Common", ui.Elements[index] or ui.Item.Loot.Gem.Element)
 			local view = source:Clone()
 			view.CurrentCamera = view:FindFirstChildOfClass("Camera")
 			view.Ambient, view.LightColor = Color3.fromRGB(235, 235, 245), Color3.new(1, 1, 1)

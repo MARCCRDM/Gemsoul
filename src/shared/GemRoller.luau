@@ -179,6 +179,18 @@ function GemRoller.rollRarity(rng, luck: number?, base: { number }?): string
 	return GemRoller.Rarities[#GemRoller.Rarities].Name
 end
 
+-- A gem for a reveal reel to roll past: its rarity rolled on `base` (as real
+-- finds are, GemRoller.MiningWeights by default) and its element any of the
+-- four alike, so every element shows up at every rarity. (A reel must never
+-- tie an element to a rarity: the real roll doesn't.)
+function GemRoller.reelGem(rng, base: { number }?): { Tier: string, Element: string }
+	local kinds = GemRoller.Elements
+	return {
+		Tier = GemRoller.rollRarity(rng, 0, base or GemRoller.MiningWeights),
+		Element = kinds[math.min(#kinds, 1 + math.floor(rng:NextNumber() * #kinds))],
+	}
+end
+
 -- The element: one of the four alike, or, with a `home` element (mined
 -- in one of the Outpost's biomes, Shared.Frontier), `home` `bias` of the
 -- time and one of the other three alike otherwise.

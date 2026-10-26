@@ -290,19 +290,24 @@ local function show(loot, token)
 	end
 	-- Only five reel cells are alive. Five templates are built once and recycled,
 	-- instead of constructing a viewport for every entry in the long strip.
+	-- (Each rarity's art in each element is built the first time the strip
+	-- needs it: every element turns up at every rarity, as in real finds.)
 	local templates = Instance.new("Folder")
 	local views = {}
 	local rng = Random.new()
-	for i, tier in GemConfig.TierOrder do
-		local preview = {
-			Id = "mining-preview-" .. tier,
-			Tier = tier,
-			Element = GemConfig.Elements[(i - 1) % #GemConfig.Elements + 1],
-			Size = 6,
-			Clarity = 7,
-			Cut = 6,
-		}
-		views[tier] = GemArt.viewport(templates, preview, false)
+	local function viewOf(tier: string, element: string)
+		local key = tier .. "/" .. element
+		if not views[key] then
+			views[key] = GemArt.viewport(templates, {
+				Id = "mining-preview-" .. key,
+				Tier = tier,
+				Element = element,
+				Size = 6,
+				Clarity = 7,
+				Cut = 6,
+			}, false)
+		end
+		return views[key]
 	end
 	views.Winner = GemArt.viewport(templates, gem, true) -- (every facet)
 	gui.Destroying:Once(function()
@@ -310,16 +315,17 @@ local function show(loot, token)
 	end)
 	-- The strip: rarities rolled like real finds, each with its own stats for
 	-- the bars to flicker through, and the awarded gem at the target.
-	local sequence, teases = {}, {}
+	local sequence, elements, teases = {}, {}, {}
 	local target = 23
 	local function grade()
 		return 2 + math.floor(rng:NextNumber() * 8)
 	end
 	for i = 0, target + 3 do
-		sequence[i] = GemRoller.rollRarity(rng, 0, GemRoller.MiningWeights)
+		local passing = GemRoller.reelGem(rng, GemRoller.MiningWeights)
+		sequence[i], elements[i] = passing.Tier, passing.Element
 		teases[i] = { Size = grade(), Clarity = grade(), Cut = grade() }
 	end
-	sequence[target] = gem.Tier
+	sequence[target], elements[target] = gem.Tier, gem.Element
 	local lastIndex = -1
 	local function render(position, strength)
 		local center = math.floor(position + 0.5)
@@ -329,7 +335,7 @@ local function show(loot, token)
 			if slot.Index ~= index then
 				slot.Index = index
 				slot.Art:ClearAllChildren()
-				local view = (if index == target then views.Winner else views[tier]):Clone()
+				local view = (if index == target then views.Winner else viewOf(tier, elements[index] or gem.Element)):Clone()
 				view.CurrentCamera = view:FindFirstChildOfClass("Camera")
 				-- Bright, white light: a gem should glitter, not sulk.
 				view.Ambient = Color3.fromRGB(235, 235, 245)
@@ -351,7 +357,7 @@ local function show(loot, token)
 			status.TextColor3 = color
 			local value = GemConfig.value({
 				Tier = tier,
-				Element = gem.Element,
+				Element = elements[center] or gem.Element,
 				Size = tease.Size,
 				Clarity = tease.Clarity,
 				Cut = tease.Cut,
