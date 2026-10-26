@@ -19,7 +19,7 @@ import soundfile as sf
 from scipy import signal
 
 SR = 44100
-OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "sounds", "combat")
+OUT = os.environ.get("COMBAT_SOUNDS_OUT") or os.path.join(os.path.dirname(__file__), "..", "assets", "sounds", "combat")
 RNG = np.random.default_rng(7)
 
 
@@ -116,13 +116,22 @@ def crush(x, bits=6, hold=4):
     return np.repeat(y[::hold], hold)[: len(x)]
 
 
+def fade_end(x, seconds=0.012):
+    """A layer cut off at its buffer's end clicks: let it die away instead."""
+    x = np.array(x, dtype=np.float64)
+    n = min(len(x) // 4, n_of(seconds))
+    if n > 1:
+        x[len(x) - n :] *= np.linspace(1, 0, n) ** 2
+    return x
+
+
 def mix(*parts):
     """(start_seconds, samples) parts into one buffer."""
     end = max(n_of(s) + len(p) for s, p in parts)
     out = np.zeros(end)
     for s, p in parts:
         i = n_of(s)
-        out[i : i + len(p)] += p
+        out[i : i + len(p)] += fade_end(p)
     return out
 
 
@@ -135,6 +144,26 @@ def room(x, size=0.25, wet=0.25):
         echo = np.zeros_like(out)
         echo[d : d + len(x)] = x * gain
         out += wet * filt(echo, "low", 3500)
+    return out
+
+
+def space(x, seconds=0.45, wet=0.18, bright=6000, pre=0.006):
+    """A real space round a sound: convolved with a burst of decaying noise
+    whose highs die first (a stone arena, not a metal tube), with a few early
+    reflections off the floor and walls ahead of the tail."""
+    n = n_of(seconds)
+    t = np.arange(n) / SR
+    tail = filt(RNG.standard_normal(n), "low", 1200) * np.exp(-t / (seconds * 0.28))
+    tail += 0.7 * filt(RNG.standard_normal(n), "high", 1200) * np.exp(-t / (seconds * 0.11))
+    tail *= np.clip((t - pre) / 0.004, 0, 1)
+    for delay, gain in ((0.0045, 0.9), (0.009, 0.6), (0.013, 0.45), (0.021, 0.35)):
+        tail[n_of(delay)] += gain * 6 * RNG.choice((-1, 1))
+    ir = filt(tail, "low", bright)
+    ir /= np.sqrt(np.sum(ir ** 2)) + 1e-9
+    x = fade_end(x)
+    out = np.concatenate([x, np.zeros(n)])
+    verb = signal.fftconvolve(x, ir)
+    out[: len(verb)] += wet * verb[: len(out)]
     return out
 
 
@@ -232,6 +261,29 @@ def crackles(count, seconds, low=1500, spread=1.0):
     return mix(*[(RNG.uniform(0, seconds), crack(0.008, low, 0.0018) * RNG.uniform(0.3, 1) * spread) for _ in range(count)])
 
 
+def slicing(seconds=0.06, lo=2400, hi=9500, decay=0.016):
+    """The edge going in: a bright "tssk" of noise that fills out downward as
+    the blade bites."""
+    x = swept_filter(noise(seconds), "high", hi, lo) * env(seconds, 0.0015, decay)
+    return drive(x * 1.5, 1.8)
+
+
+def flesh(seconds=0.14, cutoff=850, decay=0.032):
+    """A body taking the blow: a wet, squashed burst of low noise."""
+    t = t_of(seconds)
+    wet = filt(noise(seconds), "low", cutoff, 4) * env(seconds, 0.001, decay)
+    slap = filt(noise(seconds), "band", (280, 1500)) * env(seconds, 0.002, decay * 0.6) * (1 + 0.6 * np.sin(2 * np.pi * 38 * t))
+    return drive((wet + 0.6 * slap) * 2, 2)
+
+
+def snap(x, gain=1.8, ms=7):
+    """A sharper attack: the first few ms louder, so it cuts through a fight."""
+    n = min(len(x), n_of(ms / 1000))
+    shape = np.ones(len(x))
+    shape[:n] = np.linspace(gain, 1, n)
+    return x * shape
+
+
 def limit(x, amount=1.6):
     """Glue and punch: soft-clip then re-normalise (a quick limiter)."""
     return drive(x / (np.max(np.abs(x)) + 1e-9), amount)
@@ -257,50 +309,104 @@ def sound(name, peak=0.8, variants=1):
 
 # Swords ------------------------------------------------------------------------------
 
-@sound("swing", 0.7, variants=3)
+@sound("swing", 0.72, variants=4)
 def swing(v):
-    secs = (0.26, 0.23, 0.29)[v]
-    air = whoosh(secs, 500 + 120 * v, 3400 + 400 * v, 0.42 + 0.05 * v)
-    edge = 0.06 * clang(1500 + 180 * v, secs, 0.6) * np.linspace(0, 1, n_of(secs)) ** 3  # the blade sings faintly
-    return room(limit(air + edge, 1.3), 0.12, 0.12)
+    """A blade through the air: the arm's swish building, the fast "vwhip" as
+    the edge peaks, its steel singing faintly behind it."""
+    secs = (0.26, 0.23, 0.29, 0.25)[v]
+    air = whoosh(secs, 450 + 110 * v, 3200 + 450 * v, 0.42 + 0.04 * v)
+    whip = 0.45 * whoosh(secs * 0.55, 1800 + 200 * v, 7000, 0.45, q=2.6)
+    edge = 0.05 * clang(1500 + 170 * v, secs, 0.6) * np.linspace(0, 1, n_of(secs)) ** 3
+    return space(limit(mix((0, air), (secs * 0.28, whip), (0, edge)), 1.35), 0.3, 0.1)
 
 
-@sound("heavy_swing", 0.85, variants=2)
+@sound("heavy_swing", 0.86, variants=3)
 def heavy_swing(v):
-    secs = 0.46 + 0.05 * v
-    air = whoosh(secs, 260, 2200 + 300 * v, 0.55, q=1.2)
-    weight = 0.55 * thump(85, 38, secs, 0.22, 1.6) * np.linspace(0.2, 1, n_of(secs)) ** 2
+    """A big two-handed swing: a slow heavy rush of air with weight behind it."""
+    secs = 0.44 + 0.05 * v
+    air = whoosh(secs, 240 + 20 * v, 2100 + 300 * v, 0.55, q=1.2)
+    whip = 0.35 * whoosh(secs * 0.5, 900, 4200 + 400 * v, 0.5, q=2)
+    weight = 0.55 * thump(85, 36, secs, 0.22, 1.6) * np.linspace(0.2, 1, n_of(secs)) ** 2
     grunt = filt(noise(secs), "low", 400) * whoosh(secs, 100, 300, 0.55) * 0.4
-    return room(limit(mix((0, air), (0, weight), (0, grunt)), 1.4), 0.2, 0.18)
+    return space(limit(mix((0, air), (secs * 0.35, whip), (0, weight), (0, grunt)), 1.45), 0.4, 0.14)
+
+
+def _hit(v):
+    """A sword landing on armour, dry: a sharp tick, the edge slicing in, a
+    body thump, a crunch and a short metal clank."""
+    tick = click(0.012, 3000)
+    edge = 0.5 * slicing(0.05, 2600 + 300 * v, 9000)
+    body = thump(150 - 15 * v, 45, 0.22, 0.06, 3)
+    meat = 0.45 * flesh(0.12, 800 + 100 * v)
+    grit = crunch(0.09, 2000 + 400 * v, 0.022)
+    metal = 0.32 * modal(380 + 90 * v, PLATE, (0.09, 0.07, 0.05, 0.04, 0.03, 0.02), (1, 0.7, 0.5, 0.35, 0.25, 0.15), 0.2, 0.02)
+    return limit(snap(mix((0, tick), (0, edge), (0.002, body), (0.002, meat), (0.002, 0.8 * grit), (0.001, metal)), 1.6), 1.8)
 
 
 @sound("hit", 0.95, variants=3)
 def hit(v):
-    """A sword landing on armour: a sharp click, a body thump, a crunch and a
-    short metal clank."""
-    tick = click(0.012, 3000)
-    body = thump(150 - 15 * v, 45, 0.22, 0.06, 3)
-    grit = crunch(0.09, 2000 + 400 * v, 0.022)
-    metal = 0.32 * modal(380 + 90 * v, PLATE, (0.09, 0.07, 0.05, 0.04, 0.03, 0.02), (1, 0.7, 0.5, 0.35, 0.25, 0.15), 0.2, 0.02)
-    return room(limit(mix((0, tick), (0, body), (0.002, 0.8 * grit), (0.001, metal)), 1.8), 0.14, 0.14)
+    return space(_hit(v), 0.35, 0.12)
 
 
 @sound("heavy_hit", 1.0, variants=2)
 def heavy_hit(v):
-    base = hit(v)
-    boom = thump(110, 32, 0.45, 0.14, 3.2)
+    boom = thump(110, 30, 0.45, 0.14, 3.2)
+    meat = 0.6 * flesh(0.22, 600, 0.06)
     debris = crackles(10, 0.2, 1200, 0.5)
     ring = 0.2 * plate(170 + 30 * v, 0.6)
-    return room(limit(mix((0, base), (0, boom), (0.02, debris), (0.005, ring)), 1.6), 0.25, 0.2)
+    return space(limit(mix((0, _hit(v)), (0, boom), (0.004, meat), (0.02, debris), (0.005, ring)), 1.6), 0.55, 0.16)
 
 
 @sound("crit", 0.95, variants=2)
 def crit(v):
-    base = hit(v)
+    """A critical: the hit, then a bright "shing" of steel that rings out."""
     shine = 0.45 * clang(1180 + 160 * v, 0.9, 1.3)
     glint = filt(noise(0.35), "high", 7000) * env(0.35, 0.003, 0.09) * 0.25
     boom = 0.6 * thump(140, 35, 0.3, 0.1, 3)
-    return room(limit(mix((0, base), (0, boom), (0.008, shine), (0.012, glint)), 1.5), 0.3, 0.22)
+    return space(limit(mix((0, _hit(v)), (0, boom), (0.008, shine), (0.012, glint)), 1.5), 0.6, 0.18)
+
+
+# Your own blade connecting (Combat's Contact, with the hit stop): played flat
+# in your ears, so it's built to be felt: short, dry and hard, all attack.
+
+def _contact(v, heavy=False):
+    tick = click(0.008, 4000 + 500 * v)
+    edge = slicing(0.06 + 0.01 * (v % 2), 2200 + 300 * v, 9500, 0.016)
+    bite = crunch(0.07, 2600 + 300 * v, 0.016)
+    meat = flesh(0.14, 800 + 120 * v, 0.03)
+    punch = thump(185 - 12 * v, 50, 0.22, 0.055, 3.2)
+    steel = 0.16 * modal(1900 + 230 * v, BAR, (0.06, 0.04, 0.03, 0.02, 0.015), (1, 0.6, 0.4, 0.25, 0.15), 0.18)
+    parts = [(0, tick), (0, 0.8 * edge), (0.003, 0.7 * bite), (0.002, 0.8 * meat), (0.003, punch), (0.001, steel)]
+    if heavy:
+        parts += [
+            (0.004, 1.1 * thump(120 - 10 * v, 28, 0.55, 0.15, 3.5)),
+            (0.004, 0.7 * flesh(0.25, 550, 0.07)),
+            (0.025, crackles(12, 0.22, 1200, 0.45)),
+            (0.003, 0.18 * plate(150 + 25 * v, 0.5)),
+        ]
+    return limit(snap(mix(*parts), 2.0), 2.1 if heavy else 2.0)
+
+
+@sound("contact", 0.88, variants=4)
+def contact(v):
+    return space(_contact(v), 0.3, 0.08)
+
+
+@sound("heavy_contact", 0.95, variants=2)
+def heavy_contact(v):
+    return space(_contact(v, True), 0.6, 0.13)
+
+
+@sound("deflect", 0.88, variants=2)
+def deflect(v):
+    """Your blow turned on a guard: steel rings off it, skids, and a tink."""
+    ring = clang(1350 + 200 * v, 0.6, 1.2) * env(0.6, 0.0005, 0.2)
+    plate_ = 0.5 * plate(230 + 40 * v, 0.3)
+    skid = 0.4 * whoosh(0.18, 2600, 7500, 0.25, q=3.5)
+    thud = 0.55 * thump(170, 80, 0.1, 0.025, 2.4)
+    tink = 0.25 * modal(3100 + 300 * v, BAR, (0.05, 0.03, 0.02, 0.015, 0.01), (1, 0.5, 0.3, 0.2, 0.1), 0.1)
+    dry = limit(snap(mix((0, click(0.008, 4500)), (0, ring), (0, plate_), (0.004, skid), (0, thud), (0.07 + 0.02 * v, tink)), 1.6), 1.6)
+    return space(dry, 0.45, 0.16)
 
 
 @sound("block", 0.88, variants=2)
@@ -309,7 +415,7 @@ def block(v):
     ring = plate(190 + 40 * v, 0.55)
     thud = 0.8 * thump(150, 70, 0.14, 0.035, 2.5)
     clank = 0.35 * clang(900 + 120 * v, 0.35, 0.8)
-    return room(limit(mix((0, click(0.01, 2000)), (0, ring), (0, thud), (0.003, clank)), 1.7), 0.25, 0.25)
+    return space(limit(snap(mix((0, click(0.01, 2000)), (0, ring), (0, thud), (0.003, clank))), 1.7), 0.5, 0.18)
 
 
 @sound("guard_break", 0.97)
@@ -319,7 +425,7 @@ def guard_break(v):
     fall = 0.4 * modal(320, PLATE, (0.5, 0.35, 0.25, 0.2, 0.15, 0.1), (1, 0.8, 0.6, 0.5, 0.4, 0.3), 0.9, 0.02)
     sub = thump(120, 30, 0.55, 0.18, 3)
     wobble = fall * (1 + 0.5 * np.sin(2 * np.pi * 9 * t_of(0.9)))
-    return room(limit(mix((0, crash), (0.01, splinter), (0, wobble), (0, sub)), 1.6), 0.4, 0.3)
+    return space(limit(mix((0, crash), (0.01, splinter), (0, wobble), (0, sub)), 1.6), 0.8, 0.22)
 
 
 @sound("parry", 0.9)
@@ -328,7 +434,7 @@ def parry(v):
     clash = clang(1240, 1.4, 1.4)
     second = 0.6 * clang(1610, 1.2, 1.1)
     scrape = whoosh(0.35, 3000, 7000, 0.3, q=3) * 0.5
-    return room(limit(mix((0, click(0.01, 4000)), (0, clash), (0.006, second), (0.01, scrape)), 1.4), 0.45, 0.32)
+    return space(limit(mix((0, click(0.01, 4000)), (0, clash), (0.006, second), (0.01, scrape)), 1.4), 0.9, 0.24)
 
 
 # Movement ----------------------------------------------------------------------------
@@ -347,6 +453,34 @@ def roll(v):
     tumble = mix(*[(0.06 + 0.07 * i, 0.4 * crunch(0.06, 1200, 0.018)) for i in range(4)])
     land = 0.7 * thump(130, 55, 0.14, 0.04, 2.5)
     return mix((0, air), (0, tumble), (0.3, land))
+
+
+# A kaiju's body (KaijuMotionFx) -------------------------------------------------------
+
+@sound("stomp", 0.85, variants=2)
+def stomp(v):
+    """A big foot coming down: a deep thud you feel, dirt crunching under it,
+    grit pattering back down."""
+    thud = thump(72 - 6 * v, 26, 0.6, 0.16, 2.6)
+    give = filt(noise(0.35), "low", 220) * env(0.35, 0.004, 0.09) * 0.9
+    dirt = 0.6 * crunch(0.12, 1100 + 200 * v, 0.03)
+    grit = crackles(9, 0.3, 1800, 0.35)
+    return space(limit(mix((0, thud), (0, give), (0.004, dirt), (0.05, grit)), 1.6), 0.6, 0.14)
+
+
+@sound("charge", 0.62)
+def charge(v):
+    """A kaiju's cast gathering at its mouth: energy drawn in, a whine that
+    climbs and trembles faster, cut as it's let go (its Bolt or Nova takes over)."""
+    seconds = 1.0
+    t = t_of(seconds)
+    rise = drive(osc("saw", sweep(70, 420, seconds)) + osc("saw", sweep(70.6, 425, seconds)), 1.6)
+    rise = swept_filter(rise, "low", 250, 5000)
+    tremble = 1 + 0.35 * np.sin(2 * np.pi * np.cumsum(6 + 26 * t) / SR)
+    shimmer = 0.25 * fm(sweep(900, 2600, seconds), 1.41, 2.5, seconds)
+    pull = 0.6 * whoosh(seconds, 500, 5500, 0.95, q=2)  # air drawn in
+    shape = np.linspace(0.15, 1, n_of(seconds)) ** 1.2
+    return space((0.6 * rise * tremble + shimmer + pull) * shape, 0.4, 0.15)
 
 
 # Surges (element casts and impacts) --------------------------------------------------
@@ -491,7 +625,8 @@ def hurt(v):
     body = thump(120 - 10 * v, 42, 0.26, 0.08, 3)
     grit = crunch(0.1, 1600 + 400 * v, 0.025)
     breath = filt(noise(0.18), "band", (500, 1800)) * env(0.18, 0.005, 0.06) * 0.35  # a grunt of air
-    return mix((0, body), (0, 0.8 * grit), (0.01, breath))
+    meat = 0.5 * flesh(0.16, 700 + 150 * v, 0.04)
+    return space(limit(mix((0, body), (0, 0.8 * grit), (0.002, meat), (0.01, breath)), 1.8), 0.35, 0.08)
 
 
 @sound("stun", 0.7)
@@ -544,7 +679,20 @@ def kill(v):
     stab = sum((osc("saw", f, 1.4) + osc("saw", f * 1.006, 1.4)) * 0.2 for f in chord)
     stab = swept_filter(stab, "low", 6000, 600) * env(1.4, 0.004, 0.5)
     ring = 0.3 * clang(880, 1.4, 1.0)
-    return room(mix((0, thump(160, 45, 0.4, 0.12, 3)), (0, stab), (0, ring)), 0.7, 0.4)
+    shing = 0.35 * clang(1760, 1.0, 1.4) * env(1.0, 0.001, 0.35)
+    drop = 0.7 * thump(90, 24, 0.9, 0.3, 2.4)
+    return space(mix((0, thump(160, 45, 0.4, 0.12, 3)), (0, drop), (0, stab), (0, ring), (0.01, shing)), 1.1, 0.26)
+
+
+def write_mp3(path, x):
+    for _ in range(4):
+        sf.write(path, x, SR, format="MP3")
+        # A sharp attack can overshoot once encoded: pull it back under clipping.
+        over = np.max(np.abs(sf.read(path)[0])) / 0.95
+        if over <= 1:
+            break
+        x = (x / over * 0.98).astype(np.float32)
+    return x
 
 
 def main():
@@ -560,12 +708,11 @@ def main():
         tail = min(len(x), n_of(0.03))
         x[-tail:] *= np.linspace(1, 0, tail)
         x = x.astype(np.float32)
-        rendered[name] = x
-        sf.write(os.path.join(OUT, name + ".mp3"), x, SR, format="MP3")
+        rendered[name] = write_mp3(os.path.join(OUT, name + ".mp3"), x)
         print(f"{name:12s} {len(x) / SR * 1000:5.0f} ms")
     gap = np.zeros(n_of(0.45), dtype=np.float32)
     preview = np.concatenate([np.concatenate([x, gap]) for x in rendered.values()])
-    sf.write(os.path.join(OUT, "_preview_all.mp3"), preview, SR, format="MP3")
+    write_mp3(os.path.join(OUT, "_preview_all.mp3"), preview)
     print("order:", ", ".join(rendered))
 
 

@@ -157,7 +157,7 @@ RunService.PreSimulation:Connect(function(dt)
 			local kind, start = model:GetAttribute("ActionKind"), model:GetAttribute("ActionStart")
 			if CASTS[kind] and type(start) == "number" and type(at) == "number" and now >= start and now < at then
 				rig.Charging = at
-				KaijuMotionFx.charge(rig, model, rig.Root, (now - start) / math.max(at - start, 0.05), colorOf(model))
+				KaijuMotionFx.charge(rig, model, rig.Root, (now - start) / math.max(at - start, 0.05), colorOf(model), at - start)
 			elseif rig.Charging then
 				if CASTS[kind] and at == rig.Charging and now >= at and now < at + 0.5 then
 					KaijuMotionFx.release(rig, model, rig.Root, colorOf(model))

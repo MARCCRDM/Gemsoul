@@ -38,8 +38,10 @@ CombatSound.Ids = {
 	Swing1 = 0, -- swing_1.mp3
 	Swing2 = 0, -- swing_2.mp3
 	Swing3 = 0, -- swing_3.mp3
+	Swing4 = 0, -- swing_4.mp3
 	HeavySwing1 = 0, -- heavy_swing_1.mp3
 	HeavySwing2 = 0, -- heavy_swing_2.mp3
+	HeavySwing3 = 0, -- heavy_swing_3.mp3
 	Hit1 = 0, -- hit_1.mp3
 	Hit2 = 0, -- hit_2.mp3
 	Hit3 = 0, -- hit_3.mp3
@@ -47,6 +49,15 @@ CombatSound.Ids = {
 	HeavyHit2 = 0, -- heavy_hit_2.mp3
 	Crit1 = 0, -- crit_1.mp3
 	Crit2 = 0, -- crit_2.mp3
+	-- Your own blade landing (Combat: Contact): felt more than heard.
+	Contact1 = 0, -- contact_1.mp3
+	Contact2 = 0, -- contact_2.mp3
+	Contact3 = 0, -- contact_3.mp3
+	Contact4 = 0, -- contact_4.mp3
+	HeavyContact1 = 0, -- heavy_contact_1.mp3
+	HeavyContact2 = 0, -- heavy_contact_2.mp3
+	Deflect1 = 0, -- deflect_1.mp3
+	Deflect2 = 0, -- deflect_2.mp3
 	Block1 = 0, -- block_1.mp3
 	Block2 = 0, -- block_2.mp3
 	GuardBreak = 0, -- guard_break.mp3
@@ -86,6 +97,11 @@ CombatSound.Ids = {
 	RoarRazorback = 0, -- roar_razorback.mp3
 	RoarCarapace = 0, -- roar_carapace.mp3
 	RoarScythe = 0, -- roar_scythe.mp3
+	-- A kaiju's footfall, and a cast gathering at its mouth (KaijuMotionFx; the
+	-- charge has no built-in stand-in, so it's silent until it's uploaded).
+	Stomp1 = 0, -- stomp_1.mp3
+	Stomp2 = 0, -- stomp_2.mp3
+	Charge = 0, -- charge.mp3
 	-- A rift critter's evil giggles and its cackle (tools/make_critter_sounds.py).
 	Giggle1 = 0, -- critter_giggle_1.mp3
 	Giggle2 = 0, -- critter_giggle_2.mp3
@@ -135,6 +151,7 @@ local LEVEL = {
 	Contact = 0.95,
 	HeavyContact = 1,
 	Deflect = 0.85,
+	Charge = 0.7,
 }
 
 -- Built-in stand-ins until a sound is uploaded: layers of { sound, speed,
@@ -264,6 +281,7 @@ local MIN_GAP = {
 	Hurt = 0.08,
 	Combo = 0.05,
 	Stomp = 0.09,
+	Charge = 0.15,
 	Contact = 0.04,
 	Giggle = 0.35, -- (a swarm giggling at once is one giggle, not a din)
 	Cackle = 0.6,

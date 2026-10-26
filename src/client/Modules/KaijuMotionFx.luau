@@ -6,10 +6,11 @@
 	      a foot landing: dust kicked up round it and a ring along the
 	      ground; a big one thuds, and a giant's shakes your screen when it's
 	      close (all at its size, FxSize)
-	  charge(rig, model, root, progress, color)
+	  charge(rig, model, root, progress, color, seconds?)
 	      a cast gathering (each frame of its wind-up, progress 0..1): an orb
 	      of its element swelling at its mouth, motes drawn in to it, its
-	      light growing, a tremble as it peaks
+	      light growing, a tremble as it peaks; a whine climbing with it,
+	      timed to peak as it's let go (`seconds`, the wind-up's length)
 	  release(rig, model, root, color)
 	      the cast let go: the orb bursts, a flash and a ring
 	  clear(rig)  any charge it held, gone (the cast was cut off)
@@ -136,11 +137,23 @@ function KaijuMotionFx.clear(rig)
 	end
 end
 
-function KaijuMotionFx.charge(rig, model: Model, root: BasePart, progress: number, color: Color3)
+function KaijuMotionFx.charge(rig, model: Model, root: BasePart, progress: number, color: Color3, seconds: number?)
 	local c = rig.Charge
 	if not c then
 		c = newCharge(color, FxSize.ofModel(model))
 		rig.Charge = c
+		-- The whine climbs over its wind-up (the sound is a second long),
+		-- unless we've only come in on the end of it.
+		if progress < 0.35 then
+			local size = c.Size
+			local at = mouth(rig, root)
+			FxSize.run(size, function()
+				CombatSound.play("Charge", at, {
+					Volume = math.clamp(0.4 + size * 0.4, 0.4, 1),
+					Pitch = math.clamp(1 / math.max(seconds or 1, 0.1), 0.7, 1.6),
+				})
+			end)
+		end
 	end
 	local size = c.Size
 	local at = mouth(rig, root)
