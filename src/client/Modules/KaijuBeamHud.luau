@@ -5,17 +5,20 @@
 	bottom row of the kaiju card (KaijuHud.beamSlot()), under the team and
 	its buttons.
 
-	  Charging   a dark core filling with your team's colours (the emptiest
-	             of them: all must be full), CHARGING and its percent, and a
-	             pip for each kaiju out (its own mana, in its element's
-	             colour).
-	  Ready      the core lit, a ring of your team's colours spinning round
-	             it, a glow that breathes, a band of light sweeping across,
-	             READY! and its key (Z; on a pad, the d-pad's down; on a
-	             phone, TAP). It pops and chimes the moment it's ready.
+	One bar, the row's width: it fills left to right in your team's
+	colours (the emptiest kaiju's mana: all must be full).
+
+	  Charging   HYPERBEAM and its percent (CHARGING 42% on a computer).
+	  Ready      the bar full and bright, its colours flowing, a glow that
+	             breathes, a band of light sweeping across, READY! (and its
+	             key on a computer: Z; on a pad, the d-pad's down). It pops
+	             and chimes the moment it's ready.
 	  Blasting   BLASTING! while the blast is under way.
-	  SAVE       the switch at its corner: ON, your kaiju fight with blows
-	             alone and charge faster (the server's KaijuSaveCharge).
+	  SAVE       the switch at its end: on (green), your kaiju fight with
+	             blows alone and charge faster (the server's KaijuSaveCharge).
+
+	(Light to run: it redraws only when what it shows changes, and moves
+	only while it's ready.)
 
 	  KaijuBeamHud.start(slot)   once, from Lobby.client, with the card's
 	                             row to draw in (KaijuHud.beamSlot())
@@ -48,8 +51,8 @@ local READY_GOLD = Color3.fromRGB(255, 226, 120)
 
 local shownNow = false -- (with the kaiju card, while your team's out)
 
--- The pill: a glow behind, the core (charge and ring), its words, the pips
--- and the SAVE switch.
+-- The bar: a glow behind, the charge filling it, its words and the SAVE
+-- switch.
 local button = new("TextButton", {
 	Name = "Hyperbeam",
 	AutoButtonColor = false,
@@ -58,19 +61,36 @@ local button = new("TextButton", {
 	BackgroundTransparency = 0.08,
 	ZIndex = 3,
 }, nil)
-UiKit.round(button, 14)
+UiKit.round(button, 10)
 local stroke = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.2 }, button)
 local scale = new("UIScale", { Scale = 1 }, button)
 local glow = new("Frame", {
 	Name = "Glow",
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.new(1, 18, 1, 18),
+	Size = UDim2.new(1, 14, 1, 14),
 	BackgroundColor3 = READY_GOLD,
 	BackgroundTransparency = 1,
 	ZIndex = 2,
 }, button)
-UiKit.round(glow, 20)
+UiKit.round(glow, 14)
+local clip = new("Frame", {
+	Name = "Track",
+	BackgroundTransparency = 1,
+	ClipsDescendants = true,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 3,
+}, button)
+UiKit.round(clip, 10)
+local fill = new("Frame", {
+	Name = "Charge",
+	Size = UDim2.fromScale(0, 1),
+	BackgroundColor3 = WHITE,
+	BackgroundTransparency = 0.45,
+	BorderSizePixel = 0,
+	ZIndex = 3,
+}, clip)
+local fillGradient = new("UIGradient", {}, fill)
 local flash = new("Frame", {
 	Name = "Flash",
 	Size = UDim2.fromScale(1, 1),
@@ -78,55 +98,25 @@ local flash = new("Frame", {
 	BackgroundTransparency = 1,
 	ZIndex = 9,
 }, button)
-UiKit.round(flash, 14)
+UiKit.round(flash, 10)
 
--- The core: a spinning ring of the team's colours (ready), the dark well,
--- the charge rising in it, and a bright heart.
-local ring = new("Frame", {
-	Name = "Ring",
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundColor3 = WHITE,
-	BackgroundTransparency = 1,
-	ZIndex = 4,
-}, button)
-UiKit.round(ring, 999)
-local ringGradient = new("UIGradient", {}, ring)
-local well = new("Frame", {
-	Name = "Well",
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundColor3 = Color3.fromRGB(20, 24, 40),
-	ClipsDescendants = true,
-	ZIndex = 5,
-}, button)
-UiKit.round(well, 999)
-local fill = new("Frame", {
-	Name = "Charge",
-	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.fromScale(0, 1),
-	Size = UDim2.fromScale(1, 0),
-	BackgroundColor3 = WHITE,
-	ZIndex = 5,
-}, well)
-local fillGradient = new("UIGradient", { Rotation = -90 }, fill)
-local heart = new("Frame", {
-	Name = "Heart",
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	BackgroundColor3 = WHITE,
-	BackgroundTransparency = 0.6,
-	ZIndex = 6,
-}, well)
-UiKit.round(heart, 999)
-
-local title = new("TextLabel", {
-	Name = "Title",
-	BackgroundTransparency = 1,
-	Text = "HYPERBEAM",
-	Font = IronUi.Heading,
-	TextColor3 = P.Text,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ZIndex = 6,
-}, button)
+local function words(name: string, font: Enum.Font, align: Enum.TextXAlignment): TextLabel
+	local text = new("TextLabel", {
+		Name = name,
+		BackgroundTransparency = 1,
+		Font = font,
+		TextColor3 = P.Text,
+		TextScaled = true,
+		TextXAlignment = align,
+		TextStrokeColor3 = INK,
+		TextStrokeTransparency = 0.55,
+		ZIndex = 6,
+	}, button)
+	new("UITextSizeConstraint", { MinTextSize = 7, MaxTextSize = 15 }, text)
+	return text
+end
+local title = words("Title", IronUi.Heading, Enum.TextXAlignment.Left)
+title.Text = "HYPERBEAM"
 local titleGradient = new("UIGradient", {
 	Color = ColorSequence.new({
 		ColorSequenceKeypoint.new(0, READY_GOLD),
@@ -135,25 +125,7 @@ local titleGradient = new("UIGradient", {
 	}),
 	Enabled = false,
 }, title)
-local state = new("TextLabel", {
-	Name = "State",
-	BackgroundTransparency = 1,
-	Text = "CHARGING",
-	Font = IronUi.Bold,
-	TextColor3 = P.Dim,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ZIndex = 6,
-}, button)
-local pipRow = new("Frame", {
-	Name = "Pips",
-	BackgroundTransparency = 1,
-	ZIndex = 6,
-}, button)
-new("UIListLayout", {
-	FillDirection = Enum.FillDirection.Horizontal,
-	Padding = UDim.new(0, 3),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-}, pipRow)
+local state = words("State", IronUi.Bold, Enum.TextXAlignment.Right)
 local save = new("TextButton", {
 	Name = "Save",
 	AutoButtonColor = false,
@@ -169,10 +141,11 @@ IronUi.juice(button, 1.03, 0.96)
 IronUi.shine(button, 2.2)
 local shineClip = button:FindFirstChild("ShineClip") :: Frame?
 
-local pips = {} -- [i] = { Back, Fill }
 local busy = false
 local wasReady = false
-local colors = { CHARGE }
+local compact = false -- (a phone's short row: shorter words)
+local drawn = "" -- (what it shows now: redrawn only when that changes)
+local paletteKey = ""
 
 local function touch(): boolean
 	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -183,68 +156,46 @@ local function layout()
 	if size.X <= 0 or size.Y <= 0 then
 		return
 	end
-	-- (A short row, a phone's: title and SAVE on one line, the charge and
-	-- the pips on the next.)
-	local compact = size.Y < 40
-	local core = size.Y - (if compact then 6 else 10)
-	local left = if compact then 4 else 6
-	ring.Size = UDim2.fromOffset(core + 6, core + 6)
-	ring.Position = UDim2.fromOffset(left + core / 2, size.Y / 2)
-	well.Size = UDim2.fromOffset(core, core)
-	well.Position = ring.Position
-	heart.Size = UDim2.fromOffset(math.floor(core * 0.32), math.floor(core * 0.32))
-	local textX = left + core + (if compact then 6 else 10)
-	local textW = size.X - textX - 6
-	local saveW, saveH = if compact then 36 else 46, if compact then 13 else 20
+	-- HYPERBEAM on the left, its state on the right, SAVE at the end.
+	compact = size.Y < 40
+	local pad = if compact then 6 else 10
+	local saveW, saveH = if compact then 32 else 46, if compact then 15 else 20
 	save.Size = UDim2.fromOffset(saveW, saveH)
+	save.Position = UDim2.new(1, -saveW - pad + 2, 0.5, -saveH / 2)
 	save.TextSize = if compact then 8 else 10
-	if compact then
-		local line = math.floor((size.Y - 4) / 2)
-		save.Position = UDim2.new(1, -saveW - 4, 0, 2)
-		title.Position, title.Size = UDim2.fromOffset(textX, 2), UDim2.fromOffset(textW - saveW - 6, line)
-		title.TextSize = math.min(12, line)
-		local stateW = math.min(80, textW - 40)
-		state.Position, state.Size = UDim2.fromOffset(textX, 2 + line), UDim2.fromOffset(stateW, line)
-		state.TextSize = math.min(9, line)
-		pipRow.Position = UDim2.fromOffset(textX + stateW + 4, 2 + line + math.floor((line - 5) / 2))
-		pipRow.Size = UDim2.fromOffset(textW - stateW - 4, 5)
-	else
-		save.Position = UDim2.new(1, -saveW - 8, 0.5, -saveH / 2)
-		local wordsW = textW - saveW - 8
-		title.Position, title.Size = UDim2.fromOffset(textX, 4), UDim2.fromOffset(wordsW, 18)
-		title.TextSize = 15
-		state.Position, state.Size = UDim2.fromOffset(textX, 22), UDim2.fromOffset(wordsW, 12)
-		state.TextSize = 10
-		pipRow.Position = UDim2.fromOffset(textX, size.Y - 9)
-		pipRow.Size = UDim2.fromOffset(textW, 5)
-	end
+	local textH = math.min(size.Y - 8, if compact then 14 else 18)
+	local room = size.X - pad * 2 - saveW - 4
+	local stateW = math.floor(room * (if compact then 0.38 else 0.45))
+	title.Position = UDim2.new(0, pad, 0.5, -textH / 2)
+	title.Size = UDim2.fromOffset(room - stateW - 4, textH)
+	state.Position = UDim2.new(0, pad + room - stateW, 0.5, -textH / 2)
+	state.Size = UDim2.fromOffset(stateW, textH)
+	drawn = "" -- (its words change with its size)
 end
 
-
--- Your kaiju out, in their slots' order: { Model, Color, Mana }.
-local function team()
+-- Your kaiju out, in their slots' order: their element colours.
+local function palette(): { Color3 }
 	local folder = workspace:FindFirstChild("Kaiju")
 	local list = {}
-	if not folder then
-		return list
-	end
-	for _, model in folder:GetChildren() do
+	for _, model in if folder then folder:GetChildren() else {} do
 		if model:IsA("Model") and model:GetAttribute("KaijuOwner") == player.UserId then
 			table.insert(list, {
-				Model = model,
 				Slot = model:GetAttribute("KaijuSlot") or 9,
 				Color = GemConfig.ElementColors[model:GetAttribute("KaijuElement")] or CHARGE,
-				Mana = tonumber(model:GetAttribute("Mana")) or 0,
 			})
 		end
 	end
 	table.sort(list, function(a, b)
 		return a.Slot < b.Slot
 	end)
-	return list
+	local colors = {}
+	for _, unit in list do
+		table.insert(colors, unit.Color)
+	end
+	return if #colors > 0 then colors else { CHARGE }
 end
 
--- A sequence of the team's colours, round (for the ring and the charge).
+-- A sequence of the team's colours, round (for the bar).
 local function sequence(list: { Color3 }): ColorSequence
 	if #list == 1 then
 		return ColorSequence.new(list[1], list[1]:Lerp(WHITE, 0.4))
@@ -257,40 +208,10 @@ local function sequence(list: { Color3 }): ColorSequence
 	return ColorSequence.new(points)
 end
 
-local function pipsFor(list)
-	for i, unit in list do
-		local pip = pips[i]
-		if not pip then
-			local back = new("Frame", {
-				Name = "Pip" .. i,
-				LayoutOrder = i,
-				BackgroundColor3 = Color3.fromRGB(34, 40, 60),
-				ZIndex = 6,
-			}, pipRow)
-			UiKit.round(back, 3)
-			local inner = new("Frame", {
-				Size = UDim2.fromScale(0, 1),
-				BackgroundColor3 = WHITE,
-				ZIndex = 7,
-			}, back)
-			UiKit.round(inner, 3)
-			pip = { Back = back, Fill = inner }
-			pips[i] = pip
-		end
-		local width = math.floor((pipRow.AbsoluteSize.X - 3 * (#list - 1)) / math.max(1, #list))
-		pip.Back.Size = UDim2.new(0, math.max(8, width), 1, 0)
-		pip.Back.Visible = true
-		pip.Fill.BackgroundColor3 = unit.Color
-		pip.Fill.Size = UDim2.fromScale(math.clamp(unit.Mana / 100, 0, 1), 1)
-		pip.Fill.BackgroundTransparency = if unit.Mana >= 100 then 0 else 0.15
-	end
-	for i = #list + 1, #pips do
-		pips[i].Back.Visible = false
-	end
-end
+local colors = { CHARGE }
 
 local function pop()
-	scale.Scale = 1.18
+	scale.Scale = 1.12
 	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
 		:Play()
 	flash.BackgroundTransparency = 0.15
@@ -308,40 +229,43 @@ local function refresh()
 		wasReady = false
 		return
 	end
-	local list = team()
-	local palette = {}
-	for _, unit in list do
-		table.insert(palette, unit.Color)
+	-- The team's colours (set only when they change).
+	local list = palette()
+	local key = ""
+	for _, color in list do
+		key ..= color:ToHex()
 	end
-	if #palette == 0 then
-		palette = { CHARGE }
+	if key ~= paletteKey then
+		paletteKey, colors = key, list
+		fillGradient.Color = sequence(list)
 	end
-	colors = palette
-	pipsFor(list)
 	local blasting = player:GetAttribute("KaijuBeamAt") ~= nil
 	local ready = charge >= 100 and not blasting
 	local saving = player:GetAttribute("KaijuSave") == true
-	-- The charge in the core, in the team's colours.
-	fill.Size = UDim2.fromScale(1, math.clamp(charge / 100, 0, 1))
-	fillGradient.Color = sequence(palette)
-	ringGradient.Color = sequence(palette)
+	local pct = math.floor(charge)
+	local look = string.format("%d/%s/%s/%s/%s", pct, tostring(blasting), tostring(saving), tostring(compact), tostring(touch()))
+	if look == drawn then
+		return
+	end
+	drawn = look
+	fill.Size = UDim2.fromScale(math.clamp(charge / 100, 0, 1), 1)
+	fill.BackgroundTransparency = if ready then 0.1 else 0.45
 	-- Its words.
 	if blasting then
 		state.Text = "BLASTING!"
 		state.TextColor3 = READY_GOLD
 	elseif ready then
-		state.Text = if touch() then "READY!  TAP" else "READY!  [ Z ]"
+		state.Text = if compact or touch() then "READY!" else "READY!  [ Z ]"
 		state.TextColor3 = READY_GOLD
 	else
-		state.Text = string.format("CHARGING  %d%%", charge)
-		state.TextColor3 = if saving then P.Good else P.Dim
+		state.Text = if compact then string.format("%d%%", pct) else string.format("CHARGING  %d%%", pct)
+		state.TextColor3 = if saving then P.Good else P.Text
 	end
-	save.Text = if saving then "SAVE ON" else "SAVE"
+	save.Text = if saving and not compact then "SAVE ON" else "SAVE"
 	save.TextColor3 = if saving then INK else P.Dim
 	save.BackgroundColor3 = if saving then P.Good else Color3.fromRGB(28, 32, 50)
 	saveStroke.Color = if saving then P.Good else P.Edge
-	-- Ready: the ring and glow on, the title shimmering; it pops once.
-	ring.BackgroundTransparency = if ready then 0 else 1
+	-- Ready: bright, the title shimmering, the glow on; it pops once.
 	titleGradient.Enabled = ready
 	if shineClip then
 		shineClip.Visible = ready
@@ -353,6 +277,7 @@ local function refresh()
 	end
 	if not ready then
 		glow.BackgroundTransparency = 1
+		fillGradient.Offset = Vector2.zero
 	end
 	wasReady = ready
 end
@@ -429,23 +354,16 @@ function KaijuBeamHud.start(slot: GuiObject)
 		end
 		return Enum.ContextActionResult.Sink
 	end, false, 3000, Enum.KeyCode.Z, Enum.KeyCode.DPadDown)
-	-- Ready: the ring spins, the glow breathes, the heart beats.
-	IronUi.animate(ring, function(now: number)
-		if wasReady then
-			ringGradient.Rotation = (now * 140) % 360
-			glow.BackgroundColor3 = colors[1 + math.floor(now * 1.5) % #colors]:Lerp(READY_GOLD, 0.35)
-			glow.BackgroundTransparency = 0.62 + 0.18 * math.sin(now * 5)
-			titleGradient.Offset = Vector2.new(((now * 0.8) % 2) - 1, 0)
-			local beat = 1 + 0.18 * math.max(0, math.sin(now * 7))
-			heart.BackgroundTransparency = 0.05
-			heart.Size = UDim2.fromOffset(
-				math.floor(well.AbsoluteSize.X * 0.34 * beat),
-				math.floor(well.AbsoluteSize.X * 0.34 * beat)
-			)
-		else
-			heart.BackgroundTransparency = 0.6
-			fillGradient.Offset = Vector2.new(0, 0.08 * math.sin(now * 3))
+	-- Ready: its colours flow, the glow breathes, the title shimmers
+	-- (nothing moves while it charges).
+	IronUi.animate(glow, function(now: number)
+		if not wasReady then
+			return
 		end
+		fillGradient.Offset = Vector2.new(((now * 0.35) % 2) - 1, 0)
+		glow.BackgroundColor3 = colors[1 + math.floor(now * 1.5) % #colors]:Lerp(READY_GOLD, 0.35)
+		glow.BackgroundTransparency = 0.62 + 0.18 * math.sin(now * 5)
+		titleGradient.Offset = Vector2.new(((now * 0.8) % 2) - 1, 0)
 	end)
 	layout()
 	pcall(refresh)
@@ -460,7 +378,7 @@ function KaijuBeamHud.start(slot: GuiObject)
 		if now < nextTick then
 			return
 		end
-		nextTick = now + 0.25
+		nextTick = now + 0.5 -- (its own changes come by its attributes)
 		local ok, err = pcall(refresh)
 		if not ok then
 			warn("[KaijuBeamHud]", err)

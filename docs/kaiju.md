@@ -477,16 +477,20 @@ above the combat HUD near the bottom center:
   - **Bottom row:** the team's [HYPERBEAM](#hyperbeam), the full width of
     the card.
 
-  Each kaiju tile shows its portrait, level and health, and dots down its
-  right edge for Q, E and R: lit when the move is ready, faint while it
-  recharges, hollow while it's still asleep. Knocked out, its tile is
+  Each kaiju tile shows its portrait, level and health. On a computer it
+  also has dots down its right edge for Q, E and R: lit when the move is
+  ready, faint while it recharges, hollow while it's still asleep. A phone
+  leaves the dots off (too small to read there; the kaiju panel has the
+  moves), and its AUTO HEAL takes two lines: the gem, then AUTO ON or
+  AUTO OFF. Knocked out, its tile is
   veiled and says DOWN until you revive it. Tap a tile for the kaiju panel
   on that kaiju (a tile that's DOWN opens HEAL).
 
   Where it sits:
   - On a computer: the bottom left. The chat feed keeps clear above it.
-  - On a phone: right of your level, coins and health. It's as tall as the
-    space above the PLAY dock allows, clear of the thumbstick.
+  - On a phone: right of your level, coins and health, 172 wide and at
+    most 124 tall (less if the space above the PLAY dock is shorter), clear
+    of the thumbstick.
   - While you hunt: the top right, because the fight's foe list takes the
     top left.
   - **AUTO HEAL**, in the middle row, in place of RECALL and HUNT: the gem
@@ -544,16 +548,19 @@ your team's blast together. It works the same in mining and in fights.
   1.6 times as fast. The support's heals still go out.
 - **The button** (`KaijuBeamHud`): the kaiju card's bottom row
   (`KaijuHud.beamSlot`), under the team, its support and the two buttons.
-  On a phone's shorter row, the title and SAVE share one line, with the
-  charge and the pips on the next. It shows:
-  - **Charging:** a dark core filling in your team's colours, by the
-    emptiest kaiju (all of them must be full), with CHARGING and a
-    percentage. Each kaiju gets a pip showing its own mana in its
-    element's colour.
-  - **Ready:** the core lights up, a ring of your team's colours spins
-    round it, the HYPERBEAM title shimmers and glints, and the pill pops
-    with a sound. It reads **READY! [ Z ]**, or **READY! TAP** on a phone.
+  One bar the row's width: it fills left to right in your team's colours,
+  by the emptiest kaiju (all of them must be full), with HYPERBEAM on the
+  left, its state on the right and SAVE at the end (green while it's on).
+  It shows:
+  - **Charging:** the percentage (CHARGING 42% on a computer).
+  - **Ready:** the bar full and bright, its colours flowing, a glow
+    breathing round it, the HYPERBEAM title shimmering and glinting; it
+    pops with a sound. It reads **READY! [ Z ]** on a computer and
+    **READY!** on a phone.
   - **Blasting:** BLASTING!
+
+  It's light to run: it redraws only when what it shows changes, and moves
+  only while it's ready.
 
   **Z**, the gamepad's d-pad down, or a tap fires it.
 

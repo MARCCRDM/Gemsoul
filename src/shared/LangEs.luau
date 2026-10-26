@@ -1846,6 +1846,8 @@ return {
 	["AUTO HEAL"] = "AUTOCURA",
 	["ON"] = "SÍ",
 	["OFF"] = "NO",
+	["AUTO ON"] = "AUTO SÍ",
+	["AUTO OFF"] = "AUTO NO",
 	["HEAL"] = "CURAR",
 	["REVIVE"] = "REVIVIR",
 	["CLEAR"] = "QUITAR",
@@ -3259,7 +3261,7 @@ return {
 
 	-- The team's HYPERBEAM (Client.KaijuBeamHud's button, Client.KaijuBeamFx, KaijuBeamServer).
 	["CHARGING  {1}%"] = "CARGANDO  {1}%",
-	["READY!  TAP"] = "¡LISTO!  TOCA",
+	["READY!"] = "¡LISTO!",
 	["READY!  [ Z ]"] = "¡LISTO!  [ Z ]",
 	["BLASTING!"] = "¡DISPARANDO!",
 	["SAVE"] = "AHORRAR",

@@ -509,12 +509,14 @@ local function layout()
 		local rect = if slot == Kaiju.SupportSlot then cells.Support else cells.Fighters[slot]
 		if rect then
 			place(tile.Button, rect)
-			-- Q, E, R and its gem surge down the right edge, spaced to fit.
+			-- Q, E, R and its gem surge down the right edge, spaced to fit
+			-- (not on a phone: too small to read there; the panel has them).
 			local step = math.clamp(math.floor((rect.H - 12) / 4), 5, 9)
 			for i, key in KEYS do
 				local gem = key == "Gem"
 				local size = math.min(if gem then 6 else 7, step - 1)
 				local dot = tile.Dots[key].Frame
+				dot.Visible = not phone
 				dot.Size = UDim2.fromOffset(size, size)
 				dot.Position = UDim2.new(1, if gem then -5 else -4, 0, 3 + (i - 1) * step + (if gem then 1 else 0))
 			end
@@ -536,23 +538,25 @@ local function layout()
 	end
 	tameTitle.Text = if touch then "TAP TO CATCH" else "[ C ]  CATCH"
 	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or
-	-- OFF; CALL BACK: its gem mark, then its name, and IN DANGER when it
-	-- can't. (Smaller on a short row.)
+	-- OFF (on a short row two lines: the gem, then AUTO ON); CALL BACK: its
+	-- gem mark, then its name, and IN DANGER when it can't.
 	local th = cells.Auto.H
 	local small = th < 46
-	local gemSize, gemY = if small then 11 else 16, if small then 2 else 4
+	card:SetAttribute("Compact", small)
+	autoTitle.Visible = not small
+	local gemSize, gemY = if small then 13 else 16, 4
 	autoGem.Position, autoGem.Size = UDim2.fromOffset(5, gemY), UDim2.fromOffset(gemSize, gemSize)
 	autoCount.Position, autoCount.Size = UDim2.fromOffset(8 + gemSize, gemY), UDim2.new(1, -12 - gemSize, 0, gemSize)
 	autoCount.TextSize = if small then 10 else 12
 	autoTitle.Position = UDim2.fromOffset(0, gemY + gemSize + 1)
 	autoTitle.Size, autoTitle.TextSize = UDim2.new(1, 0, 0, if small then 9 else 11), if small then 7 else 9
-	local stateH = if small then 10 else 14
-	autoState.Position = UDim2.new(0, 0, 1, -1 - stateH)
+	local stateH = if small then 12 else 14
+	autoState.Position = UDim2.new(0, 0, 1, -(if small then 3 else 1) - stateH)
 	autoState.Size, autoState.TextSize = UDim2.new(1, 0, 0, stateH), if small then 10 else 13
-	local mark = if small then 8 else 12
+	local mark = if small then 9 else 12
 	callMark.Size = UDim2.fromOffset(mark, mark)
-	callMark.Position = UDim2.new(0.5, 0, 0, if small then 4 else 8)
-	callTitle.Position = UDim2.new(0, 0, 0, if small then 14 else 24)
+	callMark.Position = UDim2.new(0.5, 0, 0, if small then 6 else 8)
+	callTitle.Position = UDim2.new(0, 0, 0, if small then 18 else 24)
 	callTitle.Size, callTitle.TextSize = UDim2.new(1, 0, 0, if small then 10 else 11), if small then 7 else 9
 	callState.Position = UDim2.new(0, 0, 1, -(if small then 10 else 15))
 	callState.Size, callState.TextSize = UDim2.new(1, 0, 0, if small then 9 else 10), if small then 7 else 8
@@ -588,7 +592,7 @@ local function drawAuto(lead)
 	end
 	autoButton.BackgroundColor3 = if on then P.Good:Lerp(INK, 0.72) else TILE_BACK
 	autoEdge.Color = if on then P.Good else P.Edge
-	autoState.Text = if on then "ON" else "OFF"
+	autoState.Text = (if card:GetAttribute("Compact") then "AUTO " else "") .. (if on then "ON" else "OFF")
 	autoState.TextColor3 = if on then P.Good else P.Dim
 	autoTitle.TextColor3 = if on then P.Text else P.Dim
 	autoCount.Text = "×" .. #spareCommons
@@ -661,9 +665,9 @@ local function drawTile(tile, record, model: Model?, lead: boolean)
 	tile.HealthFill.Size = UDim2.fromScale(share, 1)
 	tile.HealthFill.BackgroundColor3 = if share < 0.3 then P.Bad else HEALTH
 	-- Q, E, R and its gem surge: lit when ready, faint while recharging,
-	-- hollow asleep.
+	-- hollow asleep (skipped where they're hidden: a phone).
 	local now = workspace:GetServerTimeNow()
-	for key, dot in tile.Dots do
+	for key, dot in if tile.Dots.Q.Frame.Visible then tile.Dots else {} do
 		local awake = if key == "Gem"
 			then Kaiju.gemSurge(record.Soul) ~= nil
 			else select(2, Kaiju.kitMove(record.Species, key, level))

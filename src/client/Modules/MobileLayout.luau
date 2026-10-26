@@ -179,7 +179,7 @@ end
 -- list has the top left then), clear of the teammates' cards. TameX, TameY,
 -- TameW, TameH: where CATCH goes on a touch screen (the top right; left of
 -- the card while you hunt).
-MobileLayout.Kaiju = { W = 186, Pad = 4, Gap = 3, Max = 136, Split = { 0.355, 0.355 } }
+MobileLayout.Kaiju = { W = 172, Pad = 4, Gap = 3, Max = 124, Split = { 0.36, 0.36 } }
 function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
 	local spec = MobileLayout.Kaiju
 	local x, y, room
