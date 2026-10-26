@@ -602,23 +602,8 @@ local function refreshDown()
 	end
 end
 
--- Someone was knocked down: a banner if it was you who did it, a line for
--- anyone close by.
-local banner = new("TextLabel", {
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.3),
-	Size = UDim2.fromOffset(700, 40),
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamBlack,
-	Text = "",
-	TextSize = 30,
-	TextColor3 = P.Gold,
-	TextStrokeColor3 = P.Ink,
-	TextStrokeTransparency = 0.25,
-	TextTransparency = 1,
-}, flashGui)
-local bannerScale = new("UIScale", { Scale = 1 }, banner)
-local bannerId = 0
+-- Someone was knocked down: a line (a toast, not big words across the
+-- screen) if it was you who did it, or for anyone close by.
 local function knockedDown(victimId: number, attackerId: number)
 	local victim = Players:GetPlayerByUserId(victimId)
 	local attacker = Players:GetPlayerByUserId(attackerId)
@@ -628,18 +613,8 @@ local function knockedDown(victimId: number, attackerId: number)
 		local from = attacker and attacker.Character and attacker.Character:FindFirstChild("HumanoidRootPart")
 		fall(if from then (from :: BasePart).Position else nil)
 	elseif attacker == player and victim then
-		bannerId += 1
-		local id = bannerId
-		banner.Text = "KNOCKED DOWN  " .. string.upper(victim.DisplayName)
-		banner.TextTransparency = 0
-		bannerScale.Scale = 1.3
-		tween(bannerScale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+		UiKit.toast("You knocked down " .. victim.DisplayName, P.Gold)
 		CombatSound.play("Kill")
-		task.delay(1.8, function()
-			if id == bannerId then
-				tween(banner, 0.4, { TextTransparency = 1 })
-			end
-		end)
 	elseif victim and attacker then
 		-- (Only for fights you can see.)
 		local mine = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?

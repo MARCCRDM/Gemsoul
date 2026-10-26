@@ -132,7 +132,7 @@ spar: you aim with the mouse and press X to lock on (see
 | `CombatServer` | `canPvP` follows `Spar.canHit` for sparring players: partners only. A lethal blow asks `onSparLethal` first; a downed player's input is ignored. Sparring counts as equal ground (no tree perks), as in the Arena |
 | `OutpostServer` | The "Ask to spar" prompt (Z) on each visitor, beside Duel (G) and Party (F); no mining with the kit out, and no prompts on a sparring player |
 | `SocialUI` | The Accept / Decline card (`SparAsk`), taken down when the request is withdrawn (`SparAskOver`) or once you're sparring |
-| `src/client/Modules/SparKit.luau` | 1 / D-pad up (ask the nearest player, or end the spar), the spar bar (only while sparring: your partner and END), the flash when a spar starts or ends, the knocked-down overlay and fall, the KO banner and toast, the ⚔ badge |
+| `src/client/Modules/SparKit.luau` | 1 / D-pad up (ask the nearest player, or end the spar), the spar bar (only while sparring: your partner and END), the flash when a spar starts or ends, the knocked-down overlay and fall, the KO toast (no banner across the screen), the ⚔ badge |
 | `Combat.client`, `TargetLock`, `BodyPoses`, `FighterSpacing`, `FightSpacing` | Treat a spar as a fight: first-person view and HUD, lock only onto your partner, face them, no jumping (Space is dodge) |
 
 Player attributes:

@@ -176,11 +176,11 @@ for _, biome in loaded.Frontier.Biomes do
 	check(biome.Label == nil and biome.Line == nil, biome.Id .. " still has a sign or a title card line")
 end
 -- Crossing into a band or a biome: no title card (FrontierHud); the Rift
--- Vein's news still has its banner.
+-- Vein's news no banner either.
 local hud = fs.readFile(ROOT .. "/src/client/Modules/FrontierHud.luau")
 check(not hud:find("THE FRINGE", 1, true) and not hud:find("OUTPOST CORE", 1, true), "The bands' title cards are back")
 check(not hud:find('GetAttributeChangedSignal("FrontierBiome")', 1, true), "Crossing into a biome shows a title card")
-check(hud:find('showLines({ "RIFT VEIN", news }', 1, true) ~= nil, "The Rift Vein news lost its banner")
+check(hud:find('"RIFT VEIN"', 1, true) == nil and hud:find("showLines", 1, true) == nil, "The Rift Vein's banner across the screen is back")
 -- The crew say what places are for, in plain words: no Uplink.
 for _, path in { "src/shared/Vendors.luau", "src/server/Systems/OutpostServer.luau" } do
 	check(not fs.readFile(ROOT .. "/" .. path):find("Uplink", 1, true), path .. " still talks of the Uplink")

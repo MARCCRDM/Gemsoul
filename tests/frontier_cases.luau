@@ -946,7 +946,7 @@ do
 			and hud:find('GetAttributeChangedSignal("FrontierBiome")', 1, true) == nil,
 		"Crossing into a band or a biome still shows a banner"
 	)
-	check(hud:find('showLines({ "RIFT VEIN", news }', 1, true) ~= nil, "The Rift Vein news lost its banner")
+	check(hud:find('"RIFT VEIN"', 1, true) == nil and hud:find("showLines", 1, true) == nil, "The Rift Vein's banner across the screen is back")
 	local world = fs.readFile(ROOT .. "/src/server/World/OutpostWorld.luau")
 	check(world:find("crossroads", 1, true) == nil and world:find("biome.Label", 1, true) == nil, "The biome signs are back by the roads")
 end

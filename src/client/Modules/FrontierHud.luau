@@ -19,8 +19,8 @@
 	               you're hurt in the Outpost, where you'll mend: HEAL AT
 	               THE SHELTER away from it (AtBase), MENDING while you do
 	               (LobbyMend).
-	  vein news    a banner when a Rift Vein surfaces somewhere new
-	               (workspace's VeinNews, VeinNewsAt), saying which way.
+	  (No banner when a Rift Vein surfaces somewhere new: no big words
+	  across the middle of the screen. Its tear and glow show where.)
 	  sightings    the nearest wild kaiju within Sighting studs, off
 	               screen, gets an arrow at the screen's edge with how far
 	               it is (the vein guardian's in red), so you can find them.
@@ -40,14 +40,12 @@ local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local Outpost = require(ReplicatedStorage.Shared.Outpost)
 
 local FrontierHud = {}
 
-FrontierHud.Hold = 2.6 -- seconds the vein news shows
 FrontierHud.Sighting = 220 -- studs: how far off a wild kaiju gets an arrow
 local WILD = Color3.fromRGB(255, 176, 70)
 
@@ -92,75 +90,6 @@ function FrontierHud.nearest(spots: { Vector3 }, from: Vector3, reach: number): 
 		end
 	end
 	return best, bestDistance
-end
-
-local function banner(player: Player, gui: ScreenGui)
-	local frame = Instance.new("Frame")
-	frame.AnchorPoint = Vector2.new(0.5, 0)
-	frame.Position = UDim2.fromScale(0.5, 0.17)
-	frame.Size = UDim2.fromOffset(460, 58)
-	frame.BackgroundTransparency = 1
-	frame.Visible = false
-	frame.Parent = gui
-	local function label(y: number, height: number, size: number, font: Enum.Font): TextLabel
-		local text = Instance.new("TextLabel")
-		text.BackgroundTransparency = 1
-		text.Position = UDim2.fromOffset(0, y)
-		text.Size = UDim2.new(1, 0, 0, height)
-		text.Font = font
-		text.TextSize = size
-		text.TextColor3 = Color3.new(1, 1, 1)
-		text.TextStrokeColor3 = Color3.new(0, 0, 0)
-		text.TextTransparency = 1
-		text.TextStrokeTransparency = 1
-		text.Parent = frame
-		return text
-	end
-	local title = label(0, 32, 28, Enum.Font.GothamBlack)
-	local subtitle = label(34, 20, 14, Enum.Font.GothamBold)
-	local rule = Instance.new("Frame")
-	rule.AnchorPoint = Vector2.new(0.5, 0)
-	rule.Position = UDim2.new(0.5, 0, 0, 32)
-	rule.Size = UDim2.fromOffset(0, 2)
-	rule.BorderSizePixel = 0
-	rule.BackgroundTransparency = 1
-	rule.Parent = frame
-	local token = 0
-	local function fade(to: number, seconds: number)
-		local info = TweenInfo.new(seconds, Enum.EasingStyle.Quad)
-		for _, text in { title, subtitle } do
-			TweenService:Create(text, info, { TextTransparency = to, TextStrokeTransparency = 0.35 + 0.65 * to }):Play()
-		end
-		TweenService:Create(rule, info, { BackgroundTransparency = to }):Play()
-	end
-	local function showLines(lines, color: Color3)
-		token += 1
-		local mine = token
-		title.Text, subtitle.Text = lines[1], lines[2]
-		title.TextColor3 = color
-		rule.BackgroundColor3 = color
-		rule.Size = UDim2.fromOffset(0, 2)
-		frame.Visible = true
-		fade(0, 0.35)
-		TweenService:Create(rule, TweenInfo.new(0.5, Enum.EasingStyle.Quad), { Size = UDim2.fromOffset(220, 2) }):Play()
-		task.delay(FrontierHud.Hold, function()
-			if mine == token then
-				fade(1, 0.6)
-				task.delay(0.65, function()
-					if mine == token then
-						frame.Visible = false
-					end
-				end)
-			end
-		end)
-	end
-	-- A Rift Vein surfacing somewhere new (while you're in the Outpost).
-	workspace:GetAttributeChangedSignal("VeinNewsAt"):Connect(function()
-		local news = workspace:GetAttribute("VeinNews")
-		if type(news) == "string" and player:GetAttribute("Outpost") == true then
-			showLines({ "RIFT VEIN", news }, Frontier.RiftColor)
-		end
-	end)
 end
 
 -- Out in the biomes, the light turns to theirs (a little each quarter
@@ -507,7 +436,6 @@ function FrontierHud.start()
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 12
 	gui.Parent = player:WaitForChild("PlayerGui")
-	banner(player, gui)
 	biomeLight(player)
 	chargedTag(player, gui)
 	statusTags(player, gui)

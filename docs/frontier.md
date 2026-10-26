@@ -86,8 +86,8 @@ A Rift Vein doesn't stay put:
 - it surfaces at one of 12 places round the walls, never one another vein
   has, and at least 70° round from the other two, so they stay spread out.
   Fresh rocks grow there, and its scar, gate and tear go with it;
-- everyone in the Outpost gets a banner as it surfaces: **RIFT VEIN** "A
-  Rift Vein surfaced to the north-east" (which way, from the middle).
+- no banner as it surfaces (*2026-10-26*: big words across the middle of
+  the screen were too much); its tear and glow show where it went.
 
 So the richest rocks are always somewhere new to head for, and nobody can
 camp them.

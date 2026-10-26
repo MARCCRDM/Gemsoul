@@ -1677,6 +1677,7 @@ return {
 	["🔎 Searching for a {*}…  {=}\n{=} searching in this server"] = "🔎 Buscando partida: {*}…  {=}\n{=} buscando en este servidor",
 	["🔎  SEARCHING {*}  ·  {=}  ·  {=} in queue"] = "🔎  BUSCANDO {*}  ·  {=}  ·  {=} en cola",
 	["SEARCHING {*}"] = "BUSCANDO {*}",
+	["You knocked down {*}"] = "Derribaste a {*}",
 	["{1} in queue"] = "{1} en cola",
 	["Raid squad: you + {1} teammates. Random search fills this server."] = "Escuadrón de incursión: tú + {1} compañeros. La búsqueda aleatoria llena este servidor.",
 	["Searching this server... Full squads deploy automatically."] = "Buscando en este servidor... Los escuadrones completos salen solos.",
