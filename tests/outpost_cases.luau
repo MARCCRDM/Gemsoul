@@ -626,7 +626,21 @@ do
 			texts[d.Text] = (texts[d.Text] or 0) + 1
 		end
 	end
-	check(texts["HALL OF FAME"] == 1 and texts["PVP HALL OF FAME"] == 1 and texts["PVE HALL OF FAME"] == 1, "The halls' titles")
+	check(texts["HALL OF FAME"] == 1 and texts["PLAYER VS PLAYER"] == 1 and texts["PLAYER VS ENVIRONMENT"] == 1, "The halls' titles")
+	-- (A plain results board: one accent, no rounded cards, no rainbow.)
+	local colors, corners = {}, 0
+	for _, d in gui:GetDescendants() do
+		if d:IsA("UICorner") then
+			corners += 1
+		elseif d:IsA("TextLabel") and d.Text ~= "" then
+			colors[d.TextColor3:ToHex()] = true
+		end
+	end
+	local distinct = 0
+	for _ in colors do
+		distinct += 1
+	end
+	check(corners == 0 and distinct <= 3, "The Hall of Fame isn't a plain board (" .. corners .. " rounded corners, " .. distinct .. " text colours)")
 	for _, title in { "1V1 DUELS", "1V1 + KAIJU", "KAIJU BATTLES", "BOUNTY HUNTERS", "TOP MINERS" } do
 		check(texts[title] == 1, "No " .. title .. " column")
 	end

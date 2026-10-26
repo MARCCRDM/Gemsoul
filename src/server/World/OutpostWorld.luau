@@ -1362,9 +1362,9 @@ end
 -- The Hall of Fame (Shared.HallOfFame draws its face: Server.OutpostServer):
 -- a big display on the Shelter's east wall, `at` its foot on the floor,
 -- facing into the hall. A dark steel backing with a gold trim round the
--- face, a cornice over it with lamps lighting it, a pylon either side with
--- a strip in its hall's colour (PvP red on the left as you face it, PvE
--- teal on the right), and a dais in front with the three trophies.
+-- face, a cornice over it with lamps lighting it, a plain steel pylon
+-- either side with a work lamp near its top (no neon: a results board on
+-- a working base, not a sign), and a dais in front with the three trophies.
 local HOF_GOLD = Color3.fromRGB(214, 170, 82)
 local HOF_SILVER = Color3.fromRGB(196, 202, 214)
 local HOF_BRONZE = Color3.fromRGB(176, 112, 64)
@@ -1385,11 +1385,12 @@ local function hallOfFame(parent, at: CFrame)
 	local w, h = 40, 19 -- Shared.HallOfFame.Size
 	local mid = 6 + h / 2
 	part(m, at * CFrame.new(0, mid, 0.5), Vector3.new(w + 3, h + 3, 0.8), HULL_DARK, Enum.Material.Metal)
-	local face = part(m, at * CFrame.new(0, mid, -0.05), Vector3.new(w, h, 0.2), Color3.fromRGB(8, 11, 20), Enum.Material.SmoothPlastic)
+	local face = part(m, at * CFrame.new(0, mid, -0.05), Vector3.new(w, h, 0.2), Color3.fromRGB(19, 19, 21), Enum.Material.SmoothPlastic)
 	face.Name = "BoardFace"
+	-- (Its frame: brushed steel, bolted, not gold.)
 	for _, s in { -1, 1 } do
-		part(m, at * CFrame.new(0, mid + s * (h / 2 + 0.4), -0.12), Vector3.new(w + 1.6, 0.5, 0.3), HOF_GOLD, Enum.Material.Metal)
-		part(m, at * CFrame.new(s * (w / 2 + 0.4), mid, -0.12), Vector3.new(0.5, h + 1.6, 0.3), HOF_GOLD, Enum.Material.Metal)
+		part(m, at * CFrame.new(0, mid + s * (h / 2 + 0.4), -0.12), Vector3.new(w + 1.6, 0.5, 0.3), STEEL, Enum.Material.Metal)
+		part(m, at * CFrame.new(s * (w / 2 + 0.4), mid, -0.12), Vector3.new(0.5, h + 1.6, 0.3), STEEL, Enum.Material.Metal)
 	end
 	-- The cornice, its lamps tipped down at the face.
 	local cornice = part(m, at * CFrame.new(0, mid + h / 2 + 2.4, -1.8), Vector3.new(w + 6, 1.2, 4), HULL_DARK, Enum.Material.Metal)
@@ -1397,12 +1398,13 @@ local function hallOfFame(parent, at: CFrame)
 		local lamp = part(m, cornice.CFrame * CFrame.new(i * 8.4, -0.66, -0.9), Vector3.new(2.6, 0.12, 1), AMBER, Enum.Material.Neon)
 		light(lamp, Color3.fromRGB(255, 232, 200), 26, 1.1, true)
 	end
-	-- The pylons: PvP (left as you face it: local +X), PvE (right).
-	for _, spec in { { 1, Color3.fromRGB(255, 84, 72) }, { -1, Color3.fromRGB(80, 214, 196) } } do
-		local x = spec[1] * (w / 2 + 2.4)
+	-- The pylons: plain steel, each with a caged work lamp near its top.
+	for _, side in { 1, -1 } do
+		local x = side * (w / 2 + 2.4)
 		part(m, at * CFrame.new(x, (mid + h / 2 + 3) / 2, -0.4), Vector3.new(2.4, mid + h / 2 + 3, 1.8), HULL_DARK, Enum.Material.Metal)
-		local strip = part(m, at * CFrame.new(x, (mid + h / 2 + 2) / 2 + 0.5, -1.32), Vector3.new(0.4, mid + h / 2 + 1, 0.06), spec[2], Enum.Material.Neon)
-		light(strip, spec[2], 12, 0.5)
+		local cage = part(m, at * CFrame.new(x, mid + h / 2 - 1, -1.6), Vector3.new(1.2, 1.2, 0.8), STEEL, Enum.Material.Metal)
+		local bulb = part(m, cage.CFrame * CFrame.new(0, 0, -0.42), Vector3.new(0.8, 0.8, 0.1), Color3.fromRGB(255, 226, 180), Enum.Material.Neon)
+		light(bulb, Color3.fromRGB(255, 226, 180), 10, 0.5)
 	end
 	-- The dais, a runner up its middle, and the trophies: gold in the
 	-- middle, silver and bronze either side.

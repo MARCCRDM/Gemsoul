@@ -14,14 +14,22 @@ are stand-ins, not Roblox screenshots.
 
 ![The board, with sample names](hall-of-fame/board.png)
 
+*2026-10-26:* redrawn as a plain results board, like a stadium's: dark,
+one amber accent, square photos, tabular figures and thin rules between
+the columns. Gone: the five rainbow column colours, the rounded neon
+cards, the CHAMPION badges and the gold title rules. The halves are
+**PLAYER VS PLAYER** and **PLAYER VS ENVIRONMENT**, and the wall round it
+is plain steel with two caged work lamps (no red and teal neon pylons).
+The wall picture below is from before this change.
+
 One board, two halves, five columns:
 
 | Half | Column | Counts |
 | --- | --- | --- |
-| **PVP HALL OF FAME** (red) | 1V1 DUELS | ranked 1v1 wins (`Duel.Solo`) |
+| **PLAYER VS PLAYER** | 1V1 DUELS | ranked 1v1 wins (`Duel.Solo`) |
 | | 1V1 + KAIJU | wins in the Kaiju Arena's 1V1 + KAIJU mode (`Stats.MixedWins`; [kaiju-arena.md](kaiju-arena.md#1v1--kaiju)) |
 | | KAIJU BATTLES | Kaiju Arena wins (`Stats.KaijuWins`, counted from this round on) |
-| **PVE HALL OF FAME** (teal) | BOUNTY HUNTERS | Rift bosses slain, every ladder (`RiftBosses`) |
+| **PLAYER VS ENVIRONMENT** | BOUNTY HUNTERS | Rift bosses slain, every ladder (`RiftBosses`) |
 | | TOP MINERS | gems mined in the Outpost (`Stats.GemsMined`, from this round on) |
 
 Each column has its **champion** on top (headshot, name, the number large),
