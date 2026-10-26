@@ -1554,26 +1554,79 @@ Players.LocalPlayer:GetAttributeChangedSignal("Spar"):Connect(function()
 	end
 end)
 
+-- Your search, while you're queued: a slim pill at the top middle, a
+-- pulsing dot, SEARCHING and the mode, the time and who's waiting, and an
+-- X to cancel. Its words change once a second, not every frame.
 local banner = new("TextButton", {
 	AutoButtonColor = false,
 	AnchorPoint = Vector2.new(0.5, 0),
 	BackgroundColor3 = P.Frame,
-	Position = UDim2.new(0.5, 0, 0, 12),
-	Size = UDim2.fromOffset(540, 40),
+	BackgroundTransparency = 0.08,
+	Position = UDim2.new(0.5, 0, 0, 10),
+	Size = UDim2.fromOffset(360, 30),
 	Text = "",
 	Visible = false,
 }, popups)
-UiKit.round(banner, 20)
-new("UIStroke", { Color = P.Gold, Thickness = 1.5 }, banner)
-local bannerText = text(banner, "", 14, P.Gold, BOLD)
+UiKit.round(banner, 15)
+new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = 0.35 }, banner)
+do
+	local dot = new("Frame", {
+		Name = "Dot",
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = P.Gold,
+		Position = UDim2.new(0, 13, 0.5, 0),
+		Size = UDim2.fromOffset(8, 8),
+	}, banner)
+	UiKit.round(dot, 4)
+	-- (Its pulse is a looping tween: nothing to run per frame.)
+	game:GetService("TweenService")
+		:Create(
+			dot,
+			TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+			{ BackgroundTransparency = 0.6 }
+		)
+		:Play()
+end
+local bannerText = text(banner, "", 12, P.Gold, BOLD)
 bannerText.AutomaticSize = Enum.AutomaticSize.None
-bannerText.Position, bannerText.Size = UDim2.fromOffset(18, 0), UDim2.new(1, -120, 1, 0)
+bannerText.Position, bannerText.Size = UDim2.fromOffset(28, 0), UDim2.new(1, -172, 1, 0)
 bannerText.TextYAlignment = Enum.TextYAlignment.Center
-local bannerCancel = chip(banner, "CANCEL", P.Bad, function()
+bannerText.TextTruncate, bannerText.TextWrapped = Enum.TextTruncate.AtEnd, false
+local bannerClock = text(banner, "", 12, P.Text, BOLD)
+bannerClock.AutomaticSize, bannerClock.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Right
+bannerClock.Position, bannerClock.Size = UDim2.new(1, -142, 0, 0), UDim2.new(0, 40, 1, 0)
+bannerClock.TextYAlignment, bannerClock.TextWrapped = Enum.TextYAlignment.Center, false
+bannerClock:SetAttribute("NoTranslate", true)
+local bannerWait = text(banner, "", 11, P.Dim, BOLD)
+bannerWait.AutomaticSize = Enum.AutomaticSize.None
+bannerWait.Position, bannerWait.Size = UDim2.new(1, -96, 0, 0), UDim2.new(0, 64, 1, 0)
+bannerWait.TextXAlignment, bannerWait.TextYAlignment = Enum.TextXAlignment.Right, Enum.TextYAlignment.Center
+bannerWait.TextWrapped = false
+local bannerCancel = new("TextButton", {
+	Name = "Cancel",
+	AutoButtonColor = true,
+	AnchorPoint = Vector2.new(1, 0.5),
+	BackgroundColor3 = P.Bad:Lerp(P.Frame, 0.45),
+	Position = UDim2.new(1, -4, 0.5, 0),
+	Size = UDim2.fromOffset(22, 22),
+	Text = "",
+}, banner)
+UiKit.round(bannerCancel, 11)
+bannerCancel:SetAttribute("UiSound", "Click")
+for _, angle in { 45, -45 } do
+	new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = P.Text,
+		BorderSizePixel = 0,
+		Position = UDim2.fromScale(0.5, 0.5),
+		Rotation = angle,
+		Size = UDim2.fromOffset(10, 2),
+	}, bannerCancel)
+end
+bannerCancel.Activated:Connect(function()
 	run("DuelCancel")
-end, 86)
-bannerCancel.AnchorPoint = Vector2.new(1, 0.5)
-bannerCancel.Position = UDim2.new(1, -8, 0.5, 0)
+end)
+local bannerShown = { Mode = nil, Second = -1, Waiting = -1 } -- (what's on it now)
 banner.Activated:Connect(SocialUI.open)
 
 -- The duel overlay ----------------------------------------------------------------
@@ -1978,14 +2031,25 @@ game:GetService("RunService").RenderStepped:Connect(function()
 	if queued and searchLine and searchLine.Parent then
 		searchLine.Text = searchText()
 	end
-	if queued then
-		local spec = Matchmaking.Modes[queued.Mode]
-		bannerText.Text = string.format(
-			"🔎  SEARCHING %s  ·  %s  ·  %d in queue",
-			string.upper(spec and spec.Name or queued.Mode),
-			clock(now - (queued.Since or now)),
-			queued.Waiting or 1
-		)
+	if banner.Visible then
+		-- (Only what's changed, and only when it has.)
+		if bannerShown.Mode ~= queued.Mode then
+			local spec = Matchmaking.Modes[queued.Mode]
+			bannerShown.Mode = queued.Mode
+			bannerText.Text = "SEARCHING " .. string.upper(spec and spec.Name or queued.Mode)
+		end
+		local second = math.floor(now - (queued.Since or now))
+		if bannerShown.Second ~= second then
+			bannerShown.Second = second
+			bannerClock.Text = clock(second)
+		end
+		local waiting = queued.Waiting or 1
+		if bannerShown.Waiting ~= waiting then
+			bannerShown.Waiting = waiting
+			bannerWait.Text = string.format("%d in queue", waiting)
+		end
+	elseif bannerShown.Mode then
+		bannerShown.Mode, bannerShown.Second, bannerShown.Waiting = nil, -1, -1
 	end
 	-- The window's live bits (queue time, statuses) redraw twice a second.
 	if gui.Enabled and os.clock() >= nextRedraw then

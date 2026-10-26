@@ -1676,6 +1676,8 @@ return {
 	["2v2 Party Duel"] = "Duelo 2v2 en grupo",
 	["🔎 Searching for a {*}…  {=}\n{=} searching in this server"] = "🔎 Buscando partida: {*}…  {=}\n{=} buscando en este servidor",
 	["🔎  SEARCHING {*}  ·  {=}  ·  {=} in queue"] = "🔎  BUSCANDO {*}  ·  {=}  ·  {=} en cola",
+	["SEARCHING {*}"] = "BUSCANDO {*}",
+	["{1} in queue"] = "{1} en cola",
 	["Raid squad: you + {1} teammates. Random search fills this server."] = "Escuadrón de incursión: tú + {1} compañeros. La búsqueda aleatoria llena este servidor.",
 	["Searching this server... Full squads deploy automatically."] = "Buscando en este servidor... Los escuadrones completos salen solos.",
 	["Tell the developer what broke or what you'd love to see. Your report includes the build ({=}) and where you were."] = "Cuéntale al desarrollador qué falló o qué te gustaría ver. Tu reporte incluye la versión ({=}) y dónde estabas.",

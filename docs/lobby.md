@@ -181,9 +181,10 @@ Either way the fight counts as played, the hints come down when it ends
 straight into the **1v1 Casual** queue (`DuelQueue`, "casual"; a few tries,
 since the server says no until they're standing in the lobby again), with
 the toast "You're in the 1v1 queue: keep mining, you'll be called in when a
-match is found." The SEARCHING card (🔎 SEARCHING 1V1 CASUAL · time · how
-many in queue, with CANCEL) stays up at the top while they follow the floor
-arrows and mine. A match found while they're in a mech takes them out of
+match is found." The search pill (a pulsing dot, SEARCHING 1V1 CASUAL,
+the time, how many in queue, and an X to cancel; 360 x 30, its words
+redrawn once a second rather than every frame) stays up at the top while
+they follow the floor arrows and mine. A match found while they're in a mech takes them out of
 it. It happens for anyone straight out of the intro, though the PLAY menu
 still shows Casual locked until 3 duels.
 
