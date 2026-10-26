@@ -4338,6 +4338,35 @@ local function teamFights()
 			check(pet.Model:GetAttribute("BeamLeapAt") == nil and pet.Model:GetAttribute("KaijuMood") ~= "Roar", "A HYPERBEAM's leap or roar left on a kaiju")
 		end
 		check(a:GetAttribute("KaijuBeamAt") == nil, "The HUD thinks it's still firing")
+		-- A boss in the fight (a dungeon's or the Rift's): the beam faces it
+		-- (off to your side), holds on it alone and hits nothing else, not
+		-- even an add right in front of you.
+		do
+			reset()
+			rootA.CFrame = CFrame.new(spot)
+			roster.BeamCharge = rules.Max
+			local boss = bugAt(spot + Vector3.new(35, 0, 10));
+			(boss :: any).Duel = { Dungeon = { Boss = true } }
+			boss.Humanoid.MaxHealth, boss.Humanoid.Health = 5000, 5000
+			local add = bugAt(spot + Vector3.new(0, 0, 25))
+			local addWhole = add.Humanoid.Health
+			table.clear(fxs)
+			local bossStart = start + at.Done + 5
+			check(Beam._fire(a, { X = 0, Z = 1 }, bossStart).Ok, "No HYPERBEAM at the boss")
+			local shownBoss = (drew("KaijuBeam") or {})[2] or {}
+			check(#(shownBoss.Targets or {}) == 1 and shownBoss.Targets[1] == boss.Root, "The beam took more than the boss")
+			local bossCast = Beam._casts[a]
+			local toBoss = ((boss.Root.Position - spot) * Vector3.new(1, 0, 1)).Unit
+			check(bossCast.Forward:Dot(toBoss) > 0.99, "The team doesn't face the boss")
+			local t2 = at.Fire + 0.01
+			while t2 < at.Stop do
+				Beam._step(bossStart + t2)
+				t2 += 0.05
+			end
+			check(boss.Humanoid.Health < 5000, "The boss wasn't hit")
+			check(add.Humanoid.Health == addWhole, "An add took the boss's HYPERBEAM")
+			Beam._step(bossStart + at.Done + 0.1)
+		end
 		print("  your HYPERBEAM: one charge of its own, long, blows (moves free), SAVE CHARGE, full to fire, leaping into formation in front of you one by one, the roar, the biggest threat first then the rest, up in the air, everything about cowed, everything in the fight blasted, the beam's reach, let go after")
 	end)()
 

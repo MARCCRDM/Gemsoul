@@ -24,9 +24,12 @@
 	the kill is yours and their colours come up by turns); then a beat to
 	recover and they're back to themselves. It takes the creatures in reach
 	and the ones in a fight with you or your team (Engaged), the biggest
-	threat first (KaijuBeam.order), holds on it, then swings onto the rest
-	in turn (KaijuBeam.direction: each pulse hits along where it's turned
-	then); with nothing in front of you it fires straight ahead. They
+	threat first (KaijuBeam.order), holds on it, then sweeps across the
+	rest in one pass, as many as it can reach (KaijuBeam.direction: each
+	pulse hits along where it's turned then); with nothing in front of you
+	it fires straight ahead. A dungeon's or the Rift's boss in the fight:
+	the team turns to face it and the beam holds on it alone, the whole
+	blast, and nothing else is hit. They
 	can't be hurt from their leap till they're let go (KaijuServer.hurt). Not
 	in a kaiju battle, nor with the team put away. Everyone near sees it
 	(CombatFx "KaijuBeam", with its Targets in turn), from their own view:
@@ -145,6 +148,13 @@ end
 
 -- Its world spot in the formation (`spot`: KaijuBeam.formation's), from
 -- `origin` facing `forward`.
+-- A dungeon's or the Rift's boss (its encounter says so: Duelist).
+local function isBoss(enemy): boolean
+	local duel = enemy and (enemy :: any).Duel
+	return type(duel) == "table" and type(duel.Dungeon) == "table" and duel.Dungeon.Boss == true
+end
+KaijuBeamServer._isBoss = isBoss
+
 local function placeOf(origin: Vector3, forward: Vector3, spot): Vector3
 	local right = forward:Cross(UP)
 	local at = origin + right * spot.Side - forward * spot.Back
@@ -176,8 +186,10 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	end
 	-- Where: always in front of you, along your aim (else where you face).
 	-- What: the creatures in reach and the ones in a fight with you or your
-	-- team, the biggest threat first, then round the rest (KaijuBeam.order);
-	-- none in front of you, it fires straight ahead.
+	-- team, the biggest threat first, then the rest in one sweep, as many as
+	-- it can reach (KaijuBeam.order); none in front of you, it fires straight
+	-- ahead. A boss in the fight: it turns to face it, and the boss alone
+	-- takes the blast.
 	local dx, dz = 0, 0
 	if type(aim) == "table" then
 		dx, dz = tonumber(aim.X) or 0, tonumber(aim.Z) or 0
@@ -226,6 +238,7 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 			Health = humanoid and humanoid.Health,
 			MaxHealth = humanoid and humanoid.MaxHealth,
 			Engaged = fighting or inFight(enemy),
+			Boss = isBoss(enemy),
 		})
 	end
 	for _, foe in KaijuServer.creaturesNear(origin, b.Reach, player) do
@@ -233,8 +246,8 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	end
 	-- (In a fight with your team further off, up to the beam's length.)
 	for _, foe in KaijuServer.creaturesNear(origin, b.Length, player) do
-		if inFight(foe.Enemy) then
-			take(foe, true)
+		if inFight(foe.Enemy) or isBoss(foe.Enemy) then
+			take(foe, inFight(foe.Enemy))
 		end
 	end
 	-- All of them back off from you, cowed, till it fires (KaijuWilds'
@@ -253,6 +266,16 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	for _, index in order do
 		local foe = candidates[index]
 		table.insert(targets, { Root = foe.Root, At = foe.Root.Position })
+	end
+	-- The boss: faced (the formation too), held on, and it alone is hit.
+	local boss = order[1] and foes[order[1]].Boss and candidates[order[1]].Enemy or nil
+	if boss then
+		local offset = boss.Root.Position - origin
+		if offset.X * offset.X + offset.Z * offset.Z > 1e-4 then
+			local flat = math.sqrt(offset.X * offset.X + offset.Z * offset.Z)
+			dx, dz = offset.X / flat, offset.Z / flat
+		end
+		marked = {}
 	end
 	local forward = Vector3.new(dx, 0, dz)
 	local ahead, high = KaijuBeam.focus()
@@ -278,6 +301,7 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 		Focus = focus,
 		Targets = targets,
 		Marked = marked,
+		Boss = boss,
 		Pulses = 0,
 		Charged = false,
 		Damage = 0,
@@ -403,6 +427,14 @@ local function pulse(cast, p: number)
 	end
 	cast.Pulses += 1
 	local dealer = units[(cast.Pulses - 1) % #units + 1].Pet
+	-- A boss's blast: the boss alone, every pulse, while it's in reach.
+	local boss = cast.Boss
+	if boss then
+		if boss.Alive and boss.Root.Parent and (boss.Root.Position - cast.Origin).Magnitude <= b.Length + b.Width then
+			KaijuServer.strike(dealer, boss, cast.Damage, nil, true)
+		end
+		return
+	end
 	local focus = cast.Focus
 	local forward = aimed(cast, p)
 	local middle = focus + forward * (b.Length / 2)

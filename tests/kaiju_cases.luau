@@ -1090,6 +1090,32 @@ do
 		table.insert(crowd, { X = i, Z = -20, MaxHealth = 50 })
 	end
 	check(#Beam.order(crowd, 0, -1) == Beam.Beam.Most, "It takes more than Most")
+	-- A boss in the fight: it alone, wherever it is (even behind you).
+	local withBoss = table.clone(foes)
+	table.insert(withBoss, { X = 10, Z = 35, MaxHealth = 800, Boss = true })
+	local bossOrder = Beam.order(withBoss, 0, -1)
+	check(#bossOrder == 1 and bossOrder[1] == #withBoss, "With a boss in the fight, it took more than the boss")
+	-- A crowd spread across in front: one sweep (out to the nearer side's
+	-- last, then back across), every one of them, never back and forth.
+	local spread = {}
+	for i, deg in { 0, -50, 40, -20, 70, 15, -65, 30 } do
+		local r = math.rad(deg)
+		table.insert(spread, { X = math.sin(r) * 30, Z = -math.cos(r) * 30, MaxHealth = if i == 1 then 500 else 50 })
+	end
+	local swept = Beam.order(spread, 0, -1)
+	check(#swept == #spread and swept[1] == 1, "Not every one in the crowd taken, the biggest first")
+	local turns, last = 0, nil
+	for k = 2, #swept do
+		local a = math.atan2(spread[swept[k]].X, -spread[swept[k]].Z) - math.atan2(spread[swept[k - 1]].X, -spread[swept[k - 1]].Z)
+		local sign = if a > 0 then 1 else -1
+		if last and sign ~= last then
+			turns += 1
+		end
+		last = sign
+	end
+	check(turns <= 1, "The sweep goes back and forth over the crowd: " .. turns .. " turns")
+	-- Held on the first less with many, so there's time for them all.
+	check(Beam.dwell(1) == 1 and Beam.dwell(3) == Beam.Beam.Dwell and Beam.dwell(12) < Beam.Beam.Dwell / 3, "Beam.dwell")
 	-- The sweep: held on the first for Dwell, then each in turn, eased.
 	check(select(1, Beam.sweep(0.2, 3)) == 1 and select(3, Beam.sweep(0.2, 3)) == 0, "Not held on the first")
 	local i, j, blend = Beam.sweep(Beam.Beam.Dwell + 0.001, 3)

@@ -12,10 +12,12 @@
 	every creature in it, and every one in a fight with you or your team
 	wherever it is, Pulses pulses over Fire seconds. It aims at the
 	biggest threat first (threat: the toughest, and the ones already in a
-	fight with you, bigger still), holds on it for Dwell of the blast, then
-	swings smoothly onto each of the others in reach or in a fight with
-	your team in turn (order, sweep, direction), never more than Swing off
-	your aim. Pure rules (numbers and plain vectors), shared so the client
+	fight with you, bigger still), holds on it for a share of the blast
+	(dwell: less the more there are), then sweeps smoothly across the others
+	in reach or in a fight with your team, in one pass, as many as it can
+	reach (order, sweep, direction), never more than Swing off your aim.
+	A boss in the fight (a dungeon's or the Rift's): the beam turns to
+	face it and holds on it alone, the whole blast. Pure rules (numbers and plain vectors), shared so the client
 	shows what the server does. Into formation they leap, one after
 	another, and roar together once they're all down (Leap).
 
@@ -62,9 +64,12 @@
 	  KaijuBeam.threat(foe) -> number                  how big a threat
 	                                                   { Health, Engaged } is
 	  KaijuBeam.order(foes, dx, dz) -> { index }       what the beam takes in
-	                                                   turn: the biggest
-	                                                   threat, then round
-	                                                   the rest (Most of them)
+	                                                   turn: a boss alone;
+	                                                   else the biggest
+	                                                   threat, then the rest
+	                                                   in one sweep (Most)
+	  KaijuBeam.dwell(n) -> share                      how long it holds on
+	                                                   the first of `n`
 	  KaijuBeam.sweep(p, n) -> i, j, blend             `p` of the way through
 	                                                   the blast over `n`:
 	                                                   from the `i`th onto
@@ -96,14 +101,14 @@ KaijuBeam.Beam = {
 	Recover = 0.5,
 	Length = 90,
 	Width = 10,
-	Pulses = 13,
+	Pulses = 26, -- (a tenth of a second apart: one it sweeps past is never skipped)
 	Power = 7, -- the team's Damage, added up, times this over the whole beam
 	Reach = 60, -- creatures this near are taken (and count for the aim assist)
 	Assist = math.rad(35), -- this far off your aim, it turns onto them
 	Focus = 16, -- the focus this far ahead of you
 	FocusUp = 6, -- and this high (level with the team, up in the air)
-	Most = 5, -- creatures it swings onto, the biggest threat first
-	Dwell = 0.4, -- the share of the blast it holds on the biggest threat
+	Most = 12, -- creatures it swings onto, the biggest threat first
+	Dwell = 0.4, -- the share of the blast it holds on the biggest threat (less with many: dwell)
 	Turn = 0.4, -- the share of each swing after that spent turning (the rest held)
 	Swing = math.rad(80), -- never further than this off your aim
 	Engaged = 1.5, -- a creature in a fight with you or your team: this much more a threat
@@ -267,11 +272,24 @@ local function between(a: number, b: number): number
 end
 
 -- What the beam takes, in turn (`foes`: each { X, Z, Health?, MaxHealth?,
--- Engaged? }, its offset from you): the biggest threat first, then from
--- each the nearest round from it, up to Most of them, never one further
--- than Swing off your aim (dx, dz). Indices into `foes`.
+-- Engaged?, Boss? }, its offset from you). A boss among them (a dungeon's
+-- or the Rift's): that boss alone, wherever it is (the biggest, if there
+-- were two), and the beam turns to face it. Otherwise the biggest threat
+-- first, then the rest in one sweep, as many as it can reach: out to the
+-- nearer side's last, then back across to the far side's, up to Most of
+-- them, never one further than Swing off your aim (dx, dz). Indices into
+-- `foes`.
 function KaijuBeam.order(foes: { any }, dx: number, dz: number): { number }
 	local b = KaijuBeam.Beam
+	local boss, bossThreat = nil, -math.huge
+	for i, foe in foes do
+		if foe.Boss and KaijuBeam.threat(foe) > bossThreat then
+			boss, bossThreat = i, KaijuBeam.threat(foe)
+		end
+	end
+	if boss then
+		return { boss }
+	end
 	local aim = heading(dx, dz)
 	local left = {}
 	for i, foe in foes do
@@ -291,33 +309,58 @@ function KaijuBeam.order(foes: { any }, dx: number, dz: number): { number }
 			best, bestAt = threat, at
 		end
 	end
-	table.insert(order, table.remove(left, bestAt))
-	while #left > 0 and #order < b.Most do
-		local last = foes[order[#order]]
-		local from = heading(last.X, last.Z)
-		local near, nearAt = math.huge, 1
-		for at, i in left do
-			local off = math.abs(between(from, heading(foes[i].X, foes[i].Z)))
-			if off < near then
-				near, nearAt = off, at
+	local first = table.remove(left, bestAt)
+	table.insert(order, first)
+	-- (Each side of the first, nearest it first; the side that's quicker
+	-- to sweep out and back taken first, so it crosses the rest once.)
+	local from = heading(foes[first].X, foes[first].Z)
+	local sides = { {}, {} }
+	local offs = {}
+	for _, i in left do
+		offs[i] = between(from, heading(foes[i].X, foes[i].Z))
+		table.insert(sides[if offs[i] >= 0 then 1 else 2], i)
+	end
+	local span = {}
+	for n, side in sides do
+		table.sort(side, function(x, y)
+			return math.abs(offs[x]) < math.abs(offs[y])
+		end)
+		span[n] = if #side > 0 then math.abs(offs[side[#side]]) else 0
+	end
+	local near = if span[1] <= span[2] then 1 else 2
+	for _, n in { near, 3 - near } do
+		for _, i in sides[n] do
+			if #order >= b.Most then
+				return order
 			end
+			table.insert(order, i)
 		end
-		table.insert(order, table.remove(left, nearAt))
 	end
 	return order
 end
 
+-- The share of the blast it holds on the first of `n` taken: Dwell, less
+-- when there are many, so the sweep has time for them all; all of it for
+-- one alone.
+function KaijuBeam.dwell(n: number): number
+	if n <= 1 then
+		return 1
+	end
+	return KaijuBeam.Beam.Dwell * math.min(1, 3 / n)
+end
+
 -- `p` (0..1) of the way through the blast, over `n` taken in turn: from
 -- the `i`th onto the `j`th, `blend` (eased) of the way. It holds on the
--- first for Dwell of it, then shares the rest out, each swing turning for
+-- first for its dwell, then shares the rest out, each swing turning for
 -- Turn of its share and holding on the next for the rest.
 function KaijuBeam.sweep(p: number, n: number): (number, number, number)
 	local b = KaijuBeam.Beam
-	if n <= 1 or p <= b.Dwell then
+	local dwell = KaijuBeam.dwell(n)
+	if n <= 1 or p <= dwell then
 		return 1, 1, 0
 	end
 	local legs = n - 1
-	local s = math.clamp((p - b.Dwell) / (1 - b.Dwell), 0, 1) * legs
+	local s = math.clamp((p - dwell) / (1 - dwell), 0, 1) * legs
 	local leg = math.min(legs, math.floor(s) + 1)
 	local turn = math.clamp((s - (leg - 1)) / b.Turn, 0, 1)
 	return leg, leg + 1, turn * turn * (3 - 2 * turn)

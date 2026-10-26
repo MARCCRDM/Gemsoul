@@ -666,12 +666,18 @@ blast together. It works the same in mining and in fights.
      light at the focus, a blaze at the far end and rock thrown up along
      it. **The biggest threat first** (`KaijuBeam.threat`: the toughest,
      and one already in a fight with you or your team counts 1.5 times):
-     it holds on that one for the first 40% of the blast, then swings
-     smoothly onto each of the rest in turn, nearest round first
-     (`KaijuBeam.order`, `sweep`, `direction`; up to 5). It takes the
-     creatures within 60 studs and any your team is fighting (up to the
-     beam's length), never one more than 80° off your aim; with none in
-     front of you it fires straight ahead. It lands 13 pulses, each on
+     it holds on that one for a share of the blast (40% with up to three
+     about, less the more there are: `KaijuBeam.dwell`), then **sweeps
+     across the rest in one pass, as many as it can reach**: out to the
+     nearer side's last one, then back across to the far side's, never back
+     and forth (`KaijuBeam.order`, `sweep`, `direction`; up to 12). It
+     takes the creatures within 60 studs and any your team is fighting (up
+     to the beam's length), never one more than 80° off your aim; with none
+     in front of you it fires straight ahead. **A boss in the fight** (a
+     dungeon's or the Rift's): the team turns to face it, wherever it is,
+     and the beam holds on it alone the whole blast; nothing else is hit,
+     every pulse goes into the boss. It lands 26 pulses (a tenth of a
+     second apart, so nothing it sweeps past is skipped), each on
      every creature in the beam where it's turned then **and on every one
      in a fight with you or your team, wherever it is** (*2026-10-26*:
      one your team's on, one after you or one of them, a wild kaiju you
