@@ -154,4 +154,41 @@ local swap = CacheLottery.gemView({ Id = "swap", Element = "Frost", Tier = "Rare
 win.still(swap)
 check(middle(win) == swap and view.Destroyed, "Swapping the still piece should replace the old one")
 frame:Destroy()
-print("PASS: " .. checks .. " cache lottery checks; all reels at once, staggered landings (gems first), exact outcomes, no doubled pictures, skip, previews wait, close, still pieces")
+
+-- 6. A reward piece's card spells out everything it carries (gearDetails):
+-- every stat it rolled, its set (what wearing 2+ of its family gives, not
+-- the bare "Armor Identity"), each affix in full; a weapon its perk.
+do
+	local piece = "ArmorJuggernautArmor4"
+	check(ArmorFamilies.ById[piece] ~= nil, "No Ultra-Rare Juggernaut chest to test with")
+	local a, b = GemConfig.Affixes[1], GemConfig.Affixes[6]
+	local lines = CacheLottery.gearDetails({
+		Kind = "Gear",
+		Slot = "Armor",
+		Id = piece,
+		Roll = {
+			Stats = { Health = 60, Defense = 3, Critical = 0.015 },
+			Affixes = { { Id = a.Id, Bonus = 0.12 }, { Id = b.Id, Bonus = 0.14 } },
+		},
+	})
+	local kinds, all = {}, {}
+	for _, line in lines do
+		kinds[line.Kind] = (kinds[line.Kind] or 0) + 1
+		table.insert(all, line.Text)
+		check(not line.Text:find("Armor Identity", 1, true), "A reward card still says Armor Identity")
+	end
+	local text = table.concat(all, "\n")
+	check(lines[1].Kind == "Stats", "A reward card's stats aren't first")
+	for _, want in { "+60 Health", "+3 Defense", "+1.5% Critical" } do
+		check(lines[1].Text:find(want, 1, true) ~= nil, "A reward card leaves out a stat: " .. want .. " in " .. lines[1].Text)
+	end
+	check(kinds.Set == 1 and text:find("Juggernaut set", 1, true) and text:find("2+", 1, true)
+		and text:find("Heavy +25% damage", 1, true) and text:find("+15 Health", 1, true), "A reward card doesn't say what its set gives: " .. text)
+	check(kinds.Affix == 2, "A reward card doesn't list each affix")
+	check(text:find(GemConfig.affixText(a.Id, 0.12), 1, true) and text:find(GemConfig.affixText(b.Id, 0.14), 1, true),
+		"A reward card's affixes aren't spelled out in full")
+	local sword = CacheLottery.gearDetails({ Kind = "Gear", Slot = "Weapon", Id = "TestSword", Roll = { Stats = { Power = 9 } } })
+	check(sword[1].Text == "+9 Power" and sword[2] and sword[2].Kind == "Perk" and sword[2].Text:find("Bulwark", 1, true),
+		"A weapon's card doesn't show its stats and perk")
+end
+print("PASS: " .. checks .. " cache lottery checks; all reels at once, staggered landings (gems first), exact outcomes, no doubled pictures, skip, previews wait, close, still pieces, every property on a card")

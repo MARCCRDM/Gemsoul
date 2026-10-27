@@ -8,9 +8,10 @@
 	screen. It opens the cache, every piece on a card in its rarity's colour
 	(Rare or Ultra-Rare), drawn in 3D:
 	  - the gems, free: all yours (marked YOURS);
-	  - six pieces of gear, with their stat rolls, passive and affixes: tap
-	    three to keep, CLAIM. The other three go to the Market from the Arena
-	    Vault, and you get 25% of each sale; the screen says so.
+	  - the pieces of gear, each card listing everything it carries (every
+	    stat, its set or perk, its signature, every affix in full: see
+	    `card`): tap the ones to keep, CLAIM. The rest go to the Market from
+	    the Arena Vault, and you get 25% of each sale; the screen says so.
 	A cache unlocking opens the screen straight away.
 
 	The first time a cache opens, its lottery plays first (CacheLottery,
@@ -26,6 +27,7 @@
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 
 local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
 local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
@@ -141,21 +143,54 @@ end
 -- Rolling (`lot`), the reel spins with the rest of the grid; the card shows
 -- what rolls past and fills in on landing. Gear whose 3D preview isn't
 -- built yet shows its silhouette until Upgrade draws it.
-local gearLines = CacheLottery.gearLines
-
-local GEAR_H, GEM_H = 272, 226 -- (card heights)
+local GEAR_H, GEM_H = 272, 226 -- (card heights: a gear card's least)
 local WINDOW = 104 -- (px: the reel's round window)
 local OFF = Color3.fromRGB(38, 46, 62) -- (an unlit bar segment)
 
-local function card(parent, entry, onToggle, cacheId: string, lot)
+-- A gear card spells out everything the piece carries (CacheLottery.
+-- gearDetails): every stat, its set or perk, its signature, every affix
+-- with its bonus. One or two pieces (a 1v1 win's reward) get wide cards:
+-- the picture, name and quality on the left, the list beside them, so the
+-- board stays short enough to read on a phone. More pieces get upright
+-- cards as wide as the row allows, the list under the quality bar. Either
+-- way the cards are as tall as the row's longest list.
+local DETAIL_TOP, DETAIL_SIZE, DETAIL_GAP = 210, 11, 4
+local GEAR_W = { 150, 236 } -- (px: an upright gear card's least and most width)
+local WIDE_W, FACE_W = 420, 150 -- (px: a wide card, and its left column)
+local function detailWidth(w: number): number
+	return if w >= WIDE_W then w - FACE_W - 16 else w - 20
+end
+local function wrapped(text: string, width: number): number
+	local ok, bounds = pcall(function()
+		return TextService:GetTextSize(text, DETAIL_SIZE, Enum.Font.GothamBold, Vector2.new(width, 10000))
+	end)
+	if ok and typeof(bounds) == "Vector2" and bounds.Y > 0 then
+		return math.ceil(bounds.Y)
+	end
+	-- (no TextService: a fair guess at Gotham's width)
+	local chars = utf8.len(text) or #text
+	return math.max(1, math.ceil(chars * DETAIL_SIZE * 0.58 / width)) * (DETAIL_SIZE + 3)
+end
+local function detailsHeight(lines, width: number): number
+	local h = 0
+	for i, line in lines do
+		h += wrapped(line.Text, width) + (if i > 1 then DETAIL_GAP else 0)
+	end
+	return h
+end
+
+local function card(parent, entry, onToggle, cacheId: string, lot, width: number?, height: number?)
 	local item = entry.Item
 	local free = entry.Free == true
 	local isGem = item.Kind == "Gem"
 	local tier = entry.Rarity or (item.Gem and item.Gem.Tier) or "Rare"
+	local w = width or 150
+	local wide = not isGem and w >= WIDE_W
+	local colW = if wide then FACE_W else w
 	-- The row lays out a plain cell; the card sits centred in it.
 	local cell = new(
 		"Frame",
-		{ BackgroundTransparency = 1, Size = UDim2.fromOffset(150, if isGem then GEM_H else GEAR_H) },
+		{ BackgroundTransparency = 1, Size = UDim2.fromOffset(w, height or (if isGem then GEM_H else GEAR_H)) },
 		parent
 	)
 	local b = new("TextButton", {
@@ -170,7 +205,18 @@ local function card(parent, entry, onToggle, cacheId: string, lot)
 	UiKit.round(b, 12)
 	-- (Border mode: on a TextButton the stroke would otherwise trace its text.)
 	local edge = new("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, b)
-	local ribbon = label(b, "", 10, INK, Enum.Font.GothamBlack)
+	-- (wide: the picture, name and quality in a column on the left)
+	local face = b
+	if wide then
+		face = new("Frame", { Name = "Face", BackgroundTransparency = 1, Size = UDim2.new(0, colW, 1, 0) }, b)
+		new("Frame", {
+			BackgroundColor3 = OFF,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, colW, 0, 12),
+			Size = UDim2.new(0, 1, 1, -24),
+		}, b)
+	end
+	local ribbon = label(face, "", 10, INK, Enum.Font.GothamBlack)
 	ribbon.BackgroundTransparency = 0
 	ribbon.Position, ribbon.Size = UDim2.fromOffset(8, 8), UDim2.new(1, -16, 0, 18)
 	UiKit.round(ribbon, 6)
@@ -179,32 +225,32 @@ local function card(parent, entry, onToggle, cacheId: string, lot)
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 32),
 		Size = UDim2.fromOffset(WINDOW, WINDOW),
-	}, b)
+	}, face)
 	local window = CacheLottery.window(art)
-	local tick = label(b, if free then "YOURS" else "KEEP", 12, INK, Enum.Font.GothamBlack)
+	local tick = label(face, if free then "YOURS" else "KEEP", 12, INK, Enum.Font.GothamBlack)
 	tick.BackgroundColor3, tick.BackgroundTransparency = if free then Color3.fromRGB(110, 220, 140) else GOLD, 0
 	tick.AnchorPoint = Vector2.new(0.5, 0)
 	tick.Position, tick.Size = UDim2.new(0.5, 0, 0, 124), UDim2.fromOffset(64, 20)
 	tick.ZIndex = 4
 	tick.Visible = false
 	UiKit.round(tick, 6)
-	local name = label(b, "", 13, TEXT, Enum.Font.GothamBlack)
+	local name = label(face, "", 13, TEXT, Enum.Font.GothamBlack)
 	name.Position, name.Size = UDim2.fromOffset(8, 148), UDim2.new(1, -16, 0, 30)
 
 	-- Bars: rows of segments under the name.
 	local bars = {}
 	local function bar(key, caption, y, count, width, gap)
-		local text = label(b, caption, 9, DIM, Enum.Font.GothamBold)
+		local text = label(face, caption, 9, DIM, Enum.Font.GothamBold)
 		text.TextXAlignment = Enum.TextXAlignment.Left
 		text.Position, text.Size = UDim2.fromOffset(10, y - 2), UDim2.fromOffset(42, 12)
 		local segments = {}
-		local x = 150 - 10 - count * width - (count - 1) * gap
+		local x = colW - 10 - count * width - (count - 1) * gap
 		for i = 1, count do
 			local segment = new("Frame", {
 				BackgroundColor3 = OFF,
 				Position = UDim2.fromOffset(x + (i - 1) * (width + gap), y),
 				Size = UDim2.fromOffset(width, 8),
-			}, b)
+			}, face)
 			UiKit.round(segment, 2)
 			segments[i] = segment
 		end
@@ -221,21 +267,28 @@ local function card(parent, entry, onToggle, cacheId: string, lot)
 			segment.BackgroundColor3 = if i <= amount then color else OFF
 		end
 	end
-	local sub, statLine, passiveLine, affixLine
+	local sub, details, pending
 	if isGem then
 		bar("Size", "SIZE", 184, 10, 7, 2)
 		bar("Clarity", "CLARITY", 198, 10, 7, 2)
 		bar("Cut", "CUT", 212, 10, 7, 2)
 	else
-		sub = label(b, "", 10, DIM, Enum.Font.GothamBold)
+		sub = label(face, "", 10, DIM, Enum.Font.GothamBold)
 		sub.Position, sub.Size = UDim2.fromOffset(8, 178), UDim2.new(1, -16, 0, 12)
 		bar("Quality", "QUALITY", 196, 4, 19, 3)
-		statLine = label(b, "", 11, Color3.fromRGB(120, 230, 150), Enum.Font.GothamBold)
-		statLine.Position, statLine.Size = UDim2.fromOffset(8, 210), UDim2.new(1, -16, 0, 26)
-		passiveLine = label(b, "", 10, GOLD, Enum.Font.GothamBold)
-		passiveLine.Position, passiveLine.Size = UDim2.fromOffset(8, 238), UDim2.new(1, -16, 0, 13)
-		affixLine = label(b, "", 10, Color3.fromRGB(140, 200, 255), Enum.Font.GothamBold)
-		affixLine.Position, affixLine.Size = UDim2.fromOffset(8, 253), UDim2.new(1, -16, 0, 13)
+		-- Everything it carries, a line each (filled in by showReal).
+		local at = if wide then Vector2.new(colW + 8, 12) else Vector2.new(10, DETAIL_TOP)
+		details = new("Frame", {
+			Name = "Details",
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(at.X, at.Y),
+			Size = UDim2.new(0, detailWidth(w), 1, -at.Y - 8),
+			Visible = false,
+		}, b)
+		new("UIListLayout", { Padding = UDim.new(0, DETAIL_GAP), SortOrder = Enum.SortOrder.LayoutOrder }, details)
+		pending = label(b, "· · ·", 11, DIM, Enum.Font.GothamBold)
+		pending.Position, pending.Size = UDim2.fromOffset(at.X, at.Y), UDim2.fromOffset(detailWidth(w), 14)
+		pending.Visible = false
 	end
 
 	-- The card's colours for a rarity.
@@ -288,12 +341,18 @@ local function card(parent, entry, onToggle, cacheId: string, lot)
 		end
 		if not isGem then
 			sub.Text = string.upper((Slots.Definitions[item.Slot] or {}).Label or item.Slot or "Gear")
-			local stats, passive, affixes = gearLines(item)
-			statLine.Text = if stats ~= "" then stats else "Base stats"
-			passiveLine.Text = if passive then "◆ " .. passive else ""
-			affixLine.Text = if affixes > 0
-				then string.format("%d elemental affix%s", affixes, if affixes == 1 then "" else "es")
-				else ""
+			pending.Visible = false
+			details:ClearAllChildren()
+			new("UIListLayout", { Padding = UDim.new(0, DETAIL_GAP), SortOrder = Enum.SortOrder.LayoutOrder }, details)
+			for i, line in CacheLottery.gearDetails(item) do
+				local row = label(details, line.Text, DETAIL_SIZE, line.Color, Enum.Font.GothamBold)
+				row.Name = line.Kind
+				row.LayoutOrder = i
+				row.TextXAlignment = Enum.TextXAlignment.Left
+				row.TextYAlignment = Enum.TextYAlignment.Top
+				row.Size = UDim2.new(1, 0, 0, wrapped(line.Text, detailWidth(w)))
+			end
+			details.Visible = true
 		end
 		if free then
 			tick.Visible = true -- (yours, whatever you pick)
@@ -319,7 +378,7 @@ local function card(parent, entry, onToggle, cacheId: string, lot)
 				else
 					sub.Text = string.upper(option.Label or "")
 					showBar("Quality", option.Quality or 1, dim)
-					statLine.Text, passiveLine.Text, affixLine.Text = "· · ·", "", ""
+					details.Visible, pending.Visible = false, true
 				end
 			end,
 			Land = function(own)
@@ -458,11 +517,21 @@ function StreakRewards.open(id: string?)
 			table.insert(if entry.Free then gemEntries else gearEntries, entry)
 		end
 		picks = math.min(picks, #gearEntries)
-		local width = math.max(880, #gearEntries * 150 + (#gearEntries - 1) * 12 + 20)
+		-- Gear cards: wide for one or two pieces, else upright and as wide
+		-- as the row allows; as tall as the longest list of what one carries.
+		local gearW = if #gearEntries <= 2
+			then WIDE_W
+			else math.clamp(math.floor((860 - (#gearEntries - 1) * 12) / #gearEntries), GEAR_W[1], GEAR_W[2])
+		local gearH = GEAR_H
+		for _, entry in gearEntries do
+			local list = detailsHeight(CacheLottery.gearDetails(entry.Item), detailWidth(gearW))
+			gearH = math.max(gearH, if gearW >= WIDE_W then 12 + list + 12 else DETAIL_TOP + list + 12)
+		end
+		local width = math.max(880, #gearEntries * gearW + (#gearEntries - 1) * 12 + 20)
 		local gemTop = 112
 		local gearLabelAt = if #gemEntries > 0 then gemTop + GEM_H + 16 else 92
 		local gearTop = gearLabelAt + 22
-		local claimAt = gearTop + GEAR_H + 20
+		local claimAt = gearTop + gearH + 20
 		local height = claimAt + 52
 		local board = new("Frame", {
 			BackgroundTransparency = 1,
@@ -588,7 +657,7 @@ function StreakRewards.open(id: string?)
 			gearLabelAt,
 			GOLD
 		)
-		gearRow = row(gearTop, GEAR_H)
+		gearRow = row(gearTop, gearH)
 
 		local claim
 		local skip = false
@@ -640,7 +709,7 @@ function StreakRewards.open(id: string?)
 			table.insert(drawn, cards[entry.OfferId])
 		end
 		for _, entry in gearEntries do
-			cards[entry.OfferId] = card(gearRow, entry, toggle, cache.Id, lot)
+			cards[entry.OfferId] = card(gearRow, entry, toggle, cache.Id, lot, gearW, gearH)
 			table.insert(drawn, cards[entry.OfferId])
 		end
 		if previewsIn then

@@ -18,11 +18,15 @@
 	    lot.run(live, skipped)                 yields until all have landed
 	    lot.destroy()
 	  CacheLottery.gearLines(item) -> stats, passive?, affixes
+	  CacheLottery.gearDetails(item) -> { { Text, Color, Kind } }
+	                                         everything it carries, spelled out
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
+local ArmorSignatures = require(ReplicatedStorage.Shared.ArmorSignatures)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
@@ -70,6 +74,94 @@ function CacheLottery.gearLines(item)
 		affixes += 1
 	end
 	return table.concat(stats, "  ·  "), passive, affixes
+end
+
+-- Everything a piece of gear carries, a line each, as the inventory spells
+-- it out: every stat it rolled; an armor piece's set (its family, and what
+-- two or more of it worn give you: the old "Armor Identity" line only said
+-- "wear matching pieces"), or a weapon's perk; its signature; each
+-- elemental affix with its bonus, in its element's colour.
+local STAT_ORDER = { "Health", "Power", "Defense", "Speed", "Critical", "Cooldown" }
+local PERCENT = {
+	Critical = true,
+	Cooldown = true,
+	DamageReduction = true,
+	HealingReceived = true,
+	ThreatGeneration = true,
+	DamageAfterDodge = true,
+}
+local function amount(stat: string, value: number): string
+	local shown = if PERCENT[stat] then value * 100 else value
+	return string.format("+%g%s %s", math.floor(shown * 100 + 0.5) / 100, if PERCENT[stat] then "%" else "", stat)
+end
+function CacheLottery.gearDetails(item)
+	local roll = item.Roll
+	local lines = {}
+	local stats = {}
+	for _, stat in STAT_ORDER do
+		local value = roll and roll.Stats and roll.Stats[stat]
+		if value and value ~= 0 then
+			table.insert(stats, amount(stat, value))
+		end
+	end
+	table.insert(lines, {
+		Text = if #stats > 0 then table.concat(stats, "  ·  ") else "Base stats",
+		Color = Color3.fromRGB(120, 230, 150),
+		Kind = "Stats",
+	})
+	local armor = ArmorFamilies.ById[item.Id]
+	if armor and armor.ArmorFamily then
+		local family = armor.ArmorFamily
+		local two = (ArmorFamilies.Sets[family] or {})[2] or {}
+		local bonus = {}
+		for _, stat in STAT_ORDER do
+			if two[stat] then
+				table.insert(bonus, amount(stat, two[stat]))
+			end
+		end
+		local moves = string.gsub(ArmorFamilies.EnhancementText[family] or "", "^2%+ pieces: ", "")
+		table.insert(lines, {
+			Text = string.format(
+				"◆ %s set: wear 2+ %s pieces for %s; %s More at 4 and 6.",
+				family,
+				family,
+				table.concat(bonus, ", "),
+				moves
+			),
+			Color = Color3.fromRGB(236, 222, 182),
+			Kind = "Set",
+		})
+	else
+		local def = Slots.Definitions[item.Slot]
+		local profile = GemClient.Profile
+		local class = profile and profile.Character and profile.Character.Class or "Warrior"
+		local ok, gear = pcall(Classes.gear, class, def and def.Kind, item.Id)
+		local passive = ok and gear and gear.Passive
+		if passive and passive.Name and passive.Name ~= "" then
+			table.insert(lines, {
+				Text = "◆ " .. passive.Name .. (if passive.Text and passive.Text ~= "" then ": " .. passive.Text else ""),
+				Color = GOLD,
+				Kind = "Perk",
+			})
+		end
+	end
+	if roll and roll.Signature then
+		local ok, name, text = pcall(ArmorSignatures.describe, roll, nil)
+		if ok and name ~= "" then
+			table.insert(lines, { Text = "✦ " .. name .. ": " .. text, Color = GOLD, Kind = "Signature" })
+		end
+	end
+	for _, affix in roll and roll.Affixes or {} do
+		local def = GemConfig.AffixById[affix.Id]
+		if def then
+			table.insert(lines, {
+				Text = GemConfig.affixText(affix.Id, affix.Bonus),
+				Color = GemConfig.ElementColors[def.Element] or Color3.fromRGB(140, 200, 255),
+				Kind = "Affix",
+			})
+		end
+	end
+	return lines
 end
 
 -- A gem in 3D, every facet.

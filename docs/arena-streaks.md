@@ -72,7 +72,23 @@ win of each run restore your pick's swings (10%, 25%, 50%). See
 
 (250 to 1000 come later: add rows to `Shared.ArenaStreak.Milestones`.)
 
-- **Pieces:** each card shows its stat rolls, passive and affixes. Gear is
+- **Pieces:** each card spells out everything the piece carries
+  (`CacheLottery.gearDetails`, *2026-10-27*): every stat it rolled (Health,
+  Power, Defense, Speed, Critical, Cooldown, whichever it has); for armour,
+  its **set**: the family and what wearing two or more of it gives you (the
+  card used to say only "Armor Identity", the placeholder name of "wear
+  matching pieces for set bonuses"), or for a sword its perk; its
+  signature, if it has one; and every elemental affix with its bonus
+  ("Ion Affinity: +13% Arc Damage"), in its element's colour, not "2
+  elemental affixes". One or two pieces (every reward now) get wide cards,
+  the picture, name and quality on the left and the list beside them, so
+  the screen still reads on a phone; an old six-piece cache keeps upright
+  cards with the list under the quality bar.
+
+  ![A 1v1 win's reward: each card lists every stat, its set and what two pieces of it give, its signature and each affix in full](arena-streaks/win-reward.png)
+  ![The same on a phone](arena-streaks/win-reward-phone.png)
+
+  Gear is
   drawn from the swords, shields, helmets, armour, gloves and boots of its
   rarity (tiers 1 to 5), never the same one twice. The only weapons are
   the standard swords and their variations (`ExpandedItemTraits.rollable`):
@@ -162,8 +178,8 @@ together. Each slows as its turn comes and lands in order, 0.4 s apart.
 - **Gem reels** (an old cache's free gems) roll through gems of every
   rarity, like a real find, and land on yours.
 - **Gear reels** roll through the cache's own armour and weapons in 3D and
-  land on each piece. Its quality bar fills in (out of 4), then its stat
-  rolls, passive and affixes appear.
+  land on each piece. Its quality bar fills in (out of 4), then the list
+  of everything it carries appears.
 
 While it rolls, each card shows the rarity and name rolling past. Tapping a
 card or the button lands everything at once. Once all have landed, the same

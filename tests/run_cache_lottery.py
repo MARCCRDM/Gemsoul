@@ -15,6 +15,8 @@ for name, path in [
     ("GemRoller", "src/shared/GemRoller.luau"),
     ("ArenaStreak", "src/shared/ArenaStreak.luau"),
     ("Slots", "src/shared/EquipmentSlots.luau"),
+    ("ArmorFamilies", "src/shared/ArmorFamilies.luau"),
+    ("ArmorSignatures", "src/shared/ArmorSignatures.luau"),
     ("CacheLottery", "src/client/Modules/CacheLottery.luau"),
 ]:
     code = re.sub(r"^local \w+ = require\([^\n]+\)\n", "", read(path), flags=re.M)
