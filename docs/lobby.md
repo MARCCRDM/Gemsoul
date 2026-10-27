@@ -13,7 +13,7 @@ answer three questions at a glance:
 - **PLAY** shows how many miners are online and how many are searching for
   a 1v1. When you're alone it lists the modes instead. A band of light
   sweeps across it now and then.
-- **INVENTORY**, then MARKET, STORE, RANKS, SOCIAL and INVITE.
+- **INVENTORY**, then **SKINS** (blue: opens the Store; the shop front in the Outpost is still signed STORE), TASKS, MARKET, RANKS, SOCIAL and INVITE.
 - **Your card**:
   - your level badge, name and coins;
   - the XP still needed for the next level ("40 / 150 XP to level 6").
