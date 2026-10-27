@@ -27,9 +27,10 @@
 	threat first (KaijuBeam.order), holds on it, then sweeps across the
 	rest in one pass, as many as it can reach (KaijuBeam.direction: each
 	pulse hits along where it's turned then); with nothing in front of you
-	it fires straight ahead. A dungeon's or the Rift's boss in the fight:
-	the team turns to face it and the beam holds on it alone, the whole
-	blast, and nothing else is hit. They
+	it fires straight ahead. A dungeon's or the Rift's boss in the fight
+	(out to Beam.BossReach) is the biggest threat whatever else is about:
+	the team turns to face it, the beam locks on to it first and goes on
+	from there across the rest, and the boss takes every pulse. They
 	can't be hurt from their leap till they're let go (KaijuServer.hurt). Not
 	in a kaiju battle, nor with the team put away. Everyone near sees it
 	(CombatFx "KaijuBeam", with its Targets in turn), from their own view:
@@ -188,8 +189,8 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	-- What: the creatures in reach and the ones in a fight with you or your
 	-- team, the biggest threat first, then the rest in one sweep, as many as
 	-- it can reach (KaijuBeam.order); none in front of you, it fires straight
-	-- ahead. A boss in the fight: it turns to face it, and the boss alone
-	-- takes the blast.
+	-- ahead. A boss in the fight: it turns to face it, locks on to it first
+	-- and sweeps on from there; the boss takes every pulse.
 	local dx, dz = 0, 0
 	if type(aim) == "table" then
 		dx, dz = tonumber(aim.X) or 0, tonumber(aim.Z) or 0
@@ -246,7 +247,13 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	end
 	-- (In a fight with your team further off, up to the beam's length.)
 	for _, foe in KaijuServer.creaturesNear(origin, b.Length, player) do
-		if inFight(foe.Enemy) or isBoss(foe.Enemy) then
+		if inFight(foe.Enemy) then
+			take(foe, true)
+		end
+	end
+	-- (A boss, from across its arena.)
+	for _, foe in KaijuServer.creaturesNear(origin, b.BossReach, player) do
+		if isBoss(foe.Enemy) then
 			take(foe, inFight(foe.Enemy))
 		end
 	end
@@ -267,7 +274,8 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 		local foe = candidates[index]
 		table.insert(targets, { Root = foe.Root, At = foe.Root.Position })
 	end
-	-- The boss: faced (the formation too), held on, and it alone is hit.
+	-- The boss: faced (the formation too), locked on to first, and hit by
+	-- every pulse wherever the sweep's turned.
 	local boss = order[1] and foes[order[1]].Boss and candidates[order[1]].Enemy or nil
 	if boss then
 		local offset = boss.Root.Position - origin
@@ -275,7 +283,9 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 			local flat = math.sqrt(offset.X * offset.X + offset.Z * offset.Z)
 			dx, dz = offset.X / flat, offset.Z / flat
 		end
-		marked = {}
+		if not table.find(marked, boss) then
+			table.insert(marked, boss)
+		end
 	end
 	local forward = Vector3.new(dx, 0, dz)
 	local ahead, high = KaijuBeam.focus()
@@ -427,14 +437,6 @@ local function pulse(cast, p: number)
 	end
 	cast.Pulses += 1
 	local dealer = units[(cast.Pulses - 1) % #units + 1].Pet
-	-- A boss's blast: the boss alone, every pulse, while it's in reach.
-	local boss = cast.Boss
-	if boss then
-		if boss.Alive and boss.Root.Parent and (boss.Root.Position - cast.Origin).Magnitude <= b.Length + b.Width then
-			KaijuServer.strike(dealer, boss, cast.Damage, nil, true)
-		end
-		return
-	end
 	local focus = cast.Focus
 	local forward = aimed(cast, p)
 	local middle = focus + forward * (b.Length / 2)
@@ -448,13 +450,14 @@ local function pulse(cast, p: number)
 		end
 	end
 	-- Every one in a fight with you or your team, wherever it is (still in
-	-- the beam's reach of you).
+	-- the beam's reach of you; a boss, in its arena).
 	for _, enemy in cast.Marked or {} do
+		local reach = if enemy == cast.Boss then b.BossReach else b.Length + b.Width
 		if
 			not struck[enemy]
 			and enemy.Alive
 			and enemy.Root.Parent
-			and (enemy.Root.Position - cast.Origin).Magnitude <= b.Length + b.Width
+			and (enemy.Root.Position - cast.Origin).Magnitude <= reach
 		then
 			struck[enemy] = true
 			KaijuServer.strike(dealer, enemy, cast.Damage, nil, true)

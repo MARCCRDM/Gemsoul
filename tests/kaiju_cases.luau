@@ -1090,11 +1090,16 @@ do
 		table.insert(crowd, { X = i, Z = -20, MaxHealth = 50 })
 	end
 	check(#Beam.order(crowd, 0, -1) == Beam.Beam.Most, "It takes more than Most")
-	-- A boss in the fight: it alone, wherever it is (even behind you).
+	-- A boss in the fight: the biggest threat whatever else is about (even
+	-- behind you, even with an add tougher than it), locked on to first; the
+	-- sweep goes on from it to the ones about it.
 	local withBoss = table.clone(foes)
 	table.insert(withBoss, { X = 10, Z = 35, MaxHealth = 800, Boss = true })
+	table.insert(withBoss, { X = 18, Z = 30, MaxHealth = 5000 })
+	table.insert(withBoss, { X = -6, Z = 38, MaxHealth = 40 })
 	local bossOrder = Beam.order(withBoss, 0, -1)
-	check(#bossOrder == 1 and bossOrder[1] == #withBoss, "With a boss in the fight, it took more than the boss")
+	check(bossOrder[1] == #withBoss - 2, "With a boss in the fight, it wasn't taken first")
+	check(table.find(bossOrder, #withBoss - 1) and table.find(bossOrder, #withBoss), "It didn't go on from the boss to the adds about it")
 	-- A crowd spread across in front: one sweep (out to the nearer side's
 	-- last, then back across), every one of them, never back and forth.
 	local spread = {}

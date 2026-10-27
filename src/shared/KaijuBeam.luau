@@ -64,9 +64,9 @@
 	  KaijuBeam.threat(foe) -> number                  how big a threat
 	                                                   { Health, Engaged } is
 	  KaijuBeam.order(foes, dx, dz) -> { index }       what the beam takes in
-	                                                   turn: a boss alone;
-	                                                   else the biggest
-	                                                   threat, then the rest
+	                                                   turn: a boss first
+	                                                   (else the biggest
+	                                                   threat), then the rest
 	                                                   in one sweep (Most)
 	  KaijuBeam.dwell(n) -> share                      how long it holds on
 	                                                   the first of `n`
@@ -111,6 +111,7 @@ KaijuBeam.Beam = {
 	Dwell = 0.4, -- the share of the blast it holds on the biggest threat (less with many: dwell)
 	Turn = 0.4, -- the share of each swing after that spent turning (the rest held)
 	Swing = math.rad(80), -- never further than this off your aim
+	BossReach = 150, -- a boss in the fight is taken, and hit, this far off (its arena's far side)
 	Engaged = 1.5, -- a creature in a fight with you or your team: this much more a threat
 }
 
@@ -272,13 +273,13 @@ local function between(a: number, b: number): number
 end
 
 -- What the beam takes, in turn (`foes`: each { X, Z, Health?, MaxHealth?,
--- Engaged?, Boss? }, its offset from you). A boss among them (a dungeon's
--- or the Rift's): that boss alone, wherever it is (the biggest, if there
--- were two), and the beam turns to face it. Otherwise the biggest threat
--- first, then the rest in one sweep, as many as it can reach: out to the
--- nearer side's last, then back across to the far side's, up to Most of
--- them, never one further than Swing off your aim (dx, dz). Indices into
--- `foes`.
+-- Engaged?, Boss? }, its offset from you). The biggest threat first, then
+-- the rest in one sweep, as many as it can reach: out to the nearer side's
+-- last, then back across to the far side's, up to Most of them, never one
+-- further than Swing off your aim (dx, dz). A boss among them (a dungeon's
+-- or the Rift's) is the biggest threat whatever else is about, wherever it
+-- is (the biggest, if there were two): first, and the aim turned to it, so
+-- the sweep goes on from the boss. Indices into `foes`.
 function KaijuBeam.order(foes: { any }, dx: number, dz: number): { number }
 	local b = KaijuBeam.Beam
 	local boss, bossThreat = nil, -math.huge
@@ -288,7 +289,10 @@ function KaijuBeam.order(foes: { any }, dx: number, dz: number): { number }
 		end
 	end
 	if boss then
-		return { boss }
+		local x, z = tonumber(foes[boss].X) or 0, tonumber(foes[boss].Z) or 0
+		if x * x + z * z > 1e-6 then
+			dx, dz = x, z
+		end
 	end
 	local aim = heading(dx, dz)
 	local left = {}
@@ -299,12 +303,15 @@ function KaijuBeam.order(foes: { any }, dx: number, dz: number): { number }
 		end
 	end
 	local order = {}
+	if boss and not table.find(left, boss) then
+		table.insert(left, boss) -- (right on top of you: still the first)
+	end
 	if #left == 0 then
 		return order
 	end
 	local best, bestAt = -math.huge, 1
 	for at, i in left do
-		local threat = KaijuBeam.threat(foes[i])
+		local threat = if i == boss then math.huge else KaijuBeam.threat(foes[i])
 		if threat > best then
 			best, bestAt = threat, at
 		end

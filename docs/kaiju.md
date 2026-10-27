@@ -683,9 +683,12 @@ blast together. It works the same in mining and in fights.
      takes the creatures within 60 studs and any your team is fighting (up
      to the beam's length), never one more than 80° off your aim; with none
      in front of you it fires straight ahead. **A boss in the fight** (a
-     dungeon's or the Rift's): the team turns to face it, wherever it is,
-     and the beam holds on it alone the whole blast; nothing else is hit,
-     every pulse goes into the boss. It lands 26 pulses (a tenth of a
+     dungeon's or the Rift's) is the biggest threat there is
+     (*2026-10-27*): it's found up to 150 studs off (`BossReach`), the
+     team turns to face it, wherever it is, and the beam locks onto it
+     first, then goes on from there across the rest in the same one sweep
+     (its adds, anything else in the fight). The boss takes every pulse
+     wherever the beam's turned. It lands 26 pulses (a tenth of a
      second apart, so nothing it sweeps past is skipped), each on
      every creature in the beam where it's turned then **and on every one
      in a fight with you or your team, wherever it is** (*2026-10-26*:
@@ -706,7 +709,10 @@ blast together. It works the same in mining and in fights.
   pops up in its colour as it lands, and all the names flare gold at the
   roar. Then **HYPERBEAM!** as it fires, a light flash, a colour grade
   and bloom. Everyone sees the beam turn the same way: the server sends
-  its targets in turn (`Targets`).
+  its targets in turn (`Targets`). Nothing's left on the ground after:
+  the dark scorched strip that used to lie along the beam's path and fade
+  out after the blast is gone (*2026-10-27*; it read as a black streak at
+  the end).
 
   ![The HYPERBEAM from your own eyes: the team leaping in either side of your view, the charge, then the beam on the biggest threat (right) and swinging onto the other. Offline render of the game's effect code, not a Roblox screenshot](kaiju/hyperbeam-firstperson.png)
 - **Not** without your team out, while it's still charging (it tells you

@@ -18,8 +18,9 @@
 	  Fire      the beam: a white-hot core in a sleeve of your team's
 	            colours, each colour's ribbon twisting round it, a star of
 	            light at the focus and a blaze at the far end, rings racing
-	            down it, rock thrown up along it, a shockwave, a scorched
-	            trail; screens shake near it.
+	            down it, rock thrown up along it, a shockwave; screens shake
+	            near it. (No scorched trail on the ground: it read as a black
+	            streak left behind as the beam faded.)
 	  Recover   it all fades.
 
 	  No cinematic: your camera stays yours (first person or not) and it
@@ -348,7 +349,7 @@ local function play(data)
 		return instance
 	end
 	local ground = origin - UP * 2.8
-	local under = Vector3.new(focus.X, ground.Y, focus.Z) -- (the ground under the focus: the scorch runs from it)
+	local under = Vector3.new(focus.X, ground.Y, focus.Z) -- (the ground under the focus: rock is thrown up along from it)
 
 	-- Your team, each with its leap: from where it stands to its place.
 	local units, calls = {}, {}
@@ -469,7 +470,7 @@ local function play(data)
 		unit.Flow, unit.Thread = flow, thread
 	end
 	-- The beam itself: its core and sleeve, each colour's ribbon, rings
-	-- racing down it, the star at the focus, the blaze at its end, the scorch.
+	-- racing down it, the star at the focus, the blaze at its end.
 	local length = b.Length
 	local axis = CFrame.lookAt(focus, focus + forward)
 	local along = axis * CFrame.new(0, 0, -length / 2) * CFrame.Angles(0, math.rad(90), 0)
@@ -502,8 +503,6 @@ local function play(data)
 	end
 	local blaze = keep(part(Vector3.one, CFrame.new(focus + forward * length), palette[1], Enum.PartType.Ball))
 	blaze.Transparency = 1
-	local scorch = keep(part(Vector3.new(b.Width * 0.7, 0.08, 0.1), CFrame.lookAt(under, under + forward), SCORCH, nil, Enum.Material.SmoothPlastic))
-	scorch.Transparency = 1
 
 	-- Yours: the names and title over your own view, a hotter grade (your
 	-- camera stays yours).
@@ -843,7 +842,6 @@ local function play(data)
 					over.Title()
 					over.Flash(0.35)
 				end
-				scorch.Transparency = 0.25
 				blaze.Transparency = 0.1
 			end
 			-- The beam: turned onto what it's taking (the biggest threat,
@@ -894,8 +892,6 @@ local function play(data)
 			shell.Size = Vector3.one * (3.5 * (1 - fade))
 			core.Size = Vector3.one * (2.8 * (1 - fade))
 			light.Brightness = 10 * (1 - fade)
-			scorch.Size = Vector3.new(b.Width * 0.7, 0.08, math.max(0.1, length * grow))
-			scorch.CFrame = CFrame.lookAt(under, under + way) * CFrame.new(0, 0, -scorch.Size.Z / 2)
 			if fade < 0.5 and now >= debrisAt then
 				debrisAt = now + 0.05
 				local where = under + way * (math.random() * length * grow) + side * ((math.random() - 0.5) * b.Width)
@@ -923,7 +919,7 @@ local function play(data)
 			if not cleared then
 				cleared = true
 				for _, instance in made do
-					if instance:IsA("BasePart") and instance ~= scorch then
+					if instance:IsA("BasePart") then
 						tween(instance, 0.3, { Transparency = 1 })
 					elseif instance:IsA("Beam") then
 						instance.Enabled = false
@@ -931,7 +927,6 @@ local function play(data)
 						instance.Enabled = false
 					end
 				end
-				tween(scorch, 2.5, { Transparency = 1 })
 				if over then
 					over.Hide()
 					over = nil
