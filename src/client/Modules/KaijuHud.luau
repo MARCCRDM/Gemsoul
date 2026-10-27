@@ -559,6 +559,9 @@ local function layout()
 	local spot = if phone then MobileLayout.kaiju(screen, hunting) else MobileLayout.kaijuDesk(screen)
 	card.Position = UDim2.fromOffset(spot.X, spot.Y)
 	card.Size = UDim2.fromOffset(spot.W, spot.H)
+	-- (On a phone the card's own back is see-through, the world showing
+	-- round the tiles; the tiles and AUTO HEAL keep theirs.)
+	card.BackgroundTransparency = if phone then MobileLayout.Kaiju.Back else 0.12
 	local cells = MobileLayout.kaijuCells(spot)
 	for slot, tile in tiles do
 		local rect = if slot == Kaiju.SupportSlot then cells.Support else cells.Fighters[slot]

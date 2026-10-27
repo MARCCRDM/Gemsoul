@@ -591,7 +591,10 @@ above the combat HUD near the bottom center:
   HEAL as a slim row across the card under them (the gem and how many,
   AUTO HEAL, ON or OFF). 164 by 67, half the width of the old one-row card
   (351 by 59). No CALL BACK (the number does it), and no HYPERBEAM pill:
-  that's a button of its own now (below).
+  that's a button of its own now (below). The card's own back is
+  see-through (`MobileLayout.Kaiju.Back`, 0.55; it was nearly solid), so
+  the world shows round the tiles; the tiles and AUTO HEAL keep their
+  solid backs.
 
   **The team keys 1 2 3 4 are off the card**: a row of their own, 34
   points square, just above the move stick, under your left thumb

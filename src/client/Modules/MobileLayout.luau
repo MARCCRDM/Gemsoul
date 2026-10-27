@@ -109,8 +109,9 @@ MobileLayout.Loot = { W = 232, H = 72, Row = 24, Gap = 6 }
 -- (Your kaiju's card at the top left: its size, the same on every phone.
 -- Two rows: the team's three and the support, Tile square, the support
 -- Split apart; AUTO HEAL under them, AutoH tall, the card's width. The
--- HYPERBEAM isn't on it: beam(screen).)
-MobileLayout.Kaiju = { Tile = 36, Pad = 4, Gap = 3, Split = 6, AutoH = 20 }
+-- HYPERBEAM isn't on it: beam(screen). Back: how see-through the card's
+-- own back is, the tiles' solid on it.)
+MobileLayout.Kaiju = { Tile = 36, Pad = 4, Gap = 3, Split = 6, AutoH = 20, Back = 0.55 }
 local function kaijuSize(): (number, number)
 	local k = MobileLayout.Kaiju
 	local w = k.Pad * 2 + k.Tile * 4 + k.Gap * 2 + k.Split
