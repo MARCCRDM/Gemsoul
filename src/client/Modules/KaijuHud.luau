@@ -2802,7 +2802,7 @@ local function refresh()
 		or player:GetAttribute("CombatSession") ~= nil
 		or player:GetAttribute("MatchId") ~= nil
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
-	local menu = dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled
+	local menu = dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled or player:GetAttribute("MenuOpen") == true
 	-- The starter roll, once, for a player still owed it.
 	if not rollTried and inOutpost and not blocked and not menu and Kaiju.rollsOwed(profile) > 0 then
 		if not LoadingFlow.active() then

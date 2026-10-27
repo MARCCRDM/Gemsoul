@@ -16,9 +16,17 @@
 	      Abilities                     how many of Gems are Q, E or R
 	      Before, After { [stat]: n }   ratings (Base + Bonus), now and after
 	      Rating, Gain                  the total after, and its change
-	      Changes                       #Gear + #Gems
+	      Looks  { { Kind, Id } }       cosmetics to wear (AutoEquip.looks)
+	      Changes                       #Gear + #Gems + #Looks
 	  }
 	  AutoEquip.power(gem)       -> how strong its moves are (Q, E and R)
+	  AutoEquip.looks(profile)   -> { { Kind, Id } } your rarest skins
+
+	Looks, in every mode (they never change stats): for each kind of look
+	(Shared.Cosmetics: suit, weapon and shield skins, pickaxe, visor,
+	helmet, trim and back piece) the rarest one you own goes on, when it's
+	rarer than what you wear (so a pick of your own of the same rarity
+	stays). Ties: the dearer one, then by name.
 
 	The modes:
 	  Best      the most total rating (Classes.ratings).
@@ -303,6 +311,55 @@ function AutoEquip.rating(loadout): number
 	return total(statsOf(ratingsOf(loadout or {})))
 end
 
+-- Looks: the rarest you own of each kind, over what you wear.
+AutoEquip.LookKinds = { "Suit", "Skin", "Shield", "Helmet", "Visor", "Pick", "Trim", "Back" }
+local LOOK_RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
+-- (the catalogue, loaded on first use: planning gear never needs it)
+local Cosmetics = nil
+local function catalogue()
+	Cosmetics = Cosmetics or require(ReplicatedStorage.Shared.Cosmetics)
+	return Cosmetics
+end
+local function lookRank(id): number
+	local cosmetic = catalogue().get(id)
+	return if cosmetic then LOOK_RANK[cosmetic.Rarity] or 0 else 0
+end
+function AutoEquip.looks(profile)
+	local steps = {}
+	local cosmetics = profile and profile.Cosmetics
+	local owned = type(cosmetics) == "table" and cosmetics.Owned
+	if type(owned) ~= "table" then
+		return steps
+	end
+	local worn = catalogue().forMiner(cosmetics, profile.Character)
+	local best = {}
+	for id, has in owned do
+		local cosmetic = has and Cosmetics.get(id)
+		local kind = cosmetic and cosmetic.Kind
+		if not kind or not table.find(AutoEquip.LookKinds, kind) then
+			continue
+		end
+		local other = best[kind] and Cosmetics.List[best[kind]]
+		local rank = lookRank(id)
+		local better = not other
+			or rank > lookRank(other.Id)
+			or rank == lookRank(other.Id) and ((cosmetic.Robux or 0) > (other.Robux or 0)
+				or (cosmetic.Robux or 0) == (other.Robux or 0) and cosmetic.Name < other.Name)
+		if better then
+			best[kind] = id
+		end
+	end
+	for _, kind in AutoEquip.LookKinds do
+		local id = best[kind]
+		local now = worn[kind]
+		local wearing = now and owned[now] and lookRank(now) or 0
+		if id and id ~= now and lookRank(id) > wearing then
+			table.insert(steps, { Kind = kind, Id = id })
+		end
+	end
+	return steps
+end
+
 function AutoEquip.plan(profile, mode: string)
 	mode = if AutoEquip.valid(mode) then mode else "Best"
 	local character = profile and profile.Character or {}
@@ -316,6 +373,7 @@ function AutoEquip.plan(profile, mode: string)
 		After = before,
 		Rating = total(before),
 		Gain = 0,
+		Looks = {},
 		Changes = 0,
 	}
 	if not profile or not character.Class then
@@ -366,7 +424,8 @@ function AutoEquip.plan(profile, mode: string)
 	plan.After = statsOf(ratingsOf(loadout))
 	plan.Rating = total(plan.After)
 	plan.Gain = plan.Rating - total(before)
-	plan.Changes = #plan.Gear + #plan.Gems
+	plan.Looks = AutoEquip.looks(profile)
+	plan.Changes = #plan.Gear + #plan.Gems + #plan.Looks
 	return plan
 end
 

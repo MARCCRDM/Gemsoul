@@ -463,6 +463,7 @@ local state = {
 	Pick = nil :: Item?, -- clicked in the grid (sticky)
 	Hover = nil :: Item?, -- under the pointer in the grid
 	AutoMode = "Best", -- AUTO EQUIP's mode (Shared.AutoEquip.Modes)
+	StatsOpen = false, -- (full) the stats card open, or folded to STATS, EQUIP BEST and the elements
 	PouchFilter = "All", -- your gems (full, left): "All" or an element
 	GemsPane = false, -- compact: your gems in the rows' place (the GEMS tab)
 	BagFilter = "All", -- your spare gear (full, right): "All" or a slot
@@ -892,6 +893,11 @@ local function buildLeft(canvas: Frame)
 	local box = canvas
 	if COMPACT then
 		box = buildStatsSheet(canvas)
+	else
+		-- (full: the card in a layer of its own, folded away by default; see
+		-- buildStatsMini and setStatsOpen)
+		box = new("Frame", { Name = "StatsPanel", BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H) }, canvas)
+		ui.StatsPanel = box
 	end
 	-- Miner 1 / 2 / 3 (none while the roster is off: one miner).
 	ui.Miners = {}
@@ -927,7 +933,7 @@ local function buildLeft(canvas: Frame)
 	else
 		ui.Name = place(text(canvas, "", 32, C.Text, HEAVY), x, nameY, w + 40, 38)
 	end
-	ui.Sub = place(text(box, "", 11, C.Dim, HEADING), x, nameY + 40, w, 16)
+	ui.Sub = place(text(if COMPACT then box else canvas, "", 11, C.Dim, HEADING), x, nameY + 40, w, 16)
 	ui.LevelBonus = place(text(box, "", 10, C.Teal, BODY), x, nameY + 58, w + 40, 13)
 	UiKit.fit(ui.LevelBonus)
 	-- The card: the rating and four stats, the set, the elements, AUTO EQUIP,
@@ -1057,9 +1063,113 @@ local function buildLeft(canvas: Frame)
 		y = buildAuto(box, x, y, w)
 	end
 	card.Size = UDim2.fromOffset(w + 32, y + 10 - cardY)
+	if not COMPACT then
+		-- HIDE, top right of the card, folds it back to STATS.
+		local hide = new("TextButton", {
+			Name = "HideStats",
+			Text = "HIDE",
+			TextSize = 10,
+			Font = HEAVY,
+			TextColor3 = C.Dim,
+			AutoButtonColor = true,
+			BackgroundColor3 = C.Ink,
+			BackgroundTransparency = 0.4,
+		}, box)
+		place(hide, x + w - 44, cardY + 10, 48, 22)
+		round(hide, 6)
+		stroke(hide, C.Line, 1, 0.8)
+		hide:SetAttribute("UiSound", "Back")
+		hide.Activated:Connect(function()
+			ui.SetStatsOpen(false)
+		end)
+		ui.StatsCardTop = cardY
+	end
+end
+
+-- Full layout, folded (the default): the stats card gives way to a STATS
+-- button with your rating on it, EQUIP BEST under it and an element each
+-- (a tap puts that build on at once: the best gems of that element). The
+-- miner moves to the middle and the armor rows grow a little. STATS opens
+-- the card again (which has all of this in its AUTO EQUIP), so these hide.
+local MINI_W = 220
+local function buildStatsMini(canvas: Frame)
+	local x, y = STATS_X - 16, ui.StatsCardTop or 212
+	local mini = new("Frame", { Name = "StatsMini", BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H), ZIndex = 2 }, canvas)
+	ui.StatsMini = mini
+	local open = new("TextButton", {
+		Name = "OpenStats",
+		Text = "",
+		AutoButtonColor = true,
+		BackgroundColor3 = C.Deep,
+		BackgroundTransparency = 0.1,
+	}, mini)
+	place(open, x, y, MINI_W, 46)
+	round(open, 10)
+	stroke(open, C.Teal, 1, 0.45)
+	open:SetAttribute("UiSound", "Click")
+	place(text(open, "STATS", 13, C.Teal, HEAVY), 14, 0, 80, 46)
+	local rating = place(text(open, "", 22, C.Gold, HEAVY), 84, 0, MINI_W - 98 - 18, 46)
+	rating.TextXAlignment = Enum.TextXAlignment.Right
+	local more = place(text(open, "+", 18, C.Dim, HEAVY), MINI_W - 26, 0, 16, 46)
+	more.TextXAlignment = Enum.TextXAlignment.Center
+	ui.MiniRating = rating
+	open.Activated:Connect(function()
+		ui.SetStatsOpen(true)
+	end)
+	y += 54
+	local best = new("TextButton", {
+		Name = "EquipBest",
+		Text = "EQUIP BEST",
+		TextSize = 13,
+		Font = HEAVY,
+		TextColor3 = Color3.fromRGB(26, 18, 6),
+		AutoButtonColor = true,
+		BackgroundColor3 = C.Gold,
+	}, mini)
+	place(best, x, y, MINI_W, 36)
+	round(best, 9)
+	best:SetAttribute("UiSound", "Confirm")
+	UpgradeHints.bind(best, function(hints) return hints.Equipment end, C.Gold)
+	best.Activated:Connect(function()
+		state.AutoMode = "Best"
+		request("AutoEquip", "Best")
+	end)
+	y += 42
+	local half = (MINI_W - 6) / 2
+	for i, element in ELEMENTS do
+		local tint = GemConfig.ElementColors[element] or C.Text
+		local b = new("TextButton", {
+			Name = "Equip" .. element,
+			Text = AutoEquip.label(element),
+			TextSize = 11,
+			Font = HEAVY,
+			TextColor3 = tint,
+			AutoButtonColor = true,
+			BackgroundColor3 = C.Ink,
+			BackgroundTransparency = 0.3,
+		}, mini)
+		place(b, x + ((i - 1) % 2) * (half + 6), y + (i - 1) // 2 * 36, half, 30)
+		round(b, 8)
+		stroke(b, tint, 1, 0.55)
+		UiKit.fit(b)
+		b:SetAttribute("UiSound", "Click")
+		b.Activated:Connect(function()
+			state.AutoMode = element
+			request("AutoEquip", element)
+		end)
+	end
+	y += 72
+	local caption = place(text(mini, "A TAP PUTS THE BEST GEMS OF IT ON", 9, C.Faint, HEADING), x, y, MINI_W, 12)
+	caption.TextXAlignment = Enum.TextXAlignment.Center
 end
 
 local function buildStage(canvas: Frame)
+	-- (full: the stage is a layer of its own, slid to the middle while the
+	-- stats card is folded: setStatsOpen)
+	if not COMPACT then
+		canvas = new("Frame", { Name = "Stage", BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H) }, canvas)
+		ui.Stage = canvas
+	end
 	-- (compact, the miner stands in the left column, under the name: the
 	-- same stage at about a third of the size)
 	local k = if COMPACT then 0.36 else 1
@@ -1398,6 +1508,8 @@ local function buildRight(canvas: Frame)
 		place(column, RIGHT_X, 56, W - RIGHT_X, 324)
 	else
 		place(column, RIGHT_X, 96, RIGHT_W, 640)
+		ui.EquipColumn = column
+		ui.EquipScale = new("UIScale", {}, column)
 	end
 	-- The list.
 	local list = new("Frame", { Name = "List", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, column)
@@ -2142,6 +2254,9 @@ local function drawLeft(profile, loadout)
 		flashValue(entry, value)
 	end
 	ui.Rating.Text = whole(total)
+	if ui.MiniRating then
+		ui.MiniRating.Text = whole(total)
+	end
 	if ui.StatsButton then
 		ui.StatsButton.Text = string.format("STATS  ·  %s", whole(total))
 	end
@@ -3784,6 +3899,29 @@ drawIntro = function(profile, loadout)
 	end
 end
 
+-- Full: the stats card open, or folded (the default). Folded, the miner
+-- stands in the middle (between the weapons and the armor) and the armor
+-- column grows a little, its spare gear shortened to fit.
+local STAGE_MID = 800 -- (the canvas's middle; the stage is drawn about 942)
+local ARMOR_GROW = 1.1
+local function setStatsOpen(open: boolean)
+	state.StatsOpen = open
+	if COMPACT or not ui.StatsPanel then
+		return
+	end
+	InventoryV2.cancelDrag()
+	ui.StatsPanel.Visible = open
+	ui.StatsMini.Visible = not open
+	ui.Stage.Position = UDim2.fromOffset(if open then 0 else STAGE_MID - 942, 0)
+	local k = if open then 1 else ARMOR_GROW
+	ui.EquipScale.Scale = k
+	ui.EquipColumn.Position = UDim2.fromOffset(RIGHT_X + RIGHT_W - RIGHT_W * k, 96)
+	-- (the bag ends about where it did, 96 + 644 on the canvas, clear of Q / E / R)
+	local bagY = ui.Bag.Position.Y.Offset
+	ui.Bag.Size = UDim2.fromOffset(RIGHT_W, math.floor((if open then 644 else 628) / k - bagY))
+end
+ui.SetStatsOpen = setStatsOpen
+
 -- Mount ------------------------------------------------------------------------------------------------
 
 -- Compact when the full layout would show at under 70% of its size (a
@@ -3869,9 +4007,13 @@ function InventoryV2.mount(host: ScreenGui)
 	buildStage(canvas)
 	buildTop(canvas)
 	buildLeft(canvas)
+	if not COMPACT then
+		buildStatsMini(canvas)
+	end
 	buildRight(canvas)
 	if not COMPACT then
 		buildWeapons(canvas)
+		setStatsOpen(state.StatsOpen)
 	end
 	buildSurges(canvas)
 	buildIntro(ui.Popups)

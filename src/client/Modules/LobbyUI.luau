@@ -457,6 +457,11 @@ function LobbyUI.closePicker()
 	bar.Visible = true
 end
 close.Activated:Connect(LobbyUI.closePicker)
+-- While the PLAY menu is up the HUD over the world stands down (KaijuHud's
+-- card and team keys, the HYPERBEAM button, SparKit's FIGHT): it sat on top.
+picker:GetPropertyChangedSignal("Visible"):Connect(function()
+	player:SetAttribute("MenuOpen", if picker.Visible then true else nil)
+end)
 
 -- The command stack (left) -------------------------------------------------------------------------
 -- PLAY first, where the eye starts; then one panel of places to go; then

@@ -64,6 +64,18 @@ roughly a third, and nothing was taken out:
 - AUTO EQUIP comes straight after the matchups instead of being pinned to
   the foot of the column, and its chips and button are a little slimmer.
 
+**Folded by default (desktop).** The card starts folded: in its place a
+**STATS** button with your rating on it, **EQUIP BEST** under it, and an
+element each (THERMAL, CRYO, ION, CORROSIVE). A tap on an element puts that
+build on at once: the best gems of that element (the same as picking it in
+AUTO EQUIP and pressing the button). Folded, the miner moves to the middle
+of the screen and the armor column grows by a tenth (its spare gear a
+little shorter to fit). **STATS** opens the full card, with a **HIDE**
+button at its top right, and the folded buttons hide while it's open: the
+card's AUTO EQUIP does their job (`buildStatsMini`, `setStatsOpen`).
+
+![The Inventory folded (default) and open. Offline render of the game's UI code, not a Roblox screenshot](inventory/stats-folded-open.png)
+
 On a phone the card is a sheet over the screen: **STATS · 212** over the
 miner (your rating on it) opens it, with everything the desktop card has,
 scrolling if it runs long; a tap outside or × closes it
@@ -109,6 +121,10 @@ ABILITIES are new gems on Q, E and R, GEMS the rest.
   menu-only).
 - A slot's gem stays in the slot when its piece changes (below), so a swap
   never drops one.
+- Every build also puts on your best looks: for each kind (suit, weapon
+  and shield skin, helmet, visor, pickaxe, trim, back piece) the rarest
+  one you own, when it's rarer than what you wear; one as rare as yours
+  stays on (`AutoEquip.looks`, applied by Forge with `setCosmetic`).
 
 On a phone, **AUTO** sits over the miner; tap it for the six builds, tap
 one to put it on.

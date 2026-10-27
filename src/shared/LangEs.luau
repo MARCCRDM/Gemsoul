@@ -3539,6 +3539,10 @@ return {
 	["Already your {*} build: nothing to change."] = "Ya está aplicado ({*}): nada que cambiar.",
 	["{*} build on: {=} gear and {=} gems changed. Rating {=}."] = "Aplicado ({*}): {=} piezas y {=} gemas cambiadas. Puntuación {=}.",
 	["Couldn't change your equipment. Try again."] = "No se pudo cambiar tu equipo. Inténtalo de nuevo.",
+	["Wearing your best skins ({=})."] = "Con tus mejores aspectos ({=}).",
+	["EQUIP BEST"] = "EQUIPAR MEJOR",
+	["HIDE"] = "OCULTAR",
+	["A TAP PUTS THE BEST GEMS OF IT ON"] = "UN TOQUE PONE SUS MEJORES GEMAS",
 	["Visit Vey at the Arcanum (east road) to change enchantments."] = "Visita a Vey en el Arcano (camino del este) para cambiar encantamientos.",
 	-- (The reworked reptile king and crested flyer, Shared.KaijuRoster.)
 	["A warrior: a heavy reptile with dorsal fins and a sweeping tail. Its breath carries its gem element."] = "Un guerrero: un reptil pesado con aletas dorsales y una cola que barre. Su aliento lleva el elemento de su gema.",

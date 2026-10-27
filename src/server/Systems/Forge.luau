@@ -13,6 +13,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Crafting = require(ReplicatedStorage.Shared.Crafting)
 local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local Nearby = require(script.Parent.Nearby)
 local PlayerData = require(script.Parent.PlayerData)
@@ -153,7 +154,16 @@ local function autoEquip(player: Player, mode: any)
 			end
 		end
 	end
-	if pieces == 0 and gems == 0 then
+	-- Your rarest skins of each kind, too (ownership checked again here).
+	local looks = 0
+	for _, step in plan.Looks do
+		local cosmetic = Cosmetics.get(step.Id)
+		if cosmetic and cosmetic.Kind == step.Kind and profile.Cosmetics.Owned[step.Id] then
+			PlayerData.setCosmetic(player, step.Kind, step.Id)
+			looks += 1
+		end
+	end
+	if pieces == 0 and gems == 0 and looks == 0 then
 		return reply(
 			false,
 			if not enchant
@@ -163,10 +173,13 @@ local function autoEquip(player: Player, mode: any)
 	end
 	local now = AutoEquip.rating(profile.Character)
 	local message = string.format("%s build on: %d gear and %d gems changed. Rating %d.", label, pieces, gems, math.floor(now + 0.5))
+	if looks > 0 then
+		message ..= string.format("\nWearing your best skins (%d).", looks)
+	end
 	if not enchant and #plan.Gems > 0 then
 		message ..= "\nVisit Vey at the Arcanum (east road) to change enchantments."
 	end
-	return reply(true, message, { Pieces = pieces, Gems = gems, Rating = now })
+	return reply(true, message, { Pieces = pieces, Gems = gems, Looks = looks, Rating = now })
 end
 
 local function upgradeSurges(player: Player)

@@ -56,6 +56,7 @@ env = setmetatable({
 	Vector3 = roblox.Vector3,
 	CFrame = roblox.CFrame,
 	NumberRange = roblox.NumberRange,
+	Enum = roblox.Enum,
 	game = {
 		GetService = function()
 			return {
@@ -608,6 +609,26 @@ do
 	check(upgrade({}).Gems == 0, "Repeated surge action changed the build again")
 	profile = nil
 	check(not upgrade({}).Ok, "Missing profile accepted")
+end
+
+-- Looks: the rarest skin you own of each kind goes on, over a commoner one;
+-- one as rare as yours stays; never one you don't own; a miner's own
+-- wardrobe is what it wears.
+do
+	local looks = AutoEquip.looks({
+		Character = {},
+		Cosmetics = { Owned = { SkinStarforged = true, SkinVoid = true }, Skin = "SkinStarforged" },
+	})
+	check(#looks == 1 and looks[1].Kind == "Skin" and looks[1].Id == "SkinVoid", "Rarest skin not put on")
+	check(#AutoEquip.looks({ Character = {}, Cosmetics = { Owned = { SkinVoid = true, SkinGalaxy = true }, Skin = "SkinGalaxy" } }) == 0,
+		"Swapped a skin for one just as rare")
+	check(#AutoEquip.looks({ Character = {}, Cosmetics = { Owned = {}, Skin = nil } }) == 0, "Planned a look you don't own")
+	local worn = AutoEquip.looks({
+		Character = { Wardrobe = { Skin = "SkinKindred" } },
+		Cosmetics = { Owned = { SkinKindred = true, SkinVoid = true }, Skin = "SkinVoid" },
+	})
+	check(#worn == 0, "Read the account's skin, not the miner's wardrobe")
+	check(#AutoEquip.looks({ Character = {} }) == 0, "No cosmetics: nothing to plan")
 end
 
 print(string.format("PASS: %d auto equip checks (Best, Balanced, the elements, two hands, other miners, gems, Q/E/R by their moves' power, the server)", checks))

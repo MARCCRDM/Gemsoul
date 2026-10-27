@@ -97,6 +97,9 @@ local function humanoid(): Humanoid?
 end
 
 local function modalOpen(): boolean
+	if player:GetAttribute("MenuOpen") == true then
+		return true -- (the PLAY menu, LobbyUI)
+	end
 	for name in MODAL do
 		local screen = playerGui:FindFirstChild(name)
 		if screen and screen:IsA("ScreenGui") and screen.Enabled then
@@ -699,7 +702,7 @@ function SparKit.start()
 	end, false, Enum.ContextActionPriority.High.Value + 20, KEY, OLD_KEY, Enum.KeyCode.DPadUp)
 	bar.Activated:Connect(SparKit.toggle)
 	switch.Activated:Connect(SparKit.toggle)
-	for _, name in { "Spar", "Hunt", "SparDown", "Outpost", "CombatSession", "MatchId", "ChatOpen" } do
+	for _, name in { "Spar", "Hunt", "SparDown", "Outpost", "CombatSession", "MatchId", "ChatOpen", "MenuOpen" } do
 		player:GetAttributeChangedSignal(name):Connect(function()
 			refreshBar()
 			refreshDown()
