@@ -1869,7 +1869,7 @@ return {
 	["IT FLED"] = "HUYÓ",
 	["It burrowed away after its third escape."] = "Se escondió bajo tierra tras su tercera fuga.",
 	["CATCH BROKEN"] = "CAPTURA INTERRUMPIDA",
-	["Caught! The {=} (level {=}) is yours."] = "¡Atrapado! El {=} (nivel {=}) es tuyo.",
+	["Caught! The {=} is yours, starting over at level {=}."] = "¡Atrapado! El {=} es tuyo y empieza de nuevo en el nivel {=}.",
 	["The {*} broke free and burrowed away!"] = "¡El {*} se soltó y se escondió bajo tierra!",
 	["It broke free! ({1}% chance) {2} tries left."] = "¡Se soltó! ({1}% de probabilidad) Quedan {2} intentos.",
 	["It broke free! ({1}% chance) {2} try left."] = "¡Se soltó! ({1}% de probabilidad) Queda {2} intento.",

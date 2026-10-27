@@ -570,8 +570,9 @@ Kaiju.TameCooldown = 2
 -- The tame is a cast: Cast seconds holding it in your gem's light (it's held
 -- still, struggling, and nothing can hurt it meanwhile); it breaks if you're
 -- hit or stray past Break studs. Range: how close you start it from. The
--- roll comes at its end.
-Kaiju.Tame = { Cast = 2.5, Range = 30, Break = 38 }
+-- roll comes at its end. Level: what a caught one starts at, whatever level
+-- it was out in the wild (its Gemsoul comes with it as rolled).
+Kaiju.Tame = { Cast = 2.5, Range = 30, Break = 38, Level = 1 }
 -- A hit on a wild kaiju lands anywhere in this range of its usual damage.
 Kaiju.Spread = { 0.6, 1.4 }
 

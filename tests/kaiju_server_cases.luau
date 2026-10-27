@@ -2002,23 +2002,27 @@ target.Root.CFrame = CFrame.new(rootA.Position + Vector3.new(4, 0, 0))
 target.Humanoid.Health = target.Humanoid.MaxHealth * 0.1
 forcedRoll = 0.01
 local owned = Kaiju.count(roster)
--- (A high one: caught at its own level, not a starter's.)
-wild2.Level = 9
-target.Model:SetAttribute("KaijuLevel", 9)
-check(Tame(a, target.Model).Casting, "No cast on a weak one")
--- (Your kaiju leaves one being caught alone.)
-check(not KaijuServer._fair(a, target), "Your kaiju still fights one being tamed")
-finishCast(target)
-check(a:GetAttribute("TameResult") == "Tamed", "A lucky try at 10% health failed")
-local tamedId
-for id, entry in roster.List do
-	if entry.Species == wild2.Species and entry.Level == wild2.Level and entry.Soul.Element == wild2.Element then
-		tamedId = id
+do
+	local had = table.clone(roster.List)
+	-- (A high one: caught, it starts over at level 1, not at its own.)
+	wild2.Level = 9
+	target.Model:SetAttribute("KaijuLevel", 9)
+	check(Tame(a, target.Model).Casting, "No cast on a weak one")
+	-- (Your kaiju leaves one being caught alone.)
+	check(not KaijuServer._fair(a, target), "Your kaiju still fights one being tamed")
+	finishCast(target)
+	check(a:GetAttribute("TameResult") == "Tamed", "A lucky try at 10% health failed")
+	local tamedId
+	for id, entry in roster.List do
+		if not had[id] and entry.Species == wild2.Species and entry.Soul.Element == wild2.Element then
+			tamedId = id
+		end
 	end
+	check(Kaiju.count(roster) == owned + 1 and tamedId ~= nil, "The tamed kaiju isn't yours (or it changed taming)")
+	check(roster.List[tamedId].Level == 1, "A level 9 kaiju didn't start over at level 1: " .. tostring(roster.List[tamedId].Level))
+	check(roster.List[tamedId].Exp == 0, "A caught kaiju came with EXP: " .. tostring(roster.List[tamedId].Exp))
+	check(select(1, Kaiju.health(roster.List[tamedId])) == select(2, Kaiju.health(roster.List[tamedId])), "A caught kaiju isn't at full health")
 end
-check(Kaiju.count(roster) == owned + 1 and tamedId ~= nil, "The tamed kaiju isn't yours (or it changed taming)")
-check(roster.List[tamedId].Level == 9, "A level 9 kaiju wasn't caught at level 9: " .. tostring(roster.List[tamedId].Level))
-check(select(1, Kaiju.health(roster.List[tamedId])) == select(2, Kaiju.health(roster.List[tamedId])), "A caught kaiju isn't at full health")
 check(not target.Alive, "The tamed one still roams")
 -- A full roster: no taming. (Another roams out once they've gone.)
 KaijuWilds._spawnWild()

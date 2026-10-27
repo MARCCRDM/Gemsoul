@@ -807,7 +807,9 @@ put back at its den.
 
 - **Kill it:** every kaiju that fought it gets 40 + 12 × its level EXP, and
   the player who (with their kaiju) did the most gets its Gemsoul.
-- **Catch it:** it joins you, Gemsoul and all, at its level.
+- **Catch it:** it joins you, Gemsoul and all, **starting over at level 1**
+  (*2026-10-27*; `Kaiju.Tame.Level`): a level 19 caught is a level 1 of
+  yours, to level up from there.
 
 ### Claimed patches
 

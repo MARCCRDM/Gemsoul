@@ -2575,7 +2575,7 @@ local function resolveTame(enemy, wild: Wild, player: Player, now: number)
 	if rng:NextNumber() < chance then
 		local soul = table.clone(wild.Soul)
 		soul.Id = PlayerData.newGemId()
-		local record = KaijuServer.adopt(player, wild.Species, soul, wild.Level)
+		local record = KaijuServer.adopt(player, wild.Species, soul, Kaiju.Tame.Level)
 		if not record then
 			tell(player, "Couldn't catch it right now.")
 			tameResult(player, "Interrupted")
@@ -2585,7 +2585,7 @@ local function resolveTame(enemy, wild: Wild, player: Player, now: number)
 		Enemies.remove(enemy)
 		gone(wild)
 		PlayerData.milestone(player, "KaijuTamed")
-		tell(player, string.format("Caught! The %s (level %d) is yours.", title, wild.Level))
+		tell(player, string.format("Caught! The %s is yours, starting over at level %d.", title, record.Level))
 		tameResult(player, "Tamed")
 		return
 	end
