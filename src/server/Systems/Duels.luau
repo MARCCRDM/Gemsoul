@@ -10,9 +10,13 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	                          1v1: stats "Full" (everything earned) or "Even"
 	  "DuelRespond", userId, accept   answer a challenge
 	  "DuelLeave"             forfeit the current duel
-	  "DuelPivot", armor?, weapon?   between Ranked rounds: lock in an armor
-	                          loadout and a weapon loadout (slots 1-3; nil
-	                          keeps what you wear)
+	  "DuelPivot", pick?, hold?   between Ranked rounds: nil or "Keep" (as
+	                          you are: READY), "Counter" (the round's loser:
+	                          the armor answer to what hurt them,
+	                          Systems/CounterServer) or a miner's number
+	                          (the roster on: the loser's counter-pick).
+	                          Locks it in; hold = true only marks it (it's
+	                          worn if the window closes on it)
 	  "DuelAuto", on          auto queue (Shared.AutoQueue): on call for the
 	                          lobby (the default) or not
 	  "DuelFill", id, accept  answer a fill-in offer for queue entry `id`
@@ -38,10 +42,13 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	             Called, Bonus, Intro }         (Called: pulled from the lobby
 	                                            for it, Bonus coins on a win)
 	  "Fight"                                   the countdown is over
-	  "Round", { Phase = "Pivot", Round, Winner, Reason, Wins, Team, Ends, Scout }
-	                                            a Ranked round is over: pick a
-	                                            preset (Scout: the elements the
-	                                            other side fought with)
+	  "Round", { Phase = "Pivot", Round, Winner, Reason, Wins, Team, Ends, Scout,
+	             CanSwap, CanCounter, Threat, Counter }
+	                                            a Ranked round is over (Scout:
+	                                            the elements the other side
+	                                            fought with; Threat: what hurt
+	                                            you; Counter: your counter's
+	                                            plan, Shared.CounterGear)
 	  "Round", { Phase = "Locked", Team }       a side locked its pick
 	  "Round", { Phase = "Reveal", Round, Wins, Team, StartsAt, Ends, Picks }
 	                                            both picks, then the countdown
@@ -104,6 +111,7 @@ local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
 local Restores = require(script.Parent.Restores)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
+local CounterServer = require(script.Parent.CounterServer)
 
 local reply = Shop.reply
 
@@ -613,7 +621,9 @@ local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 		FirstFighters = {},
 		-- Rounds (1v1 Ranked): wins per team, rounds played, the pivot's
 		-- picks and locks, and what each side was scouted carrying.
-		Rounds = if rounds then { Wins = { 0, 0 }, Played = 0, Picks = {}, Locked = {}, PivotEnds = 0 } else nil,
+		Rounds = if rounds
+			then { Wins = { 0, 0 }, Played = 0, Picks = {}, Locked = {}, PivotEnds = 0, Threats = {} }
+			else nil,
 	}
 	matches[match.Id] = match
 	local startsAt = serverNow() + countdown
@@ -626,6 +636,7 @@ local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 			CombatServer.reset(member)
 			-- The rule its stats follow (CombatServer's kit, Equipment's stats)
 			-- before the health is topped up below.
+			CounterServer.newRound(member)
 			member:SetAttribute("MatchStats", rules.Stats)
 			member:SetAttribute("MatchRarityCap", rules.RarityCap)
 			member:SetAttribute("MatchId", match.Id)
@@ -693,6 +704,12 @@ local function tell(match, payload: (number) -> any)
 	end
 end
 
+-- May team `t` counter between rounds? The round's loser, or both sides
+-- after a drawn round (gear: Shared.CounterGear; miners: MinerRoster).
+local function counters(winner: number?, t: number): boolean
+	return winner == nil or winner ~= t
+end
+
 -- A round is over: `winner` took it (nil: a drawn round). The match ends
 -- when a side has enough, else the pivot window opens.
 local function endRound(match, winner: number?, reason: string)
@@ -712,10 +729,22 @@ local function endRound(match, winner: number?, reason: string)
 		return
 	end
 	match.State = "Pivot"
-	r.Picks, r.Locked = {}, {}
+	r.Picks, r.Locked, r.Threats = {}, {}, {}
 	r.LastWinner = winner
-	-- (With one miner there's nothing to pick: a shorter break.)
-	local pause = if MinerRoster.Enabled then Matchmaking.Rounds.Pivot else Matchmaking.Rounds.Break
+	-- What hurt each fighter this round, and the counter the round's loser
+	-- (both, after a draw) may wear into the next (Systems/CounterServer).
+	local offers, picking = {}, MinerRoster.Enabled
+	for t, team in match.Teams do
+		for _, member in team do
+			r.Threats[member] = CounterServer.threat(member, match.Teams[other(t)])
+			if counters(winner, t) then
+				offers[member] = CounterServer.offer(member, r.Threats[member])
+				picking = picking or offers[member].Changes > 0
+			end
+		end
+	end
+	-- (Nothing anyone can change: a shorter break.)
+	local pause = if picking then Matchmaking.Rounds.Pivot else Matchmaking.Rounds.Break
 	r.PivotEnds = os.clock() + pause
 	local ends = serverNow() + pause
 	for _, team in match.Teams do
@@ -724,19 +753,28 @@ local function endRound(match, winner: number?, reason: string)
 			CombatServer.reset(member)
 		end
 	end
-	tell(match, function(t)
-		return {
-			Phase = "Pivot",
-			Round = r.Played,
-			Winner = if winner == nil then "Draw" elseif winner == t then "You" else "Them",
-			CanSwap = MinerRoster.canCounter(winner, t),
-			Reason = reason,
-			Wins = { Mine = r.Wins[t], Theirs = r.Wins[other(t)] },
-			Team = t,
-			Ends = ends,
-			Scout = scout[other(t)],
-		}
-	end)
+	for t, team in match.Teams do
+		for _, member in team do
+			local offer = offers[member]
+			if not member.Parent then
+				continue
+			end
+			Remotes.Social:FireClient(member, "Round", {
+				Phase = "Pivot",
+				Round = r.Played,
+				Winner = if winner == nil then "Draw" elseif winner == t then "You" else "Them",
+				CanSwap = MinerRoster.canCounter(winner, t),
+				CanCounter = offer ~= nil and offer.Changes > 0,
+				Threat = r.Threats[member],
+				Counter = offer,
+				Reason = reason,
+				Wins = { Mine = r.Wins[t], Theirs = r.Wins[other(t)] },
+				Team = t,
+				Ends = ends,
+				Scout = scout[other(t)],
+			})
+		end
+	end
 end
 
 -- Both locked (or the window closed): wear the picks, show them, count down.
@@ -750,15 +788,23 @@ local function reveal(match)
 		picks[t] = {}
 		for _, member in team do
 			local chosen = r.Picks[member]
-			if chosen and MinerRoster.canCounter(r.LastWinner, t) then
+			local countered = nil
+			if type(chosen) == "number" and MinerRoster.canCounter(r.LastWinner, t) then
 				PlayerData.selectMiner(member, chosen)
+			elseif chosen == "Counter" and counters(r.LastWinner, t) then
+				local worn = CounterServer.wear(member, r.Threats[member])
+				if worn.Pieces + worn.Gems > 0 then
+					countered = worn.Element
+				end
 			end
+			CounterServer.newRound(member)
 			local profile = PlayerData.get(member)
 			local current = profile and profile.Miners and profile.Miners.Active or 1
 
 			table.insert(picks[t], {
 				Name = member.DisplayName,
 				Preset = if MinerRoster.Enabled then "Miner " .. current else nil,
+				Countered = countered,
 				Locked = r.Locked[member] == true,
 			})
 		end
@@ -808,31 +854,44 @@ local function reveal(match)
 	end)
 end
 
-local function pivot(player: Player, index: any)
+local function pivot(player: Player, index: any, hold: any)
 	local match = matchOf[player]
 	local r = match and match.Rounds
 	if not r or match.State ~= "Pivot" then
-		return reply(false, "You can only switch miners between rounds.")
+		return reply(false, "You can only change your gear between rounds.")
 	end
 	if r.Locked[player] then
 		return reply(false, "Your pick is locked in.")
 	end
-	local profile = PlayerData.get(player)
-	local roster = profile and profile.Miners
-	local chosen = index or (roster and roster.Active)
-	if roster and chosen ~= roster.Active and not MinerRoster.Enabled then
-		return reply(false, "You play one miner for now.")
+	local team = player:GetAttribute("MatchTeam")
+	if index == "Counter" then
+		-- The armor answer to what hurt you (the round's loser only).
+		if not counters(r.LastWinner, team) then
+			return reply(false, "The round winner keeps their gear. The loser may counter.")
+		end
+		r.Picks[player] = "Counter"
+	elseif index == nil or index == "Keep" then
+		r.Picks[player] = nil
+	else
+		local profile = PlayerData.get(player)
+		local roster = profile and profile.Miners
+		local chosen = index
+		if roster and chosen ~= roster.Active and not MinerRoster.Enabled then
+			return reply(false, "You play one miner for now.")
+		end
+		if not MinerRoster.valid(chosen) or not roster or not roster.Slots[chosen] then
+			return reply(false, "Choose one of your three miners.")
+		end
+		if chosen ~= roster.Active and not MinerRoster.canCounter(r.LastWinner, team) then
+			return reply(false, "The round winner keeps their miner. The loser may counter-pick.")
+		end
+		r.Picks[player] = chosen
 	end
-	if not MinerRoster.valid(chosen) or not roster or not roster.Slots[chosen] then
-		return reply(false, "Choose one of your three miners.")
+	if hold == true then
+		return reply(true, "")
 	end
-	if chosen ~= roster.Active and not MinerRoster.canCounter(r.LastWinner, player:GetAttribute("MatchTeam")) then
-		return reply(false, "The round winner keeps their miner. The loser may counter-pick.")
-	end
-	r.Picks[player] = chosen
 
 	r.Locked[player] = true
-	local team = player:GetAttribute("MatchTeam")
 	tell(match, function()
 		return { Phase = "Locked", Team = team }
 	end)

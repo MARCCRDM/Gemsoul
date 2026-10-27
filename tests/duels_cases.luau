@@ -510,6 +510,57 @@ do
 	check(m.State == "Done", "Round 3 didn't end the match")
 	advance(Matchmaking.EndPause)
 	respawn(gus, hal)
+	-- COUNTER (Systems/CounterServer): the round's loser may wear the armor
+	-- answer to what hurt them; the winner keeps their gear. One miner here
+	-- (the beta), so the counter is the only pick.
+	MinerRoster.configure(false)
+	profiles[hal].Counter = {
+		Element = "Fire",
+		Changes = 2,
+		Gems = { { Slot = "Helmet", Gem = "g1", Element = "Fire" }, { Slot = "Boots", Gem = "g2", Element = "Fire" } },
+		Gear = {},
+		Lines = { { Element = "Fire", Share = 1, Before = 1.25, After = 0.84 } },
+		Before = 1.25,
+		After = 0.84,
+	}
+	profiles[gus].Counter = { Element = "Shock", Changes = 1, Gems = {}, Gear = {}, Lines = {} }
+	handlers.DuelQueue(gus, "1v1")
+	handlers.DuelQueue(hal, "1v1")
+	advance(0.25)
+	joinAll()
+	m = Duels.matchOf(gus)
+	check((counterRounds[hal] or 0) > 0, "A match began with last match's damage on the books")
+	advance(Matchmaking.Countdown)
+	lethalBlow(hal)
+	local lost, won = last(hal, "Round")[2], last(gus, "Round")[2]
+	check(lost.CanCounter and lost.Counter and lost.Counter.Element == "Fire", "The round's loser wasn't offered the counter")
+	check(lost.Threat and lost.Threat.Shares[1].Element == "Fire", "The loser wasn't told what hurt them")
+	check(not won.CanCounter and won.Counter == nil, "The round's winner was offered a counter")
+	check(lost.Ends - now > Matchmaking.Rounds.Break, "A counter to pick still got the short break")
+	check(not handlers.DuelPivot(gus, "Counter").Ok, "The round's winner countered")
+	-- Marking it (hold) doesn't lock; the window closing wears what's marked.
+	check(handlers.DuelPivot(hal, "Counter", true).Ok and not m.Rounds.Locked[hal], "Marking the counter locked it")
+	check(handlers.DuelPivot(hal, "Keep", true).Ok and m.Rounds.Picks[hal] == nil, "Going back to KEEP didn't clear it")
+	check(handlers.DuelPivot(hal, "Counter", true).Ok, "The counter couldn't be marked again")
+	check(not counterWorn[hal], "The counter was worn before the reveal")
+	advance(Matchmaking.Rounds.Pivot)
+	check(m.State == "Countdown" and counterWorn[hal] == 1 and not counterWorn[gus], "The marked counter wasn't worn at the reveal")
+	local shown = last(gus, "Round")[2]
+	check(shown.Phase == "Reveal" and shown.Picks.Theirs[1].Countered == "Fire", "The winner wasn't shown the counter")
+	check(last(hal, "Round")[2].Picks.Mine[1].Countered == "Fire", "The loser wasn't shown their counter")
+	-- Round 2 to Hal: now Gus may counter, Hal keeps.
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(gus)
+	check(last(gus, "Round")[2].CanCounter and not last(hal, "Round")[2].CanCounter, "The counter didn't pass to round 2's loser")
+	check(handlers.DuelPivot(gus, "Counter").Ok and handlers.DuelPivot(hal, nil).Ok, "Locking in failed")
+	check(counterWorn[gus] == 1 and counterWorn[hal] == 1, "Round 2's counter wasn't worn (or the winner's was)")
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(hal)
+	check(m.State == "Done", "Round 3 didn't end the match")
+	profiles[hal].Counter, profiles[gus].Counter = nil, nil
+	MinerRoster.configure(true)
+	advance(Matchmaking.EndPause)
+	respawn(gus, hal)
 end
 
 -- MATCH READY: a decline or no answer leaves the queue; the other side

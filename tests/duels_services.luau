@@ -246,6 +246,27 @@ local Duelist = {
 		table.insert(raidsStarted, { Members = members, Id = id })
 	end,
 }
+-- The counter between Ranked rounds (Systems/CounterServer has its own
+-- suite, counter_gear): each player's offer is profiles[p].Counter (a
+-- CounterGear plan; nothing to change when unset), and each wear and each
+-- fresh round (what they took, forgotten) is recorded.
+local counterWorn, counterRounds = {}, {}
+local CounterServer = {
+	threat = function(p, foes)
+		return { Source = "Gear", Shares = { { Element = "Fire", Share = 1 } }, Foe = foes and foes[1] }
+	end,
+	offer = function(p)
+		return profiles[p] and profiles[p].Counter or { Changes = 0, Gems = {}, Gear = {}, Lines = {} }
+	end,
+	wear = function(p)
+		local plan = profiles[p] and profiles[p].Counter or { Changes = 0 }
+		counterWorn[p] = (counterWorn[p] or 0) + 1
+		return { Element = plan.Element, Pieces = 0, Gems = plan.Changes or 0 }
+	end,
+	newRound = function(p)
+		counterRounds[p] = (counterRounds[p] or 0) + 1
+	end,
+}
 local resets = {}
 local lethalHook
 local CombatServer = {

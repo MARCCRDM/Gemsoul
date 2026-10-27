@@ -32,8 +32,6 @@ local Config = require(ReplicatedStorage.Shared.Config)
 -- Squad dungeons and raids switched off (Config.Features): their buttons go.
 local dungeonsOpen = not (Config.Features and Config.Features.Dungeons == false)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
-local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
-local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
@@ -47,6 +45,7 @@ local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 local UiSound = require(script.Parent.UiSound)
+local RoundPivot = require(script.Parent.RoundPivot)
 
 local player = Players.LocalPlayer
 local P = IronUi.Colors
@@ -1857,172 +1856,21 @@ local resultFoot = text(result, "Returning to the menu…", 12, P.Dim)
 resultFoot.AutomaticSize, resultFoot.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
 resultFoot.Position, resultFoot.Size = UDim2.new(0, 0, 1, -34), UDim2.new(1, 0, 0, 18)
 
--- The pivot window between Ranked rounds: the round's result, what the
--- opponent fought with (scouting), and your presets to lock one in.
-local pivotPanel = new("Frame", {
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundColor3 = P.Frame,
-	BackgroundTransparency = 0.08,
-	Position = UDim2.fromScale(0.5, 0.48),
-	Size = UDim2.fromOffset(620, 370),
-	Visible = false,
-}, overlay)
-UiKit.round(pivotPanel, 14)
-local pivotStroke = new("UIStroke", { Color = P.Gold, Thickness = 2 }, pivotPanel)
-local pivotScale = new("UIScale", {}, pivotPanel)
-local function pivotLabel(value, size, color, font, y, h)
-	local l = text(pivotPanel, value, size, color, font)
-	l.AutomaticSize, l.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-	l.Position, l.Size = UDim2.fromOffset(16, y), UDim2.new(1, -32, 0, h)
-	return l
-end
-local pivotTitle = pivotLabel("", 30, P.Gold, HEADING, 14, 36)
-local pivotScore = pivotLabel("", 15, P.Text, BOLD, 52, 20)
-local pivotTimer = pivotLabel("", 13, P.Dim, BOLD, 74, 18)
-pivotLabel("THEY FOUGHT WITH", 11, P.Dim, BOLD, 102, 14)
-local scoutRow = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 120),
-	Size = UDim2.new(1, -32, 0, 26),
-}, pivotPanel)
-local scoutList = UiKit.list(scoutRow, 8, true)
-scoutList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-local counterLabel = pivotLabel("COUNTER-PICK  ·  the round loser may switch miners", 12, P.Dim, BOLD, 160, 18)
-local pickRow = new("Frame", {
-	BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 194),
-	Size = UDim2.new(1, -32, 0, 64),
-}, pivotPanel)
-UiKit.list(pickRow, 8, true)
-local lockButton = new("TextButton", {
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 276),
-	Size = UDim2.fromOffset(200, 34),
-	Text = "LOCK IN",
-	TextSize = 15,
-	Font = HEADING,
-	TextColor3 = P.Frame,
-	BackgroundColor3 = P.Gold,
-}, pivotPanel)
-UiKit.round(lockButton, 8)
-local pivotStatus = pivotLabel("", 13, P.Text, BOLD, 318, 18)
-local pivotTheirs = pivotLabel("", 12, P.Dim, BOLD, 340, 16)
--- One miner (the roster off): nothing to pick. The break shows the round,
--- what they fought with and READY, in a shorter panel.
-if not MinerRoster.Enabled then
-	counterLabel.Visible, pickRow.Visible = false, false
-	lockButton.Position = UDim2.new(0.5, 0, 0, 170)
-	pivotStatus.Position, pivotTheirs.Position = UDim2.fromOffset(16, 212), UDim2.fromOffset(16, 234)
-	pivotPanel.Size = UDim2.fromOffset(620, 266)
-end
-local pivotEnds = 0
-local pivotLocked = false
-local picked = nil
-local canSwap = false
-
--- (clear of Roblox's buttons at the top of a phone's screen)
-local function fitPivot()
-	local screen = overlay.AbsoluteSize
-	if screen.X > 0 then
-		local size = pivotPanel.Size
-		local s = math.min(1, (screen.X - 24) / size.X.Offset, (screen.Y - 24) / size.Y.Offset)
-		local room, at = UiKit.clearTopbar(screen, Vector2.new(size.X.Offset, size.Y.Offset) * s)
-		pivotScale.Scale = s * room
-		pivotPanel.Position = at
-	end
-end
-overlay:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPivot)
-UiKit.onTopbar(fitPivot)
-
-local drawPicks
-function drawPicks()
-	clear(pickRow)
-	local profile = GemClient.Profile
-	local roster = profile and profile.Miners
-	for index = 1, if MinerRoster.Enabled then MinerRoster.Count else 0 do
-		local miner = roster and roster.Slots[index]
-		local selected = picked == index
-		local enabled = miner ~= nil and (canSwap or index == roster.Active) and not pivotLocked
-		local level = Tree.level(miner and miner.Augments and miner.Augments.XP or 0)
-		local button = new("TextButton", {
-			Text = string.format("MINER %d · LV %d\n%s", index, level, if selected then "SELECTED" elseif enabled then "COUNTER-PICK" else "LOCKED"),
-			TextSize = 13, Font = BOLD, Size = UDim2.fromOffset(184, 62),
-			TextColor3 = if selected then P.Frame elseif enabled then P.Text else P.Dim,
-			BackgroundColor3 = if selected then P.Gold else P.Inset,
-			AutoButtonColor = enabled, LayoutOrder = index,
-		}, pickRow)
-		UiKit.round(button, 8)
-		button.Activated:Connect(function()
-			if enabled then picked = index; drawPicks() end
-		end)
-	end
-	lockButton.Text = if pivotLocked then "LOCKED IN" else "READY"
-	lockButton.AutoButtonColor = not pivotLocked
-end
-lockButton.Activated:Connect(function()
-	if pivotLocked then return end
-	pivotLocked = true
-	drawPicks()
-	local choice = picked
-	task.spawn(function()
-		local response = GemClient.request("DuelPivot", choice)
-		pivotStatus.Text = response.Message or ""
-		if not response.Ok then pivotLocked = false; drawPicks() end
-	end)
-end)
-
+-- The window between Ranked rounds (RoundPivot): the round's result, what
+-- hit you, and the counter or READY.
+RoundPivot.mount(overlay)
 local function showPivot(info)
 	faceoff.Visible, fightTimer.Visible, result.Visible = false, false, false
 	if match then
 		match.Score = info.Wins
 		match.Round = info.Round
 	end
-	local color = if info.Winner == "You" then P.Good elseif info.Winner == "Them" then P.Bad else P.Dim
-	pivotTitle.Text = string.format(
-		"ROUND %d  ·  %s",
-		info.Round,
-		if info.Winner == "You" then "WON" elseif info.Winner == "Them" then "LOST" else "DRAW"
-	)
-	pivotTitle.TextColor3, pivotStroke.Color = color, color
-	pivotScore.Text = string.format(
-		"You %d  –  %d Them  ·  first to %d",
-		info.Wins.Mine,
-		info.Wins.Theirs,
-		Matchmaking.Rounds.ToWin
-	)
-	clear(scoutRow)
-	for order, element in info.Scout or {} do
-		local tint = GemConfig.ElementColors[element] or P.Text
-		local tag = text(scoutRow, string.upper(GemConfig.elementName(element)), 12, tint, BOLD)
-		tag.AutomaticSize = Enum.AutomaticSize.None
-		tag.Size, tag.LayoutOrder = UDim2.fromOffset(104, 26), order
-		tag.TextXAlignment = Enum.TextXAlignment.Center
-		tag.BackgroundColor3, tag.BackgroundTransparency = tint, 0.82
-		UiKit.round(tag, 6)
-	end
-	if not info.Scout or #info.Scout == 0 then
-		local none = text(scoutRow, "No elements: no gems in their gear", 12, P.Dim, BOLD)
-		none.AutomaticSize = Enum.AutomaticSize.None
-		none.Size = UDim2.fromOffset(300, 26)
-		none.TextXAlignment = Enum.TextXAlignment.Center
-	end
-	pivotEnds = info.Ends
-	pivotLocked = false
-	picked = GemClient.Profile and GemClient.Profile.Miners and GemClient.Profile.Miners.Active or 1
-	canSwap = info.CanSwap == true
-	pivotStatus.Text = if not MinerRoster.Enabled
-		then "Next round soon. Press READY when you are."
-		elseif canSwap then "Choose a miner to counter their build, or keep your current miner."
-		else "Round won. Keep your miner; your opponent may counter-pick."
-	pivotStatus.TextColor3 = P.Text
-	pivotTheirs.Text = if MinerRoster.Enabled then "Opponent: choosing…" else "Opponent: getting ready…"
-	drawPicks()
-	fitPivot()
-	pivotPanel.Visible = true
+	RoundPivot.show(info)
 end
 
 -- Both locked: the picks, then the next round's face-off.
 local function showReveal(info)
-	pivotPanel.Visible = false
+	RoundPivot.hide()
 	if not match then
 		return
 	end
@@ -2031,7 +1879,11 @@ local function showReveal(info)
 	local function picked(list)
 		local out = {}
 		for _, entry in list or {} do
-			table.insert(out, entry.Name .. "\n" .. (if entry.Preset then "→ " .. entry.Preset else "kept setup"))
+			local change = if entry.Countered
+				then "countered " .. string.upper(GemConfig.elementName(entry.Countered))
+				elseif entry.Preset then "→ " .. entry.Preset
+				else "kept their gear"
+			table.insert(out, entry.Name .. "\n" .. change)
 		end
 		return table.concat(out, "\n")
 	end
@@ -2068,13 +1920,14 @@ local function showFaceoff(info)
 		info.Score, info.Round = { Mine = 0, Theirs = 0 }, 1
 		faceKind.Text ..= string.format("  ·  FIRST TO %d", info.Rounds.ToWin)
 	end
-	pivotPanel.Visible = false
+	RoundPivot.hide()
 	faceoff.Visible = true
 end
 
 local function showResult(info)
 	match = nil
-	faceoff.Visible, fightTimer.Visible, pivotPanel.Visible = false, false, false
+	faceoff.Visible, fightTimer.Visible = false, false
+	RoundPivot.hide()
 	local color = if info.Draw then P.Dim elseif info.Won then P.Good else P.Bad
 	resultTitle.Text = if info.Draw then "DRAW" elseif info.Won then "VICTORY" else "DEFEAT"
 	resultTitle.TextColor3, resultStroke.Color = color, color
@@ -2150,7 +2003,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
 		else
 			faceoff.Visible = false
 		end
-		fightTimer.Visible = left <= 0 and not pivotPanel.Visible
+		fightTimer.Visible = left <= 0 and not RoundPivot.visible()
 		fightTimer.Text = if match.Score
 			then string.format(
 				"R%d  ·  %d – %d  ·  ⚔ %s",
@@ -2161,9 +2014,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
 			)
 			else "⚔ " .. clock(match.Ends - now)
 	end
-	if pivotPanel.Visible then
-		pivotTimer.Text = string.format("Next round in %s", clock(pivotEnds - now))
-	end
+	RoundPivot.tick(now)
 	-- (not over the Social window: its Arena section shows the search)
 	-- (The intro queue has its own card: Lobby.client.)
 	banner.Visible = queued ~= nil and not gui.Enabled and queued.Mode ~= "intro"
@@ -2347,7 +2198,7 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 			showPivot(a)
 		elseif a.Phase == "Locked" then
 			if match and a.Team ~= match.Team then
-				pivotTheirs.Text = "Opponent: LOCKED IN"
+				RoundPivot.theyLocked()
 			end
 		elseif a.Phase == "Reveal" then
 			showReveal(a)

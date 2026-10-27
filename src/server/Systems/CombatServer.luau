@@ -435,6 +435,17 @@ local function spared(player, humanoid, amount, source): boolean
 	if dungeonLethalHook and dungeonLethalHook(player, humanoid) then return true end
 	return lethalHook ~= nil and lethalHook(player, humanoid)
 end
+-- Damage each fighter took through a match, by element ("None": no gem):
+-- what hurt them in a Ranked round, for the counter between rounds
+-- (Systems/CounterServer).
+local taken: { [Player]: { [string]: number } } = {}
+function CombatServer.takenByElement(player: Player): { [string]: number }
+	return taken[player] or {}
+end
+function CombatServer.clearTaken(player: Player)
+	taken[player] = nil
+end
+
 local function rawDamage(target, amount, source, crit, color, matchTag)
 	if target.Player then
 		if not spared(target.Player, target.Humanoid, amount, source) then
@@ -752,6 +763,11 @@ receive = function(player, amount, element, source, origin, projectile, heavy, r
 		DamageLog.send(source, outgoing)
 	end
 	TriadServer.afterIncoming(player, k, st, damage, source, enemySource, projectile, heavy, reflected, now)
+	if damage > 0 and player:GetAttribute("MatchId") then
+		local ledger = taken[player] or {}
+		taken[player] = ledger
+		ledger[element or "None"] = (ledger[element or "None"] or 0) + damage
+	end
 	if damage > 0 then
 		if origin then
 			Remotes.CombatFx:FireClient(player, "IncomingDamage", origin, swordHit == true, heavy == true)
@@ -2803,6 +2819,7 @@ function CombatServer.start()
 			stopDodge(states[player])
 		end
 		states[player] = nil
+		taken[player] = nil
 		for _, st in states do
 			st.Dots[player] = nil
 		end
