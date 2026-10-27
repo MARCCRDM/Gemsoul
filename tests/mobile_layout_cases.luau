@@ -402,8 +402,57 @@ check(
 )
 MobileLayout.claimTop("Other", false)
 check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given back")
+
+-- The Store on a phone (MobileLayout.store): the whole screen at every phone
+-- size (drawn 844 wide, as tall as the screen's shape leaves, scaled to fill
+-- it); the coins and the close button in Roblox's strip, at its right end,
+-- clear of its buttons and of DEV; the seven categories down the rail, every
+-- tab a thumb's height, all of them in it; the page beside the rail, inside
+-- the screen; and a catalog page with at least two columns of looks beside a
+-- product page that keeps its width.
+for _, s in {
+	{ 667, 375, 36 },
+	{ 736, 414, 36 },
+	{ 812, 375, 58 },
+	{ 844, 390, 58 },
+	{ 847, 391, 58 },
+	{ 896, 414, 58 },
+	{ 932, 430, 58 },
+	{ 568, 320, 36 },
+	{ 960, 411, 58 },
+	{ 1000, 400, 58 },
+} do
+	local screen = Vector2.new(s[1], s[2])
+	local label = "Store " .. s[1] .. "x" .. s[2]
+	local right = screen.X - 70 -- (DEV)
+	local store = MobileLayout.store(screen, s[3], right)
+	check(math.abs(store.W * store.Scale - screen.X) <= 1.5, label .. ": doesn't fill the screen's width")
+	check(math.abs(store.H * store.Scale - screen.Y) <= 1.5, label .. ": doesn't fill the screen's height")
+	check(store.W >= MobileLayout.Store.Width and store.H >= MobileLayout.Store.MinH, label .. ": drawn too small")
+	check(store.Scale >= 0.6, label .. ": scaled down to " .. store.Scale)
+	local close, rail, page = store.Close, store.Rail, store.Page
+	check(close.Y >= 0 and close.Y + close.H <= store.Strip, label .. ": the close button isn't in the strip")
+	check(close.W >= 32, label .. ": the close button is small: " .. close.W)
+	check((close.X + close.W) * store.Scale <= right, label .. ": the close button is under DEV")
+	check(store.Wallet.Right <= close.X - 6, label .. ": the coins run into the close button")
+	check(rail.Y >= store.Strip, label .. ": the rail starts under Roblox's buttons")
+	check(store.TabH >= 36, label .. ": the tabs are short: " .. store.TabH)
+	local tabs = MobileLayout.Store.Tabs
+	check(tabs * store.TabH + (tabs - 1) * MobileLayout.Store.TabGap <= rail.H, label .. ": the tabs don't fit the rail")
+	check(page.X >= rail.X + rail.W and page.Y == rail.Y, label .. ": the page isn't beside the rail")
+	check(page.X + page.W <= store.W and page.Y + page.H <= store.H, label .. ": the page runs off the screen")
+	check(page.H >= 290, label .. ": the page is short: " .. page.H)
+	local grid = MobileLayout.storeGrid(page.W)
+	check(grid.Cols >= 2 and grid.CardW >= MobileLayout.StoreGrid.CardMin, label .. ": the grid is cramped")
+	check(grid.GridW + 12 <= grid.ProductX, label .. ": the grid runs into the product page")
+	check(grid.ProductX + grid.ProductW == page.W, label .. ": the product page isn't at the page's right")
+	check(grid.ProductW >= MobileLayout.StoreGrid.ProductMin, label .. ": the product page is narrow")
+end
+-- A strip too thin for the close button gets one of our own.
+local thin = MobileLayout.store(Vector2.new(844, 390), 0, 844)
+check(thin.Strip >= thin.Close.H + 8 and thin.Close.Y >= 0, "No strip, and the close button had no room")
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (your kaiju's card small, two rows, at the top left, CATCH under it, the pick card beside it, the team keys above the move stick and the HYPERBEAM right of them, the foe list at the top right over the fight's ring, coins, chat, dock with TASKS, teammates' rows under your health and its size, the toast beside the pick card's place or under your health, the loot card under or beside them clear of the jump button, the kit switch by PLAY and clear of the fight's ring and vitals, at 7 screen sizes with 0 to 3 teammates)"
+		.. " mobile layout checks (your kaiju's card small, two rows, at the top left, CATCH under it, the pick card beside it, the team keys above the move stick and the HYPERBEAM right of them, the foe list at the top right over the fight's ring, coins, chat, dock with TASKS, teammates' rows under your health and its size, the toast beside the pick card's place or under your health, the loot card under or beside them clear of the jump button, the kit switch by PLAY and clear of the fight's ring and vitals, at 7 screen sizes with 0 to 3 teammates; the Store filling the screen at 10 phone sizes, its rail and page beside it)"
 )

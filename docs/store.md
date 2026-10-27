@@ -5,6 +5,10 @@ categories along the top, product grids with a product page beside them, and
 bundles that show what they hold and how much you save. Nothing random is
 sold.
 
+On a phone it's the whole screen, with the categories down a rail on the
+left and the coins and close button in Roblox's strip at the top (see
+[mobile.md](mobile.md#the-store-takes-the-whole-screen)).
+
 Code:
 - `src/shared/Store.luau`: the catalog, prices and the rules for who can buy what.
 - `src/server/Systems/StoreServer.luau`: purchases and receipts.

@@ -40,6 +40,52 @@ description stays at 12, since the longest are already two lines there.
 These are offline renders of the game's UI code over a stand-in
 background, not Roblox screenshots.
 
+### The Store takes the whole screen
+
+On a phone the Store is now the whole screen, not a window over the world
+(`MobileLayout.store`, used by `ShopUI`). The world, the kaiju card, the
+team keys and the dock are all covered while you shop.
+
+![The Store on a phone, before and after](mobile/store-phone-full.png)
+![On a small phone, and the Bundles page](mobile/store-phone-full-2.png)
+
+- **It fills any phone.** It's drawn 844 points wide, as tall as the
+  screen's shape leaves (360 at least), and scaled to fill the screen. On an
+  844 x 390 phone that's its own size; a 667 x 375 phone gets a taller page
+  (a second row of looks shows); a long 20:9 phone the same as 844. On a
+  phone with a notch it keeps inside the notch and the rounded corners
+  (`ScreenInsets` `DeviceSafeInsets`), and its dark runs out to the edges.
+- **The coins and the close button sit in Roblox's own strip** across the
+  top, at its right end, clear of Roblox's buttons and of DEV. A strip too
+  thin for the close button gets one of our own.
+- **The categories run down a rail on the left**, one under another, every
+  tab a thumb's height (42 points on an 844 x 390 phone, up to 48). The
+  picked one is lit, with a gold edge. Bundles says SALE while the
+  new-player offer is open.
+- **The page fills the rest.** A catalog has a grid as many columns wide as
+  fit (`MobileLayout.storeGrid`: three, 133 points each), with the sorting
+  over it and the product page on the right (a third of the width, at least
+  232). The product page is laid out from the bottom up: the note, Buy (44
+  tall), the price, three lines of words and the name, and the picture
+  takes whatever height is left. On Bundles the three squad kits fill a row
+  with the squad's summary under them (price, the one/two/three ladder, Buy
+  and Details), then the collections three to a row and the premium sets
+  one to a row. Bundle pages and order confirmations open below Roblox's
+  strip.
+
+**Why it showed small.** In the screenshot that started this, the Store
+was under half its size. The window was built while the phone was still
+upright and kept that size while hidden. When it opened, its little grow
+animation ran towards a scale fitted to an upright phone, and it
+overwrote the right one that came a moment later. Now the screen is read
+from the camera whenever the two disagree on which way up the phone is.
+The Store is fitted again when the screen turns and once it's up, and a
+fit always beats the grow (a phone has no grow at all). `tests/run_phone_layout.py`
+checks the source for these. `tests/mobile_layout_cases.luau` checks the
+layout at ten phone sizes: it fills the screen, the close button is in the
+strip and clear of DEV, the tabs fit the rail, and the grid and product
+page don't overlap. A computer's Store is unchanged.
+
 ## The lobby and fights
 
 The lobby and the fight screen are cleared down to what you use, like a

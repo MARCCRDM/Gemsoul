@@ -81,20 +81,24 @@ for _, name in { "ShopUI", "MarketBoardUI", "KaijuHud", "SurgeArrayUI", "SeasonU
 	check(source:find("local SHORT = UiKit.short()", 1, true) ~= nil, name .. " doesn't ask UiKit whether it's a phone")
 end
 
--- The Store on a phone: its phone layout near full size, where a computer's
--- would be a third (ShopUI's own fit: the screen less a margin, then below
--- Roblox's buttons, about 58 tall on a phone).
+-- The Store on a phone: the whole screen (MobileLayout.store, checked in
+-- mobile_layout_cases), fitted from the screen whichever way up the window
+-- last saw it (a window built while the phone was upright kept that size
+-- while hidden, and the Store came out fitted to an upright phone, under
+-- half its size), and the opening's little grow never has the last word
+-- over a fit.
 local shop = fs.readFile(ROOT .. "/src/client/Modules/ShopUI.luau")
-local phoneW, deskW, phoneH, deskH = shop:match("local W, H = if SHORT then (%d+) else (%d+), if SHORT then (%d+) else (%d+)")
-check(phoneW ~= nil, "The Store's sizes moved: update this test")
-local function fit(w, h, screen)
-	local s = math.min(1, (screen.X - 24) / w, (screen.Y - 12) / h)
-	-- (below Roblox's buttons: what's left under them, at most)
-	return math.min(s, (screen.Y - 58 - 6) / h)
-end
-local phone = Vector2.new(844, 390)
-check(fit(tonumber(phoneW), tonumber(phoneH), phone) >= 0.85, "The Store's phone layout is shrunk on a phone")
-check(fit(tonumber(deskW), tonumber(deskH), phone) < 0.5, "(a computer's layout on a phone isn't the small one it was)")
+check(shop:find("MobileLayout.store(screen, top, right - (whole - screen.X) / 2)", 1, true) ~= nil, "The Store on a phone isn't the whole screen")
+check(shop:find("local function screenSize(): Vector2", 1, true) ~= nil, "The Store doesn't read the screen itself")
+check(
+	shop:find("(view.X > view.Y) ~= (screen.X > screen.Y)", 1, true) ~= nil,
+	"The Store trusts a window size from an upright phone"
+)
+check(shop:find("camera:GetPropertyChangedSignal(\"ViewportSize\"):Connect(fit)", 1, true) ~= nil, "The Store isn't fitted again when the screen turns")
+check(shop:find("gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets", 1, true) ~= nil, "The Store on a phone runs under the notch")
+check(shop:find("pop:Cancel()", 1, true) ~= nil, "The opening's grow can undo a fit")
+check(shop:find("scale.Scale *= 0.96", 1, true) == nil, "The opening's grow scales whatever was there")
+check(shop:find("task.defer(fit)", 1, true) ~= nil, "The Store isn't fitted again once it's up")
 check(shop:find("local UP = if SHORT then 1 else 0", 1, true) ~= nil, "The Store's small print isn't a size up on a phone")
 for _, piece in {
 	"9 + UP)", -- a card's rarity
@@ -107,4 +111,4 @@ for _, piece in {
 	check(shop:find(piece, 1, true) ~= nil, "A size up missing on a phone: " .. piece)
 end
 
-print(string.format("PASS: %d phone layout checks (a phone either way up, never a tablet or a computer; the Store's phone layout near full size, its small print up)", checks))
+print(string.format("PASS: %d phone layout checks (a phone either way up, never a tablet or a computer; the Store the whole screen on a phone, fitted whichever way up, its small print up)", checks))

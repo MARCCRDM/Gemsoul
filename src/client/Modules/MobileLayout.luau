@@ -533,6 +533,68 @@ function MobileLayout.vitals(viewport: Vector2, ring, clear)
 	return { X = centre - width / 2, W = width, Centre = centre }
 end
 
+-- The Store on a phone (ShopUI): the whole screen, not a window over the
+-- world. It's drawn Width wide (MinH tall at least) and scaled to the
+-- screen, so it fills it on any phone whatever its points: the height is
+-- whatever the screen's shape leaves. Roblox's strip across the top keeps
+-- its buttons at the left; the coins and the close button sit at its right
+-- end (`right`, clear of DEV). Below it, the categories run down a rail on
+-- the left (tabs up to TabMax tall, filling it), and the page fills the
+-- rest. `top` and `right` are the strip's (UiKit.topbar), in the screen's
+-- points. Scale, W and H (the drawn size), Strip (its height, drawn), Rail
+-- and Page (rects), TabH, Close (a square) and Wallet (where the coins end,
+-- on the right, and their height).
+MobileLayout.Store =
+	{ Width = 844, MinH = 360, Edge = 10, Rail = 128, Gap = 10, TabMax = 48, TabGap = 4, Close = 40, Tabs = 7 }
+function MobileLayout.store(screen: Vector2, top: number, right: number)
+	local k = MobileLayout.Store
+	local s = math.min(screen.X / k.Width, screen.Y / k.MinH)
+	local w, h = math.floor(screen.X / s + 0.5), math.floor(screen.Y / s + 0.5)
+	-- (a strip too thin for the close button gets one of our own)
+	local strip = math.max(math.floor(top / s), k.Close + 8)
+	local close = math.min(k.Close, strip - 8)
+	local y = strip + 4
+	local rail = { X = k.Edge, Y = y, W = k.Rail, H = h - y - k.Edge }
+	local tab = math.min(k.TabMax, math.floor((rail.H - (k.Tabs - 1) * k.TabGap) / k.Tabs))
+	local pageX = rail.X + rail.W + k.Gap
+	local edge = math.min(w, math.floor(right / s)) - 8
+	return {
+		Scale = s,
+		W = w,
+		H = h,
+		Strip = strip,
+		Rail = rail,
+		TabH = tab,
+		Page = { X = pageX, Y = y, W = w - pageX - k.Edge, H = rail.H },
+		Close = { X = edge - close, Y = math.floor((strip - close) / 2), W = close, H = close },
+		Wallet = { Right = edge - close - 10, H = close },
+	}
+end
+
+-- A catalog page on a phone's Store (`width` the page's): the grid of looks
+-- on the left (Cols columns, as many as keep a card CardMin wide), the
+-- picked look's page on the right (Product of the width, kept between
+-- ProductMin and ProductMax). Cols, CardW, GridW, ProductX, ProductW.
+MobileLayout.StoreGrid =
+	{ Cols = 3, CardMin = 124, Gap = 10, Bar = 8, Product = 0.36, ProductMin = 232, ProductMax = 300 }
+function MobileLayout.storeGrid(width: number)
+	local k = MobileLayout.StoreGrid
+	local product = math.clamp(math.floor(width * k.Product), k.ProductMin, k.ProductMax)
+	local room = width - product - 12 - k.Bar
+	local cols = k.Cols
+	while cols > 1 and (room - (cols - 1) * k.Gap) / cols < k.CardMin do
+		cols -= 1
+	end
+	local card = math.floor((room - (cols - 1) * k.Gap) / cols)
+	return {
+		Cols = cols,
+		CardW = card,
+		GridW = cols * card + (cols - 1) * k.Gap,
+		ProductX = width - product,
+		ProductW = product,
+	}
+end
+
 function MobileLayout.overlaps(a, b): boolean
 	return a.X < b.X + b.W and b.X < a.X + a.W and a.Y < b.Y + b.H and b.Y < a.Y + a.H
 end
