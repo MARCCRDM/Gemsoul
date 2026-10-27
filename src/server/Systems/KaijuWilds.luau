@@ -22,7 +22,9 @@
 	              kit out: SparServer). It fights those who started on it
 	              and their kaiju (its packmate close by joins in:
 	              Kaiju.Wild.Defend; a pack shares out its foes and flanks
-	              one it shares, Shared.Squad), and forgets them once home. It walks
+	              one it shares, Shared.Squad), and forgets them once home.
+	              With your team all knocked out or called back mid-fight,
+	              it comes for you, pick in hand or not (exposed). It walks
 	              only where the way is clear (clearPath). It fights as the Arena's duellist does
 	              (KaijuFighter: combos, telegraphed heavies, guard and
 	              parry, hops, their Gemsoul's E), and walk home to heal if
@@ -374,9 +376,12 @@ end
 
 -- Foes -------------------------------------------------------------------------------------------------
 
+local exposed -- (below: one who started on it with no kaiju left out)
+
 -- Its foes inside a circle: kaiju out (not recalled) and hunters (`wide`,
--- a rift's critter: any prey).
-local function foesNear(center: Vector3, radius: number, wide: boolean?): { any }
+-- a rift's critter: any prey); for `wild`, a wild kaiju, also anyone who
+-- started on it whose kaiju are all down or called back (exposed).
+local function foesNear(center: Vector3, radius: number, wide: boolean?, wild: any?): { any }
 	local list = {}
 	for _, pet in KaijuServer.all() do
 		if KaijuServer.targetable(pet) and (pet.Root.Position - center).Magnitude <= radius then
@@ -385,7 +390,7 @@ local function foesNear(center: Vector3, radius: number, wide: boolean?): { any 
 	end
 	for _, player in Players:GetPlayers() do
 		local root = rootOf(player)
-		local fair = if wide then prey(player) else hunter(player)
+		local fair = if wide then prey(player) else (hunter(player) or (wild ~= nil and exposed(wild, player)))
 		if root and fair and (root.Position - center).Magnitude <= radius then
 			table.insert(list, { Root = root, Player = player })
 		end
@@ -424,6 +429,22 @@ local function engaged(wild: Wild, player: Player?): boolean
 	return player ~= nil and player.Parent ~= nil and wild.Engaged[player] ~= nil
 end
 
+-- One who started on it with nobody left in front of them: their kaiju
+-- all knocked out or called back mid-fight. It comes for them then, on
+-- foot or not (out past its leash and home a while, it forgets them as
+-- ever); send the team back out and it goes back to them.
+function exposed(wild: Wild, player: Player): boolean
+	if wild.Bug or not engaged(wild, player) or not prey(player) then
+		return false
+	end
+	for _, pet in KaijuServer.all() do
+		if pet.Owner == player and KaijuServer.targetable(pet) then
+			return false
+		end
+	end
+	return true
+end
+
 -- A guardian, or a pack holding a patch: it goes for miners on foot too.
 local function territorial(wild: Wild): boolean
 	return wild.Guard == true or (wild.Pack ~= nil and wild.Pack.Claim ~= nil)
@@ -450,7 +471,7 @@ end
 local function foesOf(wild: Wild)
 	return function(center: Vector3, radius: number): { any }
 		local list = {}
-		for _, victim in foesNear(center, radius, territorial(wild)) do
+		for _, victim in foesNear(center, radius, territorial(wild), wild) do
 			if engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
 				table.insert(list, victim)
 			end
@@ -475,7 +496,14 @@ local function hitFoe(enemy, victim, amount: number, element: string?, status: s
 	local player = victim.Player
 	if victim.Pet then
 		return KaijuServer.hurt(victim.Pet, amount, element, status, heavy)
-	elseif player and (hunter(player) or (wild ~= nil and (wild.Bug or territorial(wild)) and prey(player))) then
+	elseif
+		player
+		and (
+			hunter(player)
+			or (wild ~= nil and (wild.Bug or territorial(wild)) and prey(player))
+			or (wild ~= nil and exposed(wild, player))
+		)
+	then
 		local _, guarded = Enemies.hitPlayer(player, alonePlayer(wild, player, amount), element, enemy, heavy)
 		return if guarded then "Guarded" else "Hit"
 	end
@@ -493,7 +521,7 @@ local function fairFor(enemy, wild: Wild, victim): boolean
 		return false
 	end
 	local wide = wild.Bug or territorial(wild)
-	if victim.Player and not (if wide then prey(victim.Player) else hunter(victim.Player)) then
+	if victim.Player and not (if wide then prey(victim.Player) else (hunter(victim.Player) or exposed(wild, victim.Player))) then
 		return false
 	end
 	if not wild.Bug and not engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
@@ -615,7 +643,7 @@ local function chooseFoe(enemy, wild: Wild, aggro: number)
 		return current
 	end
 	local best, bestDistance = nil, aggro
-	for _, victim in foesNear(enemy.Root.Position, aggro, wide) do
+	for _, victim in foesNear(enemy.Root.Position, aggro, wide, wild) do
 		local distance = (victim.Root.Position - enemy.Root.Position).Magnitude
 		if valid(victim) and distance <= bestDistance then
 			best, bestDistance = victim, distance
@@ -659,7 +687,7 @@ local function packShare(enemy, wild: Wild, victim)
 	end
 	for _, mate in members do
 		add((mate.Enemy :: any).FoeVictim)
-		for _, near in foesNear(mate.Enemy.Root.Position, mate.Enemy.Kind.Aggro, mate.Guard == true) do
+		for _, near in foesNear(mate.Enemy.Root.Position, mate.Enemy.Kind.Aggro, mate.Guard == true, mate) do
 			if fairFor(mate.Enemy, mate, near) then
 				add(near)
 			end

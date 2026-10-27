@@ -876,8 +876,12 @@ it. There are two ways:
 
 Then it fights everyone who started on it, and their kaiju. **Its packmate
 joins in** if it's within 40 studs: start on one of a pair and you'll often
-face both. It doesn't go for anyone else near. It fights as above (its E too), and only hits you
-while you hunt. Lead it more than 70 studs from its den and it walks back to
+face both. It doesn't go for anyone else near. It fights as above (its E too), and hits you
+while you hunt. **With your team gone** (*2026-10-27*: all knocked out, or
+called back mid-fight) it comes for you instead, pick in hand or not, out
+past the core (`KaijuWilds` `exposed`); it used to stand there once your
+kaiju were gone. Send your team back out and it goes back to them; run
+past its leash and it gives up. Lead it more than 70 studs from its den and it walks back to
 heal. Once it has been back 8 seconds with nobody fighting it, it forgets who
 started on it, and goes about its day again.
 

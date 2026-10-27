@@ -1533,6 +1533,57 @@ a:SetAttribute("Hunt", nil)
 a:SetAttribute("Spar", nil)
 enemy.LastSource, enemy.FoeVictim = nil, nil
 
+-- Your team called back (or knocked out) mid-fight, out past the core: it
+-- comes for you, on foot, pick in hand; your kaiju back out, it goes back
+-- to them. Someone it was never in a fight with is still left alone.
+do
+	local home, at = enemy.Home, enemy.Root.CFrame
+	local away = outpost + Vector3.new(FrontierRules.Core + 60, 0, 0)
+	enemy.Root.CFrame = CFrame.new(away)
+	enemy.Home = away
+	rootA.CFrame = CFrame.new(away + Vector3.new(4, 0, 0))
+	pet.Root.CFrame = CFrame.new(away + Vector3.new(2.5, 0, 0))
+	pet.RecallUntil = 0
+	check(KaijuWilds.prey(a) and not KaijuWilds.hunter(a), "Not a miner out past the core")
+	table.clear(wild.Engaged) -- (a fresh fight)
+	enemy.FoeVictim, enemy.LastPet, enemy.LastSource = nil, nil, nil
+	KaijuWilds._brain(enemy, now)
+	check(enemy.Foe == nil, "A wild kaiju went for a miner nobody had started on it")
+	wild.Engaged[a] = now -- (challenged)
+	KaijuWilds._brain(enemy, now)
+	check(enemy.Foe == pet, "It went for you over your kaiju")
+	registered.KaijuRecall(a)
+	enemy.FoeVictim, enemy.LastPet = nil, nil
+	KaijuWilds._brain(enemy, now)
+	check(enemy.Foe == a, "Your team called back mid-fight, it left you be")
+	local hits = #playerHits
+	for _ = 1, 40 do
+		now += 0.15
+		KaijuWilds._brain(enemy, now)
+		if #playerHits > hits then
+			break -- (no longer than it takes: the fights below keep their clock)
+		end
+	end
+	check(#playerHits > hits and playerHits[#playerHits][1] == a, "It never struck you with your team called back")
+	pet.RecallUntil = 0
+	enemy.FoeVictim = nil
+	KaijuWilds._brain(enemy, now)
+	check(enemy.Foe == pet, "Your kaiju back out, it kept on at you")
+	-- (Knocked out counts as gone too.)
+	local health = pet.Humanoid.Health
+	pet.Humanoid.Health = 0
+	enemy.FoeVictim = nil
+	KaijuWilds._brain(enemy, now)
+	check(enemy.Foe == a, "Your team knocked out, it left you be")
+	pet.Humanoid.Health = health
+	-- (Back as it was for what follows.)
+	table.clear(wild.Engaged)
+	enemy.FoeVictim, enemy.Foe = nil, nil
+	enemy.Home, enemy.Root.CFrame = home, at
+	pet.Root.CFrame = CFrame.new(outpost + Vector3.new(0, 0, 400))
+	rootA.CFrame = CFrame.new(enemy.Root.Position + Vector3.new(6, 0, 0))
+end
+
 -- Fighting as a duellist ------------------------------------------------------------------------------------------
 
 local fighter, wf = pet.Fighter, wild.Fighter
