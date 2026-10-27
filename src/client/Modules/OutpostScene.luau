@@ -247,22 +247,22 @@ end
 -- The swing bar: beside the rock you're mining, to its right as you look
 -- at it (a billboard on the rock), your swings left, counting down with
 -- each one (a little pop as it drops), over a bar of them: the free pick's
--- charge, or a bought pick's wear. Red at none left. Tap it for the pick
--- card's details.
+-- charge, or a bought pick's wear. Red at none left. Display only: it
+-- never takes a click or tap, so it can't block the rock or its prompts
+-- (it sits low, below them).
 local swingBar = new("BillboardGui", {
 	Name = "SwingBar",
 	Size = UDim2.fromOffset(78, 34),
 	AlwaysOnTop = true,
-	Active = true,
+	Active = false,
 	LightInfluence = 0,
 	MaxDistance = 90,
 	Enabled = false,
 	ResetOnSpawn = false,
 }, player.PlayerGui)
-local swingFace = new("TextButton", {
+local swingFace = new("Frame", {
 	Name = "Face",
-	Text = "",
-	AutoButtonColor = false,
+	Active = false,
 	Size = UDim2.fromScale(1, 1),
 	BackgroundColor3 = Color3.fromRGB(12, 16, 26),
 	BackgroundTransparency = 0.15,
@@ -321,7 +321,7 @@ local function swingBarOn(body: BasePart?)
 	swingBar.Adornee = body
 	if body then
 		local reach = math.max(body.Size.X, body.Size.Z) / 2
-		swingBar.StudsOffset = Vector3.new(reach + 1.6, body.Size.Y * 0.2, 0)
+		swingBar.StudsOffset = Vector3.new(reach + 2.2, -body.Size.Y * 0.35, 0)
 	end
 end
 local blockingScreens = {
@@ -361,11 +361,6 @@ local function fitOutpostHud()
 end
 togglePick.Activated:Connect(function()
 	expanded = not expanded
-	collapseAt = os.clock() + 8
-	fitOutpostHud()
-end)
-swingFace.Activated:Connect(function()
-	expanded = true
 	collapseAt = os.clock() + 8
 	fitOutpostHud()
 end)
