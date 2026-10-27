@@ -18,9 +18,10 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local GemFacts = require(ReplicatedStorage.Shared.GemFacts)
+local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local Rules = require(ReplicatedStorage.Shared.Market)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
-local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GearArt = require(script.Parent.GearArt)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
@@ -186,17 +187,24 @@ local function gearOf(payload)
 	return def and Classes.gear(class, def.Kind, payload.Id)
 end
 
-local function surgeName(gem): string?
-	if not gem.Cut then
-		return nil
-	end
-	local ok, id = pcall(Tech.surgeOf, gem)
-	if not ok or not id then
-		return nil
-	end
-	local surge = Tech.Catalog and Tech.Catalog[id]
-	return surge and surge.Name or id
-end
+-- How each kind of line in a gem's list looks: size, colour, font.
+local FACT_STYLE = {
+	Name = { 16, P.Text, BOLD },
+	Sub = { 12, P.Dim, BOLD },
+	Head = { 11, GOLD, BOLD },
+	Move = { 13, P.Text, BOLD },
+	Stats = { 12, P.Text, BODY },
+	Grade = { 13, P.Good, BOLD },
+	Effect = { 12, P.Text, BODY },
+	Worth = { 12, P.Dim, BODY },
+	Total = { 13, P.Gold, BOLD },
+	Note = { 12, Color3.fromRGB(150, 160, 185), BODY },
+}
+local KEY_COLORS = {
+	Q = Color3.fromRGB(255, 138, 92),
+	E = Color3.fromRGB(122, 196, 255),
+	R = Color3.fromRGB(120, 230, 170),
+}
 
 local function itemName(payload): string
 	if payload.Kind == "Gem" then
@@ -218,8 +226,11 @@ local function itemLine(payload): string
 	if payload.Kind == "Gem" then
 		local gem = payload.Gem
 		local tier = GemConfig.TierLabels[gem.Tier] or gem.Tier
-		local surge = surgeName(gem)
-		local line = tier .. " gem" .. (if surge then "  ·  Power: " .. surge else "  ·  Rough")
+		local line = tier
+			.. " gem  ·  "
+			.. GemConfig.elementName(gem.Element)
+			.. "  ·  "
+			.. (if gem.Cut then GemRoller.levelLabel(gem) else "Rough")
 		return if payload.Where then line .. "  ·  " .. payload.Where else line
 	end
 	local rarity = GearRolls.Rarities[payload.Roll and payload.Roll.Rarity or 1] or GearRolls.Rarities[1]
@@ -282,47 +293,18 @@ end
 -- socket in their element's colour, then the roll's finish and serial.
 local function detailLines(payload)
 	local lines = {}
-	local function add(value, size, color, font)
-		table.insert(lines, { value, size, color, font or BODY })
+	local function add(value, size, color, font, gap)
+		table.insert(lines, { value, size, color, font or BODY, gap })
 	end
 	if payload.Kind == "Gem" then
-		local gem = payload.Gem
-		add(GemConfig.displayName(gem), 16, itemColor(payload), BOLD)
-		add(
-			(GemConfig.TierLabels[gem.Tier] or gem.Tier) .. " gem  ·  " .. GemConfig.elementName(gem.Element),
-			12,
-			P.Dim,
-			BOLD
-		)
-		local surge = surgeName(gem)
-		add(
-			if surge then "Power: " .. surge .. " (on Q · E · R)" else "Rough: cut it to unlock its power",
-			13,
-			P.Gold,
-			BOLD
-		)
-		for _, metric in GemConfig.MetricOrder do
-			local grade = gem[metric]
-			if grade then
-				add(
-					string.format(
-						"%s %s/10  ·  %s",
-						GemConfig.MetricLabels[metric],
-						tostring(grade),
-						string.lower(GemConfig.MetricRoles[metric])
-					),
-					13,
-					P.Good,
-					BOLD
-				)
-			end
-		end
-		local ok, worth = pcall(GemConfig.value, gem)
-		if ok and worth then
-			add("Worth about " .. commas(worth) .. " coins", 12, P.Dim)
-		end
-		if gem.MinedBy then
-			add("Mined by " .. gem.MinedBy, 12, Color3.fromRGB(150, 160, 185))
+		-- Every property, as the gem window shows it (Shared.GemFacts).
+		for _, fact in GemFacts.lines(payload.Gem) do
+			local style = FACT_STYLE[fact.Kind] or FACT_STYLE.Note
+			local color = if fact.Kind == "Name"
+				then itemColor(payload)
+				elseif fact.Key then KEY_COLORS[fact.Key]:Lerp(P.Text, if fact.Kind == "Stats" then 0.55 else 0)
+				else style[2]
+			add(fact.Text, style[1], color, style[3], if fact.Kind == "Head" then 6 else nil)
 		end
 		if payload.Where then
 			add("Now " .. payload.Where .. " (listing takes it out)", 12, P.Dim)
@@ -388,7 +370,7 @@ local function details(parent, payload, x, y, w, h, skipHeader: boolean?)
 		if skipHeader and i <= 2 then
 			continue
 		end
-		new("TextLabel", {
+		local row = new("TextLabel", {
 			BackgroundTransparency = 1,
 			Text = line[1],
 			TextSize = line[2],
@@ -400,6 +382,9 @@ local function details(parent, payload, x, y, w, h, skipHeader: boolean?)
 			TextXAlignment = Enum.TextXAlignment.Left,
 			LayoutOrder = i,
 		}, box)
+		if line[5] then
+			new("UIPadding", { PaddingTop = UDim.new(0, line[5]) }, row)
+		end
 	end
 	return box
 end

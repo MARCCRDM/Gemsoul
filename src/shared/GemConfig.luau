@@ -650,16 +650,17 @@ GemConfig.GradeWords = {
 	{ 2, "Chipped" },
 	{ 0, "Cracked" },
 }
-function GemConfig.title(gem: Gem): string
+function GemConfig.gradeWord(gem: Gem): string
 	local average = (gem.Size + gem.Clarity + (gem.Cut or 0)) / 3
-	local word = "Cracked"
 	for _, entry in GemConfig.GradeWords do
 		if average >= entry[1] then
-			word = entry[2]
-			break
+			return entry[2]
 		end
 	end
-	return word .. " " .. GemConfig.elementName(gem.Element) .. " Gem"
+	return "Cracked"
+end
+function GemConfig.title(gem: Gem): string
+	return GemConfig.gradeWord(gem) .. " " .. GemConfig.elementName(gem.Element) .. " Gem"
 end
 
 -- How strongly a gem's enchantment shows on gear (glow, particles), 0-1.
