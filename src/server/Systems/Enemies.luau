@@ -594,6 +594,13 @@ local function die(enemy: Enemy)
 		reward(enemy)
 	end
 	local model = enemy.Model
+	-- (Held where it fell till it's gone: a dead Humanoid stops holding the
+	-- body up, and a kaiju's parts don't collide, so it sank into the ground.)
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.Anchored = true
+		end
+	end
 	task.delay(0.6, function()
 		enemies[model] = nil
 		model:Destroy()

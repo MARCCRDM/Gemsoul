@@ -512,6 +512,12 @@ function ElementalDeath.play(model: Model?, element: string?, color: Color3?): b
 	local camera = workspace.CurrentCamera
 	local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
 	if camera and root and (root.Position - camera.CFrame.Position).Magnitude > ElementalDeath.Far then
+		-- (...but the body goes all the same: none of it left standing.)
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.LocalTransparencyModifier = 1
+			end
+		end
 		return true
 	end
 	local limit = if model:GetAttribute("MoonBug") then ElementalDeath.CritterPieces else ElementalDeath.MaxPieces
