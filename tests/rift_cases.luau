@@ -1071,7 +1071,7 @@ do
 	-- BACKUP on the strip opens the same list anywhere on the way; down at
 	-- the boss the kaiju are called back and come out again on a revive.
 	check(client:find('Name = "Backup"', 1, true) ~= nil and client:find("RiftClient.openBackup", 1, true) ~= nil, "No BACKUP on the strip")
-	check(server:find("KaijuServer.recallTeam(player)", 1, true) ~= nil and server:find("KaijuServer.deployTeam(player, true)", 1, true) ~= nil, "The kaiju aren't called back and out again")
+	check(server:find("KaijuServer.recallTeam(player)", 1, true) ~= nil and server:find("KaijuServer.deployTeam(player)", 1, true) ~= nil, "The kaiju aren't called back and out again")
 	-- The boss takes turns on the kaiju too (Shared.Aggro's turns, each
 	-- kaiju's own threat: KaijuServer.strike; Duelist's PetTarget).
 	local duelist = fs.readFile(ROOT .. "/src/server/Systems/Duelist.luau")

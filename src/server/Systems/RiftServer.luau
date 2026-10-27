@@ -970,12 +970,12 @@ local function fallAtBoss(run, player: Player)
 end
 
 -- Back on their feet at the boss, whole, their kaiju restored and out
--- again beside them (deployed in danger: the one time it's allowed).
+-- again beside them.
 local function revive(run, player: Player, text: string)
 	run.Fallen[player], run.Handled[player] = nil, nil
 	standUp(player)
 	KaijuServer.restoreAll(player)
-	KaijuServer.deployTeam(player, true)
+	KaijuServer.deployTeam(player)
 	local root = rootOf(player)
 	if root then
 		fx("Deploy", root.Position, 6, nil, root.Position)

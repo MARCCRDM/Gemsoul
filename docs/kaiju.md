@@ -326,11 +326,10 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   the team that's filling. Press a team's number (or tap its chip on the
   kaiju card) and:
   - **the team out's own number** calls it back (they fold into light and
-    fly to you), and the same number brings it out again, only once you're
-    out of danger;
+    fly to you), and the same number brings it out again, in a fight or out
+    of one;
   - **another team's number** swaps that team in: the team out goes back
-    and the other comes out where you are (three seconds between swaps,
-    `Kaiju.SwitchSeconds`);
+    and the other comes out where you are;
   - **an empty team** says how they fill ("Team 3 is empty. Your kaiju fill
     the teams in order: fill Team 2 first."), and a team all knocked out
     says so and stays home.
@@ -338,12 +337,33 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   This replaced CALL BACK / DEPLOY: there's no button for them now, the
   number does both (`KaijuTeamOut`; `Kaiju.order`, `teamOf`, `outTeam`). The
   pick or combat kit switch moved from 1 to **Y** to free the numbers.
+
+  *2026-10-27:* **every call is instant, in danger too.** There used to be
+  a three-second wait between swaps ("One moment.", `Kaiju.SwitchSeconds`)
+  and a team called back only came out again once you were clear of the
+  fight. Both are gone: the keys, SEND OUT and DEPLOY act at once, in a
+  fight or out of one. Changing the team, its lead or the support doesn't
+  wait either. So swapping back and forth can't refresh moves, each kaiju
+  keeps its moves' waits when it goes back in its Gemsoul (its Q, E, R and
+  gem surge, the support's pulses, and the HUD's cooldowns:
+  `KaijuServer`'s `waits`). Swap a team out and straight back and it comes
+  out as it went in, nothing ready that wasn't. A fresh team swapped in
+  fights as fresh. The one thing that still stops a deploy is being down
+  ("Not while you're down."): the Rift calls your kaiju back while you're
+  down at its boss, and they come out with you when you're up.
 - **The TEAMS tab** (the kaiju panel's fourth): a row for each team, its
   three places, OUT or CALLED BACK on the team out, LOCKED on a team past
   the one filling ("Fill Team 2 first" in its places), and SEND OUT on the
   others. Tap a kaiju, then another, in any team, and they swap places
   (`KaijuSwap`); tap the one picked again to let it go. Not in the middle
   of a fight.
+
+  *2026-10-27, fixed:* in the game the tab could show only Team 1's first
+  place, the rest missing. Each redraw cleared the rows and destroyed the
+  kaiju pictures the tab keeps for next time. Roblox won't let a destroyed
+  model be shown again, so the next draw stopped at its first picture. Now
+  the pictures are taken out of the rows before they go (`keepModels`), and
+  one destroyed anyway is built again (`modelFor`).
 
   ![The TEAMS tab](kaiju/teams-tab.png)
 
@@ -563,8 +583,8 @@ above the combat HUD near the bottom center:
     first, edged in gold, then the second beside it and the third under
     it), and your support beside the third.
   - **On the right:** AUTO HEAL over the team keys, four chips two by two:
-    the team out gold, one called back edged in gold (red while you're in
-    danger), one all knocked out red, one not filled yet faint.
+    the team out gold, one called back edged in gold, one all knocked out
+    red, one not filled yet faint.
 
   On a phone, *2026-10-27*, **one row at the top left**, where the pick card
   was: the team's three, the support a little apart, AUTO HEAL, then the

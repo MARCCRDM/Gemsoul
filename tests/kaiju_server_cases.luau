@@ -1254,7 +1254,10 @@ pet.LastFight = now - 10
 check(registered.KaijuActive(a, second.Id).Ok and roster.Active == second.Id, "Couldn't switch")
 pet = KaijuServer.pets()[a]
 check(pet and pet.Record == second, "The new one didn't come out")
-check(not registered.KaijuActive(a, starter.Id).Ok, "Switched again at once")
+-- (and back, and again, at once: no wait between switches)
+check(registered.KaijuActive(a, starter.Id).Ok and registered.KaijuActive(a, second.Id).Ok, "Couldn't switch again at once")
+pet = KaijuServer.pets()[a]
+check(pet and pet.Record == second and roster.Active == second.Id, "Switched back and again, the new one isn't out")
 
 -- Enchanting (KaijuSocket): only a gem of its own element; the old one
 -- back in the pouch; attuned (harder hits, its surge).
@@ -3301,29 +3304,29 @@ local function yourTeam()
 	end
 	now += Kaiju.RecallSeconds + 0.1
 	-- Call back: the whole team away in its Gemsouls, none of it out (and
-	-- kept away through upkeep); deploying waits till you're out of
-	-- danger, then they're all back.
+	-- kept away through upkeep); DEPLOY brings them all back at once, in
+	-- danger too, but not while you're down.
 	local inDanger = KaijuServer.inDanger
 	check(registered.KaijuCallBack(a, true).Ok, "Couldn't call the team back")
 	check(Kaiju.away(roster) and #KaijuServer.team(a) == 0, "Called back, the team's still out")
 	KaijuServer._upkeep(a, now)
 	check(#KaijuServer.team(a) == 0, "Upkeep put a called-back team out again")
+	a:SetAttribute("SparDown", now + 3)
+	check(not registered.KaijuCallBack(a, false).Ok and Kaiju.away(roster), "Deployed while down")
+	a:SetAttribute("SparDown", nil)
 	KaijuServer.inDanger = function()
 		return true
 	end
-	check(not registered.KaijuCallBack(a, false).Ok and Kaiju.away(roster), "Deployed in danger")
-	KaijuServer.inDanger = function()
-		return false
-	end
-	check(registered.KaijuCallBack(a, false).Ok and not Kaiju.away(roster), "Couldn't deploy out of danger")
+	check(registered.KaijuCallBack(a, false).Ok and not Kaiju.away(roster), "Couldn't deploy in danger")
 	KaijuServer.inDanger = inDanger
 	squad = KaijuServer.team(a)
 	check(#squad == 3, "Deployed, the team isn't all out: " .. #squad)
 	check(not registered.KaijuCallBack(a, "yes").Ok, "Called back with nonsense")
 	-- Teams and their keys (Kaiju.Teams): Team 2 fills once Team 1 is full;
 	-- 1 (the team out's own key) calls it back and brings it out again; 2
-	-- swaps Team 2 in (and not again within SwitchSeconds); an empty team's
-	-- key does nothing; from called back, 1 deploys only out of danger.
+	-- swaps Team 2 in, and 1 straight back, no wait between, each kaiju's
+	-- moves' waits kept through it; an empty team's key does nothing; from
+	-- called back, 1 deploys, in danger too, but not while you're down.
 	-- KaijuSwap trades two places.
 	do
 		local team1 = Kaiju.teamIds(roster)
@@ -3340,7 +3343,6 @@ local function yourTeam()
 		local empty = Kaiju.teamCount(roster) + 1
 		check(empty > Kaiju.Teams or (not registered.KaijuTeamOut(a, empty).Ok and Kaiju.outTeam(roster) == 1), "An empty team came out")
 		check(not registered.KaijuTeamOut(a, 0).Ok and not registered.KaijuTeamOut(a, "2").Ok, "A team that isn't one")
-		now += Kaiju.SwitchSeconds + 0.1
 		check(registered.KaijuTeamOut(a, 2).Ok and Kaiju.outTeam(roster) == 2, "2 didn't swap Team 2 in")
 		local out = KaijuServer.team(a)
 		local ids2 = {}
@@ -3348,21 +3350,36 @@ local function yourTeam()
 			ids2[pet.Record.Id] = true
 		end
 		check(ids2[team2[1]] and ids2[team2[2]] and ids2[team2[3]] and not ids2[team1[1]], "Team 2 isn't the one out")
-		check(not registered.KaijuTeamOut(a, 1).Ok and Kaiju.outTeam(roster) == 2, "Swapped back within SwitchSeconds")
-		now += Kaiju.SwitchSeconds + 0.1
+		-- Straight back to Team 1 and to Team 2 again, at once: Team 2's
+		-- lead comes back with its waits as it went (no move of its ready
+		-- again, nor its HUD's), not a fresh one's.
+		local lead = KaijuServer.team(a)[1]
+		local leadId, fighter = lead.Record.Id, lead.Fighter :: any
+		fighter.NextQ, fighter.NextR, fighter.LastFight = now + 9, now + 20, now
+		lead.Model:SetAttribute("KaijuRAt", 1234)
+		check(registered.KaijuTeamOut(a, 1).Ok and Kaiju.outTeam(roster) == 1, "Couldn't swap straight back to Team 1")
+		check(registered.KaijuTeamOut(a, 2).Ok and Kaiju.outTeam(roster) == 2, "Couldn't swap straight back to Team 2")
+		local again
+		for _, pet in KaijuServer.team(a) do
+			if pet.Record.Id == leadId then
+				again = pet
+			end
+		end
+		check(again ~= nil and again ~= lead, "Team 2's lead didn't come out again")
+		local kept = again.Fighter :: any
+		check(kept.NextQ == now + 9 and kept.NextR == now + 20 and kept.LastFight == now, "A quick swap reset its moves' waits")
+		check(again.Model:GetAttribute("KaijuRAt") == 1234, "The HUD's R wait didn't come back with it")
 		check(registered.KaijuTeamOut(a, 2).Ok and Kaiju.away(roster) and #KaijuServer.team(a) == 0, "2 again didn't call Team 2 back")
+		a:SetAttribute("SparDown", now + 3)
+		check(not registered.KaijuTeamOut(a, 1).Ok and Kaiju.away(roster) and Kaiju.outTeam(roster) == 2, "Deployed from called back while down")
+		a:SetAttribute("SparDown", nil)
 		KaijuServer.inDanger = function()
 			return true
 		end
-		check(not registered.KaijuTeamOut(a, 1).Ok and Kaiju.away(roster) and Kaiju.outTeam(roster) == 2, "Deployed from called back in danger")
-		KaijuServer.inDanger = function()
-			return false
-		end
-		check(registered.KaijuTeamOut(a, 1).Ok and not Kaiju.away(roster) and Kaiju.outTeam(roster) == 1, "1 didn't deploy Team 1")
+		check(registered.KaijuTeamOut(a, 1).Ok and not Kaiju.away(roster) and Kaiju.outTeam(roster) == 1, "1 didn't deploy Team 1 in danger")
 		KaijuServer.inDanger = inDanger
 		check(#KaijuServer.team(a) == 3, "Team 1 isn't all out again")
 		-- Swap a kaiju of Team 2 into Team 1: it's out, the other's home.
-		now += Kaiju.SwitchSeconds + 0.1
 		check(registered.KaijuSwap(a, team1[3], team2[1]).Ok, "Couldn't swap two kaiju")
 		check(Kaiju.teamNumber(roster, team2[1]) == 1 and Kaiju.teamNumber(roster, team1[3]) == 2, "The swap didn't trade teams")
 		local outNow = {}
@@ -3380,6 +3397,18 @@ local function yourTeam()
 		KaijuServer._upkeep(a, now)
 		squad = KaijuServer.team(a)
 	end
+	-- The TEAMS tab (KaijuHud) takes its portraits out of its rows before
+	-- the rows go, and builds afresh one that was destroyed anyway: Roblox
+	-- locks a destroyed model's Parent, so putting it in again stopped the
+	-- tab's draw at its first kaiju (one box of Team 1, the rest missing).
+	do
+		local hud = fs.readFile(ROOT .. "/src/client/Modules/KaijuHud.luau")
+		local draw = string.find(hud, "function teamsUi.draw(data)", 1, true)
+		local keep = draw and string.find(hud, 'keepModels("team:")', draw, true)
+		local clear = draw and string.find(hud, "teamsUi.Rows:GetChildren()", draw, true)
+		check(keep ~= nil and clear ~= nil and keep < clear, "The TEAMS tab destroys the portraits it keeps")
+		check(string.find(hud, "entry.Model.Parent = entry.Model.Parent", 1, true) ~= nil, "A destroyed portrait isn't built afresh")
+	end
 	-- EXP: each one out gets it.
 	local before = {}
 	for _, member in squad do
@@ -3394,7 +3423,9 @@ local function yourTeam()
 	now += 5
 	check(registered.KaijuTeam(a, order).Ok, "Couldn't set the team")
 	check(KaijuServer.team(a)[1].Record.Id == squadIds[3] and roster.Active == squadIds[3], "The new lead isn't first")
-	check(not registered.KaijuTeam(a, squadIds).Ok, "Changed the team twice in a moment")
+	-- (and again at once, and back: no wait between changes)
+	check(registered.KaijuTeam(a, squadIds).Ok and registered.KaijuTeam(a, order).Ok, "Couldn't change the team again at once")
+	check(KaijuServer.team(a)[1].Record.Id == squadIds[3], "Changed back, the lead isn't first")
 	now += 5
 	check(not registered.KaijuTeam(a, { "nope" }).Ok, "Put out a kaiju they don't own")
 	check(not registered.KaijuTeam(a, { order[1], order[1] }).Ok, "Put the same kaiju out twice")
@@ -6195,9 +6226,10 @@ end)()
 	for _, record in profiles[a].Kaiju.List do
 		record.Health = 1
 	end
-	-- (The boss is right there: in danger, where DEPLOY is otherwise refused.)
+	-- (The boss is right there, and they're down: DEPLOY waits till they're
+	-- up, in danger or not.)
 	check(KaijuServer.inDanger(a), "Not in danger at the boss")
-	check(not KaijuServer.deployTeam(a, false), "Deployed in danger without the Rift's say-so")
+	check(not KaijuServer.deployTeam(a), "Deployed while down at the boss")
 	check(registered.RiftChoice(a, "Restore").Ok, "Couldn't restore")
 	check(profiles[a].Coins == 1000 - RiftRun.restoreCost(0), "RESTORE didn't cost its coins")
 	check(a:GetAttribute("RiftFallen") == nil and a:GetAttribute("SparDown") == nil and hA.Health == hA.MaxHealth, "Not back on their feet")

@@ -73,10 +73,10 @@ Level 5 to 6 now takes 1,563 EXP (was 894); level 10 to 11, 4,913 (was
 
 The strip's AUTO HEAL button is split: **AUTO HEAL** and, beside it,
 **CALL BACK**. Called back, your team folds into points of light that fly
-to you, and the button reads **DEPLOY**. You can't deploy while you're in
-danger: the button shows **IN DANGER** and the server answers "Not while
-you're in danger: get clear of the fight first." Deployed, they open out of a shard
-of light from you. Sounds: `call_back.mp3`, `deploy.mp3`.
+to you, and the button reads **DEPLOY**. Deployed, they open out of a shard
+of light from you. Sounds: `call_back.mp3`, `deploy.mp3`. (*2026-10-27:*
+DEPLOY works in danger too, at once; it used to wait till you were clear
+of the fight. See [kaiju.md](kaiju.md), Teams 1 to 4.)
 
 ## The lobby card and side buttons
 
@@ -132,7 +132,7 @@ the stone sits beside the details.
 | Suite | What it checks |
 | --- | --- |
 | `run_levelup_fx` | The column, the rings, the sparks, the flash, the plate, a kaiju's at its size, following its body, gone after 2.6 s, sent and drawn, its sounds. Your card: across the top middle on a computer; on every phone size on the screen, at the top, clear of the pick card, toasts and loot card; its words and a kaiju's name (not translated); the number turning over with sparks, the rays turning, the line running down, gone at the end; its Spanish |
-| `run_kaiju` | The EXP curve and mining EXP; CALL BACK, DEPLOY and its danger check; kaiju jumping after you; `restoreAll` |
+| `run_kaiju` | The EXP curve and mining EXP; CALL BACK, DEPLOY (in danger too, not while you're down); kaiju jumping after you; `restoreAll` |
 | `run_gem_metric` | A gem's worth: grades, weights, points, rate, value |
 | `run_critter_fx` | The carried gem is the real gem |
 | `run_store_displays`, `run_quarry_life`, `run_moon_quarry_scene`, `run_outpost` | The stands, no searchlights, Mole drills in every bay, the spawn facing one |

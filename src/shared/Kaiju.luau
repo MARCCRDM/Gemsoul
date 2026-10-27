@@ -1072,8 +1072,7 @@ function Kaiju.autoHealOn(roster): boolean
 end
 
 -- Called back (roster.Away): the team is put away in its Gemsouls, none of
--- it out, till you deploy it again; and it deploys only out of danger
--- (Kaiju.Danger).
+-- it out, till you deploy it again (at once, in danger or out of it).
 function Kaiju.away(roster): boolean
 	return roster ~= nil and roster.Away == true
 end
@@ -1527,7 +1526,6 @@ end
 -- the TEAMS tab swaps two places (Kaiju.swap). One team is out at a time
 -- (roster.Out; keys 1 to 4 pick it: KaijuServer's KaijuTeamOut).
 Kaiju.Teams = 4
-Kaiju.SwitchSeconds = 3 -- (between swapping one team out for another)
 
 -- The line, tidied: kaiju you own, each once, no support kinds; the ones in
 -- roster.Order first (a save from before teams: its team, roster.Team, and

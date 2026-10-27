@@ -15,9 +15,9 @@
 	                  keys, 1 to 4 (Shared.Kaiju.Teams): press a number or
 	                  tap its chip. The team out's own number calls it back
 	                  into its Gemsouls (each tile AWAY) or brings it out
-	                  again (only out of danger: IN DANGER till then,
-	                  Shared.Kaiju.away, KaijuServer's KaijuDanger); another
-	                  team's swaps it in (KaijuServer's KaijuTeamOut). Tap a
+	                  again, fight or no fight (Shared.Kaiju.away); another
+	                  team's swaps it in, at once (KaijuServer's
+	                  KaijuTeamOut). Tap a
 	                  tile for the panel on that kaiju. The team's HYPERBEAM
 	                  is the card's outline, its pill on the bottom edge
 	                  (KaijuBeamHud, in KaijuHud.beamSlot()). Computer:
@@ -204,11 +204,15 @@ local built: { [string]: { Look: string, Model: Model } } = {}
 local function modelFor(key: string, record): Model
 	local look = record.Species .. "/" .. record.Element
 	local entry = built[key]
-	if entry and entry.Look == look then
+	-- (One destroyed with the frame it was in can't be shown again: Roblox
+	-- locks its Parent, so it's built afresh.)
+	if entry and entry.Look == look and pcall(function()
+		entry.Model.Parent = entry.Model.Parent
+	end) then
 		return entry.Model
 	end
 	if entry then
-		entry.Model:Destroy()
+		pcall(entry.Model.Destroy, entry.Model)
 	end
 	local model = KaijuModels.forPortrait(KaijuModels.build(record.Species, record.Element))
 	built[key] = { Look = look, Model = model }
@@ -236,6 +240,18 @@ local function portrait(frame: ViewportFrame, model: Model?)
 	camera.CFrame = CFrame.lookAt(cf.Position + Vector3.new(reach * 0.9, reach * 0.35, -reach * 1.25), cf.Position)
 	camera.Parent = frame
 	frame.CurrentCamera = camera
+end
+
+-- The models kept under `prefix` ("row:", "team:") taken out of their
+-- frames, so destroying the frames leaves them whole for next time.
+local function keepModels(prefix: string)
+	for key, entry in built do
+		if string.sub(key, 1, #prefix) == prefix then
+			pcall(function()
+				entry.Model.Parent = nil
+			end)
+		end
+	end
 end
 
 local function roster()
@@ -429,8 +445,7 @@ local autoArt: string? = nil
 
 -- The team keys, beside AUTO HEAL: four chips, 1 to 4 (Kaiju.Teams), the
 -- keys that bring each team out. The team out is gold; picked but called
--- back, a gold edge (red while you're in danger: it deploys only out of
--- it); a team with kaiju in it, plain; one all knocked out, red; one not
+-- back, a gold edge; a team with kaiju in it, plain; one all knocked out, red; one not
 -- filled yet, faint (they fill in order: Kaiju.order). Tap one or press its
 -- number: the team out's own calls it back or brings it out again, another
 -- team's swaps it in (KaijuServer's KaijuTeamOut).
@@ -685,7 +700,6 @@ end
 local function drawTeams()
 	local data = roster()
 	local out, away = Kaiju.outTeam(data), Kaiju.away(data)
-	local danger = player:GetAttribute("KaijuDanger") == true
 	for n, chip in teamChips do
 		local ids = Kaiju.teamOf(data, n)
 		local standing = 0
@@ -699,7 +713,7 @@ local function drawTeams()
 		if filled and n == out and not away then
 			back, edge, text = P.Gold, P.Gold, INK
 		elseif filled and n == out then
-			edge, text = if danger then P.Bad else P.Gold, P.Gold
+			edge, text = P.Gold, P.Gold
 		elseif filled and standing == 0 then
 			edge, text = P.Bad:Lerp(P.Edge, 0.5), P.Bad:Lerp(P.Text, 0.3)
 		elseif not filled then
@@ -1237,6 +1251,7 @@ do
 end
 teamsUi.Pick = nil :: string?
 function teamsUi.draw(data)
+	keepModels("team:") -- (the portraits are kept for the next draw)
 	for _, child in teamsUi.Rows:GetChildren() do
 		child:Destroy()
 	end
@@ -1559,12 +1574,7 @@ end)
 -- The panel's list ------------------------------------------------------------------------------------------------
 
 local function clearList()
-	-- (The rows' models are kept for next time.)
-	for key, entry in built do
-		if string.sub(key, 1, 4) == "row:" then
-			entry.Model.Parent = nil
-		end
-	end
+	keepModels("row:") -- (the rows' models are kept for next time)
 	for _, child in listFrame:GetChildren() do
 		if child:IsA("GuiObject") then
 			child:Destroy()

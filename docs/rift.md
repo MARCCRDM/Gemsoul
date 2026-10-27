@@ -515,8 +515,8 @@ fighters leave you be while you're down; with everyone down, they wait.
   - **Your kaiju are called back** the moment you go down (into their
     Gemsouls: `KaijuServer.recallTeam`), so they're not left fighting
     without you. Restored, or got up by backup coming through, they come
-    out again beside you at once, **in danger or not** (`deployTeam` with
-    `force`: the one place DEPLOY is allowed in a fight);
+    out again beside you at once, **in danger or not**
+    (`KaijuServer.deployTeam`; while you're down, it waits);
   - **CALL FOR BACKUP · 1/4 IN YOUR PARTY**: a list of who you can call in
     (`Shared.RiftLobby.backup`): the rest of your party first (with you in
     the Rift, or where they are in the Outpost, no button), then every

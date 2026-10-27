@@ -31,9 +31,9 @@
 	               (record.DownUntil, Kaiju.reviveSeconds), or at once for
 	               Robux or a Revive coupon (KaijuServer.reviveAll).
 	  Call back    the whole team put away in its Gemsouls (roster.Away:
-	               Kaiju.away), none of it out till you deploy it again;
-	               it deploys only out of danger (KaijuServer.inDanger), so
-	               calling it back is no way out of a fight.
+	               Kaiju.away), none of it out till you deploy it again,
+	               at once, in a fight or out of one; each kaiju comes back
+	               out with its moves' waits as they were (`waits`).
 	  Auto heal    switched on (Kaiju.AutoHeal, kept as roster.AutoHeal),
 	               your spare Commons heal your team by themselves, out of
 	               danger, never a gem wasted. Quiet, but for running out
@@ -63,11 +63,11 @@
 	                        KaijuServer.filterName); "" for no name
 	  "KaijuAutoHeal", on   auto heal on or off
 	  "KaijuCallBack", away   true: the team put away (Kaiju.away); false:
-	                        deployed again, only out of danger
-	  "KaijuTeamOut", n     a team key (1 to Kaiju.Teams): the team out's own
-	                        number calls it back or deploys it; another's
-	                        swaps that team in (Kaiju.SwitchSeconds apart),
-	                        or, called back, deploys it out of danger
+	                        deployed again
+	  "KaijuTeamOut", n     a team key (1 to Kaiju.Teams), at once: the team
+	                        out's own number calls it back or deploys it;
+	                        another's swaps that team in, or, called back,
+	                        deploys it
 	  "KaijuSwap", a, b     two of yours swap places in your teams (Kaiju.swap)
 	  "KaijuRoll"           the starter roll owed: { Rolls = { { Species, Element, Soul } } }
 	  "KaijuRollClaim"      take it: the kaiju join you
@@ -212,7 +212,13 @@ end
 local rng = Random.new()
 -- When a player owing a starter roll was first seen in the Outpost.
 local owedSince: { [Player]: number } = {}
-local lastSwitch: { [Player]: number } = {}
+-- Each of a player's kaiju's waits as it went back in its Gemsoul (its
+-- fighter's NextQ, NextR, NextSurge, NextGem and LastFight, its pulses,
+-- and the HUD's *At), by record id, so one swapped out and straight back
+-- in comes out with them as they were: swaps are instant, and none of
+-- them resets a move.
+local waits: { [Player]: { [string]: any } } = {}
+local CAST_SHOWN = { "KaijuQAt", "KaijuAbilityAt", "KaijuRAt", "KaijuGemAt" }
 -- How fast each owner was rising last frame (to see them jump: Kaiju.leapt),
 -- when their client last said they jumped (Remotes.KaijuJump), and when the
 -- last jump of theirs was counted (Kaiju.newJump).
@@ -389,6 +395,25 @@ local function despawn(player: Player, id: string?)
 			if pet.Humanoid.Health > 0 then
 				keepHealth(pet)
 			end
+			local f = pet.Fighter
+			if f then
+				local shown = {}
+				for _, name in CAST_SHOWN do
+					shown[name] = pet.Model:GetAttribute(name)
+				end
+				waits[player] = waits[player] or {}
+				waits[player][petId] = {
+					NextQ = f.NextQ,
+					NextR = f.NextR,
+					NextSurge = f.NextSurge,
+					NextGem = f.NextGem,
+					Ability = f.Ability,
+					GemSurge = f.GemSurge,
+					LastFight = f.LastFight,
+					PulseAt = table.clone(pet.PulseAt or {}),
+					Shown = shown,
+				}
+			end
 			KaijuFighter.forget(pet.Fighter)
 			pet.Model:Destroy()
 		end
@@ -479,6 +504,20 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 	})
 	humanoid.MaxHealth = pet.Stats.Health
 	humanoid.Health = math.clamp(Kaiju.health(record), 1, pet.Stats.Health)
+	-- (Back from a swap: its waits as they were, not fresh: see `waits`.)
+	local kept = waits[player] and waits[player][record.Id]
+	if kept then
+		waits[player][record.Id] = nil
+		local f = pet.Fighter :: any
+		f.NextQ, f.NextR, f.LastFight = kept.NextQ, kept.NextR, kept.LastFight
+		-- (a new E or Gemsoul since starts its own wait, as a fresh one)
+		f.NextSurge = if kept.Ability == ability then kept.NextSurge else f.NextSurge
+		f.NextGem = if kept.GemSurge == gem then kept.NextGem else f.NextGem
+		pet.PulseAt = kept.PulseAt
+		for name, at in kept.Shown do
+			model:SetAttribute(name, at)
+		end
+	end
 	refresh(pet)
 	KaijuServer.place(model, spotBy(root, slot), root.Position + root.CFrame.LookVector * 10)
 	model.Parent = folder
@@ -1729,10 +1768,10 @@ function KaijuServer.recallTeam(player: Player): boolean
 	return true
 end
 
--- The team deployed again: only out of danger, unless `force` (the one
--- time it's allowed in danger: back on your feet at the Rift's boss,
--- restored or with backup come through the gate). Returns ok, why not.
-function KaijuServer.deployTeam(player: Player, force: boolean?): (boolean, string)
+-- The team deployed again, at once, in danger or out of it (back from a
+-- swap with their waits as they were: see `waits`); not while you're down
+-- (the Rift calls them back till you're up). Returns ok, why not.
+function KaijuServer.deployTeam(player: Player): (boolean, string)
 	local profile = PlayerData.get(player)
 	local roster = profile and profile.Kaiju
 	if not roster then
@@ -1741,8 +1780,8 @@ function KaijuServer.deployTeam(player: Player, force: boolean?): (boolean, stri
 	if not Kaiju.away(roster) then
 		return true, ""
 	end
-	if not force and KaijuServer.inDanger(player, os.clock()) then
-		return false, "Not while you're in danger: get clear of the fight first."
+	if player:GetAttribute("SparDown") ~= nil then
+		return false, "Not while you're down."
 	end
 	roster.Away = nil
 	PlayerData.sync(player)
@@ -1755,7 +1794,7 @@ function KaijuServer.deployTeam(player: Player, force: boolean?): (boolean, stri
 end
 
 -- The team called back (`away`), into its Gemsouls; or deployed again,
--- only out of danger.
+-- at once (KaijuServer.deployTeam).
 local function callBack(player: Player, away: any)
 	local profile = PlayerData.get(player)
 	local roster = profile and profile.Kaiju
@@ -1769,18 +1808,18 @@ local function callBack(player: Player, away: any)
 		if not KaijuServer.recallTeam(player) then
 			return reply(true, "")
 		end
-		return reply(true, "Team called back. Deploy them again once you're clear of danger.")
+		return reply(true, "Team called back.")
 	end
-	local ok, text = KaijuServer.deployTeam(player, false)
+	local ok, text = KaijuServer.deployTeam(player)
 	return reply(ok, text)
 end
 
--- A team key (1 to 4: Kaiju.Teams). The team out's own number calls it
--- back, or deploys it again (only out of danger, as DEPLOY). Another team's
--- swaps it in: the one out goes back in its Gemsouls and that one comes out,
--- fight or no fight (it brings a fresh team in, it's no way out), at most
--- once every Kaiju.SwitchSeconds. Called back, another team's number picks
--- it and deploys it, out of danger.
+-- A team key (1 to 4: Kaiju.Teams), at once, fight or no fight. The team
+-- out's own number calls it back, or deploys it again (as DEPLOY). Another
+-- team's swaps it in: the one out goes back in its Gemsouls and that one
+-- comes out. Called back, another team's number picks it and deploys it.
+-- (No wait between: each kaiju keeps its waits through a swap, `waits`, so
+-- swapping back and forth resets no move.)
 local function teamOut(player: Player, n: any)
 	local profile = PlayerData.get(player)
 	local roster = profile and profile.Kaiju
@@ -1797,7 +1836,7 @@ local function teamOut(player: Player, n: any)
 	local current, away = Kaiju.outTeam(roster), Kaiju.away(roster)
 	if n == current then
 		if away then
-			local ok, text = KaijuServer.deployTeam(player, false)
+			local ok, text = KaijuServer.deployTeam(player)
 			return reply(ok, if ok then string.format("Team %d out.", n) else text)
 		end
 		KaijuServer.recallTeam(player)
@@ -1814,18 +1853,14 @@ local function teamOut(player: Player, n: any)
 	end
 	local now = os.clock()
 	if away then
-		if KaijuServer.inDanger(player, now) then
-			return reply(false, "Not while you're in danger: get clear of the fight first.")
+		if player:GetAttribute("SparDown") ~= nil then
+			return reply(false, "Not while you're down.")
 		end
 		roster.Out = n
 		roster.Team, roster.Active = Kaiju.teamIds(roster), ids[1]
-		local ok, text = KaijuServer.deployTeam(player, false)
+		local ok, text = KaijuServer.deployTeam(player)
 		return reply(ok, if ok then string.format("Team %d out.", n) else text)
 	end
-	if lastSwitch[player] and now - lastSwitch[player] < Kaiju.SwitchSeconds then
-		return reply(false, "One moment.")
-	end
-	lastSwitch[player] = now
 	local root = rootOf(player)
 	for _, pet in petsOf(player) do
 		fx("CallBack", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
@@ -1868,8 +1903,8 @@ local function swapKaiju(player: Player, a: any, b: any)
 	return reply(true, "")
 end
 
--- Puts `ids` out as the team (the first leads): only your own, not while
--- one of them is mid-fight, and not twice in a moment.
+-- Puts `ids` out as the team (the first leads): only your own, and not
+-- taking one away mid-fight.
 local function changeTeam(player: Player, ids: { string }): (boolean, string)
 	local profile = PlayerData.get(player)
 	local roster = profile and Kaiju.roster(profile)
@@ -1886,15 +1921,11 @@ local function changeTeam(player: Player, ids: { string }): (boolean, string)
 	if KaijuServer.battling(player) then
 		return false, "Not during a kaiju battle."
 	end
-	if lastSwitch[player] and now - lastSwitch[player] < 3 then
-		return false, "One moment."
-	end
 	for _, pet in petsOf(player) do
 		if now - pet.LastFight < 3 and not table.find(after, pet.Record.Id) then
 			return false, "Not in the middle of a fight."
 		end
 	end
-	lastSwitch[player] = now
 	Kaiju.setTeam(roster, after)
 	PlayerData.sync(player)
 	upkeep(player, now)
@@ -1936,10 +1967,6 @@ local function setSupport(player: Player, id: any)
 		return reply(false, "Not during a kaiju battle.")
 	end
 	local now = os.clock()
-	if lastSwitch[player] and now - lastSwitch[player] < 3 then
-		return reply(false, "One moment.")
-	end
-	lastSwitch[player] = now
 	Kaiju.setSupport(roster, id)
 	PlayerData.sync(player)
 	upkeep(player, now)
@@ -2451,7 +2478,7 @@ end
 
 local function left(player: Player)
 	despawn(player)
-	teams[player], lastSwitch[player], owedSince[player], rising[player] = nil, nil, nil, nil
+	teams[player], waits[player], owedSince[player], rising[player] = nil, nil, nil, nil
 	saidJump[player], lastJump[player] = nil, nil
 	healAt[player], toldEmpty[player] = nil, nil
 end
@@ -2497,8 +2524,8 @@ function KaijuServer.start()
 				if not ok then
 					warn("[Kaiju] auto heal:", err)
 				end
-				-- (The HUD's HEAL waits while you're in danger, and so does
-				-- DEPLOY for a team called back.)
+				-- (The HUD's HEAL waits while you're in danger, the team out
+				-- or called back.)
 				local profile = PlayerData.get(player)
 				local away = profile ~= nil and Kaiju.away(profile.Kaiju) and canBeOut(player)
 				local danger = ((teams[player] ~= nil and next(teams[player]) ~= nil) or away)
