@@ -1,4 +1,6 @@
--- A shared boxed lottery following the miner's head. No screen window or input lock.
+-- A shared boxed lottery following the miner's head: a small tag (Roll.displaySize),
+-- the reel while it rolls, then the gem, its rarity, name, element and value. No
+-- screen window or input lock.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,6 +16,7 @@ local WHITE = Color3.fromRGB(239, 249, 255)
 local GOLD = Color3.fromRGB(255, 206, 92)
 local MUTED = Color3.fromRGB(152, 173, 194)
 local active, templates, seen = {}, {}, {}
+local limits = setmetatable({}, { __mode = "k" }) -- [label] = its UITextSizeConstraint
 local connection, folder = nil, nil
 local started = false
 local playerGui = player:WaitForChild("PlayerGui")
@@ -34,8 +37,16 @@ local function label(parent, y, height, size, color)
 	text.Text = ""
 	text.Parent = parent
 	local limit = Instance.new("UITextSizeConstraint")
-	limit.MaxTextSize, limit.MinTextSize, limit.Parent = size, 10, text
+	limit.MaxTextSize, limit.MinTextSize, limit.Parent = size, 8, text
+	limits[text] = limit
 	return text
+end
+-- Moves a label within the tag (scale) and sets its largest text size.
+local function place(text, x, y, w, h, size, align)
+	text.Position, text.Size = UDim2.fromScale(x, y), UDim2.fromScale(w, h)
+	text.TextXAlignment = align or Enum.TextXAlignment.Center
+	local limit = limits[text]
+	if limit and size then limit.MaxTextSize = size end
 end
 local function billboard(anchor, name, offset, size)
 	local board = Instance.new("BillboardGui")
@@ -178,34 +189,36 @@ local function showResult(entry, elapsed)
 		local model, radius = GemArt.model(gem, true)
 		entry.Winner = prepare(model, radius)
 		entry.Winner.Name, entry.Winner.Parent = "AwardedGem", entry.Viewport
-		entry.Well.Position, entry.Well.Size = UDim2.fromScale(0.045, 0.22), UDim2.fromScale(0.32, 0.50)
+		-- The gem in a square on the left; rarity, name, then element and
+		-- value beside it.
+		entry.Well.Position, entry.Well.Size = UDim2.fromScale(0.04, 0.29), UDim2.fromScale(0.27, 0.64)
 		entry.Camera.FieldOfView = 28
+		local LEFT, RIGHT = Enum.TextXAlignment.Left, Enum.TextXAlignment.Right
+		entry.Rarity.Visible = true
 		entry.Rarity.Text = string.upper(GemConfig.TierLabels[gem.Tier] or gem.Tier)
 		entry.Rarity.TextColor3 = entry.Color
-		entry.Heading.Position, entry.Heading.Size = UDim2.fromScale(0.40, 0.34), UDim2.fromScale(0.55, 0.21)
-		entry.Detail.Position, entry.Detail.Size = UDim2.fromScale(0.40, 0.57), UDim2.fromScale(0.55, 0.10)
+		place(entry.Rarity, 0.35, 0.29, 0.61, 0.17, 10, LEFT)
 		entry.Heading.Text = GemConfig.shade(gem).Name
 		entry.Heading.TextColor3 = entry.Color
+		place(entry.Heading, 0.35, 0.47, 0.61, 0.26, 16, LEFT)
 		entry.Detail.Text = string.upper(GemConfig.elementName(gem.Element))
 		entry.Detail.TextColor3 = GemConfig.ElementColors[gem.Element] or WHITE
-		entry.Stats.Text = string.format("SIZE %d/10   ·   CLARITY %d/10   ·   %s", gem.Size, gem.Clarity, if gem.Cut then "CUT " .. gem.Cut .. "/10" else "UNCUT")
+		place(entry.Detail, 0.35, 0.76, 0.36, 0.16, 10, LEFT)
+		place(entry.Extras, 0.70, 0.76, 0.26, 0.16, 10, RIGHT)
 	else
 		-- Every rock pays a gem; only a full pouch (the server normally
 		-- refuses that swing) lands here, as a short notice, never a blank reel.
 		entry.Notice = true
-		entry.Well.Visible, entry.Stats.Visible, entry.Rarity.Visible = false, false, false
-		entry.Miner.Position, entry.Miner.Size = UDim2.fromScale(0.05, 0.08), UDim2.fromScale(0.90, 0.17)
-		entry.Heading.Position, entry.Heading.Size = UDim2.fromScale(0.05, 0.29), UDim2.fromScale(0.90, 0.30)
-		entry.Detail.Position, entry.Detail.Size = UDim2.fromScale(0.05, 0.63), UDim2.fromScale(0.90, 0.17)
-		entry.Extras.Position, entry.Extras.Size = UDim2.fromScale(0.05, 0.82), UDim2.fromScale(0.90, 0.14)
+		entry.Well.Visible, entry.Rarity.Visible, entry.Extras.Visible = false, false, false
+		place(entry.Miner, 0.05, 0.1, 0.9, 0.24, 10)
+		place(entry.Heading, 0.05, 0.36, 0.9, 0.3, 14)
+		place(entry.Detail, 0.05, 0.68, 0.9, 0.24, 10)
 		entry.Heading.Text = "ROCK MINED"
 		entry.Heading.TextColor3 = WHITE
 		entry.Detail.Text = if packet.Full then "GEM POUCH FULL" else ""
 		entry.Detail.TextColor3 = MUTED
 	end
-	local rewards = {}
-	if gem then table.insert(rewards, "VALUE ≈ " .. math.floor(GemConfig.value(gem)) .. " coins") end
-	entry.Extras.Text = table.concat(rewards, "  ·  ")
+	entry.Extras.Text = if gem then string.format("≈ %d ◆", math.floor(GemConfig.value(gem))) else ""
 	-- A delayed observer sees the result without replaying an old explosion.
 	if gem and elapsed - Roll.Duration < 0.7 then burst(entry) end
 end
@@ -303,7 +316,7 @@ function Reveal.receive(packet)
 	local root = Instance.new("Model")
 	root.Name, root.Parent = "MiningRoll_" .. packet.Id, folder
 	local anchor = part(root, "RollAnchor", center)
-	local board = billboard(anchor, "Discovery", Vector3.zero, UDim2.fromOffset(344, 206))
+	local board = billboard(anchor, "Discovery", Vector3.zero, UDim2.fromOffset(Roll.Tag.Width, math.floor(Roll.Tag.Width * Roll.Tag.Ratio)))
 	local box = frame(board, "MiningRollBox", UDim2.fromScale(0.5, 0.5), UDim2.fromScale(1, 1), Color3.fromRGB(8, 16, 27), 0.08)
 	box.AnchorPoint = Vector2.new(0.5, 0.5)
 	local gradient = Instance.new("UIGradient")
@@ -313,17 +326,20 @@ function Reveal.receive(packet)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius, corner.Parent = UDim.new(0.04, 0), box
 	local border = edge(box, MUTED, 1)
-	local accent = frame(box, "RarityAccent", UDim2.fromScale(0.07, 0.025), UDim2.fromScale(0.86, 0.009), GOLD)
-	local miner = label(box, 0.055, 0.105, 14, WHITE)
+	local accent = frame(box, "RarityAccent", UDim2.fromScale(0.07, 0.03), UDim2.fromScale(0.86, 0.02), GOLD)
+	-- Rolling: who's mining over the reel, the rarity it's passing under it.
+	local miner = label(box, 0.07, 0.2, 11, WHITE)
 	miner.TextWrapped, miner.TextTruncate = false, Enum.TextTruncate.AtEnd
-	miner.Position, miner.Size = UDim2.fromScale(0.04, 0.055), UDim2.fromScale(0.92, 0.105)
+	place(miner, 0.04, 0.07, 0.92, 0.2, 11)
 	miner:SetAttribute("NoTranslate", true)
 	miner.Text = packet.MinerName .. "  ·  MINING"
-	local heading = label(box, 0.18, 0.12, 22, WHITE)
+	local heading = label(box, 0.76, 0.2, 12, WHITE)
 	heading.Name = "ResultHeading"
-	local rarity = label(box, 0.22, 0.09, 14, MUTED)
-	rarity.Position, rarity.Size = UDim2.fromScale(0.40, 0.22), UDim2.fromScale(0.55, 0.09)
-	local well = frame(box, "ReelWindow", UDim2.fromScale(0.045, 0.34), UDim2.fromScale(0.91, 0.43), Color3.fromRGB(17, 30, 45), 0.12)
+	heading.TextWrapped, heading.TextTruncate = false, Enum.TextTruncate.AtEnd
+	place(heading, 0.04, 0.76, 0.92, 0.2, 12)
+	local rarity = label(box, 0.29, 0.17, 10, MUTED)
+	rarity.Visible = false
+	local well = frame(box, "ReelWindow", UDim2.fromScale(0.04, 0.29), UDim2.fromScale(0.92, 0.45), Color3.fromRGB(17, 30, 45), 0.12)
 	well.ClipsDescendants = true
 	local viewport = Instance.new("ViewportFrame")
 	viewport.Name, viewport.BackgroundTransparency, viewport.Size = "GemReel", 1, UDim2.fromScale(1, 1)
@@ -332,11 +348,11 @@ function Reveal.receive(packet)
 	camera.FieldOfView = 35
 	local selection = frame(well, "WinningSlot", UDim2.fromScale(0.36, 0.05), UDim2.fromScale(0.28, 0.90), GOLD, 1)
 	local selectionEdge = edge(selection, GOLD, 1.5)
-	local detail = label(box, 0.83, 0.09, 14, MUTED)
-	detail.Text = "Finding your stone..."
-	local stats, extras = label(box, 0.76, 0.09, 12, WHITE), label(box, 0.88, 0.08, 13, GOLD)
-	stats.Position, stats.Size = UDim2.fromScale(0.04, 0.76), UDim2.fromScale(0.92, 0.08)
-	extras.Position, extras.Size = UDim2.fromScale(0.04, 0.88), UDim2.fromScale(0.92, 0.07)
+	local detail = label(box, 0.76, 0.16, 10, MUTED)
+	local extras = label(box, 0.76, 0.16, 10, GOLD)
+	-- (Size, clarity and cut are the miner's own loot card's; not shown to onlookers.)
+	local stats = label(box, 0, 0, 10, WHITE)
+	stats.Visible = false
 	local light = Instance.new("PointLight")
 	light.Range, light.Brightness, light.Color, light.Parent = 10, 0.6, WHITE, anchor
 	active[packet.Id] = { Packet = packet, Sequence = Roll.sequence(packet), Elements = Roll.elements(packet), Root = root, Anchor = anchor, Light = light,

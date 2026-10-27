@@ -7,13 +7,15 @@ Roll.Target = 23
 Roll.Range = 180
 Roll.MaxActive = 12
 
--- Pixel-sized public cards stay readable at normal viewing distances.
--- Cap their footprint on short landscape phones and shrink gently at range.
+-- Someone else's find: a small tag over their head, not a window. Readable
+-- up close, a little smaller further off, never much of the screen.
+Roll.Tag = { Width = 200, TouchWidth = 176, Least = 150, TouchLeast = 140, Ratio = 0.42, NoticeRatio = 0.3 }
 function Roll.displaySize(screen, distance, touch, notice)
-	local cap = math.min(if touch then 320 else 344, screen.X * 0.8, screen.Y * 0.5 / 0.6)
-	local floor = math.min(cap, if touch then 260 else 240)
-	local width = math.floor(math.clamp(cap - math.max(0, distance - 35) * 0.8, floor, cap))
-	return width, math.floor(width * (if notice then 0.29 else 0.6))
+	local tag = Roll.Tag
+	local cap = math.min(if touch then tag.TouchWidth else tag.Width, screen.X * 0.4, screen.Y * 0.24 / tag.Ratio)
+	local floor = math.min(cap, if touch then tag.TouchLeast else tag.Least)
+	local width = math.floor(math.clamp(cap - math.max(0, distance - 30) * 0.6, floor, cap))
+	return width, math.floor(width * (if notice then tag.NoticeRatio else tag.Ratio))
 end
 
 function Roll.rank(packet)

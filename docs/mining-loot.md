@@ -8,10 +8,21 @@ When you mine a rock in the Outpost, two things show the find:
   (`MinerLoot`). The box over your own head is no longer drawn on your
   screen, so it doesn't block your view while you mine.
 
-The public box now uses bounded pixel sizing (up to 344 × 206 on desktop,
-320 × 192 on touch screens, reduced to fit short landscape screens). It
-shrinks gently with distance instead of becoming an unreadable world-sized
-label. Its bottom sits above the miner's head, and it draws above geometry.
+*2026-10-27:* the public box is a small tag now (`Roll.Tag`,
+`Roll.displaySize`): 200 × 84 on a computer, 176 × 74 on a phone, never
+more than 40% of the screen's width or a quarter of its height, down to
+150 (140 on touch) wide further off. It was 344 × 206, too much of the
+screen for someone else's find. While it rolls: the miner's name, a strip
+of the reel and ROLLING · RARITY. Landed: the gem in a square on the left,
+then its rarity, its name, its element and its worth (≈ coins). Its size,
+clarity and cut are left to the miner's own loot card.
+
+![Someone else's find, before and now](mining-loot/public-tag.png)
+
+![The tag on a phone](mining-loot/public-tag-phone.png)
+
+It shrinks gently with distance instead of becoming an unreadable
+world-sized label. Its bottom sits above the miner's head, and it draws above geometry.
 While it is visible, that miner's native overhead display, cosmetic title,
 and party name are hidden locally; their name remains in the card header.
 Original display states return on expiry, replacement, streaming changes,

@@ -46,13 +46,16 @@ for rank,tier in GemConfig.TierOrder do
 	step(.31)
 	check(#live("AwardedGem")==1 and live("AwardedGem")[1].Gem==packet.Gem,"Showcase not actual awarded gem")
 	check(live("AwardedGem")[1].Parent==live("GemReel")[1],"Winning gem escaped box")
-	check(textContains("SIZE 8/10") and textContains("CLARITY 7/10") and textContains("CUT 6/10"),"Rolled metrics missing")
-	check(textContains(string.upper(GemConfig.TierLabels[tier])) and textContains("VALUE"),"Result lost rarity/worth")
+	-- Onlookers get a small tag: rarity, the gem's name and its worth; its
+	-- size, clarity and cut are the miner's own loot card's.
+	check(not textContains("SIZE 8/10") and not textContains("CLARITY 7/10"),"The public tag lists every metric again")
+	check(textContains(GemConfig.shade(packet.Gem).Name),"The tag doesn't name the gem")
+	check(textContains(string.upper(GemConfig.TierLabels[tier])) and textContains("≈"),"Result lost rarity/worth")
 	-- Rocks pay gems only: stray coins or gear never reach the broadcast or the box.
 	check(packet.Coins==nil and packet.Gear==nil and not textContains("+4 coins"),"A gem find advertised coins")
 	check(#live("DiscoveryRing")==0 and #live("RarityBeacon")==0,"World geometry cuts through reward card")
 	check(live("WinningSlot")[1].Visible==false,"Reel selection remains on final gem")
-	check(live("Discovery")[1].Size[2]==344 and live("Discovery")[1].Size[4]==206,"Nearby roll did not enlarge with a bounded pixel size")
+	check(live("Discovery")[1].Size[2]==Roll.Tag.Width and live("Discovery")[1].Size[4]==math.floor(Roll.Tag.Width*Roll.Tag.Ratio),"Nearby roll isn't the small tag's full size")
 	check(liveClass("ParticleEmitter")[1].Emitted==8+rank*10,"Rarity did not increase celebration")
 	for _,p in liveClass("Part") do if p.Parent~=minerCharacter then check(not p.CanQuery and not p.CanCollide and not p.CanTouch,"Cosmetic obstructs mining/players") end end
 	Reveal.receive(packet)
@@ -154,13 +157,14 @@ check(not title.Enabled and humanoid.DisplayDistanceType==Enum.HumanoidDisplayDi
 Reveal.close()
 check(title.Enabled and lateTitle.Enabled and not party.Enabled,"Cleanup failed to restore original enabled states")
 check(humanoid.DisplayDistanceType==Enum.HumanoidDisplayDistanceType.Viewer,"Native name remained hidden after cleanup")
--- Both portrait and short landscape devices keep a readable, bounded box.
+-- Someone else's find is a small tag: readable, but never much of the screen
+-- (desktop or phone, near or far).
 for _,screen in {Vector2.new(1280,720),Vector2.new(667,339),Vector2.new(812,317),Vector2.new(390,844)} do
 	for _,touch in {false,true} do
 		for _,distance in {5,35,80,180} do
 			local w,h=Roll.displaySize(screen,distance,touch,false)
-			check(w>=240 and h>=144,"Public roll shrank below readable size")
-			check(w<=screen.X*.8 and h<=screen.Y*.5,"Public roll covers too much of a small screen")
+			check(w>=130 and h>=54,"Public roll shrank below readable size")
+			check(w<=210 and w<=screen.X*.4 and h<=screen.Y*.25,"Public roll covers too much of the screen")
 			local _,notice=Roll.displaySize(screen,distance,touch,true)
 			check(notice<h,"Full-pouch notice kept the large reel footprint")
 		end
@@ -170,9 +174,9 @@ services.UserInputService.TouchEnabled=true
 workspace.CurrentCamera={CFrame=CFrame.new(0,0,100),ViewportSize=Vector2.new(812,317)}
 MiningRolls.publish(miner,at,reward("Rare"))
 local board=live("Discovery")[1]
-check(board.Size[2]>=260 and board.Size[4]<=159,"Mobile card did not use readable pixel sizing")
+check(board.Size[2]>=140 and board.Size[2]<=176 and board.Size[4]<=74,"Mobile tag isn't small and readable")
 workspace.CurrentCamera.ViewportSize=Vector2.new(390,844); step(.1)
-check(board.Size[2]<=312,"Portrait rotation did not resize the public card")
+check(board.Size[2]<=156,"Portrait rotation did not resize the public tag")
 player:SetAttribute("CombatSession","Rival")
 check(title.Enabled and lateTitle.Enabled and not party.Enabled,"Arena transition failed to restore overhead titles")
 print("PASS: "..checks.." shared world mining lottery checks")
