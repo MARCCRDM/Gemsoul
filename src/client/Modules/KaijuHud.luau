@@ -112,6 +112,7 @@ local IronUi = require(script.Parent.IronUi)
 local KaijuRoll = require(script.Parent.KaijuRoll)
 local KaijuTaming = require(script.Parent.KaijuTaming)
 local LoadingFlow = require(script.Parent.LoadingFlow)
+local LevelUpFx = require(script.Parent.LevelUpFx)
 local MobileLayout = require(script.Parent.MobileLayout)
 local BodyHealth = require(script.Parent.BodyHealth)
 local WildBars = require(script.Parent.WildBars)
@@ -2939,11 +2940,51 @@ function KaijuHud.beamSlot(): Frame
 	return beamSlot
 end
 
+-- Your team out of its Gemsouls as you come in. The server plays each
+-- one's deploy as it comes out (KaijuServer), but arriving (getting into
+-- the game, a respawn, back from a fight) that's often under the loading
+-- screen: once the screen's gone, each that came out under it, its deploy
+-- long over, plays it again where you can see it.
+local DEPLOY_SECONDS = 0.8 -- (its shard and its burst: LevelUpFx.deploy)
+local UNDER_COVER = 30 -- (out longer ago than this: it was out all along)
+local function deployAfterLoading()
+	local folder = workspace:FindFirstChild("Kaiju")
+	local character = player.Character
+	local from = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local now = workspace:GetServerTimeNow()
+	local radius = 4 * Kaiju.size(Kaiju.Scale.Pet)
+	for _, model in if folder then folder:GetChildren() else {} do
+		local outAt = model:GetAttribute("KaijuOutAt")
+		if model:IsA("Model") and model:GetAttribute("KaijuOwner") == player.UserId and type(outAt) == "number" then
+			local ago = now - outAt
+			local root = model.PrimaryPart
+			if root and ago >= DEPLOY_SECONDS and ago <= UNDER_COVER then
+				local tint = GemConfig.ElementColors[model:GetAttribute("KaijuElement") or ""]
+				LevelUpFx.deploy(root.Position, radius, tint, from and from.Position)
+			end
+		end
+	end
+end
+KaijuHud._deployAfterLoading = deployAfterLoading
+
 function KaijuHud.start()
 	if started then
 		return
 	end
 	started = true
+	-- (The loading screen going: your team's deploy, as above.)
+	task.spawn(function()
+		local covered = LoadingFlow.active()
+		while true do
+			task.wait(0.25)
+			local now = LoadingFlow.active()
+			if covered and not now then
+				task.wait(0.35) -- (as the screen fades)
+				deployAfterLoading()
+			end
+			covered = now
+		end
+	end)
 	ContextActionService:BindActionAtPriority("KaijuCatch", function(_, state)
 		if UserInputService:GetFocusedTextBox() or not gui.Enabled or not tame.Visible then
 			return Enum.ContextActionResult.Pass

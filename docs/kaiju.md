@@ -351,6 +351,16 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   fights as fresh. The one thing that still stops a deploy is being down
   ("Not while you're down."): the Rift calls your kaiju back while you're
   down at its boss, and they come out with you when you're up.
+
+  *2026-10-27:* **getting into the game, Team 1 comes out**, whatever was
+  out or called back when you left (once a visit, `KaijuServer`'s
+  `teamOneOnJoin`; after that your pick holds). And **every kaiju that
+  comes out plays its deploy**, a shard from you and it opens out of the
+  light, for everyone to see: arriving, a team key, back from a fight or a
+  respawn, back on its feet (it used to play only for the keys, and
+  arriving they just stood there). Coming in, that's often under the
+  loading screen, so once the screen's gone your own team plays it again
+  where you can see it (`KaijuOutAt` on the model, `KaijuHud`).
 - **The TEAMS tab** (the kaiju panel's fourth): a row for each team, its
   three places, OUT or CALLED BACK on the team out, LOCKED on a team past
   the one filling ("Fill Team 2 first" in its places), and SEND OUT on the

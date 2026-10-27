@@ -34,6 +34,10 @@
 	               Kaiju.away), none of it out till you deploy it again,
 	               at once, in a fight or out of one; each kaiju comes back
 	               out with its moves' waits as they were (`waits`).
+	               Getting into the game, Team 1 is the one out (once a
+	               visit). Every kaiju that comes out plays its deploy for
+	               everyone (KaijuOutAt on it: KaijuHud plays yours again
+	               once your loading screen's gone).
 	  Auto heal    switched on (Kaiju.AutoHeal, kept as roster.AutoHeal),
 	               your spare Commons heal your team by themselves, out of
 	               danger, never a gem wasted. Quiet, but for running out
@@ -440,6 +444,9 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 	model:SetAttribute("KaijuId", record.Id)
 	model:SetAttribute("KaijuSlot", slot)
 	model:SetAttribute("KaijuName", Kaiju.nameOf(record))
+	-- (When it came out: a client under its loading screen then plays the
+	-- deploy once it can see it, KaijuHud.)
+	model:SetAttribute("KaijuOutAt", serverNow())
 	local ability = Kaiju.kitMoves(record.Species, record.Level).E
 	model:SetAttribute("KaijuAbility", ability)
 	-- Beside its own moves, its gem surge (its Gemsoul's E, attuned; a
@@ -676,11 +683,29 @@ local function putBack(roster): { string }
 end
 
 -- Puts the right kaiju out (or away) for `player`.
+-- Getting into the game: team 1 out, whatever was out (or called back)
+-- when you left, once a visit, as your profile comes in.
+local joined: { [Player]: boolean } = {}
+local function teamOneOnJoin(player: Player, roster)
+	if joined[player] or not roster then
+		return
+	end
+	joined[player] = true
+	local ids = Kaiju.teamOf(roster, 1)
+	if #ids == 0 or (Kaiju.outTeam(roster) == 1 and not Kaiju.away(roster)) then
+		return
+	end
+	roster.Out, roster.Away = 1, nil
+	roster.Team, roster.Active = Kaiju.teamIds(roster), ids[1]
+	PlayerData.sync(player)
+end
+
 local function upkeep(player: Player, now: number)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return
 	end
+	teamOneOnJoin(player, profile.Kaiju)
 	-- A roll left unclaimed: given after a while in the Outpost.
 	if player:GetAttribute("Outpost") == true and Kaiju.rollsOwed(profile) > 0 then
 		owedSince[player] = owedSince[player] or now
@@ -749,7 +774,14 @@ local function upkeep(player: Player, now: number)
 				pet.Model:SetAttribute("KaijuSlot", slot)
 			end
 		else
-			spawnPet(player, roster.List[id], slot)
+			-- Out of its Gemsoul (arriving, deployed, swapped in, back on its
+			-- feet, back from a fight): a shard from you, and it opens out of
+			-- the light, for everyone to see.
+			local made = spawnPet(player, roster.List[id], slot)
+			if made then
+				local root = rootOf(player)
+				fx("Deploy", made.Root.Position, 4 * PET_SIZE, made.Element, root and root.Position)
+			end
 		end
 	end
 end
@@ -1785,11 +1817,7 @@ function KaijuServer.deployTeam(player: Player): (boolean, string)
 	end
 	roster.Away = nil
 	PlayerData.sync(player)
-	upkeep(player, os.clock())
-	local root = rootOf(player)
-	for _, pet in petsOf(player) do
-		fx("Deploy", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
-	end
+	upkeep(player, os.clock()) -- (out they come, each with its deploy)
 	return true, "Team deployed."
 end
 
@@ -1868,10 +1896,7 @@ local function teamOut(player: Player, n: any)
 	roster.Out = n
 	roster.Team, roster.Active = Kaiju.teamIds(roster), ids[1]
 	PlayerData.sync(player)
-	upkeep(player, now)
-	for _, pet in petsOf(player) do
-		fx("Deploy", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
-	end
+	upkeep(player, now) -- (the new team out, each with its deploy)
 	return reply(true, string.format("Team %d out.", n))
 end
 
@@ -2481,6 +2506,7 @@ local function left(player: Player)
 	teams[player], waits[player], owedSince[player], rising[player] = nil, nil, nil, nil
 	saidJump[player], lastJump[player] = nil, nil
 	healAt[player], toldEmpty[player] = nil, nil
+	joined[player] = nil
 end
 
 function KaijuServer.start()
@@ -2550,6 +2576,7 @@ end
 
 -- For tests.
 KaijuServer._upkeep, KaijuServer._think, KaijuServer._infuse = upkeep, think, infuse
+KaijuServer._joined = joined -- (who's had Team 1 put out this visit)
 KaijuServer._autoHeal, KaijuServer._socketSoul = autoHeal, socketSoul
 KaijuServer._recall, KaijuServer._setActive, KaijuServer._setTeam = recall, setActive, setTeam
 KaijuServer._callBack, KaijuServer._hops, KaijuServer._jumped = callBack, hops, jumped

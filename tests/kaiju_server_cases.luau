@@ -979,9 +979,24 @@ a:SetAttribute("CombatSession", "s1")
 KaijuServer._upkeep(a, now)
 check(KaijuServer.pets()[a] == nil, "Out with you in an Arena fight")
 a:SetAttribute("CombatSession", nil)
+table.clear(fxs)
 KaijuServer._upkeep(a, now)
 pet = KaijuServer.pets()[a]
 check(pet ~= nil, "Not back after the fight")
+-- Out of its Gemsoul (back from the fight here): its deploy, for everyone,
+-- from you to it, and when it came out (a client under its loading screen
+-- then plays it once that's gone: KaijuHud).
+do
+	local deployed = drew("Deploy")
+	check(
+		deployed and (deployed[2] - pet.Root.Position).Magnitude < 1e-6 and deployed[4] == pet.Element and deployed[5] ~= nil,
+		"It came back out without its deploy"
+	)
+	check(type(pet.Model:GetAttribute("KaijuOutAt")) == "number", "When it came out isn't on it")
+	table.clear(fxs)
+	KaijuServer._upkeep(a, now)
+	check(drew("Deploy") == nil, "A deploy for one already out")
+end
 
 -- Hurt by element: its own element 75%, its weakness 125%, less its Guard.
 local function hurtBy(element)
@@ -3430,6 +3445,22 @@ local function yourTeam()
 		check(registered.KaijuTeamOut(a, 1).Ok and not Kaiju.away(roster) and Kaiju.outTeam(roster) == 1, "1 didn't deploy Team 1 in danger")
 		KaijuServer.inDanger = inDanger
 		check(#KaijuServer.team(a) == 3, "Team 1 isn't all out again")
+		-- Getting into the game: Team 1 out, whatever was out or called back
+		-- when you left, each with its deploy (once a visit: after that,
+		-- your pick holds).
+		check(registered.KaijuTeamOut(a, 2).Ok and registered.KaijuTeamOut(a, 2).Ok, "Couldn't call Team 2 back")
+		check(Kaiju.away(roster) and Kaiju.outTeam(roster) == 2, "Team 2 isn't the one called back")
+		KaijuServer._upkeep(a, now)
+		check(Kaiju.away(roster) and Kaiju.outTeam(roster) == 2, "Your pick didn't hold in the same visit")
+		KaijuServer._joined[a] = nil -- (as if you'd left and come back)
+		table.clear(fxs)
+		KaijuServer._upkeep(a, now)
+		check(not Kaiju.away(roster) and Kaiju.outTeam(roster) == 1 and #KaijuServer.team(a) == 3, "Getting into the game, Team 1 isn't out")
+		local comingOut = 0
+		for _, entry in fxs do
+			comingOut += if entry[1] == "Deploy" then 1 else 0
+		end
+		check(comingOut == 3, "Team 1 came out without its deploy: " .. comingOut)
 		-- Swap a kaiju of Team 2 into Team 1: it's out, the other's home.
 		check(registered.KaijuSwap(a, team1[3], team2[1]).Ok, "Couldn't swap two kaiju")
 		check(Kaiju.teamNumber(roster, team2[1]) == 1 and Kaiju.teamNumber(roster, team1[3]) == 2, "The swap didn't trade teams")
