@@ -2322,8 +2322,8 @@ local function drawWallet(profile)
 	ui.Season.Text = "LV " .. level
 	ui.SeasonFill.Size = UDim2.fromScale(if level >= Season.MaxLevel then 1 else math.clamp(into / need, 0, 1), 1)
 	local outpost = profile.Outpost
-	local charged, nextIn = ChargeMeter.read(outpost and outpost.Picks, outpost and outpost.SurveyAt)
-	ui.Pick.Text = ChargeMeter.count(charged)
+	local charged, nextIn, _, extra = ChargeMeter.read(outpost and outpost.Picks, outpost and outpost.SurveyAt)
+	ui.Pick.Text = ChargeMeter.count(charged, extra)
 	ui.PickCap.Text = if nextIn then "FREE PICK  ·  " .. OutpostRules.clock(nextIn) else "FREE PICK  ·  FULL"
 end
 

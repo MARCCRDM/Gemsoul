@@ -132,7 +132,14 @@ local function record(profile)
 		o.Picks[id] = nil
 	end
 	if legacy > 0 then
-		o.Picks.Survey = (o.Picks.Survey or 0) + legacy
+		o.Picks.Extra = (o.Picks.Extra or 0) + legacy
+	end
+	-- (Refills bought before they had their own bank sat on top of the
+	-- charge: past full, they move to the bank.)
+	local full = Rules.Picks.Survey.Swings
+	if (o.Picks.Survey or 0) > full then
+		o.Picks.Extra = (o.Picks.Extra or 0) + o.Picks.Survey - full
+		o.Picks.Survey = full
 	end
 	if o.SurveyAt == nil then
 		-- A new miner (or one from before the refill) starts with it full.
@@ -694,7 +701,8 @@ local function hit(player: Player, nodeId: any)
 	end
 	local o = record(profile)
 	local pickId = o.Active
-	if (o.Picks[pickId] or 0) <= 0 then
+	local held = if pickId == "Survey" then Rules.surveySwings(o.Picks) else o.Picks[pickId] or 0
+	if held <= 0 then
 		local _, nextIn = Rules.surveyCharge(o.Picks.Survey or 0, o.SurveyAt or os.time(), os.time())
 		return reply(
 			false,
@@ -707,7 +715,7 @@ local function hit(player: Player, nodeId: any)
 		)
 	end
 	lastSwing[player] = now
-	local strikes = if mech then Rules.mechStrikes(machineId, o.Picks[pickId]) else 1
+	local strikes = if mech then Rules.mechStrikes(machineId, held) else 1
 	-- Noise out past the core: the frontier's critters come for it (and a
 	-- vein's guardian for a swing at its rocks).
 	task.spawn(OutpostServer.onSwing, player, strikes)
@@ -718,7 +726,11 @@ local function hit(player: Player, nodeId: any)
 	if swungSpot then
 		task.spawn(OutpostServer.onRockSwing, swungSpot.Position, player)
 	end
-	o.Picks[pickId] -= strikes
+	if pickId == "Survey" then
+		Rules.spendSurvey(o.Picks, strikes)
+	else
+		o.Picks[pickId] -= strikes
+	end
 	local pick = Rules.Picks[pickId]
 	local crit = rng:NextNumber() < Rules.CritChance + pick.Crit
 	node.Hp = math.max(0, node.Hp - Rules.damage(pickId, crit) * strikes)
@@ -740,7 +752,7 @@ local function hit(player: Player, nodeId: any)
 		character:SetAttribute("ActionStart", t - 0.12)
 		character:SetAttribute("ActionAt", t + 0.05)
 	end
-	local broke = o.Picks[pickId] <= 0
+	local broke = (if pickId == "Survey" then Rules.surveySwings(o.Picks) else o.Picks[pickId]) <= 0
 	if broke then
 		o.Picks[pickId] = nil
 		record(profile)
@@ -826,15 +838,15 @@ local function bonk(player: Player, model: any)
 end
 
 -- Swings bought for the free pick (a swing refill, for Robux: StoreServer
--- grants it), on top of its charge brought up to now. They're spent first,
--- and it recharges again once it's back under its full charge.
+-- grants it): into their own bank, stacked on the charge. The free charge
+-- is spent first, so it keeps regaining underneath them.
 function OutpostServer.addSwings(player: Player, swings: number): boolean
 	local profile = PlayerData.get(player)
 	if not profile or swings <= 0 then
 		return false
 	end
 	local o = record(profile)
-	o.Picks.Survey = (o.Picks.Survey or 0) + swings
+	o.Picks.Extra = (o.Picks.Extra or 0) + swings
 	o.Active = "Survey"
 	if player:GetAttribute("Outpost") then
 		pickModel(player)
@@ -875,7 +887,7 @@ function OutpostServer.charge(player: Player): (number, number)
 	if not profile then
 		return 0, full
 	end
-	return record(profile).Picks.Survey or 0, full
+	return Rules.surveySwings(record(profile).Picks), full
 end
 
 local function enter(player: Player)

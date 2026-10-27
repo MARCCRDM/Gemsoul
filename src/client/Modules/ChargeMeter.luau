@@ -3,8 +3,9 @@
 	Outpost.FreeSwingSeconds, up to its full swings. Drawn the same way on
 	the Outpost HUD, in the refills window and on the dashboard.
 
-	  ChargeMeter.read(picks, surveyAt)   swings, seconds to the next one
-	                                      (nil when full), progress 0..1
+	  ChargeMeter.read(picks, surveyAt)   swings (free + bought), seconds to
+	                                      the next free one (nil when full),
+	                                      progress 0..1, bought swings
 	  ChargeMeter.new(parent, x, y, w)    a meter; meter.set(swings, nextIn,
 	                                      progress) redraws it
 ]]
@@ -26,31 +27,36 @@ ChargeMeter.Height = 44
 
 -- The charge now, from a profile's or the server state's picks and clock.
 -- No clock yet means a new miner, whose free pick starts full.
-function ChargeMeter.read(picks: { [string]: number }?, surveyAt: number?): (number, number?, number)
+-- Bought swings (picks.Extra) stack on top: the charge keeps regaining
+-- under them.
+function ChargeMeter.read(picks: { [string]: number }?, surveyAt: number?): (number, number?, number, number)
+	local extra = picks and picks.Extra or 0
 	if surveyAt == nil then
-		return ChargeMeter.Full, nil, 1
+		return ChargeMeter.Full + extra, nil, 1, extra
 	end
-	return Rules.surveyCharge(picks and picks.Survey or 0, surveyAt, workspace:GetServerTimeNow())
+	local free, nextIn, progress = Rules.surveyCharge(picks and picks.Survey or 0, surveyAt, workspace:GetServerTimeNow())
+	return free + extra, nextIn, progress, extra
 end
 
--- The swings as a count: "23 / 60", or with refills on top "60 + 140".
-function ChargeMeter.count(swings: number): string
-	if swings > ChargeMeter.Full then
-		return string.format("%d + %d", ChargeMeter.Full, swings - ChargeMeter.Full)
+-- The swings as a count: "23 / 600", or with refills on top "23 + 140".
+function ChargeMeter.count(swings: number, extra: number?): string
+	extra = extra or math.max(0, swings - ChargeMeter.Full)
+	if extra > 0 then
+		return string.format("%d + %d", swings - extra, extra)
 	end
 	return string.format("%d / %d", swings, ChargeMeter.Full)
 end
 
--- "+1 swing in 1:42 · full in 46:00", "Fully charged", or with refills on
--- top "Fully charged · 140 extra" (they're spent first; it recharges after).
-function ChargeMeter.status(swings: number, nextIn: number?): string
+-- "+1 swing in 1:42 · full in 46:00", "Fully charged", and with refills on
+-- top "· 140 extra" (the charge keeps regaining under them).
+function ChargeMeter.status(swings: number, nextIn: number?, extra: number?): string
+	extra = extra or math.max(0, swings - ChargeMeter.Full)
+	local tail = if extra > 0 then string.format(" · %d extra", extra) else ""
 	if not nextIn then
-		return if swings > ChargeMeter.Full
-			then string.format("Fully charged · %d extra", swings - ChargeMeter.Full)
-			else "Fully charged"
+		return "Fully charged" .. tail
 	end
-	local fullIn = nextIn + (ChargeMeter.Full - swings - 1) * Rules.FreeSwingSeconds
-	return string.format("+1 swing in %s · full in %s", Rules.clock(nextIn), Rules.clock(fullIn))
+	local fullIn = nextIn + (ChargeMeter.Full - (swings - extra) - 1) * Rules.FreeSwingSeconds
+	return string.format("+1 swing in %s · full in %s", Rules.clock(nextIn), Rules.clock(fullIn)) .. tail
 end
 
 local function label(parent, value, size, color, font, x, y, w, align)
@@ -105,10 +111,10 @@ function ChargeMeter.new(parent: GuiObject, x: number, y: number, w: number)
 	local status = label(root, "", 11, P.Dim, IronUi.Body, 0, 30, w)
 
 	local meter = { Frame = root }
-	function meter.set(swings: number, nextIn: number?, progress: number)
+	function meter.set(swings: number, nextIn: number?, progress: number, extra: number?)
 		local full = nextIn == nil
 		local color = if full then ChargeMeter.Charged else ChargeMeter.Charging
-		local share = math.clamp(swings / ChargeMeter.Full, 0, 1)
+		local share = math.clamp((swings - (extra or 0)) / ChargeMeter.Full, 0, 1)
 		fill.Size = UDim2.fromScale(share, 1)
 		fill.BackgroundColor3 = color
 		next.Visible = not full
@@ -120,9 +126,9 @@ function ChargeMeter.new(parent: GuiObject, x: number, y: number, w: number)
 		title.Text = if full
 			then (if short then "⚡ CHARGED" else "⚡ FREE PICK CHARGED")
 			else (if short then "⚡ CHARGING" else "⚡ FREE PICK CHARGING")
-		count.Text = ChargeMeter.count(swings)
+		count.Text = ChargeMeter.count(swings, extra)
 		count.TextColor3 = if swings > 0 then P.Text else P.Bad
-		status.Text = ChargeMeter.status(swings, nextIn)
+		status.Text = ChargeMeter.status(swings, nextIn, extra)
 		status.TextColor3 = if full then ChargeMeter.Charged else P.Dim
 	end
 	meter.set(ChargeMeter.Full, nil, 1)

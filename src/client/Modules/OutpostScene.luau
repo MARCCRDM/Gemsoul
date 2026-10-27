@@ -403,16 +403,16 @@ local function refreshCharge()
 	if not state then
 		return
 	end
-	local swings, nextIn, progress = ChargeMeter.read(state.Picks, state.SurveyAt)
-	charge.set(swings, nextIn, progress)
+	local swings, nextIn, progress, extra = ChargeMeter.read(state.Picks, state.SurveyAt)
+	charge.set(swings, nextIn, progress, extra)
 	refreshSwingBar()
 	if probeCharge then
-		probeCharge.set(swings, nextIn, progress)
+		probeCharge.set(swings, nextIn, progress, extra)
 	end
 	if state.Active == "Survey" then
 		pickSwings.Text = if swings > 0 then swings .. " swings" else "RECHARGING"
 		pickSwings.TextColor3 = if swings > 0 then ChargeMeter.Charging else P.Bad
-		fill.Size = UDim2.fromScale(math.clamp(swings / ChargeMeter.Full, 0, 1), 1)
+		fill.Size = UDim2.fromScale(math.clamp((swings - extra) / ChargeMeter.Full, 0, 1), 1)
 		fill.BackgroundColor3 = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
 	end
 end
@@ -1389,7 +1389,7 @@ local function pickCard(L)
 	local id = Rules.PickOrder[1]
 	local spec = Rules.Picks[id]
 	local phone = L.Phone
-	local swings = ChargeMeter.read(state.Picks, state.SurveyAt)
+	local _, _, _, extra = ChargeMeter.read(state.Picks, state.SurveyAt)
 	local card, art = probeCard(L, 1, "Pick" .. id, spec.Color, true, true)
 	pickView(art, id, spec, L.ArtH)
 	pill(art, spec.Tag or "", spec.Color, false, false, if phone then 9 else 10)
@@ -1398,7 +1398,6 @@ local function pickCard(L)
 	local y = L.StatsY
 	statRow(card, L, y, "FULL CHARGE", spec.Swings .. " swings", nil, spec.Color)
 	statRow(card, L, y + L.Row, "RECHARGE", "+1 every " .. Rules.rechargeEvery(), nil, spec.Color)
-	local extra = math.max(0, swings - ChargeMeter.Full)
 	statRow(card, L, y + L.Row * 2, "EXTRA", if extra > 0 then "+" .. commas(extra) else "none", nil, spec.Color)
 
 	local info, count, track, buttonY = cardFooter(card, L)
@@ -1421,20 +1420,20 @@ local function pickCard(L)
 	status.TextWrapped = true
 	status.ZIndex = 3
 	probeCharge = {
-		set = function(now: number, nextIn: number?, progress: number)
+		set = function(now: number, nextIn: number?, progress: number, bought: number?)
 			local full = nextIn == nil
 			local color = if full then ChargeMeter.Charged else ChargeMeter.Charging
 			info.Text = if full then "⚡ CHARGED" else "⚡ CHARGING"
 			info.TextColor3 = color
-			count.Text = ChargeMeter.count(now)
+			count.Text = ChargeMeter.count(now, bought)
 			count.TextColor3 = if now > 0 then P.Text else P.Bad
-			local share = math.clamp(now / ChargeMeter.Full, 0, 1)
+			local share = math.clamp((now - (bought or 0)) / ChargeMeter.Full, 0, 1)
 			fillBar.Size = UDim2.fromScale(share, 1)
 			fillBar.BackgroundColor3 = color
 			next.Visible = not full
 			next.Position = UDim2.fromScale(share, 0)
 			next.Size = UDim2.fromScale(math.clamp(progress, 0, 1) / ChargeMeter.Full, 1)
-			status.Text = ChargeMeter.status(now, nextIn)
+			status.Text = ChargeMeter.status(now, nextIn, bought)
 			status.TextColor3 = if full then ChargeMeter.Charged else P.Dim
 		end,
 	}

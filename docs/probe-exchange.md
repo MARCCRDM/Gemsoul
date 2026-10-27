@@ -36,10 +36,11 @@ doesn't sell other picks. It sells refills.
 - Until a product's id is set, its button says "COMING SOON". While testing
   (`Config.TestCosmeticPrice`), refills can be bought for coins through the
   store's `BuyProduct`.
-- A refill adds its swings on top of what you have, past the full 600. The
-  window shows that as "600 + 2,000".
-- Bought swings are spent first. The free pick starts recharging again once
-  it's back under 600.
+- A refill's swings go in their own bank (`Picks.Extra`), stacked on top of
+  the free charge. The window shows that as "412 + 2,000".
+- The free charge is spent first, then the bank, so the free pick keeps
+  regaining a swing every 24 s underneath the bought ones: refills never
+  pause the regeneration.
 - Refills stack, so you can buy as many as you like.
 - Each refill card shows:
   - the swings it adds;
@@ -103,9 +104,10 @@ no "✕" character, so in the game it showed as an empty box.
   - `Picks` (the free pick only);
   - `LegacyPicks` and `legacySwings` (picks a save still holds).
 - `src/server/Systems/OutpostServer.luau`:
-  - `addSwings` (a refill's swings on the pick, on top of its charge;
+  - `addSwings` (a refill's swings into the bought bank, on top of its charge;
     `StoreServer` calls it for a receipt);
-  - `record`, which turns old picks into swings.
+  - `record`, which turns old picks into banked swings (and moves swings
+    past full, from refills bought before the bank, into it).
 - `src/shared/Store.luau`: the refills' products (`RobuxProducts`,
   `refill`, `contents`), and `src/server/Systems/StoreServer.luau`, which
   grants them.

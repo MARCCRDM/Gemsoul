@@ -660,7 +660,7 @@ do
 	local scene = fs.readFile(ROOT .. "/src/client/Modules/OutpostScene.luau")
 	check(scene:find('Name = "SwingBar"', 1, true) and scene:find("ResetOnSpawn = false", 1, true), "No swing bar on the rock, or it goes on a respawn")
 	check(scene:find("swingBarOn(body)\n\tminedAt = os.clock()", 1, true) ~= nil, "A swing doesn't put the swing bar on its rock")
-	check(scene:find("charge.set(swings, nextIn, progress)\n\trefreshSwingBar()", 1, true) ~= nil, "The swing bar isn't redrawn with the swings")
+	check(scene:find("charge.set(swings, nextIn, progress, extra)\n\trefreshSwingBar()", 1, true) ~= nil, "The swing bar isn't redrawn with the swings")
 	check(scene:find("swingBar.Enabled = not blocked and hud.Enabled and mining()", 1, true) ~= nil, "The swing bar doesn't show while you mine")
 	check(scene:find("card.Visible = not blocked and expanded", 1, true) ~= nil, "The pick card still pops up as you mine")
 end
@@ -1345,16 +1345,29 @@ local Refill, Mega = Rules.Refills.Refill, Rules.Refills.Mega
 check(Server.addSwings(ana, Refill.Swings), "A refill's swings weren't added")
 local bought = handlers.OutpostState(ana).State
 check(
-	bought.Active == "Survey" and bought.Picks.Survey == Refill.Swings and profiles[ana].Coins == coins,
+	bought.Active == "Survey" and bought.Picks.Extra == Refill.Swings and profiles[ana].Coins == coins,
 	"A refill didn't put its swings in the pick (or took coins)"
 )
--- Refills stack past the full charge (the extra goes first).
+-- Refills go in their own bank and stack, on top of the free charge.
 check(Server.addSwings(ana, Mega.Swings), "A second refill wasn't added")
-check(handlers.OutpostState(ana).State.Picks.Survey == Refill.Swings + Mega.Swings, "Refills don't stack")
+check(handlers.OutpostState(ana).State.Picks.Extra == Refill.Swings + Mega.Swings, "Refills don't stack")
+-- The free charge is spent first, then the bank: it keeps regaining
+-- underneath the bought swings.
+do
+	local picks = { Survey = 2, Extra = 5 }
+	Rules.spendSurvey(picks, 3)
+	check(picks.Survey == 0 and picks.Extra == 4 and Rules.surveySwings(picks) == 4, "Bought swings were spent before the free ones")
+	local at = profiles[ana].Outpost.SurveyAt
+	profiles[ana].Outpost.SurveyAt -= Rules.FreeSwingSeconds * 3
+	local stacked = handlers.OutpostState(ana).State.Picks
+	check(stacked.Survey == 3 and stacked.Extra == Refill.Swings + Mega.Swings, "The free pick didn't regain under the bought swings")
+	profiles[ana].Outpost.Picks.Survey, profiles[ana].Outpost.SurveyAt = 0, at
+end
 check(not Server.addSwings(ana, 0), "Added no swings")
 -- Swing restores (Shared.SwingRestore: arena wins, dungeons, coupons) fill
 -- toward the full charge, never past it; none while it's over full.
-check(Server.restoreSwings(ana, 0.5) == 0, "A restore took a refilled pick")
+check(Server.restoreSwings(ana, 0.5) == Rules.Picks.Survey.Swings // 2 and profiles[ana].Outpost.Picks.Extra == Refill.Swings + Mega.Swings, "A restore didn't fill the charge under the bought swings")
+profiles[ana].Outpost.Picks.Extra = nil
 profiles[ana].Outpost.Picks.Survey = 100
 check(Server.restoreSwings(ana, 0.10) == 60, "10% isn't 60 swings")
 check(handlers.OutpostState(ana).State.Picks.Survey == 160, "A restore didn't reach the pick")
@@ -1379,7 +1392,7 @@ profiles[ben].Outpost = {
 }
 local migrated = handlers.OutpostState(ben).State
 check(
-	migrated.Picks.Survey == 10 + 100 + 60 and migrated.Picks.Titan == nil and migrated.Picks.Plasma == nil,
+	migrated.Picks.Survey == 10 and migrated.Picks.Extra == 100 + 60 and migrated.Picks.Titan == nil and migrated.Picks.Plasma == nil,
 	"An old save's picks didn't turn into swings"
 )
 check(migrated.Active == "Survey", "An old save kept a pick nobody sells in hand")

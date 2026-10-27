@@ -10,7 +10,9 @@
 	holds a long session's mining (its full 600: your kaiju fights and
 	levels beside you while you mine) and regains a swing every
 	FreeSwingSeconds, full again in two hours; refills (more swings, on top
-	of those) are bought from Garrick, the mining foreman, for Robux.
+	of those) are bought from Garrick, the mining foreman, for Robux. Bought
+	swings sit in their own bank (picks.Extra) and stack on the charge: the
+	free ones are spent first, so it keeps regaining underneath them.
 
 	  Outpost.Sizes / Outpost.SizeOrder      the rocks
 	  Outpost.Picks / Outpost.PickOrder      the pick (the free Survey Pick)
@@ -26,6 +28,9 @@
 	                                         (its first hitter keeps it a while)
 	  Outpost.refillSurvey(swings, since, now) the free pick's swings regained
 	                                         since `since` -> swings, since
+	  Outpost.surveySwings(picks)            free + bought swings, all you can swing
+	  Outpost.spendSurvey(picks, n)          spend n: the free charge first, then
+	                                         the bought bank
 	  Outpost.Machines / Outpost.MachineOrder   the big machines anyone can drive
 	                                         (just for getting around: no tools)
 	  Outpost.Secrets / Outpost.SecretOrder  the hidden Easter eggs
@@ -339,6 +344,19 @@ function Outpost.refillSurvey(swings: number, since: number, now: number): (numb
 	end
 	local total = math.min(full, swings + gained)
 	return total, if total >= full then now else since + gained * Outpost.FreeSwingSeconds
+end
+
+-- Every swing you hold for the free pick: its charge plus the bought bank.
+function Outpost.surveySwings(picks: { [string]: number }): number
+	return (picks.Survey or 0) + (picks.Extra or 0)
+end
+
+-- Spend `n` swings: the free charge first (so it keeps regaining under the
+-- bought ones), then the bought bank.
+function Outpost.spendSurvey(picks: { [string]: number }, n: number)
+	local free = math.min(picks.Survey or 0, n)
+	picks.Survey = (picks.Survey or 0) - free
+	picks.Extra = math.max(0, (picks.Extra or 0) - (n - free))
 end
 
 -- The free pick as a charge at `now`: swings, seconds until the next one
