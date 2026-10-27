@@ -5,7 +5,7 @@
 	(Wilds, Arena, Quarry, Crafting Hall, Market) that draws a trail for
 	every member.
 
-	Out in the world: an invite popup (Accept / Decline), teammates' health
+	Out in the world (invites come up as SocialUI's cards): teammates' health
 	at the top right (on a phone a slim row each, the size of your own
 	health bar, stacked under it: MobileLayout.party; hidden in a fight and
 	under a full screen such as the Inventory), and a marker over each
@@ -244,36 +244,6 @@ window.Shade.Activated:Connect(PartyUI.close)
 Players.PlayerAdded:Connect(PartyUI.refresh)
 Players.PlayerRemoving:Connect(function()
 	task.defer(PartyUI.refresh)
-end)
-
--- Invite popup -------------------------------------------------------------------------------------------
-
-local popupGui = UiKit.gui("PartyInvite", 14)
-local popup = IronUi.box(popupGui, UDim2.new(0.5, -180, 0, 90), UDim2.fromOffset(360, 110), P.Frame, 14)
-popup.Visible = false
-UiKit.pad(popup, 12)
-local popupText = text(popup, "", 15, P.Text, BOLD)
-local popupButtons = new("Frame", {
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.fromScale(0, 1),
-	Size = UDim2.new(1, 0, 0, 34),
-}, popup)
-UiKit.list(popupButtons, 8, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
-local popupFrom: number? = nil
-
-local function answer(accept: boolean)
-	popup.Visible = false
-	if popupFrom then
-		run("PartyRespond", popupFrom, accept)
-	end
-	popupFrom = nil
-end
-button(popupButtons, "✓ Accept", true, function()
-	answer(true)
-end)
-button(popupButtons, "Decline", false, function()
-	answer(false)
 end)
 
 -- Teammates on the HUD, markers and the rally trail -------------------------------------------------------
@@ -569,16 +539,6 @@ partyEvent.OnClientEvent:Connect(function(kind: string, a: any, b: any)
 		state = a
 		rebuildHud()
 		PartyUI.refresh()
-	elseif kind == "Invite" then
-		popupFrom = a
-		popupText.Text = string.format("👥  %s invited you to their party.", tostring(b))
-		popup.Visible = true
-		task.delay(60, function()
-			if popupFrom == a then
-				popup.Visible = false
-				popupFrom = nil
-			end
-		end)
 	end
 end)
 

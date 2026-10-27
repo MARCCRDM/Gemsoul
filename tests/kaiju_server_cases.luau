@@ -5668,10 +5668,42 @@ end)()
 			homesOpened += 1
 		end,
 	}
-	local parties = {}
+	local parties, readied, partyHooks = {}, {}, {}
 	server.Party = {
 		of = function(player)
 			return parties[player]
+		end,
+		-- (What an invite says, and who just took one: RiftServer's.)
+		setInviteContext = function(fn)
+			partyHooks.Context = fn
+		end,
+		onJoined = function(fn)
+			partyHooks.Joined = fn
+		end,
+		setReady = function(player, on)
+			readied[player] = on
+		end,
+	}
+	-- ADJUST ARMOR (CounterServer: CounterGear's plan against a boss's
+	-- element, worn): two changes to make till it's worn.
+	local worn = {}
+	server.CounterServer = {
+		offer = function(player, threat)
+			local element = threat.Shares[1] and threat.Shares[1].Element
+			local done = element == nil or worn[player] == element
+			return {
+				Element = element,
+				Changes = if done then 0 else 2,
+				Before = if done then 0.8 else 1,
+				After = 0.8,
+				Note = if done then "Your armor already answers it as well as your gems can." else nil,
+				Gems = if done then {} else { { Slot = "Helmet", Name = "Fire Gem", Gem = "g1" }, { Slot = "Gloves", Name = "Fire Gem", Gem = "g2" } },
+				Gear = {},
+			}
+		end,
+		wear = function(player, threat)
+			worn[player] = threat.Shares[1] and threat.Shares[1].Element
+			return {}
 		end,
 	}
 	local restored = {}
@@ -5773,7 +5805,7 @@ end)()
 	local RiftServer = serverModule("RiftServer")
 	local site = { Spawn = CFrame.new(outpost + Vector3.new(0, 3, 0)) }
 	RiftServer.start(site)
-	for _, name in { "RiftEnter", "RiftLeave", "RiftChoice", "RiftPeek" } do
+	for _, name in { "RiftEnter", "RiftLeave", "RiftChoice", "RiftPeek", "RiftGear" } do
 		check(registered[name] ~= nil, name .. " isn't a request")
 	end
 	check(registered.RiftLootChoice == nil, "The old claim/roll/pass is still a request")
@@ -6172,6 +6204,11 @@ end)()
 	check(profiles[a].Coins == 1000 - RiftRun.restoreCost(0), "Backup's revive cost coins")
 	check(#KaijuServer.team(a) > 0 and not Kaiju.away(profiles[a].Kaiju), "Their kaiju didn't come out with backup")
 	check(noted(a, "back on your feet, kaiju and all") and noted(b, "was down"), "Neither told about the revive")
+	-- (Backup comes in at the last cave cleared, by the throne, and walks
+	-- back to the gate to leave.)
+	check(inside(world.Rooms[RiftRun.Rooms], rootB.Position) and noted(b, "In at cave " .. RiftRun.Rooms), "Backup didn't come in by the throne")
+	check(not registered.RiftLeave(b).Ok, "Left from the last cave, nowhere near a way home")
+	rootB.CFrame = CFrame.new(world.Exit.Position)
 	check(registered.RiftLeave(b).Ok and RiftServer.runOf(b) == nil, "Backup couldn't leave again")
 	-- Down a third time: back to base keeps what they found.
 	a:SetAttribute("SparDown", now + 3)
@@ -6332,6 +6369,77 @@ end)()
 	rootA.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
 	check(registered.RiftEnter(b, 2, nil, true).Ok and RiftServer.runOf(a) == nil, "A member going in together brought their leader")
 	homeBoth()
+	-- ADJUST ARMOR ("RiftGear"): what setting your armor against a boss's
+	-- element would change, and (apply) it set; no boss, nothing to set.
+	do
+		local first = riftGate.Ladder[1]
+		local looked = registered.RiftGear(a, first.Id, false)
+		check(looked.Ok and looked.Element == first.Element and looked.Plan.Changes == 2 and worn[a] == nil, "Looking at ADJUST ARMOR changed something, or saw nothing")
+		check(looked.Plan.Gems[1].Gem == nil and looked.Plan.Gems[1].Slot == "Helmet", "ADJUST ARMOR sends more than names and slots")
+		local set = registered.RiftGear(a, first.Id, true)
+		check(set.Ok and worn[a] == first.Element and set.Applied.Changes == 2 and set.Plan.Changes == 0, "ADJUST ARMOR didn't set the armor")
+		check(string.find(set.Message, "Armor set against", 1, true) and string.find(set.Message, first.Name, 1, true), "Not told what ADJUST ARMOR did")
+		local again = registered.RiftGear(a, first.Id, true)
+		check(again.Ok and string.find(again.Message, "already answers", 1, true), "Setting it twice didn't say there's nothing more")
+		check(not registered.RiftGear(a, "Nope", false).Ok and not registered.RiftGear(a, nil, true).Ok, "ADJUST ARMOR with no boss")
+		worn[a] = nil
+	end
+	-- Invites (Party.setInviteContext, Party.onJoined): an invite from the
+	-- board names the boss picked; taking it, you're ready to go in with
+	-- them (and your armor's set against it if you asked). Once the party's
+	-- in, any of them can invite (Live), and taking that takes you straight
+	-- in, to the last cave they cleared, facing on.
+	check(partyHooks.Context ~= nil and partyHooks.Joined ~= nil, "Invites don't hear from the Rift")
+	do
+		local first = riftGate.Ladder[1]
+		local asked = partyHooks.Context(a, { Rift = first.Id })
+		check(asked and asked.Kind == "Rift" and asked.Live == false and asked.BossId == first.Id and asked.Boss == first.Name and asked.Element == first.Element, "An invite from the board doesn't name its boss")
+		check(partyHooks.Context(a, nil) == nil and partyHooks.Context(a, { Rift = "Nope" }) == nil, "An invite with no boss picked says it's for the Rift")
+		parties[a] = { Leader = a, Members = { a, b }, Ready = {} }
+		parties[b] = parties[a]
+		table.clear(notes)
+		partyHooks.Joined(b, a, asked, { GearUp = true })
+		check(readied[b] == true and noted(b, "You're ready for " .. first.Name .. ": when " .. a.DisplayName .. " goes in"), "Taking a board invite didn't make them ready, or named someone else")
+		check(worn[b] == first.Element and noted(b, "Armor set against"), "Their armor wasn't set for its boss")
+		check(RiftServer.runOf(b) == nil, "A board invite took them in before their leader")
+		readied[b], worn[b] = nil, nil
+		-- Mid-trip: two caves cleared, then someone new is asked in.
+		parties[a], parties[b] = nil, nil
+		rootA.CFrame = CFrame.new(gate.Position)
+		check(enter(a, 2).Ok, "Couldn't go in alone for the invite")
+		run = RiftServer.runOf(a)
+		world = built[#built]
+		for i = 1, 2 do
+			walkIn(a, world.Rooms[i])
+			clearCave()
+		end
+		check(run.Room == 3, "Two caves cleared isn't the third reached: " .. tostring(run.Room))
+		local live = partyHooks.Context(a, { Rift = "Nope" })
+		check(live and live.Live == true and live.BossId == run.Boss.Id and live.Cave == 2, "An invite from the Rift isn't live, or doesn't say how far")
+		parties[a] = { Leader = a, Members = { a, b }, Ready = {} }
+		parties[b] = parties[a]
+		rootB.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
+		-- (One in the middle of something else is told how to follow, and
+		-- their armor stays as it is.)
+		b:SetAttribute("MatchId", "M1")
+		partyHooks.Joined(b, a, live, { GearUp = true })
+		check(RiftServer.runOf(b) == nil and noted(b, "party is in the Rift: join them from any Rift Gate"), "Pulled out of a match, or not told how to follow")
+		check(worn[b] == nil, "Their armor changed in the middle of a match")
+		b:SetAttribute("MatchId", nil)
+		table.clear(notes)
+		partyHooks.Joined(b, a, live, { GearUp = true })
+		check(RiftServer.runOf(b) == run and b:GetAttribute("RiftRun") == run.Id, "Taking an invite mid-trip didn't take them in")
+		check(inside(world.Rooms[2], rootB.Position) and run.Reached[b] == 2, "Not in the last cave cleared")
+		-- (Along the way on: Lune's CFrame.lookAt has Z backwards, so either way along it.)
+		local onward = world.Rooms[3].Center - rootB.Position
+		onward = Vector3.new(onward.X, 0, onward.Z).Unit
+		check(math.abs(rootB.CFrame.LookVector:Dot(onward)) > 0.9, "Not facing on, to the next cave")
+		check(noted(b, "In at cave 2") and noted(a, "came through the gate") and worn[b] == run.Element, "Not told where they came in, or armor not set")
+		check(kit[b] == true and readied[b] == nil, "In without their kit, or only made ready")
+		homeBoth()
+		parties[a], parties[b] = nil, nil
+		worn[b] = nil
+	end
 	parties[a], parties[b] = nil, nil
 	-- Brutus's bounties (Shared.Bounties): from his counter, every biome's
 	-- ladder, a boss off any of them, the same trip as through its gate;
@@ -6693,7 +6801,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together, your support)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together, ADJUST ARMOR, invites that take you in, your support)",
 		checks
 	)
 )

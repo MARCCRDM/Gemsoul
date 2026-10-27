@@ -77,7 +77,19 @@
 	              { { Id, Name, Element, Threat, Level (bossLevel, at
 	              your party's kaiju), Group, Loot, Unlocked, Beaten,
 	              Need } }, Next (the boss it offers first), Boss (your
-	              party's, joining) }. Each boss's portrait waits in
+	              party's, joining) and Theirs (its card, joining) }.
+	  Armor       "RiftGear", bossId, apply: ADJUST ARMOR (the board's
+	              GET READY, a Rift invite): your armor set against the
+	              boss's element (Shared.CounterGear.versus, worn by
+	              Systems/CounterServer: resist gems and armor pieces from
+	              your bag, never your sword or your Q, E and R gems), the
+	              plan back as CounterGear.summary.
+	  Invites     a party invite from the board says which boss
+	              (Party.setInviteContext); one from inside a trip says it's
+	              on its way (Live). Accepted (Party.onJoined): into the
+	              trip now if it's on its way, coming in at the last cave
+	              cleared (join), else ready to go in with them; the
+	              invite's ADJUST MY ARMOR sets their armor first. Each boss's portrait waits in
 	              ReplicatedStorage.RiftPortraits (portraitOf).
 	  Healing     each cave and the throne cave have healing crystals
 	              (RiftRun.Heal, World.RiftWorld.healRock): "RiftMine", id
@@ -126,6 +138,8 @@ local KaijuServer = require(script.Parent.KaijuServer)
 local KaijuWilds = require(script.Parent.KaijuWilds)
 local Party = require(script.Parent.Party)
 local Bounties = require(ReplicatedStorage.Shared.Bounties)
+local CounterGear = require(ReplicatedStorage.Shared.CounterGear)
+local CounterServer = require(script.Parent.CounterServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
@@ -452,6 +466,7 @@ end
 
 local checkClear
 local spawnHeals -- (below, with the healing crystals)
+local welcome -- (below, after going in)
 
 -- One foe through a tear of its own at `at`: the tear opens `after` seconds
 -- from now (`height` tall; the Outpost's size when nil) in the critters'
@@ -1060,15 +1075,23 @@ local function step(now: number)
 	end
 end
 
--- Joins `run`: on its landing, the attributes, and word of how many are in.
+-- Joins `run`: on its landing, or (once a cave's cleared) in the last cave
+-- cleared, facing the way on, so one who joins a trip on its way comes in
+-- where the party's got to; the attributes, and word of how many are in.
 local function join(run, player: Player)
 	table.insert(run.Members, player)
 	runOf[player] = run
 	run.Found[player] = run.Found[player] or {}
-	run.Reached[player] = 0
+	local cleared = math.clamp(run.Room - 1, 0, RiftRun.Rooms)
+	run.Reached[player] = cleared
 	player:SetAttribute("RiftRun", run.Id)
 	player:SetAttribute("RiftRealm", run.World.Folder:GetAttribute("Realm"))
 	local spot = run.World.Start * CFrame.new((#run.Members - 1) * 3 - 4.5, 0, 0)
+	if cleared > 0 then
+		local here = run.World.Rooms[cleared].Center + Vector3.new((#run.Members - 1) * 3 - 4.5, 3, 0)
+		local onward = if cleared < RiftRun.Rooms then run.World.Rooms[cleared + 1].Center else run.World.Boss.Center
+		spot = CFrame.lookAt(here, Vector3.new(onward.X, here.Y, onward.Z))
+	end
 	player.Character:PivotTo(spot)
 	local root = rootOf(player)
 	if root then
@@ -1079,6 +1102,9 @@ local function join(run, player: Player)
 	SparServer.riftKit(player, true)
 	notify(player, "Green crystals by the cave walls heal you: swap to your pick (1, or the kit button) and mine them.")
 	show(run)
+	if cleared > 0 then
+		notify(player, string.format("In at cave %d: your party's cleared the way this far.", cleared))
+	end
 	for _, other in run.Members do
 		if other ~= player then
 			notify(other, player.DisplayName .. " came through the gate.")
@@ -1358,6 +1384,13 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 	else
 		join(run, player)
 	end
+	welcome(run, player)
+	return reply(true, "", { Runners = #run.Members, Boss = run.Boss.Name })
+end
+
+-- What `player` is told on the way in: a first boss, going alone, and what
+-- to bring against it.
+function welcome(run, player: Player)
 	local starter = DungeonRules.starter(run.Boss)
 	if starter then
 		notify(
@@ -1376,7 +1409,104 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 	local tips = DungeonRules.elementTips(run.Boss)
 	notify(player, tips.Lines[2])
 	notify(player, tips.Lines[3])
-	return reply(true, "", { Runners = #run.Members, Boss = run.Boss.Name })
+end
+
+-- ADJUST ARMOR: your armor set against `element` (Shared.CounterGear:
+-- resist gems in your helmet, gloves and boots, armor pieces that power
+-- them; never your sword or your Q, E and R gems). What it would change,
+-- or (apply) changed, as CounterGear.summary.
+local function gearUp(player: Player, element: string?, apply: boolean)
+	local threat = CounterGear.versus(element)
+	if apply then
+		CounterServer.wear(player, threat)
+	end
+	return CounterGear.summary(CounterServer.offer(player, threat))
+end
+
+-- The element of a boss by its id (any biome's ladder), or of your
+-- party's trip.
+local function elementFor(player: Player, bossId: any): (string?, any)
+	local run = runOf[player] or partyRun(player)
+	if run and run.Boss then
+		return run.Boss.Element or run.Element, run.Boss
+	end
+	local boss = if type(bossId) == "string" then RiftRun.bossById(bossId) else nil
+	return boss and (boss.Element or Bounties.elementOf(bossId)), boss
+end
+
+-- "RiftGear", bossId, apply: ADJUST ARMOR on the Bounty Board, a gate's
+-- lobby or a Rift invite.
+local function gear(player: Player, bossId: any, apply: any)
+	local element, boss = elementFor(player, bossId)
+	if not element then
+		return reply(false, "Pick a boss first.")
+	end
+	local before = if apply == true then gearUp(player, element, false) else nil
+	local plan = gearUp(player, element, apply == true)
+	local name = GemConfig.elementName(element)
+	local message = ""
+	if apply == true then
+		message = if before and before.Changes > 0
+			then string.format("Armor set against %s%s.", name, if boss then " for " .. boss.Name else "")
+			else before and before.Note or string.format("Your armor already answers %s as well as your gems can.", name)
+	end
+	return reply(true, message, { Plan = plan, Applied = before, Element = element })
+end
+
+-- One who just joined `player`'s party by an invite: into the party's
+-- trip now if it's on its way (to the last cave cleared), else ready to
+-- go in with them. `opts.GearUp` sets their armor for its boss first.
+local function onJoined(player: Player, from: Player, context: any, opts: any)
+	local run = partyRun(player)
+	local element = if run then run.Boss.Element or run.Element elseif type(context) == "table" then context.Element else nil
+	-- (Busy, in a match say, your armor stays as it is.)
+	local why = problem(player)
+	if opts.GearUp == true and element and not why then
+		local done = gearUp(player, element, false)
+		gearUp(player, element, true)
+		if done.Changes > 0 then
+			notify(player, string.format("Armor set against %s.", GemConfig.elementName(element)))
+		end
+	end
+	if run then
+		if why then
+			notify(player, from.DisplayName .. "'s party is in the Rift: join them from any Rift Gate or the bounty counter. " .. why)
+			return
+		end
+		join(run, player)
+		welcome(run, player)
+	elseif type(context) == "table" and context.Kind == "Rift" then
+		-- (Ready: the leader's ENTER TOGETHER takes you in with them.)
+		local party = Party.of(player)
+		local leader = if party and party.Leader then party.Leader else from
+		Party.setReady(player, true)
+		notify(
+			player,
+			string.format("You're ready for %s: when %s goes in, you go too.", context.Boss or "the Rift", leader.DisplayName)
+		)
+	end
+end
+
+-- What an invite from `player` says (Party.setInviteContext): the boss of
+-- their party's trip (Live), or the one they've picked on the board.
+local function inviteContext(player: Player, wanted: any)
+	local run = runOf[player]
+	if run and not run.Done and not run.Won then
+		return {
+			Kind = "Rift",
+			Live = true,
+			Boss = run.Boss.Name,
+			BossId = run.Boss.Id,
+			Element = run.Boss.Element or run.Element,
+			Cave = math.clamp(run.Room - 1, 0, RiftRun.Rooms),
+		}
+	end
+	local bossId = type(wanted) == "table" and wanted.Rift
+	local boss = type(bossId) == "string" and RiftRun.bossById(bossId)
+	if boss then
+		return { Kind = "Rift", Live = false, Boss = boss.Name, BossId = boss.Id, Element = boss.Element or Bounties.elementOf(bossId) }
+	end
+	return nil
 end
 
 -- Home through a way home you're standing at.
@@ -1436,28 +1566,33 @@ local function peek(player: Player, vein: any)
 	local theirs = partyRun(player)
 	local beaten = beatenBy(player)
 	local levels = leadLevels(if theirs then theirs.Members elseif party then party.Members else { player })
+	-- A boss as its card shows it.
+	local function entryOf(boss, element: string?)
+		local open, _, need = RiftRun.canFight(element or boss.Element, boss.Id, beaten)
+		local tips = DungeonRules.elementTips(boss)
+		portraitOf(boss)
+		return {
+			Id = boss.Id,
+			Name = boss.Name,
+			Element = boss.Element,
+			Threat = BossLoot.threat(boss),
+			Level = RiftRun.bossLevel(levels, boss),
+			Group = RiftRun.isGroup(boss),
+			-- (A first boss: recommended solo at its level.)
+			Starter = DungeonRules.starter(boss) ~= nil,
+			Weakness = tips.Weakness,
+			Tips = tips.Lines,
+			Loot = boss.Loot,
+			Unlocked = open,
+			Beaten = beaten[boss.Id] or 0,
+			Need = need and need.Name,
+		}
+	end
 	-- One biome's ladder as its cards show it.
 	local function ladderOf(element: string?)
 		local ladder = {}
 		for _, boss in RiftRun.ladder(element) do
-			local open, _, need = RiftRun.canFight(element, boss.Id, beaten)
-			portraitOf(boss)
-			table.insert(ladder, {
-				Id = boss.Id,
-				Name = boss.Name,
-				Element = boss.Element,
-				Threat = BossLoot.threat(boss),
-				Level = RiftRun.bossLevel(levels, boss),
-				Group = RiftRun.isGroup(boss),
-				-- (A first boss: recommended solo at its level.)
-				Starter = DungeonRules.starter(boss) ~= nil,
-				Weakness = boss.Weakness,
-				Tips = DungeonRules.elementTips(boss).Lines,
-				Loot = boss.Loot,
-				Unlocked = open,
-				Beaten = beaten[boss.Id] or 0,
-				Need = need and need.Name,
-			})
+			table.insert(ladder, entryOf(boss, element))
 		end
 		local nextUp = RiftRun.nextBoss(element, beaten)
 		return ladder, nextUp and nextUp.Id
@@ -1482,6 +1617,7 @@ local function peek(player: Player, vein: any)
 			Ladder = first.Ladder or {},
 			Next = first.Next,
 			Boss = theirs and theirs.Boss.Name,
+			Theirs = theirs and entryOf(theirs.Boss),
 		})
 	end
 	local biome = gateBiome(vein)
@@ -1496,6 +1632,7 @@ local function peek(player: Player, vein: any)
 		Ladder = ladder,
 		Next = nextId,
 		Boss = theirs and theirs.Boss.Name,
+		Theirs = theirs and entryOf(theirs.Boss),
 	})
 end
 
@@ -1517,6 +1654,9 @@ end
 function RiftServer.start(outpost)
 	site = outpost
 	Shop.register("RiftEnter", enter)
+	Shop.register("RiftGear", gear)
+	Party.setInviteContext(inviteContext)
+	Party.onJoined(onJoined)
 	Shop.register("RiftLeave", leave)
 	Shop.register("RiftChoice", choose)
 	Shop.register("RiftPeek", peek)

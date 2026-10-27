@@ -303,4 +303,21 @@ do
 	end
 end
 
-print("PASS: " .. checks .. " counter checks (what hurt you, from the round or their gear; resist gems in the free sockets, finest first; Q/E/R untouched; never weak to the mix; affix pieces within the rating floor; says why when there's nothing)")
+-- Against a boss (the Bounty Board's ADJUST ARMOR): all its element ------------------------
+do
+	local threat = CounterGear.versus("Fire")
+	check(threat.Source == "Boss" and #threat.Shares == 1 and threat.Shares[1].Element == "Fire" and threat.Shares[1].Share == 1, "A boss's threat isn't all its element")
+	check(#CounterGear.versus(nil).Shares == 0 and #CounterGear.versus("Nope").Shares == 0, "No boss, or no element, still a threat")
+	local profile = cryoFighter()
+	for i = 1, 3 do
+		table.insert(profile.Gems, gem("f" .. i, "Fire", 9))
+	end
+	local plan = CounterGear.plan(profile, threat)
+	local summary = CounterGear.summary(plan)
+	check(summary.Element == "Fire" and summary.Changes == plan.Changes and summary.Changes > 0, "The summary doesn't count the changes")
+	check(summary.Before == plan.Before and summary.After == plan.After and summary.After < summary.Before, "The summary's before/after")
+	check(#summary.Gems == #plan.Gems and summary.Gems[1].Slot ~= nil and summary.Gems[1].Gem == nil, "The summary sends more than names and slots")
+	check(CounterGear.summary(CounterGear.plan(profile, CounterGear.versus(nil))).Changes == 0, "Nothing to answer, still changes")
+end
+
+print("PASS: " .. checks .. " counter checks (what hurt you, from the round or their gear; resist gems in the free sockets, finest first; Q/E/R untouched; never weak to the mix; affix pieces within the rating floor; a boss's element; says why when there's nothing)")

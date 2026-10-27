@@ -1538,6 +1538,106 @@ local function prompt(
 	return dismiss
 end
 
+-- A Rift invite (the context Systems/RiftServer gives it): who, which
+-- boss, and what accepting does (into their trip now, to the last cave
+-- they've cleared; or in with them when they go). ADJUST MY ARMOR (on to
+-- start with) sets your armor against the boss's element as you accept.
+local function riftInvite(fromId: number, fromName: string, context)
+	local accent = GemConfig.ElementColors[context.Element or ""] or Color3.fromRGB(255, 120, 48)
+	local element = string.upper(GemConfig.elementName(context.Element or ""))
+	local card = new("Frame", {
+		Name = "RiftInvite",
+		BackgroundColor3 = P.Frame,
+		Size = UDim2.fromOffset(330, 176),
+	}, stack)
+	UiKit.round(card, 10)
+	new("UIStroke", { Color = accent, Thickness = 1.5 }, card)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(accent:Lerp(P.Frame, 0.8), P.Frame) }, card)
+	local badge = IronUi.badge(card, "⚔", 40, accent)
+	badge.Position = UDim2.fromOffset(12, 12)
+	local head = text(card, if context.Live then "JOIN THE FIGHT" else "RIFT INVITE", 15, accent, HEADING)
+	head.AutomaticSize = Enum.AutomaticSize.None
+	head.Position, head.Size = UDim2.fromOffset(62, 10), UDim2.new(1, -72, 0, 20)
+	local sub = text(
+		card,
+		string.format(
+			if context.Live
+				then "%s needs you against %s. Accept and you're in, where they've got to."
+				else "%s wants you against %s. Accept and you go in with them.",
+			fromName,
+			context.Boss or "a Rift boss"
+		),
+		12,
+		P.Text
+	)
+	sub.AutomaticSize = Enum.AutomaticSize.None
+	sub.Position, sub.Size = UDim2.fromOffset(62, 32), UDim2.new(1, -72, 0, 32)
+	-- ADJUST MY ARMOR: a tick box, on to start with.
+	local gearUp = true
+	local toggle = new("TextButton", {
+		Name = "GearUp",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.fromRGB(18, 20, 30),
+		Position = UDim2.fromOffset(14, 74),
+		Size = UDim2.new(1, -28, 0, 40),
+	}, card)
+	UiKit.round(toggle, 8)
+	local edge = new("UIStroke", { Color = accent, Thickness = 1, Transparency = 0.3 }, toggle)
+	local tick = new("TextLabel", {
+		BackgroundColor3 = accent,
+		Position = UDim2.fromOffset(8, 10),
+		Size = UDim2.fromOffset(20, 20),
+		Text = "✓",
+		TextSize = 14,
+		Font = BOLD,
+		TextColor3 = P.Frame,
+	}, toggle)
+	UiKit.round(tick, 5)
+	local what = text(toggle, "ADJUST MY ARMOR FOR " .. element, 12, P.Text, BOLD)
+	what.AutomaticSize = Enum.AutomaticSize.None
+	what.Position, what.Size = UDim2.fromOffset(38, 4), UDim2.new(1, -44, 0, 16)
+	local why = text(toggle, "Resist gems and armor from your bag", 10, P.Dim)
+	why.AutomaticSize = Enum.AutomaticSize.None
+	why.Position, why.Size = UDim2.fromOffset(38, 21), UDim2.new(1, -44, 0, 14)
+	toggle.Activated:Connect(function()
+		gearUp = not gearUp
+		tick.Text = if gearUp then "✓" else ""
+		tick.BackgroundColor3 = if gearUp then accent else Color3.fromRGB(40, 44, 58)
+		edge.Transparency = if gearUp then 0.3 else 0.75
+	end)
+	local track = new("Frame", {
+		BackgroundColor3 = accent,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 1, -3),
+		Size = UDim2.new(1, 0, 0, 3),
+	}, card)
+	TweenService:Create(track, TweenInfo.new(60, Enum.EasingStyle.Linear), { Size = UDim2.new(0, 0, 0, 3) }):Play()
+	local answered = false
+	local function answer(accept: boolean)
+		if answered then
+			return
+		end
+		answered = true
+		card:Destroy()
+		run("PartyRespond", fromId, accept, { GearUp = accept and gearUp })
+	end
+	local yes = chip(card, if context.Live then "JOIN NOW" else "JOIN", P.Good, function()
+		answer(true)
+	end, 146)
+	yes.Position, yes.Size = UDim2.fromOffset(14, 124), UDim2.fromOffset(146, 40)
+	local no = chip(card, "Not now", P.Bad, function()
+		answer(false)
+	end, 146)
+	no.Position, no.Size = UDim2.fromOffset(170, 124), UDim2.fromOffset(146, 40)
+	task.delay(60, function()
+		if not answered then
+			answered = true
+			card:Destroy()
+		end
+	end)
+end
+
 -- Open spar requests, by who asked: their card's dismiss. Once you're
 -- sparring, the rest come down (the server has dropped them).
 local sparCards: { [number]: () -> () } = {}
@@ -1951,7 +2051,7 @@ end)
 -- Server events -------------------------------------------------------------------
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
-remotes:WaitForChild("Party").OnClientEvent:Connect(function(kind: string, a: any, b: any)
+remotes:WaitForChild("Party").OnClientEvent:Connect(function(kind: string, a: any, b: any, c: any)
 	if kind == "State" then
 		local had = party
 		party = a
@@ -1965,6 +2065,8 @@ remotes:WaitForChild("Party").OnClientEvent:Connect(function(kind: string, a: an
 		end
 		SocialUI.PartyChanged:Fire(party)
 		SocialUI.refresh()
+	elseif kind == "Invite" and type(c) == "table" and c.Kind == "Rift" then
+		riftInvite(a, b, c)
 	elseif kind == "Invite" then
 		prompt("👥", "Party invite", b .. " invited you to their party.", 60, P.Teal, function(accept)
 			run("PartyRespond", a, accept)

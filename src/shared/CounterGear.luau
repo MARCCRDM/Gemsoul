@@ -32,6 +32,11 @@
 	      Plain                              share of it with no element (Taken)
 	      TheirMain, TheirWeak               their armor's element, what beats it
 	  }
+	  CounterGear.versus(element) -> the threat of a foe that hits with
+	      `element` only: a Rift boss (Systems/RiftServer's ADJUST ARMOR)
+	  CounterGear.summary(plan) -> the plan in plain words to send a client:
+	      { Element, Changes, Before, After, Note, Gems { { Slot, Name,
+	      FromName } }, Gear { { Slot, Name, FromName } } }
 	  CounterGear.expected(loadout, threat) -> what their elements do to you,
 	      on average (1 = full; 1.25 = weak; under 1 resisted)
 	  CounterGear.plan(profile, threat) -> {
@@ -131,6 +136,32 @@ function CounterGear.threat(taken: { [string]: number }?, foe)
 		threat.TheirWeak = ElementMatchup.weakTo(armor.Main)
 	end
 	return threat
+end
+
+function CounterGear.versus(element: string?)
+	if not element or not GemConfig.ElementLabels[element] then
+		return { Source = nil, Shares = {}, Plain = 0 }
+	end
+	return { Source = "Boss", Shares = { { Element = element, Share = 1 } }, Plain = 0 }
+end
+
+function CounterGear.summary(plan)
+	local out = {
+		Element = plan.Element,
+		Changes = plan.Changes,
+		Before = plan.Before,
+		After = plan.After,
+		Note = plan.Note,
+		Gems = {},
+		Gear = {},
+	}
+	for _, step in plan.Gems or {} do
+		table.insert(out.Gems, { Slot = step.Slot, Name = step.Name, FromName = step.FromName })
+	end
+	for _, step in plan.Gear or {} do
+		table.insert(out.Gear, { Slot = step.Slot, Name = step.Name, FromName = step.FromName })
+	end
+	return out
 end
 
 function CounterGear.expected(loadout, threat): number

@@ -1,13 +1,21 @@
 --[[
 	Parties of up to four. Request actions:
-	  "PartyInvite", userId          invite someone in the server
-	  "PartyRespond", userId, accept  answer an invite from that player
+	  "PartyInvite", userId, wanted   invite someone in the server (`wanted`:
+	                                  { Rift = bossId } from the Bounty Board or a
+	                                  Rift Gate, so the invite says which boss)
+	  "PartyRespond", userId, accept, opts  answer an invite from that player
+	                                  (opts.GearUp: set your armor for its boss)
 	  "PartyLeave"                    leave (the next member leads)
 	  "PartyKick", userId             leader only
 	  "PartyReady", ready             ready check
 	  "PartyRally", landmark|nil      leader sets a rally point everyone sees
 	The Party remote tells members the state ("State", data) and invitees
-	about invites ("Invite", fromId, fromName).
+	about invites ("Invite", fromId, fromName, context). An invite's context
+	comes from Party.setInviteContext (Systems/RiftServer): { Kind = "Rift",
+	Boss, BossId, Element, Live } when it's for a Rift boss (Live: the
+	inviter's party is in there now; then anyone in it may invite, not just
+	the leader). Party.onJoined(fn) hears every accepted invite: fn(player,
+	from, context, opts); Party.setReady(player, on) marks one ready.
 
 	In a party, a monster's rewards go to every member fighting nearby, not
 	just the top damage dealer (see Enemies). Members never hurt each other
@@ -43,7 +51,10 @@ type PartyData = {
 local Party = {}
 
 local memberOf: { [Player]: PartyData } = {}
-local invites: { [Player]: { [Player]: number } } = {} -- invitee -> inviter -> expiry
+-- invitee -> inviter -> { Expiry, Context }
+local invites: { [Player]: { [Player]: { Expiry: number, Context: any } } } = {}
+local inviteContext: ((Player, any) -> any)? = nil
+local joinedHooks: { (Player, Player, any, any) -> () } = {}
 
 local partyCount = 0
 
@@ -146,6 +157,22 @@ local function leave(player: Player)
 	push(party)
 end
 
+function Party.setInviteContext(fn: (Player, any) -> any)
+	inviteContext = fn
+end
+
+function Party.onJoined(fn: (Player, Player, any, any) -> ())
+	table.insert(joinedHooks, fn)
+end
+
+function Party.setReady(player: Player, on: boolean)
+	local party = memberOf[player]
+	if party then
+		party.Ready[player] = on
+		push(party)
+	end
+end
+
 function Party.of(player: Player): PartyData?
 	return memberOf[player]
 end
@@ -209,13 +236,15 @@ local function byUserId(userId: any): Player?
 	return if typeof(userId) == "number" then Players:GetPlayerByUserId(userId) else nil
 end
 
-local function invite(player: Player, userId: any)
+local function invite(player: Player, userId: any, wanted: any)
 	local target = byUserId(userId)
 	if not target or target == player then
 		return reply(false, "That player isn't here.")
 	end
+	local context = if inviteContext then inviteContext(player, wanted) else nil
 	local party = memberOf[player]
-	if party and party.Leader ~= player then
+	-- (In the Rift, anyone in the party may call for backup.)
+	if party and party.Leader ~= player and not (type(context) == "table" and context.Live) then
 		return reply(false, "Only the party leader can invite.")
 	end
 	if party and #party.Members >= MAX_SIZE then
@@ -225,19 +254,19 @@ local function invite(player: Player, userId: any)
 		return reply(false, target.DisplayName .. " is already in a party.")
 	end
 	invites[target] = invites[target] or {}
-	invites[target][player] = os.clock() + INVITE_SECONDS
-	Remotes.Party:FireClient(target, "Invite", player.UserId, player.DisplayName)
+	invites[target][player] = { Expiry = os.clock() + INVITE_SECONDS, Context = context }
+	Remotes.Party:FireClient(target, "Invite", player.UserId, player.DisplayName, context)
 	return reply(true, "Invited " .. target.DisplayName .. ".")
 end
 
-local function respond(player: Player, fromId: any, accept: any)
+local function respond(player: Player, fromId: any, accept: any, opts: any)
 	local from = byUserId(fromId)
 	local pending = invites[player]
-	local expiry = from and pending and pending[from]
+	local entry = from and pending and pending[from]
 	if pending and from then
 		pending[from] = nil
 	end
-	if not from or not expiry or os.clock() > expiry then
+	if not from or not entry or os.clock() > entry.Expiry then
 		return reply(false, "That invite has expired.")
 	end
 	if accept ~= true then
@@ -267,6 +296,9 @@ local function respond(player: Player, fromId: any, accept: any)
 	table.insert(party.Members, player)
 	memberOf[player] = party
 	push(party)
+	for _, hook in joinedHooks do
+		task.spawn(hook, player, from, entry.Context, if type(opts) == "table" then opts else {})
+	end
 	return reply(true, "Joined " .. party.Leader.DisplayName .. "'s party.")
 end
 

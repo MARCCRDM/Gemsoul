@@ -44,4 +44,32 @@ handlers.PartyInvite(j,k.UserId);handlers.PartyRespond(k,j.UserId,true)
 handlers.PartyReady(j,true);handlers.PartyReady(k,true)
 handlers.DungeonFind(j);handlers.PartyReady(k,false);Queue.step()
 check(not j:GetAttribute("DungeonQueue") and not k:GetAttribute("DungeonQueue"),"Unready member did not cancel duo")
-print("PASS: "..checks.." dungeon matchmaking checks: solo, duo, consent, cancellation, disconnect, busy state, duplicates and party preservation")
+-- Invites with a reason (Party.setInviteContext: RiftServer's), and what
+-- taking one does (Party.onJoined). Anyone in the party may ask someone in
+-- while it's on a live Rift trip; otherwise only the leader.
+local told={}
+Remotes.Party.FireClient=function(_,p,kind,...) if kind=="Invite" then table.insert(told,{To=p,Args=table.pack(...)}) end end
+local live={}
+Party.setInviteContext(function(p,wanted)
+ if live[p] then return {Kind="Rift",Live=true,Boss="Gorgo"} end
+ if type(wanted)=="table" and wanted.Rift then return {Kind="Rift",Live=false,BossId=wanted.Rift} end
+ return nil
+end)
+local joined={}
+Party.onJoined(function(p,from,context,opts) table.insert(joined,{P=p,From=from,Context=context,Opts=opts}) end)
+local l,m,n,o=makePlayer(313,"L"),makePlayer(314,"M"),makePlayer(315,"N"),makePlayer(316,"O")
+check(handlers.PartyInvite(l,m.UserId,{Rift="Drago"}).Ok,"A Rift invite failed")
+local note=told[#told]
+check(note.To==m and note.Args[1]==l.UserId and note.Args[3].Kind=="Rift" and note.Args[3].BossId=="Drago","The invite didn't say what it's for")
+check(handlers.PartyRespond(m,l.UserId,true,{GearUp=true}).Ok and Party.of(m)==Party.of(l),"Taking a Rift invite failed")
+check(#joined==1 and joined[1].P==m and joined[1].From==l and joined[1].Context.BossId=="Drago" and joined[1].Opts.GearUp==true,"Taking it wasn't heard, or lost its options")
+check(not handlers.PartyInvite(m,n.UserId).Ok,"A member invited outside the Rift")
+live[m]=true
+check(handlers.PartyInvite(m,n.UserId).Ok and told[#told].Args[3].Live==true,"A member couldn't call for backup from the Rift")
+check(handlers.PartyRespond(n,m.UserId,true,"nonsense").Ok and #Party.of(l).Members==3,"Backup didn't join the party")
+check(joined[2].P==n and joined[2].From==m and joined[2].Context.Live and type(joined[2].Opts)=="table","Backup's join wasn't heard")
+check(handlers.PartyInvite(l,o.UserId).Ok and handlers.PartyRespond(o,l.UserId,false).Ok and #joined==2,"A declined invite was heard as taken")
+Party.setReady(n,true)
+check(Party.of(n).Ready[n]==true,"setReady didn't mark them ready")
+Party.setInviteContext(nil)
+print("PASS: "..checks.." dungeon matchmaking checks: solo, duo, consent, cancellation, disconnect, busy state, duplicates, party preservation, Rift invites and backup")

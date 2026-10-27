@@ -844,6 +844,47 @@ local function personRow(parent: Instance, row, order: number, compact: boolean,
 	return line
 end
 
+-- A step's heading: its number in a ring, then what it is.
+local function stepHead(parent: Instance, n: number, label: string, order: number, small: boolean): TextLabel
+	local row = new("Frame", {
+		Name = "Step" .. n,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, if small then 16 else 22),
+		LayoutOrder = order,
+	}, parent)
+	local ring = new("TextLabel", {
+		BackgroundColor3 = EMBER:Lerp(P.Frame, 0.55),
+		Size = UDim2.fromOffset(if small then 16 else 22, if small then 16 else 22),
+		Text = tostring(n),
+		TextSize = if small then 10 else 13,
+		Font = BOLD,
+		TextColor3 = P.Text,
+	}, row)
+	UiKit.round(ring, 999)
+	new("UIStroke", { Color = EMBER, Thickness = 1 }, ring)
+	local words = text(row, label, if small then 11 else 13, P.Gold, BOLD)
+	words.AutomaticSize = Enum.AutomaticSize.None
+	words.TextWrapped = false
+	words.TextTruncate = Enum.TextTruncate.AtEnd
+	words.Position = UDim2.fromOffset(if small then 22 else 30, 0)
+	words.Size = UDim2.new(1, if small then -22 else -30, 1, 0)
+	return words
+end
+
+-- "100%" from a CounterGear.expected value (1 = every bit of its hits).
+local function share(value: number?): string
+	return string.format("%d%%", math.floor((value or 1) * 100 + 0.5))
+end
+
+-- The Bounty Board (and a Rift Gate's lobby), in three steps:
+--   1 CHOOSE YOUR BOSS   a biome's tab (the board), its ladder as cards
+--   2 GET READY          the boss picked: what it hits with, what it's weak
+--                        to, its level, and ADJUST ARMOR (Shared.CounterGear
+--                        through "RiftGear": resist gems and armor against
+--                        its element, from your bag, never your Q, E, R)
+--   3 YOUR PARTY         its four places, two by two, and who's about to
+--                        invite (an invite says which boss: Party's context)
+-- with ENTER under them.
 function RiftClient.openGate(vein: any, at: Vector3?)
 	if gateCard and gateCard.Parent or player:GetAttribute("RiftRun") then
 		return
@@ -852,91 +893,89 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	local ladder = info.Ladder or {}
 	local s = screen()
 	local small = narrow(s)
-	local width = math.min(if small then 820 else 980, s.AbsoluteSize.X - 24)
+	local width = math.min(if small then 820 else 1000, s.AbsoluteSize.X - 24)
 	local panel, holder = modal("RiftGate", width, EMBER, true, small)
 	gateCard = panel
-	local title = text(panel, if info.Bounty then "BOUNTY BOARD" else "RIFT GATE", if small then 20 else 24, EMBER, IronUi.Heading)
-	title.LayoutOrder = 1
-	local cancel = new("TextButton", {
-		Text = "Not now",
-		TextSize = 13,
-		Font = BOLD,
-		TextColor3 = P.Dim,
+
+	-- The header: what this is and where, a close button on the right.
+	local header = new("Frame", {
+		Name = "Header",
 		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.fromScale(1, 0.5),
-		Size = UDim2.fromOffset(80, 24),
-		TextXAlignment = Enum.TextXAlignment.Right,
-	}, title)
+		Size = UDim2.new(1, 0, 0, if small then 34 else 46),
+		LayoutOrder = 1,
+	}, panel)
+	local title = text(header, if info.Bounty then "BOUNTY BOARD" else "RIFT GATE", if small then 18 else 24, EMBER, IronUi.Heading)
+	title.AutomaticSize = Enum.AutomaticSize.None
+	title.Size = UDim2.new(1, -50, 0, if small then 20 else 28)
+	local where = if info.Bounty
+		then "BRUTUS'S BOUNTIES  ·  EVERY BOSS BEHIND THE RIFT GATES"
+		else string.upper(string.format("%s  ·  %s Rift", info.Biome or "", GemConfig.elementName(info.Element or "")))
+			.. (if small then "" else string.format("  ·  %d CAVES, THEN THE BOSS", RiftRun.Rooms))
+	local sub = text(
+		header,
+		where,
+		if small then 10 else 12,
+		if info.Bounty then WARN else GemConfig.ElementColors[info.Element or ""] or P.Text,
+		BOLD
+	)
+	sub.AutomaticSize = Enum.AutomaticSize.None
+	sub.Position = UDim2.fromOffset(0, if small then 21 else 29)
+	sub.Size = UDim2.new(1, -50, 0, 14)
+	local side = if small then 30 else 36
+	local cancel = new("TextButton", {
+		Name = "Close",
+		Text = "",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.fromOffset(side, side),
+		BackgroundColor3 = Color3.fromRGB(26, 22, 30),
+		AutoButtonColor = true,
+	}, header)
+	UiKit.round(cancel, 8)
+	new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.3 }, cancel)
+	IronUi.cross(cancel, if small then 10 else 12, P.Dim)
 	cancel.Activated:Connect(function()
 		close(gateCard)
 	end)
-	if info.Bounty then
-		local which = text(panel, "BRUTUS'S BOUNTIES  ·  EVERY BOSS BEHIND THE RIFT GATES", if small then 11 else 12, WARN, BOLD)
-		which.LayoutOrder = 2
-	elseif info.Element then
-		local which = text(
-			panel,
-			string.upper(string.format("%s  ·  %s Rift", info.Biome or "", GemConfig.elementName(info.Element))),
-			if small then 11 else 12,
-			GemConfig.ElementColors[info.Element] or P.Text,
-			BOLD
-		)
-		which.LayoutOrder = 2
-	end
-	-- (A phone's screen is short: its lobby goes without.)
-	if not small then
-		local about = text(
-			panel,
-			if info.Bounty
-				then "Pick a biome, then its boss: you and your party go through from here. Each boss opens once you've beaten the one before it."
-				else string.format("%d caves of brainrot critters and fighters, then the boss you pick, on its throne.", RiftRun.Rooms),
-			13,
-			P.Dim
-		)
-		about.LayoutOrder = 2
-	end
 
-	-- Two columns: your party and the boss (left), who's about (right).
-	local gap = if small then 8 else 12
-	local side = if small then 270 else 330
+	-- Two columns: the boss and getting ready (left), your party (right).
+	local gap = if small then 8 else 14
+	local right = if small then 268 else 320
 	local body = new("Frame", {
 		Name = "Body",
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		LayoutOrder = 3,
+		LayoutOrder = 2,
 	}, panel)
-	-- (Both columns from the top: joining, the left one is short.)
 	UiKit.list(body, gap, true).VerticalAlignment = Enum.VerticalAlignment.Top
 	local left = new("Frame", {
 		Name = "Left",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, -side - gap, 0, 0),
+		Size = UDim2.new(1, -right - gap, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 1,
 	}, body)
-	UiKit.list(left, if small then 5 else 8)
-	local partyHead = text(left, "YOUR PARTY", if small then 11 else 12, P.Gold, BOLD)
-	partyHead.LayoutOrder = 1
-	local slotRow = new("Frame", {
-		Name = "Party",
+	UiKit.list(left, if small then 4 else 8)
+	local column = new("Frame", {
+		Name = "Right",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, if small then 50 else 76),
+		Size = UDim2.new(0, right, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 2,
-	}, left)
-	new("UIGridLayout", {
-		CellSize = UDim2.new(1 / RiftRun.Party, -6, 1, 0),
-		CellPadding = UDim2.fromOffset(8, 0),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, slotRow)
+	}, body)
+	UiKit.list(column, if small then 4 else 8)
 
 	-- The boss: theirs when joining your party's trip, else the leader's pick.
 	local picked = info.Next
 	local cards = {}
-	local warnHolder = nil
 	local view = nil -- (the lobby as last drawn: Shared.RiftLobby)
+	local plans: { [string]: any } = {} -- element -> CounterGear.summary, from "RiftGear"
+	local asking: { [string]: boolean } = {}
 	local function entryOf(id)
+		if info.Joining then
+			return info.Theirs
+		end
 		for _, entry in ladder do
 			if entry.Id == id then
 				return entry
@@ -944,68 +983,33 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		end
 		return nil
 	end
-	local function redrawBoss()
-		local chosen = entryOf(picked)
-		for id, c in cards do
-			local on = id == picked
-			c.Edge.Color = if on then EMBER else P.Dim
-			c.Edge.Thickness = if on then 2.5 else 1
-			c.Edge.Transparency = if on then 0 else 0.55
-			c.Card.BackgroundColor3 = if on then Color3.fromRGB(44, 26, 22) else Color3.fromRGB(20, 16, 20)
-		end
-		if warnHolder then
-			warnHolder:ClearAllChildren()
-			new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, warnHolder)
-			if view and view.Size <= 1 and chosen and chosen.Group then
-				warning(
-					warnHolder,
-					1,
-					small,
-					"BRING FRIENDS",
-					string.format(
-						"%s is built for 2 to 4 of you. You can go in alone, but it won't be easy: invite someone from the list.",
-						chosen.Name
-					)
-				)
-			end
-			-- What to bring against it: its element, what protects you,
-			-- what beats it, what it punishes.
-			if chosen and chosen.Tips then
-				local weak = GemConfig.ElementLabels[chosen.Weakness or ""] or chosen.Weakness or "?"
-				tipBox(
-					warnHolder,
-					2,
-					small,
-					if chosen.Starter
-						then string.format("FIRST BOSS  ·  RECOMMENDED SOLO, LV %d  ·  WEAK TO %s", chosen.Level or 2, string.upper(weak))
-						else string.format("WEAK TO %s", string.upper(weak)),
-					{ chosen.Tips[2], chosen.Tips[3], chosen.Tips[4] },
-					GemConfig.ElementColors[chosen.Element or ""] or WARN
-				)
-			end
-		end
-	end
+
+	stepHead(left, 1, if info.Joining then "YOUR PARTY'S BOSS" elseif info.Ladders then "CHOOSE A BIOME, THEN YOUR BOSS" else "CHOOSE YOUR BOSS", 1, small)
+	local readyHead = nil
+	local readyCard = nil
+	local redrawReady
+
 	if info.Joining then
 		local l = text(
 			left,
-			string.format("Your party's on the path in there, against %s: you'll join them.", info.Boss or "the boss"),
-			13,
+			string.format(
+				"Your party's on the path in there, against %s: you'll come in where they've got to.",
+				info.Boss or "the boss"
+			),
+			if small then 11 else 13,
 			P.Good,
 			BOLD
 		)
 		l.LayoutOrder = 3
 	elseif #ladder > 0 then
-		local head = text(left, "CHOOSE YOUR BOSS", if small then 11 else 12, P.Gold, BOLD)
-		head.LayoutOrder = 3
 		-- Brutus's board: a tab for each biome's ladder.
 		local biomeRow = nil
 		if info.Ladders then
-			head.Text = "CHOOSE A BIOME, THEN YOUR BOSS"
 			biomeRow = new("Frame", {
 				Name = "Biomes",
 				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, if small then 24 else 30),
-				LayoutOrder = 4,
+				Size = UDim2.new(1, 0, 0, if small then 22 else 30),
+				LayoutOrder = 2,
 			}, left)
 			new("UIGridLayout", {
 				CellSize = UDim2.new(1 / #info.Ladders, -6, 1, 0),
@@ -1016,8 +1020,8 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		local list = new("Frame", {
 			Name = "Ladder",
 			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 0, if small then 84 else 196),
-			LayoutOrder = 5,
+			Size = UDim2.new(1, 0, 0, if small then 84 else 168),
+			LayoutOrder = 3,
 		}, left)
 		local cardGap = if small then 6 else 10
 		new("UIListLayout", {
@@ -1025,6 +1029,15 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 			Padding = UDim.new(0, cardGap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}, list)
+		local function redrawCards()
+			for id, c in cards do
+				local on = id == picked
+				c.Edge.Color = if on then EMBER else P.Dim
+				c.Edge.Thickness = if on then 2.5 else 1
+				c.Edge.Transparency = if on then 0 else 0.55
+				c.Card.BackgroundColor3 = if on then Color3.fromRGB(44, 26, 22) else Color3.fromRGB(20, 16, 20)
+			end
+		end
 		local function buildCards()
 			for _, child in list:GetChildren() do
 				if child:IsA("GuiObject") then
@@ -1042,11 +1055,13 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 						return
 					end
 					picked = entry.Id
-					redrawBoss()
+					redrawCards()
+					redrawReady()
 				end)
 				card.Size = UDim2.new(1 / #ladder, -cardGap * (#ladder - 1) / #ladder, 1, 0)
 				cards[entry.Id] = { Card = card, Edge = edge }
 			end
+			redrawCards()
 		end
 		local biome = 1
 		local function drawBiomes()
@@ -1084,33 +1099,226 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 					picked = entry.Next
 					drawBiomes()
 					buildCards()
-					redrawBoss()
+					redrawReady()
 				end)
 			end
 		end
 		drawBiomes()
 		buildCards()
-		warnHolder = new("Frame", {
-			Name = "Warnings",
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			LayoutOrder = 6,
-		}, left)
 	end
 
-	-- Who's about: the Outpost's miners and your friends online, a tab each.
-	local listTall = if small then 172 else 330
+	-- 2: getting ready for the boss picked.
+	readyHead = stepHead(left, 2, "GET READY", 4, small)
+	readyCard = new("Frame", {
+		Name = "Ready",
+		BackgroundColor3 = Color3.fromRGB(18, 16, 24),
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = 5,
+	}, left)
+	UiKit.round(readyCard, 10)
+	local readyEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, readyCard)
+	new("UIPadding", {
+		PaddingTop = UDim.new(0, if small then 6 else 10),
+		PaddingBottom = UDim.new(0, if small then 6 else 10),
+		PaddingLeft = UDim.new(0, if small then 8 else 12),
+		PaddingRight = UDim.new(0, if small then 8 else 12),
+	}, readyCard)
+
+	-- ADJUST ARMOR's plan for `element` (asked for once, then kept).
+	local function planOf(chosen)
+		local element = chosen and chosen.Element
+		if not element then
+			return nil
+		end
+		if plans[element] == nil and not asking[element] then
+			asking[element] = true
+			task.spawn(function()
+				local result = GemClient.request("RiftGear", chosen.Id, false)
+				asking[element] = nil
+				if type(result) == "table" and result.Ok and result.Plan then
+					plans[element] = result.Plan
+					-- (Deferred: an answer that comes at once mustn't redraw
+					-- the card in the middle of drawing it.)
+					task.defer(function()
+						if panel.Parent then
+							redrawReady()
+						end
+					end)
+				end
+			end)
+		end
+		return plans[element]
+	end
+	local adjusting = false
+	local function adjust(chosen)
+		if adjusting or not chosen then
+			return
+		end
+		adjusting = true
+		task.spawn(function()
+			local result = GemClient.request("RiftGear", chosen.Id, true)
+			adjusting = false
+			if type(result) == "table" and result.Ok then
+				if result.Plan and chosen.Element then
+					plans[chosen.Element] = result.Plan
+				end
+				UiKit.toast(result.Message or "Armor set.", P.Good)
+			else
+				UiKit.toast(type(result) == "table" and result.Message or "Couldn't change your armor.", P.Bad)
+			end
+			task.defer(function()
+				if panel.Parent then
+					redrawReady()
+				end
+			end)
+		end)
+	end
+
+	redrawReady = function()
+		local chosen = entryOf(picked)
+		readyCard:ClearAllChildren()
+		readyEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, readyCard)
+		new("UIPadding", {
+			PaddingTop = UDim.new(0, if small then 6 else 10),
+			PaddingBottom = UDim.new(0, if small then 6 else 10),
+			PaddingLeft = UDim.new(0, if small then 8 else 12),
+			PaddingRight = UDim.new(0, if small then 8 else 12),
+		}, readyCard)
+		UiKit.list(readyCard, if small then 4 else 6)
+		readyHead.Text = if chosen then "GET READY FOR " .. string.upper(chosen.Name) else "GET READY"
+		if not chosen then
+			readyEdge.Color = P.Edge
+			text(readyCard, "Pick a boss to see what it takes.", if small then 11 else 12, P.Dim).LayoutOrder = 1
+			return
+		end
+		local tint = GemConfig.ElementColors[chosen.Element or ""] or EMBER
+		readyEdge.Color = tint
+		-- What it is: its element, what beats it, its level, built for how many.
+		local chips = new("Frame", {
+			Name = "Chips",
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, if small then 16 else 20),
+			LayoutOrder = 1,
+		}, readyCard)
+		UiKit.list(chips, 5, true)
+		local size = if small then 9 else 11
+		pill(chips, "HITS WITH " .. string.upper(GemConfig.elementName(chosen.Element or "")), tint, size).LayoutOrder = 1
+		if chosen.Weakness then
+			local weak = GemConfig.ElementColors[chosen.Weakness] or P.Good
+			pill(chips, "WEAK TO " .. string.upper(GemConfig.elementName(chosen.Weakness)), weak, size).LayoutOrder = 2
+		end
+		if chosen.Level then
+			pill(chips, string.format("LV %d", chosen.Level), THREAT_COLORS[chosen.Threat or 1] or P.Text, size).LayoutOrder = 3
+		end
+		if chosen.Starter then
+			pill(chips, "FIRST BOSS · SOLO", P.Good, size).LayoutOrder = 4
+		elseif chosen.Group then
+			local alone = view and view.Size <= 1
+			pill(chips, if alone then "BRING FRIENDS · 2-4" else "FOR 2-4", if alone then WARN else P.Dim, size).LayoutOrder = 4
+		end
+		-- How to beat it, and what it punishes (the computer's card).
+		if not small and chosen.Tips then
+			for i, line in { chosen.Tips[3], chosen.Tips[4] } do
+				if line then
+					local l = text(readyCard, "•  " .. line, 12, P.Text)
+					l.LayoutOrder = 1 + i
+				end
+			end
+		end
+		-- ADJUST ARMOR: what your armor takes of its hits now, and after.
+		local bar = new("Frame", {
+			Name = "Armor",
+			BackgroundColor3 = Color3.fromRGB(26, 24, 34),
+			Size = UDim2.new(1, 0, 0, if small then 36 else 48),
+			LayoutOrder = 10,
+		}, readyCard)
+		UiKit.round(bar, 8)
+		new("UIStroke", { Color = P.Teal, Thickness = 1, Transparency = 0.55 }, bar)
+		local buttonW = if small then 112 else 156
+		local head = text(
+			bar,
+			"YOUR ARMOR VS " .. string.upper(GemConfig.elementName(chosen.Element or "")),
+			if small then 10 else 12,
+			P.Text,
+			BOLD
+		)
+		head.AutomaticSize = Enum.AutomaticSize.None
+		head.TextWrapped = false
+		head.TextTruncate = Enum.TextTruncate.AtEnd
+		head.Position = UDim2.fromOffset(10, if small then 3 else 6)
+		head.Size = UDim2.new(1, -buttonW - 24, 0, if small then 14 else 16)
+		local plan = planOf(chosen)
+		local line, lineColor
+		if not plan then
+			line, lineColor = "Checking your gear...", P.Dim
+		elseif plan.Changes > 0 then
+			line = string.format(
+				"Takes %s of its hits  ·  %s after (%d change%s)",
+				share(plan.Before),
+				share(plan.After),
+				plan.Changes,
+				if plan.Changes == 1 then "" else "s"
+			)
+			lineColor = P.Teal
+		elseif plan.Before < 0.995 then
+			line, lineColor = string.format("Takes %s of its hits: as little as your gems allow", share(plan.Before)), P.Good
+		else
+			line, lineColor = plan.Note or "No gems in your bag resist it", WARN
+		end
+		local what = text(bar, line, if small then 9 else 11, lineColor)
+		what.AutomaticSize = Enum.AutomaticSize.None
+		what.TextWrapped = false
+		what.TextTruncate = Enum.TextTruncate.AtEnd
+		what.Position = UDim2.fromOffset(10, if small then 18 else 25)
+		what.Size = UDim2.new(1, -buttonW - 24, 0, if small then 12 else 15)
+		if plan and plan.Changes == 0 then
+			local ready = plan.Before < 0.995
+			local done = pill(bar, if ready then "✓ ARMOR READY" else "NO GEMS FOR IT", if ready then P.Good else WARN, if small then 10 else 12)
+			done.AnchorPoint = Vector2.new(1, 0.5)
+			done.Position = UDim2.new(1, -8, 0.5, 0)
+		else
+			local b, f = IronUi.chunk(bar, {
+				Color = P.Teal,
+				Size = UDim2.fromOffset(buttonW, if small then 28 else 36),
+				Radius = 6,
+				Stripes = "None",
+				Lip = 3,
+			})
+			b.Name = "Adjust"
+			IronUi.label(b, f, "ADJUST ARMOR", if small then 11 else 13, BOLD)
+			b.AnchorPoint = Vector2.new(1, 0.5)
+			b.Position = UDim2.new(1, -6, 0.5, 0)
+			b.Activated:Connect(function()
+				adjust(chosen)
+			end)
+		end
+	end
+
+	-- 3: your party, and who's about to invite.
+	local partyHead = stepHead(column, 3, "YOUR PARTY", 1, small)
+	local slotRow = new("Frame", {
+		Name = "Party",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, if small then 104 else 132),
+		LayoutOrder = 2,
+	}, column)
+	new("UIGridLayout", {
+		CellSize = UDim2.new(0.5, -4, 0.5, -4),
+		CellPadding = UDim2.fromOffset(8, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, slotRow)
+	local listTall = if small then 98 else (if info.Ladders then 240 else 200)
 	local people = new("Frame", {
 		Name = "People",
 		BackgroundColor3 = Color3.fromRGB(14, 12, 18),
-		Size = UDim2.new(0, side, 0, listTall),
-		LayoutOrder = 2,
-	}, body)
+		Size = UDim2.new(1, 0, 0, listTall),
+		LayoutOrder = 3,
+	}, column)
 	UiKit.round(people, 10)
 	new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.5 }, people)
-	UiKit.pad(people, if small then 6 else 8)
-	local tabTall = if small then 24 else 28
+	UiKit.pad(people, if small then 5 else 8)
+	local tabTall = if small then 22 else 28
 	local tabs = new("Frame", {
 		Name = "Tabs",
 		BackgroundTransparency = 1,
@@ -1121,26 +1329,27 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		CellPadding = UDim2.fromOffset(6, 0),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, tabs)
-	local inviteAllTall = if small then 28 else 32
+	local inviteAllTall = if small then 24 else 32
 	local scroller = new("ScrollingFrame", {
 		Name = "List",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, tabTall + 6),
-		Size = UDim2.new(1, 0, 1, -tabTall - inviteAllTall - 12),
+		Position = UDim2.fromOffset(0, tabTall + 5),
+		Size = UDim2.new(1, 0, 1, -tabTall - inviteAllTall - 10),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 4,
-		ScrollBarImageColor3 = P.Edge,
+		ScrollBarImageColor3 = P.Dim,
+		BorderSizePixel = 0,
 	}, people)
 	UiKit.list(scroller, 4)
 	local inviteAll, inviteFace = IronUi.chunk(people, {
 		Color = P.Teal,
 		Size = UDim2.new(1, 0, 0, inviteAllTall),
-		Radius = 7,
+		Radius = 6,
 		Stripes = "None",
 		Lip = 3,
 	})
-	IronUi.label(inviteAll, inviteFace, "INVITE FRIENDS TO THE GAME", if small then 11 else 13, BOLD)
+	IronUi.label(inviteAll, inviteFace, "INVITE FRIENDS TO THE GAME", if small then 10 else 13, BOLD)
 	inviteAll.AnchorPoint = Vector2.new(0, 1)
 	inviteAll.Position = UDim2.fromScale(0, 1)
 	inviteAll.Activated:Connect(function()
@@ -1154,7 +1363,7 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	local tab = "Outpost"
 
 	-- The buttons, and a line under them.
-	local tall = if small then 34 else 44
+	local tall = if small then 34 else 46
 	local row = new("Frame", {
 		Name = "Buttons",
 		BackgroundTransparency = 1,
@@ -1218,7 +1427,8 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 			end
 		else
 			task.spawn(function()
-				local result = GemClient.request("PartyInvite", person.UserId)
+				-- (The boss picked goes with it: their card says which.)
+				local result = GemClient.request("PartyInvite", person.UserId, { Rift = picked })
 				UiKit.toast(result.Message or "", if result.Ok then P.Gold else P.Bad)
 				if not result.Ok then
 					invited[person.UserId] = nil
@@ -1359,10 +1569,10 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		end
 		hint.Text = if how == "Join"
 			then "Through the gate and you're with them, wherever they've got to."
-			elseif how == "Alone" then string.format("Invite miners from the list: up to %d go in together.", RiftRun.Party)
+			elseif how == "Alone" then string.format("Invite miners from the list: up to %d go in together, and an invite takes them straight to you.", RiftRun.Party)
 			elseif how == "Lead" then "Everyone ready comes in with you. The rest can follow through any gate."
 			else "Your leader takes everyone who's ready in with them."
-		redrawBoss()
+		redrawReady()
 	end
 	draw()
 

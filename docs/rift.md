@@ -32,42 +32,57 @@ shots are the real client code rendered by the UI harness.
 - **Its prompt**: **Enter the Rift** (`ProximityPrompt` on the gate's
   `Heart`, `PromptKind` "Rift", attribute `Vein` = the vein's index).
 - **The lobby** (`RiftClient.openGate`), before you go in. It is the
-  gate's own lobby: who's going with you, who else is about, and the boss.
+  gate's own lobby, in three numbered steps: **1** the boss, **2** getting
+  ready for it, **3** your party.
 
 ![The gate's lobby, on your own: three miners about, one at the gate](rift/gate-lobby.png)
 
-  - **The header**: which Rift it is, the gate's biome and its element
-    (**RIMEFROST · CRYO RIFT**), in the element's colour, and what's
-    through it. **Not now** sits by the title.
-  - **YOUR PARTY · n/4**: four places. Each member has their face (their
-    Roblox headshot), their name, where they are (**AT THE GATE**, **IN
-    THE OUTPOST**, **IN THE RIFT**, **NOT IN THE OUTPOST**, or **AWAY**
-    when they're not in this server), **READY** or **NOT READY**, and
-    **LEADER** on the leader. You're first and marked **YOU**. An empty
-    place says **OPEN** · "Invite from the list". On your own you're the
-    only member, ready, and no one is marked leader.
-
-    In a party, your own card has a red **LEAVE** in its top corner
-    (`PartyLeave`: you're out, and the gate shows you on your own). The
-    leader also sees a small red **×** in the bottom corner of each other
-    member's card, by their READY pill, to remove them from the party
-    (`PartyKick`; leaders only). Either way a toast says what happened.
-    Others' cards keep their whole line for where they are.
-  - **CHOOSE YOUR BOSS**: the biome's ladder as a row of cards (see
+  - **The header**: **RIFT GATE**, then the gate's biome, its element and
+    what's through it (**RIMEFROST · CRYO RIFT · 4 CAVES, THEN THE BOSS**)
+    in the element's colour. The **×** in the corner closes it.
+  - **1 CHOOSE YOUR BOSS**: the biome's ladder as a row of cards (see
     [The ladders](#the-ladders)). Each card has:
     - the boss's portrait: its real body, built once by the server into
       `ReplicatedStorage.RiftPortraits`, shown in a `ViewportFrame` from
       the front quarter;
     - its threat as pips (green, amber, red);
     - its **level** (`LV 13`) and its name;
-    - its favourite gear, and how often you've beaten it.
+    - its favourite gear, how often you've beaten it, and **RECOMMENDED
+      SOLO** on a first boss.
 
     A locked boss is a dark silhouette marked **LOCKED**, with "Beat
     Tralalero Tralala to unlock". The card opens on the first boss you
     haven't beaten (`RiftRun.nextBoss`). **The leader picks**: in someone
     else's party, clicking a card says "Your party's leader picks the
     boss."
-  - **Who's about**, on the right, in two tabs:
+  - **2 GET READY FOR TRALALERO TRALALA**: one box, edged in the boss's
+    element's colour, with what to know before you go:
+    - chips: **HITS WITH CRYO** (its element), **WEAK TO ION** (what beats
+      it), its level, and **FIRST BOSS · SOLO** on a first boss or
+      **BRING FRIENDS · 2-4** on one built for a group (**FOR 2-4** once
+      you're in a party);
+    - what to enchant your sword with, and which armor its hits hurt most
+      (`DungeonRules.elementTips`);
+    - **YOUR ARMOR VS CRYO**: how much of its hits your armor takes now and
+      after an adjustment ("Takes 100% of its hits · 78% after (3
+      changes)"), and the **ADJUST ARMOR** button (see
+      [ADJUST ARMOR](#adjust-armor)). Once it's done, the bar says "Takes
+      78% of its hits: as little as your gems allow" and **✓ ARMOR READY**.
+      With nothing in your bag that resists it: **NO GEMS FOR IT**.
+  - **3 YOUR PARTY · n/4**: four places, two by two. Each member has their
+    face (their Roblox headshot), their name, where they are (**AT THE
+    GATE**, **IN THE OUTPOST**, **IN THE RIFT**, **NOT IN THE OUTPOST**, or
+    **AWAY** when they're not in this server), **READY** or **NOT READY**,
+    and **LEADER** on the leader. You're first and marked **YOU**. An
+    empty place says **OPEN** · "Invite from the list". On your own you're
+    the only member, ready, and no one is marked leader.
+
+    In a party, your own card has a red **LEAVE** in its top corner
+    (`PartyLeave`: you're out, and the gate shows you on your own). The
+    leader also sees a small red **×** in the bottom corner of each other
+    member's card, by their READY pill, to remove them from the party
+    (`PartyKick`; leaders only). Either way a toast says what happened.
+  - **Who's about**, under your party, in two tabs:
     - **IN THE OUTPOST n**: every other miner in the Outpost. Those
       within 30 studs of this gate come first (**At the gate**, in green),
       then your friends, then the rest by name. Each row has their face,
@@ -78,10 +93,12 @@ shots are the real client code rendered by the UI harness.
       this game (**Playing, another server**), then the rest
       (**Online**).
     - What a row offers: **INVITE** asks a miner here into your party
-      (`PartyInvite`; leaders only, while there's room). **INVITE ↗** is
-      Roblox's invite to the game, for a friend who isn't here. After a
-      click the row says **INVITED** for a while. A miner already in a
-      party says **IN A PARTY**, one in the Rift **IN THE RIFT**.
+      (`PartyInvite`; leaders only, while there's room), and says which
+      boss you've picked: see [Invites](#invites-that-take-you-in).
+      **INVITE ↗** is Roblox's invite to the game, for a friend who isn't
+      here. After a click the row says **INVITED** for a while. A miner
+      already in a party says **IN A PARTY**, one in the Rift **IN THE
+      RIFT**.
     - **INVITE FRIENDS TO THE GAME** under the list opens Roblox's invite
       window.
   - **The buttons**, by where you stand:
@@ -91,31 +108,31 @@ shots are the real client code rendered by the UI harness.
     | On your own | **ENTER ALONE** | In you go |
     | Leading a party | **ENTER TOGETHER**, or **ENTER · 2 OF 3 READY** while some aren't | In you go, and everyone ready comes with you, wherever they are in the Outpost |
     | In someone's party | **READY** / **NOT READY** and **GO IN NOW** | Tell your leader you're set, or go ahead (they can follow) |
-    | Your party's in there already | **JOIN THEM** | Through to wherever they've got to, against their boss (no ladder then) |
+    | Your party's in there already | **JOIN THEM** | In at the last cave they've cleared, against their boss (step 1 says so; no ladder then) |
 
-    A line under the buttons says the same in a sentence.
-  - **Alone against a boss built for 2 to 4** (threat III), a warning box
-    with the warning sign: **BRING FRIENDS**. "Frigo Camelo is built for
-    2 to 4 of you. You can go in alone, but it won't be easy: invite
-    someone from the list." You can still go.
+    A line under the buttons says the same in a sentence. On your own:
+    "Invite miners from the list: up to 4 go in together, and an invite
+    takes them straight to you."
+  - **Alone against a boss built for 2 to 4** (threat III), the ready box
+    says **BRING FRIENDS · 2-4**. You can still go.
   - **It keeps itself up to date** while it's open: your party
     (`SocialUI.PartyChanged`), your friends (`SocialUI.FriendsChanged`),
     miners joining and leaving, and once a second who's where. It only
-    redraws when something changed. It closes by itself when you're taken
-    in.
+    redraws when something changed. What ADJUST ARMOR would do is asked
+    for once for each element. It closes by itself when you're taken in.
 
-  ![Leading a party of three: LEAVE on your card, × on Bram's and Ivy's to remove them](rift/gate-lobby-party.png)
+  ![Leading a party of three: LEAVE on your card, × on Ivy's and Bram's to remove them](rift/gate-lobby-party.png)
 
-  ![In Ivy's party: LEAVE on your card, no × (only the leader removes), READY and GO IN NOW](rift/gate-lobby-member.png)
+  ![In Ivy's party: LEAVE on your card, no × (only the leader removes), NOT READY and GO IN NOW](rift/gate-lobby-member.png)
 
   ![The FRIENDS tab: Kadey here, Sasha and Theo online elsewhere (INVITE ↗)](rift/gate-lobby-friends.png)
 
-  ![Alone, picking the top of the ladder: BRING FRIENDS](rift/gate-lobby-warning.png)
+  ![Alone, picking the top of the ladder: BRING FRIENDS · 2-4](rift/gate-lobby-warning.png)
 
-  ![Your party's already in there: JOIN THEM](rift/gate-lobby-join.png)
+  ![Your party's already in there: JOIN THEM, against their boss](rift/gate-lobby-join.png)
 
-  On phones the about line and the hint go, the party's places, the
-  boss cards and the list are shorter, and the list scrolls:
+  On phones the tips and the about line go, and the boss cards, the
+  party's places and the list are shorter; the list scrolls:
 
   ![The lobby on a phone](rift/gate-lobby-phone.png)
 
@@ -130,6 +147,16 @@ shots are the real client code rendered by the UI harness.
 **Brutus's bounty board** in the Shelter is the same lobby with a tab per
 biome: every gate's ladder from one counter. See
 [hall-of-fame.md](hall-of-fame.md#brutuss-bounty-booth).
+
+*2026-10-27.* The board and the gates' lobbies were redone. Before, the
+party sat on top, the boss's warning was a red box on its own, and there
+was nothing to do about its element. Now it reads left to right in three
+numbered steps, the boss's element, weakness and tips sit in one box with
+ADJUST ARMOR, and the party is a 2 × 2 grid over the list:
+
+| Before | After |
+| --- | --- |
+| ![The bounty board before](rift/bounty-board-before.png) | ![The bounty board after](rift/bounty-board.png) |
 
 ## The ladders
 
@@ -545,8 +572,9 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 
 ## Together
 
-- Up to 4 in a trip. Party members can join through **any** gate while the
-  trip is still on the way (not once it's at the boss).
+- Up to 4 in a trip. Party members can join through **any** gate, the
+  bounty counter, or an invite while the boss is still standing. They
+  come in at the last cave the party cleared.
 - **Going in together.** The leader's **ENTER TOGETHER** (`RiftEnter`
   with `together`) takes every member who's ready in with them, from
   anywhere in the Outpost, up to 4 (they get the same **THE RIFT**
@@ -561,6 +589,69 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
   Arena and expeditions all answer "Leave the Rift first." or "Sam is in
   the Rift." (It would pull you out mid-trip.) Going in ends a spar you
   were in ("Sam went into the Rift.").
+
+## ADJUST ARMOR
+
+![After ADJUST ARMOR: ✓ ARMOR READY](rift/bounty-board-armor-ready.png)
+
+**ADJUST ARMOR** sets your armor against the boss's element. It's on the
+bounty board, a gate's lobby and a Rift invite. It is the ranked rounds'
+auto counter ([ranked-rounds.md](ranked-rounds.md#what-the-auto-counter-changes))
+with the boss's element as the whole threat (`CounterGear.versus`):
+
+- Only armor changes: resist gems from your bag into your helmet, gloves
+  and boots, and armor pieces with a Defense roll against the element (as
+  long as your gear rating stays at 90% or more). Your sword and your Q, E
+  and R gems never move.
+- It never makes your armor worse. When there's nothing in your bag to
+  help, it says so.
+- When you pick a boss, the board asks the server what it would change
+  (`RiftGear`, bossId, false) and shows before and after. Pressing it
+  (`RiftGear`, bossId, true) wears the change, and a toast says "Armor set
+  against Cryo for Frigo Camelo."
+- When your party's in a trip, it's always against their boss.
+
+## Invites that take you in
+
+An invite from the board, a gate's lobby or the Rift itself says which boss
+it's for (`PartyInvite`, userId, { Rift = bossId }; the server fills it in
+through `Party.setInviteContext`, `RiftServer`'s `inviteContext`). It comes
+up as a card in the boss's element's colour (`SocialUI.riftInvite`, 60 s):
+
+![Two Rift invites: JOIN THE FIGHT from inside a trip, RIFT INVITE from the board](rift/invite-cards.png)
+
+- **RIFT INVITE** (from the board or a gate): "Ivy wants you against
+  Tralalero Tralala. Accept and you go in with them." **JOIN** puts you in
+  the party and marks you **ready**, so when the leader presses **ENTER
+  TOGETHER** you're taken in with them, from wherever you are in the
+  Outpost. You don't walk back to the counter.
+- **JOIN THE FIGHT** (from inside a trip): "Orrin needs you against Tung
+  Tung Tung Sahur. Accept and you're in, where they've got to." **JOIN
+  NOW** takes you straight into the trip.
+- Both have **ADJUST MY ARMOR FOR <ELEMENT>**, ticked to start with, so
+  your armor is set against the boss before you go
+  ([ADJUST ARMOR](#adjust-armor)). Untick it to keep your gear as it is.
+- **Not now** declines.
+
+**Anyone in the party can invite while it's in the Rift**: the down card's
+CALL FOR BACKUP and the strip's BACKUP list. Outside the Rift, only the
+leader can.
+
+**Where you come in**: at the last cave your party has cleared, facing on
+to the next one (or the throne), with "In at cave 2: your party's cleared
+the way this far." If nobody has cleared one yet, you come in on the
+landing. Walking in through a gate to join your party works the same way.
+
+If you can't go in just now (in a match or a spar, down, in a mech),
+you're told "Orrin's party is in the Rift: join them from any Rift Gate or
+the bounty counter." and why.
+
+One invite now brings up one card. It used to come up twice: PartyUI had
+its own popup as well as SocialUI's.
+
+On a phone:
+
+![The invite cards on a phone](rift/invite-cards-phone.png)
 
 ## Leaving
 
@@ -580,7 +671,9 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 | `src/shared/RiftRealms.luau` | Each boss's realm: how it's built (its Style), its colours, its sky, what falls from it, its set pieces' kind, its lighting |
 | `src/server/World/RiftStyles.luau` | The kinds a realm is built from: ten walls (and corners), ten floors, ten barriers, ten lamps, ten arches, ten thrones, four skies |
 | `src/server/World/FallenMiners.luau` | The fallen: `place` (one, in a pose), `heap` (by the boss), `scatter` (round a room, by the walls first, clear of the doors and of what it's told to avoid), `Count`; the dungeon's rooms use it too (`DungeonWorld`) |
-| `src/server/Systems/RiftServer.luau` | Runs trips: `RiftEnter` (going in together: the ready members with their leader), `RiftLeave`, `RiftChoice`, `RiftPeek`; a boss cache each at the kill |
+| `src/server/Systems/RiftServer.luau` | Runs trips: `RiftEnter` (going in together: the ready members with their leader), `RiftLeave`, `RiftChoice`, `RiftPeek`, `RiftGear` (ADJUST ARMOR); joining at the last cave cleared; what an invite says (`inviteContext`) and what taking one does (`onJoined`); a boss cache each at the kill |
+| `src/server/Systems/Party.luau` | Invites: `Party.setInviteContext` (what an invite says), `Party.onJoined` (hooks on a taken invite, with its options), `Party.setReady`; anyone in a party in the Rift may invite |
+| `src/shared/CounterGear.luau`, `src/server/Systems/CounterServer.luau` | ADJUST ARMOR's plan: `CounterGear.versus` (a boss's element as the threat), `CounterGear.summary` (what's sent to the client), `CounterServer.offer` / `wear` |
 | `src/server/Systems/ArenaStreaks.luau` | `ArenaStreaks.bossCache`: rolls and saves a boss cache, and tells its owner |
 | `src/server/Systems/KaijuServer.luau` | Your kaiju take the critters before the leaders |
 | `src/shared/TargetLockRules.luau`, `src/client/Modules/TargetLock.luau` | Your lock takes the leader first |
@@ -591,7 +684,7 @@ the middle, where it sits beside PLAY in the Outpost), swaps between your kit an
 | `src/server/Systems/SparServer.luau` | `SparServer.riftKit`: the kit out going in, away coming home |
 | `src/client/Modules/RiftClient.luau` | The gate's lobby, the crossing, hell lighting, the strip, the down window |
 | `src/shared/RiftLobby.luau` | The lobby's rules: the party's places, who's about and in what order, what each row offers |
-| `src/client/Modules/SocialUI.luau` | Your party (`party`, `PartyChanged`), your friends online (`friends`, `FriendsChanged`), Roblox's invite (`inviteFriends`) |
+| `src/client/Modules/SocialUI.luau` | Your party (`party`, `PartyChanged`), your friends online (`friends`, `FriendsChanged`), Roblox's invite (`inviteFriends`), the Rift invite card (`riftInvite`) |
 | `src/client/Modules/StreakRewards.luau` | The cache screen: the roll, the picks, CLAIM (a boss cache's heading, threat and element) |
 | `src/server/World/OutpostWorld.luau` | The gate on each vein (`veinMarks`) |
 | `src/client/Modules/RiftTear.luau` | The tear in the gate, in the Hell palette |
@@ -604,8 +697,9 @@ Arena Caches (`profile.Duel.StreakCaches`, `Kind = "Boss"`).
 
 ## Spanish
 
-Every line above is in `Shared.LangEs`: the lobby (its places, tabs, rows,
-buttons and hints), the warning, the strip,
+Every line above is in `Shared.LangEs`: the lobby (its steps, places,
+tabs, rows, chips, armor bar, buttons and hints), ADJUST ARMOR and its
+toasts, the invite cards, the warning, the strip,
 the down window, the boss cache, the server's messages and the prompts.
 Boss and move names stay in English (they're names).
 
@@ -613,11 +707,13 @@ Boss and move names stay in English (they're names).
 
 | Suite | What it checks |
 | --- | --- |
-| `run_rift` | 47,784 checks: the gate's lobby (on your own; the Outpost's rows in order and what each offers; your friends here, elsewhere in the game and online; INVITED; a member's party and a full one; your party already in there); the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open (each leading a little way into the next cave), the ways home, no lava, the sky, parts per trip (1,400 with the realm's set pieces). Each boss's realm: a trip built in each of the ten, marked with it, its walls, floor, barrier, lamps, arch and throne each of a kind no other realm has, its sky one of four, its walls across the passages a colour no other realm's are, its rock its own, its fire in its colour, its set pieces in the caves, its sky burning and its ash its own, every barrier solid with its curtain and fires, every arch clear of the floor, the throne lit, the middle of every cave clear, lights and fire enough; the client lights the realm you're in and the server builds the boss's. The fallen: 2 in each cave and more round the throne, none on the landing, the heap by the throne, every part one you walk through, none in the way through or the way home, a pose each; scattered alone, by the walls first, clear of what to avoid and of the doorway; in a dungeon, one a room, more and the heap in the boss's. And nothing else starts for a runner |
+| `run_rift` | 48,367 checks: the gate's lobby (on your own; the Outpost's rows in order and what each offers; your friends here, elsewhere in the game and online; INVITED; a member's party and a full one; your party already in there; ADJUST ARMOR on the board, an invite naming its boss, the invite card's ADJUST MY ARMOR, one card per invite, the server hearing invites); the ladders (every boss on one ladder of its element, threats rising, the first built for one and the last for 2 to 4, locks, the next boss, levels rising and capped, fighters of the Rift's element), pack sizes (never fewer critters than a team of kaiju), where the tears open (spread, clear of the runners, on the cave's floor, one for each even when crowded), fighters and their gear, levels, the elite, every boss picked over many draws and each with its moves, the boss's gear tier and health, each boss's threat and favourite gear (its health and cache by threat), adds, caches, rewards, robbery, RESTORE's price, the solo warning, the layout. The world over many trips: walled caves you can't walk out of, floor all the way, arches you fit under, walls of fire at the passages that open (each leading a little way into the next cave), the ways home, no lava, the sky, parts per trip (1,400 with the realm's set pieces). Each boss's realm: a trip built in each of the ten, marked with it, its walls, floor, barrier, lamps, arch and throne each of a kind no other realm has, its sky one of four, its walls across the passages a colour no other realm's are, its rock its own, its fire in its colour, its set pieces in the caves, its sky burning and its ash its own, every barrier solid with its curtain and fires, every arch clear of the floor, the throne lit, the middle of every cave clear, lights and fire enough; the client lights the realm you're in and the server builds the boss's. The fallen: 2 in each cave and more round the throne, none on the landing, the heap by the throne, every part one you walk through, none in the way through or the way home, a pose each; scattered alone, by the walls first, clear of what to avoid and of the doorway; in a dungeon, one a room, more and the heap in the boss's. And nothing else starts for a runner |
 | `run_fallen_miners` | The fallen miners as real miners: 40 kits rolled (whole kits of real catalogue gear, 24 chests, 25 weapons, no pistols, rolls and gems on them; suits, weapon skins, visors and helmet skins of the right kind, owned, and some with nothing); six laid down in the three poses (dressed, no Humanoid, no joints, 20+ gear parts, every part anchored and walk-through, lying low with the head near the floor, slumped sat up, every welded piece still on its limb, the stain under it, the pose recorded); the old suit when no body is handed over |
 | `run_boss_targets` | 29 checks on the real `raidTarget` and `foeRoot`, cut out of Duelist's source and driven through a Rift fight (two runners, a kaiju, the real `Shared.Aggro`): it opens on the duel's player; a kaiju out-damaging everyone draws it (`PetTarget`, the owner stays the duel's player and hears "turns on Pebble!"); after `RotateAfter` the other runner hurting it half as much takes a turn (the duel's player and `RivalOwner` follow, "turns on you!"); a called-back kaiju is no target however much it hurt it; a downed runner is no target, so a redeployed kaiju is; a knocked-out kaiju hands the foe back to its owner; everyone down, it waits; a runner leaving is dropped and the last one leaving ends it, with no raid-style notice |
 | `run_boss_focus` | 26 checks: which creature is a fight's boss (a Rift boss, a dungeon's boss, a party raid's; not a room's fighters or an Arena rival), who sees its mark (the players in its raid, trip or dungeon, nobody else), the words over you, your kaiju and the rest, your mark's beat and the others' stillness, and the wiring (the server names the kaiju it's on by id, the body faces it, the lobby and combat scripts start the marks, the Spanish is there) |
-| `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (two pieces to keep one; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The ladder: the gate's peek (its biome's element, the ladder, the next boss, each boss's level at your kaiju's and rising, locks, a portrait each), a locked boss, an unknown one and another biome's refused, the gate's first boss and its element's fighters, a joiner seeing the party's boss, a win tallied for everyone and the next boss unlocked and offered, the top boss alone allowed and warned. Going in together: a ready member brought in from far off, one not ready told they can follow, a member going in bringing nobody. The fighters are stand-ins here: the real Duelist isn't loaded |
+| `run_kaiju` (`kaiju_server_cases`) | Whole trips on the server: going in with the kit out, packs coming up as you walk in, each foe through a tear of its own (critters first, leaders through taller ones, spread out, a moment apart, in the Rift's colours), counted on the strip while on their way and the cave not clearing before they're through, the leaders marked, your kaiju taking critters before a leader and the leader once they're gone, the boss through its own tear and its adds through theirs, a wall opening, caches, the floor, robbery on the way, the Colossus and its adds, down at the boss, RESTORE, BACK TO BASE, joining a party, winning, a boss cache each (two pieces to keep one; alone or in a party; no claim, roll or pass), the clock home starting at the kill, the kit away at home. The ladder: the gate's peek (its biome's element, the ladder, the next boss, each boss's level at your kaiju's and rising, locks, a portrait each), a locked boss, an unknown one and another biome's refused, the gate's first boss and its element's fighters, a joiner seeing the party's boss, a win tallied for everyone and the next boss unlocked and offered, the top boss alone allowed and warned. Going in together: a ready member brought in from far off, one not ready told they can follow, a member going in bringing nobody. Backup at the boss comes in by the throne and walks back to leave. ADJUST ARMOR (`RiftGear`): what it would change, wearing it, "already answers" the second time, no boss refused, only names and slots sent. Invites: a board invite names its boss; taking it makes you ready (armor set if asked) without taking you in; from inside a trip it's live and says how far; taking that takes you in at the last cave cleared, facing on, told so, in your kit; someone busy is told how to follow. The fighters are stand-ins here: the real Duelist isn't loaded |
+| `run_counter_gear` | ADJUST ARMOR's threat: all of the boss's element, none without one; the summary counts the changes and sends only names and slots |
+| `run_dungeon_queue` | Party invites with a reason: the card hears which boss, taking it is heard with its options, a member can't invite outside the Rift but can from inside it, backup joins the party, a declined invite isn't heard as taken, `setReady` |
 | `run_target_lock` | Your lock takes a pack's leader over nearer critters and those attacking you, holds it against them, takes it back from a critter, but not hidden or out of range; a target you pick still holds |
 | `run_spar` | Going into the Rift ends a spar, the kit stays out in there and can't be put away, nobody spars with a runner, and the kit goes away at home |
 | `run_outpost` | Each vein has its gate, prompt, arch, glow, cracks in its colour and its index |

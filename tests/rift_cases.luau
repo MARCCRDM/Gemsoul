@@ -1057,6 +1057,16 @@ do
 	check(client:find("CALL FOR BACKUP", 1, true) ~= nil and client:find("RiftLobby.backup(", 1, true) ~= nil, "The down card has no backup list")
 	check(client:find('GemClient.request("PartyInvite"', 1, true) ~= nil, "The down card can't invite")
 	check(client:find("INVITE A FRIEND", 1, true) == nil, "The old INVITE A FRIEND button's still on the down card")
+	-- The board: ADJUST ARMOR against the boss picked ("RiftGear"), and an
+	-- invite says which boss; the invite's card (Client.SocialUI) has its
+	-- own ADJUST MY ARMOR, and PartyUI no longer puts up a second card.
+	check(client:find('GemClient.request("RiftGear", chosen.Id, true)', 1, true) ~= nil and client:find('"ADJUST ARMOR"', 1, true) ~= nil, "No ADJUST ARMOR on the board")
+	check(client:find('GemClient.request("PartyInvite", person.UserId, { Rift = picked })', 1, true) ~= nil, "A board invite doesn't say which boss")
+	local social = fs.readFile(ROOT .. "/src/client/Modules/SocialUI.luau")
+	local partyUi = fs.readFile(ROOT .. "/src/client/Modules/PartyUI.luau")
+	check(social:find('"ADJUST MY ARMOR FOR "', 1, true) ~= nil and social:find('{ GearUp = accept and gearUp }', 1, true) ~= nil, "A Rift invite can't set your armor")
+	check(social:find('c.Kind == "Rift"', 1, true) ~= nil and partyUi:find('kind == "Invite"', 1, true) == nil, "Two cards for one invite, or no Rift card")
+	check(server:find("Party.onJoined(onJoined)", 1, true) ~= nil and server:find("Party.setInviteContext(inviteContext)", 1, true) ~= nil, "Invites don't take you into the Rift")
 	check(server:find("run.Room <= RiftRun.Rooms and #run.Members", 1, true) == nil, "Backup can't join at the throne")
 	-- BACKUP on the strip opens the same list anywhere on the way; down at
 	-- the boss the kaiju are called back and come out again on a revive.
@@ -1072,7 +1082,7 @@ end
 
 print(
 	string.format(
-		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, first bosses, element tips and the bosses' bite, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen, each boss's realm; the KIT OUT bar under the strip; the gate's lobby; the down card's backup list; %d parts a trip)",
+		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, first bosses, element tips and the bosses' bite, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen, each boss's realm; the KIT OUT bar under the strip; the gate's lobby, ADJUST ARMOR and invites that take you in; the down card's backup list; %d parts a trip)",
 		checks,
 		#parts
 	)

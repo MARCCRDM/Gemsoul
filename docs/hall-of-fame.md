@@ -75,6 +75,11 @@ biome on top. Pick a biome and then a boss, and you and your party go
 through from the counter, just as through that biome's gate. Each boss still
 opens once you've beaten the one before it on its ladder.
 
+Each boss has a **GET READY** box: its element, its weakness, what to
+bring, and **ADJUST ARMOR** to set your armor against it. An invite from
+the board says which boss, and taking it gets you ready to go in with the
+party from anywhere. See [rift.md](rift.md#adjust-armor).
+
 ![Rimefrost's tab](hall-of-fame/bounty-board-tab.png)
 
 ![On a phone](hall-of-fame/bounty-board-phone.png)
