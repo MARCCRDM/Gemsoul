@@ -482,9 +482,9 @@ Kaiju.RecallSeconds = 4 -- recalled: it stays out of the fight this long
 
 -- Wild kaiju in the Outpost.
 Kaiju.Wild = {
-	Max = 12, -- six roaming pairs across the expanded quarry, plus the vein guardian
-	Pack = 2, -- of them to a pack, sharing a den out in the frontier
-	Apart = 90, -- studs between dens
+	Max = 30, -- ten roaming packs of three across the quarry, plus the vein guardian
+	Pack = 3, -- of them to a pack, sharing a den out in the frontier
+	Apart = 55, -- studs between dens
 	-- Claimed patches: most packs den beside an outcrop (Shared.Frontier.Outcrop)
 	-- and guard it. Share of new packs that do (the rest roam free); Link:
 	-- rocks this many steps apart (Outcrop.Step) are one seam, all of it
@@ -494,14 +494,14 @@ Kaiju.Wild = {
 	-- their rocks roll gems this much luckier while they hold the patch.
 	Claim = { Share = 0.75, Link = 1.35, Den = { 10, 14 }, Radius = 32, Wake = 3, Luck = 0.08 },
 	Defend = 40, -- studs: start on one and its packmate this close joins in
-	Respawn = 90, -- seconds after one is killed or tamed
-	Return = 20, -- seconds after one burrows away (another comes up elsewhere)
+	Respawn = 45, -- seconds after one is killed or tamed
+	Return = 10, -- seconds after one burrows away (another comes up elsewhere)
 	Lifetime = 600, -- one nobody fights burrows back after about this long (each its own: 70% to 150%)
 	Aggro = 26, -- notices fighters this close
 	Leash = 70,
 	LevelSpread = 2, -- within this many levels of the strongest kaiju near it
 	Health = 1.5, -- tougher than a kaiju of yours at its level: it takes two to bring down
-	FarFromSpawn = 140, -- studs: they roam the quarry, not the landing pad
+	FarFromSpawn = 90, -- studs: they roam the quarry, not the landing pad
 }
 
 -- A wild kaiju's day, when nobody's fighting it: it wanders round its

@@ -832,7 +832,7 @@ past the core.
 
 ### Wild kaiju
 
-Up to eight roam the Outpost at once, in **packs of two** of a kind (each
+Up to 30 roam the Outpost at once, in **packs of three** of a kind (each
 its own element; the packs are different kinds where there are enough to
 go round). They're within two levels of the strongest kaiju near them,
 with half again the health of a kaiju of yours at their level: it takes

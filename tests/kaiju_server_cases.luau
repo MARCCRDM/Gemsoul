@@ -1368,7 +1368,7 @@ check(#wilds == Kaiju.Wild.Max, "Not " .. Kaiju.Wild.Max .. " wild kaiju: " .. #
 -- In packs of up to two of a kind, each round a den out in the frontier:
 -- clear of the rocks, away from the landing pad and the other dens.
 local packs = KaijuWilds._packs
-check(#packs == math.ceil(Kaiju.Wild.Max / Kaiju.Wild.Pack), "Not packs of two: " .. #packs)
+check(#packs == math.ceil(Kaiju.Wild.Max / Kaiju.Wild.Pack), "Not packs of " .. Kaiju.Wild.Pack .. ": " .. #packs)
 local FrontierRules = shared("Frontier")
 for i, pack in packs do
 	check(#pack.Members >= 1 and #pack.Members <= Kaiju.Wild.Pack, "A pack of " .. #pack.Members)
@@ -2816,7 +2816,7 @@ end
 local function across(v: Vector3): Vector3
 	return Vector3.new(v.X, 0, v.Z)
 end
-check(Kaiju.Wild.Max == 12 and Kaiju.Wild.Pack == 2, "Expanded quarry should support 12 wild kaiju in pairs")
+check(Kaiju.Wild.Max == 30 and Kaiju.Wild.Pack == 3, "The quarry should hold 30 wild kaiju in packs of three")
 local Guarded = Frontier.Veins.Guarded
 local veinScar = CFrame.new(center + Vector3.new(0, 0, -(Frontier.Rim + 2)))
 KaijuWilds._setGuardAt(veinScar)
@@ -3210,7 +3210,7 @@ riftsOnOpenGround()
 local function packsAndPaths()
 	local pack
 	for _, candidate in KaijuWilds._packs do
-		if #candidate.Members == 2 then
+		if #candidate.Members >= 2 then
 			pack = candidate
 			break
 		end
