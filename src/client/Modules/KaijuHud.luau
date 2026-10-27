@@ -22,13 +22,15 @@
 	                  is the card's outline, its pill on the bottom edge
 	                  (KaijuBeamHud, in KaijuHud.beamSlot()). Computer:
 	                  bottom left, three by two (the kaiju two by two, AUTO
-	                  HEAL over the team keys). Phone: one row at the top
-	                  left (the pick card shows under it while you mine), and
-	                  on the right under your health while you hunt (the
-	                  fight's foe list has the top left then)
-	                  (MobileLayout.kaiju, kaijuDesk, kaijuCells).
-	  TAME            beside the strip when a wild kaiju near you is down to
-	                  half its health (it glows gold then: KaijuTaming): the
+	                  HEAL over the team keys). Phone: small, at the top left
+	                  in a fight too, two rows (the kaiju in a row, AUTO HEAL
+	                  a slim row under them); the team keys off the card, a
+	                  row of their own just above the move stick, under your
+	                  left thumb (MobileLayout.kaiju, keys, kaijuDesk,
+	                  kaijuCells).
+	  TAME            beside the strip (under it on a phone) when a wild
+	                  kaiju near you is down to half its health (it glows
+	                  gold then: KaijuTaming): the
 	                  chance now, and the tries left. It casts the tame
 	                  (KaijuTaming's bar), hidden while that's under way.
 	  Challenge       a wild kaiju's prompt (hold E beside it): it leaves you
@@ -443,7 +445,8 @@ autoState.TextXAlignment = Enum.TextXAlignment.Center
 local autoWant: boolean? = nil -- (switched here, till the roster says so)
 local autoArt: string? = nil
 
--- The team keys, beside AUTO HEAL: four chips, 1 to 4 (Kaiju.Teams), the
+-- The team keys, under AUTO HEAL (on a phone, above the move stick: see
+-- layout): four chips, 1 to 4 (Kaiju.Teams), the
 -- keys that bring each team out. The team out is gold; picked but called
 -- back, a gold edge; a team with kaiju in it, plain; one all knocked out, red; one not
 -- filled yet, faint (they fill in order: Kaiju.order). Tap one or press its
@@ -547,8 +550,9 @@ local function layout()
 	local phone = UiKit.short()
 	local hunting = Spar.hunting(player)
 	-- One card (MobileLayout.kaiju, kaijuDesk, kaijuCells): on a computer
-	-- the kaiju two by two, AUTO HEAL over the team keys; on a phone all in
-	-- one row; the HYPERBEAM round it.
+	-- the kaiju two by two, AUTO HEAL over the team keys; on a phone small,
+	-- the kaiju in a row over AUTO HEAL, the team keys apart; the HYPERBEAM
+	-- round it.
 	local spot = if phone then MobileLayout.kaiju(screen, hunting) else MobileLayout.kaijuDesk(screen)
 	card.Position = UDim2.fromOffset(spot.X, spot.Y)
 	card.Size = UDim2.fromOffset(spot.W, spot.H)
@@ -557,6 +561,11 @@ local function layout()
 		local rect = if slot == Kaiju.SupportSlot then cells.Support else cells.Fighters[slot]
 		if rect then
 			place(tile.Button, rect)
+			-- (its role's mark: on a phone's small tile smaller and just above
+			-- its health, clear of its level)
+			local mark = math.clamp(math.floor(rect.H * 0.34), 12, 18)
+			tile.RoleMark.Size = UDim2.fromOffset(mark, mark)
+			tile.RoleMark.Position = if rect.H < 46 then UDim2.new(0, 10, 1, -9 - mark / 2) else UDim2.new(0, 12, 1, -18)
 			-- Q, E, R and its gem surge down the right edge, spaced to fit
 			-- (not on a phone: too small to read there; the panel has them).
 			local step = math.clamp(math.floor((rect.H - 12) / 4), 5, 9)
@@ -571,25 +580,32 @@ local function layout()
 		end
 	end
 	place(autoButton, cells.Auto)
-	place(teamPad, cells.Teams)
-	-- (the four team chips: in a row on a phone, like the keys; two by two
-	-- on a computer)
+	-- The four team chips: on a computer two by two on the card, under AUTO
+	-- HEAL; on a phone off the card, a row of their own just above the move
+	-- stick, under your left thumb (MobileLayout.keys).
 	do
-		local gap = 3
-		local across = if cells.Row then Kaiju.Teams else 2
+		local gap, across, rect = 3, 2, cells.Teams
+		if phone then
+			local keys = MobileLayout.keys(screen)
+			gap, across, rect = keys.Gap, Kaiju.Teams, keys
+			teamPad.Parent = gui
+		else
+			teamPad.Parent = card
+		end
+		place(teamPad, rect)
 		local down = math.ceil(Kaiju.Teams / across)
-		local w = math.floor((cells.Teams.W - gap * (across - 1)) / across)
-		local h = math.floor((cells.Teams.H - gap * (down - 1)) / down)
+		local w = math.floor((rect.W - gap * (across - 1)) / across)
+		local h = math.floor((rect.H - gap * (down - 1)) / down)
 		for n, chip in teamChips do
 			local col, row = (n - 1) % across, (n - 1) // across
 			chip.Button.Position = UDim2.fromOffset(col * (w + gap), row * (h + gap))
 			chip.Button.Size = UDim2.fromOffset(w, h)
-			chip.Number.TextSize = math.clamp(math.floor(math.min(w, h) * 0.62), 10, 16)
+			chip.Number.TextSize = math.clamp(math.floor(math.min(w, h) * 0.55), 10, 18)
 		end
 	end
 	place(beamSlot, cells.Beam)
-	-- CATCH: a readable, non-modal prompt, at the top right on touch (under
-	-- the card while you hunt), above the combat HUD at center on a computer.
+	-- CATCH: a readable, non-modal prompt, under the card on touch, above
+	-- the combat HUD at center on a computer.
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	if touch then
 		local at = MobileLayout.kaiju(screen, hunting)
@@ -616,10 +632,27 @@ local function layout()
 		tameTries.Position, tameTries.Size = UDim2.new(1, -right - 50, 0, top + 14), UDim2.fromOffset(50, 12)
 	end
 	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or
-	-- OFF (on a short row two lines: the gem, then AUTO ON).
+	-- OFF (on a short cell two lines: the gem, then AUTO ON; on a phone's
+	-- slim row across the card, one line: the gem and how many on the left,
+	-- AUTO HEAL in the middle, ON or OFF on the right).
 	local th = cells.Auto.H
+	local slim = th < 30
 	local small = th < 46
-	card:SetAttribute("Compact", small)
+	-- (Compact: no room for its name, so the state says AUTO ON itself.)
+	card:SetAttribute("Compact", small and not slim)
+	if slim then
+		local gemSize = th - 6
+		autoTitle.Visible = true
+		autoGem.Position, autoGem.Size = UDim2.fromOffset(5, 3), UDim2.fromOffset(gemSize, gemSize)
+		autoCount.Position, autoCount.Size = UDim2.fromOffset(8 + gemSize, 0), UDim2.new(0, 40, 1, 0)
+		autoCount.TextSize = 10
+		autoTitle.Position, autoTitle.Size, autoTitle.TextSize = UDim2.fromOffset(0, 0), UDim2.fromScale(1, 1), 9
+		autoState.Position, autoState.Size = UDim2.new(1, -40, 0, 0), UDim2.new(0, 36, 1, 0)
+		autoState.TextSize = 10
+		autoState.TextXAlignment = Enum.TextXAlignment.Right
+		return
+	end
+	autoState.TextXAlignment = Enum.TextXAlignment.Center
 	autoTitle.Visible = not small
 	local gemSize, gemY = if small then 13 else 16, 4
 	autoGem.Position, autoGem.Size = UDim2.fromOffset(5, gemY), UDim2.fromOffset(gemSize, gemSize)

@@ -231,11 +231,11 @@ for _, size in { { 667, 339 }, { 736, 378 }, { 812, 317 }, { 844, 332 }, { 896, 
 	local L = Fx.cardLayout(screen, true)
 	local what = size[1] .. "x" .. size[2]
 	check(inside(L, screen), what .. ": the card runs off the screen")
-	-- (At the top, between your kaiju's card and the toasts; with no room
-	-- there, a row down, beside the pick card's place.)
+	-- (At the top, between the pick card's place and the toasts; with no
+	-- room there, under the pick card's place.)
 	local toastRow, pick = MobileLayout.toast(screen), MobileLayout.card()
 	local k = MobileLayout.kaiju(screen, false)
-	check((L.Y <= toastRow.Y + toastRow.H + 8 or L.Y == pick.Y) and L.H <= 40 and L.W <= 220, what .. ": the card isn't at the top, or is too big")
+	check((L.Y <= toastRow.Y + toastRow.H + 8 or L.Y == pick.Y + pick.H + 8) and L.H <= 40 and L.W <= 220, what .. ": the card isn't at the top, or is too big")
 	for name, r in
 		{
 			["pick card"] = pick,

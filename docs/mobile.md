@@ -146,14 +146,22 @@ Teammates' cards were big red bars on the right side, over the middle of
 the screen, and the pick card and your kaiju's card took two blocks down
 the left. Now:
 
-- **Your kaiju** are one row at the top left, where the pick card was
-  (`MobileLayout.kaiju`): the three fighters and the support, AUTO HEAL,
-  then the team keys 1–4 (the team that's out is gold). There's no CALL
-  BACK button on it: tap the team that's out to call it back, another team
-  to send it out instead. See [kaiju.md](kaiju.md#your-team).
-- **The pick card** shows only while you mine: it comes up under your
-  kaiju's row with your first swing and goes 6 seconds after your last
-  (`OutpostScene`, `MobileLayout.card`).
+- **Your kaiju** are a small grid at the top left, in a fight too
+  (`MobileLayout.kaiju`): the three fighters and the support in a row,
+  AUTO HEAL a slim row under them. *2026-10-27:* it was one long row (351
+  wide) that moved across the middle of the screen while you hunted.
+- **The team keys 1–4** have their own row just above the move stick,
+  under your left thumb (`MobileLayout.keys`; the team that's out is gold).
+  There's no CALL BACK button: tap the team that's out to call it back,
+  another team to send it out instead. See [kaiju.md](kaiju.md#your-team).
+- **CATCH** comes up under your kaiju's card, as wide.
+- **The pick card** shows only while you mine: it comes up beside your
+  kaiju's card with your first swing and goes 6 seconds after your last
+  (`OutpostScene`, `MobileLayout.card`, at 0.66 scale).
+- **The foe list** comes up on the right in a fight, at the top where your
+  coins and health sit (they hide while you fight), as many rows as fit
+  above DODGE: two on most phones, one on the narrowest
+  (`MobileLayout.foes`, `FoeBars`).
 - **Teammates** are rows under your HP bar, the same size as it
   (`MobileLayout.party`): their name in their colour, a gold edge for the
   leader, and their health. Up to three.
@@ -343,8 +351,10 @@ get out from under Roblox's buttons, which it used to sit under.
 | `UiKit.topbar(width)`, `UiKit.onTopbar(fn)`, `UiKit.reserveTopbar(width)` | The strip Roblox's buttons sit in, a call when it changes, and room in it for DEV (see [Roblox's buttons](#roblox-s-buttons)) |
 | `UiKit.fit(label)` | Keeps a one-line label at its size, shrinking it only when its words don't fit |
 | `UiKit.shrinkRow(row, list)` | Shrinks a row laid out side by side to its parent's width when its contents outgrow it |
-| `MobileLayout.kaiju(screen, hunting)`, `kaijuCells(card)` | Your kaiju's one row at the top left (right-aligned under your health while you hunt), and where its tiles, AUTO HEAL and team keys go |
-| `MobileLayout.card(screen)` | The pick card's place: under your kaiju's row |
+| `MobileLayout.kaiju(screen)`, `kaijuCells(card)` | Your kaiju's small grid at the top left, where its tiles and AUTO HEAL go, and CATCH under it |
+| `MobileLayout.keys(screen)` | The team keys 1–4: a row just above the move stick |
+| `MobileLayout.card()` | The pick card's place: beside your kaiju's card |
+| `MobileLayout.foes(screen, viewY)` | The fight's foe list: top right, down to just over DODGE |
 | `MobileLayout.party(screen, rows)`, `setPartyRows(n)`, `onParty(fn)` | Teammates' rows under your HP bar, how many are up, and a call when that changes |
 | `MobileLayout.toast(screen)` | A toast's place on a phone: left of the coins, `Toast.W` (240) at most, one line (`Toast.H`); `Under` when it goes under the column instead |
 | `MobileLayout.loot(screen)` | Where the slim loot card goes on a phone: under your health and teammates; `Beside` when it goes beside them |

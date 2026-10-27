@@ -2,15 +2,19 @@
 	Where the lobby's pieces sit on a phone, in one place so they can't drift
 	onto each other (tests/mobile_layout_cases checks every phone size):
 
-	  top left      your kaiju's card (KaijuHud): one row, the team's three,
-	                the support, AUTO HEAL and the team keys 1 to 4. Under
-	                it, only while you mine, the pick card (OutpostScene),
-	                drawn at CardScale. On a small screen with a keyboard,
-	                the CHAT button goes under that; opened, the chat is a
-	                column down the left that stops above the dock. Phones
-	                and tablets use Roblox's own chat instead (ChatFrame).
-	  top middle    the live feed (LobbyFeed), between your kaiju's card and
-	                the toasts' place (gone on a screen too narrow for it)
+	  top left      your kaiju's card (KaijuHud), small, two rows: the
+	                team's three and the support, AUTO HEAL under them; in
+	                a fight too. CATCH under it. Beside it, only while you
+	                mine, the pick card (OutpostScene), drawn at CardScale;
+	                in a fight, the foe list (FoeBars) is on the right. On a
+	                small screen with a keyboard, the CHAT button goes under
+	                CATCH's place; opened, the chat is a column down the left
+	                that stops above the dock. Phones and tablets use
+	                Roblox's own chat instead (ChatFrame).
+	  bottom left   the team keys 1 to 4 (KaijuHud), in a row just above
+	                the move stick (your left thumb)
+	  top middle    the live feed (LobbyFeed), between the pick card's place
+	                and the toasts' place (gone on a screen too narrow for it)
 	  top right     your level and coins (LobbyUI) in a pill, your health
 	                under it, and your teammates' health under that, a row
 	                each the same size (PartyUI; hidden in a fight); a toast
@@ -54,12 +58,15 @@
 	                                       loot card); topClaimed(except?)
 	                                       says if anything else does, and
 	                                       onTop(fn) hears when that changes
-	  MobileLayout.kaiju(screen, hunting)  your kaiju's card (KaijuHud), one
-	                                       row, at the top left (on the right
-	                                       under your health while you hunt),
-	                                       and CATCH; kaijuDesk(screen) on a
-	                                       computer (three by two),
-	                                       kaijuCells(card) its cells
+	  MobileLayout.kaiju(screen)           your kaiju's card (KaijuHud), two
+	                                       rows at the top left, and CATCH;
+	                                       kaijuDesk(screen) on a computer
+	                                       (three by two), kaijuCells(card)
+	                                       its cells; keys(screen) the team
+	                                       keys above the move stick
+	  MobileLayout.foes(screen, viewY)     the fight's foe list (FoeBars):
+	                                       on the right at the top, down to
+	                                       just over DODGE
 	  MobileLayout.Drive                   a mech's HOP OUT button (VehicleDrive),
 	                                       bottom middle on every screen, in
 	                                       PLAY's place on a phone (PLAY hides
@@ -81,7 +88,7 @@
 ]]
 local MobileLayout = {}
 
-MobileLayout.CardScale = 0.7
+MobileLayout.CardScale = 0.66
 MobileLayout.Margin = 12
 MobileLayout.Drive = { W = 160, H = 38, Bottom = 62 }
 MobileLayout.Stick = { Size = 112, Knob = 46, Left = 20, Bottom = 16 }
@@ -92,20 +99,33 @@ MobileLayout.Wallet = { W = 150, H = 30, Top = 8, Right = 30 }
 MobileLayout.Toast = { W = 240, H = 28, Top = 8, Min = 170 }
 MobileLayout.Loot = { W = 232, H = 72, Row = 24, Gap = 6 }
 
--- (Your kaiju's card at the top left: its size, the same on every phone.)
-MobileLayout.Kaiju = { Tile = 42, Pad = 4, Gap = 3, Split = 6, Auto = 54, Chip = 22, Notch = 20 }
+-- (Your kaiju's card at the top left: its size, the same on every phone.
+-- Two rows: the team's three and the support, Tile square, the support
+-- Split apart; AUTO HEAL under them, AutoH tall, the card's width.)
+MobileLayout.Kaiju = { Tile = 36, Pad = 4, Gap = 3, Split = 6, AutoH = 20, Notch = 20 }
 local function kaijuSize(): (number, number)
 	local k = MobileLayout.Kaiju
-	local w = k.Pad * 2 + k.Tile * 4 + k.Gap * 2 + k.Split * 3 + k.Auto + k.Chip * 4 + k.Gap * 3
-	return w, k.Pad + k.Tile + MobileLayout.under(k.Notch)
+	local w = k.Pad * 2 + k.Tile * 4 + k.Gap * 2 + k.Split
+	return w, k.Pad + k.Tile + k.Gap + k.AutoH + MobileLayout.under(k.Notch)
 end
-
--- The pick card (only while you mine): under your kaiju's card, at
--- CardScale (H: as tall as it opens).
-function MobileLayout.card()
+-- (Where the card ends, the HYPERBEAM pill's lower half too.)
+local function kaijuBottom(): number
 	local _, h = kaijuSize()
-	local top = 12 + h + math.floor(MobileLayout.Kaiju.Notch / 2) + 6
-	return { X = 12, Y = top, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }
+	return 12 + h + math.floor(MobileLayout.Kaiju.Notch / 2)
+end
+-- CATCH on a phone: under your kaiju's card, as wide.
+MobileLayout.Tame = { H = 38 }
+
+-- The pick card (only while you mine): beside your kaiju's card at the
+-- top, at CardScale (H: as tall as it opens).
+function MobileLayout.card()
+	local kw = kaijuSize()
+	return { X = 12 + kw + 8, Y = 12, W = 300 * MobileLayout.CardScale, H = 100 * MobileLayout.CardScale }
+end
+-- (The top left's right edge: your kaiju's card and the pick card's place.)
+local function topLeftRight(): number
+	local pick = MobileLayout.card()
+	return pick.X + pick.W
 end
 
 function MobileLayout.stick(screen: Vector2)
@@ -141,8 +161,8 @@ end
 
 function MobileLayout.chat(screen: Vector2, open: boolean)
 	if not open then
-		local pick = MobileLayout.card()
-		return { X = 12, Y = pick.Y + pick.H + 6, W = 76, H = 44 }
+		-- (Under CATCH's place, under your kaiju's card.)
+		return { X = 12, Y = kaijuBottom() + 6 + MobileLayout.Tame.H + 6, W = 76, H = 44 }
 	end
 	local dock = MobileLayout.dock(screen, 5)
 	local width = math.floor(math.clamp(screen.X * 0.38, 240, 340))
@@ -209,38 +229,38 @@ function MobileLayout.jump(screen: Vector2)
 	return { X = screen.X - 130, Y = screen.Y - 125, W = 70, H = 70 }
 end
 
--- Left of your coins, right of your kaiju's card; on a phone with less
--- than Toast.Min between them, under your health and teammates instead,
--- right-aligned with them (Under).
+-- Left of your coins, right of the pick card's place (beside your kaiju's
+-- card); on a phone with less than Toast.Min between them, under your
+-- health and teammates instead, right-aligned with them (Under).
 function MobileLayout.toast(screen: Vector2)
 	local t, wallet = MobileLayout.Toast, MobileLayout.wallet(screen)
-	local kw = kaijuSize()
-	local left, right = 12 + kw + 8, wallet.X - 8
+	local left, right = topLeftRight() + 8, wallet.X - 8
 	if right - left >= t.Min then
 		local w = math.min(t.W, right - left)
 		return { X = right - w, Y = t.Top, W = w, H = t.H, Under = false }
 	end
-	return { X = wallet.X + wallet.W - t.W, Y = columnBottom(screen) + 6, W = t.W, H = t.H, Under = true }
+	-- (as wide as it can be, clear of the pick card's place)
+	local w = math.min(t.W, wallet.X + wallet.W - (topLeftRight() + 8))
+	return { X = wallet.X + wallet.W - w, Y = columnBottom(screen) + 6, W = w, H = t.H, Under = true }
 end
 
--- The top's free middle: from your kaiju's card to the toasts' place (to
--- your coins where the toasts go under your health). { X, W }; W may be
--- small, or none.
+-- The top's free middle: from the pick card's place to the toasts' place
+-- (to your coins where the toasts go under your health). { X, W }; W may
+-- be small, or none.
 function MobileLayout.topGap(screen: Vector2)
-	local kw = kaijuSize()
 	local toast = MobileLayout.toast(screen)
-	local left = 12 + kw + 8
+	local left = topLeftRight() + 8
 	local right = (if toast.Under then MobileLayout.wallet(screen).X else toast.X) - 8
 	return { X = left, W = math.max(0, right - left) }
 end
 
 -- Under your health and teammates, right-aligned with them; where that
--- would reach the jump button, beside them on the left (Beside), if your
--- kaiju's card leaves room there.
+-- would reach the jump button, beside them on the left (Beside), if the
+-- top left (your kaiju's card, the pick card) leaves room there.
 function MobileLayout.loot(screen: Vector2)
 	local l, health = MobileLayout.Loot, MobileLayout.health(screen)
 	local x, y = health.X + health.W - l.W, columnBottom(screen) + l.Gap
-	local beside = y + l.H > MobileLayout.jump(screen).Y and health.X - 8 - l.W >= 12 + kaijuSize() + 8
+	local beside = y + l.H > MobileLayout.jump(screen).Y and health.X - 8 - l.W >= topLeftRight() + 8
 	if beside then
 		x, y = health.X - 8 - l.W, health.Y
 	end
@@ -281,49 +301,65 @@ function MobileLayout.health(screen: Vector2)
 	return { X = wallet.X, Y = wallet.Y + wallet.H + 4, W = wallet.W, H = 20 }
 end
 
--- Your kaiju's card on a phone (KaijuHud): one row: the team's three, the
--- support a little apart, AUTO HEAL, and the team keys 1 to 4; the team's
--- HYPERBEAM (KaijuBeamHud) is the card's own outline, its pill (Notch
--- tall) set on the card's bottom edge, half over it. At the top left (the
--- pick card shows under it while you mine); while you hunt (the fight's
--- foe list has the top left then), on the right under your health. TameX,
--- TameY, TameW, TameH: where CATCH goes on a touch screen (beside the pick
--- card's place, short of your loot card's; left of the card while you
--- hunt).
-function MobileLayout.kaiju(screen: Vector2, hunting: boolean?)
+-- Your kaiju's card on a phone (KaijuHud), small, at the top left, in a
+-- fight too: two rows, the team's three and the support a little apart,
+-- AUTO HEAL under them; the team's HYPERBEAM (KaijuBeamHud) is the card's
+-- own outline, its pill (Notch tall) set on the card's bottom edge, half
+-- over it. The team keys aren't on it: keys(screen), above the move stick.
+-- TameX, TameY, TameW, TameH: where CATCH goes on a touch screen, under it.
+-- (`_hunting`: the same place either way now.)
+function MobileLayout.kaiju(_screen: Vector2, _hunting: boolean?)
 	local spec = MobileLayout.Kaiju
 	local w, h = kaijuSize()
-	local x, y = 12, 12
-	if hunting then
-		local health = MobileLayout.health(screen)
-		x, y = health.X + health.W - w, health.Y + health.H + 6
-	end
-	local tameW, tameX, tameY = 176, 0, 0
-	if hunting then
-		tameW = math.min(tameW, x - 20)
-		tameX, tameY = x - 8 - tameW, y
-	else
-		local pick, loot = MobileLayout.card(), MobileLayout.loot(screen)
-		tameX, tameY = pick.X + pick.W + 8, pick.Y
-		tameW = math.min(tameW, loot.X - 8 - tameX)
-	end
 	return {
-		X = x,
-		Y = y,
+		X = 12,
+		Y = 12,
 		W = w,
 		H = h,
 		Pad = spec.Pad,
 		Gap = spec.Gap,
 		Split = spec.Split,
-		Rows = { spec.Tile },
-		Auto = spec.Auto,
-		Chip = spec.Chip,
+		Rows = { spec.Tile, spec.AutoH },
+		Grid = true,
 		Notch = spec.Notch,
-		TameX = tameX,
-		TameY = tameY,
-		TameW = tameW,
-		TameH = 38,
+		TameX = 12,
+		TameY = kaijuBottom() + 6,
+		TameW = w,
+		TameH = MobileLayout.Tame.H,
 	}
+end
+
+-- The team keys 1 to 4 on a phone (KaijuHud): their own row, Size square,
+-- just above the move stick, under your left thumb.
+MobileLayout.Keys = { Size = 34, Gap = 5, Above = 8, Count = 4 }
+function MobileLayout.keys(screen: Vector2)
+	local k, stick = MobileLayout.Keys, MobileLayout.stick(screen)
+	return {
+		X = stick.X,
+		Y = stick.Y - k.Above - k.Size,
+		W = k.Size * k.Count + k.Gap * (k.Count - 1),
+		H = k.Size,
+		Size = k.Size,
+		Gap = k.Gap,
+	}
+end
+
+-- The fight's foe list on a phone (FoeBars): on the right, at the top
+-- (your coins and health hide in a fight), right-aligned with their
+-- column, W wide, down to Bottom: just over DODGE, the fight's ring's top
+-- (`viewY`: the camera's height, which sizes the ring), and over a toast's
+-- place where the toasts come down there.
+MobileLayout.Foes = { W = 150 }
+function MobileLayout.foes(screen: Vector2, viewY: number?)
+	local wallet, ring = MobileLayout.wallet(screen), MobileLayout.ring(viewY or screen.Y)
+	local dodge = MobileLayout.onRing(screen, ring, ring.Dodge, ring.Outer, MobileLayout.Ring.Dodge)
+	local toast = MobileLayout.toast(screen)
+	local bottom = dodge.Y - 6
+	if toast.Under then
+		bottom = math.min(bottom, toast.Y - 6)
+	end
+	local w = MobileLayout.Foes.W
+	return { X = wallet.X + wallet.W - w, Y = wallet.Y, W = w, Bottom = bottom }
 end
 
 -- The same card on a computer: bottom left, a fixed size, the pill's
@@ -349,37 +385,30 @@ function MobileLayout.kaijuDesk(screen: Vector2)
 	}
 end
 
--- The card's cells, inside it (`card`: kaiju's or kaijuDesk's). With two
--- rows (a computer's): the kaiju two by two on the left (Fighters 1 and 2
--- on top, Fighter 3 and Support under them), Auto (AUTO HEAL) over Teams
--- (the team keys) on the right. With one (a phone's): all in a row,
--- Fighters, then Support, Auto and Teams each a little apart. Beam, the
--- HYPERBEAM's pill, across the middle of the card's bottom edge (half
--- below it).
+-- The card's cells, inside it (`card`: kaiju's or kaijuDesk's). A
+-- computer's: the kaiju two by two on the left (Fighters 1 and 2 on top,
+-- Fighter 3 and Support under them), Auto (AUTO HEAL) over Teams (the team
+-- keys) on the right. A phone's (Grid): the team's three in a row and the
+-- support a little apart, Auto across the card under them, no Teams (its
+-- keys are keys(screen)). Beam, the HYPERBEAM's pill, across the middle of
+-- the card's bottom edge (half below it): on a phone's small card nearly
+-- its width, so its words still fit.
 function MobileLayout.kaijuCells(card)
 	local pad, gap, rows = card.Pad, card.Gap, card.Rows
 	local notch = card.Notch or 22
-	local beamW = math.floor(card.W * 0.78)
+	local beamW = if card.Grid then card.W - pad * 4 else math.floor(card.W * 0.78)
 	local beam = { X = math.floor((card.W - beamW) / 2), Y = card.H - math.floor(notch / 2), W = beamW, H = notch }
-	if #rows == 1 then
+	if card.Grid then
 		local t, split = rows[1], card.Split or gap
 		local x = pad
-		local function take(w: number)
-			local rect = { X = x, Y = pad, W = w, H = t }
-			x += w
-			return rect
-		end
 		local fighters = {}
 		for i = 1, 3 do
-			fighters[i] = take(t)
-			x += if i < 3 then gap else split
+			fighters[i] = { X = x, Y = pad, W = t, H = t }
+			x += t + (if i < 3 then gap else split)
 		end
-		local support = take(t)
-		x += split
-		local auto = take(card.Auto)
-		x += split
-		local teams = take(card.Chip * 4 + gap * 3)
-		return { Fighters = fighters, Support = support, Auto = auto, Teams = teams, Beam = beam, Row = true }
+		local support = { X = x, Y = pad, W = t, H = t }
+		local auto = { X = pad, Y = pad + t + gap, W = card.W - pad * 2, H = rows[2] }
+		return { Fighters = fighters, Support = support, Auto = auto, Beam = beam, Grid = true }
 	end
 	local cell = math.floor((card.W - pad * 2 - gap * 2) / 3)
 	local function at(column: number, y: number, h: number)
@@ -392,7 +421,7 @@ function MobileLayout.kaijuCells(card)
 		Auto = at(3, pad, rows[1]),
 		Teams = at(3, y2, rows[2]),
 		Beam = beam,
-		Row = false,
+		Grid = false,
 	}
 end
 

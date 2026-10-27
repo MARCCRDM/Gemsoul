@@ -586,17 +586,27 @@ above the combat HUD near the bottom center:
     the team out gold, one called back edged in gold, one all knocked out
     red, one not filled yet faint.
 
-  On a phone, *2026-10-27*, **one row at the top left**, where the pick card
-  was: the team's three, the support a little apart, AUTO HEAL, then the
-  team keys 1 2 3 4 in a row. 351 by 59, the HYPERBEAM's pill on its bottom
-  edge. No CALL BACK (the number does it).
+  On a phone, *2026-10-27*, **a small grid at the top left**, in a fight
+  too: the team's three and the support a little apart in a row, and AUTO
+  HEAL as a slim row across the card under them (the gem and how many,
+  AUTO HEAL, ON or OFF). 164 by 76, half the width of the old one-row card
+  (351 by 59), the HYPERBEAM's pill on its bottom edge nearly its whole
+  width so its words still fit. No CALL BACK (the number does it).
 
-  ![The kaiju row on a phone, with two teammates' health under yours](kaiju/hud-phone-row.png)
+  **The team keys 1 2 3 4 are off the card**: a row of their own, 34
+  points square, just above the move stick, under your left thumb
+  (`MobileLayout.keys`). They used to sit at the end of the row; while you
+  hunted the whole row moved over to the right, across the middle of the
+  screen and onto DODGE.
 
-  While you hunt it moves under your health on the right (the fight's foe
-  list takes the top left):
+  ![The kaiju grid on a phone, the team keys above the move stick](kaiju/hud-phone-grid.png)
 
-  ![While you hunt](kaiju/hud-phone-row-hunting.png)
+  ![In a fight: before and now](kaiju/hud-phone-grid-hunting.png)
+
+  Around it: **CATCH** under the card, as wide; the **pick card** (while
+  you mine) beside it at the top, and in a fight the **foe list** on the
+  right, at the top, as many rows as fit above DODGE: two on most phones,
+  one on the narrowest (`MobileLayout.foes`, `FoeBars`).
 
   - **Its outline:** the team's [HYPERBEAM](#hyperbeam) meter, with its
     pill on the card's bottom edge. *2026-10-26:* this replaced the
@@ -607,24 +617,23 @@ above the combat HUD near the bottom center:
   also has dots down its right edge for Q, E and R: lit when the move is
   ready, faint while it recharges, hollow while it's still asleep. A phone
   leaves the dots off (too small to read there; the kaiju panel has the
-  moves), and its AUTO HEAL takes two lines: the gem, then AUTO ON or
-  AUTO OFF. Knocked out, its tile is
+  moves), and its role mark is a little smaller, just above its health.
+  Knocked out, its tile is
   veiled and says DOWN until you revive it. Tap a tile for the kaiju panel
   on that kaiju (a tile that's DOWN opens HEAL).
 
   Where it sits:
   - On a computer: the bottom left. The chat feed keeps clear above it.
-  - On a phone: one row at the top left; the pick card shows under it only
-    while you mine (see [mobile.md](mobile.md)).
-  - While you hunt: under your health on the right, because the fight's foe
-    list takes the top left.
+  - On a phone: the top left, mining or fighting; the pick card shows
+    beside it only while you mine, the foe list on the right in a fight,
+    the team keys above the move stick (see [mobile.md](mobile.md)).
   - **AUTO HEAL**, in the middle row, in place of RECALL and HUNT: the gem
     it takes next (a Common of your lead's element; an Uncommon once the
     Commons are gone), how many spare Commons and Uncommons you have, and
     ON or OFF. Tap it to switch. On, your spare Commons, then your spare
     Uncommons, heal your team by themselves (see [Healing](#healing)).
-- **CATCH**, at the top right on a phone (left of the card while you
-  hunt), when a wild kaiju near you is down to half its
+- **CATCH**, under the kaiju card on a phone, when a wild kaiju near you
+  is down to half its
   health: the chance right now and the tries left. It starts the catch
   (see [Catching](#catching)), and hides while it's under way.
 - **The kaiju panel:** on the left every kaiju you have: YOUR TEAM (numbered,

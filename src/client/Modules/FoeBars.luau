@@ -5,8 +5,11 @@
 	                  charge); your locked target's is wider, with a gold edge.
 	                  The status icons (StatusBars) sit just above it.
 	  Target list     with two or more foes around, a compact list in the top
-	                  left (under the "?" and Augment Tree buttons): icon,
-	                  name, health. Tap one to lock it.
+	                  left (under the "?" and Augment Tree buttons; on a
+	                  phone on the right, at the top, where your coins sit
+	                  out of a fight, as many rows as fit over DODGE:
+	                  MobileLayout.foes): icon, name, health. Tap one to
+	                  lock it.
 
 	Foes come from TargetLock.foes() (empty outside fights), so nothing shows
 	in the Outpost or the lobby. The Outpost's creatures (wild kaiju, moon
@@ -20,6 +23,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local MobileLayout = require(script.Parent.MobileLayout)
 local TargetLock = require(script.Parent.TargetLock)
 local UiKit = require(script.Parent.UiKit)
 
@@ -188,6 +192,22 @@ local list = make("Frame", {
 local layout = make("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, list)
 local _ = layout
 
+-- Where the list goes, and how many rows fit there: the top left on a
+-- computer, 180 wide; on a phone on the right, at the top, narrower, as
+-- many rows as fit over the fight's ring (MobileLayout.foes: your kaiju's
+-- card has the top left there).
+local ROW = 34 + 4 -- (a row and the gap under it)
+local function placeList(): number
+	if not UiKit.short() then
+		list.Position, list.Size = UDim2.fromOffset(12, 62), UDim2.fromOffset(180, 0)
+		return FoeBars.MaxRows
+	end
+	local camera = workspace.CurrentCamera
+	local spot = MobileLayout.foes(gui.AbsoluteSize, if camera then camera.ViewportSize.Y else nil)
+	list.Position, list.Size = UDim2.fromOffset(spot.X, spot.Y), UDim2.fromOffset(spot.W, 0)
+	return math.clamp(math.floor((spot.Bottom - spot.Y + 4) / ROW), 1, FoeBars.MaxRows)
+end
+
 type Row = {
 	Button: TextButton,
 	Stroke: UIStroke,
@@ -205,7 +225,7 @@ for i = 1, FoeBars.MaxRows do
 		AutoButtonColor = true,
 		BackgroundColor3 = INK,
 		BackgroundTransparency = 0.18,
-		Size = UDim2.fromOffset(180, 34),
+		Size = UDim2.new(1, 0, 0, 34), -- (the list's width: placeList)
 		LayoutOrder = i,
 		Visible = false,
 	}, list)
@@ -226,7 +246,7 @@ for i = 1, FoeBars.MaxRows do
 	local name = make("TextLabel", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(35, 3),
-		Size = UDim2.fromOffset(104, 15),
+		Size = UDim2.new(1, -76, 0, 15),
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
 		TextColor3 = Color3.fromRGB(235, 242, 249),
@@ -236,7 +256,7 @@ for i = 1, FoeBars.MaxRows do
 	}, button)
 	local percent = make("TextLabel", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(139, 3),
+		Position = UDim2.new(1, -41, 0, 3),
 		Size = UDim2.fromOffset(36, 15),
 		Font = Enum.Font.GothamBold,
 		TextSize = 10,
@@ -249,7 +269,7 @@ for i = 1, FoeBars.MaxRows do
 		BorderSizePixel = 0,
 		Visible = false, -- health is shown only above the fighter
 		Position = UDim2.fromOffset(35, 21),
-		Size = UDim2.fromOffset(140, 6),
+		Size = UDim2.new(1, -40, 0, 6),
 	}, button)
 	corner(track, 3)
 	local fill = make("Frame", { BackgroundColor3 = HEALTH, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1) }, track)
@@ -323,8 +343,9 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	-- The list: only with two or more foes.
 	list.Visible = #foes >= 2
+	local fit = if list.Visible then placeList() else FoeBars.MaxRows
 	for i, row in rows do
-		local model = if list.Visible then foes[i] else nil
+		local model = if list.Visible and i <= fit then foes[i] else nil
 		row.Model = model
 		row.Button.Visible = model ~= nil
 		if model then

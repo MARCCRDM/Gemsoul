@@ -235,7 +235,7 @@ local expanded = false
 local collapseAt = 0
 -- It shows only while you mine: from a swing (or a find) till MINING_SHOW
 -- seconds after the last one, or while it's opened. On a phone it sits
--- under your kaiju's card (MobileLayout.card), which has the top left.
+-- beside your kaiju's card (MobileLayout.card), which has the top left.
 local MINING_SHOW = 6
 local minedAt = -math.huge
 local function mining(): boolean

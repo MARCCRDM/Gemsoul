@@ -42,10 +42,11 @@ pill (`LevelUpFx.banner`, `cardLayout`, `card`, `poseCard`):
   phone.
 - **Timing:** it drops in a little, stays about 2 seconds, then lifts and
   fades (2.8 s in all, was 3.8). One at a time, as before.
-- **On a phone** it sits in the top middle, between the pick card and the
-  toasts, clear of the loot card. On a phone too narrow for that, it drops
-  a row, under the toasts. While it's up, the live feed steps aside
-  (`MobileLayout.claimTop`).
+- **On a phone** it sits in the top middle, between the pick card's place
+  and the toasts, clear of the loot card. On a phone too narrow for that
+  (most, now that the pick card sits beside your kaiju's card), it drops
+  under the pick card's place, left of your health, loot card and toasts.
+  While it's up, the live feed steps aside (`MobileLayout.claimTop`).
 
 ![Before (top) and after: yours and a kaiju's, on a computer](levelup-lobby/level-card.jpg)
 
