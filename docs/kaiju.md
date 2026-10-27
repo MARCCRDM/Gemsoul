@@ -613,8 +613,8 @@ above the combat HUD near the bottom center:
 
   ![In a fight: before and now](kaiju/hud-phone-grid-hunting.png)
 
-  Around it: **CATCH** under the card, as wide; the **pick card** (while
-  you mine) beside it at the top, and in a fight the **foe list** on the
+  Around it: **CATCH** under the card, as wide; the **pick card** (when
+  you tap the swing bar by a rock) beside it at the top, and in a fight the **foe list** on the
   right, at the top, as many rows as fit above DODGE: two on most phones,
   one on the narrowest (`MobileLayout.foes`, `FoeBars`).
 
@@ -635,7 +635,7 @@ above the combat HUD near the bottom center:
   Where it sits:
   - On a computer: the bottom left. The chat feed keeps clear above it.
   - On a phone: the top left, mining or fighting; the pick card shows
-    beside it only while you mine, the foe list on the right in a fight,
+    beside it only when opened, the foe list on the right in a fight,
     the team keys above the move stick (see [mobile.md](mobile.md)).
   - **AUTO HEAL**, in the middle row, in place of RECALL and HUNT: the gem
     it takes next (a Common of your lead's element; an Uncommon once the

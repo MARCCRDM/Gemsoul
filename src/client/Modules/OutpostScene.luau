@@ -233,13 +233,96 @@ hint.Visible = not UserInputService.TouchEnabled
 local cardScale = new("UIScale", { Scale = 1 }, card)
 local expanded = false
 local collapseAt = 0
--- It shows only while you mine: from a swing (or a find) till MINING_SHOW
--- seconds after the last one, or while it's opened. On a phone it sits
--- beside your kaiju's card (MobileLayout.card), which has the top left.
+-- While you mine, your swings show by the rock (the swing bar, below):
+-- from a swing (or a find) till MINING_SHOW seconds after the last one.
+-- The pick card shows only opened (tap the swing bar), its details: the
+-- charge and when it's next up. On a phone it sits beside your kaiju's
+-- card (MobileLayout.card), which has the top left.
 local MINING_SHOW = 6
 local minedAt = -math.huge
 local function mining(): boolean
-	return expanded or os.clock() - minedAt < MINING_SHOW
+	return os.clock() - minedAt < MINING_SHOW
+end
+
+-- The swing bar: beside the rock you're mining, to its right as you look
+-- at it (a billboard on the rock), your swings left, counting down with
+-- each one (a little pop as it drops), over a bar of them: the free pick's
+-- charge, or a bought pick's wear. Red at none left. Tap it for the pick
+-- card's details.
+local swingBar = new("BillboardGui", {
+	Name = "SwingBar",
+	Size = UDim2.fromOffset(78, 34),
+	AlwaysOnTop = true,
+	Active = true,
+	LightInfluence = 0,
+	MaxDistance = 90,
+	Enabled = false,
+	ResetOnSpawn = false,
+}, player.PlayerGui)
+local swingFace = new("TextButton", {
+	Name = "Face",
+	Text = "",
+	AutoButtonColor = false,
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.fromRGB(12, 16, 26),
+	BackgroundTransparency = 0.15,
+}, swingBar)
+UiKit.round(swingFace, 8)
+local swingEdge = new("UIStroke", { Color = ChargeMeter.Charging, Thickness = 1.5, Transparency = 0.25 }, swingFace)
+local swingPop = new("UIScale", { Scale = 1 }, swingFace)
+local swingIcon = text(swingFace, "⛏", 14, P.Text, IronUi.Bold, 6, 2, 18, 18, Enum.TextXAlignment.Center)
+local swingCount = text(swingFace, "", 17, P.Text, Enum.Font.GothamBlack, 24, 1, 50, 20)
+swingCount:SetAttribute("NoTranslate", true)
+swingCount.TextStrokeTransparency = 0.5
+local swingTrack = new("Frame", {
+	Position = UDim2.fromOffset(6, 24),
+	Size = UDim2.new(1, -12, 0, 5),
+	BackgroundColor3 = Color3.fromRGB(34, 40, 56),
+}, swingFace)
+UiKit.round(swingTrack, 3)
+local swingFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = ChargeMeter.Charging }, swingTrack)
+UiKit.round(swingFill, 3)
+swingIcon.TextStrokeTransparency = 0.6
+local shownSwings: number? = nil
+-- Your swings left and how full: from the server's picks (state).
+local function refreshSwingBar()
+	if not state then
+		return
+	end
+	local id = state.Active
+	local free = id == "Survey"
+	local left, share, color
+	if free then
+		local swings, nextIn = ChargeMeter.read(state.Picks, state.SurveyAt)
+		left, share = swings, swings / ChargeMeter.Full
+		color = if nextIn then ChargeMeter.Charging else ChargeMeter.Charged
+	else
+		local spec = Rules.Picks[id] or Rules.Picks.Survey
+		left = state.Picks[id] or 0
+		share, color = left / spec.Swings, spec.Color
+	end
+	if left <= 0 then
+		color = P.Bad
+	end
+	swingCount.Text = tostring(left)
+	swingCount.TextColor3 = if left > 0 then P.Text else P.Bad
+	swingFill.Size = UDim2.fromScale(math.clamp(share, 0, 1), 1)
+	swingFill.BackgroundColor3 = color
+	swingEdge.Color = color
+	if shownSwings and left < shownSwings and swingBar.Enabled then
+		swingPop.Scale = 1.18
+		TweenService:Create(swingPop, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+			:Play()
+	end
+	shownSwings = left
+end
+-- On the rock you swing at: to its right, a little up (camera-relative).
+local function swingBarOn(body: BasePart?)
+	swingBar.Adornee = body
+	if body then
+		local reach = math.max(body.Size.X, body.Size.Z) / 2
+		swingBar.StudsOffset = Vector3.new(reach + 1.6, body.Size.Y * 0.2, 0)
+	end
 end
 local blockingScreens = {
 	Dashboard = true, Shop = true, Season = true, AugmentTree = true,
@@ -262,7 +345,9 @@ local function fitOutpostHud()
 	track.Position = UDim2.fromOffset(14, if mobile and not expanded then 48 else 30)
 	-- Keep the contents at their designed width; scale the whole card on narrow screens.
 	cardScale.Scale = math.min(if mobile then MobileLayout.CardScale elseif expanded then 1 else 0.78, math.max(0.1, (size.X - 24) / 300))
-	card.Visible = not blocked and mining()
+	card.Visible = not blocked and expanded
+	local rock = swingBar.Adornee
+	swingBar.Enabled = not blocked and hud.Enabled and mining() and rock ~= nil and rock:IsDescendantOf(workspace)
 	for _, promptGui in miningPrompts do
 		promptGui.Enabled = not blocked and hud.Enabled
 	end
@@ -276,6 +361,11 @@ local function fitOutpostHud()
 end
 togglePick.Activated:Connect(function()
 	expanded = not expanded
+	collapseAt = os.clock() + 8
+	fitOutpostHud()
+end)
+swingFace.Activated:Connect(function()
+	expanded = true
 	collapseAt = os.clock() + 8
 	fitOutpostHud()
 end)
@@ -315,6 +405,7 @@ local function refreshCharge()
 	end
 	local swings, nextIn, progress = ChargeMeter.read(state.Picks, state.SurveyAt)
 	charge.set(swings, nextIn, progress)
+	refreshSwingBar()
 	if probeCharge then
 		probeCharge.set(swings, nextIn, progress)
 	end
@@ -897,6 +988,7 @@ function OutpostScene.swing(nodeId: number?, walked: boolean?)
 		end)
 		return
 	end
+	swingBarOn(body)
 	minedAt = os.clock()
 	fitOutpostHud()
 	task.spawn(function()
@@ -1995,8 +2087,8 @@ task.spawn(function()
 			if expanded and os.clock() >= collapseAt then
 				expanded = false
 				fitOutpostHud()
-			elseif card.Visible and not mining() then
-				fitOutpostHud() -- (you've stopped mining: the pick card goes)
+			elseif swingBar.Enabled and not mining() then
+				fitOutpostHud() -- (you've stopped mining: the swing bar goes)
 			end
 		end
 	end

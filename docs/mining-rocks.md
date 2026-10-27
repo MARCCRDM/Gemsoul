@@ -128,6 +128,15 @@ A rock's name and HP bar show only within 24 studs. Once a rock is hit,
 its label shows from up to 60 studs, so you can see who's mining it from
 across the field. The label stays up until the rock pops.
 
+**The swing bar** (*2026-10-27*): while you mine, a small tag sits to the
+right of the rock you're hitting, with ⛏ and your swings left. The count
+drops with each swing, with a little pop, over a bar of them (the free
+pick's charge, or a bought pick's wear). It turns red when none are left,
+and goes 6 seconds after your last swing (`OutpostScene`'s `SwingBar`, a
+billboard on the rock). Tap it for the pick card: the charge and when the
+next swing is back. The pick card used to pop up at the top as you
+mined.
+
 ## Contracts kept
 
 - The main chunk is the `Body`: the model's PrimaryPart, the only part

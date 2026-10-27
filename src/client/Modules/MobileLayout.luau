@@ -4,8 +4,9 @@
 
 	  top left      your kaiju's card (KaijuHud), small, two rows: the
 	                team's three and the support, AUTO HEAL under them; in
-	                a fight too. CATCH under it. Beside it, only while you
-	                mine, the pick card (OutpostScene), drawn at CardScale;
+	                a fight too. CATCH under it. Beside it, when it's opened
+	                (tap the swing bar by a rock), the pick card
+	                (OutpostScene), drawn at CardScale;
 	                in a fight, the foe list (FoeBars) is on the right. On a
 	                small screen with a keyboard, the CHAT button goes under
 	                CATCH's place; opened, the chat is a column down the left

@@ -168,9 +168,16 @@ the left. Now:
   percent, SAVE along its bottom, its rim the meter. It used to be a pill
   on the kaiju card's bottom edge.
 - **CATCH** comes up under your kaiju's card, as wide.
-- **The pick card** shows only while you mine: it comes up beside your
-  kaiju's card with your first swing and goes 6 seconds after your last
-  (`OutpostScene`, `MobileLayout.card`, at 0.66 scale).
+- **The swing bar** shows by the rock while you mine, *2026-10-27*: a
+  small tag to the rock's right (a billboard on it, so it stays by the
+  rock) with ⛏ and your swings left, dropping with each swing (it pops a
+  little as it does), over a bar of them: the free pick's charge, or a
+  bought pick's wear; red at none left. It comes with your first swing
+  and goes 6 seconds after your last (`OutpostScene`'s `SwingBar`). It
+  replaced the pick card popping up at the top as you mined: that card
+  now shows only when you tap the swing bar (its charge and when the
+  next swing is back), beside your kaiju's card (`MobileLayout.card`, at
+  0.66 scale).
 - **The foe list** comes up on the right in a fight, at the top where your
   coins and health sit (they hide while you fight), as many rows as fit
   above DODGE: two on most phones, one on the narrowest

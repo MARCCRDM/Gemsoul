@@ -653,6 +653,17 @@ do
 	local headshot = gui:FindFirstChild("Headshot", true)
 	check(headshot and string.find(headshot.Image, "id=7", 1, true), "The champion's face isn't theirs")
 end
+-- The swing bar: by the rock you swing at (a billboard on it, kept over a
+-- respawn), your swings left from the server's picks, redrawn with the
+-- charge; it's what shows while you mine (the pick card only opened).
+do
+	local scene = fs.readFile(ROOT .. "/src/client/Modules/OutpostScene.luau")
+	check(scene:find('Name = "SwingBar"', 1, true) and scene:find("ResetOnSpawn = false", 1, true), "No swing bar on the rock, or it goes on a respawn")
+	check(scene:find("swingBarOn(body)\n\tminedAt = os.clock()", 1, true) ~= nil, "A swing doesn't put the swing bar on its rock")
+	check(scene:find("charge.set(swings, nextIn, progress)\n\trefreshSwingBar()", 1, true) ~= nil, "The swing bar isn't redrawn with the swings")
+	check(scene:find("swingBar.Enabled = not blocked and hud.Enabled and mining()", 1, true) ~= nil, "The swing bar doesn't show while you mine")
+	check(scene:find("card.Visible = not blocked and expanded", 1, true) ~= nil, "The pick card still pops up as you mine")
+end
 -- The Shelter's Store and Market counters open those screens (OutpostScene).
 for kind, counter in { Store = site.Stations.Store, Market = site.Stations.Market } do
 	local prompt = counter:FindFirstChildOfClass("ProximityPrompt")
