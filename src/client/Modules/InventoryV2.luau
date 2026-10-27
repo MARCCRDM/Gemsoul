@@ -622,7 +622,7 @@ local function buildTop(canvas: Frame)
 		{ "AUGMENTS", open("AugmentTreeUI", "toggle"), "K" },
 		{ "SEASON", open("SeasonUI", "toggle"), "J" },
 		{ "MARKET", open("MarketBoardUI", "open") },
-		{ "STORE", open("ShopUI", "toggle") },
+		{ "SKINS", open("ShopUI", "toggle") },
 	} do
 		local on = spec[2] == nil
 		-- The tab: its name, then (with a keyboard) its key in a small keycap.

@@ -36,7 +36,7 @@ local SCREENS = {
 	{ 932, 430 - 58, 430 },
 	{ 1024, 768 - 36, 768 },
 }
-local TILES = 7 -- PLAY, INVENTORY, TASKS, MARKET, STORE, SOCIAL, INVITE (no RANKS on a phone)
+local TILES = 7 -- PLAY, INVENTORY, SKINS, TASKS, MARKET, SOCIAL, INVITE (no RANKS on a phone)
 for _, s in SCREENS do
 	local screen = Vector2.new(s[1], s[2])
 	local label = s[1] .. "x" .. s[2]

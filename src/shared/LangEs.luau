@@ -41,6 +41,7 @@ return {
 	["Weapon skin"] = "Aspecto de arma",
 	["Weapon Skins"] = "Armas",
 	["Skins"] = "Aspectos",
+	["SKINS"] = "ASPECTOS",
 	["Health"] = "Vida",
 	["HP"] = "PV",
 	["Power"] = "Poder",

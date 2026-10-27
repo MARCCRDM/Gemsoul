@@ -875,7 +875,9 @@ local function fitDock()
 	table.sort(buttons, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
 	phoneDock = mobile
 	pilotingChanged()
-	inventoryLook(mobile)
+	if inventoryLook then
+		inventoryLook(mobile)
+	end
 	modes.Visible = false
 	status.Visible = not mobile
 	health.Frame.Visible = not mobile
@@ -1052,6 +1054,31 @@ local function inventoryUpgradeLabel(hints)
 end
 UpgradeHints.Changed:Connect(inventoryUpgradeLabel)
 inventoryUpgradeLabel(UpgradeHints.Current)
+-- SKINS (the Store: skins, suits, helmets, visors, pickaxes, bundles),
+-- right after INVENTORY (third on a phone, after PLAY), blue. (The shop
+-- front in the Outpost is still signed STORE.)
+local SKINS_TOP, SKINS_BOTTOM = Color3.fromRGB(86, 156, 255), Color3.fromRGB(34, 92, 214)
+local SKINS_EDGE = Color3.fromRGB(10, 34, 92)
+local skinsTile = tile("SKINS", "Coins", Color3.new(1, 1, 1), function()
+	require(script.Parent.ShopUI).toggle()
+end)
+do
+	local face = skinsTile:FindFirstChildOfClass("UIGradient")
+	if face then
+		face.Color = ColorSequence.new(SKINS_TOP, SKINS_BOTTOM)
+	end
+	local rim = skinsTile:FindFirstChildOfClass("UIStroke")
+	if rim then
+		rim.Color = SKINS_EDGE
+		skinsTile.MouseLeave:Connect(function()
+			rim.Color = SKINS_EDGE
+		end)
+	end
+	local chevron = skinsTile:FindFirstChild("NavChevron")
+	if chevron and chevron:IsA("TextLabel") then
+		chevron.TextColor3 = Color3.fromRGB(220, 234, 255)
+	end
+end
 -- Tasks and today's challenges: the Tasks window (TrainingRewards.client),
 -- with how many are still to do on the tile. (Nothing of them sits on the
 -- play screen.)
@@ -1091,9 +1118,6 @@ task.spawn(function()
 end)
 tile("MARKET", "Market", ICON, function()
 	require(script.Parent.MarketBoardUI).open()
-end)
-tile("STORE", "Coins", ICON, function()
-	require(script.Parent.ShopUI).toggle()
 end)
 tile("RANKS", "Ranks", ICON, function()
 	require(script.Parent.TopPlayersUI).toggle()
