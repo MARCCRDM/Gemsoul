@@ -690,7 +690,9 @@ local function pill(parent: Instance, value: string, color: Color3, size: number
 end
 
 -- One of your party's places: a member, or an open place to invite into.
-local function partySlot(parent: Instance, slot, order: number, compact: boolean)
+-- In a party, your own card has LEAVE (`acts.Leave`), and the leader sees a
+-- red × on each of the others' to remove them (`acts.Kick`).
+local function partySlot(parent: Instance, slot, order: number, compact: boolean, acts)
 	local card = new("Frame", {
 		Name = if slot then "Member" else "Open",
 		BackgroundColor3 = if slot then Color3.fromRGB(26, 22, 30) else Color3.fromRGB(16, 14, 20),
@@ -745,6 +747,36 @@ local function partySlot(parent: Instance, slot, order: number, compact: boolean
 	pill(pills, if ready then "READY" else "NOT READY", if ready then P.Good else P.Dim, if compact then 8 else 10).LayoutOrder = 1
 	if slot.Leader then
 		pill(pills, "LEADER", P.Gold, if compact then 8 else 10).LayoutOrder = 2
+	end
+	-- (LEAVE top right on yours; × bottom right on theirs, by the READY pill,
+	-- so where they are keeps the whole line.)
+	local act = if slot.You then acts and acts.Leave else acts and acts.Kick
+	if act then
+		local side = if compact then 18 else 22
+		local inset = if compact then 4 else 6
+		local b = new("TextButton", {
+			Name = if slot.You then "Leave" else "Kick",
+			AnchorPoint = if slot.You then Vector2.new(1, 0) else Vector2.new(1, 1),
+			Position = if slot.You then UDim2.new(1, -inset, 0, inset) else UDim2.new(1, -inset, 1, -inset),
+			Size = if slot.You then UDim2.fromOffset(if compact then 40 else 46, side) else UDim2.fromOffset(side, side),
+			BackgroundColor3 = P.Bad:Lerp(P.Frame, 0.6),
+			Text = if slot.You then "LEAVE" else "",
+			TextSize = if compact then 9 else 10,
+			Font = BOLD,
+			TextColor3 = P.Text,
+			AutoButtonColor = true,
+		}, card)
+		UiKit.round(b, 6)
+		new("UIStroke", { Color = P.Bad, Thickness = 1, Transparency = 0.35 }, b)
+		b.Activated:Connect(function()
+			act(slot)
+		end)
+		if slot.You then
+			-- (your name makes room for it)
+			name.Size = UDim2.new(1, -left - 6 - b.Size.X.Offset - 4, 0, if compact then 15 else 18)
+		else
+			IronUi.cross(b, if compact then 7 else 9, P.Text)
+		end
 	end
 	return card
 end
@@ -1164,6 +1196,19 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 			end
 		end)
 	end
+	-- Out of your party, or (leading it) someone out of it.
+	local function leaveParty()
+		task.spawn(function()
+			local result = GemClient.request("PartyLeave")
+			UiKit.toast(result.Message or "", if result.Ok then P.Gold else P.Bad)
+		end)
+	end
+	local function kickMember(slot)
+		task.spawn(function()
+			local result = GemClient.request("PartyKick", slot.UserId)
+			UiKit.toast(result.Message or "", if result.Ok then P.Gold else P.Bad)
+		end)
+	end
 	local function onInvite(person)
 		invited[person.UserId] = os.clock()
 		if person.Invite == "Game" then
@@ -1214,8 +1259,15 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 				child:Destroy()
 			end
 		end
+		-- (LEAVE and × only in a party with someone else in it.)
+		local mine = view.Slots[1]
+		local together = view.Size > 1
+		local acts = {
+			Leave = if together then leaveParty else nil,
+			Kick = if together and mine and mine.Leader then kickMember else nil,
+		}
 		for i, slot in view.Slots do
-			partySlot(slotRow, slot, i, small)
+			partySlot(slotRow, slot, i, small, acts)
 		end
 		-- The tabs, with their counts.
 		for _, child in tabs:GetChildren() do

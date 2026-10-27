@@ -46,6 +46,13 @@ shots are the real client code rendered by the UI harness.
     **LEADER** on the leader. You're first and marked **YOU**. An empty
     place says **OPEN** · "Invite from the list". On your own you're the
     only member, ready, and no one is marked leader.
+
+    In a party, your own card has a red **LEAVE** in its top corner
+    (`PartyLeave`: you're out, and the gate shows you on your own). The
+    leader also sees a small red **×** in the bottom corner of each other
+    member's card, by their READY pill, to remove them from the party
+    (`PartyKick`; leaders only). Either way a toast says what happened.
+    Others' cards keep their whole line for where they are.
   - **CHOOSE YOUR BOSS**: the biome's ladder as a row of cards (see
     [The ladders](#the-ladders)). Each card has:
     - the boss's portrait: its real body, built once by the server into
@@ -97,9 +104,9 @@ shots are the real client code rendered by the UI harness.
     redraws when something changed. It closes by itself when you're taken
     in.
 
-  ![Leading a party of three: Ivy at the gate and ready, Bram in the Outpost and not](rift/gate-lobby-party.png)
+  ![Leading a party of three: LEAVE on your card, × on Bram's and Ivy's to remove them](rift/gate-lobby-party.png)
 
-  ![In Ivy's party: READY and GO IN NOW, no INVITE (only the leader invites)](rift/gate-lobby-member.png)
+  ![In Ivy's party: LEAVE on your card, no × (only the leader removes), READY and GO IN NOW](rift/gate-lobby-member.png)
 
   ![The FRIENDS tab: Kadey here, Sasha and Theo online elsewhere (INVITE ↗)](rift/gate-lobby-friends.png)
 
