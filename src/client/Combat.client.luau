@@ -1454,10 +1454,13 @@ RunService.RenderStepped:Connect(function(dt)
 		return
 	end
 	FirstPerson.start()
-	-- (a cache's board, a boss's in the Rift, needs the cursor too)
+	-- (a cache's board, a boss's in the Rift, needs the cursor too, and so
+	-- does the screen between a 1v1's rounds: free while it's up, and back
+	-- in the fight by itself when the next round starts, no TAB)
 	local guideOpen = CombatGuide.isOpen()
 		or AugmentTreeUI.isOpen()
 		or require(script.Parent.Modules.StreakRewards).isOpen()
+		or require(script.Parent.Modules.RoundPivot).visible()
 	if guideOpen ~= guideWasOpen then
 		cursorFree = guideOpen
 		FirstPerson.setCursorFree(cursorFree)

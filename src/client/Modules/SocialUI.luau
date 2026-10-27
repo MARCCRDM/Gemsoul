@@ -10,9 +10,8 @@
 	  Popups       party invites and duel challenges (Accept / Decline), on
 	               any screen; a "searching" tab up in the top bar while queued.
 	  Duel overlay the face-off (who's on which side, a countdown), FIGHT!,
-	               the time left, and the result (rating change, coins; a
-	               queued 1v1's arena tournament run and the swings it
-	               restored: Shared.SwingRestore).
+	               the time left, the window between a 1v1's rounds
+	               (RoundPivot) and the result card (MatchResult).
 	  Playtests    Invite friends (Roblox's invite prompt), Feedback (a bug or
 	               idea, sent with the build; owners also read everyone's
 	               reports and the most frequent errors there), and client
@@ -35,7 +34,6 @@ local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
-local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local Referrals = require(ReplicatedStorage.Shared.Referrals)
 local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
@@ -45,6 +43,7 @@ local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 local UiSound = require(script.Parent.UiSound)
+local MatchResult = require(script.Parent.MatchResult)
 local RoundPivot = require(script.Parent.RoundPivot)
 
 local player = Players.LocalPlayer
@@ -1816,65 +1815,16 @@ fightTimer.AnchorPoint = Vector2.new(0.5, 0)
 fightTimer.Position, fightTimer.Size = UDim2.new(0.5, 0, 0, 92), UDim2.fromOffset(240, 24)
 fightTimer.TextStrokeTransparency = 0.4
 fightTimer.Visible = false
-local result = new("Frame", {
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundColor3 = P.Frame,
-	BackgroundTransparency = 0.1,
-	Position = UDim2.fromScale(0.5, 0.4),
-	Size = UDim2.fromOffset(460, 190),
-	Visible = false,
-}, overlay)
-UiKit.round(result, 14)
-local resultStroke = new("UIStroke", { Color = P.Gold, Thickness = 2 }, result)
-local resultTitle = text(result, "", 40, P.Gold, HEADING)
-resultTitle.AutomaticSize, resultTitle.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-resultTitle.Position, resultTitle.Size = UDim2.fromOffset(0, 18), UDim2.new(1, 0, 0, 46)
-local resultLine = text(result, "", 15, P.Text, BOLD)
-resultLine.AutomaticSize, resultLine.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-resultLine.Position, resultLine.Size = UDim2.fromOffset(16, 72), UDim2.new(1, -32, 0, 44)
--- A queued 1v1's arena tournament (Shared.SwingRestore): a pip for each of
--- its ten wins, this run's lit, the ones that restore swings marked with
--- their share, and what this one restored.
-local tourney = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 122),
-	Size = UDim2.new(1, -32, 0, 48),
-	Visible = false,
-}, result)
-local pipRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 16) }, tourney)
-UiKit.list(pipRow, 5, true).HorizontalAlignment = Enum.HorizontalAlignment.Center
-local pips = {}
-for i = 1, SwingRestore.Tournament do
-	local share = SwingRestore.Streak[i]
-	local pip = new("Frame", {
-		BackgroundColor3 = P.Inset,
-		LayoutOrder = i,
-		Size = UDim2.fromOffset(if share then 38 else 24, 16),
-	}, pipRow)
-	UiKit.round(pip, 8)
-	local stroke = new("UIStroke", { Color = if share then P.Gold else P.Edge, Thickness = 1.5 }, pip)
-	local tag = text(pip, if share then string.format("%d%%", math.floor(share * 100 + 0.5)) else "", 10, P.Text, BOLD)
-	tag.AutomaticSize, tag.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-	tag.Size = UDim2.fromScale(1, 1)
-	pips[i] = { Frame = pip, Stroke = stroke }
-end
--- The rewards' ladder (Shared.RewardRoll): every 1v1 played makes your
--- rolls rarer; a win's reward is waiting.
-local ladderLine = text(result, "", 13, P.Dim, BOLD)
-ladderLine.AutomaticSize, ladderLine.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-ladderLine.Size, ladderLine.Visible = UDim2.new(1, -32, 0, 18), false
-local tourneyLine = text(tourney, "", 13, P.Gold, BOLD)
-tourneyLine.AutomaticSize, tourneyLine.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-tourneyLine.Position, tourneyLine.Size = UDim2.fromOffset(0, 24), UDim2.new(1, 0, 0, 20)
-local resultFoot = text(result, "Returning to the menu…", 12, P.Dim)
-resultFoot.AutomaticSize, resultFoot.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
-resultFoot.Position, resultFoot.Size = UDim2.new(0, 0, 1, -34), UDim2.new(1, 0, 0, 18)
+-- The card at the end of a match (MatchResult): the result, the score,
+-- rating and coins, the arena tournament and any win reward.
+MatchResult.mount(overlay)
 
 -- The window between Ranked rounds (RoundPivot): the round's result, what
 -- hit you, and the counter or READY.
 RoundPivot.mount(overlay)
 local function showPivot(info)
-	faceoff.Visible, fightTimer.Visible, result.Visible = false, false, false
+	faceoff.Visible, fightTimer.Visible = false, false
+	MatchResult.hide()
 	if match then
 		match.Score = info.Wins
 		match.Round = info.Round
@@ -1916,7 +1866,7 @@ end
 
 local function showFaceoff(info)
 	match = info
-	result.Visible = false
+	MatchResult.hide()
 	local mine, theirs = info.Teams[info.Team], info.Teams[if info.Team == 1 then 2 else 1]
 	-- What the fight counts (Shared.PvPRules): the kind, then its stats.
 	local rules = info.Rules
@@ -1942,66 +1892,7 @@ local function showResult(info)
 	match = nil
 	faceoff.Visible, fightTimer.Visible = false, false
 	RoundPivot.hide()
-	local color = if info.Draw then P.Dim elseif info.Won then P.Good else P.Bad
-	resultTitle.Text = if info.Draw then "DRAW" elseif info.Won then "VICTORY" else "DEFEAT"
-	resultTitle.TextColor3, resultStroke.Color = color, color
-	local why = if info.Reason == "Time"
-		then "Time's up  ·  "
-		elseif info.Reason == "Left" or info.Reason == "Forfeit" then "Forfeit  ·  "
-		else ""
-	local rounds = if info.Rounds
-		then string.format("Rounds %d – %d  ·  ", info.Rounds.Mine, info.Rounds.Theirs)
-		else ""
-	local change = if info.Ranked
-		then string.format("Rating %d (%s%d)", info.Rating, if info.Delta >= 0 then "+" else "", info.Delta)
-		else string.format(
-			"%s (unrated)",
-			if info.Rules and info.Rules.Name then info.Rules.Name else "Friendly duel"
-		)
-	local bonus = if (info.Bonus or 0) > 0 then string.format("  ·  +%d ◆ fill-in bonus", info.Bonus) else ""
-	if (info.JoinBonus or 0) > 0 then bonus ..= string.format("  ·  %d ◆ paid when you joined", info.JoinBonus) end
-	resultLine.Text =
-		string.format("%s%svs %s\n%s  ·  +%d coins%s", why, rounds, info.Opponents or "?", change, info.Coins or 0, bonus)
-	-- The arena tournament: this run's wins, and the swings it restored.
-	local t = info.Tournament
-	tourney.Visible = t ~= nil
-	local ladderAt = if t then 176 else 122
-	ladderLine.Visible = info.Plays ~= nil
-	if info.Plays then
-		local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
-		local band, _, nextBand = RewardRoll.band(info.Plays)
-		ladderLine.Position = UDim2.fromOffset(16, ladderAt)
-		ladderLine.TextColor3 = if info.WinReward then P.Gold else P.Dim
-		ladderLine.Text = (if info.WinReward then "WIN REWARD: PICK ONE OF TWO  ·  " else "")
-			.. string.format("%s  ·  %d 1v1s played", string.upper(band.Name), info.Plays)
-			.. if nextBand
-				then string.format("  ·  %s at %d: rarer rolls", string.upper(nextBand.Name), nextBand.Plays)
-				else ""
-	end
-	result.Size = UDim2.fromOffset(460, (if t then 224 else 190) + (if info.Plays then 20 else 0))
-	if t then
-		local wins = t.Win
-		for i, pip in pips do
-			local share = SwingRestore.Streak[i]
-			pip.Frame.BackgroundColor3 = if i <= wins then (if share then P.Gold else P.Good) else P.Inset
-			pip.Frame.BackgroundTransparency = if i <= wins then 0.1 else 0.3
-		end
-		local nextShare = string.format("%d%%", math.floor((t.NextShare or 0) * 100 + 0.5))
-		tourneyLine.TextColor3 = if t.Champion then P.Gold elseif t.Swings > 0 then P.Good else P.Text
-		tourneyLine.Text = if t.Champion
-			then string.format("TOURNAMENT WON!  ·  +%d swings restored", t.Swings)
-			elseif t.Swings > 0 then string.format("Tournament win %d / %d  ·  +%d swings restored", t.Win, t.Of, t.Swings)
-			elseif t.Share > 0 then string.format("Tournament win %d / %d  ·  your swings are full", t.Win, t.Of)
-			elseif info.Won and not t.Counted then "Same opponent twice running: this win doesn't count"
-			elseif info.Won then string.format("Tournament win %d / %d  ·  win %d restores %s swings", t.Win, t.Of, t.NextAt, nextShare)
-			else string.format("Tournament run over  ·  your next win restores %s swings", nextShare)
-	end
-	result.Visible = true
-	task.delay(Matchmaking.EndPause + 0.5, function()
-		if not match then
-			result.Visible = false
-		end
-	end)
+	MatchResult.show(info, Matchmaking.EndPause + 0.5)
 end
 
 -- Every frame: the countdown, the fight timer, the searching banner.

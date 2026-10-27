@@ -33,6 +33,7 @@ local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
 local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local BossLoot = require(ReplicatedStorage.Shared.BossLoot)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -827,7 +828,8 @@ function StreakRewards.start()
 		if kind == "StreakReward" or kind == "BossCache" or kind == "WinReward" then
 			-- Fetch the new cache, then show it (after the match result, or
 			-- the boss's fall).
-			task.delay(if kind == "BossCache" then 3 elseif kind == "WinReward" then 3.5 else 2.5, function()
+			-- (a win's reward once the match's result card has gone: MatchResult)
+			task.delay(if kind == "BossCache" then 3 elseif kind == "WinReward" then Matchmaking.EndPause + 0.7 else 2.5, function()
 				local result = GemClient.request("StreakCaches")
 				if result.Ok then
 					state = result
@@ -835,7 +837,8 @@ function StreakRewards.start()
 				end
 			end)
 		elseif kind == "MatchEnd" then
-			StreakRewards.refresh()
+			-- (its READY pill after the result card, not over it)
+			task.delay(Matchmaking.EndPause + 0.7, StreakRewards.refresh)
 		end
 	end)
 	StreakRewards.refresh()

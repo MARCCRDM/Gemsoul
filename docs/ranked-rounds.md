@@ -56,6 +56,42 @@ On a phone, the panel scales down to fit the screen:
 When both players lock in (or time runs out), the next round's faceoff says
 what each side did: **countered THERMAL** or **kept their gear**.
 
+## Back into the fight by itself
+
+The round screen frees the mouse while it's up, so you can click its options
+and LOCK IN. When the next round starts, the screen closes and you're back
+in first person with the mouse locked, ready to fight. You don't need to
+press Tab. (Before, you had to press Tab to free the mouse, click, then press
+Tab again to fight; until you did, the screen said "TAB · return to combat".)
+
+## The end of the match
+
+When the match is over, one card shows the result, in the same style as the
+round screen:
+
+![Ranked win](ranked-rounds/result-win.png)
+
+- **Header:** RANKED 1V1 · FINAL over VICTORY, DEFEAT or DRAW in the result's
+  colour, with the rounds' score and who you played on the right. The rule
+  under it runs down until you're sent back.
+- **RATING**, **COINS** and how it **ENDED** (knockout, time's up or
+  forfeit), each a caption over a big figure with a small note under it
+  (the rating change in green or red, a fill-in bonus).
+- **ARENA TOURNAMENT** (a queued 1v1): ten segments, your run's wins lit, the
+  wins that restore swings marked 10%, 25% and 50%, and what this one did.
+- **WIN REWARD**: a gold chip when a reward is waiting, then your rolls' band
+  and the next one. The reward board opens by itself once the card is gone.
+  The gold "WIN REWARD READY" button waits until then too, so nothing stacks
+  on top of the card any more.
+
+A loss, and a Casual win (no rating, no tournament):
+
+![Loss and Casual](ranked-rounds/result-loss-casual.png)
+
+On a phone it scales down to fit:
+
+![Phone](ranked-rounds/result-phone.png)
+
 ## What the auto counter changes
 
 Only armor. Your sword and your Q, E and R moves stay exactly as they are, so
@@ -88,7 +124,8 @@ that moment. The screen only says "counter" or "keep".
 | `Systems/CombatServer` | Keeps a running total of damage each fighter takes in a match, by element (`takenByElement`, `clearTaken`). |
 | `Systems/CounterServer` | Connects the two for one player: `threat`, `offer` (the plan to show), `wear` (rebuild the plan and equip it), `newRound`. |
 | `Systems/Duels` | At the end of a round, sends each fighter their own `Round` payload with `CanCounter`, `Threat` and `Counter`. It wears the counter when the next round is revealed. The winner can't pick it. |
-| `Modules/RoundPivot` | The round screen above. |
+| `Modules/RoundPivot` | The round screen above. While it's up, `Combat.client` frees the mouse; when it closes, the mouse locks again. |
+| `Modules/MatchResult` | The card at the end of the match. |
 
 The break is `Matchmaking.Rounds.Pivot` (30 s) when the loser has something to
 change, and `Break` (10 s) when there is nothing to pick.
