@@ -967,6 +967,25 @@ do
 	)
 end
 
+-- Down at the boss, then up (RESTORE, backup): the body gets up with you.
+-- SparKit stood you up only as its own KNOCKED DOWN card closed, which the
+-- boss's fallen card (RiftFallen) never opened, so a revived player lay on
+-- the floor. The body follows SparDown alone now, whichever card is up:
+-- it rises the moment that's cleared, and not while the Rift keeps you down.
+do
+	local kit = fs.readFile(ROOT .. "/src/client/Modules/SparKit.luau")
+	local refresh = kit:find("local function refreshDown()", 1, true)
+	local floored = refresh and kit:find("local floored = Spar.isDown(player)", refresh, true)
+	local rises = floored and kit:find("if fallen and not floored then\n\t\trise()", floored, true)
+	local card = refresh and kit:find('local down = floored and player:GetAttribute("RiftFallen") == nil', refresh, true)
+	check(rises ~= nil and card ~= nil and rises < card, "Revived at the boss, the body isn't stood up")
+	local close = card and kit:find("elseif not down and downGui.Enabled then", card, true)
+	local nextFn = close and kit:find("\nend\n", close, true)
+	local body = close and nextFn and kit:sub(close, nextFn) or ""
+	check(body ~= "" and not body:find("rise()", 1, true), "The card closing stands you up while the Rift still keeps you down")
+	check(body:find("if not floored then", 1, true) ~= nil, "BACK UP flashes as the Rift's card takes over")
+end
+
 -- The gate's lobby (Shared.RiftLobby): your party's places, the miners in
 -- the Outpost and your friends online, and who you can invite.
 do

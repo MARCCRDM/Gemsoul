@@ -551,8 +551,17 @@ local wasKilled = false
 local KILLED = Color3.fromRGB(255, 72, 64)
 local KNOCKED = Color3.fromRGB(255, 120, 104)
 local function refreshDown()
+	-- Your body follows SparDown alone, whichever card has the screen: down
+	-- at the Rift's boss it stays down under the Rift's card, and it's up
+	-- the moment you are, by RESTORE or backup too. (It used to get up only
+	-- as this card closed, which the Rift's boss never opens: back on your
+	-- feet there, you lay on the floor.)
+	local floored = Spar.isDown(player)
+	if fallen and not floored then
+		rise()
+	end
 	-- (Down at the Rift's boss the Rift's own card has the screen: Client.RiftClient.)
-	local down = Spar.isDown(player) and player:GetAttribute("RiftFallen") == nil
+	local down = floored and player:GetAttribute("RiftFallen") == nil
 	local killed = down and player:GetAttribute("Killed") ~= nil
 	if down and not downGui.Enabled then
 		downGui.Enabled = true
@@ -564,11 +573,13 @@ local function refreshDown()
 		end
 	elseif not down and downGui.Enabled then
 		downGui.Enabled = false
-		rise()
-		if wasKilled then
-			flash("BACK AT BASE", "On your feet, full health", Color3.fromRGB(110, 230, 150))
-		elseif Spar.sparring(player) then
-			flash("BACK UP", "Full health  ·  keep going, or 1 to stop", Color3.fromRGB(110, 230, 150))
+		-- (Still down, the Rift's card taking over, it's no BACK UP.)
+		if not floored then
+			if wasKilled then
+				flash("BACK AT BASE", "On your feet, full health", Color3.fromRGB(110, 230, 150))
+			elseif Spar.sparring(player) then
+				flash("BACK UP", "Full health  ·  keep going, or 1 to stop", Color3.fromRGB(110, 230, 150))
+			end
 		end
 		lastAttacker = nil
 		downBy.Text = ""
