@@ -148,7 +148,8 @@ function CacheLottery.gearDetails(item)
 	if roll and roll.Signature then
 		local ok, name, text = pcall(ArmorSignatures.describe, roll, nil)
 		if ok and name ~= "" then
-			table.insert(lines, { Text = "✦ " .. name .. ": " .. text, Color = GOLD, Kind = "Signature" })
+			-- (◆, not ✦: Roblox's fonts draw ✦ as an empty box)
+			table.insert(lines, { Text = "◆ " .. name .. ": " .. text, Color = GOLD, Kind = "Signature" })
 		end
 	end
 	for _, affix in roll and roll.Affixes or {} do

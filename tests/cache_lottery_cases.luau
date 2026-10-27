@@ -187,8 +187,26 @@ do
 	check(kinds.Affix == 2, "A reward card doesn't list each affix")
 	check(text:find(GemConfig.affixText(a.Id, 0.12), 1, true) and text:find(GemConfig.affixText(b.Id, 0.14), 1, true),
 		"A reward card's affixes aren't spelled out in full")
+	-- Its signature too, marked with a glyph Roblox's fonts draw (✦ comes
+	-- out as an empty box in the game).
+	local signature = next(ArmorSignatures.Definitions)
+	local signed = CacheLottery.gearDetails({
+		Kind = "Gear",
+		Slot = "Armor",
+		Id = piece,
+		Roll = { Stats = { Health = 60 }, Signature = signature, Rarity = 4 },
+	})
+	local found = nil
+	for _, line in signed do
+		check(not line.Text:find("✦", 1, true), "A reward card's line uses ✦, an empty box in the game: " .. line.Text)
+		if line.Kind == "Signature" then
+			found = line
+		end
+	end
+	check(found and found.Text:sub(1, #"◆ ") == "◆ " and found.Text:find(ArmorSignatures.Definitions[signature].Name, 1, true),
+		"A reward card doesn't show its signature")
 	local sword = CacheLottery.gearDetails({ Kind = "Gear", Slot = "Weapon", Id = "TestSword", Roll = { Stats = { Power = 9 } } })
 	check(sword[1].Text == "+9 Power" and sword[2] and sword[2].Kind == "Perk" and sword[2].Text:find("Bulwark", 1, true),
 		"A weapon's card doesn't show its stats and perk")
 end
-print("PASS: " .. checks .. " cache lottery checks; all reels at once, staggered landings (gems first), exact outcomes, no doubled pictures, skip, previews wait, close, still pieces, every property on a card")
+print("PASS: " .. checks .. " cache lottery checks; all reels at once, staggered landings (gems first), exact outcomes, no doubled pictures, skip, previews wait, close, still pieces, every property on a card (its signature in a glyph the game draws)")

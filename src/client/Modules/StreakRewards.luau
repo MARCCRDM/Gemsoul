@@ -150,42 +150,49 @@ local OFF = Color3.fromRGB(38, 46, 62) -- (an unlit bar segment)
 
 -- A gear card spells out everything the piece carries (CacheLottery.
 -- gearDetails): every stat, its set or perk, its signature, every affix
--- with its bonus. One or two pieces (a 1v1 win's reward) get wide cards:
--- the picture, name and quality on the left, the list beside them, so the
--- board stays short enough to read on a phone. More pieces get upright
--- cards as wide as the row allows, the list under the quality bar. Either
--- way the cards are as tall as the row's longest list.
+-- with its bonus. One or two pieces (a 1v1 win's reward, a boss cache's
+-- keep-one) get wide cards: the picture, name and quality on the left, the
+-- list beside them, so the board stays short enough to read on a phone.
+-- A wide card is only as tall as its picture column, and its list as big
+-- as fits beside it (no dead space under a short list); a long list makes
+-- the card taller, at the smallest size. More pieces get upright cards as
+-- wide as the row allows, the list under the quality bar. Either way the
+-- cards are as tall as the row's longest list.
 local DETAIL_TOP, DETAIL_SIZE, DETAIL_GAP = 210, 11, 4
+local WIDE_SIZES = { 15, 14, 13, 12, 11 } -- (a wide card's list: the biggest that fits)
 local GEAR_W = { 150, 236 } -- (px: an upright gear card's least and most width)
 local WIDE_W, FACE_W = 420, 150 -- (px: a wide card, and its left column)
+local WIDE_H = 216 -- (px: a wide card's least height: its picture, name and quality)
 local function detailWidth(w: number): number
 	return if w >= WIDE_W then w - FACE_W - 16 else w - 20
 end
-local function wrapped(text: string, width: number): number
+local function wrapped(text: string, width: number, size: number?): number
+	size = size or DETAIL_SIZE
 	local ok, bounds = pcall(function()
-		return TextService:GetTextSize(text, DETAIL_SIZE, Enum.Font.GothamBold, Vector2.new(width, 10000))
+		return TextService:GetTextSize(text, size, Enum.Font.GothamBold, Vector2.new(width, 10000))
 	end)
 	if ok and typeof(bounds) == "Vector2" and bounds.Y > 0 then
 		return math.ceil(bounds.Y)
 	end
 	-- (no TextService: a fair guess at Gotham's width)
 	local chars = utf8.len(text) or #text
-	return math.max(1, math.ceil(chars * DETAIL_SIZE * 0.58 / width)) * (DETAIL_SIZE + 3)
+	return math.max(1, math.ceil(chars * size * 0.58 / width)) * (size + 3)
 end
-local function detailsHeight(lines, width: number): number
+local function detailsHeight(lines, width: number, size: number?): number
 	local h = 0
 	for i, line in lines do
-		h += wrapped(line.Text, width) + (if i > 1 then DETAIL_GAP else 0)
+		h += wrapped(line.Text, width, size) + (if i > 1 then DETAIL_GAP else 0)
 	end
 	return h
 end
 
-local function card(parent, entry, onToggle, cacheId: string, lot, width: number?, height: number?)
+local function card(parent, entry, onToggle, cacheId: string, lot, width: number?, height: number?, textSize: number?)
 	local item = entry.Item
 	local free = entry.Free == true
 	local isGem = item.Kind == "Gem"
 	local tier = entry.Rarity or (item.Gem and item.Gem.Tier) or "Rare"
 	local w = width or 150
+	local size = textSize or DETAIL_SIZE
 	local wide = not isGem and w >= WIDE_W
 	local colW = if wide then FACE_W else w
 	-- The row lays out a plain cell; the card sits centred in it.
@@ -346,12 +353,12 @@ local function card(parent, entry, onToggle, cacheId: string, lot, width: number
 			details:ClearAllChildren()
 			new("UIListLayout", { Padding = UDim.new(0, DETAIL_GAP), SortOrder = Enum.SortOrder.LayoutOrder }, details)
 			for i, line in CacheLottery.gearDetails(item) do
-				local row = label(details, line.Text, DETAIL_SIZE, line.Color, Enum.Font.GothamBold)
+				local row = label(details, line.Text, size, line.Color, Enum.Font.GothamBold)
 				row.Name = line.Kind
 				row.LayoutOrder = i
 				row.TextXAlignment = Enum.TextXAlignment.Left
 				row.TextYAlignment = Enum.TextYAlignment.Top
-				row.Size = UDim2.new(1, 0, 0, wrapped(line.Text, detailWidth(w)))
+				row.Size = UDim2.new(1, 0, 0, wrapped(line.Text, detailWidth(w), size))
 			end
 			details.Visible = true
 		end
@@ -523,10 +530,34 @@ function StreakRewards.open(id: string?)
 		local gearW = if #gearEntries <= 2
 			then WIDE_W
 			else math.clamp(math.floor((860 - (#gearEntries - 1) * 12) / #gearEntries), GEAR_W[1], GEAR_W[2])
-		local gearH = GEAR_H
-		for _, entry in gearEntries do
-			local list = detailsHeight(CacheLottery.gearDetails(entry.Item), detailWidth(gearW))
-			gearH = math.max(gearH, if gearW >= WIDE_W then 12 + list + 12 else DETAIL_TOP + list + 12)
+		local gearH, detailSize = GEAR_H, DETAIL_SIZE
+		if gearW >= WIDE_W then
+			-- Wide: the list as big as fits beside the picture, in a card
+			-- no taller than the picture's column; else the smallest, and a
+			-- card as tall as the list.
+			local lists = {}
+			for i, entry in gearEntries do
+				lists[i] = CacheLottery.gearDetails(entry.Item)
+			end
+			local function tallest(size: number): number
+				local most = 0
+				for _, list in lists do
+					most = math.max(most, detailsHeight(list, detailWidth(gearW), size))
+				end
+				return most
+			end
+			for _, size in WIDE_SIZES do
+				detailSize = size
+				if 12 + tallest(size) + 12 <= WIDE_H then
+					break
+				end
+			end
+			gearH = math.max(WIDE_H, 12 + tallest(detailSize) + 12)
+		else
+			for _, entry in gearEntries do
+				local list = detailsHeight(CacheLottery.gearDetails(entry.Item), detailWidth(gearW))
+				gearH = math.max(gearH, DETAIL_TOP + list + 12)
+			end
 		end
 		local width = math.max(880, #gearEntries * gearW + (#gearEntries - 1) * 12 + 20)
 		local gemTop = 112
@@ -710,7 +741,7 @@ function StreakRewards.open(id: string?)
 			table.insert(drawn, cards[entry.OfferId])
 		end
 		for _, entry in gearEntries do
-			cards[entry.OfferId] = card(gearRow, entry, toggle, cache.Id, lot, gearW, gearH)
+			cards[entry.OfferId] = card(gearRow, entry, toggle, cache.Id, lot, gearW, gearH, detailSize)
 			table.insert(drawn, cards[entry.OfferId])
 		end
 		if previewsIn then

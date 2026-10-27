@@ -85,6 +85,18 @@ win of each run restore your pick's swings (10%, 25%, 50%). See
   the screen still reads on a phone; an old six-piece cache keeps upright
   cards with the list under the quality bar.
 
+  A wide card is only as tall as its picture column (216 px), and its list
+  is set as big as fits beside it (15 px down to 11 px,
+  `StreakRewards.WIDE_SIZES`); only a list too long even at 11 px makes the
+  card taller. *2026-10-27*: the cards used to be at least 272 px tall with
+  11 px text, so a short list left a big empty block under it. The
+  signature's mark is now ◆ like the set's: Roblox's fonts drew ✦ as an
+  empty box.
+
+  | Before | After |
+  | --- | --- |
+  | ![A boss cache's two cards with empty space under their lists](arena-streaks/boss-cache-before.png) | ![The same cards, as tall as the picture, the lists bigger](arena-streaks/boss-cache-after.png) |
+
   ![A 1v1 win's reward: each card lists every stat, its set and what two pieces of it give, its signature and each affix in full](arena-streaks/win-reward.png)
   ![The same on a phone](arena-streaks/win-reward-phone.png)
 
