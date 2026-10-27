@@ -142,7 +142,10 @@ about 3,976).
   screen, brightest in the middle) instead of an emoticon face (`^_^`,
   `$_$`, `o_O`). `Builder.vendor` draws the visor when a vendor has
   `Visor`. Nameplates are Gotham (name in white, role in the station
-  colour) instead of the arcade pixel font.
+  colour) instead of the arcade pixel font. They're small tags, the same
+  size on a phone as on a computer: the name at 14 px over the role at
+  11 px, gone past 50 studs (*2026-10-27*; they had filled a 220 by 54
+  box with scaled text, too big on a phone).
 - **The dialogue box** has the game's window look (`IronUi.window`): navy,
   a hairline edge, the speaker's colour as a short bar under the name, the
   words in plain Gotham in an inset. The purple gradient, the thick gold

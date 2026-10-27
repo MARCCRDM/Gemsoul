@@ -47,6 +47,8 @@ local function load(path: string, name: string)
 			GetService = function(_, service)
 				if service == "ReplicatedStorage" then
 					return { Shared = setmetatable({}, { __index = function(_, k) return { Name = k } end }) }
+				elseif service == "CollectionService" then
+					return { AddTag = function() end }
 				end
 				return nil
 			end,
@@ -192,6 +194,33 @@ do
 	local a, b = faces.STORE, faces.MARKET
 	check(math.abs(a.R - b.R) + math.abs(a.G - b.G) + math.abs(a.B - b.B) > 0.3, "The Store and the Market aren't each in their own colour")
 	check(site.Model:FindFirstChild("PriceBoard", true) == nil, "The Market's candle board is back on its counter")
+end
+-- The crew's nameplates (Builder.vendor): a small tag, the same size on a
+-- phone as on a computer, not scaled text filling a big box.
+do
+	local Builder = load("src/server/World/Builder.luau", "Builder")
+	Builder.landmark = function() end
+	for _, visor in { true, false } do
+		local crew = Builder.vendor(R.Instance.new("Folder"), R.CFrame.new(), "Foreman", {
+			Name = "Garrick",
+			Role = "Mining Foreman",
+			Color = R.Color3.fromRGB(240, 170, 60),
+			Visor = visor,
+		})
+		local plate = crew:FindFirstChild("Nameplate", true)
+		check(plate ~= nil, "A crew member has no nameplate")
+		check(plate.Size.X.Scale == 0 and plate.Size.Y.Scale == 0, "A crew nameplate grows with distance")
+		check(plate.Size.X.Offset <= 170 and plate.Size.Y.Offset <= 32, "A crew nameplate is too big: " .. tostring(plate.Size))
+		local sizes = {}
+		for _, label in plate:GetChildren() do
+			if label.ClassName == "TextLabel" then
+				check(not label.TextScaled, "A crew nameplate's text is scaled to fill its box")
+				check(label.TextSize <= 14, "A crew nameplate's text is too big: " .. label.TextSize)
+				table.insert(sizes, label.TextSize)
+			end
+		end
+		check(#sizes == 2 and sizes[1] > sizes[2], "A crew nameplate isn't its name over a smaller role")
+	end
 end
 -- Out in the quarry: no signs at the spokes naming the biomes.
 check(site.Model:FindFirstChild("Crossroads", true) == nil, "The biome signs are back by the roads")

@@ -931,31 +931,40 @@ function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info)
 	})
 	Builder.neon(model, frame, Vector3.new(0.45, 0.45, 0.45), CFrame.new(0.7, 9.4, 0.3), info.Color)
 
+	-- A small tag over the head: the name at 14 px and the role under it at
+	-- 11 px, the same on a phone as on a computer (no TextScaled filling a
+	-- big box), gone past 50 studs.
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Nameplate"
-	billboard.Size = UDim2.fromOffset(220, 54)
-	billboard.StudsOffset = Vector3.new(0, 2.6, 0)
-	billboard.MaxDistance = 70
+	billboard.Size = UDim2.fromOffset(160, 30)
+	billboard.StudsOffset = Vector3.new(0, 2.2, 0)
+	billboard.MaxDistance = 50
 	billboard.LightInfluence = 0
 	billboard.Parent = head
-	for i, line in
+	local y = 0
+	for _, line in
 		if info.Visor
 			then {
-				{ info.Name, Enum.Font.GothamBold, Color3.fromRGB(236, 238, 242) },
-				{ info.Role, Enum.Font.GothamMedium, info.Color },
+				{ info.Name, Enum.Font.GothamBold, Color3.fromRGB(236, 238, 242), 14 },
+				{ info.Role, Enum.Font.GothamMedium, info.Color, 11 },
 			}
-			else { { info.Name, Enum.Font.Arcade, info.Color }, { info.Role, Enum.Font.Code, Color3.new(1, 1, 1) } }
+			else {
+				{ info.Name, Enum.Font.Arcade, info.Color, 14 },
+				{ info.Role, Enum.Font.Code, Color3.new(1, 1, 1), 11 },
+			}
 	do
 		local label = Instance.new("TextLabel")
-		label.Size = UDim2.fromScale(1, 0.5)
-		label.Position = UDim2.fromScale(0, (i - 1) * 0.5)
+		label.Size = UDim2.new(1, 0, 0, line[4] + 2)
+		label.Position = UDim2.fromOffset(0, y)
 		label.BackgroundTransparency = 1
 		label.Text = line[1]
 		label.Font = line[2]
 		label.TextColor3 = line[3]
+		label.TextSize = line[4]
 		label.TextStrokeTransparency = 0.4
-		label.TextScaled = true
+		label.TextTruncate = Enum.TextTruncate.AtEnd
 		label.Parent = billboard
+		y += line[4] + 2
 	end
 
 	local prompt = Builder.prompt(torso, "Talk", info.Name .. ", " .. info.Role)
