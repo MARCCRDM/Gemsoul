@@ -336,7 +336,8 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 
   This replaced CALL BACK / DEPLOY: there's no button for them now, the
   number does both (`KaijuTeamOut`; `Kaiju.order`, `teamOf`, `outTeam`). The
-  pick or combat kit switch moved from 1 to **Y** to free the numbers.
+  pick or combat kit switch moved from 1 to **Y** to free the numbers (and
+  then to **X**: see [friendly-sparring.md](friendly-sparring.md)).
 
   *2026-10-27:* **every call is instant, in danger too.** There used to be
   a three-second wait between swaps ("One moment.", `Kaiju.SwitchSeconds`)

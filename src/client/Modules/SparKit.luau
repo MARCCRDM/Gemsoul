@@ -2,7 +2,7 @@
 	Your pick or your combat kit, and friendly sparring (Shared.Spar has the
 	rules, the server's SparServer runs them).
 
-	  The kit       Y swaps your pick for your combat kit and back (the
+	  The kit       X swaps your pick for your combat kit and back (the
 	                server's "Hunt"), in the Outpost and in the Rift alike:
 	                the kit out, you fight beside your kaiju (and only
 	                creatures can hit you); the pick out, you mine (in the
@@ -13,12 +13,12 @@
 	                down.
 	  A spar        is asked for and agreed to: press Z over another player
 	                ("Ask to spar", OutpostServer's prompt). They get a card to
-	                accept (SocialUI). Once they do, both kits come out; Y
+	                accept (SocialUI). Once they do, both kits come out; X
 	                ends the spar, for both.
 
 	  The spar bar  top centre, while your kit is out: who you're fighting
 	                (or HUNTING), and END for a spar or MINE for your pick
-	                (the Y key; tap or click it too). The kit coming out or
+	                (the X key; tap or click it too). The kit coming out or
 	                going away gets a quick flash, a word and the sound of a
 	                blade.
 	  A spar        with the kit out the fight view takes over (Combat.client,
@@ -35,7 +35,7 @@
 	                spar (they can't touch you).
 
 	  SparKit.start()     once, from Lobby.client
-	  SparKit.available() whether Y does anything right now
+	  SparKit.available() whether X does anything right now
 	  SparKit.toggle()    swap the pick for the kit (or back), or end your spar
 ]]
 local ContextActionService = game:GetService("ContextActionService")
@@ -61,7 +61,9 @@ local new = IronUi.new
 
 local SparKit = {}
 
-local KEY = Enum.KeyCode.Y -- (1 to 4 are the kaiju team keys: KaijuHud)
+-- (1 to 4 are the kaiju team keys: KaijuHud. X was the lock-on key; that's
+-- T now, Combat.client. Y, the key before X, still swaps too.)
+local KEY, OLD_KEY = Enum.KeyCode.X, Enum.KeyCode.Y
 local PICK = Color3.fromRGB(255, 202, 91) -- the pick's gold
 local FIGHT = Color3.fromRGB(255, 92, 76) -- the combat kit's red
 local GLASS = Color3.fromRGB(12, 14, 26)
@@ -104,7 +106,7 @@ local function modalOpen(): boolean
 	return false
 end
 
--- Whether Y swaps kits now: in the lobby on your feet, out of any fight,
+-- Whether X swaps kits now: in the lobby on your feet, out of any fight,
 -- seat or menu. (The server checks again.)
 function SparKit.available(): boolean
 	local h = humanoid()
@@ -241,7 +243,7 @@ local keyCap = new("TextLabel", {
 	Size = UDim2.fromOffset(22, 22),
 	BackgroundColor3 = Color3.fromRGB(34, 38, 58),
 	Font = Enum.Font.GothamBlack,
-	Text = "Y",
+	Text = "X",
 	TextSize = 13,
 	TextColor3 = P.Text,
 }, endChip)
@@ -296,7 +298,7 @@ local function refreshBar()
 	versus.Text = if hunting then "KIT OUT" else "SPAR vs " .. string.upper(partnerName())
 	endLabel.Text = if hunting then "MINE" else "END"
 	caption.Text = if hunting
-		then "KIT OUT  ·  only creatures can hit you  ·  Y for your pick"
+		then "KIT OUT  ·  only creatures can hit you  ·  X for your pick"
 		else "FRIENDLY SPAR  ·  only you two can hit each other"
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	-- (Touch: no key to show; the chip itself is the button.)
@@ -370,15 +372,15 @@ local function sparChanged()
 	if sparring then
 		wasHunting = Spar.hunting(player)
 		if wasHunting then
-			flash("FIGHT", "your kit is out  ·  fight beside your kaiju  ·  Y for your pick", FIGHT)
+			flash("FIGHT", "your kit is out  ·  fight beside your kaiju  ·  X for your pick", FIGHT)
 		else
-			flash("SPAR", "vs " .. partnerName() .. "  ·  only you two can hit each other  ·  Y to stop", FIGHT)
+			flash("SPAR", "vs " .. partnerName() .. "  ·  only you two can hit each other  ·  X to stop", FIGHT)
 		end
 		CombatSound.play("Draw")
 	else
 		flash(
 			"PICKAXE",
-			if wasHunting then "back to mining  ·  Y for your kit" else "Spar over  ·  back to mining",
+			if wasHunting then "back to mining  ·  X for your kit" else "Spar over  ·  back to mining",
 			PICK
 		)
 		CombatSound.play("Sheathe")
@@ -694,7 +696,7 @@ function SparKit.start()
 			SparKit.toggle()
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, Enum.ContextActionPriority.High.Value + 20, KEY, Enum.KeyCode.DPadUp)
+	end, false, Enum.ContextActionPriority.High.Value + 20, KEY, OLD_KEY, Enum.KeyCode.DPadUp)
 	bar.Activated:Connect(SparKit.toggle)
 	switch.Activated:Connect(SparKit.toggle)
 	for _, name in { "Spar", "Hunt", "SparDown", "Outpost", "CombatSession", "MatchId", "ChatOpen" } do

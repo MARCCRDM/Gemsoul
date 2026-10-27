@@ -570,7 +570,7 @@ for i, id in { "Charge", "Stamina" } do
 end
 local controlsHint = text(
 	gui,
-	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | X Switch Target | K Tree | L Log",
+	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Switch Target | K Tree | L Log",
 	10,
 	Color3.fromRGB(205, 198, 182)
 )
@@ -1242,7 +1242,7 @@ ContextActionService:BindActionAtPriority("SwitchTarget", function(_, state)
 		TargetLock.switch()
 	end
 	return Enum.ContextActionResult.Sink
-end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.X, Enum.KeyCode.DPadRight)
+end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.T, Enum.KeyCode.DPadRight)
 UserInputService.WindowFocusReleased:Connect(cancel)
 -- Shift is the off-hand key (Shift + click, read with IsKeyDown). In a fight
 -- it's kept here, so it can't also flip Roblox's Shift Lock unseen behind the
@@ -1766,12 +1766,12 @@ RunService.RenderStepped:Connect(function(dt)
 	-- Key reminder: shown for the first seconds of a fight, or with a free cursor.
 	local hintAge = now - fightSince
 	controlsHint.Visible = not UserInputService.TouchEnabled and (cursorFree or hintAge < 13)
-	-- (X switches targets where the lock is automatic, and locks on where you aim yourself.)
+	-- (T switches targets where the lock is automatic, and locks on where you aim yourself.)
 	if controlsHint.Visible and TargetLock.auto() ~= shown.ControlsAuto then
 		shown.ControlsAuto = not shown.ControlsAuto
 		controlsHint.Text = if shown.ControlsAuto
-			then "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | X Switch Target | K Tree | L Log"
-			else "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | X Lock On | K Tree | L Log"
+			then "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Switch Target | K Tree | L Log"
+			else "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Lock On | K Tree | L Log"
 	end
 	controlsHint.TextTransparency = if cursorFree then 0 else math.clamp(hintAge - 12, 0, 1)
 	cursorModal.Modal = cursorFree
@@ -1798,7 +1798,7 @@ RunService.RenderStepped:Connect(function(dt)
 		switchHint.Visible = lockedTarget ~= nil and nearby >= 2
 		switchHint.Text = string.format(
 			"%s  SWITCH TARGET  ·  %d NEARBY",
-			if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then "TAP" else "X",
+			if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then "TAP" else "T",
 			nearby
 		)
 		for _, cap in targetCaps do

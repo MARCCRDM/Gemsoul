@@ -2,7 +2,7 @@
 -- the target, and the camera keeps pulling toward its head (gentler while
 -- you're looking around yourself). Selection is local; hits remain
 -- server-validated. On desktop it only picks targets by itself in a 1v1
--- (Lock.auto); elsewhere a mouse player aims freely and X locks on.
+-- (Lock.auto); elsewhere a mouse player aims freely and T locks on.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -165,7 +165,7 @@ function Lock.auto(): boolean
 	local desktop = UserInputService.MouseEnabled and UserInputService.KeyboardEnabled and not padInHand
 	return Rules.auto(player:GetAttribute("CombatSession"), desktop == true)
 end
--- X: moves the lock to the next target within SwitchRange (left to right).
+-- T: moves the lock to the next target within SwitchRange (left to right).
 -- Without the automatic lock it locks what you're aiming at, moves on, and
 -- past the last one lets go.
 function Lock.switch()

@@ -114,7 +114,7 @@ phone game should be.
   INVITE.
 
 ![The phone dock: PLAY green and first, INVENTORY yellow, no RANKS. Offline render of the game's UI code, not a Roblox screenshot](mobile/dock-play-tile.png)
-- **FIGHT / MINE** (your kit or your pick, the Y key on a keyboard) is a
+- **FIGHT / MINE** (your kit or your pick, the X key on a keyboard) is a
   pill just left of PLAY's old place, level with it and a little taller (44 points),
   with its icon and word: ⚔ FIGHT with the pick out, ⛏ MINE with the kit
   out. It stays clear of Roblox's thumbstick; where there's little room

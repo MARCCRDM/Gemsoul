@@ -1454,8 +1454,25 @@ check(
 	"Left with the mining kit on"
 )
 
+-- The keys on a keyboard: X swaps your pick for your combat kit and back
+-- (Y, the key before it, still does), and T locks on and switches targets
+-- in a fight (it was X).
+do
+	local kit = fs.readFile(ROOT .. "/src/client/Modules/SparKit.luau")
+	local combat = fs.readFile(ROOT .. "/src/client/Combat.client.luau")
+	check(kit:find("local KEY, OLD_KEY = Enum.KeyCode.X, Enum.KeyCode.Y", 1, true) ~= nil, "X isn't the kit switch")
+	check(kit:find("High.Value + 20, KEY, OLD_KEY, Enum.KeyCode.DPadUp)", 1, true) ~= nil, "The kit switch isn't bound to X and Y")
+	check(kit:find('Text = "X",', 1, true) ~= nil, "The kit bar's key cap doesn't say X")
+	check(
+		combat:find("High.Value + 10, Enum.KeyCode.T, Enum.KeyCode.DPadRight)", 1, true) ~= nil,
+		"T doesn't lock on and switch targets"
+	)
+	check(combat:find("Enum.KeyCode.X", 1, true) == nil, "A fight still takes X from the kit switch")
+	check(combat:find("| T Lock On |", 1, true) ~= nil and combat:find("| T Switch Target |", 1, true) ~= nil, "The controls reminder still says X")
+end
+
 print(
 	"PASS: "
 		.. checks
-		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, Garrick's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave)"
+		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, Garrick's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave, X for the kit and T for the target)"
 )

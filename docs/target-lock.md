@@ -7,13 +7,15 @@ stay authoritative.
 
 **On desktop it only works by itself in a 1v1.** With a mouse, an automatic
 lock fights your own aim when there are critters, kaiju and fighters all
-around. So outside a 1v1, desktop players aim themselves and lock on with X.
+around. So outside a 1v1, desktop players aim themselves and lock on with T.
+(It was X; X is now the kit switch, your pick or your combat kit: see
+[friendly-sparring.md](friendly-sparring.md).)
 
 | Where | Desktop (mouse and keyboard) | Touch screen or gamepad |
 | --- | --- | --- |
 | The Arena, against a player (`PvP`) or a rival (`Training`). This includes the intro's first fight and the combat tutorial, which run there | Automatic | Automatic |
 | A 1v1 match (`Duel`) | Automatic | Automatic |
-| Spars in the lobby, hunting in the quarry, the Rift, raids and dungeons, expeditions | **You aim; X locks on** | Automatic |
+| Spars in the lobby, hunting in the quarry, the Rift, raids and dungeons, expeditions | **You aim; T locks on** | Automatic |
 
 (The session is the player's `CombatSession` attribute; `TargetLockRules.AutoSessions`.)
 
@@ -38,7 +40,7 @@ around. So outside a 1v1, desktop players aim themselves and lock on with X.
 
 **Switching.**
 
-- X (D-pad right) cycles the targets within 10 studs, left to right. A target
+- T (D-pad right) cycles the targets within 10 studs, left to right. A target
   you switched to stays until it's lost.
 - Clicking or tapping a name in the target list locks that foe the same way.
 
@@ -55,14 +57,14 @@ around. So outside a 1v1, desktop players aim themselves and lock on with X.
 
 - **Nothing is picked for you.** Not the nearest enemy, not a pack's leader,
   and not whatever just hit you. Your moves go where the crosshair points.
-- **X locks on** to what you're aiming at. That's the target in sight, in
+- **T locks on** to what you're aiming at. That's the target in sight, in
   range (90 studs) and nearest the middle of your view (within 25°).
-- **X again** moves to the next target around you (within 10 studs, left to
+- **T again** moves to the next target around you (within 10 studs, left to
   right). Past the last one, or with nothing else around, it lets go.
 - **Clicking a name** in the target list still locks that foe.
 - **A lock you chose holds** just as above: through brief cover, until the
   target dies, leaves range or stays hidden. The camera follows it.
-- **The controls reminder** says "X Lock On" here, and "X Switch Target" where
+- **The controls reminder** says "T Lock On" here, and "T Switch Target" where
   the lock is automatic.
 
 **Desktop or not.** Desktop means a mouse and a keyboard with no gamepad in
@@ -83,9 +85,9 @@ without a keyboard keeps the automatic lock.
 
 | File | What |
 | --- | --- |
-| `src/shared/TargetLockRules.luau` | The rules: `update` (the automatic lock), `switch`, `pick`. For desktop: `auto(session, desktop)` and `AutoSessions`, plus `hold` (keep only a chosen target), `aimed` and `toggle` (what X does) |
+| `src/shared/TargetLockRules.luau` | The rules: `update` (the automatic lock), `switch`, `pick`. For desktop: `auto(session, desktop)` and `AutoSessions`, plus `hold` (keep only a chosen target), `aimed` and `toggle` (what T does) |
 | `src/client/Modules/TargetLock.luau` | The live lock: who's eligible, line of sight, the camera pull, and `Lock.auto()`. That reads the player's `CombatSession` and whether they're on a mouse (a gamepad in hand comes from `LastInputTypeChanged`) |
-| `src/client/Combat.client.luau` | Turns the lock on in a fight, binds X, and shows the controls reminder |
+| `src/client/Combat.client.luau` | Turns the lock on in a fight, binds T, and shows the controls reminder |
 | `src/client/Modules/FoeBars.luau` | The target list (click a name to lock it) |
 
 ## Tests and playtesting
@@ -101,7 +103,7 @@ against deterministic service mocks. It checks:
 - **The desktop rule:** automatic only in `PvP`, `Training` and `Duel`.
   Elsewhere:
   - nothing is picked or pulled, and being hit doesn't lock;
-  - X locks what you aim at, moves left to right, then lets go;
+  - T locks what you aim at, moves left to right, then lets go;
   - a gamepad or touch screen brings the automatic lock back.
 
 None of this has been played in Roblox Studio. Before publishing, test it with
@@ -112,5 +114,5 @@ a mouse, a gamepad and a touch screen:
 - hunting in the quarry with critters and kaiju about;
 - in the Rift.
 
-Check that the mouse aims freely outside a 1v1, that X locks on and lets go,
+Check that the mouse aims freely outside a 1v1, that T locks on and lets go,
 and that the automatic lock still feels right in the Arena.

@@ -4,7 +4,7 @@
 	nearest), and they get a card to accept or decline. Once they accept,
 	both of you swap your pickaxes for your combat kits and fight exactly as
 	in a duel (the first-person view, every move, gear and gems only), but
-	only each other: nobody else can hit either of you, or be hit. Press Y
+	only each other: nobody else can hit either of you, or be hit. Press X
 	to end it, for both of you.
 
 	Nothing is lost. At 0 health you're knocked down for a few seconds,

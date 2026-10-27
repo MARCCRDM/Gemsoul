@@ -20,7 +20,7 @@
 -- On desktop (a mouse to aim with) the lock is only automatic in a 1v1: the
 -- Arena (against a player or a rival) and a 1v1 match (Rules.auto). In
 -- spars, quarry hunts, the Rift, raids and dungeons you aim with the mouse:
--- nothing is picked for you (Rules.hold keeps only what you chose), and X
+-- nothing is picked for you (Rules.hold keeps only what you chose), and T
 -- locks what you're aiming at, then the next one around you, then lets go
 -- (Rules.toggle). Touch screens and gamepads keep the automatic lock.
 local Rules = {
@@ -30,7 +30,7 @@ local Rules = {
 	HiddenGrace = 4,
 	SwitchRange = 10, -- studs: the targets around you that switching cycles through
 	SwitchMargin = 2, -- studs: how much nearer another enemy must be to take the lock
-	AimDot = math.cos(math.rad(25)), -- how near the middle of the view X looks for a target to lock
+	AimDot = math.cos(math.rad(25)), -- how near the middle of the view T looks for a target to lock
 	-- The 1v1s that keep the automatic lock on desktop (the player's CombatSession).
 	AutoSessions = { PvP = true, Training = true, Duel = true },
 }
@@ -152,7 +152,7 @@ local function nearestLeader(candidates)
 	return best
 end
 
--- Without the automatic lock: a target you chose (X, the target list) is
+-- Without the automatic lock: a target you chose (T, the target list) is
 -- held as Rules.update holds it; nothing is picked for you.
 function Rules.hold(state, candidates, now)
 	if state.Pinned and state.Target and keep(state, candidates, now) then
@@ -171,7 +171,7 @@ function Rules.aimed(candidates)
 	end
 	return best
 end
--- X without the automatic lock: nothing locked, it locks what you're aiming
+-- T without the automatic lock: nothing locked, it locks what you're aiming
 -- at; locked, the next target around you (left to right), and past the last
 -- one (or with none around), it lets go.
 function Rules.toggle(state, candidates)

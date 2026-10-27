@@ -6229,7 +6229,7 @@ end)()
 		rootA.CFrame = CFrame.new(rock.At + Vector3.new(3, 0, 0))
 		a:SetAttribute("Spar", true)
 		a:SetAttribute("Hunt", true)
-		check(registered.RiftMine(a, rock.Id).Message == "Press Y for your pick to mine.", "Mined a crystal with the kit out")
+		check(registered.RiftMine(a, rock.Id).Message == "Press X for your pick to mine.", "Mined a crystal with the kit out")
 		a:SetAttribute("Spar", nil)
 		a:SetAttribute("Hunt", nil)
 		local gems = #profiles[a].Gems
