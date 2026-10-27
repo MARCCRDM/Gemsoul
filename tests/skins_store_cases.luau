@@ -224,6 +224,7 @@ freshProfile()
 local thePlayer = { UserId = 7 }
 local handlers = {}
 local saves = 0
+local failSave = false -- (a save that fails: the receipt waits for Roblox to ask again)
 local stubs = {
 	Cosmetics = Cosmetics,
 	MinerRoster = { Count = 3, Enabled = true },
@@ -244,6 +245,7 @@ local stubs = {
 		addGem = function() return true end,
 		save = function()
 			saves += 1
+			return not failSave
 		end,
 		setCosmetic = function(_, kind, id)
 			profile.Cosmetics[kind] = id
@@ -325,6 +327,12 @@ end
 check(buy("SkinPlasma", "a1") == Granted, "A skin purchase wasn't granted")
 check(profile.Cosmetics.Owned.SkinPlasma and profile.Cosmetics.Skin == "SkinPlasma", "The bought skin isn't owned and worn")
 check(saves >= 1, "A paid purchase wasn't saved at once")
+-- A save that fails: not granted yet, so Roblox asks again; asked again once
+-- saving works, it's granted (and not given twice).
+failSave = true
+check(buy("SkinCamo", "f1") == NotYet, "A purchase counted as granted though its save failed")
+failSave = false
+check(buy("SkinCamo", "f1") == Granted, "A purchase asked about again after a failed save wasn't granted")
 -- The same receipt again (Roblox retries): granted, not given twice.
 profile.Cosmetics.Owned.SkinPlasma = nil
 check(buy("SkinPlasma", "a1") == Granted and not profile.Cosmetics.Owned.SkinPlasma, "A retried receipt was granted twice")

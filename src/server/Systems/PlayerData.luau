@@ -419,9 +419,16 @@ local function save(player: Player, release: boolean?)
 end
 
 -- Saves now (a Robux purchase, so a crash can't lose it). Does nothing in a
--- session that may not save (FreshStart, a locked session).
-function PlayerData.save(player: Player)
-	save(player, false)
+-- session that may not save (FreshStart, a locked session). Whether it saved.
+function PlayerData.save(player: Player): boolean
+	return save(player, false)
+end
+
+-- Whether this server keeps saves at all: off without DataStores (Studio
+-- without API access) and in the Playtest fresh start, where nothing is
+-- ever saved. (A purchase there is granted without waiting on a save.)
+function PlayerData.mayPersist(_player: Player): boolean
+	return store ~= nil and not (Config.Playtest and Config.Playtest.FreshStart == true)
 end
 
 -- Coins for coming back each day; the streak (up to a week) pays more.

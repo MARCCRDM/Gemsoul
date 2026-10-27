@@ -340,9 +340,15 @@ local function processReceipt(receipt)
 	while #profile.Receipts > 200 do
 		table.remove(profile.Receipts, 1)
 	end
-	-- Saved now, so a crash can't lose a paid purchase.
-	if PlayerData.save then
-		pcall(PlayerData.save, player)
+	-- Saved now, so a crash can't lose a paid purchase. Not saved (a failed
+	-- save, or one already under way): Roblox asks again later, and the
+	-- receipt kept above makes that a no-op once the profile is saved. (A
+	-- session that never saves, the Playtest fresh start, counts as saved.)
+	if PlayerData.save and (not PlayerData.mayPersist or PlayerData.mayPersist(player)) then
+		local ok, saved = pcall(PlayerData.save, player)
+		if not ok or not saved then
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
 	end
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
