@@ -84,17 +84,24 @@ shows them all (`allStats` in `drawDetail`).
 Pick a build and press **AUTO EQUIP**: the server puts on the gear you own
 that fits it best and fills the gem sockets (Forge's `"AutoEquip"`,
 `Shared.AutoEquip`). Above the button, what it would change
-(`+56 RATING · 4 GEAR · 2 GEMS`, or NOTHING TO CHANGE).
+(`+56 RATING · 4 GEAR · 3 ABILITIES · 2 GEMS`, or NOTHING TO CHANGE):
+ABILITIES are new gems on Q, E and R, GEMS the rest.
 
 | Mode | Gear | Gems |
 | --- | --- | --- |
-| **BEST** | the most total rating | empty sockets get your most valuable gem; the helmet, gloves and boots swap theirs for a more valuable one |
-| **BALANCED** | the most even stats: the product of the four, each against what you have now, so a fair lift to all beats a big lift to one | as BEST, but a new element beats a repeat |
-| **THERMAL / CRYO / ION / CORROSIVE** | armor whose affinity affixes are that element first, then the most rating | every socket that isn't that element takes its most valuable gem of it, while there are some |
+| **BEST** | the most total rating | Q, E and R get your strongest moves, whatever their element; the helmet, gloves and boots swap theirs for a more valuable gem |
+| **BALANCED** | the most even stats: the product of the four, each against what you have now, so a fair lift to all beats a big lift to one | your Q, E and R stay (an empty one is filled); the rest as BEST, but a new element beats a repeat |
+| **THERMAL / CRYO / ION / CORROSIVE** | armor whose affinity affixes are that element first, then the most rating | Q, E and R get that element's strongest moves; the helmet, gloves and boots its most valuable gems; any gem of another element goes |
 
-- The sword's, chest's and shield's gems are Q, E and R: BEST and BALANCED
-  only fill those when they're empty, so your moves don't change under you.
-  An element build swaps them for that element's (that's the build).
+- The sword's, chest's and shield's gems are Q, E and R. A gem's moves are
+  as strong as its rarity first (the "% power" they show: Common 60% up to
+  Legendary 100%, with its Flourish), then its Size, Clarity and Cut
+  (`AutoEquip.power`). BEST puts the strongest of your loose gems on Q,
+  the next on E, then R, each only when it's stronger than what's there,
+  whatever its element. An element build does the same with that element's
+  gems only, so it upgrades a weaker gem of its own element too. The gem
+  that comes out goes back in your pouch and can fill another socket.
+  *2026-10-27*: BEST used to leave Q, E and R alone once they were full.
 - Only gear you own, of your class, not another miner's; no shield under a
   two-handed weapon (the weapon goes on first).
 - Not mid-match (the same rule as changing gear by hand), and the gems only

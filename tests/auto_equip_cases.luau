@@ -2,8 +2,9 @@
 -- AUTO EQUIP (Shared.AutoEquip): Best is the most rating you can wear,
 -- Balanced the most even, an element its affinity armor first and its
 -- gems; owned pieces only, never another miner's, no shield under two
--- hands; Q/E/R gems kept unless a socket is empty; a plan applied leaves
--- nothing more to do.
+-- hands; Best's Q/E/R the strongest moves whatever their element, an
+-- element's its own strongest, Balanced's kept unless a socket is empty;
+-- a plan applied leaves nothing more to do.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -335,13 +336,35 @@ do
 		end
 	end
 	check(by.Gloves == "h" or by.Boots == "h", "The helmet's old gem didn't fill an empty socket")
-	check(by.Weapon == nil, "Best swapped the sword's gem (your Q)")
-	check(by.Armor == "leg", "The empty chest didn't get your most valuable gem")
+	-- Q, E and R: the strongest moves, whatever their element (an Ion
+	-- Legendary over the Thermal Common on the sword), strongest first.
+	check(by.Weapon == "leg", "Best didn't give Q your strongest move: " .. tostring(by.Weapon))
+	check(by.Armor == "rare", "Best didn't give E your next strongest: " .. tostring(by.Armor))
 	check(by.Helmet ~= nil and by.Helmet ~= "h", "The helmet kept a worse gem")
+	check(plan.Abilities >= 2 and plan.Abilities <= 3, "The plan doesn't count its new abilities: " .. plan.Abilities)
+	local keys = 0
+	for _, step in plan.Gems do
+		keys += if AutoEquip.KeySlots[step.Slot] then 1 else 0
+	end
+	check(keys == plan.Abilities, "Abilities isn't the Q/E/R steps")
 	apply(profile, plan)
-	check(profile.Character.WeaponGem.Id == "q", "The Q gem moved")
+	check(profile.Character.WeaponGem.Id == "leg", "Q isn't your strongest move")
 	local again = AutoEquip.plan(profile, "Best")
-	check(#again.Gems == 0, "Best again had gems to move")
+	check(#again.Gems == 0 and again.Abilities == 0, "Best again had gems to move")
+end
+-- How strong a gem's moves are: rarity first, then Size, Clarity and Cut.
+do
+	local common, legendary = gem("c", "Fire", "Common", 10), gem("l", "Frost", "Legendary", 1)
+	check(AutoEquip.power(legendary) > AutoEquip.power(common), "A perfect Common out-powered a rough Legendary")
+	check(AutoEquip.power(gem("r9", "Fire", "Rare", 9)) > AutoEquip.power(gem("r3", "Fire", "Rare", 3)), "Better grades, no more power")
+	check(AutoEquip.power(nil) == 0 and AutoEquip.power({ Id = "x", Element = "Nope", Tier = "Rare" }) == 0, "A gem with no moves has power")
+	-- Best never trades a stronger Q for a weaker one, even one worth more.
+	local profile = gemProfile()
+	profile.Character.WeaponGem = gem("q", "Fire", "Legendary", 10)
+	profile.Character.ItemGems.Weapon[profile.Character.Weapon] = profile.Character.WeaponGem
+	for _, step in AutoEquip.plan(profile, "Best").Gems do
+		check(step.Slot ~= "Weapon", "Best swapped out your strongest Q")
+	end
 end
 do
 	local profile = gemProfile()
@@ -349,16 +372,24 @@ do
 	local by = {}
 	for _, step in plan.Gems do
 		by[step.Slot] = step.Gem
+		-- (loose, or one an earlier step took out of its socket)
 		local g
 		for _, x in profile.Gems do
 			g = if x.Id == step.Gem then x else g
 		end
-		check(g.Element == "Fire", "Thermal socketed a gem of another element")
+		for _, slot in Slots.Order do
+			local x = profile.Character[slot .. "Gem"]
+			g = if x and x.Id == step.Gem then x else g
+		end
+		check(g ~= nil and g.Element == "Fire", "Thermal socketed a gem of another element")
 	end
-	check(by.Weapon == nil, "The sword's gem is Thermal already")
-	check(by.Armor == "rare", "The chest didn't get your Thermal gem")
+	-- The sword's Thermal Common gives way to a stronger Thermal gem, and
+	-- goes on the empty chest.
+	check(by.Weapon == "rare", "Thermal didn't give Q your strongest Thermal move: " .. tostring(by.Weapon))
+	check(by.Armor == "q", "The chest didn't get the sword's old Thermal gem: " .. tostring(by.Armor))
 	apply(profile, plan)
 	check(profile.Character.HelmetGem.Id == "h", "No Thermal gem left: the helmet keeps its own")
+	check(#AutoEquip.plan(profile, "Fire").Gems == 0, "Thermal again had gems to move")
 	local cryo = AutoEquip.plan(profile, "Frost")
 	check(#cryo.Gems == 0, "Cryo with no Cryo gems loose moved one")
 	local ion = AutoEquip.plan(profile, "Shock")
@@ -366,7 +397,29 @@ do
 	for _, step in ion.Gems do
 		ionBy[step.Slot] = step.Gem
 	end
-	check(ionBy.Weapon == "leg" and ionBy.Armor == "rare2", "Ion: its gems, most valuable first, Q, E then R")
+	check(ionBy.Weapon == "leg" and ionBy.Armor == "rare2", "Ion: its gems, strongest first, Q, E then R")
+end
+-- An element's Q/E/R: its strongest moves, even over one worth more.
+do
+	local profile = gemProfile()
+	profile.Gems = {
+		gem("heavy", "Frost", "Rare", 10),
+		gem("strong", "Frost", "Legendary", 1),
+		gem("other", "Fire", "Legendary", 10),
+	}
+	local by = {}
+	for _, step in AutoEquip.plan(profile, "Frost").Gems do
+		by[step.Slot] = step.Gem
+		check(step.Gem ~= "other", "Cryo socketed a Thermal gem")
+	end
+	check(AutoEquip.power(profile.Gems[2]) > AutoEquip.power(profile.Gems[1]), "(the fixture: the Legendary is stronger)")
+	check(by.Weapon == "strong" and by.Armor == "heavy", "Cryo's Q isn't its strongest Cryo move")
+	-- Best, the same pouch: the strongest of all, any element.
+	local best = {}
+	for _, step in AutoEquip.plan(profile, "Best").Gems do
+		best[step.Slot] = step.Gem
+	end
+	check(best.Weapon == "other" and best.Armor == "strong", "Best's Q/E/R aren't the strongest of any element")
 end
 do
 	local profile = gemProfile()
@@ -557,4 +610,4 @@ do
 	check(not upgrade({}).Ok, "Missing profile accepted")
 end
 
-print(string.format("PASS: %d auto equip checks (Best, Balanced, the elements, two hands, other miners, gems, the server)", checks))
+print(string.format("PASS: %d auto equip checks (Best, Balanced, the elements, two hands, other miners, gems, Q/E/R by their moves' power, the server)", checks))

@@ -13,10 +13,12 @@
 	      Mode,
 	      Gear   { { Slot, Id } }       pieces to put on, the weapon first
 	      Gems   { { Slot, Gem } }      loose gems to socket (Gem = its id)
+	      Abilities                     how many of Gems are Q, E or R
 	      Before, After { [stat]: n }   ratings (Base + Bonus), now and after
 	      Rating, Gain                  the total after, and its change
 	      Changes                       #Gear + #Gems
 	  }
+	  AutoEquip.power(gem)       -> how strong its moves are (Q, E and R)
 
 	The modes:
 	  Best      the most total rating (Classes.ratings).
@@ -33,11 +35,16 @@
 	set bonus counts. A slot's gem stays in the slot when its piece
 	changes (PlayerData.equipGear), so a swap never drops one.
 
-	Gems: the sword's, chest's and shield's gems are Q, E and R, so Best and
-	Balanced only fill those when they're empty; the helmet, gloves and
-	boots take your most valuable loose gem (GemConfig.value) when it's
-	worth more than theirs. An element build swaps every socket that isn't
-	its element for its most valuable gem of it, while there are some.
+	Gems: the sword's, chest's and shield's gems are Q, E and R (Shared.
+	GemTraits). Best gives them your strongest moves, whatever their
+	element: the loose gems with the most power (AutoEquip.power: rarity
+	first, then Size, Clarity and Cut), the strongest on Q, then
+	E, then R, each only for a stronger one than it holds. An element build
+	does the same with that element's gems only, and swaps out any of
+	another element. Balanced keeps your Q, E and R and only fills one
+	that's empty. The helmet, gloves and boots take your most valuable loose
+	gem (GemConfig.value) when it's worth more than theirs (an element
+	build: its most valuable of that element, over any of another).
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -45,6 +52,7 @@ local Classes = require(ReplicatedStorage.Shared.Classes)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
+local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 
@@ -192,6 +200,27 @@ local function value(gem): number
 	return if ok and type(worth) == "number" then worth else 0
 end
 
+-- How strong a gem's moves are, whichever key it's on (GemTraits.stats):
+-- its rarity first (its output, the "% power" its moves show, and a
+-- Legendary's Flourish), then its grades within that rarity, each as much
+-- as it adds (Size's potency, Clarity's durations, Cut's cooldown). The
+-- grades never lift a gem past the next rarity.
+function AutoEquip.power(gem): number
+	if type(gem) ~= "table" or not GemTraits.traitsOf(gem) then
+		return 0
+	end
+	local function grade(key: string): number
+		return (math.clamp(tonumber(gem[key]) or 1, 1, 10) - 1) / 9
+	end
+	local weights = GemTraits.SizePotency + GemTraits.ClarityDuration + GemTraits.CutCooldown
+	local grades = (
+		GemTraits.SizePotency * grade("Size")
+		+ GemTraits.ClarityDuration * grade("Clarity")
+		+ GemTraits.CutCooldown * grade("Cut")
+	) / weights
+	return GemTraits.output(gem) + 0.09 * grades
+end
+
 local function planGems(profile, loadout, mode: string): { { Slot: string, Gem: string } }
 	local now = gemsAfter(profile.Character, loadout)
 	local pouch = {}
@@ -220,20 +249,15 @@ local function planGems(profile, loadout, mode: string): { { Slot: string, Gem: 
 			continue
 		end
 		local held = now[slot]
-		local wants
-		if ELEMENT[mode] then
-			wants = not held or held.Element ~= mode
-		elseif AutoEquip.KeySlots[slot] then
-			wants = not held
-		else
-			wants = true
+		local key = AutoEquip.KeySlots[slot] == true
+		if mode == "Balanced" and key and held then
+			continue -- (Balanced keeps your Q, E and R)
 		end
-		if not wants then
-			continue
-		end
+		-- A key socket's gem is ranked by its moves, the others by their worth.
+		local rank = if key and mode ~= "Balanced" then AutoEquip.power else value
 		local pick
 		for _, gem in pouch do
-			if used[gem.Id] then
+			if used[gem.Id] or (key and rank == AutoEquip.power and rank(gem) <= 0) then
 				continue
 			end
 			if mode == "Balanced" and pick == nil then
@@ -245,13 +269,17 @@ local function planGems(profile, loadout, mode: string): { { Slot: string, Gem: 
 				if fresh and not pickFresh then
 					pick = gem
 				end
-			else
-				pick = gem
+			elseif rank == value then
+				pick = gem -- (the pouch is in order of worth)
 				break
+			elseif pick == nil or rank(gem) > rank(pick) + 1e-9 then
+				pick = gem
 			end
 		end
-		if pick and held and not ELEMENT[mode] and value(pick) <= value(held) then
-			pick = nil -- (only for a better one)
+		-- Only for a better one (a gem of another element always goes, in
+		-- an element build).
+		if pick and held and (not ELEMENT[mode] or held.Element == mode) and rank(pick) <= rank(held) + 1e-9 then
+			pick = nil
 		end
 		if pick then
 			used[pick.Id] = true
@@ -283,6 +311,7 @@ function AutoEquip.plan(profile, mode: string)
 		Mode = mode,
 		Gear = {},
 		Gems = {},
+		Abilities = 0,
 		Before = before,
 		After = before,
 		Rating = total(before),
@@ -329,6 +358,11 @@ function AutoEquip.plan(profile, mode: string)
 		end
 	end
 	plan.Gems = planGems(profile, loadout, mode)
+	for _, step in plan.Gems do
+		if AutoEquip.KeySlots[step.Slot] then
+			plan.Abilities += 1
+		end
+	end
 	plan.After = statsOf(ratingsOf(loadout))
 	plan.Rating = total(plan.After)
 	plan.Gain = plan.Rating - total(before)

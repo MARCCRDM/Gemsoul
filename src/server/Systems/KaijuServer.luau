@@ -825,12 +825,17 @@ local function strike(pet: Pet, enemy, amount: number, status: string?, heavy: b
 		else "Hit"
 	local before = enemy.Humanoid.Health
 	local color = GemConfig.ElementColors[pet.Element]
-	Enemies.damage(enemy, amount, nil, false, color, heavy, pet.Element)
 	local e = enemy :: any
-	local dealt = math.max(0, before - enemy.Humanoid.Health)
+	-- Its owner's credit goes on before the blow: a killing blow runs the
+	-- kill's rewards (OnDeath: a critter's coins and EXP) inside
+	-- Enemies.damage, and they'd have missed it. Set right after.
+	local guess = math.clamp(amount, 0, math.max(before, 0))
 	e.KaijuCredit = e.KaijuCredit or {}
-	e.KaijuCredit[pet.Owner] = (e.KaijuCredit[pet.Owner] or 0) + dealt
+	e.KaijuCredit[pet.Owner] = (e.KaijuCredit[pet.Owner] or 0) + guess
 	e.LastPet, e.LastPetAt = pet, now
+	Enemies.damage(enemy, amount, nil, false, color, heavy, pet.Element)
+	local dealt = math.max(0, before - enemy.Humanoid.Health)
+	e.KaijuCredit[pet.Owner] = math.max(0, (e.KaijuCredit[pet.Owner] or 0) + dealt - guess)
 	-- Its own threat on what it hits (Shared.Aggro): a boss turns on the
 	-- kaiju hurting it, not only on their owner (Duelist's raidTarget).
 	if e.Threat and e.ThreatAt then

@@ -2701,6 +2701,22 @@ for _, fx in fxs do
 end
 check(after == count, "A zero reward must not create collectible-looking coins")
 end
+-- A critter your kaiju kills outright (its first blow the killing one):
+-- the kill's still yours, coins to you and EXP to the kaiju. (Its credit
+-- used to go on after the blow, too late for the kill's rewards.)
+do
+	roster.Bugs = nil -- (a fresh day)
+	local victim = KaijuWilds.spawnBug(center + Vector3.new(360, 0, 0), { Prey = a, Band = "Edge", Level = 10, Facing = rootA.Position })
+	victim.DodgeUntil = nil
+	local fighter = KaijuServer.pets()[a]
+	local before, gained = profiles[a].Coins, expOf(Kaiju.active(roster))
+	local landed = KaijuServer.strike(fighter, victim, victim.Humanoid.MaxHealth * 10, nil, false)
+	check(landed == "Hit" and not victim.Alive, "The kaiju's blow didn't kill it: " .. tostring(landed))
+	local paid = profiles[a].Coins - before
+	check(paid >= Frontier.CritterCoins.Min and paid <= Frontier.CritterCoins.Max, "A kaiju's kill paid its owner no coins: " .. paid)
+	check(expOf(Kaiju.active(roster)) > gained, "A kaiju's kill gave its kaiju no EXP")
+	check(math.abs((victim :: any).KaijuCredit[a] - (victim.Humanoid.MaxHealth)) < 1e-6, "The credit isn't the damage dealt: " .. tostring((victim :: any).KaijuCredit[a]))
+end
 
 -- The pick's bonk: a share of a critter's health, yours, back it goes,
 -- reeling; never on a wild kaiju.

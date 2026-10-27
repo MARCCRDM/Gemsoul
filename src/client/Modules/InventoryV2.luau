@@ -3630,8 +3630,14 @@ local function drawAuto(profile)
 		if #plan.Gear > 0 then
 			table.insert(parts, string.format("%d GEAR", #plan.Gear))
 		end
-		if #plan.Gems > 0 then
-			table.insert(parts, if #plan.Gems == 1 then "1 GEM" else string.format("%d GEMS", #plan.Gems))
+		-- (Q, E and R apart: a new ability is worth saying so)
+		local abilities = plan.Abilities or 0
+		local others = #plan.Gems - abilities
+		if abilities > 0 then
+			table.insert(parts, if abilities == 1 then "1 ABILITY" else string.format("%d ABILITIES", abilities))
+		end
+		if others > 0 then
+			table.insert(parts, if others == 1 then "1 GEM" else string.format("%d GEMS", others))
 		end
 		ui.AutoPreview.Text = table.concat(parts, "  ·  ")
 		ui.AutoPreview.TextColor3 = if gain > 0 then C.Good elseif gain < 0 then C.Bad else C.Dim

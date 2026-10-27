@@ -3533,6 +3533,8 @@ return {
 	["+{1} rating"] = "+{1} de puntuación",
 	["−{1} rating"] = "−{1} de puntuación",
 	["{1} gear"] = "{1} piezas",
+	["{1} ability"] = "{1} habilidad",
+	["{1} abilities"] = "{1} habilidades",
 	["The slot's gem moves onto it."] = "La gema de la ranura pasa a esta pieza.",
 	["Pick how to equip: Best, Balanced or an element."] = "Elige cómo equiparte: Lo mejor, Equilibrado o un elemento.",
 	["Your equipment is still loading."] = "Tu equipo aún se está cargando.",

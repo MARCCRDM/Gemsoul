@@ -335,6 +335,11 @@ What one pays:
   out, bounce, then fly toward that player; nearby players see the effect
   too. The server awards the money once, independently of the animation.
   Near the cap, only the remaining allowance is paid and displayed.
+  *2026-10-27*: a critter your kaiju killed outright used to pay nothing:
+  the kaiju's damage was put down to you only after the blow, and the
+  killing blow pays out inside it (`KaijuServer.strike`). With a team of
+  three or four out, most critters die that way. Its credit now goes on
+  first, so the coins and the kaiju's EXP come every time.
 
 ### What you do about them
 
