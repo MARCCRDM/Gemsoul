@@ -2180,47 +2180,10 @@ local function shelter(parent, at: CFrame, rules)
 	-- Client.StoreDisplays.)
 	local store = storefront(6, "STORE", STATION.Store)
 	local market, marketLook = storefront(40, "MARKET", STATION.Market)
-	-- The Market's own: a board on its counter's front of prices moving
-	-- (candles, green up and red down: no words), bulbs strung under its
-	-- ceiling, and crates of gear waiting by its corner.
+	-- The Market's own: bulbs strung under its ceiling and crates of gear
+	-- waiting by its corner (no board of prices on its counter's front).
 	do
 		local x = -W + 18
-		local board = part(m, facing(x + 1.68, 2.9, 40, 1, 0), Vector3.new(11, 1.5, 0.1), HULL_DARK, Enum.Material.Metal)
-		board.Name = "PriceBoard"
-		local gui = Instance.new("SurfaceGui")
-		gui.Face = Enum.NormalId.Front
-		gui.CanvasSize = Vector2.new(440, 60)
-		gui.LightInfluence = 0
-		gui.Parent = board
-		local back = Instance.new("Frame")
-		back.Size = UDim2.fromScale(1, 1)
-		back.BorderSizePixel = 0
-		back.BackgroundColor3 = Color3.fromRGB(10, 14, 16)
-		back.Parent = gui
-		local UP, DOWN = Color3.fromRGB(70, 226, 150), Color3.fromRGB(238, 92, 82)
-		local level = 30
-		for i = 1, 24 do
-			local move = math.floor(math.sin(i * 1.7) * 9 + math.cos(i * 0.6) * 5 + 0.5)
-			local from, to = level, math.clamp(level - move, 8, 52)
-			level = to
-			local top, low = math.min(from, to), math.max(from, to)
-			local shade = if to <= from then UP else DOWN
-			local cx = 10 + (i - 1) * 17.6
-			local wick = Instance.new("Frame")
-			wick.Name = "Wick"
-			wick.BorderSizePixel = 0
-			wick.BackgroundColor3 = shade
-			wick.Position = UDim2.fromOffset(cx + 4, top - 4)
-			wick.Size = UDim2.fromOffset(2, low - top + 8)
-			wick.Parent = back
-			local candle = Instance.new("Frame")
-			candle.Name = "Candle"
-			candle.BorderSizePixel = 0
-			candle.BackgroundColor3 = shade
-			candle.Position = UDim2.fromOffset(cx, top)
-			candle.Size = UDim2.fromOffset(10, math.max(3, low - top))
-			candle.Parent = back
-		end
 		-- Bulbs on two wires, front to back, sagging between the ends.
 		local bulbs = 8
 		for _, dz in { -6, 6 } do

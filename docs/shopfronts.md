@@ -37,8 +37,8 @@ in them.
 ![The Market, before and now](shopfronts/market.jpg)
 
 - A stall's canopy: green and cream stripes with a pennant under each.
-- A **price board** on the counter's front: green and red candles, like a
-  market chart, with no words on it (`PriceBoard`).
+- Nothing on the counter's front but its two lit strips: the board of
+  green and red candles that was on it is gone (*2026-10-27*).
 - Two strings of warm bulbs under its ceiling, front to back.
 - Three crates of gear by its south corner, near Tamsin, banded in the
   Market's green.
@@ -46,4 +46,4 @@ in them.
 Tested in `tests/signage_cases.luau`:
 
 - both lightboxes are lit in a colour of their own, with a white word;
-- the price board has candles and no text.
+- no candle board (`PriceBoard`) on the Market's counter.

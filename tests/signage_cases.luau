@@ -171,8 +171,8 @@ for _, root in { site.Model, pit } do
 	end
 end
 -- The Store's and the Market's lightboxes: lit in each shop's own colour
--- (not the old grey-white), the word white on it; the Market's price board
--- is candles only, not a word on it.
+-- (not the old grey-white), the word white on it; no board of candles on
+-- the Market's counter (taken off, 2026-10-27).
 do
 	local faces = {}
 	for _, d in site.Model:GetDescendants() do
@@ -191,14 +191,7 @@ do
 	check(faces.STORE and faces.MARKET, "The Store or the Market has no lightbox")
 	local a, b = faces.STORE, faces.MARKET
 	check(math.abs(a.R - b.R) + math.abs(a.G - b.G) + math.abs(a.B - b.B) > 0.3, "The Store and the Market aren't each in their own colour")
-	local board = site.Model:FindFirstChild("PriceBoard", true)
-	check(board ~= nil, "The Market has no price board")
-	local candles = 0
-	for _, d in board:GetDescendants() do
-		check(d.ClassName ~= "TextLabel", "The Market's price board has words on it")
-		candles += if d.Name == "Candle" then 1 else 0
-	end
-	check(candles >= 12, "The Market's price board has no candles")
+	check(site.Model:FindFirstChild("PriceBoard", true) == nil, "The Market's candle board is back on its counter")
 end
 -- Out in the quarry: no signs at the spokes naming the biomes.
 check(site.Model:FindFirstChild("Crossroads", true) == nil, "The biome signs are back by the roads")
