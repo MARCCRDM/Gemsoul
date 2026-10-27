@@ -51,11 +51,15 @@
 	  KaijuBattle.field(posA, posB) -> field     the field between them
 	  KaijuBattle.winner(a, b, timedOut) -> "A" | "B" | "Draw"
 	  KaijuBattle.Modes, KaijuBattle.mode(wanted) -> "Kaiju" | "Mixed"
+	  KaijuBattle.offered() -> the modes a pad offers, in order (only
+	                                "Kaiju" while Config.Features.KaijuDuel
+	                                is off)
 	  KaijuBattle.mixedWinner(a, b, timedOut) -> "A" | "B" | "Draw" | nil
 	  KaijuBattle.mixedShare(side) -> 0 to 1
 	  KaijuBattle.askProblem(state) -> string?   why one can't ask (nil: can)
 	  KaijuBattle.Sides[side] -> { Name, Color }  BLUE (A) or RED (B)
 ]]
+local Config = require(script.Parent.Config)
 local KaijuRoles = require(script.Parent.KaijuRoles)
 
 local KaijuBattle = {}
@@ -225,11 +229,15 @@ KaijuBattle.Modes = {
 	Kaiju = { Name = "KAIJU BATTLE", Line = "Your kaiju fight it out by themselves." },
 	Mixed = { Name = "1V1 + KAIJU", Line = "You duel them while your kaiju fight." },
 }
-KaijuBattle.ModeOrder = { "Kaiju", "Mixed" }
 
--- A mode asked for, or the kaiju alone.
+-- The modes a pad offers, in order: 1V1 + KAIJU only while it's switched on.
+function KaijuBattle.offered(): { string }
+	return if Config.Features.KaijuDuel then { "Kaiju", "Mixed" } else { "Kaiju" }
+end
+
+-- A mode asked for, or the kaiju alone (1V1 + KAIJU too while it's off).
 function KaijuBattle.mode(wanted: any): string
-	return if wanted == "Mixed" then "Mixed" else "Kaiju"
+	return if wanted == "Mixed" and Config.Features.KaijuDuel then "Mixed" else "Kaiju"
 end
 
 -- What a side has left in a 1v1 + Kaiju battle, 0 to 1: its miner (in the

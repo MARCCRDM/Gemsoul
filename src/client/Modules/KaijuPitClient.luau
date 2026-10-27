@@ -532,11 +532,15 @@ function KaijuPitClient.showPad(state)
 	modeLine.Text = mode.Name .. ": " .. mode.Line
 	modeLine.TextColor3 = if modeId == "Mixed" then RED:Lerp(P.Text, 0.25) else P.Text
 	if state.Host then
-		modeRow.Visible = true
-		for _, id in KaijuBattle.ModeOrder do
-			chip(KaijuBattle.Modes[id].Name, id == modeId, true, function()
-				request("KaijuPitMode", id)
-			end, modeRow)
+		-- (No choice to show while the kaiju battle is the only mode.)
+		local modes = KaijuBattle.offered()
+		modeRow.Visible = #modes > 1
+		if #modes > 1 then
+			for _, id in modes do
+				chip(KaijuBattle.Modes[id].Name, id == modeId, true, function()
+					request("KaijuPitMode", id)
+				end, modeRow)
+			end
 		end
 		cardStroke.Color = HAZARD
 		heading.Text = if state.Foe then state.Foe .. " STEPPED UP!" else "WAITING ON COURT " .. state.Court

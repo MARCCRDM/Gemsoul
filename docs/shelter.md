@@ -27,7 +27,7 @@ at its peak). Ribs run up the outside, with heavier corners.
 | Middle | **Kaiju arena** stage: open floor round it, pylons, the hologram over it. The battles themselves are downstairs: a stairwell west of the stage, a steel plate saying **ARENA**, goes down to the [Kaiju Arena](kaiju-arena.md). |
 | West wall | **STORE** and **MARKET** shopfronts (open the Store and the player Market), each a counter with a prompt and its word on a lightbox lit in the shop's own colour (the Store blue, the Market green, a striped stall's canopy, bulbs and crates): see [shopfronts.md](shopfronts.md). Next to the Market, along the south wall, **Ilsa's desk and the Gem Gallery**. The Store shows what it sells on stands: helmets, weapon skins and pickaxes behind the counter, suits on turntables either side ([the Store's stands](probe-store-crew-quarry.md#the-stores-stands)). |
 | East wall | The **Hall of Fame** (PvP and PvE columns, trophies on a dais, stanchions in front) and the **bounty office** beside it: talk to Marlo, or walk up to the counter, for the bounty board (every Rift boss, a tab per biome). See [hall-of-fame.md](hall-of-fame.md). |
-| South wall, east | **Brutus's duel booth** (DUELS): talk to him, or walk up to his counter, for a 1v1 duel (ranked, casual or 1V1 + KAIJU; win streaks restore your swings: see [swing-restores.md](swing-restores.md)). A sparring dummy and a supply corner beside it. |
+| South wall, east | **Brutus's duel booth** (DUELS): talk to him, or walk up to his counter, for a 1v1 duel (ranked or casual; win streaks restore your swings: see [swing-restores.md](swing-restores.md)). A sparring dummy and a supply corner beside it. |
 | Over the door, inside | **QUARRY**, painted. |
 
 *Since then (2026-10-22): plain one-word signs, and the Shelter's floor cleared (no PROBE-7 station, duel gate, stands or survey table; PROBE-7 and Brutus are crew; the Gem Gallery is next to the Market). See [plain-signs.md](plain-signs.md).*
@@ -107,7 +107,7 @@ Their questions sit under one topic (Ilsa's **Gems and prices**, Brutus's
   elements), how gems are priced, when to check the Market first.
 - **Brutus:** win rewards (two pieces, keep one; rarer the more 1v1 you
   play), win streaks and Arena Caches, best of three, Casual for trying
-  loadouts, parrying, 1v1 + Kaiju.
+  loadouts, parrying, the AUTO COUNTER between ranked rounds.
 - **Marlo:** threat I to III, what boss caches roll, favourite gear,
   biome elements, the 20 seconds home, the HYPERBEAM on a boss.
 - **Tamsin:** six listings for 48 hours, the 5% cut, escrow, empty

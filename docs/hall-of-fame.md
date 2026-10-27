@@ -22,7 +22,15 @@ cards, the CHAMPION badges and the gold title rules. The halves are
 is plain steel with two caged work lamps (no red and teal neon pylons).
 The wall picture below is from before this change.
 
-One board, two halves, five columns:
+*2026-10-27:* the **1V1 + KAIJU** column is gone, with the mode itself
+(`Config.Features.KaijuDuel` is off: see
+[kaiju-arena.md](kaiju-arena.md#1v1--kaiju)). The board has four columns
+now, two a side, each a little wider:
+
+![The Hall of Fame with four columns](hall-of-fame/board-four.png)
+
+One board, two halves (the table is how it was; 1V1 + KAIJU comes back
+only if that switch is turned on):
 
 | Half | Column | Counts |
 | --- | --- | --- |

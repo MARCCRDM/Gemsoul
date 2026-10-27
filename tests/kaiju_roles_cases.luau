@@ -872,7 +872,12 @@ do
 	local function side(up, share, miner, minerShare)
 		return { Up = up, Share = share, Miner = miner, MinerShare = minerShare }
 	end
-	check(KaijuBattle.mode("Mixed") == "Mixed" and KaijuBattle.mode("Chess") == "Kaiju" and KaijuBattle.mode(nil) == "Kaiju", "A mode that isn't one isn't the kaiju alone")
+	-- (Off by default: a pad offers the kaiju alone, and "Mixed" is that.)
+	local Config = load("Config")
+	check(not Config.Features.KaijuDuel and KaijuBattle.mode("Mixed") == "Kaiju" and #KaijuBattle.offered() == 1, "1V1 + KAIJU offered while it's off")
+	Config.Features.KaijuDuel = true
+	check(KaijuBattle.mode("Mixed") == "Mixed" and KaijuBattle.mode("Chess") == "Kaiju" and KaijuBattle.mode(nil) == "Kaiju" and #KaijuBattle.offered() == 2, "A mode that isn't one isn't the kaiju alone")
+	Config.Features.KaijuDuel = false
 	check(KaijuBattle.mixedWinner(side(2, 0.5, true, 0.4), side(3, 0.9, true, 0.9)) == nil, "Over with everyone still fighting")
 	check(KaijuBattle.mixedWinner(side(1, 0.2, true, 1), side(0, 0, false, 0)) == "A", "Out of the duel with its kaiju down isn't beaten")
 	check(KaijuBattle.mixedWinner(side(0, 0, false, 0), side(2, 0.4, true, 0.1)) == "B", "The other side beaten isn't a win")

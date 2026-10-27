@@ -43,6 +43,10 @@ local Config = {
 		-- Mini kaiju in the Outpost (docs/kaiju.md): a kaiju of your own
 		-- beside you, wild ones to fight or tame, moon bugs, hunting.
 		Kaiju = true,
+		-- 1V1 + KAIJU (Shared.KaijuBattle): duel each other on a Kaiju Arena
+		-- court while your kaiju fight. Off: the pads offer the kaiju battle
+		-- alone, and the Hall of Fame has no column for it.
+		KaijuDuel = false,
 		-- The MMO chat box (ChatFrame: tabs, channels, slash commands). Off
 		-- for now: chat is the windowless feed at the bottom left (ChatFeed),
 		-- and Roblox's own chat on phones and in fights.

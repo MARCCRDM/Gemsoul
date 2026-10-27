@@ -2,7 +2,7 @@
 	Top Players: global leaderboards for the best gem ever owned, monsters
 	slain, Season level, gear score (Gear) and duel wins (Wins), and the
 	Shelter's Hall of Fame (Shared.HallOfFame): 1v1 wins (Duel), 1v1 + Kaiju
-	wins (Mixed), Kaiju Arena wins (Kaiju), Rift bosses slain (Bosses) and
+	wins (Mixed, while Config.Features.KaijuDuel is on), Kaiju Arena wins (Kaiju), Rift bosses slain (Bosses) and
 	gems mined (Mined). Each player's scores are written to ordered data
 	stores every couple of minutes; the top ten are read back and cached.
 
@@ -24,7 +24,10 @@ local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 
 local REFRESH_SECONDS = 120
-local BOARDS = { "Gem", "Slain", "Level", "Gear", "Wins", "Duel", "Mixed", "Kaiju", "Bosses", "Mined" }
+local BOARDS = { "Gem", "Slain", "Level", "Gear", "Wins", "Duel", "Kaiju", "Bosses", "Mined" }
+if Config.Features.KaijuDuel then
+	table.insert(BOARDS, "Mixed")
+end
 
 local TopPlayers = {}
 

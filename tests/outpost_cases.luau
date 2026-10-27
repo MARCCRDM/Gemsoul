@@ -241,7 +241,8 @@ local function load(path, name, extra)
 				return 86400 * 20000 + now
 			end,
 		},
-		script = { Parent = { Parent = {} } },
+		-- (script.Parent.X is "X": a require of it is extra.X)
+		script = { Parent = setmetatable({ Parent = {} }, { __index = function(_, key) return key end }) },
 		require = function(m)
 			return extra[m]
 		end,
@@ -411,7 +412,7 @@ local Server = (function()
 				MechPilot = load("src/shared/MechPilot.luau", "MechPilot", {}),
 				SwingRestore = load("src/shared/SwingRestore.luau", "SwingRestore", {}),
 				Vendors = Vendors,
-				HallOfFame = load("src/shared/HallOfFame.luau", "HallOfFame", {}),
+				HallOfFame = load("src/shared/HallOfFame.luau", "HallOfFame", { Config = { Features = { KaijuDuel = false } } }),
 				Bounties = Bounties,
 				Builder = Builder,
 				Intro = { tutorialMined = function() return nil end },
@@ -641,10 +642,11 @@ do
 		distinct += 1
 	end
 	check(corners == 0 and distinct <= 3, "The Hall of Fame isn't a plain board (" .. corners .. " rounded corners, " .. distinct .. " text colours)")
-	for _, title in { "1V1 DUELS", "1V1 + KAIJU", "KAIJU BATTLES", "BOUNTY HUNTERS", "TOP MINERS" } do
+	for _, title in { "1V1 DUELS", "KAIJU BATTLES", "BOUNTY HUNTERS", "TOP MINERS" } do
 		check(texts[title] == 1, "No " .. title .. " column")
 	end
-	check(texts.Ana == 5 and texts.UNCLAIMED == nil, "Each column's champion isn't the board's first")
+	check(texts["1V1 + KAIJU"] == nil, "A 1V1 + KAIJU column while that mode's off")
+	check(texts.Ana == 4 and texts.UNCLAIMED == nil, "Each column's champion isn't the board's first")
 	local children = #gui:GetDescendants()
 	Server._drawBoard()
 	check(#gui:GetDescendants() == children, "The board was drawn twice over")

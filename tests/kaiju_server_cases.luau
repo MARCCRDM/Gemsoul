@@ -5108,6 +5108,10 @@ end
 		rootA.CFrame = CFrame.new(mixedCourt.PadA + Vector3.new(0, 3, 0))
 		step()
 		check(mixedState.Mode == "Kaiju" and told(a, "KaijuPitPad")[3].Mode == "Kaiju", "A pad doesn't start on the kaiju alone")
+		-- (Switched off, as it ships: the pads won't take it. On for the rest.)
+		local Config = shared("Config")
+		check(not Config.Features.KaijuDuel and not registered.KaijuPitMode(a, "Mixed").Ok and mixedState.Mode == "Kaiju", "1V1 + KAIJU picked while it's off")
+		Config.Features.KaijuDuel = true
 		check(not registered.KaijuPitMode(b, "Mixed").Ok, "Picked a mode off the pads")
 		check(not registered.KaijuPitMode(a, "Chess").Ok, "A mode that isn't one")
 		check(registered.KaijuPitMode(a, "Mixed").Ok and mixedState.Mode == "Mixed", "Couldn't pick 1V1 + KAIJU")
@@ -5168,6 +5172,7 @@ end
 		KaijuBattles.step(again, now)
 		step()
 		check(KaijuBattles.of(a) == nil and not Spar.sparring(a), "Still in the battle after it closed")
+		Config.Features.KaijuDuel = false
 	end
 
 	-- A battle asked for from the card: both brought down onto a free court.

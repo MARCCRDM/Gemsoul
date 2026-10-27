@@ -510,7 +510,8 @@ local function setStake(player: Player, wanted: any)
 	return reply(true, "")
 end
 
--- The host picks the mode: the kaiju alone, or 1V1 + KAIJU.
+-- The host picks the mode: the kaiju alone, or 1V1 + KAIJU (while it's on:
+-- Shared.KaijuBattle.offered).
 local function setMode(player: Player, wanted: any)
 	local state, side = padOf(player)
 	if not state or state.Battle then
@@ -519,7 +520,7 @@ local function setMode(player: Player, wanted: any)
 	if state.Host ~= side then
 		return reply(false, "The one who was waiting picks the mode.")
 	end
-	if wanted ~= "Kaiju" and wanted ~= "Mixed" then
+	if type(wanted) ~= "string" or KaijuBattle.mode(wanted) ~= wanted then
 		return reply(false, "That isn't a mode.")
 	end
 	state.Mode = KaijuBattle.mode(wanted)

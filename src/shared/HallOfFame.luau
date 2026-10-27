@@ -5,7 +5,7 @@
 
 	  PLAYER VS PLAYER   1V1 DUELS (Arena 1v1 wins: Duels' Solo),
 	                     1V1 + KAIJU (wins in the Kaiju Arena's mixed
-	                     match: you duel while your kaiju battle theirs),
+	                     match, only while Config.Features.KaijuDuel is on),
 	                     KAIJU BATTLES (Kaiju Arena battle wins)
 	  PLAYER VS ENVIRONMENT  BOUNTY HUNTERS (Rift bosses slain: the bounties
 	                     Brutus posts), TOP MINERS (gems mined)
@@ -26,6 +26,8 @@
 	  HallOfFame.draw(gui, boards, global?)   (re)draws `gui` (a SurfaceGui)
 	                                     from boards[Id] = rows
 ]]
+local Config = require(script.Parent.Config)
+
 local HallOfFame = {}
 
 -- A plain results board, like a stadium's: dark, one warm accent, tight
@@ -39,11 +41,17 @@ local STRIPE = Color3.fromRGB(26, 26, 29)
 
 HallOfFame.Boards = {
 	{ Id = "Duel", Group = "PvP", Title = "1V1 DUELS", Unit = "WINS", Color = Color3.fromRGB(255, 96, 80) },
-	{ Id = "Mixed", Group = "PvP", Title = "1V1 + KAIJU", Unit = "WINS", Color = Color3.fromRGB(255, 150, 64) },
 	{ Id = "Kaiju", Group = "PvP", Title = "KAIJU BATTLES", Unit = "WINS", Color = Color3.fromRGB(196, 110, 255) },
 	{ Id = "Bosses", Group = "PvE", Title = "BOUNTY HUNTERS", Unit = "BOSSES", Color = Color3.fromRGB(90, 220, 150) },
 	{ Id = "Mined", Group = "PvE", Title = "TOP MINERS", Unit = "GEMS", Color = Color3.fromRGB(96, 196, 255) },
 }
+if Config.Features.KaijuDuel then
+	table.insert(
+		HallOfFame.Boards,
+		2,
+		{ Id = "Mixed", Group = "PvP", Title = "1V1 + KAIJU", Unit = "WINS", Color = Color3.fromRGB(255, 150, 64) }
+	)
+end
 HallOfFame.Groups = {
 	PvP = { Title = "PLAYER VS PLAYER" },
 	PvE = { Title = "PLAYER VS ENVIRONMENT" },
@@ -56,8 +64,8 @@ HallOfFame.Canvas = Vector2.new(1600, 760) -- pixels: 40 to the stud
 local MARGIN, GAP, GROUP_GAP = 40, 28, 56
 local HEADSHOT = "rbxthumb://type=AvatarHeadShot&id=%d&w=150&h=150"
 
--- Where each column sits across `width` pixels: the PvP group's three,
--- then the PvE group's two, a wider gap between the groups.
+-- Where each column sits across `width` pixels: the PvP group's, then the
+-- PvE group's, a wider gap between the groups.
 function HallOfFame.layout(width: number)
 	local count = #HallOfFame.Boards
 	local inner = 0

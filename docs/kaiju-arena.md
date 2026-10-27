@@ -356,6 +356,14 @@ To go again with someone new, step off your pad and back on.
 
 ## 1V1 + KAIJU
 
+*Switched off 2026-10-27* (`Config.Features.KaijuDuel = false`). The pads
+offer the kaiju battle alone: the host no longer sees a mode choice, and
+the server refuses `KaijuPitMode` "Mixed" ("That isn't a mode."). Its
+column is off the Hall of Fame, and Brutus and the arena's tip bot no
+longer mention it. The rules below stay in the code
+(`KaijuBattle.mixedWinner`, the paired duel), and the tests still run them
+with the switch on, so it can come back by flipping the switch.
+
 *Added 2026-10-22.* A second mode: you duel each other while your kaiju
 fight. The one waiting on the pad picks it (**KAIJU BATTLE** or **1V1 +
 KAIJU**, `KaijuPitMode`); the challenger sees which before saying FIGHT,
