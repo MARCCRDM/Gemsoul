@@ -23,7 +23,9 @@
 	(Compact, on a phone: the miner on the left with STATS, AUTO, GEMS and
 	SKINS, two columns of three rows, Q / E / R under them. STATS opens the
 	stats card as a sheet over the screen; a piece's card lists every stat
-	on it, since there's no hovering.)
+	on it, since there's no hovering. GEMS is a tab: your loose gems in the
+	rows' place, a tab per element, ‹ GEAR to go back; drag one onto a key,
+	or start dragging and the rows come back to drop it on a piece.)
 
 	Drag a gem from the grid onto any row or Q / E / R card to socket it.
 	The server checks every move (the same requests as the first Inventory).
@@ -462,6 +464,7 @@ local state = {
 	Hover = nil :: Item?, -- under the pointer in the grid
 	AutoMode = "Best", -- AUTO EQUIP's mode (Shared.AutoEquip.Modes)
 	PouchFilter = "All", -- your gems (full, left): "All" or an element
+	GemsPane = false, -- compact: your gems in the rows' place (the GEMS tab)
 	BagFilter = "All", -- your spare gear (full, right): "All" or a slot
 }
 local gui: ScreenGui? = nil
@@ -1141,6 +1144,7 @@ local function buildButtons(holder: Instance, x: number, buttonY: number, totalW
 		Color = ColorSequence.new(Color3.fromRGB(38, 31, 60), Color3.fromRGB(16, 20, 31)),
 	}, gems)
 	local gemsEdge = stroke(gems, Color3.fromRGB(190, 120, 255), 1, 0.55)
+	ui.GemsEdge = gemsEdge
 	local gemsIcon = frame(gems, Color3.fromRGB(255, 255, 255), 0.95)
 	place(gemsIcon, iconAt, (buttonH - iconSize) / 2, iconSize, iconSize)
 	round(gemsIcon, 20)
@@ -1162,7 +1166,12 @@ local function buildButtons(holder: Instance, x: number, buttonY: number, totalW
 		gemsEdge.Transparency = 0.55
 	end)
 	gems.Activated:Connect(function()
-		if ui.Popups then
+		if COMPACT then
+			-- (a phone: your gems in the rows' place, and back)
+			state.GemsPane = not state.GemsPane
+			state.Detail, state.Pick, state.Hover = nil, nil, nil
+			draw()
+		elseif ui.Popups then
 			GemVault.open(ui.Popups, nil, InventoryV2.beginGemDrag)
 		end
 	end)
@@ -1220,12 +1229,12 @@ local function filterTabs(holder: Frame, entries: { { any } }, picked: string, p
 		local b = new("TextButton", {
 			Name = "Filter" .. entry[1],
 			Text = entry[2],
-			TextSize = 10,
+			TextSize = if COMPACT then 12 else 10,
 			Font = HEADING,
 			TextColor3 = if on then tint elseif entry[3] then tint:Lerp(C.Faint, 0.45) else C.Faint,
 			BackgroundTransparency = 1,
 			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.fromOffset(0, 24),
+			Size = UDim2.fromOffset(0, if COMPACT then 26 else 24),
 			LayoutOrder = order,
 		}, row)
 		b:SetAttribute("UiSound", "Tab")
@@ -1413,6 +1422,48 @@ local function buildRight(canvas: Frame)
 	-- the miner, in the left column.)
 	if COMPACT then
 		buildButtons(canvas, 0, 326, RIGHT_X - 12, 54, 8)
+		-- The GEMS tab (GEMS under the miner, ‹ GEAR to go back): your loose
+		-- gems in the rows' place, a tab per element, as the full layout's
+		-- left column has them. Drag one onto a key below; as a drag starts
+		-- the rows come back, to drop it on a piece. Tap one for the gem
+		-- window.
+		local paneW = W - RIGHT_X
+		local pane = new("Frame", { Name = "GemsPane", BackgroundTransparency = 1, Visible = false }, column)
+		place(pane, 0, 0, paneW, 230)
+		local gear = new("TextButton", {
+			Name = "GearTab",
+			Text = "‹  GEAR",
+			TextSize = 13,
+			Font = HEADING,
+			TextColor3 = C.Text,
+			AutoButtonColor = false,
+			BackgroundColor3 = Color3.fromRGB(10, 14, 22),
+			BackgroundTransparency = 0.2,
+		}, pane)
+		place(gear, 0, 0, 96, 28)
+		round(gear, 8)
+		stroke(gear, C.Line, 1, 0.5)
+		gear:SetAttribute("UiSound", "Back")
+		gear.Activated:Connect(function()
+			state.GemsPane = false
+			draw()
+		end)
+		place(text(pane, "YOUR GEMS", 13, C.Text, HEAVY), 110, 5, 200, 18)
+		ui.PouchCount = place(text(pane, "", 10, C.Faint, HEADING), paneW - 340, 7, 340, 16)
+		ui.PouchCount.TextXAlignment = Enum.TextXAlignment.Right
+		ui.PouchTabs = new("Frame", { Name = "PouchTabs", BackgroundTransparency = 1 }, pane)
+		place(ui.PouchTabs, 0, 36, paneW, 26)
+		ui.Pouch = new("ScrollingFrame", {
+			Name = "Pouch",
+			BackgroundTransparency = 1,
+			ScrollBarThickness = 4,
+			ScrollBarImageColor3 = C.Faint,
+			CanvasSize = UDim2.new(),
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+		}, pane)
+		place(ui.Pouch, 0, 70, paneW, 160)
+		ui.GemsPane = pane
 	else
 		buildBag(list, y + 6)
 	end
@@ -1930,6 +1981,11 @@ UserInputService.InputChanged:Connect(function(input)
 			GemVault.close()
 			state.Detail, state.Pick, state.Hover = nil, nil, nil
 			ui.List.Visible, ui.Detail.Visible = true, false
+		end
+		-- (Compact, from the GEMS tab: the rows come back to drop it on.)
+		if ui.GemsPane and state.GemsPane then
+			state.GemsPane = false
+			ui.GemsPane.Visible, ui.List.Visible = false, state.Detail == nil
 		end
 		local ghost = frame(gui, C.Ink, 0.15)
 		ghost.Name = "V2DragGhost"
@@ -2804,8 +2860,14 @@ end
 local previewAsked = ""
 local function drawDetail(loadout)
 	local target = state.Detail
-	ui.List.Visible = target == nil
+	local pane = COMPACT and state.GemsPane and target == nil
+	ui.List.Visible = target == nil and not pane
 	ui.Detail.Visible = target ~= nil
+	if ui.GemsPane then
+		ui.GemsPane.Visible = pane
+		ui.GemsEdge.Color = if pane then C.Gold else Color3.fromRGB(190, 120, 255)
+		ui.GemsEdge.Transparency = if pane then 0 else 0.55
+	end
 	-- (compact, the open piece takes the Q / E / R row's place too: its strip
 	-- still hops to them)
 	for _, entry in ui.Keys do
@@ -3272,8 +3334,9 @@ local function drawSkinsButton(profile)
 	end
 end
 
--- Full, left: your loose gems, rarest first, a tab per element. Each shows
--- its tier level ("T3 II": its surge tier and rank) in its rarity's colour.
+-- Your loose gems, rarest first, a tab per element (full: the left column;
+-- compact: the GEMS tab). Each shows its tier level ("T3 II": its surge
+-- tier and rank) in its rarity's colour.
 local pouchKey = ""
 local function drawPouch(profile)
 	if not ui.Pouch then
@@ -3305,7 +3368,9 @@ local function drawPouch(profile)
 			draw()
 		end)
 	end
-	ui.PouchCount.Text = if counts.All > 0 then "DRAG ONTO A PIECE OR A KEY" else ""
+	ui.PouchCount.Text = if counts.All == 0 then ""
+		elseif COMPACT then "DRAG TO SOCKET  ·  TAP FOR DETAILS"
+		else "DRAG ONTO A PIECE OR A KEY"
 	local shown, levels = {}, {}
 	for _, gem in all do
 		if filter == "All" or gem.Element == filter then

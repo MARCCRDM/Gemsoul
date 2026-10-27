@@ -64,6 +64,11 @@
 	  "KaijuAutoHeal", on   auto heal on or off
 	  "KaijuCallBack", away   true: the team put away (Kaiju.away); false:
 	                        deployed again, only out of danger
+	  "KaijuTeamOut", n     a team key (1 to Kaiju.Teams): the team out's own
+	                        number calls it back or deploys it; another's
+	                        swaps that team in (Kaiju.SwitchSeconds apart),
+	                        or, called back, deploys it out of danger
+	  "KaijuSwap", a, b     two of yours swap places in your teams (Kaiju.swap)
 	  "KaijuRoll"           the starter roll owed: { Rolls = { { Species, Element, Soul } } }
 	  "KaijuRollClaim"      take it: the kaiju join you
 
@@ -1765,6 +1770,99 @@ local function callBack(player: Player, away: any)
 	return reply(ok, text)
 end
 
+-- A team key (1 to 4: Kaiju.Teams). The team out's own number calls it
+-- back, or deploys it again (only out of danger, as DEPLOY). Another team's
+-- swaps it in: the one out goes back in its Gemsouls and that one comes out,
+-- fight or no fight (it brings a fresh team in, it's no way out), at most
+-- once every Kaiju.SwitchSeconds. Called back, another team's number picks
+-- it and deploys it, out of danger.
+local function teamOut(player: Player, n: any)
+	local profile = PlayerData.get(player)
+	local roster = profile and profile.Kaiju
+	if not roster or type(n) ~= "number" or n ~= math.floor(n) or n < 1 or n > Kaiju.Teams then
+		return reply(false, "You have no kaiju.")
+	end
+	if KaijuServer.battling(player) then
+		return reply(false, "Not during a kaiju battle.")
+	end
+	local ids = Kaiju.teamOf(roster, n)
+	if #ids == 0 then
+		return reply(false, string.format("Team %d is empty: fill Team %d first, then catch more kaiju.", n, Kaiju.teamCount(roster)))
+	end
+	local current, away = Kaiju.outTeam(roster), Kaiju.away(roster)
+	if n == current then
+		if away then
+			local ok, text = KaijuServer.deployTeam(player, false)
+			return reply(ok, if ok then string.format("Team %d out.", n) else text)
+		end
+		KaijuServer.recallTeam(player)
+		return reply(true, string.format("Team %d called back.", n))
+	end
+	local standing = 0
+	for _, id in ids do
+		if not roster.List[id].Down then
+			standing += 1
+		end
+	end
+	if standing == 0 then
+		return reply(false, string.format("Everyone in Team %d is knocked out.", n))
+	end
+	local now = os.clock()
+	if away then
+		if KaijuServer.inDanger(player, now) then
+			return reply(false, "Not while you're in danger: get clear of the fight first.")
+		end
+		roster.Out = n
+		roster.Team, roster.Active = Kaiju.teamIds(roster), ids[1]
+		local ok, text = KaijuServer.deployTeam(player, false)
+		return reply(ok, if ok then string.format("Team %d out.", n) else text)
+	end
+	if lastSwitch[player] and now - lastSwitch[player] < Kaiju.SwitchSeconds then
+		return reply(false, "One moment.")
+	end
+	lastSwitch[player] = now
+	local root = rootOf(player)
+	for _, pet in petsOf(player) do
+		fx("CallBack", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
+	end
+	roster.Out = n
+	roster.Team, roster.Active = Kaiju.teamIds(roster), ids[1]
+	PlayerData.sync(player)
+	upkeep(player, now)
+	for _, pet in petsOf(player) do
+		fx("Deploy", pet.Root.Position, 4 * PET_SIZE, pet.Element, root and root.Position)
+	end
+	return reply(true, string.format("Team %d out.", n))
+end
+
+-- Two of your kaiju swap places in your teams (the TEAMS tab): not during a
+-- kaiju battle, nor taking one of the team out away mid-fight.
+local function swapKaiju(player: Player, a: any, b: any)
+	local profile = PlayerData.get(player)
+	local roster = profile and Kaiju.roster(profile)
+	if not roster or type(a) ~= "string" or type(b) ~= "string" or not roster.List[a] or not roster.List[b] or a == b then
+		return reply(false, "That kaiju isn't yours.")
+	end
+	if not Kaiju.teamNumber(roster, a) or not Kaiju.teamNumber(roster, b) then
+		return reply(false, "A support kaiju has its own slot.")
+	end
+	if KaijuServer.battling(player) then
+		return reply(false, "Not during a kaiju battle.")
+	end
+	local now = os.clock()
+	local out = Kaiju.teamIds(roster)
+	for _, pet in petsOf(player) do
+		local id = pet.Record.Id
+		if (id == a or id == b) and now - pet.LastFight < 3 and table.find(out, id) then
+			return reply(false, "Not in the middle of a fight.")
+		end
+	end
+	Kaiju.swap(roster, a, b)
+	PlayerData.sync(player)
+	upkeep(player, now)
+	return reply(true, "")
+end
+
 -- Puts `ids` out as the team (the first leads): only your own, not while
 -- one of them is mid-fight, and not twice in a moment.
 local function changeTeam(player: Player, ids: { string }): (boolean, string)
@@ -2365,6 +2463,8 @@ function KaijuServer.start()
 	Shop.register("KaijuName", nameKaiju)
 	Shop.register("KaijuAutoHeal", setAutoHeal)
 	Shop.register("KaijuCallBack", callBack)
+	Shop.register("KaijuTeamOut", teamOut)
+	Shop.register("KaijuSwap", swapKaiju)
 	Shop.register("KaijuRoll", rollRequest)
 	Shop.register("KaijuRollClaim", rollClaim)
 	Shop.register("KaijuSupport", setSupport)
@@ -2421,6 +2521,7 @@ KaijuServer._upkeep, KaijuServer._think, KaijuServer._infuse = upkeep, think, in
 KaijuServer._autoHeal, KaijuServer._socketSoul = autoHeal, socketSoul
 KaijuServer._recall, KaijuServer._setActive, KaijuServer._setTeam = recall, setActive, setTeam
 KaijuServer._callBack, KaijuServer._hops, KaijuServer._jumped = callBack, hops, jumped
+KaijuServer._teamOut, KaijuServer._swap = teamOut, swapKaiju
 KaijuServer._despawn, KaijuServer._fair = despawn, fair
 KaijuServer._prepareRoll, KaijuServer._claimRoll = prepareRoll, claimRoll
 

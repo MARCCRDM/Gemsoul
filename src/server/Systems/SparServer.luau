@@ -198,7 +198,7 @@ local function askProblem(player: Player, target: Player?, answering: boolean?):
 		return target.DisplayName .. " is in the Rift."
 	end
 	if Spar.hunting(player) then
-		return "Put your kit away first (1)."
+		return "Put your kit away first (Y)."
 	elseif Spar.hunting(target) then
 		return target.DisplayName .. " is out hunting."
 	end

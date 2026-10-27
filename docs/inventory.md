@@ -38,6 +38,16 @@ armor and spare gear on the right, Q / E / R along the bottom.
 The gem window's list and the gems under an open piece show the tier level
 too (top right of each gem).
 
+**On a phone** there's no gems column, so **GEMS** (bottom left) opens
+YOUR GEMS in place of the gear list on the right: the element tabs, then
+your loose gems as tiles. **‹ GEAR** brings the gear list back, and so does
+starting to drag a gem. Drag a gem onto a piece's row or a Q / E / R card to
+socket it; tap one for the gem window. GEMS is lit gold while the tab is
+open. (On a computer, GEMS still opens the gem window, as YOUR GEMS is
+always on the left there.)
+
+![YOUR GEMS on a phone](inventory/gems-tab-phone.png)
+
 ## Middle: you, your stats, AUTO EQUIP
 
 Left of the miner (who now stands between this card and your armor): your

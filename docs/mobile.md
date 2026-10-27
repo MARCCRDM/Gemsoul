@@ -55,10 +55,11 @@ phone game should be.
   the windowless chat feed in the bottom left (`ChatFeed`; see
   [lobby.md](lobby.md#chat-the-bottom-left-windowless)). The old chat box is
   off for now.
-- **Level and coins** sit in a pill at the top left, under the pick card,
-  where the CHAT button was (`MobileLayout.wallet`).
+- **Level and coins** sit in a pill at the top right, with your health
+  under it (`MobileLayout.wallet`, `MobileLayout.health`). See
+  [Your kaiju, your pick and your party](#your-kaiju-your-pick-and-your-party).
 - **The "online" pill is gone.** PLAY stands alone at the bottom centre.
-- **FIGHT / MINE** (your kit or your pick, the 1 key on a keyboard) is a
+- **FIGHT / MINE** (your kit or your pick, the Y key on a keyboard) is a
   pill just left of PLAY, level with it and a little taller (44 points),
   with its icon and word: ⚔ FIGHT with the pick out, ⛏ MINE with the kit
   out. It stays clear of Roblox's thumbstick; where there's little room
@@ -78,7 +79,9 @@ phone game should be.
   challenges are the Tasks window's DAILY page. See
   [play-screen.md](play-screen.md).
 - **No BUG button** on a phone. The same form is SOCIAL's Feedback button.
-- **The live feed** fits between the pick card and the toasts' place.
+- **The live feed** fits between your kaiju's row and the toasts' place
+  where there's room for it (`MobileLayout.topGap`); on most phones the row
+  takes that room and the feed stays off.
 
 ![The lobby on a small phone, before and after](mobile/lobby-small-phone.png)
 
@@ -135,6 +138,32 @@ you, your kaiju and what's coming:
 
 Each find is still in chat, and a full pouch still gets its message.
 
+### Your kaiju, your pick and your party
+
+![The phone HUD with a party: before, and now](mobile/phone-hud-row.png)
+
+Teammates' cards were big red bars on the right side, over the middle of
+the screen, and the pick card and your kaiju's card took two blocks down
+the left. Now:
+
+- **Your kaiju** are one row at the top left, where the pick card was
+  (`MobileLayout.kaiju`): the three fighters and the support, AUTO HEAL,
+  then the team keys 1–4 (the team that's out is gold). There's no CALL
+  BACK button on it: tap the team that's out to call it back, another team
+  to send it out instead. See [kaiju.md](kaiju.md#your-team).
+- **The pick card** shows only while you mine: it comes up under your
+  kaiju's row with your first swing and goes 6 seconds after your last
+  (`OutpostScene`, `MobileLayout.card`).
+- **Teammates** are rows under your HP bar, the same size as it
+  (`MobileLayout.party`): their name in their colour, a gold edge for the
+  leader, and their health. Up to three.
+- **Full screens** (the Inventory, the Store, the Market, Social, the
+  kaiju panel and the like) hide the teammates' rows on a phone and on a
+  computer, so they no longer draw over them.
+
+When teammates' rows push the column down, the toasts' place and the loot
+card move under it (see below).
+
 ### The top right: toasts and your loot
 
 ![The top right on a phone: a toast and the loot card, before and now](mobile/phone-top-right.png)
@@ -145,22 +174,23 @@ their words. Now they stack in one column on the right:
 
 - **A toast** comes up in the top right (`MobileLayout.toast`): one at a
   time, one line, only as wide as its words (240 points at most, wrapping
-  past that) and 30 points in from the edge, clear of the slim tab Roblox
-  puts on a phone's right side.
-- **The loot card** sits right under the toast's place, right-aligned with
-  it, and 196 points wide (it was 250). Its rarity, the gem's name and its
+  past that), left of the coins and after your kaiju's row. Where that
+  leaves less than 170 points (667 and 736 wide), it goes under your
+  health and teammates instead, right-aligned with them.
+- **The loot card** sits under your health and teammates, right-aligned
+  with them, and 196 points wide (it was 250). With three teammates on a
+  short screen it'd reach the jump button, so it goes beside the column
+  instead, where there's room. Its rarity, the gem's name and its
   worth are three lines beside the reel, so a long name still fits. Its row
   under it shows the gem's name in its rarity's colour, with no rarity
   name, so the name isn't cut off. While a toast wraps onto a second line,
   the card steps down under it, and back up when the toast goes.
-- The card and its row end above the teammates' cards (PartyUI). The live
-  feed in the top middle now stops short of the toasts' place.
+- The live feed in the top middle stops short of the toasts' place.
 
 `tests/mobile_layout_cases.luau` checks, on every phone size, that the toast
 and the card (with its row) stay on the screen, clear of Roblox's tab, of
-each other, of the pick card, the coins, the dock, the teammates' cards and
-your kaiju's card, and that the card sits right under the toast and lines up
-with it. It checks the same for FIGHT / MINE: just left of PLAY and level
+each other, of the pick card, the coins, the dock, the teammates' rows and
+your kaiju's row, with no teammates, one and three. It checks the same for FIGHT / MINE: just left of PLAY and level
 with it, room for its word, clear of PLAY, the tiles, Roblox's thumbstick
 and jump button, the cards and the fight's ring. It also checks that the
 fight's vitals and moves keep right of it and clear of GUARD, and that
@@ -313,8 +343,12 @@ get out from under Roblox's buttons, which it used to sit under.
 | `UiKit.topbar(width)`, `UiKit.onTopbar(fn)`, `UiKit.reserveTopbar(width)` | The strip Roblox's buttons sit in, a call when it changes, and room in it for DEV (see [Roblox's buttons](#roblox-s-buttons)) |
 | `UiKit.fit(label)` | Keeps a one-line label at its size, shrinking it only when its words don't fit |
 | `UiKit.shrinkRow(row, list)` | Shrinks a row laid out side by side to its parent's width when its contents outgrow it |
-| `MobileLayout.toast(screen)` | A toast's place on a phone: top right, `Toast.W` (240) at most, one line (`Toast.H`) |
-| `MobileLayout.loot(screen)` | Where the slim loot card goes on a phone: under the toast's place, right-aligned with it |
+| `MobileLayout.kaiju(screen, hunting)`, `kaijuCells(card)` | Your kaiju's one row at the top left (right-aligned under your health while you hunt), and where its tiles, AUTO HEAL and team keys go |
+| `MobileLayout.card(screen)` | The pick card's place: under your kaiju's row |
+| `MobileLayout.party(screen, rows)`, `setPartyRows(n)`, `onParty(fn)` | Teammates' rows under your HP bar, how many are up, and a call when that changes |
+| `MobileLayout.toast(screen)` | A toast's place on a phone: left of the coins, `Toast.W` (240) at most, one line (`Toast.H`); `Under` when it goes under the column instead |
+| `MobileLayout.loot(screen)` | Where the slim loot card goes on a phone: under your health and teammates; `Beside` when it goes beside them |
+| `MobileLayout.topGap(screen)` | The room left at the top middle (the live feed and the level-up card) |
 | `UiKit.toastBottom()`, `UiKit.onToastMoved(fn)` | How far down a phone's toast reaches, and a call when that changes (the loot card moves under one that wraps) |
 | `MobileLayout.claimTop(owner, on)`, `topClaimed()`, `onTop(fn)` | Who has the top (the loot card), so the feed can step aside |
 | `BodyHealth.watch(model)` | A creature's health on its body, not over its head |

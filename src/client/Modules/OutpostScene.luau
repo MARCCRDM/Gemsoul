@@ -233,6 +233,14 @@ hint.Visible = not UserInputService.TouchEnabled
 local cardScale = new("UIScale", { Scale = 1 }, card)
 local expanded = false
 local collapseAt = 0
+-- It shows only while you mine: from a swing (or a find) till MINING_SHOW
+-- seconds after the last one, or while it's opened. On a phone it sits
+-- under your kaiju's card (MobileLayout.card), which has the top left.
+local MINING_SHOW = 6
+local minedAt = -math.huge
+local function mining(): boolean
+	return expanded or os.clock() - minedAt < MINING_SHOW
+end
 local blockingScreens = {
 	Dashboard = true, Shop = true, Season = true, AugmentTree = true,
 	SurgeArray = true, Social = true, ProbeExchange = true, WelcomeBundle = true,
@@ -248,11 +256,13 @@ local function fitOutpostHud()
 		or (mobile and player:GetAttribute("ChatOpen") == true)
 	if blocked or not hud.Enabled then expanded = false end
 	card.Size = UDim2.fromOffset(300, if expanded then 100 elseif mobile then 64 else 44)
+	local spot = if mobile then MobileLayout.card() else { X = 12, Y = 12 }
+	card.Position = UDim2.fromOffset(spot.X, spot.Y)
 	togglePick.Size = UDim2.fromScale(1, 1)
 	track.Position = UDim2.fromOffset(14, if mobile and not expanded then 48 else 30)
 	-- Keep the contents at their designed width; scale the whole card on narrow screens.
 	cardScale.Scale = math.min(if mobile then MobileLayout.CardScale elseif expanded then 1 else 0.78, math.max(0.1, (size.X - 24) / 300))
-	card.Visible = not blocked
+	card.Visible = not blocked and mining()
 	for _, promptGui in miningPrompts do
 		promptGui.Enabled = not blocked and hud.Enabled
 	end
@@ -673,6 +683,8 @@ local revealToken = 0
 -- over your head: the server broadcasts it (MiningWorldReveal).
 function OutpostScene.reveal(loot, at: Vector3?)
 	if loot.Tutorial then return end
+	minedAt = os.clock()
+	fitOutpostHud()
 	MinerLoot.push(loot)
 	-- (every rock pays one gem: no coins, no gear)
 	if loot.Gem then
@@ -885,6 +897,8 @@ function OutpostScene.swing(nodeId: number?, walked: boolean?)
 		end)
 		return
 	end
+	minedAt = os.clock()
+	fitOutpostHud()
 	task.spawn(function()
 		local result = GemClient.request("OutpostHit", id)
 		if result.State then
@@ -1981,6 +1995,8 @@ task.spawn(function()
 			if expanded and os.clock() >= collapseAt then
 				expanded = false
 				fitOutpostHud()
+			elseif card.Visible and not mining() then
+				fitOutpostHud() -- (you've stopped mining: the pick card goes)
 			end
 		end
 	end

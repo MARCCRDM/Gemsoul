@@ -489,7 +489,7 @@ Vendors.Tips = {
 	"Hold your swing and release it on gold for a perfect hit.",
 	"Your sword's gem gives you Q, your chest's E and your shield's R. Swap a gem to swap the move.",
 	"Thermal beats Cryo, Cryo beats Ion, Ion beats Corrosive and Corrosive beats Thermal.",
-	"Press 1 to ask the nearest miner to spar. In a spar, only the two of you can hit each other.",
+	"Press Z by another miner to ask to spar. In a spar, only the two of you can hit each other.",
 	"Arena win streaks restore swings: a tenth on the first win, a quarter on the fifth, half on the tenth.",
 	"A loss ends your win streak. Choose your duels carefully.",
 	-- The base

@@ -3304,6 +3304,66 @@ local function yourTeam()
 	squad = KaijuServer.team(a)
 	check(#squad == 3, "Deployed, the team isn't all out: " .. #squad)
 	check(not registered.KaijuCallBack(a, "yes").Ok, "Called back with nonsense")
+	-- Teams and their keys (Kaiju.Teams): Team 2 fills once Team 1 is full;
+	-- 1 (the team out's own key) calls it back and brings it out again; 2
+	-- swaps Team 2 in (and not again within SwitchSeconds); an empty team's
+	-- key does nothing; from called back, 1 deploys only out of danger.
+	-- KaijuSwap trades two places.
+	do
+		local team1 = Kaiju.teamIds(roster)
+		check(#team1 == 3 and Kaiju.outTeam(roster) == 1, "Team 1 isn't out")
+		local extra = {}
+		for i = 1, 3 - #Kaiju.teamOf(roster, 2) do
+			local record = KaijuServer.adopt(a, "Razorback", Kaiju.rollSoul(Random.new(40 + i), "Fire", { Id = "tm" .. i, Time = 1 }), 1)
+			if record then
+				table.insert(extra, record)
+			end
+		end
+		local team2 = Kaiju.teamOf(roster, 2)
+		check(#team2 == 3, "Team 2 isn't three once Team 1 is full: " .. #team2)
+		local empty = Kaiju.teamCount(roster) + 1
+		check(empty > Kaiju.Teams or (not registered.KaijuTeamOut(a, empty).Ok and Kaiju.outTeam(roster) == 1), "An empty team came out")
+		check(not registered.KaijuTeamOut(a, 0).Ok and not registered.KaijuTeamOut(a, "2").Ok, "A team that isn't one")
+		now += Kaiju.SwitchSeconds + 0.1
+		check(registered.KaijuTeamOut(a, 2).Ok and Kaiju.outTeam(roster) == 2, "2 didn't swap Team 2 in")
+		local out = KaijuServer.team(a)
+		local ids2 = {}
+		for _, pet in out do
+			ids2[pet.Record.Id] = true
+		end
+		check(ids2[team2[1]] and ids2[team2[2]] and ids2[team2[3]] and not ids2[team1[1]], "Team 2 isn't the one out")
+		check(not registered.KaijuTeamOut(a, 1).Ok and Kaiju.outTeam(roster) == 2, "Swapped back within SwitchSeconds")
+		now += Kaiju.SwitchSeconds + 0.1
+		check(registered.KaijuTeamOut(a, 2).Ok and Kaiju.away(roster) and #KaijuServer.team(a) == 0, "2 again didn't call Team 2 back")
+		KaijuServer.inDanger = function()
+			return true
+		end
+		check(not registered.KaijuTeamOut(a, 1).Ok and Kaiju.away(roster) and Kaiju.outTeam(roster) == 2, "Deployed from called back in danger")
+		KaijuServer.inDanger = function()
+			return false
+		end
+		check(registered.KaijuTeamOut(a, 1).Ok and not Kaiju.away(roster) and Kaiju.outTeam(roster) == 1, "1 didn't deploy Team 1")
+		KaijuServer.inDanger = inDanger
+		check(#KaijuServer.team(a) == 3, "Team 1 isn't all out again")
+		-- Swap a kaiju of Team 2 into Team 1: it's out, the other's home.
+		now += Kaiju.SwitchSeconds + 0.1
+		check(registered.KaijuSwap(a, team1[3], team2[1]).Ok, "Couldn't swap two kaiju")
+		check(Kaiju.teamNumber(roster, team2[1]) == 1 and Kaiju.teamNumber(roster, team1[3]) == 2, "The swap didn't trade teams")
+		local outNow = {}
+		for _, pet in KaijuServer.team(a) do
+			outNow[pet.Record.Id] = true
+		end
+		check(outNow[team2[1]] and not outNow[team1[3]], "Swapped in, it isn't out")
+		check(not registered.KaijuSwap(a, team1[1], "nope").Ok and not registered.KaijuSwap(a, team1[1], team1[1]).Ok, "Swapped with nonsense")
+		-- (back as it was, for what follows)
+		registered.KaijuSwap(a, team1[3], team2[1])
+		for _, record in extra do
+			roster.List[record.Id] = nil
+		end
+		Kaiju.saveOrder(roster, Kaiju.order(roster))
+		KaijuServer._upkeep(a, now)
+		squad = KaijuServer.team(a)
+	end
 	-- EXP: each one out gets it.
 	local before = {}
 	for _, member in squad do
@@ -6008,7 +6068,7 @@ end)()
 		rootA.CFrame = CFrame.new(rock.At + Vector3.new(3, 0, 0))
 		a:SetAttribute("Spar", true)
 		a:SetAttribute("Hunt", true)
-		check(registered.RiftMine(a, rock.Id).Message == "Press 1 for your pick to mine.", "Mined a crystal with the kit out")
+		check(registered.RiftMine(a, rock.Id).Message == "Press Y for your pick to mine.", "Mined a crystal with the kit out")
 		a:SetAttribute("Spar", nil)
 		a:SetAttribute("Hunt", nil)
 		local gems = #profiles[a].Gems

@@ -8,23 +8,24 @@
 	                  portrait (the model itself), level, health,
 	                  and dots for its Q, E and R, lit when ready (hollow
 	                  while asleep); knocked out, DOWN and when it's back by
-	                  itself (tap it to revive it now). AUTO HEAL at
-	                  its end: a Common, how many you have spare, and ON or
+	                  itself (tap it to revive it now). AUTO HEAL after
+	                  them: a Common, how many you have spare, and ON or
 	                  OFF; on, your spare Commons heal the team by themselves
-	                  (Shared.Kaiju.AutoHeal, KaijuServer). Beside it CALL
-	                  BACK: the team put away in its Gemsouls (each tile
-	                  AWAY); then DEPLOY brings it out again, only out of
-	                  danger (IN DANGER till then: Shared.Kaiju.away,
-	                  KaijuServer's KaijuDanger). Tap a tile for
-	                  the panel on that kaiju. One card, three by two:
-	                  the kaiju two by two (the team's three and the
-	                  support), AUTO HEAL over CALL BACK beside them; the
-	                  team's HYPERBEAM is its outline, its pill on the
-	                  bottom edge (KaijuBeamHud, in KaijuHud.beamSlot()).
-	                  Computer: bottom left. Phone: on the left under the
-	                  pick card (your level and coins are at the top right),
-	                  and on the right under your health while you hunt
-	                  (the fight's foe list has the top left then)
+	                  (Shared.Kaiju.AutoHeal, KaijuServer). Then the team
+	                  keys, 1 to 4 (Shared.Kaiju.Teams): press a number or
+	                  tap its chip. The team out's own number calls it back
+	                  into its Gemsouls (each tile AWAY) or brings it out
+	                  again (only out of danger: IN DANGER till then,
+	                  Shared.Kaiju.away, KaijuServer's KaijuDanger); another
+	                  team's swaps it in (KaijuServer's KaijuTeamOut). Tap a
+	                  tile for the panel on that kaiju. The team's HYPERBEAM
+	                  is the card's outline, its pill on the bottom edge
+	                  (KaijuBeamHud, in KaijuHud.beamSlot()). Computer:
+	                  bottom left, three by two (the kaiju two by two, AUTO
+	                  HEAL over the team keys). Phone: one row at the top
+	                  left (the pick card shows under it while you mine), and
+	                  on the right under your health while you hunt (the
+	                  fight's foe list has the top left then)
 	                  (MobileLayout.kaiju, kaijuDesk, kaijuCells).
 	  TAME            beside the strip when a wild kaiju near you is down to
 	                  half its health (it glows gold then: KaijuTaming): the
@@ -426,34 +427,37 @@ autoState.TextXAlignment = Enum.TextXAlignment.Center
 local autoWant: boolean? = nil -- (switched here, till the roster says so)
 local autoArt: string? = nil
 
--- CALL BACK, beside AUTO HEAL: the team put away in its Gemsouls. Called
--- back, it's DEPLOY, which brings them out again, only out of danger (IN
--- DANGER till then). A gem mark over the word: hollow while they're out,
--- filled in once they're in it.
-local callButton = new("TextButton", {
-	Name = "CallBack",
-	Text = "",
-	AutoButtonColor = true,
-	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -5, 0.5, 0),
-	Size = UDim2.fromOffset(72, 52),
-	BackgroundColor3 = TILE_BACK,
-}, card)
-UiKit.round(callButton, 8)
-local callEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, callButton)
-local callMark = new("Frame", {
-	Name = "Mark",
-	AnchorPoint = Vector2.new(0.5, 0),
-	BackgroundColor3 = P.Dim,
+-- The team keys, beside AUTO HEAL: four chips, 1 to 4 (Kaiju.Teams), the
+-- keys that bring each team out. The team out is gold; picked but called
+-- back, a gold edge (red while you're in danger: it deploys only out of
+-- it); a team with kaiju in it, plain; one all knocked out, red; one not
+-- filled yet, faint (they fill in order: Kaiju.order). Tap one or press its
+-- number: the team out's own calls it back or brings it out again, another
+-- team's swaps it in (KaijuServer's KaijuTeamOut).
+local teamPad = new("Frame", {
+	Name = "Teams",
 	BackgroundTransparency = 1,
-	Rotation = 45,
-}, callButton)
-local callMarkEdge = new("UIStroke", { Color = P.Dim, Thickness = 1.5 }, callMark)
-local callTitle = label(callButton, "CALL BACK", 9, P.Dim, IronUi.Bold)
-callTitle.TextXAlignment = Enum.TextXAlignment.Center
-local callState = label(callButton, "", 8, P.Dim, IronUi.Bold)
-callState.TextXAlignment = Enum.TextXAlignment.Center
-local callWant: boolean? = nil -- (pressed here, till the roster says so)
+	Size = UDim2.fromOffset(72, 52),
+}, card)
+local teamChips = {}
+local pressTeam -- (below: a team's key or its chip)
+for n = 1, Kaiju.Teams do
+	local chip = new("TextButton", {
+		Name = "Team" .. n,
+		Text = "",
+		AutoButtonColor = true,
+		BackgroundColor3 = TILE_BACK,
+	}, teamPad)
+	UiKit.round(chip, 6)
+	local edge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, chip)
+	local number = label(chip, tostring(n), 14, P.Text, Enum.Font.GothamBlack)
+	number.Size, number.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+	number:SetAttribute("NoTranslate", true)
+	chip.Activated:Connect(function()
+		pressTeam(n)
+	end)
+	teamChips[n] = { Button = chip, Edge = edge, Number = number }
+end
 
 -- The team's HYPERBEAM's pill, on the card's bottom edge (KaijuBeamHud
 -- draws it in here, and its meter round the card: KaijuHud.beamSlot()).
@@ -527,8 +531,9 @@ local function layout()
 	end
 	local phone = UiKit.short()
 	local hunting = Spar.hunting(player)
-	-- One card, three by three (MobileLayout.kaiju, kaijuDesk, kaijuCells):
-	-- the kaiju two by two, AUTO HEAL over CALL BACK, the HYPERBEAM.
+	-- One card (MobileLayout.kaiju, kaijuDesk, kaijuCells): on a computer
+	-- the kaiju two by two, AUTO HEAL over the team keys; on a phone all in
+	-- one row; the HYPERBEAM round it.
 	local spot = if phone then MobileLayout.kaiju(screen, hunting) else MobileLayout.kaijuDesk(screen)
 	card.Position = UDim2.fromOffset(spot.X, spot.Y)
 	card.Size = UDim2.fromOffset(spot.W, spot.H)
@@ -551,7 +556,22 @@ local function layout()
 		end
 	end
 	place(autoButton, cells.Auto)
-	place(callButton, cells.Call)
+	place(teamPad, cells.Teams)
+	-- (the four team chips: in a row on a phone, like the keys; two by two
+	-- on a computer)
+	do
+		local gap = 3
+		local across = if cells.Row then Kaiju.Teams else 2
+		local down = math.ceil(Kaiju.Teams / across)
+		local w = math.floor((cells.Teams.W - gap * (across - 1)) / across)
+		local h = math.floor((cells.Teams.H - gap * (down - 1)) / down)
+		for n, chip in teamChips do
+			local col, row = (n - 1) % across, (n - 1) // across
+			chip.Button.Position = UDim2.fromOffset(col * (w + gap), row * (h + gap))
+			chip.Button.Size = UDim2.fromOffset(w, h)
+			chip.Number.TextSize = math.clamp(math.floor(math.min(w, h) * 0.62), 10, 16)
+		end
+	end
 	place(beamSlot, cells.Beam)
 	-- CATCH: a readable, non-modal prompt, at the top right on touch (under
 	-- the card while you hunt), above the combat HUD at center on a computer.
@@ -581,8 +601,7 @@ local function layout()
 		tameTries.Position, tameTries.Size = UDim2.new(1, -right - 50, 0, top + 14), UDim2.fromOffset(50, 12)
 	end
 	-- AUTO HEAL: a Common and how many you have spare, then its name, ON or
-	-- OFF (on a short row two lines: the gem, then AUTO ON); CALL BACK: its
-	-- gem mark, then its name, and IN DANGER when it can't.
+	-- OFF (on a short row two lines: the gem, then AUTO ON).
 	local th = cells.Auto.H
 	local small = th < 46
 	card:SetAttribute("Compact", small)
@@ -596,15 +615,9 @@ local function layout()
 	local stateH = if small then 12 else 14
 	autoState.Position = UDim2.new(0, 0, 1, -(if small then 3 else 1) - stateH)
 	autoState.Size, autoState.TextSize = UDim2.new(1, 0, 0, stateH), if small then 10 else 13
-	local mark = if small then 9 else 12
-	callMark.Size = UDim2.fromOffset(mark, mark)
-	callMark.Position = UDim2.new(0.5, 0, 0, if small then 6 else 8)
-	callTitle.Position = UDim2.new(0, 0, 0, if small then 18 else 24)
-	callTitle.Size, callTitle.TextSize = UDim2.new(1, 0, 0, if small then 10 else 11), if small then 7 else 9
-	callState.Position = UDim2.new(0, 0, 1, -(if small then 10 else 15))
-	callState.Size, callState.TextSize = UDim2.new(1, 0, 0, if small then 9 else 10), if small then 7 else 8
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
+MobileLayout.onParty(layout) -- (CATCH keeps short of your loot card, under your teammates' rows)
 player:GetAttributeChangedSignal("Hunt"):Connect(layout)
 
 -- Your spare Commons, then Uncommons (what AUTO HEAL uses, in that order:
@@ -668,27 +681,36 @@ local function drawAuto(lead)
 	end
 end
 
--- CALL BACK as it stands: CALL BACK while they're out; called back, DEPLOY
--- (green when it can, IN DANGER while you're in danger).
-local function drawCall()
-	local away = Kaiju.away(roster())
-	if callWant ~= nil and callWant ~= away then
-		away = callWant
-	else
-		callWant = nil
-	end
+-- The team chips as they stand (see teamPad).
+local function drawTeams()
+	local data = roster()
+	local out, away = Kaiju.outTeam(data), Kaiju.away(data)
 	local danger = player:GetAttribute("KaijuDanger") == true
-	local ready = away and not danger
-	callTitle.Text = if away then "DEPLOY" else "CALL BACK"
-	callTitle.TextColor3 = if ready then P.Good else if away then P.Dim else P.Text
-	callState.Text = if away and danger then "IN DANGER" elseif ready then "READY" else ""
-	callState.TextColor3 = if danger then P.Bad:Lerp(P.Text, 0.25) else P.Good
-	callEdge.Color = if ready then P.Good else P.Edge
-	callButton.BackgroundColor3 = if ready then P.Good:Lerp(INK, 0.78) else TILE_BACK
-	local markColor = if ready then P.Good elseif away then P.Dim else P.Text
-	callMark.BackgroundColor3, callMarkEdge.Color = markColor, markColor
-	-- (Filled in: they're in their Gemsouls.)
-	callMark.BackgroundTransparency = if away then 0 else 1
+	for n, chip in teamChips do
+		local ids = Kaiju.teamOf(data, n)
+		local standing = 0
+		for _, id in ids do
+			if not data.List[id].Down then
+				standing += 1
+			end
+		end
+		local filled = #ids > 0
+		local back, edge, text = TILE_BACK, P.Edge, P.Text
+		if filled and n == out and not away then
+			back, edge, text = P.Gold, P.Gold, INK
+		elseif filled and n == out then
+			edge, text = if danger then P.Bad else P.Gold, P.Gold
+		elseif filled and standing == 0 then
+			edge, text = P.Bad:Lerp(P.Edge, 0.5), P.Bad:Lerp(P.Text, 0.3)
+		elseif not filled then
+			text = P.Dim
+		end
+		chip.Button.BackgroundColor3 = back
+		chip.Button.BackgroundTransparency = if filled then 0 else 0.55
+		chip.Button.AutoButtonColor = filled
+		chip.Edge.Color, chip.Edge.Transparency = edge, if filled then 0 else 0.55
+		chip.Number.TextColor3, chip.Number.TextTransparency = text, if filled then 0 else 0.45
+	end
 end
 
 local function drawTile(tile, record, model: Model?, lead: boolean)
@@ -1190,10 +1212,153 @@ local tabButtons = {}
 local rowLive = {} -- [id] = the bits of its row that change while you look
 local drawPanel
 
-for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" }, { "Soul", "ENCHANT" } } do
+-- TEAMS: your four teams (Kaiju.Teams), a row each with its places
+-- (Kaiju.slots). They fill in order (Kaiju.order): a team past the one
+-- filling is LOCKED till that one's full. Tap a kaiju, then another in any
+-- team, and they swap places (KaijuSwap); tap the one picked again to let
+-- it go. SEND OUT brings a team out, as its number key does (pressTeam).
+local teamsUi = {} -- (one table: this file is at Luau's 200 locals)
+teamsUi.Pane = new("Frame", {
+	Name = "Teams",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 38),
+	Size = UDim2.new(1, 0, 1, -38),
+	Visible = false,
+}, right)
+do
+	local hintH = if SHORT then 16 else 22
+	teamsUi.Hint = label(teamsUi.Pane, "", if SHORT then 10 else 11, P.Dim, IronUi.Body)
+	teamsUi.Hint.Size = UDim2.new(1, 0, 0, hintH - 4)
+	teamsUi.Rows = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, hintH),
+		Size = UDim2.new(1, 0, 1, -hintH),
+	}, teamsUi.Pane)
+end
+teamsUi.Pick = nil :: string?
+function teamsUi.draw(data)
+	for _, child in teamsUi.Rows:GetChildren() do
+		child:Destroy()
+	end
+	local order, size = Kaiju.order(data), Kaiju.slots(data)
+	local filling = math.clamp(math.floor(#order / size) + 1, 1, Kaiju.Teams) -- (the team the next catch joins)
+	local out, away = Kaiju.outTeam(data), Kaiju.away(data)
+	if teamsUi.Pick and not table.find(order, teamsUi.Pick) then
+		teamsUi.Pick = nil
+	end
+	teamsUi.Hint.Text = if teamsUi.Pick
+		then "Now tap the kaiju to swap it with (or tap it again to let go)."
+		else "Tap a kaiju, then another, to swap them. Press 1 to 4 to bring a team out."
+	teamsUi.Hint.TextColor3 = if teamsUi.Pick then P.Gold else P.Dim
+	local gap = 4
+	local rowH = if SHORT then 48 else 84
+	local nameW, buttonW = if SHORT then 74 else 66, if SHORT then 82 else 76
+	for n = 1, Kaiju.Teams do
+		local isOut = n == out
+		local row = new("Frame", {
+			Name = "Team" .. n,
+			BackgroundColor3 = if isOut and not away then P.Gold:Lerp(INK, 0.86) else P.Inset,
+			Position = UDim2.fromOffset(0, (n - 1) * (rowH + gap)),
+			Size = UDim2.new(1, 0, 0, rowH),
+		}, teamsUi.Rows)
+		UiKit.round(row, 8)
+		new("UIStroke", { Color = if isOut then P.Gold else P.Edge, Thickness = 1, Transparency = if isOut then 0.2 else 0.6 }, row)
+		-- Its number (its key), and whether it's out.
+		local number = label(row, tostring(n), if SHORT then 18 else 24, if isOut then P.Gold else P.Text, Enum.Font.GothamBlack)
+		number:SetAttribute("NoTranslate", true)
+		number.Position, number.Size = UDim2.fromOffset(8, if SHORT then 2 else 10), UDim2.fromOffset(nameW - 10, if SHORT then 22 else 30)
+		local filled = #Kaiju.teamOf(data, n)
+		local stateText = if filled == 0 and n > filling then "LOCKED"
+			elseif filled == 0 then "EMPTY"
+			elseif isOut and away then "CALLED BACK"
+			elseif isOut then "OUT"
+			else "TEAM " .. n
+		local state = label(row, stateText, 9, if isOut then P.Gold else P.Dim, IronUi.Bold)
+		state.Position, state.Size = UDim2.fromOffset(8, if SHORT then 25 else 44), UDim2.fromOffset(nameW - 10, 14)
+		-- Its places.
+		local cellsW = row.AbsoluteSize.X > 0 and row.AbsoluteSize.X or (if SHORT then 608 else 490)
+		local cellW = math.floor((cellsW - nameW - buttonW - 12 - gap * (size - 1)) / size)
+		for i = 1, size do
+			local id = order[(n - 1) * size + i]
+			local record = id and data.List[id]
+			local x = nameW + (i - 1) * (cellW + gap)
+			local cell = new("TextButton", {
+				Name = "Place" .. i,
+				Text = "",
+				AutoButtonColor = record ~= nil,
+				BackgroundColor3 = if record and teamsUi.Pick == id then P.Gold:Lerp(INK, 0.55) else TILE_BACK,
+				BackgroundTransparency = if record then 0 else 0.4,
+				Position = UDim2.fromOffset(x, 4),
+				Size = UDim2.fromOffset(cellW, rowH - 8),
+			}, row)
+			UiKit.round(cell, 6)
+			if not record then
+				local note = label(cell, if n > filling then string.format("Fill Team %d first", n - 1) else "Open", 9, P.Dim, IronUi.Bold)
+				note.Size, note.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+				continue
+			end
+			local color = elementColor(record.Element)
+			new("UIStroke", { Color = if teamsUi.Pick == id then P.Gold else color, Thickness = if teamsUi.Pick == id then 2 else 1, Transparency = if teamsUi.Pick == id then 0 else 0.5 }, cell)
+			-- (a phone: its face, then its name and level beside it; a
+			-- computer: its face over its name and level, so the name fits)
+			local face = if SHORT then rowH - 16 else 42
+			local view = viewport(cell, {
+				Position = if SHORT then UDim2.fromOffset(4, 4) else UDim2.new(0.5, -face / 2, 0, 3),
+				Size = UDim2.fromOffset(face, face),
+			})
+			UiKit.round(view, 6)
+			portrait(view, modelFor("team:" .. id, record))
+			local name = nameLabel(cell, Kaiju.nameOf(record), if SHORT then 10 else 11, color:Lerp(P.Text, 0.35), IronUi.Bold)
+			local level = label(cell, (if record.Down then "DOWN  ·  " else "") .. "LV " .. tostring(record.Level or 1), 9, if record.Down then P.Bad else P.Dim, IronUi.Bold)
+			if SHORT then
+				name.Position, name.Size = UDim2.fromOffset(face + 8, 4), UDim2.new(1, -(face + 12), 0, 14)
+				level.Position, level.Size = UDim2.fromOffset(face + 8, 20), UDim2.new(1, -(face + 12), 0, 12)
+			else
+				name.Position, name.Size = UDim2.fromOffset(4, face + 6), UDim2.new(1, -8, 0, 14)
+				level.Position, level.Size = UDim2.fromOffset(4, face + 21), UDim2.new(1, -8, 0, 12)
+				name.TextXAlignment, level.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
+			end
+			cell.Activated:Connect(function()
+				if teamsUi.Pick == nil then
+					teamsUi.Pick = id
+					teamsUi.draw(roster())
+				elseif teamsUi.Pick == id then
+					teamsUi.Pick = nil
+					teamsUi.draw(roster())
+				else
+					local a = teamsUi.Pick
+					teamsUi.Pick = nil
+					task.spawn(function()
+						local result = GemClient.request("KaijuSwap", a, id)
+						if not result.Ok and result.Message and result.Message ~= "" then
+							UiKit.toast(result.Message, P.Bad)
+						end
+						if window.Gui.Enabled and tab == "Teams" then
+							teamsUi.draw(roster())
+						end
+					end)
+					teamsUi.draw(roster())
+				end
+			end)
+		end
+		-- SEND OUT (as its key does), or where it stands.
+		if filled > 0 and not (isOut and not away) then
+			local send = smallButton(row, if isOut then "DEPLOY" else "SEND OUT", P.Gold)
+			send.AnchorPoint = Vector2.new(1, 0.5)
+			send.Position = UDim2.new(1, -6, 0.5, 0)
+			send.Size = UDim2.fromOffset(buttonW, if SHORT then 30 else 32)
+			send.TextSize = if SHORT then 10 else 11
+			send.Activated:Connect(function()
+				pressTeam(n)
+			end)
+		end
+	end
+end
+
+for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" }, { "Soul", "ENCHANT" }, { "Teams", "TEAMS" } } do
 	local b = smallButton(tabRow, entry[2], P.Gold)
 	b.LayoutOrder = order
-	b.Size = UDim2.fromOffset(if SHORT then 104 else 120, 28)
+	b.Size = UDim2.fromOffset(if SHORT then 104 else 112, 28)
 	b.Activated:Connect(function()
 		tab = entry[1]
 		swapping = false
@@ -2393,6 +2558,14 @@ function drawPanel()
 	detail.Visible = tab == "Details" and record ~= nil
 	healPane.Visible = tab == "Heal" and record ~= nil
 	soulUi.soulPane.Visible = tab == "Soul" and record ~= nil
+	teamsUi.Pane.Visible = tab == "Teams" and data ~= nil
+	if tab == "Teams" and data then
+		teamsUi.draw(data)
+		if record then
+			portrait(heroView, nil)
+		end
+		return
+	end
 	if not record then
 		portrait(heroView, nil)
 		return
@@ -2485,6 +2658,7 @@ function KaijuHud.open(id: string?, onTab: string?)
 	tab = if onTab == "Heal" or onTab == "Infuse"
 		then "Heal"
 		elseif onTab == "Soul" or onTab == "Enchant" then "Soul"
+		elseif onTab == "Teams" then "Teams"
 		else "Details"
 	swapping = false
 	pickFresh = true
@@ -2597,7 +2771,7 @@ local function refresh()
 		end
 	end
 	drawAuto(team[1] and data.List[team[1]])
-	drawCall()
+	drawTeams()
 	-- TAME.
 	local target, chance = tameTarget()
 	tameModel = target
@@ -2649,26 +2823,24 @@ autoButton.Activated:Connect(function()
 		end
 	end)
 end)
-callButton.Activated:Connect(function()
+-- A team's key or chip (see teamPad): an empty team says how they fill.
+function pressTeam(n: number)
 	local data = roster()
-	if not data or busy then
+	if not data or busy or not n then
 		return
 	end
-	local away = if callWant ~= nil then callWant else Kaiju.away(data)
-	if away and player:GetAttribute("KaijuDanger") == true then
-		UiKit.toast("Get clear of the fight first: your team deploys only out of danger.", P.Bad)
+	if #Kaiju.teamOf(data, n) == 0 then
+		UiKit.toast(
+			string.format("Team %d is empty. Your kaiju fill the teams in order: fill Team %d first.", n, Kaiju.teamCount(data)),
+			P.Gold
+		)
 		return
 	end
-	callWant = not away
-	pcall(refresh)
 	act(function()
-		local result = GemClient.request("KaijuCallBack", not away)
-		say(result)
-		if not (result and result.Ok) then
-			callWant = nil -- (as it was)
-		end
+		say(GemClient.request("KaijuTeamOut", n))
+		pcall(refresh)
 	end)
-end)
+end
 -- A wild kaiju's Challenge prompt: your kaiju go in (KaijuWilds).
 ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
 	if who ~= player or prompt:GetAttribute("PromptKind") ~= "KaijuChallenge" then
@@ -2720,6 +2892,18 @@ function KaijuHud.start()
 		if state == Enum.UserInputState.Begin then catchReady() end
 		return Enum.ContextActionResult.Sink
 	end, false, 3000, Enum.KeyCode.C)
+	-- The team keys: 1 to 4 bring a team out (pressTeam). (The kit switch,
+	-- SparKit, is on Y.)
+	local TEAM_KEYS = { [Enum.KeyCode.One] = 1, [Enum.KeyCode.Two] = 2, [Enum.KeyCode.Three] = 3, [Enum.KeyCode.Four] = 4 }
+	ContextActionService:BindActionAtPriority("KaijuTeams", function(_, state, input)
+		if UserInputService:GetFocusedTextBox() or not gui.Enabled or not card.Visible then
+			return Enum.ContextActionResult.Pass
+		end
+		if state == Enum.UserInputState.Begin then
+			pressTeam(TEAM_KEYS[input.KeyCode])
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, 3000, Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four)
 	KaijuTaming.start()
 	BodyHealth.start()
 	WildBars.start()

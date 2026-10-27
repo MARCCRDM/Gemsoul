@@ -304,9 +304,10 @@ function UiKit.toastBottom(): number
 	return 0
 end
 
--- Phones (a short landscape screen): one small toast at a time, in the top
--- right (MobileLayout.toast), as wide as its words, clear of the fight in
--- the middle and the thumb buttons lower down.
+-- Phones (a short landscape screen): one small toast at a time, left of
+-- your coins (MobileLayout.toast: under your health on a phone too narrow
+-- for that), as wide as its words, clear of the fight in the middle and
+-- the thumb buttons lower down.
 local function phone(): boolean
 	local camera = workspace.CurrentCamera
 	return game:GetService("UserInputService").TouchEnabled
@@ -351,9 +352,14 @@ function UiKit.toast(message: string, color: Color3?)
 	local accent = color or K.Gold
 	local small = phone()
 	local layout = toastHolder:FindFirstChildOfClass("UIListLayout")
-	local slot = MobileLayout.Toast
+	local screen = toastGui.AbsoluteSize
+	if screen.X <= 0 then
+		local camera = workspace.CurrentCamera
+		screen = if camera then camera.ViewportSize else Vector2.new(844, 332)
+	end
+	local slot = MobileLayout.toast(screen)
 	toastHolder.AnchorPoint = if small then Vector2.new(1, 0) else Vector2.new(0.5, 0)
-	toastHolder.Position = if small then UDim2.new(1, -slot.Right, 0, slot.Top) else UDim2.new(0.5, 0, 0, 12)
+	toastHolder.Position = if small then UDim2.fromOffset(slot.X + slot.W, slot.Y) else UDim2.new(0.5, 0, 0, 12)
 	toastHolder.Size = if small then UDim2.fromOffset(slot.W, 0) else UDim2.new(0.9, 0, 0, 0)
 	if layout then
 		layout.HorizontalAlignment = if small then Enum.HorizontalAlignment.Right else Enum.HorizontalAlignment.Center

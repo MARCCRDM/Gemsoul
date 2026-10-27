@@ -538,7 +538,7 @@ as the caves' crystals.
 
 ## Your kit and your pick
 
-Your combat kit is out when you go in, but you can put it away: **1** on a
+Your combat kit is out when you go in, but you can put it away: **Y** on a
 keyboard, or the **FIGHT / MINE** button on phones (at the bottom, left of
 the middle, where it sits beside PLAY in the Outpost), swaps between your kit and your pick, here and in the Outpost alike
 (`SparKit.toggle`, the server's `Hunt`). Not while you're down.

@@ -449,7 +449,7 @@ server = (ROOT / "src/server/Systems/OutpostServer.luau").read_text(encoding="ut
 spawn_node = server[server.index("local function spawnNode("):server.index("-- A rock popped:")]
 source += r'''
 do
-local freeSpots,fieldSpots,nodes={},{},{}
+local freeSpots,fieldSpots,nodes,healingSpots={},{},{},{}
 local nodesFolder={}
 local nextId=0
 local rng=Random.new(45)

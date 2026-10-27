@@ -636,8 +636,14 @@ local k4 = Kaiju.add(roster, "Razorback", soulFor("Toxic", "s4"))
 k4.Level = 7
 local ids = Kaiju.teamIds(roster)
 check(#ids == 3 and ids[1] == k1.Id, "The first kaiju doesn't lead a team of three")
-check(ids[2] == k4.Id and ids[3] == k2.Id, "Empty slots don't fill highest level, then oldest")
-check(Kaiju.inTeam(roster, k4.Id) and not Kaiju.inTeam(roster, k3.Id), "inTeam is wrong")
+-- (Teams fill in the order you catch them: Team 2 only once Team 1 is full.)
+check(ids[2] == k2.Id and ids[3] == k3.Id, "Team 1 isn't the first three caught")
+check(
+	table.concat(Kaiju.teamOf(roster, 2), ",") == k4.Id and #Kaiju.teamOf(roster, 3) == 0 and Kaiju.teamCount(roster) == 2,
+	"Team 2 doesn't start once Team 1 is full"
+)
+check(Kaiju.teamNumber(roster, k4.Id) == 2 and Kaiju.teamNumber(roster, k1.Id) == 1, "teamNumber is wrong")
+check(Kaiju.inTeam(roster, k2.Id) and not Kaiju.inTeam(roster, k4.Id), "inTeam is wrong")
 Kaiju.setTeam(roster, { k3.Id, k3.Id, "nope", k2.Id })
 ids = Kaiju.teamIds(roster)
 check(ids[1] == k3.Id and ids[2] == k2.Id and #ids == 3, "setTeam didn't keep its order (once each, owned)")
@@ -646,6 +652,45 @@ check(#roster.Team == 3, "setTeam didn't tidy the team it saved")
 roster.List[k3.Id] = nil
 check(Kaiju.teamIds(roster)[1] == k2.Id and #Kaiju.teamIds(roster) == 3, "A kaiju gone kept its place")
 check(#Kaiju.team(roster) == 3 and Kaiju.team(roster)[1] == k2, "Kaiju.team isn't the records in order")
+-- Four teams of three: twelve kaiju fill them in order; the team out is
+-- roster.Out (a team with nobody in it isn't one: Team 1); a support kind
+-- isn't in a team (its own slot); two swap places, and teams; setTeam puts
+-- kaiju in the team out, the ones there taking their places.
+do
+	local r = Kaiju.roster({})
+	local all = {}
+	for i = 1, 12 do
+		table.insert(all, Kaiju.add(r, if i % 2 == 0 then "Bulwark" else "Razorback", soulFor("Fire", "t" .. i)).Id)
+	end
+	local jelly = Kaiju.add(r, "Skyjelly", soulFor("Shock", "j"), nil, true)
+	check(Kaiju.Teams == 4 and Kaiju.teamCount(r) == 4, "Twelve kaiju aren't four teams")
+	for n = 1, 4 do
+		local team = Kaiju.teamOf(r, n)
+		check(#team == 3 and team[1] == all[n * 3 - 2] and team[3] == all[n * 3], "Team " .. n .. " isn't its three, in order")
+	end
+	check(jelly and Kaiju.teamNumber(r, jelly.Id) == nil and Kaiju.supportId(r) == jelly.Id, "The support is in a team")
+	check(Kaiju.outTeam(r) == 1 and Kaiju.teamIds(r)[1] == all[1], "Team 1 isn't out to start with")
+	r.Out = 3
+	check(Kaiju.outTeam(r) == 3 and Kaiju.teamIds(r)[2] == all[8], "roster.Out isn't the team out")
+	r.Out = 9
+	check(Kaiju.outTeam(r) == 4, "A team past the last isn't the last")
+	r.Out = 3
+	check(Kaiju.swap(r, all[1], all[9]) and Kaiju.teamNumber(r, all[1]) == 3 and Kaiju.teamOf(r, 1)[1] == all[9], "A swap didn't trade places")
+	check(not Kaiju.swap(r, all[1], jelly.Id), "A support swapped into a team")
+	Kaiju.setTeam(r, { all[2], all[7] })
+	check(Kaiju.teamIds(r)[1] == all[2] and Kaiju.teamIds(r)[2] == all[7] and Kaiju.teamNumber(r, all[1]) ~= nil, "setTeam didn't put them in the team out")
+	local counts = {}
+	for n = 1, 4 do
+		counts[n] = #Kaiju.teamOf(r, n)
+	end
+	check(counts[1] == 3 and counts[2] == 3 and counts[3] == 3 and counts[4] == 3, "setTeam left a team short")
+	check(r.Team ~= nil and r.Team[1] == all[2] and r.Active == all[2], "roster.Team and Active aren't the team out")
+	-- A team with nobody in it: back to Team 1.
+	local small = Kaiju.roster({})
+	Kaiju.add(small, "Razorback", soulFor("Fire", "u1"))
+	small.Out = 2
+	check(Kaiju.outTeam(small) == 1 and #Kaiju.teamIds(small) == 1, "An empty team is out")
+end
 -- One out from before (Active, no Team) still leads.
 local before = { List = { k1 = { Id = "k1", Level = 9 }, k2 = { Id = "k2", Level = 2 } }, Active = "k2" }
 check(Kaiju.teamIds(before)[1] == "k2" and Kaiju.teamIds(before)[2] == "k1", "The one out from before lost the lead")

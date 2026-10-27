@@ -12,7 +12,9 @@
 
 	  LobbyFeed.mount(gui)        builds both in the lobby's ScreenGui
 	  LobbyFeed.setCompact(on, span?)  phone layout, fitted to the gap it's
-	                                   given ({ X, W }) between the corners;
+	                                   given ({ X, W }) between the corners
+	                                   (none on most phones now: the top
+	                                   left has your kaiju's card);
 	                                   there, the feed steps aside while
 	                                   your loot card has the top middle
 	                                   (MobileLayout.claimTop)
@@ -531,14 +533,15 @@ function LobbyFeed.mount(gui: ScreenGui)
 	return stack
 end
 
--- `span` (a phone's) is the gap the feed fits in, between the pick card and
--- the board: { X = its left edge, W = its width }.
+-- `span` (a phone's) is the gap the feed fits in, between your kaiju's card
+-- and the toasts' place (MobileLayout.topGap): { X = its left edge, W = its
+-- width }.
 function LobbyFeed.setCompact(on: boolean, span: { X: number, W: number }?)
 	compact = on
 	if stack then
 		local width = if compact then 300 else 380
-		-- (A phone too narrow for it between the pick card and the toasts'
-		-- place: no feed there.)
+		-- (A phone too narrow for it between your kaiju's card and the
+		-- toasts' place: no feed there.)
 		local narrow = span ~= nil and span.W < 160
 		if span then
 			width = math.min(width, math.max(160, span.W))

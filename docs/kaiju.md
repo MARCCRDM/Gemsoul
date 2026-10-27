@@ -320,9 +320,34 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **Recall.** The server can still call all of them back to you for 4
   seconds (`KaijuRecall`), but the strip no longer has a button for it:
   AUTO HEAL took the place of RECALL and HUNT.
-- **CALL BACK / DEPLOY.** Beside AUTO HEAL: CALL BACK puts the whole team
-  away (they fold into light and fly to you); DEPLOY brings them out again,
-  only once you're out of danger (`KaijuCallBack`; `docs/levelup-lobby.md`).
+- **Teams 1 to 4, on the number keys.** Your kaiju fill four teams of
+  three, in order: Team 1 first, then Team 2, then 3, then 4 (12 kept at
+  most; the support has its own slot and is in no team). A new catch joins
+  the team that's filling. Press a team's number (or tap its chip on the
+  kaiju card) and:
+  - **the team out's own number** calls it back (they fold into light and
+    fly to you), and the same number brings it out again, only once you're
+    out of danger;
+  - **another team's number** swaps that team in: the team out goes back
+    and the other comes out where you are (three seconds between swaps,
+    `Kaiju.SwitchSeconds`);
+  - **an empty team** says how they fill ("Team 3 is empty. Your kaiju fill
+    the teams in order: fill Team 2 first."), and a team all knocked out
+    says so and stays home.
+
+  This replaced CALL BACK / DEPLOY: there's no button for them now, the
+  number does both (`KaijuTeamOut`; `Kaiju.order`, `teamOf`, `outTeam`). The
+  pick or combat kit switch moved from 1 to **Y** to free the numbers.
+- **The TEAMS tab** (the kaiju panel's fourth): a row for each team, its
+  three places, OUT or CALLED BACK on the team out, LOCKED on a team past
+  the one filling ("Fill Team 2 first" in its places), and SEND OUT on the
+  others. Tap a kaiju, then another, in any team, and they swap places
+  (`KaijuSwap`); tap the one picked again to let it go. Not in the middle
+  of a fight.
+
+  ![The TEAMS tab](kaiju/teams-tab.png)
+
+  ![The TEAMS tab on a phone](kaiju/teams-tab-phone.png)
 - **They jump with you, follow the leader.** Jump and your team jumps
   after you one by one, down your line: the one nearest you first (0.14 s
   after you), then each one behind it 0.26 s after the one before
@@ -532,12 +557,27 @@ On a computer the strip sits at the bottom left; the CATCH prompt appears
 above the combat HUD near the bottom center:
 [the lobby on a computer](kaiju/hud-desktop.png).
 
-- **The kaiju card:** one card, three across and two down
-  (`MobileLayout.kaiju`, `kaijuDesk`, `kaijuCells`):
+- **The kaiju card** (`MobileLayout.kaiju`, `kaijuDesk`, `kaijuCells`). On a
+  computer, three across and two down:
   - **The kaiju, two by two on the left:** your team's three (the lead
     first, edged in gold, then the second beside it and the third under
     it), and your support beside the third.
-  - **On the right:** AUTO HEAL over CALL BACK.
+  - **On the right:** AUTO HEAL over the team keys, four chips two by two:
+    the team out gold, one called back edged in gold (red while you're in
+    danger), one all knocked out red, one not filled yet faint.
+
+  On a phone, *2026-10-27*, **one row at the top left**, where the pick card
+  was: the team's three, the support a little apart, AUTO HEAL, then the
+  team keys 1 2 3 4 in a row. 351 by 59, the HYPERBEAM's pill on its bottom
+  edge. No CALL BACK (the number does it).
+
+  ![The kaiju row on a phone, with two teammates' health under yours](kaiju/hud-phone-row.png)
+
+  While you hunt it moves under your health on the right (the fight's foe
+  list takes the top left):
+
+  ![While you hunt](kaiju/hud-phone-row-hunting.png)
+
   - **Its outline:** the team's [HYPERBEAM](#hyperbeam) meter, with its
     pill on the card's bottom edge. *2026-10-26:* this replaced the
     full-width bottom row, so the card is shorter (143 px tall on a
@@ -554,11 +594,10 @@ above the combat HUD near the bottom center:
 
   Where it sits:
   - On a computer: the bottom left. The chat feed keeps clear above it.
-  - On a phone: right of your level, coins and health, 172 wide and at
-    most 124 tall (less if the space above the PLAY dock is shorter), clear
-    of the thumbstick.
-  - While you hunt: the top right, because the fight's foe list takes the
-    top left.
+  - On a phone: one row at the top left; the pick card shows under it only
+    while you mine (see [mobile.md](mobile.md)).
+  - While you hunt: under your health on the right, because the fight's foe
+    list takes the top left.
   - **AUTO HEAL**, in the middle row, in place of RECALL and HUNT: the gem
     it takes next (a Common of your lead's element; an Uncommon once the
     Commons are gone), how many spare Commons and Uncommons you have, and
@@ -1167,7 +1206,7 @@ Proposed guardrails:
 | `SparServer` | `Hunt`: the kit out alone |
 | `Shared.KaijuBeam` | The HYPERBEAM's rules: its charge (`Charge`, `gain`, `ready`), its timeline and phases, the formation and the leaps into it (`Leap`, `leap`, `leapHeight`, `arc`), the beam's reach (`hits`), the aim assist (`aim`), what it takes and how it swings (`threat`, `order`, `sweep`, `direction`) and its damage |
 | `KaijuBeamServer` | The team's charge on your profile (`BeamCharge`; `KaijuCharge` and `KaijuSave` on you), SAVE CHARGE (`KaijuSaveCharge`), the blast (`KaijuBeam`): the formation, holding them still, the pulses, letting go |
-| `KaijuHud` (client) | The kaiju card (three by two: the team and the support two by two, AUTO HEAL over CALL BACK beside them; the HYPERBEAM its outline, its pill on the bottom edge), CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL tab, and the roll in the Outpost for a player still owed one |
+| `KaijuHud` (client) | The kaiju card (a computer's three by two: the team and the support two by two, AUTO HEAL over the team keys; a phone's one row; the HYPERBEAM its outline, its pill on the bottom edge), the team keys 1 to 4, CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL and TEAMS tabs, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
 | `KaijuBeamHud` (client) | The HYPERBEAM: the card's outline as its meter, its pill on the card's bottom edge (the charge, READY, SAVE), Z / tap |
 | `KaijuBeamFx` (client) | The blast on screen: the rune circle, each leap carried along its arc and slammed down, the roar, the auras, the streams and orb, the beam turning onto its targets in turn; your roll call, grade and bloom, no camera takeover (`flight`; `tools/vfx_sim.luau`'s Hyperbeam renders it from your eyes) |

@@ -6,13 +6,17 @@
 	every member.
 
 	Out in the world: an invite popup (Accept / Decline), teammates' health
-	at the top right, and a marker over each teammate's head.
+	at the top right (on a phone a slim row each, the size of your own
+	health bar, stacked under it: MobileLayout.party; hidden in a fight and
+	under a full screen such as the Inventory), and a marker over each
+	teammate's head.
 	Party members share monster rewards when they fight nearby.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local BodyHealth = require(script.Parent.BodyHealth)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
@@ -278,25 +282,77 @@ local hudGui = UiKit.gui("PartyHud", 2)
 local hudList = new("Frame", {
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(1, 0),
-	-- (On a phone under your loot card's place at the top right: MobileLayout.party.)
-	Position = UDim2.new(1, -16, 0, if UiKit.short() then MobileLayout.party(Vector2.new(844, 332)).Y else 132),
+	Position = UDim2.new(1, -16, 0, 132),
 	Size = UDim2.fromOffset(220, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 }, hudGui)
-UiKit.list(hudList, 6)
-local hudBars: { [number]: Frame } = {}
+local hudLayout = UiKit.list(hudList, 6)
+local hudBars: { [number]: { Fill: Frame, Value: TextLabel? } } = {}
+local rowCount = 0
+local phoneRows = false -- (the rows as drawn: slim, a phone's)
 -- In a fight the fight HUD has the bars that matter, and on a phone the
 -- teammates' cards sat right on the DODGE and HEAVY buttons: hidden until
 -- the fight's over.
 -- On a phone your kaiju's card has their place while you hunt
 -- (MobileLayout.kaiju): hidden then too.
+-- On a phone, a slim row each under your health, its size
+-- (MobileLayout.party); MobileLayout hears how many are up, so your loot
+-- card goes under them.
+-- A screen over the world (the Inventory, the Store, a window like this
+-- one) hides them too: they sat on top of it, over its own rows.
+local COVERS = {
+	Dashboard = true, Shop = true, Season = true, AugmentTree = true, SurgeArray = true,
+	Social = true, WelcomeBundle = true, Welcome = true, Intro = true, Tutorial = true,
+	MarketBoard = true, ChallengeChooser = true, Character = true, Party = true,
+	Referral = true, TopPlayers = true, EquipmentTrade = true, KaijuPanel = true,
+	Rift = true, Guide = true, GemPouch = true, KaijuRoll = true, KaijuPit = true,
+}
+local covering: { [ScreenGui]: boolean } = {}
 local function fitPartyHud()
-	local hunting = UiKit.short() and player:GetAttribute("Hunt") == true
+	local phone = UiKit.short()
+	local hunting = phone and player:GetAttribute("Hunt") == true
 	hudGui.Enabled = player:GetAttribute("CombatSession") == nil and player:GetAttribute("MatchId") == nil and not hunting
+		and next(covering) == nil
+	if phone then
+		local spot = MobileLayout.party(hudGui.AbsoluteSize, rowCount)
+		hudList.AnchorPoint = Vector2.zero
+		hudList.Position = UDim2.fromOffset(spot.X, spot.Y)
+		hudList.Size = UDim2.fromOffset(spot.W, 0)
+		hudLayout.Padding = UDim.new(0, spot.Gap)
+	else
+		hudList.AnchorPoint = Vector2.new(1, 0)
+		hudList.Position = UDim2.new(1, -16, 0, 132)
+		hudList.Size = UDim2.fromOffset(220, 0)
+		hudLayout.Padding = UDim.new(0, 6)
+	end
+	MobileLayout.setPartyRows(if phone and hudGui.Enabled then rowCount else 0)
 end
 player:GetAttributeChangedSignal("CombatSession"):Connect(fitPartyHud)
 player:GetAttributeChangedSignal("MatchId"):Connect(fitPartyHud)
 player:GetAttributeChangedSignal("Hunt"):Connect(fitPartyHud)
+local function watchCover(screen: Instance)
+	if not screen:IsA("ScreenGui") or not COVERS[screen.Name] then
+		return
+	end
+	local function update()
+		covering[screen] = if screen.Parent and screen.Enabled then true else nil
+		fitPartyHud()
+	end
+	screen:GetPropertyChangedSignal("Enabled"):Connect(update)
+	screen.AncestryChanged:Connect(update)
+	update()
+end
+player.PlayerGui.ChildAdded:Connect(watchCover)
+for _, screen in player.PlayerGui:GetChildren() do
+	watchCover(screen)
+end
+hudGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	if UiKit.short() ~= phoneRows then
+		PartyUI.redrawHud()
+	else
+		fitPartyHud()
+	end
+end)
 fitPartyHud()
 
 local markers: { [number]: BillboardGui } = {}
@@ -328,19 +384,85 @@ local function landmark(name: string): Vector3?
 	return if typeof(position) == "Vector3" then position else nil
 end
 
+-- A teammate's row on a phone: as big as your own health bar (LobbyUI's
+-- phone one), their name in their colour, a bar in the colour their body's
+-- outline would be (BodyHealth), and their health.
+local function phoneRow(member, height: number)
+	local row = new("Frame", {
+		Name = "Member",
+		BackgroundColor3 = Color3.fromRGB(11, 14, 20),
+		BackgroundTransparency = 0.12,
+		Size = UDim2.new(1, 0, 0, height),
+	}, hudList)
+	UiKit.round(row, 5)
+	new("UIStroke", { Color = Color3.fromRGB(58, 66, 80), Thickness = 1, Transparency = 0.2 }, row)
+	local name = text(row, member.Name, 10, member.Color, BOLD)
+	name:SetAttribute("NoTranslate", true)
+	name.TextWrapped, name.AutomaticSize = false, Enum.AutomaticSize.None
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	name.Position, name.Size = UDim2.fromOffset(8, 0), UDim2.new(0, 46, 1, 0)
+	if member.UserId == (state and state.Leader) then
+		-- (the leader's: a gold edge on the left)
+		local mark = new("Frame", { BackgroundColor3 = P.Gold, Position = UDim2.fromOffset(0, 4), Size = UDim2.new(0, 3, 1, -8) }, row)
+		UiKit.round(mark, 2)
+	end
+	local track = new("Frame", {
+		Name = "Track",
+		BackgroundColor3 = Color3.fromRGB(34, 40, 52),
+		Position = UDim2.new(0, 58, 0.5, -3),
+		Size = UDim2.new(1, -94, 0, 6),
+	}, row)
+	UiKit.round(track, 3)
+	local fill = new("Frame", { Name = "Fill", BackgroundColor3 = BodyHealth.Outline.Good, Size = UDim2.fromScale(1, 1) }, track)
+	UiKit.round(fill, 3)
+	local value = text(row, "", 11, P.Text, BOLD)
+	value:SetAttribute("NoTranslate", true)
+	value.TextWrapped, value.AutomaticSize = false, Enum.AutomaticSize.None
+	value.TextXAlignment = Enum.TextXAlignment.Right
+	value.AnchorPoint = Vector2.new(1, 0)
+	value.Position, value.Size = UDim2.new(1, -8, 0, 0), UDim2.new(0, 28, 1, 0)
+	return { Fill = fill, Value = value }
+end
+
+-- A teammate's bar as their health stands.
+local function drawBar(member)
+	local other = Players:GetPlayerByUserId(member.UserId)
+	local character = other and other.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local bar = hudBars[member.UserId]
+	if bar and humanoid then
+		local share = math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1)
+		bar.Fill.Size = UDim2.fromScale(share, 1)
+		if bar.Value then
+			bar.Fill.BackgroundColor3 = BodyHealth.outlineColor(share)
+			bar.Value.Text = tostring(math.ceil(math.max(0, humanoid.Health)))
+		end
+	end
+	return other, character
+end
+
 local function rebuildHud()
 	clear(hudList)
 	table.clear(hudBars)
+	rowCount = 0
+	phoneRows = UiKit.short()
 	for userId, marker in markers do
 		marker:Destroy()
 		markers[userId] = nil
 	end
 	if not state then
 		rallyBeam.Enabled = false
+		fitPartyHud()
 		return
 	end
+	local rowHeight = MobileLayout.party(hudGui.AbsoluteSize).Row
 	for _, member in state.Members do
 		if member.UserId ~= player.UserId then
+			rowCount += 1
+			if phoneRows then
+				hudBars[member.UserId] = phoneRow(member, rowHeight)
+				continue
+			end
 			local row = box(hudList, UDim2.new(), UDim2.new(1, 0, 0, 40), P.Frame, 10)
 			UiKit.pad(row, 6)
 			local name = text(
@@ -360,9 +482,13 @@ local function rebuildHud()
 			local fill =
 				new("Frame", { BackgroundColor3 = Color3.fromRGB(200, 60, 60), Size = UDim2.fromScale(1, 1) }, back)
 			UiKit.round(fill, 4)
-			hudBars[member.UserId] = fill
+			hudBars[member.UserId] = { Fill = fill }
 		end
 	end
+	for _, member in state.Members do
+		drawBar(member)
+	end
+	fitPartyHud()
 	local spot = state.Rally and landmark(state.Rally)
 	if spot then
 		rallyMarker.Position = spot + Vector3.new(0, 3, 0)
@@ -370,6 +496,8 @@ local function rebuildHud()
 	end
 	rallyBeam.Enabled = spot ~= nil
 end
+
+PartyUI.redrawHud = rebuildHud
 
 local function attachBeam(character: Model)
 	local root = character:WaitForChild("HumanoidRootPart", 10)
@@ -395,13 +523,7 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 	timer = 0
 	for _, member in state.Members do
-		local other = Players:GetPlayerByUserId(member.UserId)
-		local character = other and other.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local fill = hudBars[member.UserId]
-		if fill and humanoid then
-			fill.Size = UDim2.fromScale(math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1), 1)
-		end
+		local other, character = drawBar(member)
 		-- A marker over each teammate's head.
 		local head = character and character:FindFirstChild("Head")
 		if

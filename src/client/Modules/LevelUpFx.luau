@@ -349,9 +349,9 @@ LevelUpFx.Card = {
 	H = 46,
 	Top = 64,
 	Badge = 34,
-	-- A phone's: smaller, in the top middle between the pick card and the
-	-- toasts; with not even Narrow between them (a small phone), it drops
-	-- a row, under the toasts, left of your health and loot cards.
+	-- A phone's: smaller, in the top middle between your kaiju's card and
+	-- the toasts; with not even Narrow between them (most phones), it drops
+	-- a row, beside the pick card's place, left of your health and loot.
 	PhoneTop = 6,
 	PhoneW = 210,
 	PhoneH = 36,
@@ -377,14 +377,17 @@ function LevelUpFx.cardLayout(screen: Vector2, short: boolean): Layout
 		}
 	end
 	local MobileLayout = require(script.Parent.MobileLayout)
-	local pick, toast = MobileLayout.card(), MobileLayout.toast(screen)
-	local left, right = pick.X + pick.W + 8, toast.X - 8
+	local gap = MobileLayout.topGap(screen)
+	local left, right = gap.X, gap.X + gap.W
 	local top = spec.PhoneTop
 	if right - left < spec.Narrow then
-		-- (No room beside the toasts: a row down, left of health and loot.)
-		local health, loot = MobileLayout.health(screen), MobileLayout.loot(screen)
-		right = math.min(health.X, loot.X) - 8
-		top = toast.Y + toast.H + 6
+		-- (No room up there beside your kaiju's card: a row down, beside the
+		-- pick card's place, left of your health, loot card and a toast.)
+		local pick, health, loot, toast =
+			MobileLayout.card(), MobileLayout.health(screen), MobileLayout.loot(screen), MobileLayout.toast(screen)
+		left = pick.X + pick.W + 8
+		right = math.min(health.X, loot.X, if toast.Under then toast.X else math.huge) - 8
+		top = pick.Y
 	end
 	local w = math.max(math.min(right - left, spec.PhoneW), spec.Narrow)
 	return {

@@ -6,7 +6,7 @@ There are two ways to ask:
 - **Press Z** ("Ask to spar") over the player. On a gamepad it's Y; on a
   phone, tap the prompt.
 
-**1** is your kit switch: it takes your combat kit out to fight critters and
+**Y** is your kit switch (it was 1; 1 to 4 are now your kaiju teams): it takes your combat kit out to fight critters and
 wild kaiju beside your kaiju (**KIT OUT**: only creatures can hit you), and
 puts it away again for your pick (**MINE**). On a gamepad it's D-pad up; on a
 phone, the **FIGHT / MINE** button just left of PLAY (it stays there with your
@@ -33,7 +33,7 @@ blade being drawn:
 
 While you spar, the lobby HUD, mining hint and Outpost prompts step aside, and
 the fight HUD takes over. A bar at the top center says who you're fighting,
-with END (the 1 key, or click it). For the first few seconds a line under it
+with END (the Y key, or click it). For the first few seconds a line under it
 gives the rule:
 
 ![Sparring](friendly-sparring/fight.png)
@@ -83,7 +83,7 @@ hit or be hit. The player who landed the blow gets a banner, and anyone nearby
 
 ## Ending it
 
-Press **1** (or END on the bar) to end the spar. It ends for both of you, and
+Press **Y** (or END on the bar) to end the spar. It ends for both of you, and
 your partner is told. You can't end it in the middle of an exchange: for 3 s after you're
 hit, and while you're down, 1 answers *Still in the fight: you can stop in N s.*
 

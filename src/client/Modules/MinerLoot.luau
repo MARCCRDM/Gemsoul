@@ -207,9 +207,9 @@ end
 -- Where everything sits. On a computer: compact, in the bottom right corner
 -- (MinerLoot.Corner), rows above it (newest first, as many as fit below the
 -- RIFT CHARGED tag, two at most). On a phone or a tablet (touch, or a short
--- window): slim, in the top right under the toast's place (and under a
--- toast that wraps past it), one row under it. Where no row fits beside the
--- card, it shows once the card's gone.
+-- window): slim, in the top right under your health and teammates' rows
+-- (MobileLayout.loot; under a toast there too), one row under it. Where no
+-- row fits beside the card, it shows once the card's gone.
 local function fit()
 	if not gui then
 		return
@@ -284,6 +284,7 @@ local function ensureGui()
 	fitScale = new("UIScale", { Scale = 1 }, holder)
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 	UiKit.onToastMoved(fit)
+	MobileLayout.onParty(fit) -- (your teammates' rows above it come and go)
 	fit()
 end
 

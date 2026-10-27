@@ -231,13 +231,16 @@ for _, size in { { 667, 339 }, { 736, 378 }, { 812, 317 }, { 844, 332 }, { 896, 
 	local L = Fx.cardLayout(screen, true)
 	local what = size[1] .. "x" .. size[2]
 	check(inside(L, screen), what .. ": the card runs off the screen")
-	-- (At the top; on a small phone, a row down, under the toasts.)
-	local toastRow = MobileLayout.toast(screen)
-	check(L.Y <= toastRow.Y + toastRow.H + 8 and L.H <= 40 and L.W <= 220, what .. ": the card isn't at the top, or is too big")
+	-- (At the top, between your kaiju's card and the toasts; with no room
+	-- there, a row down, beside the pick card's place.)
+	local toastRow, pick = MobileLayout.toast(screen), MobileLayout.card()
+	local k = MobileLayout.kaiju(screen, false)
+	check((L.Y <= toastRow.Y + toastRow.H + 8 or L.Y == pick.Y) and L.H <= 40 and L.W <= 220, what .. ": the card isn't at the top, or is too big")
 	for name, r in
 		{
-			["pick card"] = MobileLayout.card(),
-			toast = MobileLayout.toast(screen),
+			["pick card"] = pick,
+			["kaiju card"] = { X = k.X, Y = k.Y, W = k.W, H = k.H + k.Notch / 2 },
+			toast = toastRow,
 			["loot card"] = MobileLayout.loot(screen),
 			["health card"] = MobileLayout.health(screen),
 			wallet = MobileLayout.wallet(screen),

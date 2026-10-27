@@ -868,13 +868,10 @@ local function fitDock()
 	tiles.BackgroundTransparency = if mobile then 1 else 0.18
 	panelRim.Enabled = not mobile
 	-- The board under REPORT A BUG on the right (not on a phone); the live
-	-- feed at the top centre (on a phone, between the pick card and the
-	-- toasts' place at the top right).
+	-- feed at the top centre (on a phone, between your kaiju's card and the
+	-- toasts' place: MobileLayout.topGap).
 	LobbyBoard.setCompact(mobile)
-	local card = MobileLayout.card()
-	local gapLeft = card.X + card.W + 8
-	local gapRight = MobileLayout.toast(size).X - 8
-	LobbyFeed.setCompact(mobile, if mobile then { X = gapLeft, W = gapRight - gapLeft } else nil)
+	LobbyFeed.setCompact(mobile, if mobile then MobileLayout.topGap(size) else nil)
 	board.Position = UDim2.new(1, -16, 0, 64)
 	LobbyBoard.setHidden(picker.Visible)
 	bug.Visible = not picker.Visible and not mobile

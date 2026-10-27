@@ -1189,7 +1189,7 @@ local function healMine(player: Player, id: any)
 		return reply(false, "That crystal's spent. It grows back in a while.")
 	end
 	if Spar.sparring(player) then
-		return reply(false, "Press 1 for your pick to mine.")
+		return reply(false, "Press Y for your pick to mine.")
 	end
 	if Spar.isDown(player) or run.Fallen[player] or run.Handled[player] then
 		return reply(false, "")

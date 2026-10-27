@@ -436,7 +436,7 @@ SparServer._stop(b)
 gap()
 check(Ask(c, a.UserId).Message == "P1 is out hunting.", "Asked a hunter to spar")
 gap()
-check(Ask(a, c.UserId).Message == "Put your kit away first (1).", "A hunter asked to spar")
+check(Ask(a, c.UserId).Message == "Put your kit away first (Y).", "A hunter asked to spar")
 -- A creature's finishing blow on a hunter: down (the Humanoid never dies),
 -- and the server's told (SparServer.onKnockedOut: FrontierServer marks it
 -- a kill, robbed out past the core, home after). A fresh knock-down clears
