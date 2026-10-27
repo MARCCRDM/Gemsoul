@@ -925,9 +925,35 @@ end
 
 -- Queue ----------------------------------------------------------------------
 
+-- When each player first reached the lobby this visit (Shared.AutoQueue:
+-- a moment after logging in before they're asked anything), and the
+-- fill-in cards taken down when they started searching themselves: entry
+-- id -> until when its bonus carries over to a match with that queue.
+local arrived: { [Player]: number } = {}
+local carried: { [Player]: { [string]: number } } = {}
+
 local function enqueue(mode: string, group, size: number)
 	for _, member in group do
 		dequeue(member)
+	end
+	-- One question at a time: a fill-in card open to someone who now
+	-- searches comes down; its bonus waits in case that queue's who they
+	-- meet.
+	local now = os.clock()
+	for _, other in queue do
+		for _, member in group do
+			local expiry = other.Offers and other.Offers[member]
+			if expiry then
+				other.Offers[member] = nil
+				if expiry > now then
+					carried[member] = carried[member] or {}
+					carried[member][other.Id] = now + AutoQueue.CarryFor
+				end
+				if member.Parent then
+					Remotes.Social:FireClient(member, "FillInOver", other.Id)
+				end
+			end
+		end
 	end
 	nextEntry += 1
 	local entry = {
@@ -1004,8 +1030,15 @@ local function lanesFree(): number
 end
 
 -- Asks everyone on `sides` to JOIN; `start()` starts the match once they
--- all have. `accepted`: who's said yes already (a called fill-in).
-local function openCheck(mode: string, sides, start: () -> (boolean, string?), accepted: { Player }?)
+-- all have. `accepted`: who's said yes already (a called fill-in);
+-- `bonus`: what a win pays on top, by player (said on the card).
+local function openCheck(
+	mode: string,
+	sides,
+	start: () -> (boolean, string?),
+	accepted: { Player }?,
+	bonus: { [Player]: number }?
+)
 	nextReady += 1
 	local spec = Matchmaking.Modes[mode]
 	local check = {
@@ -1049,6 +1082,7 @@ local function openCheck(mode: string, sides, start: () -> (boolean, string?), a
 				Accepted = check.Accepted[member] == true,
 				Ready = yes,
 				Of = all,
+				Bonus = bonus and bonus[member] or 0,
 			})
 		end
 	end
@@ -1207,7 +1241,9 @@ local function autoReturn(player: Player)
 	if not record or not AutoQueue.setting(record) then
 		return reply(false, "Auto queue is off.")
 	end
-	enqueue("1v1", { player }, 1)
+	local entry = enqueue("1v1", { player }, 1)
+	-- (Just logged in: searching, but nothing asked for a moment.)
+	entry.Hold = AutoQueue.holdUntil(arrived[player], os.clock())
 	return reply(true, "Searching ranked 1v1 while you mine. Cancel anytime.")
 end
 
@@ -1217,7 +1253,7 @@ end
 local function onCall(entry)
 	local manual = {}
 	for _, other in Players:GetPlayers() do
-		if not table.find(entry.Players, other) and not busy(other) then
+		if not table.find(entry.Players, other) and not busy(other) and AutoQueue.settled(arrived[other], os.clock()) then
 			local ok = AutoQueue.ready(function(name)
 				return other:GetAttribute(name)
 			end, entryOf(other) ~= nil)
@@ -1275,7 +1311,7 @@ end
 -- A lone 1v1 invites the lobby; only DuelFill acceptance starts a fill-in.
 -- An unanswered intro still falls back to the sparring rival on schedule.
 local function fill(entry, now: number)
-	if entry.Size ~= 1 or entry.Check then
+	if entry.Size ~= 1 or entry.Check or (entry.Hold and now < entry.Hold) then
 		return
 	end
 	local spec = Matchmaking.Modes[entry.Mode]
@@ -1374,7 +1410,7 @@ local function fillRespond(player: Player, id: any, accept: any)
 		-- You've said yes; the one waiting is asked MATCH READY too.
 		openCheck(entry.Mode, { { Players = entry.Players, Entry = entry }, { Players = { player } } }, function()
 			return fillWith(entry, player)
-		end, { player })
+		end, { player }, { [player] = AutoQueue.FillBonus })
 		return reply(true, string.format("Waiting for %s to join…", entry.Players[1].DisplayName))
 	end
 	local ok, problem = fillWith(entry, player)
@@ -1418,8 +1454,9 @@ end
 function Duels.pairUp()
 	for mode in Matchmaking.Modes do
 		local entries = {}
+		local now = os.clock()
 		for _, entry in queue do
-			if entry.Mode == mode and not entry.Check then
+			if entry.Mode == mode and not entry.Check and not (entry.Hold and now < entry.Hold) then
 				table.insert(entries, entry)
 			end
 		end
@@ -1443,19 +1480,33 @@ function Duels.pairUp()
 			end
 			local a, b = entries[pair[1]], entries[pair[2]]
 			local kind = spec.Kind or "Ranked"
+			-- A fill-in card taken down when its player started searching:
+			-- met with that same queue, its bonus comes too (called in).
+			local called, bonus = {}, {}
+			for _, sides in { { a, b }, { b, a } } do
+				for _, member in sides[1].Players do
+					local keep = carried[member] and carried[member][sides[2].Id]
+					if keep and keep > now and not spec.Intro then
+						called[member], bonus[member] = true, AutoQueue.FillBonus
+					end
+				end
+			end
 			local function start()
+				for member in called do
+					carried[member] = nil
+				end
 				return startMatch(
 					mode,
 					{ table.clone(a.Players), table.clone(b.Players) },
 					PvPRules.profile(kind),
-					{ Intro = spec.Intro }
+					{ Intro = spec.Intro, Called = called }
 				)
 			end
 			local ok, problem = true, nil
 			if spec.Intro then
 				ok, problem = start()
 			else
-				openCheck(mode, { { Players = a.Players, Entry = a }, { Players = b.Players, Entry = b } }, start)
+				openCheck(mode, { { Players = a.Players, Entry = a }, { Players = b.Players, Entry = b } }, start, nil, bonus)
 			end
 			if not ok then
 				-- Someone became busy: drop whoever it was from the queue.
@@ -1625,6 +1676,15 @@ function Duels.start()
 		return reply(true, "You forfeited the duel.")
 	end)
 	local function watch(player: Player)
+		-- When they first reach the lobby this visit (a moment before
+		-- they're asked anything: Shared.AutoQueue.Settle).
+		local function arrive()
+			if player:GetAttribute("Outpost") and not arrived[player] then
+				arrived[player] = os.clock()
+			end
+		end
+		player:GetAttributeChangedSignal("Outpost"):Connect(arrive)
+		arrive()
 		local wasDungeon = player:GetAttribute("DungeonId") or player:GetAttribute("RiftRun")
 		local pendingReturn = false
 		local function returned()
@@ -1674,6 +1734,7 @@ function Duels.start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		dequeue(player, player.DisplayName .. " left the game, so your party left the duel queue.")
+		arrived[player], carried[player] = nil, nil
 		local match = matchOf[player]
 		if match then
 			knockOut(match, player, "Left")

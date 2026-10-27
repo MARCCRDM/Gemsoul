@@ -704,7 +704,9 @@ do
 	lobby(kim, 4)
 	Duels.record(jon).Rating = 1300
 	Duels.record(kim).Rating = 1020
-	advance(1) -- (the watch loop publishes)
+	-- (The watch loop publishes; and they've been in the lobby a while, past
+	-- the moment after logging in: AutoQueue.Settle.)
+	advance(AutoQueue.Settle)
 	check(jon:GetAttribute("DuelAuto") == true, "Auto queue isn't on by default on the player")
 
 	-- Ivy queues Ranked alone: after CallAfter seconds the closest lobby player is pulled in.
@@ -846,6 +848,63 @@ do
 	check(over and over[2] == offer.Id, "The offer wasn't withdrawn when the queue was cancelled")
 	check(handlers.DuelAuto(kim, true).Ok and kim:GetAttribute("DuelAuto") == true, "Auto queue didn't switch back on")
 
+	-- Just logged in: a moment first (AutoQueue.Settle). Searching at once,
+	-- but no fill-in card and no MATCH READY till it's passed.
+	check(
+		not AutoQueue.settled(nil, 100) and AutoQueue.settled(0, AutoQueue.Settle) and not AutoQueue.settled(0, AutoQueue.Settle - 1),
+		"Settled after logging in"
+	)
+	check(AutoQueue.holdUntil(5, 7) == 5 + AutoQueue.Settle and AutoQueue.holdUntil(nil, 7) == 7 + AutoQueue.Settle, "An auto search's hold")
+	local lia, max = makePlayer(51, "Lia"), makePlayer(52, "Max")
+	lobby(lia, 4)
+	check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued")
+	advance(AutoQueue.CallAfter + 0.5)
+	check(last(kim, "FillIn") ~= nil and last(lia, "FillIn") == nil, "A player who'd just logged in was asked to fill in")
+	handlers.DuelCancel(ivy)
+	lobby(max, 4)
+	check(handlers.DuelReturnQueue(lia).Ok and handlers.DuelReturnQueue(max).Ok, "Auto queue on arriving failed")
+	check(lia:GetAttribute("DuelQueue") == "1v1" and max:GetAttribute("DuelQueue") == "1v1", "Not searching straight away")
+	advance(1)
+	check(last(lia, "MatchReady") == nil and last(max, "MatchReady") == nil, "Asked MATCH READY straight after logging in")
+	advance(AutoQueue.Settle)
+	local liaAsk, maxAsk = last(lia, "MatchReady"), last(max, "MatchReady")
+	check(liaAsk and maxAsk and liaAsk[2].Id == maxAsk[2].Id, "Not asked MATCH READY once the moment had passed")
+	check(liaAsk[2].Bonus == 0, "A plain pairing carried a bonus")
+	handlers.DuelReady(lia, liaAsk[2].Id, false)
+	handlers.DuelCancel(max)
+	for _, p in { lia, max } do
+		Players.PlayerRemoving.Fire(p)
+		table.remove(playerList, table.find(playerList, p))
+	end
+
+	-- One question at a time: Kim's offered Ivy's queue, then starts her own
+	-- search (auto queue). The card comes down, and met with that same
+	-- queue, its bonus comes along (MATCH READY says so; she's called in).
+	lobby(kim)
+	check(handlers.DuelQueue(ivy, "1v1").Ok, "Ivy not queued")
+	advance(AutoQueue.CallAfter + 0.5)
+	offer = last(kim, "FillIn")[2]
+	check(handlers.DuelReturnQueue(kim).Ok, "Kim's own search didn't start")
+	over = last(kim, "FillInOver")
+	check(over and over[2] == offer.Id, "The fill-in card stayed up once Kim was searching")
+	check(not handlers.DuelFill(kim, offer.Id, true).Ok, "The taken-down card could still be accepted")
+	advance(0.5)
+	local kimAsk = last(kim, "MatchReady")[2]
+	check(kimAsk.Bonus == AutoQueue.FillBonus and last(ivy, "MatchReady")[2].Bonus == 0, "The carried bonus isn't on Kim's MATCH READY")
+	joinAll()
+	m = Duels.matchOf(kim)
+	check(m and Duels.matchOf(ivy) == m and m.Called[kim] and not m.Called[ivy], "Kim isn't called in for the carried bonus")
+	check(last(kim, "Match")[2].Bonus == AutoQueue.FillBonus, "Kim's Match payload doesn't carry the bonus")
+	advance(Matchmaking.Countdown)
+	lethalBlow(ivy)
+	advance(Matchmaking.Rounds.Pivot)
+	advance(Matchmaking.Rounds.Reveal + Matchmaking.Countdown)
+	lethalBlow(ivy)
+	kimEnd = last(kim, "MatchEnd")[2]
+	check(kimEnd.Won and kimEnd.Bonus == AutoQueue.FillBonus, "The carried bonus wasn't paid on the win")
+	advance(Matchmaking.EndPause)
+	respawn(ivy, kim)
+
 	-- The intro queue: two new players pair at once ---------------------------------
 	local new1, new2 = makePlayer(41, "Nia"), makePlayer(42, "Oli")
 	check(not handlers.DuelQueue(new1, "intro").Ok, "The PLAY menu could queue the intro")
@@ -923,7 +982,7 @@ do
 	new4:SetAttribute("CombatSession", nil)
 
 	-- Nobody is called while the Arena's lanes are full: the entry waits.
-	print("PASS: " .. (checks - before) .. " lobby invitation checks (explicit consent, muted invites, expiry, decline, forged requests, upfront intro bonus, no duplicate payment, normal PvP rewards unchanged, bot fallback)")
+	print("PASS: " .. (checks - before) .. " lobby invitation checks (explicit consent, muted invites, expiry, decline, forged requests, a moment after logging in, one card at a time, the bonus carried over, upfront intro bonus, no duplicate payment, normal PvP rewards unchanged, bot fallback)")
 end
 
 -- Auto queue: back in the lobby (from a dungeon or the Rift, or arriving),
@@ -934,6 +993,9 @@ do
 	local a, b = makePlayer(81, "ReturnWin"), makePlayer(82, "ReturnLoss")
 	for _, p in { a, b } do
 		p:SetAttribute("Outpost", true)
+	end
+	advance(AutoQueue.Settle) -- (they logged in a while ago)
+	for _, p in { a, b } do
 		p:SetAttribute("DungeonId", "test-run")
 		check(not handlers.DuelReturnQueue(p).Ok, "Auto queued inside dungeon")
 		check(not handlers.DuelQueue(p, "1v1").Ok, "Manual queue allowed inside dungeon")

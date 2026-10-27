@@ -16,6 +16,13 @@
 	                         newcomer's first fight, never paid again at its end.
 	  Other 1v1s             keep the existing win bonus and rating protection.
 
+	Just logged in: a moment first. For Settle seconds after you first
+	reach the lobby you're searching (auto queue) but not asked anything:
+	no MATCH READY and no fill-in card. One question at a time: starting
+	your own search takes down a fill-in card you had open, and if that
+	same queue is who you're then matched with, the card's bonus comes with
+	you (you're called in for it).
+
 	A new player's first fight is a queue of its own ("intro"):
 
 	  two new players          paired at once, each in their first fight
@@ -34,6 +41,8 @@
 	  AutoQueue.introPhase(waited)         "Search" | "Call" | "Bot"
 	  AutoQueue.pick(candidates, rating)   the closest in rating ({ Rating })
 	  AutoQueue.bonus(called, won)         the fill-in's extra coins
+	  AutoQueue.settled(arrivedAt, now)    past the moment after logging in?
+	  AutoQueue.holdUntil(arrivedAt, now)  when an auto search may be asked
 ]]
 local AutoQueue = {}
 
@@ -41,6 +50,8 @@ AutoQueue.Default = true
 AutoQueue.CallAfter = 8 -- seconds a 1v1 queue waits before the lobby is called
 AutoQueue.AskSeconds = 15 -- how long a fill-in offer stands
 AutoQueue.FillBonus = 20 -- first-fight join bonus; other fill-ins retain the win bonus
+AutoQueue.Settle = 20 -- seconds after you first reach the lobby before you're asked to join anything
+AutoQueue.CarryFor = 60 -- seconds a taken-down fill-in card's bonus waits for that same queue
 AutoQueue.Intro = {
 	CallAfter = 5, -- seconds alone before lobby invitations
 	BotAfter = 15, -- seconds alone before the sparring rival steps in
@@ -87,6 +98,17 @@ function AutoQueue.setting(record): boolean
 		return false
 	end
 	return AutoQueue.Default
+end
+
+-- Past the moment after logging in: `arrivedAt` is when you first reached
+-- the lobby (nil: not yet).
+function AutoQueue.settled(arrivedAt: number?, now: number): boolean
+	return arrivedAt ~= nil and now - arrivedAt >= AutoQueue.Settle
+end
+
+-- When an auto search started now may first be asked MATCH READY.
+function AutoQueue.holdUntil(arrivedAt: number?, now: number): number
+	return (arrivedAt or now) + AutoQueue.Settle
 end
 
 -- Where an intro search is after `waited` seconds alone.

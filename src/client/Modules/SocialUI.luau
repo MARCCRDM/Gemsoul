@@ -1667,6 +1667,12 @@ local function readyWaiting(count: number?, of: number?)
 end
 local function showReady(info)
 	closeReady()
+	-- One window at a time: a fill-in card still up comes down (the server
+	-- has withdrawn it; its bonus, if this is that same queue, is on this one).
+	for entry, dismiss in fillCards do
+		dismiss()
+		fillCards[entry] = nil
+	end
 	local id = tostring(info.Id)
 	local seconds = if type(info.Seconds) == "number" then info.Seconds else Matchmaking.ReadySeconds
 	local ends = if type(info.Ends) == "number" then info.Ends else serverNow() + seconds
@@ -1692,12 +1698,13 @@ local function showReady(info)
 	for _, foe in (if type(info.Foes) == "table" then info.Foes else {}) do
 		table.insert(names, string.format("%s (%d)", tostring(foe.Name), tonumber(foe.Rating) or 0))
 	end
+	local bonus = if type(info.Bonus) == "number" and info.Bonus > 0 then info.Bonus else 0
 	local line = text(
 		card,
-		if #names > 0 then string.format("%s  ·  vs %s", tostring(info.Name), table.concat(names, ", "))
-			else tostring(info.Name),
+		(if #names > 0 then string.format("%s  ·  vs %s", tostring(info.Name), table.concat(names, ", "))
+			else tostring(info.Name)) .. (if bonus > 0 then string.format("  ·  +%d ◆ if you win", bonus) else ""),
 		13,
-		P.Dim
+		if bonus > 0 then P.Gold else P.Dim
 	)
 	line.AutomaticSize = Enum.AutomaticSize.None
 	line.TextWrapped = false
