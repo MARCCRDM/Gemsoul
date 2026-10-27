@@ -6,8 +6,9 @@
 	name, coins, XP) and your health under that; one small panel on the
 	right for the daily streak, the day's challenges and the next mode to
 	unlock, a REPORT A BUG button at the top right, and the PLAY menu that
-	picks what to play. On a phone: PLAY alone at the bottom centre with
-	icon tiles under it (TASKS one of them), level and coins at the top
+	picks what to play. On a phone: a row of icon tiles at the bottom
+	centre, PLAY the first (a green tile; the big PLAY bar goes), INVENTORY
+	yellow after it, TASKS one of them, no RANKS; level and coins at the top
 	left with your health under them, and nothing on the right: no board
 	(the challenges are the Tasks window's DAILY page) and no bug button
 	(SOCIAL has the form).
@@ -522,9 +523,11 @@ playCaption.Size = UDim2.fromScale(1, 1)
 playCaption.TextStrokeTransparency = 1
 hoverRim(play, playRim, Color3.fromRGB(70, 42, 8), GOLD_RIM)
 -- In a mech, its HOP OUT button takes PLAY's place at the bottom of a
--- phone's screen (Client VehicleDrive).
+-- phone's screen (Client VehicleDrive). On a phone PLAY is a tile of its
+-- own at the start of the row instead (playTile, fitDock).
+local phoneDock = false
 local function pilotingChanged()
-	play.Visible = player:GetAttribute("MechPilot") == nil
+	play.Visible = player:GetAttribute("MechPilot") == nil and not phoneDock
 end
 player:GetAttributeChangedSignal("MechPilot"):Connect(pilotingChanged)
 pilotingChanged()
@@ -851,14 +854,23 @@ bug.Activated:Connect(function()
 	require(script.Parent.SocialUI).feedback()
 end)
 
+local inventoryLook -- (below: INVENTORY yellow on a phone)
 local function fitDock()
 	local size = gui.AbsoluteSize
 	local mobile = game:GetService("UserInputService").TouchEnabled or size.Y < 540
+	-- (On a phone: PLAY a green tile first, no RANKS; on a computer the
+	-- other way round.)
 	local buttons = {}
 	for _, button in tiles:GetChildren() do
-		if button:IsA("TextButton") then table.insert(buttons, button) end
+		if button:IsA("TextButton") then
+			button.Visible = not button:GetAttribute(if mobile then "DeskOnly" else "PhoneOnly")
+			if button.Visible then table.insert(buttons, button) end
+		end
 	end
 	table.sort(buttons, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
+	phoneDock = mobile
+	pilotingChanged()
+	inventoryLook(mobile)
 	modes.Visible = false
 	status.Visible = not mobile
 	health.Frame.Visible = not mobile
@@ -916,7 +928,7 @@ local function fitDock()
 					child.Size = UDim2.fromOffset(tileHeight - 22, tileHeight - 22)
 				elseif child.Name == "NavBadge" then
 					child.AnchorPoint, child.Position = Vector2.new(1, 0), UDim2.new(1, -3, 0, 3)
-				elseif child.Name == "Lip" then
+				elseif child.Name == "Lip" or child.Name == "PlayCaption" then
 					child.Visible = true
 				elseif child:IsA("GuiObject") then child.Visible = false end
 			end
@@ -1080,7 +1092,7 @@ tile("STORE", "Coins", ICON, function()
 end)
 tile("RANKS", "Ranks", ICON, function()
 	require(script.Parent.TopPlayersUI).toggle()
-end)
+end):SetAttribute("DeskOnly", true) -- (not on a phone)
 tile("SOCIAL", "Social", ICON, function()
 	require(script.Parent.SocialUI).toggle()
 end)
@@ -1088,6 +1100,65 @@ end)
 tile("INVITE", "Invite", ICON, function()
 	require(script.Parent.ReferralUI).toggle()
 end)
+
+-- On a phone, PLAY is the first tile of the row, green, its word across it
+-- (the big amber PLAY over the tiles goes; its place stays for HOP OUT and
+-- the kit switch beside it). It opens the modes, as PLAY does.
+local GREEN_TOP, GREEN_BOTTOM = Color3.fromRGB(88, 212, 118), Color3.fromRGB(32, 146, 70)
+local GREEN_EDGE = Color3.fromRGB(12, 66, 32)
+local playTile = new("TextButton", {
+	Name = "PLAY",
+	Text = "",
+	AutoButtonColor = false,
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	LayoutOrder = -1,
+	Visible = false,
+}, tiles)
+playTile:SetAttribute("PhoneOnly", true)
+UiKit.round(playTile, 3)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(GREEN_TOP, GREEN_BOTTOM) }, playTile)
+local playTileRim = new("UIStroke", { Color = GREEN_EDGE, Thickness = 1.5 }, playTile)
+lip(playTile, 0.45)
+local playWord = text(playTile, "PLAY", 17, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
+playWord.Name = "PlayCaption"
+playWord.Size = UDim2.fromScale(1, 1)
+playWord.TextStrokeColor3, playWord.TextStrokeTransparency = GREEN_EDGE, 0.35
+hoverRim(playTile, playTileRim, GREEN_EDGE, Color3.fromRGB(200, 255, 214))
+IronUi.juice(playTile, 1.015, 0.98)
+playTile.Activated:Connect(LobbyUI.openPicker)
+
+-- INVENTORY on a phone: yellow, like the old PLAY plate, its pack and name
+-- in dark ink (on a computer the steel plate, the pack in amber).
+local inventoryFace = inventoryTile:FindFirstChildOfClass("UIGradient")
+local inventoryRim = inventoryTile:FindFirstChildOfClass("UIStroke")
+local inventoryYellow: boolean? = nil
+function inventoryLook(yellow: boolean)
+	if inventoryYellow == yellow then
+		return
+	end
+	inventoryYellow = yellow
+	if inventoryFace then
+		inventoryFace.Color = if yellow
+			then ColorSequence.new(GOLD_TOP, GOLD_BOTTOM)
+			else ColorSequence.new(FACE_TOP, FACE_BOTTOM)
+	end
+	if inventoryRim then
+		inventoryRim.Color = if yellow then Color3.fromRGB(70, 42, 8) else RIM
+	end
+	local ink = if yellow then GOLD_INK else P.Gold
+	local name = inventoryTile:FindFirstChild("NavLabel")
+	if name and name:IsA("TextLabel") then
+		name.TextColor3 = if yellow then GOLD_INK else P.Text
+	end
+	local icon = inventoryTile:FindFirstChild("NavIcon")
+	for _, piece in if icon then icon:GetDescendants() else {} do
+		if piece:IsA("UIStroke") then
+			piece.Color = ink
+		elseif piece:IsA("Frame") and piece.BackgroundTransparency < 1 then
+			piece.BackgroundColor3 = ink
+		end
+	end
+end
 
 -- Public -----------------------------------------------------------------------------------------------
 

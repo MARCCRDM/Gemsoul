@@ -58,9 +58,18 @@ phone game should be.
 - **Level and coins** sit in a pill at the top right, with your health
   under it (`MobileLayout.wallet`, `MobileLayout.health`). See
   [Your kaiju, your pick and your party](#your-kaiju-your-pick-and-your-party).
-- **The "online" pill is gone.** PLAY stands alone at the bottom centre.
+- **The "online" pill is gone.**
+- **PLAY is a green tile**, *2026-10-27*: the first of the row of tiles at
+  the bottom, PLAY across it, where INVENTORY was. The big amber PLAY bar
+  over the tiles is gone (a computer keeps it); its place stays for a
+  mech's HOP OUT and the FIGHT / MINE switch beside it. **INVENTORY** is
+  yellow, next along, and **RANKS isn't on a phone** any more (a computer
+  keeps it). The row: PLAY, INVENTORY, TASKS, MARKET, STORE, SOCIAL,
+  INVITE.
+
+![The phone dock: PLAY green and first, INVENTORY yellow, no RANKS. Offline render of the game's UI code, not a Roblox screenshot](mobile/dock-play-tile.png)
 - **FIGHT / MINE** (your kit or your pick, the Y key on a keyboard) is a
-  pill just left of PLAY, level with it and a little taller (44 points),
+  pill just left of PLAY's old place, level with it and a little taller (44 points),
   with its icon and word: ⚔ FIGHT with the pick out, ⛏ MINE with the kit
   out. It stays clear of Roblox's thumbstick; where there's little room
   beside PLAY it's narrower, down to round with just its icon. It used to
@@ -70,9 +79,9 @@ phone game should be.
 ![FIGHT beside PLAY, and MINE with the kit out: 844 x 390 (top), 667 x 375 (bottom)](mobile/kit-switch.jpg)
 
 (The client code drawn by the UI harness, not Roblox screenshots.)
-- **The six buttons under PLAY** are icons with their name small under
-  them, 44 points tall.
-- **Tasks:** a TASKS tile in the dock under PLAY (a clipboard), with a gold
+- **The tiles** are icons with their name small under them, 44 points
+  tall (PLAY's is its word).
+- **Tasks:** a TASKS tile in the dock (a clipboard), with a gold
   count of what's still to do. There's no TASKS button and no task or
   challenge strip in the top right: it's kept for toasts and your loot
   card (see [The top right](#the-top-right-toasts-and-your-loot)). The

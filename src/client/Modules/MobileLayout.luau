@@ -31,7 +31,10 @@
 	                (claimTop). Nothing else: tasks and the day's challenges
 	                open from the dock's TASKS tile, and the lobby's board
 	                isn't shown
-	  bottom middle the dock (LobbyUI): PLAY, and a row of tiles under it
+	  bottom middle the dock (LobbyUI): a row of tiles, PLAY the first (on a
+	                phone a green tile; a computer's big PLAY bar), and over
+	                them PLAY's old place, HOP OUT's in a mech, the kit
+	                switch just left of it
 
 	Rects are { X, Y, W, H } in the ScreenGui's space (below the top bar).
 
