@@ -19,15 +19,16 @@
 	                  team's swaps it in, at once (KaijuServer's
 	                  KaijuTeamOut). Tap a
 	                  tile for the panel on that kaiju. The team's HYPERBEAM
-	                  is the card's outline, its pill on the bottom edge
-	                  (KaijuBeamHud, in KaijuHud.beamSlot()). Computer:
-	                  bottom left, three by two (the kaiju two by two, AUTO
-	                  HEAL over the team keys). Phone: small, at the top left
-	                  in a fight too, two rows (the kaiju in a row, AUTO HEAL
-	                  a slim row under them); the team keys off the card, a
-	                  row of their own just above the move stick, under your
-	                  left thumb (MobileLayout.kaiju, keys, kaijuDesk,
-	                  kaijuCells).
+	                  (KaijuBeamHud, in KaijuHud.beamSlot()): on a computer
+	                  the card's outline, its pill on the bottom edge; on a
+	                  phone a button of its own. Computer: bottom left, three
+	                  by two (the kaiju two by two, AUTO HEAL over the team
+	                  keys). Phone: small, at the top left in a fight too,
+	                  two rows (the kaiju in a row, AUTO HEAL a slim row
+	                  under them); the team keys off the card, a row of their
+	                  own just above the move stick, under your left thumb,
+	                  and the HYPERBEAM just right of them (MobileLayout.kaiju,
+	                  keys, beam, kaijuDesk, kaijuCells).
 	  TAME            beside the strip (under it on a phone) when a wild
 	                  kaiju near you is down to half its health (it glows
 	                  gold then: KaijuTaming): the
@@ -477,8 +478,10 @@ for n = 1, Kaiju.Teams do
 	teamChips[n] = { Button = chip, Edge = edge, Number = number }
 end
 
--- The team's HYPERBEAM's pill, on the card's bottom edge (KaijuBeamHud
--- draws it in here, and its meter round the card: KaijuHud.beamSlot()).
+-- The team's HYPERBEAM: on a computer its pill, on the card's bottom edge
+-- (KaijuBeamHud draws it in here, and its meter round the card:
+-- KaijuHud.beamSlot()); on a phone off the card, a button of its own right
+-- of the team keys (Apart: its meter round it instead).
 local beamSlot = new("Frame", {
 	Name = "BeamSlot",
 	BackgroundTransparency = 1,
@@ -603,7 +606,16 @@ local function layout()
 			chip.Number.TextSize = math.clamp(math.floor(math.min(w, h) * 0.55), 10, 18)
 		end
 	end
-	place(beamSlot, cells.Beam)
+	-- The HYPERBEAM: on a computer its pill on the card's bottom edge; on a
+	-- phone off the card, just right of the team keys (MobileLayout.beam).
+	if phone then
+		beamSlot.Parent = gui
+		place(beamSlot, MobileLayout.beam(screen))
+	else
+		beamSlot.Parent = card
+		place(beamSlot, cells.Beam)
+	end
+	beamSlot:SetAttribute("Apart", phone)
 	-- CATCH: a readable, non-modal prompt, under the card on touch, above
 	-- the combat HUD at center on a computer.
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -2917,8 +2929,9 @@ end
 tame.Activated:Connect(catchReady)
 
 local started = false
--- Where the team's HYPERBEAM's pill goes: on the card's bottom edge
--- (KaijuBeamHud; the card, its parent, carries its meter).
+-- Where the team's HYPERBEAM goes (KaijuBeamHud): on a computer its pill on
+-- the card's bottom edge (the card, its parent, carries its meter); on a
+-- phone a button of its own (its Apart attribute: its meter round it).
 function KaijuHud.beamSlot(): Frame
 	return beamSlot
 end

@@ -12,7 +12,9 @@
 	                that stops above the dock. Phones and tablets use
 	                Roblox's own chat instead (ChatFrame).
 	  bottom left   the team keys 1 to 4 (KaijuHud), in a row just above
-	                the move stick (your left thumb)
+	                the move stick (your left thumb), and the team's
+	                HYPERBEAM (KaijuBeamHud) just right of them, a button of
+	                its own over the kit switch
 	  top middle    the live feed (LobbyFeed), between the pick card's place
 	                and the toasts' place (gone on a screen too narrow for it)
 	  top right     your level and coins (LobbyUI) in a pill, your health
@@ -63,7 +65,9 @@
 	                                       kaijuDesk(screen) on a computer
 	                                       (three by two), kaijuCells(card)
 	                                       its cells; keys(screen) the team
-	                                       keys above the move stick
+	                                       keys above the move stick, and
+	                                       beam(screen) the HYPERBEAM right
+	                                       of them
 	  MobileLayout.foes(screen, viewY)     the fight's foe list (FoeBars):
 	                                       on the right at the top, down to
 	                                       just over DODGE
@@ -101,17 +105,18 @@ MobileLayout.Loot = { W = 232, H = 72, Row = 24, Gap = 6 }
 
 -- (Your kaiju's card at the top left: its size, the same on every phone.
 -- Two rows: the team's three and the support, Tile square, the support
--- Split apart; AUTO HEAL under them, AutoH tall, the card's width.)
-MobileLayout.Kaiju = { Tile = 36, Pad = 4, Gap = 3, Split = 6, AutoH = 20, Notch = 20 }
+-- Split apart; AUTO HEAL under them, AutoH tall, the card's width. The
+-- HYPERBEAM isn't on it: beam(screen).)
+MobileLayout.Kaiju = { Tile = 36, Pad = 4, Gap = 3, Split = 6, AutoH = 20 }
 local function kaijuSize(): (number, number)
 	local k = MobileLayout.Kaiju
 	local w = k.Pad * 2 + k.Tile * 4 + k.Gap * 2 + k.Split
-	return w, k.Pad + k.Tile + k.Gap + k.AutoH + MobileLayout.under(k.Notch)
+	return w, k.Pad * 2 + k.Tile + k.Gap + k.AutoH
 end
--- (Where the card ends, the HYPERBEAM pill's lower half too.)
+-- (Where the card ends.)
 local function kaijuBottom(): number
 	local _, h = kaijuSize()
-	return 12 + h + math.floor(MobileLayout.Kaiju.Notch / 2)
+	return 12 + h
 end
 -- CATCH on a phone: under your kaiju's card, as wide.
 MobileLayout.Tame = { H = 38 }
@@ -303,9 +308,8 @@ end
 
 -- Your kaiju's card on a phone (KaijuHud), small, at the top left, in a
 -- fight too: two rows, the team's three and the support a little apart,
--- AUTO HEAL under them; the team's HYPERBEAM (KaijuBeamHud) is the card's
--- own outline, its pill (Notch tall) set on the card's bottom edge, half
--- over it. The team keys aren't on it: keys(screen), above the move stick.
+-- AUTO HEAL under them. The team keys and the HYPERBEAM aren't on it:
+-- keys(screen), above the move stick, and beam(screen), right of them.
 -- TameX, TameY, TameW, TameH: where CATCH goes on a touch screen, under it.
 -- (`_hunting`: the same place either way now.)
 function MobileLayout.kaiju(_screen: Vector2, _hunting: boolean?)
@@ -321,7 +325,6 @@ function MobileLayout.kaiju(_screen: Vector2, _hunting: boolean?)
 		Split = spec.Split,
 		Rows = { spec.Tile, spec.AutoH },
 		Grid = true,
-		Notch = spec.Notch,
 		TameX = 12,
 		TameY = kaijuBottom() + 6,
 		TameW = w,
@@ -342,6 +345,16 @@ function MobileLayout.keys(screen: Vector2)
 		Size = k.Size,
 		Gap = k.Gap,
 	}
+end
+
+-- The team's HYPERBEAM on a phone (KaijuBeamHud): a button of its own, W
+-- by H, just right of the team keys and level with their bottom (your
+-- left thumb's row, over the kit switch). Its meter is its own rim (Rim
+-- out round it), SAVE a strip along its bottom inside it.
+MobileLayout.Beam = { W = 60, H = 52, Gap = 12, Rim = 3 }
+function MobileLayout.beam(screen: Vector2)
+	local b, keys = MobileLayout.Beam, MobileLayout.keys(screen)
+	return { X = keys.X + keys.W + b.Gap, Y = keys.Y + keys.H - b.H, W = b.W, H = b.H, Rim = b.Rim }
 end
 
 -- The fight's foe list on a phone (FoeBars): on the right, at the top
@@ -388,16 +401,12 @@ end
 -- The card's cells, inside it (`card`: kaiju's or kaijuDesk's). A
 -- computer's: the kaiju two by two on the left (Fighters 1 and 2 on top,
 -- Fighter 3 and Support under them), Auto (AUTO HEAL) over Teams (the team
--- keys) on the right. A phone's (Grid): the team's three in a row and the
--- support a little apart, Auto across the card under them, no Teams (its
--- keys are keys(screen)). Beam, the HYPERBEAM's pill, across the middle of
--- the card's bottom edge (half below it): on a phone's small card nearly
--- its width, so its words still fit.
+-- keys) on the right, and Beam, the HYPERBEAM's pill, across the middle of
+-- the card's bottom edge (half below it). A phone's (Grid): the team's
+-- three in a row and the support a little apart, Auto across the card
+-- under them, no Teams or Beam (they're keys(screen) and beam(screen)).
 function MobileLayout.kaijuCells(card)
 	local pad, gap, rows = card.Pad, card.Gap, card.Rows
-	local notch = card.Notch or 22
-	local beamW = if card.Grid then card.W - pad * 4 else math.floor(card.W * 0.78)
-	local beam = { X = math.floor((card.W - beamW) / 2), Y = card.H - math.floor(notch / 2), W = beamW, H = notch }
 	if card.Grid then
 		local t, split = rows[1], card.Split or gap
 		local x = pad
@@ -408,8 +417,11 @@ function MobileLayout.kaijuCells(card)
 		end
 		local support = { X = x, Y = pad, W = t, H = t }
 		local auto = { X = pad, Y = pad + t + gap, W = card.W - pad * 2, H = rows[2] }
-		return { Fighters = fighters, Support = support, Auto = auto, Beam = beam, Grid = true }
+		return { Fighters = fighters, Support = support, Auto = auto, Grid = true }
 	end
+	local notch = card.Notch or 22
+	local beamW = math.floor(card.W * 0.78)
+	local beam = { X = math.floor((card.W - beamW) / 2), Y = card.H - math.floor(notch / 2), W = beamW, H = notch }
 	local cell = math.floor((card.W - pad * 2 - gap * 2) / 3)
 	local function at(column: number, y: number, h: number)
 		return { X = pad + (column - 1) * (cell + gap), Y = y, W = cell, H = h }

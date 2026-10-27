@@ -3,11 +3,15 @@
 	Shared.KaijuBeam; the show: KaijuBeamFx). Shown with the kaiju card
 	(KaijuHud's) while your team's out, in mining and in fights alike.
 
-	The card's own outline is its meter: it fills left to right round the
-	card in your team's colours (the team's charge, a meter of its own:
-	KaijuCharge), over the card's dim edge. Its button, a pill on the
-	card's bottom edge (KaijuHud.beamSlot(): its cell, the card its
-	parent), says how far along it is and holds SAVE.
+	On a computer the card's own outline is its meter: it fills left to
+	right round the card in your team's colours (the team's charge, a meter
+	of its own: KaijuCharge), over the card's dim edge. Its button, a pill
+	on the card's bottom edge (KaijuHud.beamSlot(): its cell, the card its
+	parent), says how far along it is and holds SAVE. On a phone the slot
+	is apart from the card (its Apart attribute: just right of the team
+	keys, MobileLayout.beam), and the button fills it, a tile: HYPERBEAM
+	over its percent, SAVE along its bottom, its meter its own rim, filling
+	from the bottom up.
 
 	  Charging   HYPERBEAM and its percent.
 	  Ready      the outline full and bright, its colours flowing round it,
@@ -151,6 +155,7 @@ local shineClip = button:FindFirstChild("ShineClip") :: Frame?
 local busy = false
 local wasReady = false
 local compact = false -- (a phone's short row: shorter words)
+local apart = false -- (a phone's: a tile of its own, its meter its rim)
 local drawn = "" -- (what it shows now: redrawn only when that changes)
 local paletteKey = ""
 
@@ -181,7 +186,22 @@ local function layout()
 	if size.X <= 0 or size.Y <= 0 then
 		return
 	end
+	if apart then
+		-- A tile: HYPERBEAM across the top, its state big under it, SAVE a
+		-- strip along the bottom.
+		compact = true
+		save.Size = UDim2.new(1, -10, 0, 13)
+		save.Position = UDim2.new(0, 5, 1, -17)
+		save.TextSize = 8
+		ringStroke.Thickness = 3
+		title.Position, title.Size = UDim2.fromOffset(4, 5), UDim2.new(1, -8, 0, 11)
+		state.Position, state.Size = UDim2.fromOffset(3, 16), UDim2.new(1, -6, 0, 17)
+		title.TextXAlignment, state.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
+		drawn = ""
+		return
+	end
 	-- HYPERBEAM on the left, its state on the right, SAVE at the end.
+	title.TextXAlignment, state.TextXAlignment = Enum.TextXAlignment.Left, Enum.TextXAlignment.Right
 	compact = size.X < 170
 	local pad = if compact then 6 else 9
 	local saveH = math.max(12, size.Y - 6)
@@ -236,6 +256,31 @@ local function sequence(list: { Color3 }): ColorSequence
 end
 
 local colors = { CHARGE }
+
+-- Where its meter goes and the shapes: round the card (the slot's parent)
+-- for the pill; round the tile itself, a little out from it, on a phone.
+local function corner(frame: GuiObject, radius: number)
+	local c = frame:FindFirstChildOfClass("UICorner")
+	if c then
+		c.CornerRadius = UDim.new(0, radius)
+	end
+end
+local function home(slot: GuiObject)
+	apart = slot:GetAttribute("Apart") == true
+	local holder = if apart then slot else slot.Parent
+	ring.Parent, halo.Parent = holder, holder
+	ring.AnchorPoint, ring.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
+	ring.Size = if apart then UDim2.new(1, 4, 1, 4) else UDim2.fromScale(1, 1)
+	halo.Size = if apart then UDim2.new(1, 10, 1, 10) else UDim2.new(1, 6, 1, 6)
+	-- (the tile's meter fills from the bottom up; the card's left to right)
+	fillGradient.Rotation = if apart then -90 else 0
+	corner(button, if apart then 10 else 999)
+	corner(flash, if apart then 10 else 999)
+	corner(glow, if apart then 16 else 999)
+	corner(ring, if apart then 12 else 10)
+	corner(halo, if apart then 15 else 13)
+	layout()
+end
 
 local function pop()
 	scale.Scale = 1.12
@@ -367,13 +412,19 @@ function KaijuBeamHud.start(slot: GuiObject)
 		return
 	end
 	started = true
-	-- The pill in its cell on the card's bottom edge; the meter round the
-	-- card itself (the cell's parent).
+	-- The pill in its cell on the card's bottom edge, the meter round the
+	-- card itself (the cell's parent); on a phone the tile, the meter round
+	-- it (home).
 	button.Size = UDim2.fromScale(1, 1)
 	button.Position = UDim2.fromScale(0, 0)
 	button.Parent = slot
-	local card = slot.Parent
-	ring.Parent, halo.Parent = card, card
+	home(slot)
+	slot:GetAttributeChangedSignal("Apart"):Connect(function()
+		home(slot)
+	end)
+	slot:GetPropertyChangedSignal("Parent"):Connect(function()
+		home(slot)
+	end)
 	button:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 	button.Activated:Connect(fire)
 	save.Activated:Connect(toggleSave)
@@ -393,7 +444,8 @@ function KaijuBeamHud.start(slot: GuiObject)
 		if not wasReady then
 			return
 		end
-		fillGradient.Offset = Vector2.new(((now * 0.35) % 2) - 1, 0)
+		local flow = ((now * 0.35) % 2) - 1
+		fillGradient.Offset = if apart then Vector2.new(0, flow) else Vector2.new(flow, 0)
 		local tint = colors[1 + math.floor(now * 1.5) % #colors]:Lerp(READY_GOLD, 0.35)
 		glow.BackgroundColor3 = tint
 		glow.BackgroundTransparency = 0.62 + 0.18 * math.sin(now * 5)

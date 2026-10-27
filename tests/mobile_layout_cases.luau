@@ -53,7 +53,7 @@ for _, s in SCREENS do
 	-- Your kaiju's card: small, two rows, at the top left; the pick card
 	-- beside it only while you mine.
 	local k = MobileLayout.kaiju(screen, false)
-	local kWhole = { X = k.X, Y = k.Y, W = k.W, H = k.H + k.Notch / 2 }
+	local kWhole = { X = k.X, Y = k.Y, W = k.W, H = k.H }
 	check(k.X == 12 and k.Y == 12, label .. ": your kaiju's card isn't at the top left")
 	check(k.Grid and #k.Rows == 2, label .. ": your kaiju's card isn't two rows")
 	check(k.W <= 200 and kWhole.H <= 100, label .. ": your kaiju's card isn't small: " .. k.W .. " by " .. kWhole.H)
@@ -172,9 +172,9 @@ for _, s in SCREENS do
 	check(dock.TileWidth >= 44 and dock.TileHeight >= 44, label .. ": tiles too small to tap")
 	check(open.H >= 120 and open.W >= 240, label .. ": the open chat is too small to read")
 	-- Your kaiju's card: small, two rows (the team's three and the support a
-	-- little apart, AUTO HEAL across the card under them), the HYPERBEAM its
-	-- outline, its pill on the bottom edge; at the top left in a fight too.
-	-- Every cell big enough to tap, inside the card and clear of the others.
+	-- little apart, AUTO HEAL across the card under them), no team keys or
+	-- HYPERBEAM on it; at the top left in a fight too. Every cell big enough
+	-- to tap, inside the card and clear of the others.
 	for _, hunting in { false, true } do
 		local kc = MobileLayout.kaiju(screen, hunting)
 		local tame = { X = kc.TameX, Y = kc.TameY, W = kc.TameW, H = kc.TameH }
@@ -183,7 +183,8 @@ for _, s in SCREENS do
 		check(inside(kc) and inside(tame), what .. ": the kaiju card or CATCH runs off the screen")
 		check(kc.H >= 64 and kc.H <= 90, what .. ": the kaiju card is squashed or too tall: " .. kc.H)
 		local cells = MobileLayout.kaijuCells(kc)
-		check(cells.Grid == true and cells.Teams == nil, what .. ": the kaiju card isn't the phone's grid, or still has the team keys")
+		check(cells.Grid == true and cells.Teams == nil and cells.Beam == nil,
+			what .. ": the kaiju card isn't the phone's grid, or still has the team keys or the HYPERBEAM")
 		local top = { cells.Fighters[1], cells.Fighters[2], cells.Fighters[3], cells.Support }
 		local all = { top[1], top[2], top[3], top[4], cells.Auto }
 		for i, cell in all do
@@ -200,16 +201,6 @@ for _, s in SCREENS do
 		check(cells.Support.X - (top[3].X + top[3].W) > cells.Fighters[2].X - (top[1].X + top[1].W), what .. ": the support isn't a little apart")
 		check(cells.Auto.Y >= top[1].Y + top[1].H and cells.Auto.W >= kc.W - 2 * kc.Pad and cells.Auto.H >= 18,
 			what .. ": AUTO HEAL isn't a row across the card under the kaiju")
-		-- The HYPERBEAM's pill: across the middle of the card's bottom edge,
-		-- big enough to tap, over none of the cells, its lower half on the screen.
-		local beam = cells.Beam
-		check(beam.W >= kc.W * 0.7 and beam.H >= 20, what .. ": the HYPERBEAM's pill is too small to tap")
-		check(math.abs(beam.Y + beam.H / 2 - kc.H) <= 1, what .. ": the HYPERBEAM's pill isn't on the card's bottom edge")
-		check(math.abs(beam.X + beam.W / 2 - kc.W / 2) <= 1, what .. ": the HYPERBEAM's pill isn't centred")
-		for i, cell in all do
-			check(not MobileLayout.overlaps(cell, beam), what .. ": the HYPERBEAM's pill covers a cell: " .. i)
-		end
-		check(inside({ X = kc.X + beam.X, Y = kc.Y + beam.Y, W = beam.W, H = beam.H }), what .. ": the HYPERBEAM's pill runs off the screen")
 	end
 	-- The team keys: off the card, a row of four just above the move stick
 	-- (under your left thumb), each big enough to tap, clear of everything
@@ -239,6 +230,36 @@ for _, s in SCREENS do
 	for name, r in keyClear do
 		check(not MobileLayout.overlaps(keys, r), label .. ": the team keys overlap the " .. name)
 	end
+	-- The HYPERBEAM: a button of its own just right of the team keys, level
+	-- with their bottom, bigger than a key; clear of the same (its rim
+	-- too), of the keys, and of the fight's vitals and the moves over them
+	-- (three at most) with your kit out.
+	local beam = MobileLayout.beam(screen)
+	local rimmed = { X = beam.X - beam.Rim, Y = beam.Y - beam.Rim, W = beam.W + 2 * beam.Rim, H = beam.H + 2 * beam.Rim }
+	check(inside(rimmed), label .. ": the HYPERBEAM runs off the screen")
+	check(beam.W >= 52 and beam.H >= 48 and beam.H > keys.Size, label .. ": the HYPERBEAM is too small to tap")
+	check(beam.X >= keys.X + keys.W + 8 and beam.X - (keys.X + keys.W) <= 16 and beam.Y + beam.H == keys.Y + keys.H,
+		label .. ": the HYPERBEAM isn't just right of the team keys, level with them")
+	local beamClear = table.clone(keyClear)
+	beamClear["team keys"] = keys
+	do
+		-- (The fight's vitals and the moves over them, on the camera's
+		-- viewport: bottom-anchored, so the same bottom edge as the screen.)
+		local view = Vector2.new(s[1], s[3])
+		local inset = s[3] - s[2]
+		local armed = MobileLayout.kitSwitch(screen, view)
+		local vitals = MobileLayout.vitals(view, fightRing, armed)
+		local height = if vitals.W < 400 then 64 else 34
+		local bottom = s[3] - (fightRing.Margin + height) - inset
+		beamClear.vitals = { X = vitals.X, Y = bottom, W = vitals.W, H = height }
+		local Mv, mvGap = math.floor(46 * fightRing.K), math.floor(12 * fightRing.K)
+		local moves = 3 * Mv + 2 * mvGap
+		beamClear.moves = { X = vitals.Centre - moves / 2, Y = bottom - 10 * fightRing.K - Mv, W = moves, H = Mv }
+		beamClear["kit switch (kit out)"] = armed
+	end
+	for name, r in beamClear do
+		check(not MobileLayout.overlaps(rimmed, r), label .. ": the HYPERBEAM overlaps the " .. name)
+	end
 	-- The fight's foe list: on the right at the top (your coins and health
 	-- hide in a fight), right-aligned with their column, clear of Roblox's
 	-- tab; two rows or more over DODGE (one where the toasts come down under
@@ -255,6 +276,7 @@ for _, s in SCREENS do
 		["kaiju card"] = kWhole,
 		CATCH = keyClear.CATCH,
 		["team keys"] = keys,
+		HYPERBEAM = beam,
 		["kit switch"] = keyClear["kit switch"],
 		ATTACK = keyClear.ATTACK,
 		GUARD = keyClear.GUARD,
@@ -348,6 +370,7 @@ for _, s in SCREENS do
 			["kaiju card"] = kWhole,
 			CATCH = { X = k.TameX, Y = k.TameY, W = k.TameW, H = k.TameH },
 			["team keys"] = MobileLayout.keys(screen),
+			HYPERBEAM = MobileLayout.beam(screen),
 		}
 		if chat then
 			others.CHAT = closed
@@ -382,5 +405,5 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (your kaiju's card small, two rows, at the top left with its HYPERBEAM pill on the edge, CATCH under it, the pick card beside it, the team keys above the move stick, the foe list at the top right over the fight's ring, coins, chat, dock with TASKS, teammates' rows under your health and its size, the toast beside the pick card's place or under your health, the loot card under or beside them clear of the jump button, the kit switch by PLAY and clear of the fight's ring and vitals, at 7 screen sizes with 0 to 3 teammates)"
+		.. " mobile layout checks (your kaiju's card small, two rows, at the top left, CATCH under it, the pick card beside it, the team keys above the move stick and the HYPERBEAM right of them, the foe list at the top right over the fight's ring, coins, chat, dock with TASKS, teammates' rows under your health and its size, the toast beside the pick card's place or under your health, the loot card under or beside them clear of the jump button, the kit switch by PLAY and clear of the fight's ring and vitals, at 7 screen sizes with 0 to 3 teammates)"
 )

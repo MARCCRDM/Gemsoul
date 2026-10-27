@@ -239,7 +239,7 @@ for _, size in { { 667, 339 }, { 736, 378 }, { 812, 317 }, { 844, 332 }, { 896, 
 	for name, r in
 		{
 			["pick card"] = pick,
-			["kaiju card"] = { X = k.X, Y = k.Y, W = k.W, H = k.H + k.Notch / 2 },
+			["kaiju card"] = { X = k.X, Y = k.Y, W = k.W, H = k.H },
 			toast = toastRow,
 			["loot card"] = MobileLayout.loot(screen),
 			["health card"] = MobileLayout.health(screen),

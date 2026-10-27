@@ -154,6 +154,10 @@ the left. Now:
   under your left thumb (`MobileLayout.keys`; the team that's out is gold).
   There's no CALL BACK button: tap the team that's out to call it back,
   another team to send it out instead. See [kaiju.md](kaiju.md#your-team).
+- **The HYPERBEAM** is a button of its own just right of the team keys,
+  over the FIGHT / MINE switch (`MobileLayout.beam`): HYPERBEAM over its
+  percent, SAVE along its bottom, its rim the meter. It used to be a pill
+  on the kaiju card's bottom edge.
 - **CATCH** comes up under your kaiju's card, as wide.
 - **The pick card** shows only while you mine: it comes up beside your
   kaiju's card with your first swing and goes 6 seconds after your last
@@ -353,6 +357,7 @@ get out from under Roblox's buttons, which it used to sit under.
 | `UiKit.shrinkRow(row, list)` | Shrinks a row laid out side by side to its parent's width when its contents outgrow it |
 | `MobileLayout.kaiju(screen)`, `kaijuCells(card)` | Your kaiju's small grid at the top left, where its tiles and AUTO HEAL go, and CATCH under it |
 | `MobileLayout.keys(screen)` | The team keys 1–4: a row just above the move stick |
+| `MobileLayout.beam(screen)` | The HYPERBEAM's own button: just right of the team keys, level with their bottom |
 | `MobileLayout.card()` | The pick card's place: beside your kaiju's card |
 | `MobileLayout.foes(screen, viewY)` | The fight's foe list: top right, down to just over DODGE |
 | `MobileLayout.party(screen, rows)`, `setPartyRows(n)`, `onParty(fn)` | Teammates' rows under your HP bar, how many are up, and a call when that changes |
