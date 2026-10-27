@@ -8,7 +8,7 @@
 	               computer rival, training) and chat (Server and Party
 	               channels, through TextChatService so it's filtered).
 	  Popups       party invites and duel challenges (Accept / Decline), on
-	               any screen; a "searching" banner while queued.
+	               any screen; a "searching" tab up in the top bar while queued.
 	  Duel overlay the face-off (who's on which side, a countdown), FIGHT!,
 	               the time left, and the result (rating change, coins; a
 	               queued 1v1's arena tournament run and the swings it
@@ -1692,28 +1692,32 @@ Players.LocalPlayer:GetAttributeChangedSignal("Spar"):Connect(function()
 	end
 end)
 
--- Your search, while you're queued: a slim pill at the top middle, a
--- pulsing dot, SEARCHING and the mode, the time and who's waiting, and an
--- X to cancel. Its words change once a second, not every frame.
+-- Your search, while you're queued: a small tab up in Roblox's top bar, at
+-- its right end beside Roblox's own buttons, out of the way of play. A
+-- pulsing dot, SEARCHING over the mode, the time, and an X to cancel; tap it
+-- for the Arena (who's waiting). Its words change once a second, not every
+-- frame.
+local tabGui = UiKit.gui("QueueTab", 22)
+tabGui.IgnoreGuiInset = true
 local banner = new("TextButton", {
 	AutoButtonColor = false,
-	AnchorPoint = Vector2.new(0.5, 0),
+	AnchorPoint = Vector2.new(1, 0.5),
 	BackgroundColor3 = P.Frame,
-	BackgroundTransparency = 0.08,
-	Position = UDim2.new(0.5, 0, 0, 10),
-	Size = UDim2.fromOffset(360, 30),
+	BackgroundTransparency = 0.12,
+	Position = UDim2.new(1, -10, 0, 29),
+	Size = UDim2.fromOffset(176, 36),
 	Text = "",
 	Visible = false,
-}, popups)
-UiKit.round(banner, 15)
-new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = 0.35 }, banner)
+}, tabGui)
+UiKit.round(banner, 18)
+new("UIStroke", { Color = P.Gold, Thickness = 1, Transparency = 0.5 }, banner)
 do
 	local dot = new("Frame", {
 		Name = "Dot",
 		AnchorPoint = Vector2.new(0, 0.5),
 		BackgroundColor3 = P.Gold,
 		Position = UDim2.new(0, 13, 0.5, 0),
-		Size = UDim2.fromOffset(8, 8),
+		Size = UDim2.fromOffset(7, 7),
 	}, banner)
 	UiKit.round(dot, 4)
 	-- (Its pulse is a looping tween: nothing to run per frame.)
@@ -1721,35 +1725,34 @@ do
 		:Create(
 			dot,
 			TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-			{ BackgroundTransparency = 0.6 }
+			{ BackgroundTransparency = 0.7 }
 		)
 		:Play()
 end
-local bannerText = text(banner, "", 12, P.Gold, BOLD)
+local bannerKind = text(banner, "SEARCHING", 9, P.Dim, BOLD)
+bannerKind.AutomaticSize = Enum.AutomaticSize.None
+bannerKind.Position, bannerKind.Size = UDim2.fromOffset(27, 5), UDim2.new(1, -100, 0, 11)
+bannerKind.TextWrapped = false
+local bannerText = text(banner, "", 11, P.Gold, BOLD)
 bannerText.AutomaticSize = Enum.AutomaticSize.None
-bannerText.Position, bannerText.Size = UDim2.fromOffset(28, 0), UDim2.new(1, -172, 1, 0)
-bannerText.TextYAlignment = Enum.TextYAlignment.Center
-bannerText.TextTruncate, bannerText.TextWrapped = Enum.TextTruncate.AtEnd, false
+bannerText.Position, bannerText.Size = UDim2.fromOffset(27, 17), UDim2.new(1, -100, 0, 14)
+bannerText.TextWrapped = false
+UiKit.fit(bannerText) -- (a long mode name, or its Spanish, shrinks to fit)
 local bannerClock = text(banner, "", 12, P.Text, BOLD)
 bannerClock.AutomaticSize, bannerClock.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Right
-bannerClock.Position, bannerClock.Size = UDim2.new(1, -142, 0, 0), UDim2.new(0, 40, 1, 0)
+bannerClock.Position, bannerClock.Size = UDim2.new(1, -70, 0, 0), UDim2.new(0, 36, 1, 0)
 bannerClock.TextYAlignment, bannerClock.TextWrapped = Enum.TextYAlignment.Center, false
 bannerClock:SetAttribute("NoTranslate", true)
-local bannerWait = text(banner, "", 11, P.Dim, BOLD)
-bannerWait.AutomaticSize = Enum.AutomaticSize.None
-bannerWait.Position, bannerWait.Size = UDim2.new(1, -96, 0, 0), UDim2.new(0, 64, 1, 0)
-bannerWait.TextXAlignment, bannerWait.TextYAlignment = Enum.TextXAlignment.Right, Enum.TextYAlignment.Center
-bannerWait.TextWrapped = false
 local bannerCancel = new("TextButton", {
 	Name = "Cancel",
 	AutoButtonColor = true,
 	AnchorPoint = Vector2.new(1, 0.5),
 	BackgroundColor3 = P.Bad:Lerp(P.Frame, 0.45),
-	Position = UDim2.new(1, -4, 0.5, 0),
-	Size = UDim2.fromOffset(22, 22),
+	Position = UDim2.new(1, -6, 0.5, 0),
+	Size = UDim2.fromOffset(24, 24),
 	Text = "",
 }, banner)
-UiKit.round(bannerCancel, 11)
+UiKit.round(bannerCancel, 12)
 bannerCancel:SetAttribute("UiSound", "Click")
 for _, angle in { 45, -45 } do
 	new("Frame", {
@@ -1764,8 +1767,19 @@ end
 bannerCancel.Activated:Connect(function()
 	run("DuelCancel")
 end)
-local bannerShown = { Mode = nil, Second = -1, Waiting = -1 } -- (what's on it now)
+local bannerShown = { Mode = nil, Second = -1 } -- (what's on it now)
 banner.Activated:Connect(SocialUI.open)
+-- (Centred on the strip's height, at the end of its free part: clear of
+-- Roblox's buttons on the right, and of our DEV button when it's there.)
+local function placeTab()
+	local width = tabGui.AbsoluteSize.X
+	local top, _, right = UiKit.topbar(width)
+	local inset = if width > 0 then math.max(0, width - right) else 0 -- (from the screen's right edge)
+	banner.Position = UDim2.new(1, -10 - inset, 0, math.max(top, 40) / 2)
+end
+placeTab()
+UiKit.onTopbar(placeTab)
+tabGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeTab)
 
 -- The duel overlay ----------------------------------------------------------------
 
@@ -2026,20 +2040,15 @@ game:GetService("RunService").RenderStepped:Connect(function()
 		if bannerShown.Mode ~= queued.Mode then
 			local spec = Matchmaking.Modes[queued.Mode]
 			bannerShown.Mode = queued.Mode
-			bannerText.Text = "SEARCHING " .. string.upper(spec and spec.Name or queued.Mode)
+			bannerText.Text = string.upper(spec and spec.Name or queued.Mode)
 		end
 		local second = math.floor(now - (queued.Since or now))
 		if bannerShown.Second ~= second then
 			bannerShown.Second = second
 			bannerClock.Text = clock(second)
 		end
-		local waiting = queued.Waiting or 1
-		if bannerShown.Waiting ~= waiting then
-			bannerShown.Waiting = waiting
-			bannerWait.Text = string.format("%d in queue", waiting)
-		end
 	elseif bannerShown.Mode then
-		bannerShown.Mode, bannerShown.Second, bannerShown.Waiting = nil, -1, -1
+		bannerShown.Mode, bannerShown.Second = nil, -1
 	end
 	-- The window's live bits (queue time, statuses) redraw twice a second.
 	if gui.Enabled and os.clock() >= nextRedraw then

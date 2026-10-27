@@ -213,12 +213,29 @@ Either way the fight counts as played, the hints come down when it ends
 straight into the **1v1 Casual** queue (`DuelQueue`, "casual"; a few tries,
 since the server says no until they're standing in the lobby again), with
 the toast "You're in the 1v1 queue: keep mining, you'll be called in when a
-match is found." The search pill (a pulsing dot, SEARCHING 1V1 CASUAL,
-the time, how many in queue, and an X to cancel; 360 x 30, its words
-redrawn once a second rather than every frame) stays up at the top while
-they follow the floor arrows and mine. A match found while they're in a mech takes them out of
+match is found." The search tab stays up while they follow the floor
+arrows and mine (see **The search tab** below). A match found while they're in a mech takes them out of
 it. It happens for anyone straight out of the intro, though the PLAY menu
 still shows Casual locked until 3 duels.
+
+## The search tab
+
+*2026-10-27:* while you're queued, the search sits in a small tab up in
+Roblox's top bar, at its right end, beside Roblox's own buttons, so it's off
+the play area. It has a pulsing dot, SEARCHING over the mode (1V1 RANKED),
+the time you've waited, and an X to leave the queue. Tap the tab itself to
+open the Arena, which shows how many are waiting. It's 176 x 36 on every
+screen; a long mode name (or its Spanish) shrinks to fit instead of being
+cut off.
+
+![The search tab on a desktop](lobby/search-tab.png)
+
+![The search tab on a phone](lobby/search-tab-phone.png)
+
+It used to be a 360-wide bar at the top middle of the screen. The tab lives
+in its own screen (`QueueTab`, which ignores the top bar's inset) and moves
+when Roblox's buttons do (`UiKit.topbar`, `UiKit.onTopbar`), so it never
+covers them or the DEV button.
 
 ## Other miners: DUEL, SPAR, PARTY
 

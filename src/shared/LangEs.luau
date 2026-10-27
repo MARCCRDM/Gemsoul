@@ -864,6 +864,7 @@ return {
 	["{1} W"] = "{1} V",
 	["{1} L"] = "{1} D",
 	["SEARCHING NOW"] = "BUSCANDO AHORA",
+	["SEARCHING"] = "BUSCANDO",
 	["2v2 PARTY"] = "2v2 EN GRUPO",
 	["Best of {1}"] = "Al mejor de {1}",
 	["rated"] = "con puntuación",
