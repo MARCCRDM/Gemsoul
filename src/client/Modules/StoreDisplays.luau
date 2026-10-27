@@ -58,9 +58,12 @@ StoreDisplays.TurnReach = 90 -- ...and past this the turning ones keep still
 local V = Vector3.new
 local FLOOR = 0.86
 -- Saga Outfitters' colour (the Store's: Server OutpostWorld's STATION.Store),
--- a marking on the prices, never a light.
+-- a marking on the prices; GLOW, the lit strips of its front (OutpostWorld's
+-- SHOP.STORE), round the back wall too.
 local BRAND = Color3.fromRGB(122, 150, 214)
+local GLOW = Color3.fromRGB(128, 176, 255)
 local DARK = Color3.fromRGB(30, 32, 42)
+local NAVY = Color3.fromRGB(24, 34, 64) -- the back wall
 local STEEL = Color3.fromRGB(150, 158, 170)
 local WARM = Color3.fromRGB(255, 238, 214) -- the shop's display lighting
 
@@ -271,8 +274,9 @@ function StoreDisplays.build(at: CFrame): Displays
 	local function put(cframe: CFrame, size: Vector3, color: Color3, material: Enum.Material?, shape: string?)
 		return part(model, at * cframe, size, color, material, shape)
 	end
-	-- The back wall: a dark panel in a steel frame, washed with warm light.
-	local panel = put(CFrame.new(WALL - 0.15, 8.6, 6), V(0.3, 11, 19), DARK, Enum.Material.Metal)
+	-- The back wall: a deep blue panel framed in the Store's lit blue, washed
+	-- with warm light, the helmets' shelf lit along its edge.
+	local panel = put(CFrame.new(WALL - 0.15, 8.6, 6), V(0.3, 11, 19), NAVY, Enum.Material.Metal)
 	panel.Name = "DisplayWall"
 	local wash = Instance.new("SurfaceLight")
 	wash.Face = Enum.NormalId.Right
@@ -282,13 +286,14 @@ function StoreDisplays.build(at: CFrame): Displays
 	wash.Angle = 120
 	wash.Parent = panel
 	for _, y in { 3.1, 14.1 } do
-		put(CFrame.new(WALL, y, 6), V(0.3, 0.3, 19.2), STEEL, Enum.Material.Metal)
+		put(CFrame.new(WALL, y, 6), V(0.3, 0.24, 19.2), GLOW, Enum.Material.Neon)
 	end
 	for _, z in { -3.5, 15.5 } do
-		put(CFrame.new(WALL, 8.6, z), V(0.3, 11.2, 0.3), STEEL, Enum.Material.Metal)
+		put(CFrame.new(WALL, 8.6, z), V(0.3, 11.2, 0.24), GLOW, Enum.Material.Neon)
 	end
 	-- The helmets' shelf, and a steel rail over each weapon skin's plate.
 	put(CFrame.new(WALL + 1.5, 11.2, 6), V(3, 0.24, 17.4), STEEL, Enum.Material.Metal)
+	put(CFrame.new(WALL + 3.02, 11.2, 6), V(0.06, 0.1, 17.4), GLOW, Enum.Material.Neon)
 	for _, z in ROWS do
 		put(CFrame.new(WALL + 0.1, 6.86, z), V(0.16, 0.12, 2.4), STEEL, Enum.Material.Metal)
 	end

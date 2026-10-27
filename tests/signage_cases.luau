@@ -170,6 +170,36 @@ for _, root in { site.Model, pit } do
 		end
 	end
 end
+-- The Store's and the Market's lightboxes: lit in each shop's own colour
+-- (not the old grey-white), the word white on it; the Market's price board
+-- is candles only, not a word on it.
+do
+	local faces = {}
+	for _, d in site.Model:GetDescendants() do
+		local word = d.Name == "Lightbox" and d:FindFirstChild("Word", true)
+		if word and (word.Text == "STORE" or word.Text == "MARKET") then
+			local face = word.Parent
+			check(face and face.ClassName == "Frame", word.Text .. "'s lightbox has no lit face")
+			local c = face.BackgroundColor3
+			local hi, lo = math.max(c.R, c.G, c.B), math.min(c.R, c.G, c.B)
+			check(hi - lo > 0.3, word.Text .. "'s lightbox isn't in its colour")
+			local t = word.TextColor3
+			check(math.min(t.R, t.G, t.B) > 0.99, word.Text .. "'s word isn't white")
+			faces[word.Text] = c
+		end
+	end
+	check(faces.STORE and faces.MARKET, "The Store or the Market has no lightbox")
+	local a, b = faces.STORE, faces.MARKET
+	check(math.abs(a.R - b.R) + math.abs(a.G - b.G) + math.abs(a.B - b.B) > 0.3, "The Store and the Market aren't each in their own colour")
+	local board = site.Model:FindFirstChild("PriceBoard", true)
+	check(board ~= nil, "The Market has no price board")
+	local candles = 0
+	for _, d in board:GetDescendants() do
+		check(d.ClassName ~= "TextLabel", "The Market's price board has words on it")
+		candles += if d.Name == "Candle" then 1 else 0
+	end
+	check(candles >= 12, "The Market's price board has no candles")
+end
 -- Out in the quarry: no signs at the spokes naming the biomes.
 check(site.Model:FindFirstChild("Crossroads", true) == nil, "The biome signs are back by the roads")
 for _, biome in loaded.Frontier.Biomes do

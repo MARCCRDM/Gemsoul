@@ -2042,47 +2042,112 @@ local function shelter(parent, at: CFrame, rules)
 	end
 
 	-- The Store and the player Market: two shopfronts in the west wall, built
-	-- alike. Each is an alcove, the Shelter's wall at its back and a ceiling
-	-- over it, behind a steel portal: two columns and a fascia carrying the
-	-- shop's lightbox: its one word (the HUD's STORE, MARKET) in dark
-	-- letters on a lit face. Inside, a counter with a steel top
-	-- and a till, lit from above by downlights. No neon.
+	-- alike, each in its own colour. Each is an alcove, the Shelter's wall at
+	-- its back and a ceiling over it, behind a dark portal: two columns with a
+	-- strip of the shop's colour lit down each, and a fascia carrying the
+	-- shop's lightbox: its one word (the HUD's STORE, MARKET) in white on a
+	-- lit face of its colour, throwing that colour down over the front. Under
+	-- it a canopy: the Store's plain, lit along its lip; the Market's striped
+	-- like a stall's, pennants along its edge. Inside, a counter with a steel
+	-- top, lit along its foot and under its lip, and a till, lit from above by
+	-- downlights; a mat of the shop's colour on the floor in front.
+	local SHOP = {
+		STORE = { Face = Color3.fromRGB(40, 96, 222), Glow = Color3.fromRGB(128, 176, 255) },
+		MARKET = { Face = Color3.fromRGB(16, 146, 110), Glow = Color3.fromRGB(112, 236, 188) },
+	}
+	local CREAM = Color3.fromRGB(236, 228, 210)
 	local function storefront(z: number, word: string, color: Color3)
+		local look = SHOP[word]
 		local x = -W + 18
 		part(m, at3(-W + 9, 15, z), Vector3.new(18, 0.8, 22.4), HULL_DARK, Enum.Material.Metal)
 		for _, dz in { -10.5, 10.5 } do
-			solid(part(m, at3(x - 0.4, 7.9, z + dz), Vector3.new(1.6, 15.8, 1.6), ARMOR, Enum.Material.Metal))
-			part(m, at3(x - 0.4, 1.3, z + dz), Vector3.new(2, 1, 2), HULL_DARK, Enum.Material.Metal)
+			solid(part(m, at3(x - 0.4, 7.9, z + dz), Vector3.new(1.6, 15.8, 1.6), HULL_DARK, Enum.Material.Metal))
+			part(m, at3(x - 0.4, 1.3, z + dz), Vector3.new(2, 1, 2), ARMOR, Enum.Material.Metal)
+			-- (its colour lit down the column's face)
+			part(m, at3(x + 0.42, 8.4, z + dz), Vector3.new(0.06, 12, 0.32), look.Glow, Enum.Material.Neon)
 		end
-		part(m, at3(x - 0.4, 17.4, z), Vector3.new(1.6, 4.4, 22.6), ARMOR, Enum.Material.Metal)
-		-- The lightbox, on the fascia's face.
-		local box = part(m, facing(x + 0.5, 17.4, z, 1, 0), Vector3.new(19, 3.2, 0.2), HULL_DARK, Enum.Material.Metal)
+		part(m, at3(x - 0.4, 17.6, z), Vector3.new(1.6, 4.8, 22.6), HULL_DARK, Enum.Material.Metal)
+		-- The lightbox, on the fascia's face, lighting the front in its colour.
+		local box = part(m, facing(x + 0.5, 17.6, z, 1, 0), Vector3.new(20, 4, 0.24), HULL_DARK, Enum.Material.Metal)
 		box.Name = "Lightbox"
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = Enum.NormalId.Front
-		gui.CanvasSize = Vector2.new(19 * 40, 3.2 * 40)
+		gui.CanvasSize = Vector2.new(20 * 40, 4 * 40)
 		gui.LightInfluence = 0
-		gui.Brightness = 1.1
+		gui.Brightness = 1.4
 		gui.Parent = box
 		local lit = Instance.new("Frame")
 		lit.Size = UDim2.fromScale(1, 1)
 		lit.BorderSizePixel = 0
-		lit.BackgroundColor3 = Color3.fromRGB(232, 228, 218)
+		lit.BackgroundColor3 = look.Face
 		lit.Parent = gui
+		local edge = Instance.new("UIStroke")
+		edge.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		edge.Color = look.Glow
+		edge.Thickness = 6
+		edge.Parent = lit
 		local name = Instance.new("TextLabel")
 		name.Name = "Word"
 		name.BackgroundTransparency = 1
-		name.Position = UDim2.fromScale(0.05, 0.16)
-		name.Size = UDim2.fromScale(0.9, 0.68)
+		name.Position = UDim2.fromScale(0.05, 0.12)
+		name.Size = UDim2.fromScale(0.9, 0.76)
 		name.Text = word
 		name.TextScaled = true
 		name.Font = Enum.Font.GothamBlack
-		name.TextColor3 = Color3.fromRGB(30, 32, 38)
+		name.TextColor3 = Color3.new(1, 1, 1)
+		name.TextStrokeColor3 = look.Face:Lerp(Color3.new(0, 0, 0), 0.6)
+		name.TextStrokeTransparency = 0.55
 		name.Parent = lit
-		-- The counter, its steel top and a till on it.
+		local wash = Instance.new("SurfaceLight")
+		wash.Face = Enum.NormalId.Front
+		wash.Color = look.Glow
+		wash.Range = 16
+		wash.Brightness = 1.4
+		wash.Angle = 120
+		wash.Parent = box
+		-- The canopy, sloping out over the counter from under the fascia.
+		local slope = math.atan2(1.6, 5)
+		local lip = x + 5.4 -- (its front edge)
+		local function canopy(dz: number, width: number, shade: Color3)
+			part(
+				m,
+				at3(x + 2.7, 14.25, z + dz) * CFrame.Angles(0, 0, -slope),
+				Vector3.new(5.25, 0.24, width),
+				shade,
+				Enum.Material.Fabric
+			)
+		end
+		if word == "MARKET" then
+			-- (A stall's: stripes of its colour and cream, a pennant under each.)
+			local stripes = 9
+			local width = 22.6 / stripes
+			for i = 1, stripes do
+				local dz = (i - (stripes + 1) / 2) * width
+				local shade = if i % 2 == 1 then look.Face else CREAM
+				canopy(dz, width, shade)
+				part(m, at3(lip + 0.06, 13.15, z + dz), Vector3.new(0.12, 0.6, width), shade, Enum.Material.Fabric)
+				part(
+					m,
+					at3(lip, 12.85, z + dz) * CFrame.Angles(math.rad(45), 0, 0),
+					Vector3.new(0.1, width * 0.62, width * 0.62),
+					shade,
+					Enum.Material.Fabric
+				)
+			end
+		else
+			canopy(0, 22.6, look.Face)
+			part(m, at3(lip + 0.06, 13.15, z), Vector3.new(0.12, 0.6, 22.6), look.Face:Lerp(Color3.new(0, 0, 0), 0.35), Enum.Material.Fabric)
+			-- (a warm strip along under its lip)
+			part(m, at3(lip - 0.3, 12.86, z), Vector3.new(0.24, 0.06, 21.6), Color3.fromRGB(255, 236, 200), Enum.Material.Neon)
+		end
+		-- The counter, its steel top and a till on it; lit along its foot
+		-- and under its lip.
 		local counter = solid(part(m, at3(x, 2.6, z), Vector3.new(3.2, 3.6, 16), HULL_DARK, Enum.Material.Metal))
 		counter.Name = word .. "Counter"
 		part(m, at3(x + 0.1, 4.55, z), Vector3.new(3.8, 0.3, 16.4), STEEL, Enum.Material.Metal)
+		for _, y in { 1.0, 4.28 } do
+			part(m, at3(x + 1.63, y, z), Vector3.new(0.06, 0.12, 15.6), look.Glow, Enum.Material.Neon)
+		end
 		local till = part(m, at3(x, 5.3, z - 5) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(math.rad(-20), 0, 0),
 			Vector3.new(1.8, 1.1, 0.14), HULL_DARK, Enum.Material.Metal)
 		local screen = Instance.new("SurfaceGui")
@@ -2100,17 +2165,91 @@ local function shelter(parent, at: CFrame, rules)
 		strip.BorderSizePixel = 0
 		strip.BackgroundColor3 = color
 		strip.Parent = glow
+		-- The mat in front, in its colour with a lighter edge.
+		local mat = at3(x + 5, 0.885, z)
+		part(m, mat, Vector3.new(6.4, 0.05, 15.4), look.Glow:Lerp(Color3.new(0, 0, 0), 0.35), Enum.Material.Fabric)
+		part(m, mat * CFrame.new(0, 0.01, 0), Vector3.new(5.6, 0.05, 14.6), look.Face:Lerp(Color3.new(0, 0, 0), 0.5), Enum.Material.Fabric)
 		-- Downlights in the ceiling: warm white onto the counter and the wall.
 		for _, dz in { -5, 5 } do
 			local lamp = part(m, at3(-W + 10, 14.55, z + dz), Vector3.new(2, 0.12, 2), Color3.fromRGB(255, 240, 220), Enum.Material.Neon)
 			light(lamp, Color3.fromRGB(255, 236, 214), 18, 1.1, true)
 		end
-		return counter
+		return counter, look
 	end
 	-- (Its stands of suits, helmets, picks and skins are the client's:
 	-- Client.StoreDisplays.)
 	local store = storefront(6, "STORE", STATION.Store)
-	local market = storefront(40, "MARKET", STATION.Market)
+	local market, marketLook = storefront(40, "MARKET", STATION.Market)
+	-- The Market's own: a board on its counter's front of prices moving
+	-- (candles, green up and red down: no words), bulbs strung under its
+	-- ceiling, and crates of gear waiting by its corner.
+	do
+		local x = -W + 18
+		local board = part(m, facing(x + 1.68, 2.9, 40, 1, 0), Vector3.new(11, 1.5, 0.1), HULL_DARK, Enum.Material.Metal)
+		board.Name = "PriceBoard"
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = Enum.NormalId.Front
+		gui.CanvasSize = Vector2.new(440, 60)
+		gui.LightInfluence = 0
+		gui.Parent = board
+		local back = Instance.new("Frame")
+		back.Size = UDim2.fromScale(1, 1)
+		back.BorderSizePixel = 0
+		back.BackgroundColor3 = Color3.fromRGB(10, 14, 16)
+		back.Parent = gui
+		local UP, DOWN = Color3.fromRGB(70, 226, 150), Color3.fromRGB(238, 92, 82)
+		local level = 30
+		for i = 1, 24 do
+			local move = math.floor(math.sin(i * 1.7) * 9 + math.cos(i * 0.6) * 5 + 0.5)
+			local from, to = level, math.clamp(level - move, 8, 52)
+			level = to
+			local top, low = math.min(from, to), math.max(from, to)
+			local shade = if to <= from then UP else DOWN
+			local cx = 10 + (i - 1) * 17.6
+			local wick = Instance.new("Frame")
+			wick.Name = "Wick"
+			wick.BorderSizePixel = 0
+			wick.BackgroundColor3 = shade
+			wick.Position = UDim2.fromOffset(cx + 4, top - 4)
+			wick.Size = UDim2.fromOffset(2, low - top + 8)
+			wick.Parent = back
+			local candle = Instance.new("Frame")
+			candle.Name = "Candle"
+			candle.BorderSizePixel = 0
+			candle.BackgroundColor3 = shade
+			candle.Position = UDim2.fromOffset(cx, top)
+			candle.Size = UDim2.fromOffset(10, math.max(3, low - top))
+			candle.Parent = back
+		end
+		-- Bulbs on two wires, front to back, sagging between the ends.
+		local bulbs = 8
+		for _, dz in { -6, 6 } do
+			local from, to = Vector3.new(x - 0.6, 14.4, 40 + dz), Vector3.new(-W + 1, 14.4, 40 + dz)
+			local last
+			for i = 0, bulbs do
+				local t = i / bulbs
+				local p = from:Lerp(to, t) - Vector3.new(0, math.sin(t * math.pi) * 1.1, 0)
+				local bulb = part(m, at3(p.X, p.Y - 0.3, p.Z), Vector3.new(0.42, 0.42, 0.42), Color3.fromRGB(255, 214, 150), Enum.Material.Neon, "Ball")
+				if i == bulbs // 2 then
+					light(bulb, Color3.fromRGB(255, 210, 150), 12, 0.6)
+				end
+				if last then
+					local mid, span = (last + p) / 2, (p - last).Magnitude
+					part(m, at3(mid.X, mid.Y, mid.Z) * CFrame.Angles(0, 0, math.atan2(p.Y - last.Y, p.X - last.X)),
+						Vector3.new(span, 0.06, 0.06), Color3.fromRGB(30, 30, 32), Enum.Material.SmoothPlastic)
+				end
+				last = p
+			end
+		end
+		-- Crates by its south corner, one on another, its colour stencilled
+		-- in a band round each.
+		for _, c in { { -62.6, 56.4, 0, 0.15 }, { -60.2, 57.4, 0, -0.3 }, { -62.4, 56.6, 2.5, 0.5 } } do
+			local crate = solid(part(m, at3(c[1], 0.86 + 1.25 + c[3], c[2]) * CFrame.Angles(0, c[4], 0), Vector3.new(2.5, 2.5, 2.5),
+				Color3.fromRGB(138, 102, 66), Enum.Material.WoodPlanks))
+			crate.Name = "Crate"
+			part(m, crate.CFrame, Vector3.new(2.56, 0.4, 2.56), marketLook.Face, Enum.Material.SmoothPlastic)
+		end
+	end
 	-- Behind the Market's counter: the escrow lockers, where sold gear waits
 	-- for its buyer, a wall of numbered doors, a lamp on each.
 	do
