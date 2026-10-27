@@ -60,7 +60,7 @@ end
 -- How much a bigger refill saves, as its line says.
 local Refill, Mega = Rules.Refills.Refill, Rules.Refills.Mega
 check(Layout.saving(Refill, Refill) == 0, "A refill saves against itself")
-check(Layout.saving(Mega, Refill) == 21, "The Mega Refill doesn't save 21% a swing: " .. Layout.saving(Mega, Refill))
+check(Layout.saving(Mega, Refill) == 32, "The Mega Refill doesn't save 32% a swing: " .. Layout.saving(Mega, Refill))
 check(string.find(Mega.Blurb, Layout.saving(Mega, Refill) .. "%", 1, true), "The Mega Refill's line has the wrong saving")
 check(Layout.saving({ Swings = 10, Robux = 100 }, Refill) == 0, "A dearer refill shows a saving")
 

@@ -162,6 +162,8 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			-- pathway of islands to a brainrot boss (your kaiju come too).
 			local RiftServer = require(script.Parent.Systems.RiftServer)
 			RiftServer.gateAt = OutpostServer.veinGate
+			-- (RESTORE when down at its boss, for Robux: the RiftRestore product)
+			StoreServer.riftRestore = RiftServer.restoreBought
 			-- (and Brutus's bounty board: any boss, from his counter)
 			RiftServer.bountyAt = OutpostServer.bountyCounter
 			RiftServer.start(OutpostServer.site())

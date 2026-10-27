@@ -128,6 +128,7 @@ local Spar = require(ReplicatedStorage.Shared.Spar)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
+local Store = require(ReplicatedStorage.Shared.Store)
 local RiftWorld = require(script.Parent.Parent.World.RiftWorld)
 local ArenaStreaks = require(script.Parent.ArenaStreaks)
 local Duelist = require(script.Parent.Duelist)
@@ -1112,10 +1113,22 @@ local function join(run, player: Player)
 	end
 	-- Backup: anyone of the trip down at the boss is back on their feet
 	-- for it, kaiju and all (the down card's CALL FOR BACKUP).
+	-- They come back in the cave before the boss, where the one who came
+	-- in is, to go on together (each gets the boss's loot of their own).
 	for _, other in table.clone(run.Members) do
 		if other ~= player and run.Fallen[other] then
-			revive(run, other, player.DisplayName .. " came through the gate: you're back on your feet, kaiju and all.")
-			notify(player, other.DisplayName .. " was down: your coming in got them back up.")
+			revive(run, other, player.DisplayName .. " came through the gate: you're back on your feet, kaiju and all, in the cave before the boss.")
+			local root = rootOf(player)
+			if root and other.Character then
+				other.Character:PivotTo(root.CFrame * CFrame.new(4, 0, 0))
+				local theirs = rootOf(other)
+				if theirs then
+					theirs.AssemblyLinearVelocity = Vector3.zero
+				end
+				KaijuServer.deployTeam(other)
+			end
+			run.Reached[other] = cleared
+			notify(player, other.DisplayName .. " was down: your coming in got them back up, here beside you.")
 		end
 	end
 end
@@ -1545,6 +1558,24 @@ local function choose(player: Player, choice: any)
 		home(player, "Back at base, with what you found.")
 		return reply(true, "")
 	elseif choice == "Restore" then
+		-- (A RESTORE bought before, kept: used now, nothing to pay.)
+		local profile = PlayerData.get(player) :: any
+		if profile and (profile.RiftRestores or 0) > 0 then
+			profile.RiftRestores -= 1
+			PlayerData.sync(player)
+			run.Restores[player] = (run.Restores[player] or 0) + 1
+			revive(run, player, "Restored: you and your kaiju are back on your feet.")
+			return reply(true, "")
+		end
+		-- (For Robux once its product is on: the purchase is prompted here,
+		-- and RiftServer.restoreBought brings you back up. Coins till then.)
+		local product = Store.RobuxProducts.RiftRestore or 0
+		if product ~= 0 then
+			pcall(function()
+				game:GetService("MarketplaceService"):PromptProductPurchase(player, product)
+			end)
+			return reply(true, "")
+		end
 		local used = run.Restores[player] or 0
 		local cost = RiftRun.restoreCost(used)
 		if not PlayerData.spendCoins(player, cost) then
@@ -1555,6 +1586,19 @@ local function choose(player: Player, choice: any)
 		return reply(true, "")
 	end
 	return reply(false, "Choose RESTORE or BACK TO BASE.")
+end
+
+-- A RESTORE bought for Robux (StoreServer's RiftRestore): back on your feet
+-- at the boss, kaiju and all, if you're still down there; false if not
+-- (StoreServer keeps it for next time).
+function RiftServer.restoreBought(player: Player): boolean
+	local run = runOf[player]
+	if not run or not run.Fallen[player] then
+		return false
+	end
+	run.Restores[player] = (run.Restores[player] or 0) + 1
+	revive(run, player, "Restored: you and your kaiju are back on your feet.")
+	return true
 end
 
 -- What going in looks like for `player` (the gate's card, Client.RiftClient):

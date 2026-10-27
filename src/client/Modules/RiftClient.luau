@@ -62,6 +62,7 @@ local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
 local RiftRealms = require(ReplicatedStorage.Shared.RiftRealms)
 local RiftLobby = require(ReplicatedStorage.Shared.RiftLobby)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local Store = require(ReplicatedStorage.Shared.Store)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -1884,6 +1885,14 @@ function RiftClient.openBackup()
 	refreshBackups()
 end
 
+-- RESTORE's price: Robux once its product is on, coins till then.
+local function restoreLabel(): string
+	if (Store.RobuxProducts.RiftRestore or 0) ~= 0 then
+		return string.format("RESTORE  ·  R$ %d", Store.RobuxPrices.RiftRestore)
+	end
+	return string.format("RESTORE  ·  %d COINS", player:GetAttribute("RiftRestore") or RiftRun.Restore.Coins)
+end
+
 -- Down at the boss: on the left what you can do for yourself (RESTORE,
 -- BACK TO BASE, the clock running down); on the right who you can call
 -- in, the gate's lobby again (your party, the Outpost, your friends).
@@ -1937,9 +1946,8 @@ local function showDown()
 	local clock = text(left, "", if small then 11 else 12, P.Dim, BOLD)
 	clock.LayoutOrder = 2
 	downClock, downFill = clock, fill
-	local cost = player:GetAttribute("RiftRestore") or RiftRun.Restore.Coins
 	local tall = if small then 36 else 44
-	restoreButton = button(left, string.format("RESTORE  ·  %d COINS", cost), P.Gold, 3, function()
+	restoreButton = button(left, restoreLabel(), P.Gold, 3, function()
 		choose("Restore")
 	end, tall)
 	local note = text(left, "You and your kaiju, back to full health, right here.", if small then 10 else 11, P.Dim)
@@ -1975,8 +1983,7 @@ local function refreshDown()
 		downFill.Size = UDim2.fromScale(math.clamp(left / RiftRun.Fallen, 0, 1), 1)
 	end
 	if restoreButton then
-		local cost = player:GetAttribute("RiftRestore") or RiftRun.Restore.Coins
-		restoreButton.Text = string.format("RESTORE  ·  %d COINS", cost)
+		restoreButton.Text = restoreLabel()
 	end
 end
 

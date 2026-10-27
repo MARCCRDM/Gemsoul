@@ -508,9 +508,12 @@ fighters leave you be while you're down; with everyone down, they wait.
   The card is two columns. On the left, what you can do for yourself; on
   the right, **CALL FOR BACKUP**: the gate's lobby again, down there.
 
-  - **RESTORE · 150 COINS**: you and your kaiju, every one of them, back to
-    full health right there (`KaijuServer.restoreAll`). It doubles each
-    time in a trip (150, 300, 600...). Coins only, no Robux;
+  - **RESTORE · R$ 100**: you and your kaiju, every one of them, back to
+    full health right there (`KaijuServer.restoreAll`). A developer product
+    (`Store.RobuxProducts.RiftRestore`): the server prompts it and
+    `RiftServer.restoreBought` brings you up when the receipt lands; bought
+    after you left, it's kept (`profile.RiftRestores`) for the next time.
+    (With no product id it falls back to coins: 150, doubling each time.);
   - **BACK TO BASE**: home with the gems you found;
   - **Your kaiju are called back** the moment you go down (into their
     Gemsouls: `KaijuServer.recallTeam`), so they're not left fighting
@@ -532,7 +535,10 @@ fighters leave you be while you're down; with everyone down, they wait.
     too** now, while the boss still stands (`RiftServer.partyRun`), not
     only on the path;
   - a party member coming through the gate while you're down **gets you up
-    for nothing**: full health, kaiju out again, no RESTORE spent;
+    for nothing**: full health, kaiju out again, no RESTORE spent, and you
+    stand up beside them in the last cleared cave (the room before), so
+    you take the boss on together. Each of you still gets your own boss
+    cache, rolls and pick;
   - nothing chosen in 60 seconds: back to base.
 
   *2026-10-27, fixed:* after RESTORE or a backup, your body could stay

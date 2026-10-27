@@ -321,6 +321,8 @@ Store.RobuxProducts = {
 	SwingMega = 3723018515,
 	-- Your knocked-out kaiju back on their feet now (Shared.Kaiju.Revive)
 	KaijuRevive = 3723018189,
+	-- Down at a Rift boss: back on your feet there, kaiju and all (RiftServer)
+	RiftRestore = 3723023347,
 }
 -- The Robux price of each bundle and offer (a cosmetic's is its own Robux).
 Store.RobuxPrices = {
@@ -335,6 +337,7 @@ Store.RobuxPrices = {
 	StarterPack = 99,
 	SeasonPremium = 399,
 	KaijuRevive = 25,
+	RiftRestore = 100,
 }
 -- (A refill's price is its own: Outpost.Refills.)
 for _, refill in Outpost.Refills do

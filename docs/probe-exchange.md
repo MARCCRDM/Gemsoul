@@ -9,7 +9,7 @@ press E, or run out of swings, to open its window. There you can buy refills
 ![The Exchange](probe/desktop.png)
 
 The screenshots are from before refills moved to Robux. The cards now show
-"R$ 49" and "BUY · R$ 49" where they show coins, and "ABOUT ≈ 130 rocks"
+"R$ 100" and "BUY · R$ 100" where they show coins, and "ABOUT ≈ 130 rocks"
 where they show the price of each swing.
 
 ## Your pick and its swings
@@ -25,8 +25,8 @@ doesn't sell other picks. It sells refills.
 
 | Refill | Swings | Robux | About |
 | --- | --- | --- | --- |
-| Swing Refill | +600 (a full charge) | R$ 49 | 130 rocks |
-| Mega Refill | +2,000 | R$ 129 | 430 rocks (21% less a swing) |
+| Swing Refill | +600 (a full charge) | R$ 100 | 130 rocks |
+| Mega Refill | +2,000 | R$ 225 | 430 rocks (32% less a swing) |
 
 - Each refill is a Developer Product (`Store.RobuxProducts.SwingRefill` and
   `SwingMega`). BUY opens Roblox's purchase prompt. When the receipt goes

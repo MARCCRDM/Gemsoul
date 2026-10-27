@@ -45,6 +45,9 @@ StoreServer.addSwings = nil :: ((Player, number) -> boolean)?
 -- Brings back every kaiju of a player's that's knocked out (a revive:
 -- KaijuServer.reviveAll, wired in by Main); how many came back.
 StoreServer.reviveKaiju = nil :: ((Player) -> number)?
+-- Down at a Rift boss: back on your feet there, kaiju and all
+-- (RiftServer.restoreBought, wired in by Main); false when not down.
+StoreServer.riftRestore = nil :: ((Player) -> boolean)?
 
 local function cosmeticName(id: string): string
 	local cosmetic = Cosmetics.get(id)
@@ -175,6 +178,17 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 		Coupons.add(profile, "Revive", 1)
 		PlayerData.sync(player)
 		return true, { "a Kaiju Revive coupon (none of yours was down)" }
+	end
+	-- A Rift RESTORE: back on your feet at the boss. Paid for once you're
+	-- no longer down (the time ran out while it went through): kept for the
+	-- next time you're down there, used by RESTORE without paying again.
+	if key == "RiftRestore" then
+		if StoreServer.riftRestore and StoreServer.riftRestore(player) then
+			return true, { "back on your feet, kaiju and all" }
+		end
+		profile.RiftRestores = (profile.RiftRestores or 0) + 1
+		PlayerData.sync(player)
+		return true, { "a Rift RESTORE, kept for the next time you're down" }
 	end
 	local reward = Store.contents(key)
 	if not reward then

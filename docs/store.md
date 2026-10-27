@@ -107,7 +107,7 @@ Nothing sells for Robux until its Developer Product exists.
    - otherwise `Store.RobuxPrices`;
    - for kits, `Store.KitPrices` (1 kit 349, 2 kits 599, 3 kits 799).
    - for PROBE-7's swing refills, their own `Robux` in `Outpost.Refills`
-     (`SwingRefill` R$ 49 for 600 swings, `SwingMega` R$ 129 for 2,000).
+     (`SwingRefill` R$ 100 for 600 swings, `SwingMega` R$ 225 for 2,000).
 2. Paste each product's id into `Store.RobuxProducts`.
    - The squad kits need seven products, one per choice: `KitProspector`, `KitSkirmisher`, `KitJuggernaut`, `KitProspectorSkirmisher`, `KitProspectorJuggernaut`, `KitSkirmisherJuggernaut` and `KitProspectorSkirmisherJuggernaut`.
 3. Until a product's id is set, its button says "Coming soon" (or buys for coins while testing).

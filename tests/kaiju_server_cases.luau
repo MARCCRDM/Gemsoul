@@ -6302,6 +6302,13 @@ end)()
 	-- Down, their kaiju are called back into their Gemsouls.
 	check(Kaiju.away(profiles[a].Kaiju) == true and #KaijuServer.team(a) == 0, "Down at the boss, the kaiju weren't called back")
 	check(noted(a, "called back while you're down"), "Not told the kaiju were called back")
+	-- (RESTORE is a Robux product: choosing it prompts the purchase, and
+	-- the receipt brings you up. Coins only with no product id.)
+	local Store = shared("Store")
+	local product = Store.RobuxProducts.RiftRestore
+	local prompted = registered.RiftChoice(a, "Restore")
+	check(prompted.Ok and type(a:GetAttribute("RiftFallen")) == "number", "RESTORE for Robux got you up unpaid")
+	Store.RobuxProducts.RiftRestore = 0
 	local poor = registered.RiftChoice(a, "Restore")
 	check(not poor.Ok and string.find(poor.Message, "Not enough coins", 1, true), "Restored for nothing")
 	profiles[a].Coins = 1000
