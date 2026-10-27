@@ -46,6 +46,7 @@ local ChallengeChooser = require(script.Parent.ChallengeChooser)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
+local UiSound = require(script.Parent.UiSound)
 
 local player = Players.LocalPlayer
 local P = IronUi.Colors
@@ -1545,6 +1546,144 @@ local sparCards: { [number]: () -> () } = {}
 local kaijuCards: { [number]: () -> () } = {}
 -- Fill-in offers (Shared.AutoQueue), by queue entry id.
 local fillCards: { [string]: () -> () } = {}
+
+-- MATCH READY: the queue found you a match. JOIN or DECLINE before the bar
+-- runs out; nothing starts until everyone's in (Systems/Duels' ready
+-- check). Over the middle of the screen, small enough to see past.
+local ready: { Id: string, Card: Frame, Status: TextLabel, Buttons: Frame }? = nil
+local function closeReady()
+	if ready then
+		ready.Card:Destroy()
+		ready = nil
+	end
+end
+local function readyWaiting(count: number?, of: number?)
+	if not ready then
+		return
+	end
+	ready.Buttons.Visible = false
+	ready.Status.Visible = true
+	ready.Status.Text = if count and of
+		then string.format("Joined. Waiting for the others… %d/%d", count, of)
+		else "Joined. Waiting for the others…"
+end
+local function showReady(info)
+	closeReady()
+	local id = tostring(info.Id)
+	local seconds = if type(info.Seconds) == "number" then info.Seconds else Matchmaking.ReadySeconds
+	local ends = if type(info.Ends) == "number" then info.Ends else serverNow() + seconds
+	local width = if SHORT then 300 else 360
+	local card = new("Frame", {
+		Name = "MatchReady",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, if SHORT then 0.42 else 0.36),
+		Size = UDim2.fromOffset(width, 150),
+		BackgroundColor3 = P.Frame,
+	}, popups)
+	UiKit.round(card, 10)
+	new("UIStroke", { Color = P.Gold, Thickness = 2 }, card)
+	local title = text(card, "MATCH READY", 22, P.Gold, HEADING)
+	title.AutomaticSize = Enum.AutomaticSize.None
+	title.Position, title.Size = UDim2.fromOffset(16, 12), UDim2.new(1, -76, 0, 26)
+	local clock = text(card, tostring(seconds), 22, P.Text, HEADING)
+	clock.AutomaticSize = Enum.AutomaticSize.None
+	clock.TextXAlignment = Enum.TextXAlignment.Right
+	clock.Position, clock.Size = UDim2.new(1, -66, 0, 12), UDim2.fromOffset(50, 26)
+	clock:SetAttribute("NoTranslate", true)
+	local names = {}
+	for _, foe in (if type(info.Foes) == "table" then info.Foes else {}) do
+		table.insert(names, string.format("%s (%d)", tostring(foe.Name), tonumber(foe.Rating) or 0))
+	end
+	local line = text(
+		card,
+		if #names > 0 then string.format("%s  ·  vs %s", tostring(info.Name), table.concat(names, ", "))
+			else tostring(info.Name),
+		13,
+		P.Dim
+	)
+	line.AutomaticSize = Enum.AutomaticSize.None
+	line.TextWrapped = false
+	line.TextTruncate = Enum.TextTruncate.AtEnd
+	line.Position, line.Size = UDim2.fromOffset(16, 42), UDim2.new(1, -32, 0, 18)
+	-- The time left, running down.
+	local track = new("Frame", {
+		BackgroundColor3 = P.Ink,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(16, 68),
+		Size = UDim2.new(1, -32, 0, 5),
+	}, card)
+	UiKit.round(track, 3)
+	local left = math.max(0, ends - serverNow())
+	local fill = new("Frame", {
+		BackgroundColor3 = P.Gold,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(math.clamp(left / seconds, 0, 1), 1),
+	}, track)
+	UiKit.round(fill, 3)
+	TweenService:Create(fill, TweenInfo.new(left, Enum.EasingStyle.Linear), { Size = UDim2.fromScale(0, 1) }):Play()
+	-- JOIN (wide) and DECLINE; once you've joined, who you're waiting on.
+	local buttons = new("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(16, 88),
+		Size = UDim2.new(1, -32, 0, 44),
+	}, card)
+	local status = text(card, "", 14, P.Text, BOLD)
+	status.AutomaticSize = Enum.AutomaticSize.None
+	status.TextXAlignment = Enum.TextXAlignment.Center
+	status.Position, status.Size = UDim2.fromOffset(16, 88), UDim2.new(1, -32, 0, 44)
+	status.Visible = false
+	ready = { Id = id, Card = card, Status = status, Buttons = buttons }
+	local function answer(accept: boolean)
+		if not ready or ready.Id ~= id then
+			return
+		end
+		if accept then
+			readyWaiting(nil, nil)
+		else
+			closeReady()
+		end
+		task.spawn(function()
+			local result = GemClient.request("DuelReady", id, accept)
+			if not result.Ok and result.Message and result.Message ~= "" then
+				UiKit.toast(result.Message, P.Bad)
+			end
+		end)
+	end
+	local join = chip(buttons, "JOIN", P.Good, function()
+		answer(true)
+	end)
+	join.Size = UDim2.new(0.64, -4, 1, 0)
+	join.TextSize = 18
+	join:SetAttribute("UiSound", "Confirm")
+	local decline = chip(buttons, "DECLINE", P.Bad, function()
+		answer(false)
+	end)
+	decline.Position, decline.Size = UDim2.new(0.64, 4, 0, 0), UDim2.new(0.36, -4, 1, 0)
+	if info.Accepted then
+		readyWaiting(info.Ready, info.Of)
+	end
+	UiSound.play("Notify")
+	-- A little pop as it opens, then the seconds count down.
+	local scale = new("UIScale", { Scale = 0.9 }, card)
+	TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	task.spawn(function()
+		while ready and ready.Id == id do
+			local remaining = math.max(0, math.ceil(ends - serverNow()))
+			clock.Text = tostring(remaining)
+			clock.TextColor3 = if remaining <= 5 then P.Bad else P.Text
+			if remaining <= 0 then
+				break
+			end
+			task.wait(0.25)
+		end
+		-- (The server closes it; this is in case its word never comes.)
+		task.delay(2, function()
+			if ready and ready.Id == id then
+				closeReady()
+			end
+		end)
+	end)
+end
 Players.LocalPlayer:GetAttributeChangedSignal("Spar"):Connect(function()
 	if Spar.sparring(Players.LocalPlayer) then
 		for from, dismiss in sparCards do
@@ -2174,6 +2313,16 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 				elseif a.BonusUpfront then string.format("+%d coins when the match starts", a.Bonus)
 				else string.format("+%d bonus coins if you win", a.Bonus)
 		)
+	elseif kind == "MatchReady" and type(a) == "table" then
+		showReady(a)
+	elseif kind == "MatchReadyState" and type(a) == "table" then
+		if ready and ready.Id == tostring(a.Id) and not ready.Buttons.Visible then
+			readyWaiting(a.Ready, a.Of)
+		end
+	elseif kind == "MatchReadyOver" and type(a) == "table" then
+		if ready and ready.Id == tostring(a.Id) then
+			closeReady()
+		end
 	elseif kind == "FillInOver" then
 		local id = tostring(a)
 		if fillCards[id] then
@@ -2188,6 +2337,7 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 		end
 	elseif kind == "Match" then
 		queued = nil
+		closeReady()
 		SocialUI.close()
 		showFaceoff(a)
 	elseif kind == "Fight" then

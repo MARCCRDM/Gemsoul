@@ -15,6 +15,8 @@
 	  Matchmaking.roundsOver(wins, played)  the match winner, "Draw" or nil
 	  Matchmaking.pair(entries, now)  pairs queue entries ({ Rating, Since,
 	                              Size }), longest-waiting first
+	  Matchmaking.ReadySeconds    a pairing's MATCH READY window: everyone in it
+	                              joins, or nobody fights (Systems/Duels)
 	  Matchmaking.lane(slot, team, index, size)  where a fighter stands in a
 	                              lane, and the point it faces (offsets from the arena floor's centre)
 
@@ -46,6 +48,7 @@ Matchmaking.Countdown = 4 -- seconds: shielded, facing off
 Matchmaking.TimeLimit = 120 -- seconds: then the healthier side wins
 Matchmaking.EndPause = 4 -- seconds on the result before heading back
 Matchmaking.ChallengeSeconds = 30
+Matchmaking.ReadySeconds = 15 -- MATCH READY: seconds to JOIN a match the queue found
 Matchmaking.Lanes = 4 -- duels running side by side in the Arena
 -- 1v1 Ranked plays rounds: first to two round wins, three rounds at most.
 -- Between rounds, a pivot window: each side may switch to one of their gear

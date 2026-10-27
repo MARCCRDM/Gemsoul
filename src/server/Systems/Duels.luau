@@ -16,6 +16,7 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	  "DuelAuto", on          auto queue (Shared.AutoQueue): on call for the
 	                          lobby (the default) or not
 	  "DuelFill", id, accept  answer a fill-in offer for queue entry `id`
+	  "DuelReady", id, accept   answer MATCH READY for ready check `id`
 	  "IntroQueue"            a new player's first fight: queued with another
 	                          new player, else a lobby player on call, else
 	                          the sparring rival (ArenaSessions.enterTraining)
@@ -25,6 +26,13 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	  "FillIn", { Id, Mode, Name, Who, Rating, Bonus, Seconds }   someone's
 	                                            waiting in a queue: step in?
 	  "FillInOver", id                          that queue was filled or left
+	  "MatchReady", { Id, Mode, Name, Ranked, Seconds, Ends, Foes = { { Name,
+	                  Rating } }, Accepted, Ready, Of }   the queue found you a
+	                                            match: JOIN? (Ready of Of in)
+	  "MatchReadyState", { Id, Ready, Of }      someone in it said JOIN
+	  "MatchReadyOver", { Id, Reason, Searching }   it's over: "Started",
+	                                            "Declined", "Expired" or "Gone"
+	                                            (Searching: you're still queued)
 	  "Challenge", fromId, fromName, rating, stats   someone challenged you
 	  "Match", { Id, Mode, Ranked, Rules, StartsAt, Ends, Team, Teams,
 	             Called, Bonus, Intro }         (Called: pulled from the lobby
@@ -63,6 +71,13 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	win; players who turned it off are offered the match instead (FillIn).
 	A new player's first fight is the "intro" queue: two new players pair at
 	once; alone, a lobby player is called; still alone, the sparring rival.
+	Nobody is put in a queued duel without saying so: when the queue pairs
+	two entries, everyone in them gets MATCH READY (JOIN / DECLINE) for
+	Matchmaking.ReadySeconds, and the match starts once they've all joined.
+	Whoever declines or lets it run out leaves the queue; the other side
+	keeps searching, its place kept. A fill-in from the lobby has said yes
+	already, so only the side that was waiting is asked. (A first fight, the
+	intro queue, starts at once: the new player has just pressed START.)
 	Queued 1v1s (Ranked or Casual, not challenges) are the arena tournament
 	(Shared.SwingRestore): the 1st, 5th and 10th win of a run restore the
 	pick's swings (Restores), and ten in a row wins the tournament (Ranked:
@@ -100,6 +115,11 @@ local nextEntry = 0
 -- [id] = { Id, Mode, Ranked, Teams, Out, Slot, State, StartsAt, Ends, Connections }
 local matches = {}
 local matchOf: { [Player]: any } = {}
+-- Ready checks (MATCH READY), by id: { Id, Mode, Sides = { { Players,
+-- Entry? } }, Accepted = { [Player] = true }, Ends, Start }. A side's Entry
+-- is its queue entry (a called fill-in has none); Start starts the match.
+local readyChecks = {}
+local nextReady = 0
 -- target -> challenger -> { Expiry, Stats }
 local challenges: { [Player]: { [Player]: { Expiry: number, Stats: string } } } = {}
 local nextId = 0
@@ -880,6 +900,225 @@ local function entryById(id: any)
 	return nil
 end
 
+-- Ready checks (MATCH READY) ---------------------------------------------------
+
+local function checkPlayers(check): { Player }
+	local list = {}
+	for _, side in check.Sides do
+		for _, member in side.Players do
+			table.insert(list, member)
+		end
+	end
+	return list
+end
+
+local function readyCount(check): (number, number)
+	local yes, all = 0, 0
+	for _, member in checkPlayers(check) do
+		all += 1
+		if check.Accepted[member] then
+			yes += 1
+		end
+	end
+	return yes, all
+end
+
+local function checkOf(player: Player)
+	for _, check in readyChecks do
+		if table.find(checkPlayers(check), player) then
+			return check
+		end
+	end
+	return nil
+end
+
+-- Lanes not taken by a match or held for a ready check.
+local function lanesFree(): number
+	local taken = 0
+	for _ in matches do
+		taken += 1
+	end
+	for _ in readyChecks do
+		taken += 1
+	end
+	return Matchmaking.Lanes - taken
+end
+
+-- Asks everyone on `sides` to JOIN; `start()` starts the match once they
+-- all have. `accepted`: who's said yes already (a called fill-in).
+local function openCheck(mode: string, sides, start: () -> (boolean, string?), accepted: { Player }?)
+	nextReady += 1
+	local spec = Matchmaking.Modes[mode]
+	local check = {
+		Id = "R" .. nextReady,
+		Mode = mode,
+		Sides = sides,
+		Accepted = {},
+		Ends = os.clock() + Matchmaking.ReadySeconds,
+		Start = start,
+	}
+	for _, member in accepted or {} do
+		check.Accepted[member] = true
+	end
+	readyChecks[check.Id] = check
+	for _, side in sides do
+		if side.Entry then
+			side.Entry.Check = check.Id
+		end
+	end
+	local endsAt = serverNow() + Matchmaking.ReadySeconds
+	local yes, all = readyCount(check)
+	for s, side in sides do
+		local foes = {}
+		for o, other in sides do
+			if o ~= s then
+				for _, foe in other.Players do
+					local record = Duels.record(foe)
+					table.insert(foes, { Name = foe.DisplayName, Rating = if record then record.Rating else Matchmaking.StartRating })
+				end
+			end
+		end
+		for _, member in side.Players do
+			Remotes.Social:FireClient(member, "MatchReady", {
+				Id = check.Id,
+				Mode = mode,
+				Name = if spec then spec.Name else mode,
+				Ranked = spec ~= nil and spec.Kind == "Ranked",
+				Seconds = Matchmaking.ReadySeconds,
+				Ends = endsAt,
+				Foes = foes,
+				Accepted = check.Accepted[member] == true,
+				Ready = yes,
+				Of = all,
+			})
+		end
+	end
+	return check
+end
+
+local function closeCheck(check, reason: string)
+	readyChecks[check.Id] = nil
+	for _, side in check.Sides do
+		if side.Entry then
+			side.Entry.Check = nil
+		end
+	end
+	for _, member in checkPlayers(check) do
+		if member.Parent then
+			Remotes.Social:FireClient(
+				member,
+				"MatchReadyOver",
+				{ Id = check.Id, Reason = reason, Searching = entryOf(member) ~= nil }
+			)
+		end
+	end
+end
+
+-- No match: `out` didn't join (declined, ran out of time, or left). Their
+-- side leaves the queue; the rest keep searching where they were (a called
+-- fill-in just stays in the lobby).
+local function failCheck(check, out: { [Player]: boolean }, reason: string)
+	for _, side in check.Sides do
+		local failed, who = false, nil
+		for _, member in side.Players do
+			if out[member] then
+				failed, who = true, who or member
+			end
+		end
+		if failed then
+			if side.Entry and entryById(side.Entry.Id) == side.Entry then
+				dequeue(side.Players[1])
+			end
+			if reason ~= "Gone" then
+				for _, member in side.Players do
+					Remotes.Notify:FireClient(
+						member,
+						if member ~= who
+							then string.format("%s didn't join, so your party left the queue.", who.DisplayName)
+							elseif reason == "Expired" then "You didn't join in time: you left the queue."
+							else "Match declined: you left the queue."
+					)
+				end
+			end
+		else
+			for _, member in side.Players do
+				if member.Parent then
+					Remotes.Notify:FireClient(
+						member,
+						if side.Entry then "Your opponent didn't join: back to searching." else "They didn't join after all."
+					)
+				end
+			end
+		end
+	end
+	closeCheck(check, reason)
+end
+
+local function readyRespond(player: Player, id: any, accept: any)
+	local check = readyChecks[id]
+	if not check or not table.find(checkPlayers(check), player) then
+		return reply(false, "That match is gone.")
+	end
+	if accept ~= true then
+		failCheck(check, { [player] = true }, "Declined")
+		return reply(true, "Declined: you left the queue.")
+	end
+	check.Accepted[player] = true
+	local yes, all = readyCount(check)
+	if yes < all then
+		for _, member in checkPlayers(check) do
+			Remotes.Social:FireClient(member, "MatchReadyState", { Id = check.Id, Ready = yes, Of = all })
+		end
+		return reply(true, "Waiting for the others to join…")
+	end
+	-- Everyone's in.
+	closeCheck(check, "Started")
+	local ok, problem = check.Start()
+	if not ok then
+		-- Someone became busy: they leave the queue; the rest keep searching.
+		for _, side in check.Sides do
+			for _, member in side.Players do
+				if busy(member) and entryOf(member) then
+					dequeue(member, problem)
+					Remotes.Notify:FireClient(member, "Left the duel queue: " .. (problem or ""))
+				elseif member.Parent then
+					Remotes.Notify:FireClient(member, "The match couldn't start: " .. (problem or "The Arena is full. Try again in a moment."))
+				end
+			end
+		end
+		return reply(false, problem or "The duel couldn't start.")
+	end
+	return reply(true, "Match found!")
+end
+
+-- Each step: a check with someone gone (left the queue, the game, or busy
+-- now) is off; one past its time leaves out whoever didn't join.
+local function stepChecks(now: number)
+	for id, check in table.clone(readyChecks) do
+		if readyChecks[id] then
+			local out, gone = {}, false
+			for _, side in check.Sides do
+				local left = side.Entry ~= nil and entryById(side.Entry.Id) ~= side.Entry
+				for _, member in side.Players do
+					if left or not member.Parent or busy(member) then
+						out[member], gone = true, true
+					end
+				end
+			end
+			if gone then
+				failCheck(check, out, "Gone")
+			elseif now >= check.Ends then
+				for _, member in checkPlayers(check) do
+					if not check.Accepted[member] then
+						out[member] = true
+					end
+				end
+				failCheck(check, out, "Expired")
+			end
+		end
+	end
+end
+
 -- A new player's first fight (Shared.AutoQueue): the intro queue.
 local function introJoin(player: Player)
 	local record = Duels.record(player)
@@ -977,7 +1216,7 @@ end
 -- A lone 1v1 invites the lobby; only DuelFill acceptance starts a fill-in.
 -- An unanswered intro still falls back to the sparring rival on schedule.
 local function fill(entry, now: number)
-	if entry.Size ~= 1 then
+	if entry.Size ~= 1 or entry.Check then
 		return
 	end
 	local spec = Matchmaking.Modes[entry.Mode]
@@ -1068,6 +1307,17 @@ local function fillRespond(player: Player, id: any, accept: any)
 	if not ready or not AutoQueue.setting(Duels.record(player)) then
 		return reply(false, "Return to the lobby to accept a match invitation.")
 	end
+	if entry.Check or checkOf(player) then
+		return reply(false, "Someone else is already stepping in.")
+	end
+	local spec = Matchmaking.Modes[entry.Mode]
+	if not (spec and spec.Intro) then
+		-- You've said yes; the one waiting is asked MATCH READY too.
+		openCheck(entry.Mode, { { Players = entry.Players, Entry = entry }, { Players = { player } } }, function()
+			return fillWith(entry, player)
+		end, { player })
+		return reply(true, string.format("Waiting for %s to join…", entry.Players[1].DisplayName))
+	end
 	local ok, problem = fillWith(entry, player)
 	if not ok then
 		return reply(false, problem or "The duel couldn't start.")
@@ -1104,12 +1354,13 @@ local function join(player: Player, mode: any)
 	return reply(true, "Searching for a " .. spec.Name .. "…")
 end
 
--- Pairs waiting entries of each mode while there's a lane free.
+-- Pairs waiting entries of each mode while there's a lane free, and asks
+-- them MATCH READY (a first fight starts at once).
 function Duels.pairUp()
 	for mode in Matchmaking.Modes do
 		local entries = {}
 		for _, entry in queue do
-			if entry.Mode == mode then
+			if entry.Mode == mode and not entry.Check then
 				table.insert(entries, entry)
 			end
 		end
@@ -1128,17 +1379,25 @@ function Duels.pairUp()
 			pairs = Matchmaking.pair(entries, os.clock())
 		end
 		for _, pair in pairs do
-			if not freeSlot() then
+			if not freeSlot() or lanesFree() <= 0 then
 				return
 			end
 			local a, b = entries[pair[1]], entries[pair[2]]
 			local kind = spec.Kind or "Ranked"
-			local ok, problem = startMatch(
-				mode,
-				{ table.clone(a.Players), table.clone(b.Players) },
-				PvPRules.profile(kind),
-				{ Intro = spec.Intro }
-			)
+			local function start()
+				return startMatch(
+					mode,
+					{ table.clone(a.Players), table.clone(b.Players) },
+					PvPRules.profile(kind),
+					{ Intro = spec.Intro }
+				)
+			end
+			local ok, problem = true, nil
+			if spec.Intro then
+				ok, problem = start()
+			else
+				openCheck(mode, { { Players = a.Players, Entry = a }, { Players = b.Players, Entry = b } }, start)
+			end
 			if not ok then
 				-- Someone became busy: drop whoever it was from the queue.
 				for _, entry in { a, b } do
@@ -1215,6 +1474,7 @@ local function step()
 		local player = entry.Players[1]
 		if busy(player) then dequeue(player) end
 	end
+	stepChecks(now)
 	Duels.pairUp()
 	-- Lone entries call the lobby (Shared.AutoQueue).
 	for _, entry in table.clone(queue) do
@@ -1294,6 +1554,7 @@ function Duels.start()
 	Shop.register("DuelPivot", pivot)
 	Shop.register("DuelAuto", setAuto)
 	Shop.register("DuelFill", fillRespond)
+	Shop.register("DuelReady", readyRespond)
 	Shop.register("IntroQueue", introJoin)
 	CombatServer.onLethal(lethal)
 	Shop.register("DuelLeave", function(player)

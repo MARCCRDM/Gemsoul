@@ -6,6 +6,20 @@ end
 
 Duels.start()
 
+-- MATCH READY (Systems/Duels' ready check): everyone the queue has asked
+-- says JOIN, so the match can start.
+local joined = {}
+local function joinAll()
+	for _, p in table.clone(playerList) do
+		local asked = last(p, "MatchReady")
+		local key = asked and (asked[2].Id .. ":" .. p.UserId)
+		if key and not joined[key] then
+			joined[key] = true
+			handlers.DuelReady(p, asked[2].Id, true)
+		end
+	end
+end
+
 -- The shared rules -------------------------------------------------------------
 check(math.abs(Matchmaking.expected(1000, 1000) - 0.5) < 1e-9, "Even ratings aren't a coin flip")
 check(Matchmaking.rated(1000, 1000, true) == 1016 and Matchmaking.rated(1000, 1000, false) == 984, "Elo step")
@@ -79,6 +93,20 @@ advance(0.25)
 check(Duels.matchOf(ana) == nil, "A lone player was matched")
 check(handlers.DuelQueue(ben, "1v1").Ok, "Ben not queued")
 advance(0.25)
+-- Paired: nobody's put in a match yet; both are asked MATCH READY.
+check(Duels.matchOf(ana) == nil and Duels.matchOf(ben) == nil, "The queue started a match nobody had joined")
+local asked = last(ana, "MatchReady") and last(ana, "MatchReady")[2]
+check(asked and asked.Mode == "1v1" and asked.Seconds == Matchmaking.ReadySeconds and asked.Of == 2, "Ana wasn't asked MATCH READY")
+check(#asked.Foes == 1 and asked.Foes[1].Name == "Ben" and not asked.Accepted, "Ana's MATCH READY doesn't name Ben")
+check(last(ben, "MatchReady") and last(ben, "MatchReady")[2].Id == asked.Id, "Ben wasn't asked the same MATCH READY")
+check(ana:GetAttribute("DuelQueue") == "1v1", "Ana left the queue while being asked")
+check(not handlers.DuelReady(ana, "R999", true).Ok, "A made-up ready check was answered")
+check(handlers.DuelReady(ben, asked.Id, true).Ok and Duels.matchOf(ben) == nil, "One JOIN started the match")
+check(last(ana, "MatchReadyState")[2].Ready == 1, "Ana wasn't told Ben joined")
+advance(0.25)
+check(Duels.matchOf(ana) == nil, "The match started without Ana")
+check(handlers.DuelReady(ana, asked.Id, true).Ok, "Ana couldn't JOIN")
+check(last(ana, "MatchReadyOver")[2].Reason == "Started", "The window wasn't closed as started")
 local match = Duels.matchOf(ana)
 check(match ~= nil and match == Duels.matchOf(ben) and match.Ranked, "Queue didn't start a ranked match")
 check(
@@ -244,6 +272,8 @@ handlers.DuelCancel(ana)
 check(handlers.DuelQueue(ana, "2v2").Ok and ben:GetAttribute("DuelQueue") == "2v2", "Party not queued together")
 check(handlers.DuelQueue(cy, "2v2").Ok, "Second party not queued")
 advance(0.25)
+check(last(di, "MatchReady") and #last(di, "MatchReady")[2].Foes == 2, "A party member wasn't asked, or the other party isn't named")
+joinAll()
 match = Duels.matchOf(ana)
 check(match and match.Mode == "2v2" and Duels.matchOf(di) == match and #match.Teams[1] == 2, "2v2 didn't start")
 advance(Matchmaking.Countdown)
@@ -264,6 +294,7 @@ check(ana:GetAttribute("DuelQueue") == nil, "A broken party stayed queued")
 local eve, fay = makePlayer(5, "Eve"), makePlayer(6, "Fay")
 check(handlers.DuelQueue(eve, "casual").Ok and handlers.DuelQueue(fay, "casual").Ok, "Casual queue refused")
 advance(0.25)
+joinAll()
 match = Duels.matchOf(eve)
 check(match and match == Duels.matchOf(fay) and not match.Ranked, "Casual didn't start an unrated match")
 check(
@@ -293,6 +324,8 @@ advance(Matchmaking.EndPause)
 respawn(fay)
 -- Beating the same player again doesn't add to the run.
 check(handlers.DuelQueue(eve, "casual").Ok and handlers.DuelQueue(fay, "casual").Ok, "Casual rematch refused")
+advance(0.25)
+joinAll()
 advance(Matchmaking.Countdown)
 kill(fay)
 check(
@@ -342,6 +375,7 @@ do
 	handlers.DuelQueue(gus, "1v1")
 	handlers.DuelQueue(hal, "1v1")
 	advance(0.25)
+	joinAll()
 	local m = Duels.matchOf(gus)
 	check(m and m.Rounds and last(gus, "Match")[2].Rounds.ToWin == 2, "1v1 Ranked started without rounds")
 	check(
@@ -414,6 +448,7 @@ do
 	handlers.DuelQueue(gus, "1v1")
 	handlers.DuelQueue(hal, "1v1")
 	advance(0.25)
+	joinAll()
 	m = Duels.matchOf(gus)
 	advance(Matchmaking.Countdown)
 	lethalBlow(hal)
@@ -429,6 +464,7 @@ do
 	handlers.DuelQueue(gus, "1v1")
 	handlers.DuelQueue(hal, "1v1")
 	advance(0.25)
+	joinAll()
 	m = Duels.matchOf(gus)
 	advance(Matchmaking.Countdown)
 	lethalBlow(gus)
@@ -450,6 +486,7 @@ do
 	handlers.DuelQueue(gus, "1v1")
 	handlers.DuelQueue(hal, "1v1")
 	advance(0.25)
+	joinAll()
 	m = Duels.matchOf(gus)
 	advance(Matchmaking.Countdown)
 	lethalBlow(gus)
@@ -475,6 +512,48 @@ do
 	respawn(gus, hal)
 end
 
+-- MATCH READY: a decline or no answer leaves the queue; the other side
+-- keeps searching, its place kept ------------------------------------------------
+do
+	local rae, sol, tia = makePlayer(70, "Rae"), makePlayer(71, "Sol"), makePlayer(72, "Tia")
+	handlers.DuelQueue(rae, "casual")
+	handlers.DuelQueue(sol, "casual")
+	advance(0.25)
+	local id = last(rae, "MatchReady")[2].Id
+	check(handlers.DuelReady(rae, id, true).Ok, "Rae couldn't join")
+	check(handlers.DuelReady(sol, id, false).Ok, "Sol couldn't decline")
+	check(sol:GetAttribute("DuelQueue") == nil and Duels.matchOf(sol) == nil, "Declining kept Sol queued")
+	check(rae:GetAttribute("DuelQueue") == "casual" and Duels.matchOf(rae) == nil, "Rae wasn't put back to searching")
+	local over = last(rae, "MatchReadyOver")[2]
+	check(over.Id == id and over.Reason == "Declined" and over.Searching, "Rae's window didn't close as declined, still searching")
+	check(last(sol, "MatchReadyOver")[2].Searching == false, "Sol's window says he's still searching")
+	check(not handlers.DuelReady(sol, id, true).Ok, "A declined match could still be joined")
+	-- Rae kept her place: the next one queued is paired with her.
+	handlers.DuelQueue(tia, "casual")
+	advance(0.25)
+	id = last(tia, "MatchReady")[2].Id
+	check(last(rae, "MatchReady")[2].Id == id, "Rae wasn't paired with the next one queued")
+	-- Rae doesn't answer this time: past ReadySeconds she leaves the queue.
+	check(handlers.DuelReady(tia, id, true).Ok, "Tia couldn't join")
+	advance(Matchmaking.ReadySeconds + 0.25)
+	check(
+		rae:GetAttribute("DuelQueue") == nil and last(rae, "MatchReadyOver")[2].Reason == "Expired",
+		"Rae, who never answered, stayed queued"
+	)
+	check(tia:GetAttribute("DuelQueue") == "casual" and Duels.matchOf(tia) == nil, "Tia, who joined, wasn't kept searching")
+	-- Cancelling while asked: the other side keeps searching.
+	handlers.DuelQueue(sol, "casual")
+	advance(0.25)
+	id = last(sol, "MatchReady")[2].Id
+	handlers.DuelCancel(sol)
+	advance(0.25)
+	check(
+		last(tia, "MatchReadyOver")[2].Id == id and tia:GetAttribute("DuelQueue") == "casual",
+		"Cancelling didn't hand Tia back to the queue"
+	)
+	handlers.DuelCancel(tia)
+end
+
 -- Lanes: more duels than lanes wait for a free one -----------------------------
 local extra = {}
 for i = 1, 10 do
@@ -482,6 +561,7 @@ for i = 1, 10 do
 	check(handlers.DuelQueue(extra[i], "1v1").Ok, "Queue " .. i)
 end
 advance(0.25)
+joinAll()
 local running = 0
 for i = 1, 10 do
 	if Duels.matchOf(extra[i]) then
@@ -496,6 +576,7 @@ Players.PlayerRemoving.Fire(gone)
 check(rival.State == "Done", "Leaving the game didn't forfeit")
 advance(Matchmaking.EndPause)
 advance(0.25)
+joinAll()
 running = 0
 for i = 2, 10 do
 	if Duels.matchOf(extra[i]) then
@@ -582,6 +663,12 @@ do
 	advance(1.5)
 	check(Duels.matchOf(ivy) == nil and Duels.matchOf(kim) == nil, "Saved auto-on setting pulled a player without consent")
 	check(handlers.DuelFill(kim, last(kim, "FillIn")[2].Id, true).Ok, "Invitation acceptance failed")
+	-- Kim's said yes; Ivy, who was waiting, is asked MATCH READY.
+	check(Duels.matchOf(ivy) == nil, "A fill-in started before the one waiting joined")
+	local fillAsk = last(ivy, "MatchReady")[2]
+	check(fillAsk.Foes[1].Name == "Kim" and fillAsk.Ready == 1 and fillAsk.Of == 2, "Ivy's MATCH READY doesn't show Kim in")
+	check(last(kim, "MatchReady")[2].Accepted == true, "Kim was asked again after saying yes")
+	joinAll()
 	local m = Duels.matchOf(ivy)
 	check(m ~= nil and Duels.matchOf(kim) == m and Duels.matchOf(jon) == nil, "The closest-rated lobby player wasn't pulled in")
 	check(m.Ranked and m.Called[kim] and not m.Called[ivy], "The pulled player isn't marked as called")
@@ -614,6 +701,7 @@ do
 	advance(AutoQueue.CallAfter + 0.5)
 	check(Duels.matchOf(kim) == nil, "Casual match started before acceptance")
 	check(handlers.DuelFill(kim, last(kim, "FillIn")[2].Id, true).Ok, "Casual invitation failed")
+	joinAll()
 	m = Duels.matchOf(ivy)
 	check(m and Duels.matchOf(kim) == m and not m.Ranked, "Kim wasn't pulled into the Casual queue")
 	advance(Matchmaking.Countdown)
@@ -687,6 +775,7 @@ do
 	advance(AutoQueue.CallAfter + 0.5)
 	entryId = last(kim, "FillIn")[2].Id
 	check(handlers.DuelFill(kim, entryId, true).Ok, "Accepting the fill-in failed")
+	joinAll()
 	m = Duels.matchOf(ivy)
 	check(m and Duels.matchOf(kim) == m and m.Called[kim], "Accepting didn't start the match")
 	advance(Matchmaking.Countdown)
@@ -787,9 +876,9 @@ do
 end
 
 -- Auto queue: back in the lobby (from a dungeon or the Rift, or arriving),
--- you're searching ranked 1v1 without being asked, and two searching are
--- paired. No question for that; only a fill-in is asked (above). Off, no
--- search; switched off while searching, out of the queue.
+-- you're searching ranked 1v1 without being asked. Two searching are
+-- paired, but nobody's put in the match until they say JOIN (MATCH READY).
+-- Off, no search; switched off while searching, out of the queue.
 do
 	local a, b = makePlayer(81, "ReturnWin"), makePlayer(82, "ReturnLoss")
 	for _, p in { a, b } do
@@ -802,6 +891,9 @@ do
 	end
 	check(last(a, "FillIn") == nil and last(b, "FillIn") == nil, "Asked before auto queuing")
 	Duels.pairUp()
+	check(Duels.matchOf(a) == nil and Duels.matchOf(b) == nil, "Two auto-queued players were put in a match without being asked")
+	check(last(a, "MatchReady") and last(b, "MatchReady"), "Two auto-queued players weren't asked MATCH READY")
+	joinAll()
 	check(Duels.matchOf(a) ~= nil and Duels.matchOf(a) == Duels.matchOf(b), "Two auto-queued players weren't paired")
 	-- Off: no search; switching it off leaves the queue, on joins it.
 	local c = makePlayer(83, "QuietMiner")
@@ -810,5 +902,5 @@ do
 	check(not handlers.DuelReturnQueue(c).Ok and c:GetAttribute("DuelQueue") == nil, "Auto queued with it off")
 	check(handlers.DuelAuto(c, true).Ok and handlers.DuelReturnQueue(c).Ok and c:GetAttribute("DuelQueue") == "1v1", "Back on, no search")
 	check(handlers.DuelAuto(c, false).Ok and c:GetAttribute("DuelQueue") == nil, "Turning auto queue off left them searching")
-	print("PASS: auto queue without asking (dungeon blocking, back from a dungeon, paired), off means no search")
+	print("PASS: auto queue (dungeon blocking, back from a dungeon, paired after MATCH READY), off means no search")
 end

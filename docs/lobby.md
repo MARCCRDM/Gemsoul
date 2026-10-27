@@ -158,6 +158,38 @@ The rules are in `Shared/AutoQueue.luau`; `Systems/Duels.luau` applies them.
 | **MATCH INVITES: OFF** | Mutes unsolicited offers. The preference uses `DuelAuto`, saved in `profile.Duel.AutoQueue`. Offers normally expire after 15 seconds; expired, declined or unissued offers cannot start a match. Cancelling the queue withdraws offers. Availability is checked again on acceptance. |
 | **Who counts as free** | In the Outpost (`Outpost` attribute), not searching, and none of: `CombatSession`, `MatchId`, `Expedition`, `RiftRun`, `DungeonQueue`, `DungeonId`, `KaijuBattle`, `Spar`, `SparDown`, `MechPilot`, `FirstFight`. |
 
+### MATCH READY
+
+*2026-10-27.* Nobody is put in a queued duel without saying so. With auto
+queue on, everyone in the lobby is searching, so two players (a desktop and
+a phone in the same server, say) could be paired and dropped into a fight
+without touching anything. Now a pairing asks first, like a queue pop in
+other games:
+
+- When the queue pairs two entries (`Duels.pairUp`), everyone in them gets
+  a **MATCH READY** window: the mode, who it's against (name and rating), a
+  countdown (`Matchmaking.ReadySeconds`, 15), **JOIN** and **DECLINE**.
+  Nobody is moved yet.
+- Everyone joins: the match starts as before.
+- Someone declines, or lets the time run out: they leave the queue. The
+  other side keeps searching, keeping its place, and the next player
+  queued is paired with them.
+- Someone cancels, leaves the game or gets busy while being asked: same, the
+  other side keeps searching.
+- A **fill-in** from the lobby (above) has said yes already, so only the
+  player who was waiting gets MATCH READY, with the fill-in shown as joined.
+- A **first fight** (`intro` queue) still starts at once: the new player
+  has just pressed START for it.
+- While a pairing is being asked, it holds an Arena lane, so a JOIN never
+  finds the Arena full.
+
+Server: `readyChecks` in `Systems/Duels.luau` (request `DuelReady`, id,
+accept; Social events `MatchReady`, `MatchReadyState`, `MatchReadyOver`).
+Client: `showReady` in `Client/Modules/SocialUI.luau`. After JOIN, the
+window says who you're waiting on ("1/2").
+
+![MATCH READY on a phone, and after JOIN on a computer](lobby/match-ready.png)
+
 ### The first fight
 
 A new player's first fight is the `intro` queue (request `IntroQueue`, only
@@ -259,3 +291,4 @@ It is off for now with `Config.Features.ChatBox = false`. Setting it to
 | `tests/run_chat_feed.py` | 57 | The real chat feed against chat and GUI doubles. Its place over the kaiju card, under the PLAY stack and on a short screen; names, your green and escaped markup; other channels kept out; system and loot lines; fading; ten shown and sixty kept; / and the hint; sending the trimmed line; Escape and empty lines; out of the Outpost, under a menu, in the intro and on a phone; the ChatBox switch |
 | `tests/run_lobby.py` | 34 board + 36 feed | The real board and feed against GUI doubles. Board: cards per screen; folded rows, tapping one open (one at a time) and closed; the phone's choice, each as one slim strip; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside; stepping aside for a phone's loot card (and not on a computer) |
 | `tests/run_duels.py` | 88 auto queue | The shared rules (who's free, the default, intro phases, the pick, the bonus); a lone Ranked queue pulls the closest-rated lobby player after `CallAfter`; a called loss costs no rating; a called win pays the bonus; busy lobby players are left alone; auto queue off gets one offer, accepting starts the match, cancelling withdraws it; two new players pair at once as a single FirstFight with hints; a lone new player gets a called veteran; nobody around brings the sparring rival |
+| `tests/run_duels.py` | MATCH READY | A pairing starts nothing until everyone joins; the window names the other side; one JOIN doesn't start it; DECLINE leaves the queue and the other side keeps searching, paired with the next one queued; no answer in `ReadySeconds` leaves the queue; cancelling while asked hands the other side back to the queue; a fill-in's waiting player is asked with the fill-in shown joined; two auto-queued players are asked before they're paired |
