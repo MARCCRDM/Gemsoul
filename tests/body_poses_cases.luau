@@ -98,8 +98,9 @@ local function body(name)
 		GetState = function()
 			return roblox.Enum.HumanoidStateType.Running
 		end,
-		ChangeState = function(self)
+		ChangeState = function(self, state)
 			self.StateChanges += 1
+			self.LastState = state
 		end,
 		FindFirstChildOfClass = function(_, class)
 			return if class == "Animator" then animator else nil
@@ -121,6 +122,7 @@ local function body(name)
 			animateState[key] = value
 		end,
 	})
+	humanoid.Parent = character
 	character.Humanoid, character.Animator, character.Animate, character.Tracks = humanoid, animator, animate, tracks
 	character.FindFirstChildOfClass = function(_, class)
 		return if class == "Humanoid" then humanoid else nil
@@ -239,6 +241,14 @@ advance(0) -- (deferred work runs)
 check(myBody.Animate.Enabled == false, "Animate isn't back on in the same frame as the stops")
 advance(BodyPoses.RestartDelay)
 check(myBody.Animate.Enabled == true, "Animate is back on after RestartDelay")
+-- (Walking on at a steady pace, the restarted Animate is kicked through
+-- Landed back to Running, or the legs stay in idle until a jump.)
+local kicksBefore = myBody.Humanoid.StateChanges
+advance(0.06)
+check(
+	myBody.Humanoid.StateChanges == kicksBefore + 1 and myBody.Humanoid.LastState == roblox.Enum.HumanoidStateType.Landed,
+	"a restarted Animate isn't kicked to pick walk or idle again"
+)
 check(log[2].At - log[1].At >= myFall.Fade + 0.1, "the restart waits out the stops' fade, and then some")
 advance(1)
 check(resets[myBody] == 2 and #log == 4, "settled again once the move back has landed")

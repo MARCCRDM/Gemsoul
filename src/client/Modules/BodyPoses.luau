@@ -257,6 +257,24 @@ local SETTLE_STATES = {
 	[Enum.HumanoidStateType.FallingDown] = true,
 	[Enum.HumanoidStateType.Ragdoll] = true,
 }
+-- A restarted Animate script starts on idle and only looks at the body
+-- again on its next Running event, which fires as it lands or starts or
+-- stops moving: walking on at a steady pace (back from combat to mining
+-- with a key held), the legs stayed in idle until a jump. Once it has
+-- hooked its events (a moment on), a body on the ground passes through
+-- Landed, back to Running, so the event comes at once with its speed.
+function BodyPoses.kickAnimate(humanoid: Humanoid)
+	task.delay(0.05, function()
+		if not humanoid.Parent or humanoid.Health <= 0 then
+			return
+		end
+		local state = humanoid:GetState()
+		if state == Enum.HumanoidStateType.Running or state == Enum.HumanoidStateType.RunningNoPhysics then
+			humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+		end
+	end)
+end
+
 function BodyPoses.settle(character: Model?)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not character or not humanoid or humanoid.Health <= 0 then
@@ -291,6 +309,7 @@ function BodyPoses.settle(character: Model?)
 		task.delay(BodyPoses.RestartDelay, function()
 			if animate.Parent then
 				animate.Enabled = true
+				BodyPoses.kickAnimate(humanoid)
 			end
 		end)
 	end
