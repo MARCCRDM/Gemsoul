@@ -428,6 +428,36 @@ do
 	-- Barely moving (turning on the spot): where you look.
 	check((Kaiju.leadSpot(here, look, V3(1, 0, 0), 1) - lead).Magnitude < 0.01, "A shuffle swung them round")
 end
+-- Where you can see them: with your camera's look known (KaijuView),
+-- standing about they're out in front of you as your camera sees it (you
+-- facing your camera, that's on your far side, not behind the camera off
+-- your screen); heading back toward your camera they keep to your far side
+-- with no lead; heading across or away, they lead the way you're going. A
+-- camera looking straight down says nothing.
+do
+	local V3 = roblox.Vector3.new
+	local here, look = V3(0, 0, 0), V3(0, 0, -1) -- (you face north...)
+	local view = V3(0, -0.4, 1) -- (...your camera looks south, at you)
+	for slot = 1, #Kaiju.TeamSpots do
+		local spot = Kaiju.leadSpot(here, look, nil, slot, view)
+		check(spot.Z > 0, "Facing your camera, slot " .. slot .. " stood behind it, off your screen: " .. tostring(spot))
+	end
+	local standing = Kaiju.leadSpot(here, look, nil, 1, view)
+	check(math.abs(standing.Z + Kaiju.TeamSpots[1][2]) < 0.01, "Not out in front of you as your camera sees it: " .. tostring(standing))
+	local back = Kaiju.leadSpot(here, look, V3(0, 0, -10), 1, view)
+	check(back.Z > 0 and back.Z <= -Kaiju.TeamSpots[1][2] + 0.01, "Walking toward your camera, they led off behind it: " .. tostring(back))
+	local across = Kaiju.leadSpot(here, look, V3(10, 0, 0), 1, view)
+	check(across.X > 10, "Walking across your camera's view, they didn't lead: " .. tostring(across))
+	local away = Kaiju.leadSpot(here, look, V3(0, 0, 10), 1, view)
+	check(away.Z > -Kaiju.TeamSpots[1][2], "Walking away from your camera, they didn't lead: " .. tostring(away))
+	local down = Kaiju.leadSpot(here, look, nil, 1, V3(0, -1, 0))
+	check((down - Kaiju.leadSpot(here, look, nil, 1)).Magnitude < 0.01, "A camera looking straight down moved them")
+end
+-- They never chase a foe off: Chase studs from where a fight began is as
+-- far as one's followed, well inside where they'd give up on a fight
+-- you've walked away from; and you come first, over a kaiju's own foe.
+check(Kaiju.Follow.Chase > 10 and Kaiju.Follow.Chase < Kaiju.Follow.Leash, "Chase isn't a short way")
+check(Kaiju.Follow.Engage >= Kaiju.SupportPulse.StrikeRange, "The support strikes what the team won't take on")
 
 -- Gemsouls ---------------------------------------------------------------------------------
 for _, element in Kaiju.Elements do
@@ -725,6 +755,8 @@ end
 
 -- Fighting as a team (Shared.Squad) -----------------------------------------------------------
 local Squad = shared("Squad")
+-- (You come first: a foe on you or your support over a kaiju's own, on it.)
+check(Kaiju.Squad.OwnerThreat > Squad.Stick + Squad.Threat, "A foe on you counts for less than a kaiju's own")
 local V3 = roblox.Vector3.new
 local function unit(id, x, z)
 	return { Id = id, At = V3(x, 0, z) }

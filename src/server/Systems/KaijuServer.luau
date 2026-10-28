@@ -13,7 +13,9 @@
 	  Your team    up to three kaiju out with you whenever you're in the
 	               Outpost (in workspace.Kaiju), each at its own spot,
 	               leading the way out in front of you (Kaiju.TeamSpots:
-	               one ahead, two side by side behind it). They follow you (jumping after you
+	               one ahead, two side by side behind it), where your camera
+	               sees them (your client's Remotes.KaijuView: Kaiju.leadSpot).
+	               They follow you (jumping after you
 	               when you jump, one after another: Kaiju.Hop) and take on any
 	               creature that comes near you (wild kaiju and moon bugs),
 	               fighting as the Arena's duellist does (KaijuFighter):
@@ -22,6 +24,9 @@
 	               creatures shared out (each its own while there are
 	               enough, the rest waiting their turn), one they share
 	               flanked from either side, and never on top of each other.
+	               You first: one on you or your support brings them back
+	               from any fight elsewhere, and none chases a foe off past
+	               Kaiju.Follow.Chase from where its fight began (teamPlan).
 	               Its health is kept (record.Health) and never comes
 	               back on its own; gems heal it (KaijuInfuse), only out of
 	               danger (Kaiju.Danger: the player's KaijuDanger attribute
@@ -159,6 +164,7 @@ export type Pet = {
 	Ability: string?,
 	GemSurge: string?, -- its Gemsoul's E, cast beside its own moves (Kaiju.gemSurge)
 	Target: any?, -- the Enemies record it's fighting
+	FightAt: Vector3?, -- where that fight began: it chases a foe no further off (Kaiju.Follow.Chase)
 	Fighter: any, -- how it fights (KaijuFighter), with this as its body
 	LastFight: number,
 	RecallUntil: number,
@@ -229,6 +235,9 @@ local CAST_SHOWN = { "KaijuQAt", "KaijuAbilityAt", "KaijuRAt", "KaijuGemAt" }
 local rising: { [Player]: number } = {}
 local saidJump: { [Player]: number } = {}
 local lastJump: { [Player]: number } = {}
+-- Which way each player's camera looks along the ground (their client says:
+-- Remotes.KaijuView), so the team stands where they can see it (Kaiju.leadSpot).
+local views: { [Player]: Vector3 } = {}
 local folder: Folder
 
 local function serverNow(): number
@@ -424,11 +433,11 @@ local function despawn(player: Player, id: string?)
 	end
 end
 
--- Where a kaiju in `slot` walks, leading `root` the way it's going
--- (Kaiju.TeamSpots, Kaiju.leadSpot).
-local function spotBy(root: BasePart, slot: number): Vector3
+-- Where `player`'s kaiju in `slot` walks, leading `root` the way it's going,
+-- where their camera sees it (Kaiju.TeamSpots, Kaiju.leadSpot).
+local function spotBy(root: BasePart, slot: number, player: Player): Vector3
 	local moving = root.AssemblyLinearVelocity or Vector3.zero
-	return Kaiju.leadSpot(root.Position, root.CFrame.LookVector, moving, slot)
+	return Kaiju.leadSpot(root.Position, root.CFrame.LookVector, moving, slot, views[player])
 end
 
 local creaturesNear -- (the creatures about a point: below)
@@ -526,7 +535,7 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 		end
 	end
 	refresh(pet)
-	KaijuServer.place(model, spotBy(root, slot), root.Position + root.CFrame.LookVector * 10)
+	KaijuServer.place(model, spotBy(root, slot, player), root.Position + root.CFrame.LookVector * 10)
 	model.Parent = folder
 	pcall(petRoot.SetNetworkOwner, petRoot, nil)
 	teams[player] = teams[player] or {}
@@ -1160,20 +1169,39 @@ end
 -- out among the team fit to fight (out, not recalled, not run off past the
 -- leash, or past Battle if it's in a fight): each its own while there are
 -- enough to go round, else as evenly as can be, a creature after it (or
--- after its owner, more so) counting nearer, and the one it's on kept unless
--- another is well nearer. The one it's on stays in the running while it's a
--- little past the engage range of its owner or of the kaiju itself (a fight
--- isn't dropped because its owner walked off), and so does a creature after
--- a kaiju fighting away from its owner. In the Rift, the critters first: a
--- pack's leaders (RiftLeader) only once none of its critters is left about.
--- Where two or more share one, the side of it each fights from. Returns
--- { [pet]: enemy } and { [pet]: flank }.
+-- after its owner or its owner's support, more so) counting nearer, and the
+-- one it's on kept unless another is well nearer. The one it's on stays in
+-- the running while it's a little past the engage range of its owner, or
+-- within Chase of where that fight began (FightAt: a fight isn't dropped
+-- because its owner walked off), and so does a creature after a kaiju
+-- fighting there; a foe backing off further (a bomber keeping its distance)
+-- is let go, not chased across the Outpost. With a creature on its owner or
+-- their support (within Kaiju.Danger.Radius: a bomber shelling them from
+-- there is in the running too), its owner comes first: no fight anywhere
+-- else stays in it, and the team comes back for what's on them. In the
+-- Rift, the critters first: a pack's leaders (RiftLeader) only once none of
+-- its critters is left about. Where two or more share one, the side of it
+-- each fights from. Returns { [pet]: enemy } and { [pet]: flank }.
 local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
-	local engage = Kaiju.Follow.Engage
+	local follow = Kaiju.Follow
+	local engage = follow.Engage
+	local at = ownerRoot.Position
+	-- (After its owner, or their support: it can't fight back.)
+	local function guarded(after: any): boolean
+		return after == player
+			or (type(after) == "table" and after.Owner == player and after.Record ~= nil and Kaiju.isSupport(after.Record.Species))
+	end
+	local threats = {}
+	for _, entry in creaturesNear(at, Kaiju.Danger.Radius, player) do
+		if guarded((entry.Enemy :: any).Foe) then
+			table.insert(threats, entry.Enemy)
+		end
+	end
+	local threatened = #threats > 0
 	local fighters = {}
 	for _, pet in petsOf(player) do
-		local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
-		local inRange = away <= Kaiju.Follow.Leash or (inFight(pet, player) and away <= Kaiju.Follow.Battle)
+		local away = flat(at - pet.Root.Position).Magnitude
+		local inRange = away <= follow.Leash or (inFight(pet, player) and away <= follow.Battle)
 		-- (Not the support: it stays by its owner and mends: pulse.)
 		if
 			pet.Model.Parent
@@ -1192,25 +1220,29 @@ local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
 			listed[enemy] = true
 		end
 	end
-	for _, entry in creaturesNear(ownerRoot.Position, engage, player) do
+	for _, entry in creaturesNear(at, engage, player) do
 		list(entry.Enemy)
+	end
+	for _, enemy in threats do
+		list(enemy)
+	end
+	-- (Where its fight began, a fight away from its owner goes on: never
+	-- with them under attack, and never after a foe backed off past Chase.)
+	local function atFight(pet: Pet, point: Vector3): boolean
+		return not threatened and pet.FightAt ~= nil and flat(point - pet.FightAt).Magnitude <= follow.Chase
 	end
 	for _, pet in fighters do
 		local current = pet.Target
-		if
-			current
-			and inFight(pet, player)
-			and (
-				(current.Root.Position - ownerRoot.Position).Magnitude <= engage + 12
-				or (current.Root.Position - pet.Root.Position).Magnitude <= engage + 12
-			)
-		then
-			list(current)
+		if current and inFight(pet, player) then
+			local p = current.Root.Position
+			if flat(p - at).Magnitude <= engage + 12 or atFight(pet, p) then
+				list(current)
+			end
 		end
 		-- (Off fighting away from its owner: what comes at it there too.)
-		if flat(ownerRoot.Position - pet.Root.Position).Magnitude > engage then
+		if flat(at - pet.Root.Position).Magnitude > engage then
 			for _, entry in creaturesNear(pet.Root.Position, engage, player) do
-				if (entry.Enemy :: any).Foe == pet then
+				if (entry.Enemy :: any).Foe == pet and atFight(pet, entry.Root.Position) then
 					list(entry.Enemy)
 				end
 			end
@@ -1233,7 +1265,7 @@ local function teamPlan(player: Player, ownerRoot: BasePart, now: number)
 		local distance = (enemy.Root.Position - pet.Root.Position).Magnitude
 		local h = enemy.Humanoid
 		return Squad.cost(distance, pet.Target == enemy, after == pet)
-			- (if after == player then Kaiju.Squad.OwnerThreat else 0)
+			- (if guarded(after) then Kaiju.Squad.OwnerThreat else 0)
 			- (if enemy.Model:GetAttribute("CritterRanged") then Kaiju.Squad.Bomber else 0)
 			- (if h and h.Health < h.MaxHealth * 0.25 then Kaiju.Squad.Finish else 0)
 	end)
@@ -1337,7 +1369,7 @@ end
 
 local function follow(pet: Pet, ownerRoot: BasePart, recalled: boolean, now: number)
 	local h = pet.Humanoid
-	local spot = spotBy(ownerRoot, pet.Slot)
+	local spot = spotBy(ownerRoot, pet.Slot, pet.Owner)
 	if not recalled and potter(pet, spot, now) then
 		return
 	end
@@ -1457,7 +1489,7 @@ local function think(pet: Pet, now: number, _dt: number)
 	-- other side's kaiju (KaijuBattles).
 	local battle = KaijuServer.battle(pet, now)
 	if battle then
-		pet.Target = nil
+		pet.Target, pet.FightAt = nil, nil
 		settle(pet)
 		pet.IdleSpot = nil
 		local fighter = pet.Fighter
@@ -1502,15 +1534,15 @@ local function think(pet: Pet, now: number, _dt: number)
 	-- (up to Kaiju.Follow.Battle): no running back, no putting back beside you.
 	local fighting = inFight(pet, owner) and away <= Kaiju.Follow.Battle
 	if away > Kaiju.Follow.Teleport and not fighting then
-		pet.Target = nil
+		pet.Target, pet.FightAt = nil, nil
 		KaijuFighter.calm(pet.Fighter)
-		KaijuServer.place(pet.Model, spotBy(ownerRoot, pet.Slot), ownerRoot.Position)
+		KaijuServer.place(pet.Model, spotBy(ownerRoot, pet.Slot, owner), ownerRoot.Position)
 		return
 	end
 	local recalled = now < pet.RecallUntil
 	if Kaiju.isSupport(pet.Record.Species) then
 		-- The support: by you, mending (pulse), never off after a creature.
-		pet.Target = nil
+		pet.Target, pet.FightAt = nil, nil
 		KaijuFighter.calm(pet.Fighter)
 		if not recalled then
 			pulse(pet, ownerRoot, now)
@@ -1526,6 +1558,14 @@ local function think(pet: Pet, now: number, _dt: number)
 	if not recalled and (away <= Kaiju.Follow.Leash or fighting) then
 		local targets, flanks = teamPlan(owner, ownerRoot, now)
 		target, flank = targets[pet], flanks[pet]
+	end
+	-- Where this fight is (FightAt, see teamPlan): set as it takes on a foe
+	-- fresh, or one away from it (back by you), so a foe it's led off by
+	-- never moves it.
+	if target == nil then
+		pet.FightAt = nil
+	elseif target ~= pet.Target and (pet.FightAt == nil or flat(target.Root.Position - pet.FightAt).Magnitude > Kaiju.Follow.Chase) then
+		pet.FightAt = target.Root.Position
 	end
 	pet.Target = target
 	if target then
@@ -1638,6 +1678,21 @@ local function jumped(player: Player)
 	if teams[player] then
 		saidJump[player] = os.clock()
 	end
+end
+
+-- Your client saying which way your camera looks (Remotes.KaijuView): along
+-- the ground, a unit; nothing else is taken (one looking straight down says
+-- nothing, and the last one stands).
+local function viewed(player: Player, look: any)
+	if typeof(look) ~= "Vector3" then
+		return
+	end
+	local along = Vector3.new(look.X, 0, look.Z)
+	local size = along.Magnitude
+	if size ~= size or size < 0.2 or size > 2 then
+		return
+	end
+	views[player] = along / size
 end
 
 -- For KaijuWilds ---------------------------------------------------------------------------------------
@@ -2504,7 +2559,7 @@ end
 local function left(player: Player)
 	despawn(player)
 	teams[player], waits[player], owedSince[player], rising[player] = nil, nil, nil, nil
-	saidJump[player], lastJump[player] = nil, nil
+	saidJump[player], lastJump[player], views[player] = nil, nil, nil
 	healAt[player], toldEmpty[player] = nil, nil
 	joined[player] = nil
 end
@@ -2528,6 +2583,7 @@ function KaijuServer.start()
 	Shop.register("KaijuSupport", setSupport)
 	Players.PlayerRemoving:Connect(left)
 	Remotes.KaijuJump.OnServerEvent:Connect(jumped)
+	Remotes.KaijuView.OnServerEvent:Connect(viewed)
 	local thinkTimer, upkeepTimer = 0, 0
 	RunService.Heartbeat:Connect(function(dt)
 		thinkTimer += dt
@@ -2580,6 +2636,7 @@ KaijuServer._joined = joined -- (who's had Team 1 put out this visit)
 KaijuServer._autoHeal, KaijuServer._socketSoul = autoHeal, socketSoul
 KaijuServer._recall, KaijuServer._setActive, KaijuServer._setTeam = recall, setActive, setTeam
 KaijuServer._callBack, KaijuServer._hops, KaijuServer._jumped = callBack, hops, jumped
+KaijuServer._viewed, KaijuServer._views, KaijuServer._teamPlan = viewed, views, teamPlan
 KaijuServer._teamOut, KaijuServer._swap = teamOut, swapKaiju
 KaijuServer._despawn, KaijuServer._fair = despawn, fair
 KaijuServer._prepareRoll, KaijuServer._claimRoll = prepareRoll, claimRoll

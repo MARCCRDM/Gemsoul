@@ -308,7 +308,9 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   left, one behind. One that's down keeps its place (down) until it's
   revived; a place fills from home only when a kaiju leaves the team.
 - **They fight on their own, as a team.** They take on any moon bug within
-  28 studs of you, and share them out (see
+  32 studs of you (28 before 2026-10-28; the support's attack reaches 30
+  from it, so now the team takes on whatever it hits), and anything going
+  for you or your support from up to 45, and share them out (see
   [Fighting as a team](#fighting-as-a-team)). They only fight a wild kaiju
   once you've started a fight with that one (see [Wild kaiju](#wild-kaiju)).
   They follow you everywhere in the Outpost (put back beside you if one falls
@@ -318,6 +320,19 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   down. Only past 150 studs (`Kaiju.Follow.Battle`) does it give up and come
   back to you. Out of a fight, it still runs back past 45 studs and is put
   back beside you past 90.
+- **They never chase a foe off, and you come first** (since 2026-10-28,
+  `Kaiju.Follow.Chase`, KaijuServer's `teamPlan`). A foe that backs away (a
+  Crocodilo bomber keeping its distance) is let go once it's 22 studs from
+  where that fight began and more than 44 from you. Before, one could drag
+  the whole team after it, 100 to 150 studs off and out of sight, while
+  other critters went for you and your support, which can't fight back.
+  And the moment a creature goes for you or your support, a fight anywhere
+  else is dropped and the team comes for what's on you; a critter on you
+  or your support counts before the one on a kaiju itself. (In a
+  hundred-second test mining at the Edge with the rifts' critters coming,
+  they never got past about 55 studs from you, and a critter on you or your
+  support went with none of yours on it for a few seconds at most; before,
+  they ran off up to 150 studs, and it was 9 to 65 seconds in two minutes.)
 - **EXP** goes to each of them out, for fighting: kills, a Rift's boss,
   kaiju battles. Never for the rocks you mine (those level you:
   [levelling.md](levelling.md)).
@@ -434,6 +449,18 @@ be 0.6 s from now (up to 9 studs further out), so they're already there
 when you arrive. The support doesn't run ahead: it keeps to you. Standing
 still or turning on the spot, they line up ahead of where you look.
 
+**Where you can see them** (since 2026-10-28, `KaijuView.client.luau`,
+`Remotes.KaijuView`, the `view` in `Kaiju.leadSpot`): your client tells
+the server which way your camera looks along the ground (only when it's
+turned 20° since it last said, at most every 0.3 s). Standing still, the
+team lines up in front of you **as your camera sees it**, not the way your
+miner faces: facing your camera while you mine, "ahead of you" was behind
+the camera, and on a phone the team stood off the bottom of the screen
+while the support fought alone at your feet. Walking back toward your
+camera (more than half of the way, `Kaiju.Lead.Facing`) they keep to your
+far side, following, rather than lead off behind it; walking across or
+away from it they lead as before.
+
 ![Skyjelly, the starter support (offline render of the game's model; the stage overexposes its Ion-yellow core and tendril tips)](kaiju/skyjelly.jpg)
 
 - **The starter support is Skyjelly** (number 57 on the second concept
@@ -549,9 +576,10 @@ Your team, a pack of wild kaiju and the critters all fight as a side
   left: with more kaiju than foes they share them out (three on two: two and
   one), and three on one all go in.
 - **Who takes whom.** The nearest, but a critter already after a kaiju counts
-  6 studs nearer to it, one after you 10 nearer, and a kaiju keeps the foe
-  it's on unless another is 8 studs nearer, so they don't swap back and
-  forth (`Kaiju.Squad`, `Squad.Stick`, `Squad.Threat`). It **dives a
+  6 studs nearer to it, one after you or your support 30 nearer (10 before
+  2026-10-28; you come first, ahead of the one on a kaiju itself), and a
+  kaiju keeps the foe it's on unless another is 8 studs nearer, so they
+  don't swap back and forth (`Kaiju.Squad`, `Squad.Stick`, `Squad.Threat`). It **dives a
   swarm's bomber** (a Crocodilo counts 8 studs nearer) and **finishes off**
   one under a quarter of its health (5 studs nearer).
 - **Sweeping heavies.** A kaiju's heavy (a stomp, a slam, a tail lash) hits
@@ -1276,6 +1304,7 @@ Proposed guardrails:
 | `CritterFx` (client) | A gem raid's snatchers on screen: their giggles and cackles with "hee hee!" over them, and a dropped gem flying back ("GOT IT BACK!") |
 | `FxSize` (client) | How big the effect being drawn is: a creature's size, held while its effect draws (`run`), kept through its delays and frame loops (`keep`); `CombatFx`, `CombatSound`, `CombatVfx`, `MoveVfx`, `TriadVfx` and `ElementalDeath` draw at it |
 | `CreatureAnimation` (client) | Moves kaiju in `workspace.Kaiju` and wild ones in `workspace.Enemies`: their walk, their fight poses and their moods (`KaijuMood`: `CreatureMotion.Moods`) |
+| `KaijuView` (client) | Which way your camera looks along the ground, told to the server (`Remotes.KaijuView`) when it turns, so your team stands where you can see it (`Kaiju.leadSpot`) |
 
 `tests/run_kaiju_roll.py` runs the roll's screen on a stand-in clock: the
 reels (yours on the third cell, three different kaiju in sight while they
@@ -1345,7 +1374,15 @@ and following when you move. A packmate close by joining in when you
 start on its mate (not one far off), and a wild kaiju never walking into a
 wall. A critter going for your kaiju rather than you, your kaiju going for
 it, the bites landing on the kaiju; recall it and the critter comes back to
-you, and another miner's critter is drawn by your kaiju too. A rock mined
+you, and another miner's critter is drawn by your kaiju too. Defending
+you: a ranged foe kiting off is let go once it's further than
+`Kaiju.Follow.Chase` from where the fight began (and they come home), one
+just short of that is kept; walking 70 studs off mid-fight they stay on
+their foe; a critter on you, or on your support, takes them off a brute
+elsewhere; they stand where your camera sees them (junk from a client
+ignored); and 100 s at the Edge with the rifts open, none ever more than
+65 studs off and a critter on you or your support with none of yours on it
+for 8 s at most in all. A rock mined
 with it out gives it EXP by the rock's size (none while it's down), and a
 long session's rocks make a young kaiju a few levels. The Outpost for
 fifteen minutes: a miner at

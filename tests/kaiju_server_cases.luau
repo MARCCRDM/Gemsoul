@@ -248,6 +248,14 @@ local Remotes = {
 			end,
 		},
 	},
+	-- (Your client saying which way your camera looks: KaijuServer listens.)
+	KaijuView = {
+		OnServerEvent = {
+			Connect = function(self, fn)
+				self.Owner.Handler = fn
+			end,
+		},
+	},
 	Notify = {
 		FireClient = function(_, player, text)
 			table.insert(notes, { player, text })
@@ -270,6 +278,7 @@ local Remotes = {
 	},
 }
 Remotes.KaijuJump.OnServerEvent.Owner = Remotes.KaijuJump
+Remotes.KaijuView.OnServerEvent.Owner = Remotes.KaijuView
 local registered = {}
 local Shop = {
 	register = function(name, fn)
@@ -6965,6 +6974,237 @@ end)()
 	print("  your support: the fourth with the roll, its own slot, mends you only in a fight, only a support kind, given to older saves")
 end)()
 
+-- Defending you ---------------------------------------------------------------------------------------------
+-- You come first. A foe backing off (a bomber keeping its distance) is let
+-- go once it's Chase from where the fight began and away from you, never
+-- chased across the Outpost; walk off mid-fight and they still see it
+-- through; but with a creature on you or on your support, a fight anywhere
+-- else is dropped and they come for it, the support's attacker before a
+-- kaiju's own. Your camera's look (KaijuView) puts them where you can see
+-- them. And mining at the Edge with the rifts' critters coming: never off
+-- past 65 studs, and a critter on you or your support with none of them on
+-- it for no more than a few seconds.
+;(function()
+	Kaiju.SlotLevels = { 1, 1, 1 }
+	local home = center + Vector3.new(-233, outpost.Y, -233) -- (out at the Edge, clear of the rest)
+	local d, rootD = makePlayer(5, home)
+	profiles[d] = { Gems = {}, Coins = 0, Milestones = {} }
+	registered.KaijuRoll(d)
+	check(registered.KaijuRollClaim(d).Ok, "Couldn't claim a roll to defend you with")
+	local north = Vector3.new(0, 0, -1)
+	rootD.CFrame = CFrame.lookAt(home, home + north)
+	rootD.AssemblyLinearVelocity = Vector3.zero
+	now += 1
+	KaijuServer._upkeep(d, now)
+	local fighters, support = {}, nil
+	for _, pet in KaijuServer.team(d) do
+		pet.Humanoid.MaxHealth, pet.Humanoid.Health = 1e6, 1e6
+		if Kaiju.isSupport(pet.Record.Species) then
+			support = pet
+		else
+			table.insert(fighters, pet)
+		end
+	end
+	check(#fighters == 3 and support ~= nil, "Not three and a support out to defend you")
+	local bugs = {}
+	-- A critter at `p` after `on` (you or one of yours: its brain isn't run here).
+	local function bugAt(p: Vector3, on: any)
+		local bug = KaijuWilds.spawnBug(p, { Prey = d, Band = "Edge", Level = 1 })
+		bug.Root.CFrame = CFrame.new(p)
+		bug.Home = p
+		bug.Humanoid.MaxHealth, bug.Humanoid.Health = 1e6, 1e6
+		bug.Foe = on
+		table.insert(bugs, bug)
+		return bug
+	end
+	local function think(times: number?)
+		for _ = 1, times or 1 do
+			now += 0.15
+			for _, pet in KaijuServer.team(d) do
+				KaijuServer._think(pet, now, 0.15)
+			end
+		end
+	end
+	local function clear()
+		for _, bug in bugs do
+			if bug.Alive then
+				Enemies.remove(bug)
+			end
+			KaijuWilds._wilds[bug] = nil
+		end
+		table.clear(bugs)
+		for _, pet in fighters do
+			pet.Target, pet.FightAt, pet.RecallUntil, pet.StunUntil = nil, nil, 0, 0
+		end
+	end
+	local function onIt(foe): number
+		local count = 0
+		for _, pet in fighters do
+			if pet.Target == foe then
+				count += 1
+			end
+		end
+		return count
+	end
+
+	-- A bomber backing off: they take it on by you, follow it a way, and let
+	-- it go once it's Chase from where the fight began and away from you.
+	for i, pet in fighters do
+		pet.Root.CFrame = CFrame.new(home + Vector3.new(i * 3 - 6, 0, -6))
+	end
+	local bomber = bugAt(home + north * 20, fighters[1])
+	think(2)
+	check(onIt(bomber) == 3, "Your kaiju didn't take on the critter by you")
+	local fightAt = bomber.Root.Position -- (where that fight began)
+	local function backOff(studs: number)
+		bomber.Root.CFrame = CFrame.new(fightAt + north * studs)
+		for i, pet in fighters do
+			pet.Root.CFrame = CFrame.new(bomber.Root.Position + Vector3.new(i * 2 - 4, 0, 3))
+		end
+		think()
+	end
+	backOff(Kaiju.Follow.Chase - 4)
+	check(onIt(bomber) == 3, "They let go of a foe still by where the fight began")
+	backOff(Kaiju.Follow.Chase + 30)
+	check(onIt(bomber) == 0, "Your kaiju chased a foe off across the Outpost")
+	for _, pet in fighters do
+		local to = pet.Humanoid.MovingTo
+		check(to and (to - home).Magnitude < 20, "Having let it go, one didn't come back to you")
+	end
+
+	-- You walk off mid-fight to mine: nothing's on you, so they see it through.
+	clear()
+	for i, pet in fighters do
+		pet.Root.CFrame = CFrame.new(home + Vector3.new(i * 3 - 6, 0, -8))
+	end
+	local brute = bugAt(home + north * 14, fighters[2])
+	think(2)
+	check(onIt(brute) == 3, "Not on the critter by you")
+	local away = home + Vector3.new(70, 0, 0)
+	rootD.CFrame = CFrame.lookAt(away, away + north)
+	think(3)
+	check(onIt(brute) == 3, "Your kaiju left its fight when you walked off to mine")
+	-- Then a critter goes for you where you are: that fight's dropped, and
+	-- they come for it.
+	local onYou = bugAt(away + north * 10, d)
+	think()
+	check(onIt(onYou) == 3 and onIt(brute) == 0, "Your kaiju stayed on a fight elsewhere with a critter on you")
+
+	-- Back by you, each of the three with a critter of its own on it, and one
+	-- on your support: the support's comes first.
+	clear()
+	rootD.CFrame = CFrame.lookAt(home, home + north)
+	for i, pet in fighters do
+		pet.Root.CFrame = CFrame.new(home + Vector3.new(i * 6 - 12, 0, -10))
+		bugAt(pet.Root.Position + north * 2, pet)
+	end
+	support.Root.CFrame = CFrame.new(home + Vector3.new(3, 0, 2))
+	local onSupport = bugAt(support.Root.Position + Vector3.new(2, 0, 2), support)
+	think()
+	check(onIt(onSupport) >= 1, "Nobody went for the critter on your support")
+
+	-- Your camera's look: along the ground, and junk ignored; you facing your
+	-- camera, they stand out on your far side, where you can see them.
+	clear()
+	local said = Remotes.KaijuView.Handler
+	check(said ~= nil, "Nothing listens for your camera's look")
+	said(d, "south")
+	said(d, Vector3.new(0, -1, 0))
+	check(KaijuServer._views[d] == nil, "A junk camera look, or one straight down, was taken")
+	said(d, Vector3.new(0, -0.5, 2)) -- (south, at you: you face it)
+	local view = KaijuServer._views[d]
+	check(view and math.abs(view.Z - 1) < 1e-3 and math.abs(view.Y) < 1e-6, "Your camera's look wasn't taken along the ground")
+	for _, pet in fighters do
+		pet.Root.CFrame = CFrame.new(home + north * 6)
+		pet.IdleSpot, pet.Plan = nil, nil
+	end
+	think()
+	for _, pet in fighters do
+		local to = pet.Humanoid.MovingTo
+		check(to and to.Z > home.Z + 3, "Your kaiju went to stand behind your camera, off your screen")
+	end
+	KaijuServer._views[d] = nil
+
+	-- A hundred seconds mining at the Edge, the rifts' critters coming for the
+	-- noise, everything walking where it's going.
+	clear()
+	clearCritters()
+	for _, pet in fighters do
+		pet.Root.CFrame = CFrame.new(home + Vector3.new(0, 0, 8))
+	end
+	local function walk(m, dt: number)
+		local to = m.Humanoid and m.Humanoid.MovingTo
+		if to and m.Root then
+			local from = m.Root.Position
+			local step = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+			local stride = math.min(step.Magnitude, (m.Humanoid.WalkSpeed or 16) * dt)
+			if step.Magnitude > 1e-3 and stride > 0 then
+				m.Root.CFrame = CFrame.new(from + step.Unit * stride)
+			end
+		end
+	end
+	local dt, swingIn, thinkIn, brainIn = 0.05, 0.5, 0, 0
+	local farthest, open, came, met = 0, 0, 0, {}
+	for _ = 1, math.floor(100 / dt) do
+		now += dt
+		swingIn -= dt
+		if swingIn <= 0 then
+			swingIn = 1.25
+			FrontierServer.swing(d)
+		end
+		FrontierServer._step(dt)
+		runDelayed()
+		thinkIn -= dt
+		if thinkIn <= 0 then
+			thinkIn = 0.15
+			for _, pet in KaijuServer.team(d) do
+				KaijuServer._think(pet, now, 0.15)
+			end
+		end
+		brainIn -= dt
+		if brainIn <= 0 then
+			brainIn = 0.1
+			for enemy, entry in KaijuWilds._wilds do
+				if entry.Bug and enemy.Alive then
+					KaijuWilds._brain(enemy, now)
+				end
+			end
+		end
+		flush()
+		for _, pet in KaijuServer.team(d) do
+			walk(pet, dt)
+		end
+		local on = {}
+		for _, pet in fighters do
+			if pet.Target then
+				on[pet.Target] = true
+			end
+			farthest = math.max(farthest, (pet.Root.Position - home).Magnitude)
+		end
+		local left = false
+		for enemy, entry in KaijuWilds._wilds do
+			if entry.Bug and enemy.Alive then
+				came += if met[enemy] then 0 else 1
+				met[enemy] = true
+				walk(enemy, dt)
+				local after = enemy.Foe
+				local guarded = after == d or after == support
+				if guarded and not on[enemy] and (enemy.Root.Position - home).Magnitude <= Kaiju.Danger.Radius then
+					left = true
+				end
+			end
+		end
+		open += if left then dt else 0
+	end
+	check(came >= 4, "Too few critters came for a miner at the Edge to tell: " .. came)
+	check(farthest <= 65, string.format("Mining at the Edge, a kaiju of yours ran off %.0f studs", farthest))
+	check(open <= 8, string.format("A critter on you or your support with none of yours on it for %.1f s of 100", open))
+	clearCritters()
+	d:SetAttribute("Outpost", nil)
+	KaijuServer._upkeep(d, now)
+	print(string.format("  defending you: a bomber let go, a fight seen through, you first, your support before their own, where your camera sees them; at the Edge for 100 s: %d critters, never past %.0f studs, %.1f s with one on you or your support left alone", came, farthest, open))
+end)()
+
 -- The rules' moods: the same roll, the same mood, and every one reachable.
 local seen = {}
 for i = 0, 99 do
@@ -6979,7 +7219,7 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together, ADJUST ARMOR, invites that take you in, your support)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together, ADJUST ARMOR, invites that take you in, your support, defending you)",
 		checks
 	)
 )

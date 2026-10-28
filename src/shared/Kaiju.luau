@@ -300,8 +300,13 @@ end
 -- runs back past Leash, and is put back beside you past Teleport. One in a
 -- fight sees it through, though: walk off to mine and it stays on its foe
 -- (and on whatever comes at it there) till the foe is down, unless you get
--- Battle studs away (then it gives up and comes back to you).
-Kaiju.Follow = { Engage = 28, Leash = 45, Battle = 150, Teleport = 90, Gap = 5 }
+-- Battle studs away (then it gives up and comes back to you). It never
+-- chases one off, though: a foe backing away (a bomber keeping its
+-- distance) is let go once it's Chase studs from where that fight began
+-- and Engage + 12 from you. And you come first: with a creature on you or
+-- on your support (it can't fight back), a fight anywhere else is dropped
+-- and the team comes for what's on you (KaijuServer's teamPlan).
+Kaiju.Follow = { Engage = 32, Leash = 45, Battle = 150, Teleport = 90, Gap = 5, Chase = 22 }
 
 -- Jumping after you: when you jump (your root rising faster than Rise studs
 -- a second, from under Settle), the team following you jumps too, follow
@@ -350,11 +355,13 @@ end
 
 -- Fighting as a team (Shared.Squad): your kaiju share out the creatures (each
 -- its own while there are enough), flank one they share, and keep Space
--- studs apart (a critter BugSpace from another); a creature after you counts
--- OwnerThreat studs nearer, a swarm's ranged one (it bombs from the back)
--- Bomber studs nearer, and one nearly done for (under a quarter of its
--- health) Finish studs nearer: they dive the bomber and finish one off.
-Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 10, Bomber = 8, Finish = 5 }
+-- studs apart (a critter BugSpace from another); a creature after you or
+-- your support counts OwnerThreat studs nearer (you come first: more than
+-- the one on a kaiju itself, Squad.Stick + Squad.Threat), a swarm's ranged
+-- one (it bombs from the back) Bomber studs nearer, and one nearly done for
+-- (under a quarter of its health) Finish studs nearer: they dive the bomber
+-- and finish one off.
+Kaiju.Squad = { Space = 5, BugSpace = 3.5, OwnerThreat = 30, Bomber = 8, Finish = 5 }
 
 -- Your team: the kaiju out with you at once. The beta opens all three
 -- slots from the start (the plan: a second when one of yours reaches level
@@ -369,18 +376,25 @@ Kaiju.TeamSpots = { { 0, -11 }, { 4, -7 }, { -4, -7 }, { 2.5, -2.5 } }
 -- Leading, they read where you're going: on the move (faster than Moving
 -- studs a second) they face the way you're heading, not the way you look,
 -- and walk where you'll be Seconds from now (no further than Max ahead).
--- The support doesn't run ahead: it keeps to you.
-Kaiju.Lead = { Moving = 3, Seconds = 0.6, Max = 9 }
+-- The support doesn't run ahead: it keeps to you. And where you can see
+-- them: with your camera's look known (`view`, from your client: KaijuView),
+-- standing about they're out in front of you as your camera sees it, not
+-- the way you face (facing your camera, that's behind it, off your screen),
+-- and heading back toward your camera (more than Facing of the way) they
+-- keep to the far side of you rather than lead off behind it.
+Kaiju.Lead = { Moving = 3, Seconds = 0.6, Max = 9, Facing = 0.5 }
 
 -- Where the one in `slot` walks: you at `position`, looking along `look`,
--- moving at `velocity` (Lead).
-function Kaiju.leadSpot(position: Vector3, look: Vector3, velocity: Vector3?, slot: number): Vector3
+-- moving at `velocity`, your camera looking along `view` if it's known (Lead).
+function Kaiju.leadSpot(position: Vector3, look: Vector3, velocity: Vector3?, slot: number, view: Vector3?): Vector3
 	local spot = Kaiju.TeamSpots[slot] or Kaiju.TeamSpots[1]
 	local lead = Kaiju.Lead
 	local moving = if velocity then Vector3.new(velocity.X, 0, velocity.Z) else Vector3.new(0, 0, 0)
-	local heading = Vector3.new(look.X, 0, look.Z)
+	local seen = if view then Vector3.new(view.X, 0, view.Z) else nil
+	seen = if seen and seen.Magnitude > 0.2 then seen.Unit else nil
+	local heading = seen or Vector3.new(look.X, 0, look.Z)
 	local ahead = position
-	if moving.Magnitude > lead.Moving then
+	if moving.Magnitude > lead.Moving and (seen == nil or moving.Unit:Dot(seen) > -lead.Facing) then
 		heading = moving.Unit
 		if slot ~= Kaiju.SupportSlot then
 			ahead = position + moving.Unit * math.min(moving.Magnitude * lead.Seconds, lead.Max)
