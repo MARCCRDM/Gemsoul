@@ -205,104 +205,100 @@ local buttons = new("Frame", {
 	Size = UDim2.fromOffset(272, 40),
 }, card)
 UiKit.list(buttons, 8, true)
--- The keys, along the bottom on a computer: each a bold key cap and what it
--- does, on a dark strip so they read over any ground. X's is a button too
--- (the kit switch: SparKit sets OutpostScene.toggleKit and shows what it
--- swaps to, FIGHT or MINE, with showKit).
-OutpostScene.Keys = {
-	{ Key = "CLICK", Does = "MINE" },
-	{ Key = "X", Does = "FIGHT / MINE", Kit = true },
-	{ Key = "Z", Does = "SPAR" },
-	{ Key = "G", Does = "DUEL" },
-	{ Key = "F", Does = "INVITE" },
-	{ Key = "E", Does = "TALK" },
-}
-local hint = new("Frame", {
+-- X, along the bottom on a computer: one button, the kit switch (SparKit
+-- sets OutpostScene.toggleKit and shows what it swaps to, FIGHT or MINE,
+-- with showKit). A key cap and what a press does, in that kit's colour.
+local FIGHT_RED, MINE_GOLD = Color3.fromRGB(255, 120, 104), Color3.fromRGB(255, 202, 91)
+local hint = new("TextButton", {
 	Name = "KeyHints",
 	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 210, 1, -14),
-	Size = UDim2.fromOffset(0, 40),
-	AutomaticSize = Enum.AutomaticSize.X,
-	BackgroundColor3 = Color3.fromRGB(8, 10, 18),
-	BackgroundTransparency = 0.25,
+	Position = UDim2.new(0.5, 210, 1, -16),
+	Size = UDim2.fromOffset(150, 46),
+	BackgroundColor3 = Color3.fromRGB(12, 14, 24),
+	BackgroundTransparency = 0.12,
+	AutoButtonColor = false,
+	Text = "",
 }, hud)
-UiKit.round(hint, 10)
-new("UIStroke", { Color = Color3.fromRGB(70, 80, 96), Thickness = 1, Transparency = 0.3 }, hint)
-new("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, hint)
-local keyRow = new("UIListLayout", {
-	FillDirection = Enum.FillDirection.Horizontal,
-	VerticalAlignment = Enum.VerticalAlignment.Center,
-	SortOrder = Enum.SortOrder.LayoutOrder,
-	Padding = UDim.new(0, 16),
+hint:SetAttribute("UiSound", "Click")
+UiKit.round(hint, 12)
+local hintEdge = new("UIStroke", { Color = FIGHT_RED, Thickness = 1.5, Transparency = 0.25 }, hint)
+new("UIGradient", {
+	Rotation = 90,
+	Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 160, 185)),
 }, hint)
-keyRow.HorizontalAlignment = Enum.HorizontalAlignment.Center
-local kitChip: { Item: GuiObject, Cap: TextLabel, Does: TextLabel }? = nil
-for i, entry in OutpostScene.Keys do
-	local item = new(if entry.Kit then "TextButton" else "Frame", {
-		Name = entry.Key,
-		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(0, 28),
-		AutomaticSize = Enum.AutomaticSize.X,
-		LayoutOrder = i,
-	}, hint)
-	new("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 7),
-	}, item)
-	local cap = new("TextLabel", {
-		Name = "Cap",
-		BackgroundColor3 = Color3.fromRGB(236, 240, 248),
-		Size = UDim2.fromOffset(if #entry.Key > 1 then 54 else 28, 28),
-		Font = Enum.Font.GothamBlack,
-		Text = entry.Key,
-		TextSize = if #entry.Key > 1 then 12 else 16,
-		TextColor3 = Color3.fromRGB(14, 16, 26),
-		LayoutOrder = 1,
-	}, item)
-	UiKit.round(cap, 6)
-	new("UIStroke", { Color = Color3.fromRGB(150, 160, 180), Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, cap)
-	local does = new("TextLabel", {
-		Name = "Does",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(0, 28),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Font = Enum.Font.GothamBlack,
-		Text = entry.Does,
-		TextSize = 15,
-		TextColor3 = Color3.fromRGB(240, 244, 252),
-		TextStrokeColor3 = Color3.new(0, 0, 0),
-		TextStrokeTransparency = 0.5,
-	}, item)
-	does.LayoutOrder = 2
-	if entry.Kit then
-		item.Text, item.AutoButtonColor = "", false
-		item:SetAttribute("UiSound", "Click")
-		item.Activated:Connect(function()
-			if OutpostScene.toggleKit then
-				OutpostScene.toggleKit()
-			end
-		end)
-		kitChip = { Item = item, Cap = cap, Does = does }
+local hintPop = new("UIScale", { Scale = 1 }, hint)
+local cap = new("TextLabel", {
+	Name = "Cap",
+	Position = UDim2.fromOffset(7, 7),
+	Size = UDim2.fromOffset(32, 32),
+	BackgroundColor3 = FIGHT_RED,
+	Font = Enum.Font.GothamBlack,
+	Text = "X",
+	TextSize = 18,
+	TextColor3 = Color3.fromRGB(14, 16, 26),
+}, hint)
+cap:SetAttribute("NoTranslate", true)
+UiKit.round(cap, 8)
+new("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 1, Transparency = 0.55, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, cap)
+local does = new("TextLabel", {
+	Name = "Does",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(48, 6),
+	Size = UDim2.fromOffset(96, 20),
+	Font = Enum.Font.GothamBlack,
+	Text = "FIGHT",
+	TextSize = 17,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextColor3 = FIGHT_RED,
+	TextStrokeColor3 = Color3.new(0, 0, 0),
+	TextStrokeTransparency = 0.6,
+}, hint)
+new("TextLabel", {
+	Name = "Sub",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(48, 25),
+	Size = UDim2.fromOffset(96, 14),
+	Font = Enum.Font.GothamBold,
+	Text = "SWITCH GEAR",
+	TextSize = 10,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextColor3 = Color3.fromRGB(170, 180, 200),
+}, hint)
+hint.MouseEnter:Connect(function()
+	TweenService:Create(hintPop, TweenInfo.new(0.12), { Scale = 1.05 }):Play()
+	hintEdge.Transparency = 0
+end)
+hint.MouseLeave:Connect(function()
+	TweenService:Create(hintPop, TweenInfo.new(0.12), { Scale = 1 }):Play()
+	hintEdge.Transparency = 0.25
+end)
+hint.Activated:Connect(function()
+	if OutpostScene.toggleKit then
+		OutpostScene.toggleKit()
 	end
+end)
+local kitChip = { Item = hint, Cap = cap, Does = does, Edge = hintEdge }
+local kitAvailable = true
+local hintBlocked = UserInputService.TouchEnabled
+local function paintHint()
+	hint.Visible = kitAvailable and not hintBlocked
 end
 OutpostScene.toggleKit = nil :: (() -> ())?
--- X's chip: what a press swaps to (FIGHT with the pick out, MINE with the
--- kit out), in its colour; hidden where X does nothing.
+-- X's button: what a press swaps to (FIGHT with the pick out, MINE with
+-- the kit out), in its colour; hidden where X does nothing.
 function OutpostScene.showKit(armed: boolean, available: boolean)
-	if not kitChip then
-		return
-	end
-	kitChip.Item.Visible = available
+	local color = if armed then MINE_GOLD else FIGHT_RED
+	kitAvailable = available
+	paintHint()
 	kitChip.Does.Text = if armed then "MINE" else "FIGHT"
-	kitChip.Does.TextColor3 = if armed then Color3.fromRGB(255, 202, 91) else Color3.fromRGB(255, 120, 104)
-	kitChip.Cap.BackgroundColor3 = if armed then Color3.fromRGB(255, 202, 91) else Color3.fromRGB(255, 120, 104)
+	kitChip.Does.TextColor3 = color
+	kitChip.Cap.BackgroundColor3 = color
+	kitChip.Edge.Color = color
 end
 
 -- Keep the field clear; navigation lives in the lobby dock and world prompts.
 findsLabel.Visible, recordLabel.Visible, buttons.Visible = false, false, false
-hint.Visible = not UserInputService.TouchEnabled
+paintHint()
 -- On a phone the card is drawn smaller (it sat over a third of the screen),
 -- with the CHAT button just under it (MobileLayout), and it steps
 -- aside while the chat is open over that corner.
@@ -430,7 +426,8 @@ local function fitOutpostHud()
 	PlayerCard.setBlocked(blocked or not hud.Enabled)
 	MinerLoot.setBlocked(blocked or not hud.Enabled)
 	-- (Hidden in a mech: its HOP OUT button names the key.)
-	hint.Visible = not blocked and not mobile and player:GetAttribute("MechPilot") == nil
+	hintBlocked = blocked or mobile or player:GetAttribute("MechPilot") ~= nil
+	paintHint()
 	charge.Frame.Visible = expanded
 	track.Visible = not expanded or (state ~= nil and state.Active ~= "Survey")
 	expandLabel.Text = if expanded then "−" else "+"

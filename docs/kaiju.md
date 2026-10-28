@@ -837,10 +837,8 @@ blast together. It works the same in mining and in fights.
   are posed by `CreatureAnimation` (crouch, spring, tuck, land, from
   `BeamLeapAt` and `BeamLandAt`), and so is the roar (`KaijuMood` "Roar",
   in each kind's voice). Your camera stays yours (first person or not):
-  it all happens in front of you. You get a roll call: each kaiju's name
-  pops up in its colour as it lands, and all the names flare gold at the
-  roar. Then **HYPERBEAM!** as it fires, a light flash, a colour grade
-  and bloom. Everyone sees the beam turn the same way: the server sends
+  it all happens in front of you. No text on screen (no title, no names):
+  as it fires, a light flash, a colour grade and bloom. Everyone sees the beam turn the same way: the server sends
   its targets in turn (`Targets`). Nothing's left on the ground after:
   the dark scorched strip that used to lie along the beam's path and fade
   out after the blast is gone (*2026-10-27*; it read as a black streak at
@@ -1306,7 +1304,7 @@ Proposed guardrails:
 | `KaijuHud` (client) | The kaiju card (a computer's three by two: the team and the support two by two, AUTO HEAL over the team keys; a phone's two rows; on a computer the HYPERBEAM its outline, its pill on the bottom edge), the team keys 1 to 4, CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL and TEAMS tabs, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
 | `KaijuBeamHud` (client) | The HYPERBEAM: on a computer the card's outline as its meter, its pill on the card's bottom edge; on a phone a button of its own right of the team keys, its rim the meter (the charge, READY, SAVE), Z / tap |
-| `KaijuBeamFx` (client) | The blast on screen: the rune circle, each leap carried along its arc and slammed down, the roar, the auras, the streams and orb, the beam turning onto its targets in turn; your roll call, grade and bloom, no camera takeover (`flight`; `tools/vfx_sim.luau`'s Hyperbeam renders it from your eyes) |
+| `KaijuBeamFx` (client) | The blast on screen: the rune circle, each leap carried along its arc and slammed down, the roar, the auras, the streams and orb, the beam turning onto its targets in turn; your flash, grade and bloom, no camera takeover (`flight`; `tools/vfx_sim.luau`'s Hyperbeam renders it from your eyes) |
 | `KaijuTaming` (client) | The gold glow and READY TO CATCH on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
 | `CritterFx` (client) | A gem raid's snatchers on screen: their giggles and cackles with "hee hee!" over them, and a dropped gem flying back ("GOT IT BACK!") |
 | `FxSize` (client) | How big the effect being drawn is: a creature's size, held while its effect draws (`run`), kept through its delays and frame loops (`keep`); `CombatFx`, `CombatSound`, `CombatVfx`, `MoveVfx`, `TriadVfx` and `ElementalDeath` draw at it |

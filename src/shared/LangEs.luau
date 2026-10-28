@@ -3066,6 +3066,7 @@ return {
 	["PICKAXE"] = "PICO",
 	["FIGHT"] = "PELEAR",
 	["MINE"] = "MINAR",
+	["SWITCH GEAR"] = "CAMBIAR EQUIPO",
 	["END"] = "FIN",
 	["KNOCKED DOWN"] = "DERRIBADO",
 	["Back up in {1}"] = "Te levantas en {1}",

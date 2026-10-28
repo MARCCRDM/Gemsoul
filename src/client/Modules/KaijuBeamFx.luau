@@ -25,7 +25,7 @@
 
 	  No cinematic: your camera stays yours (first person or not) and it
 	  all happens in front of you. Yours gets a hotter grade, your kaiju's
-	  names called as each lands, HYPERBEAM! as it fires and a light flash.
+	  a light flash as it fires (no title or names on screen).
 	  The beam turns as the server's does (Targets, in turn: KaijuBeam.
 	  direction), from the biggest threat onto each of the rest, smoothly.
 
@@ -155,15 +155,6 @@ local function mouthOf(model: Model, toward: Vector3): Vector3
 	return pivot.Position + UP * size.Y * 0.2 + toward * size.Z * 0.35
 end
 
--- What its name is called out as.
-local function nameOf(model: Model): string
-	local name = model:GetAttribute("KaijuName")
-	if type(name) ~= "string" or name == "" then
-		name = model:GetAttribute("KaijuSpecies")
-	end
-	return string.upper(if type(name) == "string" and name ~= "" then name else model.Name)
-end
-
 -- A ring on the ground: `count` short bars round `radius`, turned `spin`.
 local function ringBars(count: number, color: Color3, thickness: number)
 	local bars = {}
@@ -186,8 +177,8 @@ local function placeRing(bars, center: Vector3, radius: number, spin: number, tr
 	end
 end
 
--- Yours, over your own view: the roll call, the title and a flash.
-local function overlay(calls: { { Name: string, Color: Color3 } }, palette: { Color3 })
+-- Yours, over your own view: a flash as it fires (no title, no names).
+local function overlay()
 	local gui = UiKit.gui("KaijuBeamCinematic", 40)
 	local flash = new("Frame", {
 		BackgroundColor3 = WHITE,
@@ -196,103 +187,13 @@ local function overlay(calls: { { Name: string, Color: Color3 } }, palette: { Co
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 6,
 	}, gui)
-	local title = new("TextLabel", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.78),
-		Size = UDim2.fromScale(0.9, 0.12),
-		BackgroundTransparency = 1,
-		Text = "HYPERBEAM!",
-		Font = IronUi.Heading,
-		TextScaled = true,
-		TextColor3 = WHITE,
-		TextTransparency = 1,
-		ZIndex = 4,
-	}, gui)
-	new("UITextSizeConstraint", { MaxTextSize = 72 }, title)
-	local stroke = new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 3, Transparency = 1 }, title)
-	local points = {}
-	for i, color in palette do
-		table.insert(points, ColorSequenceKeypoint.new(if #palette == 1 then 0 else (i - 1) / (#palette - 1), color))
-	end
-	if #points == 1 then
-		table.insert(points, ColorSequenceKeypoint.new(1, palette[1]:Lerp(WHITE, 0.5)))
-	end
-	local gradient = new("UIGradient", { Color = ColorSequence.new(points) }, title)
-	local scale = new("UIScale", { Scale = 0.6 }, title)
-	-- The roll call: each name in its colour, popping in as it lands.
-	local row = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.fromScale(0.5, 0.86),
-		Size = UDim2.fromScale(0.94, 0.05),
-		BackgroundTransparency = 1,
-		ZIndex = 4,
-	}, gui)
-	new("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, 18),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, row)
-	local names = {}
-	for i, call in calls do
-		local label = new("TextLabel", {
-			LayoutOrder = i,
-			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.fromScale(0, 1),
-			BackgroundTransparency = 1,
-			Text = call.Name,
-			Font = IronUi.Heading,
-			TextScaled = true,
-			TextColor3 = call.Color:Lerp(WHITE, 0.25),
-			TextTransparency = 1,
-			ZIndex = 4,
-		}, row)
-		new("UITextSizeConstraint", { MaxTextSize = 24 }, label)
-		local outline = new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 2, Transparency = 1 }, label)
-		local pop = new("UIScale", { Scale = 1 }, label)
-		names[i] = { Label = label, Stroke = outline, Scale = pop, Color = label.TextColor3 }
-	end
 	return {
 		Gui = gui,
-		Call = function(i: number)
-			local name = names[i]
-			if not name then
-				return
-			end
-			name.Label.TextTransparency, name.Stroke.Transparency = 0, 0
-			name.Scale.Scale = 1.9
-			tween(name.Scale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
-		end,
-		Rally = function()
-			-- They roar: every name flares gold and settles back.
-			for _, name in names do
-				name.Label.TextColor3 = GOLD
-				name.Scale.Scale = 1.25
-				tween(name.Label, 0.6, { TextColor3 = name.Color })
-				tween(name.Scale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
-			end
-		end,
-		Title = function()
-			title.TextTransparency, stroke.Transparency = 0, 0
-			scale.Scale = 1.6
-			tween(scale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
-		end,
 		Flash = function(strength: number)
 			flash.BackgroundTransparency = 1 - strength
 			tween(flash, 0.35, { BackgroundTransparency = 1 })
 		end,
-		Spin = function(now: number)
-			gradient.Offset = Vector2.new(math.sin(now * 3) * 0.3, 0)
-		end,
 		Hide = function()
-			local info = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-			TweenService:Create(title, info, { TextTransparency = 1 }):Play()
-			TweenService:Create(stroke, info, { Transparency = 1 }):Play()
-			for _, name in names do
-				TweenService:Create(name.Label, info, { TextTransparency = 1 }):Play()
-				TweenService:Create(name.Stroke, info, { Transparency = 1 }):Play()
-			end
 			task.delay(0.4, function()
 				gui:Destroy()
 			end)
@@ -352,7 +253,7 @@ local function play(data)
 	local under = Vector3.new(focus.X, ground.Y, focus.Z) -- (the ground under the focus: rock is thrown up along from it)
 
 	-- Your team, each with its leap: from where it stands to its place.
-	local units, calls = {}, {}
+	local units = {}
 	for i, model in models do
 		if typeof(model) ~= "Instance" or not model:IsA("Model") or not model.Parent then
 			continue
@@ -390,7 +291,6 @@ local function play(data)
 			TrailAt = 0,
 		}
 		table.insert(units, unit)
-		table.insert(calls, { Name = nameOf(model), Color = unit.Color })
 	end
 
 	-- The rune circle under you: a disc spreading, two rings of bars
@@ -509,7 +409,7 @@ local function play(data)
 	local over = nil
 	local grade, bloom = nil, nil
 	if mine then
-		over = overlay(calls, palette)
+		over = overlay()
 		grade = keep(Instance.new("ColorCorrectionEffect"))
 		grade.Name = "KaijuBeamGrade"
 		grade.Parent = Lighting
@@ -571,9 +471,6 @@ local function play(data)
 		CombatFx.shakeNear(feet, 0.14, 0.3, 50)
 		CombatSound.play("Stomp", feet, { Volume = 1.2, Pitch = 0.85 })
 		CombatSound.element("Impact", unit.Element, feet, { Volume = 0.6 })
-		if over then
-			over.Call(call)
-		end
 	end
 	-- Together: they roar, pillars of their colours, lines of light
 	-- joining them to each other and to you.
@@ -622,9 +519,6 @@ local function play(data)
 		tween(sigil, 0.8, { Transparency = 0.88 })
 		CombatFx.shakeNear(origin, 0.2, 0.5, 60)
 		CombatSound.play("Combo", origin, { Volume = 1.1, Pitch = 0.8 })
-		if over then
-			over.Rally()
-		end
 		if grade then
 			grade.Brightness = 0.12
 			tween(grade, 0.6, { Brightness = 0 })
@@ -677,9 +571,6 @@ local function play(data)
 		local t = workspace:GetServerTimeNow() - start
 		local now = os.clock()
 		local phase, k = KaijuBeam.phase(t)
-		if over then
-			over.Spin(now)
-		end
 		-- The rune circle turns (and brightens as it charges).
 		if phase == "Gather" or phase == "Charge" or phase == "Fire" then
 			local grow = smooth(t / 0.9)
@@ -839,7 +730,6 @@ local function play(data)
 					CombatSound.element("Cast", unit.Element, focus, { Volume = 0.5 })
 				end
 				if over then
-					over.Title()
 					over.Flash(0.35)
 				end
 				blaze.Transparency = 0.1
