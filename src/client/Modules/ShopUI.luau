@@ -45,6 +45,7 @@ local FreeRewards = require(ReplicatedStorage.Shared.FreeRewards)
 local Referrals = require(ReplicatedStorage.Shared.Referrals)
 local Store = require(ReplicatedStorage.Shared.Store)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
+local CoinShop = require(script.Parent.CoinShop)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
@@ -436,8 +437,9 @@ MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, produc
 		return
 	end
 	local key = Store.productKey(productId)
-	-- (A swing refill is Garrick's: OutpostScene confirms those.)
-	if key and not Store.refill(key) then
+	-- (A swing refill is Garrick's: OutpostScene confirms those. A coin
+	-- pack is the coin window's: CoinShop.)
+	if key and not Store.refill(key) and not Store.coinPack(key) then
 		task.delay(0.8, function()
 			showReceipt(key)
 			refresh()
@@ -607,6 +609,15 @@ ShopArt.coin(walletCoin, 18)
 local walletValue = text(wallet, "0", 15, C.Text, BLACK, 0, 0, 0, 36)
 walletValue.AutomaticSize = Enum.AutomaticSize.X
 walletValue.LayoutOrder = 2
+-- (a + to top it up: the coin packs, Client CoinShop)
+local walletPlus = text(wallet, "+", 16, C.Ink, BLACK, 0, 0, 20, 20)
+walletPlus.Name = "TopUp"
+walletPlus.TextXAlignment = Enum.TextXAlignment.Center
+walletPlus.BackgroundTransparency = 0
+walletPlus.BackgroundColor3 = Color3.fromRGB(255, 202, 91)
+walletPlus.LayoutOrder = 3
+round(walletPlus, 10)
+CoinShop.hook(wallet)
 -- While the Starter Pack (or the Welcome Kit) is open: a deal, with its clock.
 local deal = new("TextButton", {
 	Name = "Deal",

@@ -15,6 +15,7 @@ Code:
 - `src/shared/Store.luau`: the catalog, prices and the rules for who can buy what.
 - `src/server/Systems/StoreServer.luau`: purchases and receipts.
 - `src/client/Modules/ShopUI.luau`: the store screen.
+- `src/client/Modules/CoinShop.luau`: the coin packs' window.
 
 ## Sections
 
@@ -35,6 +36,40 @@ What was removed or moved:
   - The looks that only came from crates are now sold on their own.
   - Crates left in a save are refunded as coins at what they cost (Geode 250, Masterwork 800), once, on load.
   - Season Path and promo-code crate rewards are now coins.
+
+## Coin packs (2026-10-28)
+
+Coins are sold for Robux in a window of their own (`src/client/Modules/CoinShop.luau`),
+apart from the Store and the Market, in the Kennel's gilt look. Four packs
+side by side, each bigger one cheaper per coin:
+
+| Pack | Robux | Coins a Robux | Saves |
+| --- | --- | --- | --- |
+| 10,000 coins | 1,000 | 10 | (the standard rate) |
+| 25,000 coins | 2,250 | 11.1 | 10% |
+| 50,000 coins (*Popular*) | 4,250 | 11.8 | 15% |
+| 100,000 coins (*Best value*) | 7,500 | 13.3 | 25% |
+
+Each card shows its pile of coins (bigger with the pack), the saving, and
+what it would cost at the first pack's rate, struck through. The packs are
+`Store.CoinPacks`; their products `Coins10k`, `Coins25k`, `Coins50k` and
+`Coins100k` (ids 0 until they're made: the window still shows the prices,
+and a click says they're coming). A pack can be bought any number of times;
+its coins come with the receipt (`StoreServer.grantProduct`).
+
+**Where it opens**
+
+- **Your coins, anywhere.** Click (or tap) them on the lobby card, the
+  phone's wallet pill, the Store's wallet (it has a gold **+** now), the
+  Inventory's COINS and the Market's total (`CoinShop.hook`).
+- **Short of coins.** A request the server turns down for want of coins says
+  how many more it takes (`Shop.short`: a reply's `CoinsShort`), and the
+  window opens by itself (`GemClient.onCoinsShort`). It says "You need ◆ N
+  more for that." and marks the smallest pack that covers it (*Covers it*,
+  `Store.coinPackFor`). So far: a Market buy, a kaiju battle stake (set or
+  matched), a Rift RESTORE, and anything test-bought for coins. On the
+  Market, a listing you can't afford says **GET COINS** instead of NOT
+  ENOUGH COINS, and opens it.
 
 ## Bundles
 

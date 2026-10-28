@@ -33,6 +33,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local BodyHealth = require(script.Parent.BodyHealth)
+local CoinShop = require(script.Parent.CoinShop)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
@@ -721,6 +722,8 @@ local coinsLabel = text(status, "0", 13, P.Gold, IronUi.Heading, Enum.TextXAlign
 coinsLabel.AnchorPoint = Vector2.new(1, 0)
 coinsLabel.Position, coinsLabel.Size = UDim2.new(1, -9, 0, 7), UDim2.fromOffset(84, 18)
 coinsLabel.TextStrokeTransparency = 1
+-- (your coins open the coin packs: Client CoinShop)
+CoinShop.hook(coinsLabel)
 local levelTrack = new("Frame", {
 	BorderSizePixel = 0,
 	BackgroundColor3 = Color3.fromRGB(34, 40, 52),
@@ -790,6 +793,7 @@ local walletText = text(walletPill, "", 12, P.Text, IronUi.Heading)
 walletText.RichText = true
 walletText.Size = UDim2.fromScale(1, 1)
 walletText.TextStrokeTransparency = 1
+CoinShop.hook(walletPill)
 local phoneHealth = healthBar(gui, "PhoneHealth")
 phoneHealth.Frame.Visible = false
 phoneHealth.Label.Text = "HP"

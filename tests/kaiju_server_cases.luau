@@ -289,6 +289,10 @@ local Shop = {
 		result.Ok, result.Message = ok, message
 		return result
 	end,
+	-- (Server Shop.short: short of coins, how many more)
+	short = function(_player, cost, message)
+		return { Ok = false, Message = message, CoinsShort = cost }
+	end,
 }
 local profiles = {}
 local synced = 0

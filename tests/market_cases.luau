@@ -169,6 +169,10 @@ local Shop = {
 		r.Ok, r.Message = ok, message
 		return r
 	end,
+	-- (Server Shop.short: short of coins, how many more)
+	short = function(_player, cost, message)
+		return { Ok = false, Message = message, CoinsShort = cost }
+	end,
 }
 local Remotes = {
 	Notify = {

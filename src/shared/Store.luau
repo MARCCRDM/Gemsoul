@@ -16,6 +16,9 @@
 	  Weapon Skins, Suits, Pickaxes
 	               every look sold on its own (Cosmetics, Robux)
 	  Free         the group, friends, the login streak and promo codes
+	  Coins        coin packs (Store.CoinPacks), in a window of their own
+	               (Client CoinShop): opened from your coins anywhere, or
+	               when you're short of coins for something
 
 	Trims and back pieces aren't sold on their own: they come as extras in
 	bundles (and on the Season Path). Nothing random is sold but the
@@ -434,6 +437,11 @@ Store.RobuxProducts = {
 	KaijuDaily = 0,
 	KaijuRareRoll = 0,
 	KaijuPremium = 0,
+	-- Coin packs (Store.CoinPacks)
+	Coins10k = 0,
+	Coins25k = 0,
+	Coins50k = 0,
+	Coins100k = 0,
 }
 -- The Robux price of each bundle and offer (a cosmetic's is its own Robux).
 Store.RobuxPrices = {
@@ -465,6 +473,59 @@ Store.RobuxPrices = {
 -- (A refill's price is its own: Outpost.Refills.)
 for _, refill in Outpost.Refills do
 	Store.RobuxPrices[refill.Product] = refill.Robux
+end
+
+-- Coin packs, sold in their own window (Client CoinShop): 10 coins a Robux
+-- for the first, and the bigger the pack the less each coin costs. `Tag` is
+-- the ribbon on its card.
+export type CoinPack = { Key: string, Coins: number, Robux: number, Tag: string? }
+Store.CoinRate = 10 -- coins per Robux, at the first pack's price
+Store.CoinPacks = {
+	{ Key = "Coins10k", Coins = 10000, Robux = 1000 },
+	{ Key = "Coins25k", Coins = 25000, Robux = 2250 },
+	{ Key = "Coins50k", Coins = 50000, Robux = 4250, Tag = "Popular" },
+	{ Key = "Coins100k", Coins = 100000, Robux = 7500, Tag = "Best value" },
+} :: { CoinPack }
+for _, pack in Store.CoinPacks do
+	Store.RobuxPrices[pack.Key] = pack.Robux
+end
+
+-- 25000 -> "25,000".
+function Store.commas(n: number): string
+	local s = tostring(math.floor(n))
+	while true do
+		local replaced, count = s:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+		s = replaced
+		if count == 0 then
+			return s
+		end
+	end
+end
+
+-- The coin pack a product key is (nil if it isn't one).
+function Store.coinPack(key: any): CoinPack?
+	for _, pack in Store.CoinPacks do
+		if pack.Key == key then
+			return pack
+		end
+	end
+	return nil
+end
+
+-- What a pack saves on the first pack's rate, as a whole percent (0 for it).
+function Store.coinSaving(pack: CoinPack): number
+	local full = pack.Coins / Store.CoinRate
+	return math.max(0, math.floor((1 - pack.Robux / full) * 100 + 0.5))
+end
+
+-- The smallest pack that covers `short` coins (the biggest if none does).
+function Store.coinPackFor(short: number): CoinPack
+	for _, pack in Store.CoinPacks do
+		if pack.Coins >= short then
+			return pack
+		end
+	end
+	return Store.CoinPacks[#Store.CoinPacks]
 end
 
 -- The swing refill a product key is (nil if it isn't one).
@@ -597,6 +658,10 @@ function Store.contents(key: any): Reward?
 	end
 	if key == "KaijuDaily" or key == "KaijuRareRoll" or key == "KaijuPremium" then
 		return { KaijuSale = if key == "KaijuDaily" then "Daily" elseif key == "KaijuRareRoll" then "Rare" else "Premium" }
+	end
+	local pack = Store.coinPack(key)
+	if pack then
+		return { Coins = pack.Coins }
 	end
 	local bundle = Store.bundle(key)
 	if bundle then
@@ -746,6 +811,10 @@ function Store.productName(key: string): string
 	end
 	if key == "KaijuPremium" then
 		return "Triskull Trinity"
+	end
+	local pack = Store.coinPack(key)
+	if pack then
+		return Store.commas(pack.Coins) .. " Coins"
 	end
 	local refill = Store.refill(key)
 	if refill then

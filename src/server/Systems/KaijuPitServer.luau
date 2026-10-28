@@ -502,6 +502,9 @@ local function setStake(player: Player, wanted: any)
 	end
 	local problem = KaijuPit.stakeProblem(stake, holdings(player))
 	if problem then
+		if stake and stake.Kind == "Coins" and (holdings(player).Coins or 0) < (stake.Coins or 0) then
+			return Shop.short(player, stake.Coins, problem)
+		end
 		return reply(false, problem)
 	end
 	state.Stake = stake
@@ -579,6 +582,9 @@ local function fight(player: Player, offer: any)
 	local gemId = if type(offer) == "string" then offer else nil
 	problem = KaijuPit.matchProblem(stake, gemId, holdings(player))
 	if problem then
+		if stake and stake.Kind == "Coins" and (holdings(player).Coins or 0) < (stake.Coins or 0) then
+			return Shop.short(player, stake.Coins, problem)
+		end
 		return reply(false, problem)
 	end
 	-- Both stakes in.

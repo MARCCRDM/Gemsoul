@@ -80,6 +80,10 @@ local function pace(): boolean
 end
 
 -- Returns the server's reply: { Ok: boolean, Message: string, ... }.
+-- Told how many coins short a request came up (its reply's CoinsShort,
+-- Server Shop.short): the coin packs open (Client CoinShop sets it).
+GemClient.onCoinsShort = nil :: ((number) -> ())?
+
 function GemClient.request(action: string, ...): { [string]: any }
 	if not pace() then
 		return { Ok = false, Message = "Slow down!" }
@@ -94,6 +98,10 @@ function GemClient.request(action: string, ...): { [string]: any }
 	local sound = REPLY_SOUNDS[action]
 	if sound and result.Message ~= "Slow down!" then
 		UiSound.play(if result.Ok then sound else "Error")
+	end
+	local short = result.CoinsShort
+	if not result.Ok and typeof(short) == "number" and short > 0 and GemClient.onCoinsShort then
+		task.defer(GemClient.onCoinsShort, short)
 	end
 	return result
 end

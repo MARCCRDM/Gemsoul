@@ -14,8 +14,9 @@
 	bundle, squad kits, the Starter Pack, the Season premium track, a
 	swing refill's swings (StoreServer.addSwings: OutpostServer's) or a
 	kaiju revive (StoreServer.reviveKaiju: KaijuServer.reviveAll; with none
-	down by then, a Revive coupon, Shared.Coupons) or a Kennel sale
-	(StoreServer.kaijuSale: KaijuServer.saleGrant).
+	down by then, a Revive coupon, Shared.Coupons), a Kennel sale
+	(StoreServer.kaijuSale: KaijuServer.saleGrant) or a coin pack's coins
+	(Store.CoinPacks).
 
 	What you buy goes on: a look you buy is worn at once; a bundle puts its
 	first suit, skin and pickaxe on the miner you're playing; squad kits go
@@ -194,6 +195,11 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 		PlayerData.sync(player)
 		return true, { "a Rift RESTORE, kept for the next time you're down" }
 	end
+	-- A coin pack: its coins, nothing to put on.
+	local pack = Store.coinPack(key)
+	if pack then
+		return true, StoreServer.grant(player, { Coins = pack.Coins })
+	end
 	local reward = Store.contents(key)
 	if not reward then
 		return false
@@ -251,7 +257,7 @@ local function buyProduct(player: Player, key: any)
 		return reply(false, why or "That isn't for sale.")
 	end
 	if not PlayerData.spendCoins(player, price) then
-		return reply(false, string.format("You need %d coins.", price))
+		return Shop.short(player, price, string.format("You need %d coins.", price))
 	end
 	local granted, lines = StoreServer.grantProduct(player, key)
 	if not granted then

@@ -126,6 +126,10 @@ local Shop = {
 		end
 		return r
 	end,
+	-- (Server Shop.short: short of coins, how many more)
+	short = function(_player, cost, message)
+		return { Ok = false, Message = message, CoinsShort = cost }
+	end,
 }
 -- Tasks events (PlayerData.training) by player, e.g. trained[p].Mine.
 local trained = {}

@@ -787,7 +787,7 @@ function handlers.MarketBuy(player: Player, listingId)
 		return Shop.reply(false, "That's your own listing.")
 	end
 	if profile.Coins < row.Price then
-		return Shop.reply(false, string.format("You need %d coins.", row.Price))
+		return Shop.short(player, row.Price, string.format("You need %d coins.", row.Price))
 	end
 	local why = Rules.cantReceive(profile, row.Item, Config.MaxGems, Config.MaxGear)
 	if why then

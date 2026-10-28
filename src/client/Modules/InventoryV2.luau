@@ -694,6 +694,10 @@ local function buildTop(canvas: Frame)
 	end
 	local step, margin = if COMPACT then 124 else 180, if COMPACT then 0 else 10
 	ui.Coins = readout(W - margin - readW - 2 * step, "COINS")
+	-- (your coins open the coin packs: Client CoinShop)
+	local coinsHit = hit(ui.Coins)
+	coinsHit.Size = UDim2.new(1, 0, 0, 40)
+	coinsHit.Activated:Connect(open("CoinShop", "open"))
 	ui.Season, ui.SeasonCap = readout(W - margin - readW - step, "SEASON")
 	ui.Pick, ui.PickCap = readout(W - margin - readW, "FREE PICK")
 	local track = frame(canvas, C.Line, 0.92)

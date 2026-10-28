@@ -1583,7 +1583,7 @@ local function choose(player: Player, choice: any)
 		local used = run.Restores[player] or 0
 		local cost = RiftRun.restoreCost(used)
 		if not PlayerData.spendCoins(player, cost) then
-			return reply(false, string.format("Not enough coins: RESTORE costs %d.", cost))
+			return Shop.short(player, cost, string.format("Not enough coins: RESTORE costs %d.", cost))
 		end
 		run.Restores[player] = used + 1
 		revive(run, player, "Restored: you and your kaiju are back on your feet.")

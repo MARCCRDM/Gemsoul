@@ -24,6 +24,7 @@ local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local Rules = require(ReplicatedStorage.Shared.Market)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local CoinShop = require(script.Parent.CoinShop)
 local GearArt = require(script.Parent.GearArt)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
@@ -38,6 +39,7 @@ local BOLD, BODY = IronUi.Bold, IronUi.Body
 local GOLD = Color3.fromRGB(232, 168, 52)
 local TRADE = Color3.fromRGB(110, 170, 255)
 local READY = Color3.fromRGB(64, 196, 110)
+local GET_COINS = Color3.fromRGB(196, 146, 52) -- (short of coins: the coin packs)
 local PANEL = Color3.fromRGB(16, 18, 32)
 -- (on a phone on its side, shorter, so it's drawn larger: the pages under
 -- the tabs get CONTENT_H, and the item and sell pages stack tighter)
@@ -659,8 +661,8 @@ local function listingCard(parent, row, order)
 		local afford = coins >= row.Price
 		button(
 			card,
-			if afford then "BUY" else "NOT ENOUGH COINS",
-			if afford then READY else Color3.fromRGB(90, 70, 70),
+			if afford then "BUY" else "GET COINS",
+			if afford then READY else GET_COINS,
 			10,
 			124,
 			184,
@@ -668,6 +670,8 @@ local function listingCard(parent, row, order)
 			function()
 				if afford then
 					act("MarketBuy", row.Id)
+				else
+					CoinShop.open(row.Price - coins)
 				end
 			end
 		)
@@ -764,17 +768,20 @@ local function drawInspect()
 			draw()
 		end)
 	elseif row.Mode == "Sell" then
-		local afford = (GemClient.Profile and GemClient.Profile.Coins or 0) >= row.Price
+		local coins = GemClient.Profile and GemClient.Profile.Coins or 0
+		local afford = coins >= row.Price
 		button(
 			box,
-			if afford then "BUY FOR " .. row.Price .. " COINS" else "NOT ENOUGH COINS",
-			if afford then READY else Color3.fromRGB(90, 70, 70),
+			if afford then "BUY FOR " .. row.Price .. " COINS" else "GET " .. (row.Price - coins) .. " MORE COINS",
+			if afford then READY else GET_COINS,
 			16,
 			buttonY,
 			260,
 			52,
 			function()
-				if afford and act("MarketBuy", row.Id) then
+				if not afford then
+					CoinShop.open(row.Price - coins)
+				elseif act("MarketBuy", row.Id) then
 					inspect = nil
 					draw()
 				end
@@ -1227,6 +1234,7 @@ draw = function()
 		Enum.TextXAlignment.Right
 	)
 	UiKit.fit(wallet)
+	CoinShop.hook(wallet)
 	button(bar, "FACE TO FACE", Color3.fromRGB(70, 76, 100), 696, 4, 164, 36, function()
 		window.Gui.Enabled = false
 		require(script.Parent.TradeUI).open()

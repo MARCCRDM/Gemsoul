@@ -26,6 +26,14 @@ end
 
 Shop.reply = reply
 
+-- Can't pay `cost` coins: a refusal saying how many more it takes
+-- (`CoinsShort`), so the client opens the coin packs (Client CoinShop).
+function Shop.short(player: Player, cost: number, message: string): { [string]: any }
+	local profile = PlayerData.get(player)
+	local have = if profile then profile.Coins or 0 else 0
+	return reply(false, message, { CoinsShort = math.max(1, math.ceil(cost - have)) })
+end
+
 -- Entry point for every client request (also called directly by tests).
 function Shop.handle(player: Player, action: any, ...): { [string]: any }
 	if PlayerData.isTradeLocked(player) and action ~= "GetProfile" and action ~= "TradeState" then

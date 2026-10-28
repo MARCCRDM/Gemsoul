@@ -166,6 +166,7 @@ for key in Store.RobuxProducts do
 	local real = Store.bundle(key) or Store.kitsOf(key) or (Cosmetics.get(key) and Cosmetics.get(key).Robux)
 		or key == "StarterPack" or key == "SeasonPremium" or Store.refill(key) or key == "KaijuRevive" or key == "RiftRestore"
 		or (Store.contents(key) or {}).KaijuSale ~= nil -- (the Kennel's: KaijuServer.saleGrant)
+		or Store.coinPack(key) ~= nil -- (a coin pack's coins: Client CoinShop)
 	check(real, key .. " is a product slot for nothing")
 	check(Store.robuxPrice(key), key .. " has no Robux price")
 end
@@ -267,6 +268,10 @@ local stubs = {
 			local r = extra or {}
 			r.Ok, r.Message = ok, message
 			return r
+		end,
+		-- (Server Shop.short: short of coins, how many more)
+		short = function(_player, cost, message)
+			return { Ok = false, Message = message, CoinsShort = cost }
 		end,
 	},
 }
@@ -566,6 +571,36 @@ check(profile.Cosmetics.Suit == nil, "The Vault changed your look")
 -- Welcome Kit marks itself bought.
 freshProfile()
 check(buy("Welcome") == Granted and profile.WelcomeBought and profile.Cosmetics.Owned.SuitCamo, "The Welcome Kit wasn't granted")
+-- Coin packs: 10k, 25k, 50k and 100k coins for Robux, each cheaper a coin
+-- than the last, in a window of their own (Client CoinShop).
+check(#Store.CoinPacks == 4 and Store.CoinPacks[1].Coins == 10000 and Store.CoinPacks[1].Robux == 1000, "10,000 coins aren't R$ 1,000")
+local lastRate = math.huge
+for i, pack in Store.CoinPacks do
+	check(pack.Coins == ({ 10000, 25000, 50000, 100000 })[i], "Coin pack " .. i .. " holds the wrong coins")
+	check(Store.robuxPrice(pack.Key) == pack.Robux and Store.RobuxProducts[pack.Key] ~= nil, pack.Key .. " has no product or price")
+	check(pack.Robux / pack.Coins < lastRate, pack.Key .. " isn't a better deal than the pack before it")
+	lastRate = pack.Robux / pack.Coins
+	check(Store.coinPack(pack.Key) == pack and Store.contents(pack.Key).Coins == pack.Coins, pack.Key .. " doesn't hold its coins")
+	check(Store.productName(pack.Key) == Store.commas(pack.Coins) .. " Coins", pack.Key .. " is misnamed")
+	check(Store.canBuy(pack.Key, { Coins = 10 ^ 9 }, os.time()), pack.Key .. " can't be bought")
+	check((Store.coinSaving(pack) > 0) == (i > 1), pack.Key .. "'s saving is wrong")
+end
+check(Store.coinSaving(Store.CoinPacks[4]) == 25, "100,000 coins don't save a quarter")
+check(Store.coinPack("Vault") == nil and Store.coinPack(nil) == nil, "Not a coin pack, called one")
+check(
+	Store.coinPackFor(1).Key == "Coins10k"
+		and Store.coinPackFor(10001).Key == "Coins25k"
+		and Store.coinPackFor(60000).Key == "Coins100k"
+		and Store.coinPackFor(10 ^ 9).Key == "Coins100k",
+	"The pack marked for a shortfall doesn't cover it"
+)
+check(Store.commas(1234567) == "1,234,567" and Store.commas(999) == "999" and Store.commas(-2500) == "-2,500", "Coins are written wrong")
+-- Bought: the coins, nothing worn, as often as you like.
+freshProfile()
+local coinsBefore = profile.Coins
+check(buy("Coins25k") == Granted and profile.Coins == coinsBefore + 25000, "A coin pack's coins weren't granted")
+check(buy("Coins25k") == Granted and profile.Coins == coinsBefore + 50000, "A second coin pack wasn't granted")
+check(profile.Cosmetics.Suit == nil and profile.Cosmetics.Skin == nil, "A coin pack changed your look")
 -- Testing: any product for coins, through the same grant; not twice.
 if Config.TestCosmeticPrice then
 	freshProfile()
@@ -576,7 +611,9 @@ if Config.TestCosmeticPrice then
 	check(not handlers.BuyProduct(thePlayer, "DeepSpace").Ok, "A retired bundle was test-bought")
 	check(not handlers.BuyProduct(thePlayer, "Nope").Ok and not handlers.BuyProduct(thePlayer, 42).Ok, "Junk was bought")
 	profile.Coins = 0
-	check(not handlers.BuyProduct(thePlayer, "StormCaller").Ok, "A bundle was bought with no coins")
+	local poor = handlers.BuyProduct(thePlayer, "StormCaller")
+	check(not poor.Ok, "A bundle was bought with no coins")
+	check(poor.CoinsShort == Config.TestCosmeticPrice, "Short of coins didn't say how many (for the coin packs)")
 end
 -- The Starter Pack goes on offer once.
 freshProfile()
