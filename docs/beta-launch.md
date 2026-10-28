@@ -26,6 +26,12 @@ which sets the same).
 - **Progress carries into launch.** `DataStoreName` stays
   `GemSoul_PlayerData_v2`, so beta progress is kept at launch. Changing the
   name starts everyone over.
+- **The Market starts empty at launch.** `MarketBoardVersion` 3 (2026-10-28)
+  is a new, empty board: every beta listing and offer goes back to its owner
+  the next time they join, and anything already sold still pays its seller
+  (the mailboxes are kept). Raise it again to clear the board; raising
+  `MarketVersion` instead clears the mailboxes too, and a seller paid while
+  away would get the item back as well.
 - **For a friends-only test server**, set `STAGE = "Playtest"`.
 
 ## Modes in the beta

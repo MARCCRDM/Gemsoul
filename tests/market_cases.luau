@@ -801,6 +801,30 @@ check(escrowCount(ann) == 0, "nothing left in ann's escrow")
 conserved("after withdrawing an accepted offer")
 local open1, total1 = openRows()
 check(open1 == total1, "still only open listings on the board")
+-- 13d. The board cleared (Config.MarketBoardVersion: a new, empty board, the
+-- mailboxes kept): what's still up goes home; what sold while its seller
+-- was away still pays them, never the item back as well.
+table.insert(profiles[ann].Gems, gem("clearedOpen", "Rare", 3))
+table.insert(profiles[dan].Gems, gem("clearedSold", "Rare", 3))
+everything = census()
+check(call(ann, "MarketList", "Gem", nil, "clearedOpen", "Sell", 40).Ok, "ann lists clearedOpen")
+check(call(dan, "MarketList", "Gem", nil, "clearedSold", "Sell", 50).Ok, "dan lists clearedSold")
+local clearedSold = listingOf("clearedSold")
+table.remove(players, table.find(players, dan))
+byId[4] = nil
+check(call(bob, "MarketBuy", clearedSold).Ok and has(bob, "clearedSold"), "bob buys clearedSold while dan is away")
+table.clear(fb.Rows) -- (the new, empty board)
+for _, p in players do
+	MarketBoard.reconcile(p)
+end
+check(has(ann, "clearedOpen") and escrowCount(ann) == 0, "cleared, ann's listing didn't come home")
+table.insert(players, dan)
+byId[4] = dan
+danCoins = profiles[dan].Coins
+MarketBoard.reconcile(dan)
+check(profiles[dan].Coins == danCoins + Rules.payout(50) and not has(dan, "clearedSold"), "cleared, dan wasn't paid for clearedSold (or got it back too)")
+check(escrowCount(dan) == 0, "cleared, something stayed in dan's escrow")
+conserved("after clearing the board")
 
 -- 10. Face to face (Shared.EquipmentTrade): swapping two copies of one model.
 local Trade = load("src/shared/EquipmentTrade.luau", {

@@ -86,6 +86,13 @@ local Config = {
 	-- Market empty: every listed or offered item goes back to its owner the
 	-- next time they join, and old mailbox notes are left behind.
 	MarketVersion = 2,
+	-- The board alone (its listings), mailboxes kept: raise it (and publish)
+	-- to clear what's up for sale. Every listed or offered item goes back to
+	-- its owner the next time they join, and anything already sold still
+	-- pays its seller (their mailbox says so). 3: cleared for launch,
+	-- 2026-10-28. (Raising MarketVersion clears the mailboxes too: a seller
+	-- paid while away would get the item back instead, a copy.)
+	MarketBoardVersion = 3,
 	AutosaveSeconds = 120,
 
 	-- Testing on a published server (the stage sets OpenAdmin and FreshStart).

@@ -45,9 +45,11 @@ local Equipment = require(script.Parent.Equipment)
 local MarketBoard = {}
 
 local KEEP_SETTLED = 7 * 24 * 3600 -- a finished row left behind by a crash (normally removed at once)
--- (Config.MarketVersion: a new number starts an empty board and mailboxes.)
+-- (Config.MarketVersion: a new number starts an empty board and mailboxes;
+-- Config.MarketBoardVersion an empty board alone, the mailboxes kept.)
 local VERSION = tostring(Config.MarketVersion or 1)
-local TOPIC = "MarketBoard_v" .. VERSION
+local BOARD = tostring(Config.MarketBoardVersion or VERSION)
+local TOPIC = "MarketBoard_v" .. BOARD
 
 -- The board -------------------------------------------------------------------
 
@@ -87,7 +89,7 @@ end
 
 local function memoryBoard()
 	local ok, map = pcall(function()
-		return game:GetService("MemoryStoreService"):GetSortedMap("MarketBoard_v" .. VERSION)
+		return game:GetService("MemoryStoreService"):GetSortedMap("MarketBoard_v" .. BOARD)
 	end)
 	if not ok or not map then
 		return nil
