@@ -333,6 +333,25 @@ failSave = true
 check(buy("SkinCamo", "f1") == NotYet, "A purchase counted as granted though its save failed")
 failSave = false
 check(buy("SkinCamo", "f1") == Granted, "A purchase asked about again after a failed save wasn't granted")
+-- Asked again while saving still fails: still waiting (granted once, never
+-- counted done before it's saved).
+failSave = true
+check(buy("SkinCopper", "f2") == NotYet and profile.Cosmetics.Owned.SkinCopper, "A purchase whose save failed wasn't held in memory")
+check(buy("SkinCopper", "f2") == NotYet, "A purchase asked about again counted as done though it still wasn't saved")
+failSave = false
+check(buy("SkinCopper", "f2") == Granted, "A purchase wasn't done once its save went through")
+-- A session that doesn't save (its save didn't load, or another server took
+-- it): nothing granted, so nothing lost when they leave; granted in the
+-- next session that saves.
+stubs.PlayerData.keeps = function()
+	return false
+end
+check(buy("SkinGlacier", "k1") == NotYet and not profile.Cosmetics.Owned.SkinGlacier, "A purchase was granted in a session that doesn't save")
+stubs.PlayerData.keeps = function()
+	return true
+end
+check(buy("SkinGlacier", "k1") == Granted and profile.Cosmetics.Owned.SkinGlacier, "A held purchase wasn't granted in a session that saves")
+stubs.PlayerData.keeps = nil
 -- The same receipt again (Roblox retries): granted, not given twice.
 profile.Cosmetics.Owned.SkinPlasma = nil
 check(buy("SkinPlasma", "a1") == Granted and not profile.Cosmetics.Owned.SkinPlasma, "A retried receipt was granted twice")

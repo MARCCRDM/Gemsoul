@@ -115,7 +115,10 @@ Nothing sells for Robux until its Developer Product exists.
 Purchases are safe to retry:
 
 - Each purchase is granted once, by its `PurchaseId`.
-- The profile is saved straight away.
+- The profile is saved straight away, and the purchase counts as done only
+  once that save has gone through.
+- A session that doesn't save (its save didn't load, or another server took
+  it) grants nothing: the purchase waits for one that does.
 
 ## Tests
 

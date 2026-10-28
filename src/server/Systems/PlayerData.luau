@@ -431,6 +431,13 @@ function PlayerData.mayPersist(_player: Player): boolean
 	return store ~= nil and not (Config.Playtest and Config.Playtest.FreshStart == true)
 end
 
+-- Whether `player`'s progress is saved this session: their save loaded and
+-- is still this server's (SessionLock). False when it didn't load (they're
+-- told so) or another server took it over.
+function PlayerData.keeps(player: Player): boolean
+	return canSave[player] == true
+end
+
 -- Coins for coming back each day; the streak (up to a week) pays more.
 local function claimDaily(player: Player, profile: Profile)
 	local daily = profile.Daily

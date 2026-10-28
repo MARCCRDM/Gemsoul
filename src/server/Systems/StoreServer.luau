@@ -342,10 +342,30 @@ local function processReceipt(receipt)
 	if not key then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
+	-- Saved now, so a crash can't lose a paid purchase. (A session that
+	-- never saves, the Playtest fresh start, counts as saved.)
+	local persists = PlayerData.save ~= nil and (not PlayerData.mayPersist or PlayerData.mayPersist(player))
+	local function saved(): boolean
+		if not persists then
+			return true
+		end
+		local ok, done = pcall(PlayerData.save, player)
+		return ok and done == true
+	end
+	-- A session whose save didn't load (or that another server took over)
+	-- never saves: granted here, it'd be gone when they leave. It waits for
+	-- one that saves (Roblox asks again when they next join).
+	if persists and PlayerData.keeps and not PlayerData.keeps(player) then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
 	profile.Receipts = profile.Receipts or {}
 	local id = tostring(receipt.PurchaseId)
 	if table.find(profile.Receipts, id) then
-		return Enum.ProductPurchaseDecision.PurchaseGranted
+		-- Granted before: done only once that's saved too (its save may have
+		-- failed then), never granted twice.
+		return if saved()
+			then Enum.ProductPurchaseDecision.PurchaseGranted
+			else Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	if not StoreServer.grantProduct(player, key) then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
@@ -354,15 +374,10 @@ local function processReceipt(receipt)
 	while #profile.Receipts > 200 do
 		table.remove(profile.Receipts, 1)
 	end
-	-- Saved now, so a crash can't lose a paid purchase. Not saved (a failed
-	-- save, or one already under way): Roblox asks again later, and the
-	-- receipt kept above makes that a no-op once the profile is saved. (A
-	-- session that never saves, the Playtest fresh start, counts as saved.)
-	if PlayerData.save and (not PlayerData.mayPersist or PlayerData.mayPersist(player)) then
-		local ok, saved = pcall(PlayerData.save, player)
-		if not ok or not saved then
-			return Enum.ProductPurchaseDecision.NotProcessedYet
-		end
+	-- Not saved (a failed save, or one already under way): Roblox asks again
+	-- later, and the receipt kept above makes that a save, not a second grant.
+	if not saved() then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end

@@ -250,7 +250,13 @@ Purchases are safe to retry:
 
 - Each Roblox purchase is granted once, by its `PurchaseId`. The last 200 are
   kept on the profile.
-- The profile is saved right after a purchase.
+- The profile is saved right after a purchase, and a purchase only counts
+  as done once that save has gone through. Asked about again while saving
+  still fails, it waits again; it's never granted twice.
+- A session that doesn't save (the save didn't load, or another server took
+  it over) grants nothing: the purchase waits for the next session that
+  saves, so nothing paid for is lost when the player leaves
+  (`PlayerData.keeps`, since 2026-10-28).
 - A bought skin or suit goes straight on.
 
 ## To switch the group reward on
@@ -282,7 +288,10 @@ players can't read the list out of the game.
   action. Roblox doesn't allow it, and the game can't check it anyway. Post
   codes in Discord instead, since anyone can redeem them. Discord links belong
   on the game page's Social Links, which Roblox shows only to users old
-  enough to see them.
+  enough to see them. In game, the Store names Discord (the promo codes
+  card, a code-only look's "how to get it") only to players PolicyService
+  allows it for (`AllowedExternalLinkReferences`); everyone else reads
+  "codes come with game updates and at like milestones" (since 2026-10-28).
 - **No random items for sale.** The store sells only named looks and bundles;
   crates are gone. Keep it that way: paid random items need odds shown and
   are restricted in some countries.

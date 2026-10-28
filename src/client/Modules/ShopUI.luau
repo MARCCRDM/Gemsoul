@@ -51,6 +51,18 @@ local new = IronUi.new
 
 local ShopUI = {}
 
+-- Whether this player may be pointed to Discord: Roblox allows naming it
+-- only where PolicyService says so (AllowedExternalLinkReferences). Off
+-- till it does.
+local discordOk = false
+task.spawn(function()
+	local ok, info = pcall(function()
+		return game:GetService("PolicyService"):GetPolicyInfoForPlayerAsync(player)
+	end)
+	local allowed = ok and type(info) == "table" and info.AllowedExternalLinkReferences
+	discordOk = type(allowed) == "table" and table.find(allowed, "Discord") ~= nil
+end)
+
 -- Look ---------------------------------------------------------------------------------------------------
 
 local C = {
@@ -107,7 +119,8 @@ local HOW_TO = {
 	Invite = "Bring friends to the game: see Free.",
 	Group = "Join the game's Roblox group: see Free.",
 	Streak = "Log in 7 days in a row: see Free.",
-	Code = "From a promo code: watch our Discord and socials.",
+	Code = "From a promo code: they come with game updates and like milestones.",
+	CodeDiscord = "From a promo code: watch our Discord and socials.",
 	Starter = "Only in the Starter Pack, offered after your first win.",
 	Season = "On the Season Path.",
 	Default = "Every miner starts with it.",
@@ -1336,7 +1349,10 @@ local function productPage(id: string, x: number)
 		wrap(
 			text(
 				side,
-				HOW_TO[cosmetic.Exclusive or ""] or cosmetic.How or "Earned in game.",
+				(if cosmetic.Exclusive == "Code" and discordOk then HOW_TO.CodeDiscord else nil)
+					or HOW_TO[cosmetic.Exclusive or ""]
+					or cosmetic.How
+					or "Earned in game.",
 				13,
 				C.Dim,
 				MEDIUM,
@@ -2204,7 +2220,9 @@ local function drawFree()
 		cardH,
 		Color3.fromRGB(190, 120, 255),
 		"Promo codes",
-		"Codes drop in our Discord, on socials and at like milestones."
+		if discordOk
+			then "Codes drop in our Discord, on socials and at like milestones."
+			else "Codes come with game updates and at like milestones."
 	)
 	local entry = new("TextBox", {
 		Name = "CodeBox",

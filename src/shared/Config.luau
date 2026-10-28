@@ -8,7 +8,7 @@
 --   "Beta"      the public beta: saves load and save, only Owners and Testers
 --               get the DEV tools, cosmetics are had the normal way.
 --   "Live"      launch: the same as Beta.
-local STAGE = "Beta"
+local STAGE = "Live"
 
 local Config = {
 	Stage = STAGE,
@@ -92,7 +92,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "Beta 2 · 2026-10-17",
+		Build = "1.0 · 2026-10-28",
 		-- UserIds who can read feedback and error reports in game (Social >
 		-- Feedback > Reports). In Studio everyone can.
 		Owners = { 11738957136, 11758049015 }, -- Devvolver, VolverDev

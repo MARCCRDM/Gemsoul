@@ -8,7 +8,8 @@ What still needs people playing on a published server is listed at the end.
 ## One switch: the stage
 
 `STAGE` at the top of `src/shared/Config.luau` sets every launch setting
-together. It is set to `"Beta"`.
+together. It is set to `"Live"` (since launch, 2026-10-28; it was `"Beta"`,
+which sets the same).
 
 | Stage | Saves | DEV tools | Cosmetics for coins |
 | --- | --- | --- | --- |
@@ -19,7 +20,7 @@ together. It is set to `"Beta"`.
 - **Who has the DEV tools.** Owners and Testers are `Playtest.Owners` and
   `Playtest.Testers`. They can still replay the first-time flow from the DEV
   panel (New player, then Restore save).
-- **The build label** (`Playtest.Build`) is `Beta 1 · 2026-10-16`. It appears
+- **The build label** (`Playtest.Build`) is `1.0 · 2026-10-28`. It appears
   on the dashboard and on every bug report. Give it a new name each time you
   publish.
 - **Progress carries into launch.** `DataStoreName` stays
