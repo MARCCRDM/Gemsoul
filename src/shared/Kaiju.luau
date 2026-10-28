@@ -65,6 +65,7 @@ local GemTraits = require(script.Parent.GemTraits)
 local ElementMatchup = require(script.Parent.ElementMatchup)
 local KaijuRoles = require(script.Parent.KaijuRoles)
 local KaijuRoster = require(script.Parent.KaijuRoster)
+local KaijuRosterMore = require(script.Parent.KaijuRosterMore)
 
 local Kaiju = {}
 
@@ -156,6 +157,10 @@ Kaiju.WildRoster = {
 	Hulkshell = true, Drillhorn = true, Triskull = true, Brightsteel = true,
 	Dreadcrown = true, Bladebrow = true, Starspine = true,
 }
+-- The rest of the roster (Shared.KaijuRosterMore) roams wild as well.
+for _, id in KaijuRosterMore.Order do
+	Kaiju.WildRoster[id] = true
+end
 function Kaiju.wildKinds(band: string?): { string }
 	local out = {}
 	for _, id in Kaiju.Order do

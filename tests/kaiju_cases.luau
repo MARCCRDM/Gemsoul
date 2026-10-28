@@ -62,7 +62,7 @@ local GemTraits = shared("GemTraits")
 local ElementMatchup = shared("ElementMatchup")
 
 -- Species and stats ------------------------------------------------------------------------
-check(#Kaiju.Order == 33 and #Kaiju.Elements == 4, "Thirty-three species in four elements")
+check(#Kaiju.Order == 94 and #Kaiju.Elements == 4, "Ninety-four species in four elements")
 check(#Kaiju.Starters == 4, "Not four starters")
 for i, id in { "Bulwark", "Razorback", "Carapace", "Scythe" } do
 	check(Kaiju.Starters[i] == id and Kaiju.Order[i] == id, "The starters aren't the first four")

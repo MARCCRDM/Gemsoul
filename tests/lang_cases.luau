@@ -213,7 +213,7 @@ same(
 	"Tu grupo ya está en el camino, contra Frigo Camelo: te unirás a ellos.",
 	"Joining the party's trip"
 )
--- The roster's 28 kinds: every blurb, move (its name and its words, numbers
+-- The roster's 90 kinds: every blurb, move (its name and its words, numbers
 -- and all) and blow comes out in Spanish.
 do
 	local untranslated = {}

@@ -1,9 +1,11 @@
 # Kaiju roster expansion: 90 new kinds
 
-> **In the game (Oct 22):** 28 of the first thirty below (all but Prisma and
-> Clawtide), with the Breaker and Warden roles, their own kits and models.
-> What shipped, and where it differs from this proposal, is in
-> [kaiju-roster.md](kaiju-roster.md). Kinds 31 to 90 are still a proposal.
+> **In the game (Oct 28): all 90.** 28 of the first thirty came on Oct 22,
+> with the Breaker and Warden roles, their own kits and models
+> ([kaiju-roster.md](kaiju-roster.md)). Prisma, Clawtide and kinds 31 to 90
+> followed on Oct 28 ([kaiju-roster-more.md](kaiju-roster-more.md)); Skyjelly
+> (57) was already in as the starter support. Where what shipped differs
+> from this proposal is in those two pages.
 
 A proposal (Oct 21, draft, not signed off). The game has four kinds of mini
 kaiju, each in four elements (`Shared.Kaiju.Species`, `Shared.KaijuRoles`;

@@ -21,6 +21,7 @@
 	serpent's head (Head).
 ]]
 local Concepts = require(script.Parent.KaijuConceptShapes)
+local More = require(script.Parent.KaijuShapesMore)
 local Shapes = {}
 
 local V, C = Vector3.new, Color3.fromRGB
@@ -61,6 +62,14 @@ Shapes.Hides = {
 }
 
 Shapes.Hover = { Stormwing = 1.1, Moonmoth = 1.1, Nightwing = 0.9 }
+
+-- The rest of the roster's (Shared.KaijuShapesMore).
+for kind, hide in More.Hides do
+	Shapes.Hides[kind] = hide
+end
+for kind, hover in More.Hover do
+	Shapes.Hover[kind] = hover
+end
 
 function Shapes.install(kit)
 	local make, limb, glow, plate, wedge, claws, root =
@@ -561,6 +570,9 @@ function Shapes.install(kit)
 	end
 
 	for name, builder in Concepts.install(kit) do
+		B[name] = builder
+	end
+	for name, builder in More.install(kit) do
 		B[name] = builder
 	end
 	return B

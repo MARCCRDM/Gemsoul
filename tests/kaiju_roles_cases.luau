@@ -160,7 +160,7 @@ do
 	for _ in owner do
 		count += 1
 	end
-	check(count == 87, "Not 87 moves of their own")
+	check(count == 270, "Not 270 moves of their own")
 	-- The warden's team moves land on its friends too.
 	local team = 0
 	for _, key in { "Q", "E", "R" } do

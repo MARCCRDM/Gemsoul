@@ -45,10 +45,11 @@ end
 local ELEMENTS = { "Fire", "Frost", "Shock", "Poison" }
 local KINDS = { Body = true, Stride = true, Arm = true, Jaw = true, Tail = true, Head = true, Wing = true }
 local FIRST = { Bulwark = true, Razorback = true, Carapace = true, Scythe = true }
-local LEGLESS = { Longcoil = true } -- a serpent on its coils
+-- a serpent on its coils, a worm out of the ground, things that float
+local LEGLESS = { Longcoil = true, Dunemaw = true, Prisma = true, Oculus = true, Shadowsphere = true }
 local BUDGET = 90 -- parts in one kaiju (up to 3 per player, plus the wild ones)
 
-check(#SPECIES == 33, "Not 33 kinds")
+check(#SPECIES == 94, "Not 94 kinds")
 for _, kind in Roster.Order do
 	local hide = KaijuShapes.Hides[kind]
 	check(hide and hide[1] and hide[2], kind .. ": no hide")
@@ -371,7 +372,7 @@ end)()
 
 print(
 	string.format(
-		"PASS: %d kaiju model checks (33 kinds x 4 elements, joints, ground, budget, motions, fight poses, gait, moods)",
+		"PASS: %d kaiju model checks (94 kinds x 4 elements, joints, ground, budget, motions, fight poses, gait, moods)",
 		checks
 	)
 )

@@ -33,15 +33,19 @@ In a battle each role's blows carry their own share of that Damage
 (`KaijuRoles.power`), tuned so that no kind's teams win much more than half
 their battles at any level.
 
-### 28 more kinds
+### 90 more kinds
 
-Twenty-eight more kinds from the roster's concept sheet are in the game too
-(32 kinds, 128 kaiju): two new roles (Breaker and Warden), three moves of
-each kind's own, and models after their concepts. The starter roll still
-deals only the four above; the others are caught in the frontier, by where
-they roam. See [kaiju-roster.md](kaiju-roster.md).
+Every kind on the roster's three concept sheets is in the game too: 94
+kinds in all, 376 kaiju. They bring two new roles (Breaker and Warden),
+three moves of each kind's own, and models after their concepts. The
+starter roll still deals only the four above, and Skyjelly is everyone's
+starter support; the others are caught in the frontier, by where they
+roam. The first sheet's 28 are in [kaiju-roster.md](kaiju-roster.md), and
+the other 61 in [kaiju-roster-more.md](kaiju-roster-more.md).
 
-![The 28 new kaiju](kaiju/roster-28.jpg)
+![The first sheet's 28](kaiju/roster-28.jpg)
+
+![The other 61](kaiju/roster-61.jpg)
 
 ## A kaiju's moves: its own, and its gem surge
 

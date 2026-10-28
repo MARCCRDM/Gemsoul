@@ -1,7 +1,8 @@
 --[[
 	The roster's new kinds (docs/kaiju-roster-expansion.md: 28 of its first
-	thirty; Prisma and Clawtide were left out; and Skyjelly, number 57 on
-	the second sheet, the starter support). Each is a silhouette
+	thirty, and Skyjelly, number 57 on the second sheet, the starter
+	support; the other 61, Prisma, Clawtide and kinds 31 to 90, are in
+	Shared.KaijuRosterMore and merged in at the end). Each is a silhouette
 	(Shared.KaijuModels), a role, a stat line, a fight style and three moves
 	of its own. Shared.Kaiju, Shared.KaijuRoles and Shared.KaijuFight merge
 	them in beside the first four kinds, so everything that reads those
@@ -35,6 +36,7 @@
 
 	Pure data.
 ]]
+local KaijuRosterMore = require(script.Parent.KaijuRosterMore)
 local Roster = {}
 
 -- In the order the concept sheet has them.
@@ -1608,5 +1610,16 @@ Roster.Moves = {
 		When = "Half",
 	},
 }
+
+-- The rest of the roster (Prisma, Clawtide and kinds 31 to 90): Shared.KaijuRosterMore.
+for _, id in KaijuRosterMore.Order do
+	table.insert(Roster.Order, id)
+end
+for id, kind in KaijuRosterMore.kinds(volley) do
+	Roster.Kinds[id] = kind
+end
+for id, move in KaijuRosterMore.Moves do
+	Roster.Moves[id] = move
+end
 
 return Roster

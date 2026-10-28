@@ -1,5 +1,9 @@
 # The 28 new kaiju
 
+> **Oct 28:** the rest of the roster is in too: Prisma, Clawtide and kinds
+> 31 to 90, 61 more (94 kinds in all). See
+> [kaiju-roster-more.md](kaiju-roster-more.md).
+
 Twenty-eight of the thirty kinds on the roster's first concept sheet
 ([kaiju-roster-expansion.md](kaiju-roster-expansion.md)) are now in the
 game; Prisma and Clawtide were left out. With the first four, that makes 32

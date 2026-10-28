@@ -9,6 +9,7 @@ def module(name, path):
     return f'local {name}=(function()\n{source}\nend)()\n'
 source = module('Lang', 'src/shared/Lang.luau')
 source += module('LangEs', 'src/shared/LangEs.luau')
+source += module('KaijuRosterMore', 'src/shared/KaijuRosterMore.luau')
 source += module('KaijuRoster', 'src/shared/KaijuRoster.luau')
 source += read('tests/lang_cases.luau')
 luau = ROOT / '.tools/luau/luau.exe'
