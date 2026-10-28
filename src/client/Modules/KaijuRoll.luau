@@ -226,6 +226,7 @@ end
 function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 	-- (The kinds the reels run through: the starters, or every kind in a test.)
 	local kinds = if preview then Kaiju.Order else Kaiju.Starters
+	local boss = false -- (a boss roll: one kaiju, any kind; Kaiju.bossRollsOwed)
 	local function done()
 		if after then
 			after()
@@ -256,6 +257,9 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 	}, screen)
 	local result = if preview then { Ok = true, Rolls = previewRolls() } else GemClient.request("KaijuRoll")
 	local rolls = if result.Ok and type(result.Rolls) == "table" then result.Rolls else {}
+	if result.Boss then
+		boss, kinds = true, Kaiju.Order
+	end
 	if #rolls == 0 then
 		screen:Destroy()
 		gui = nil
@@ -388,7 +392,7 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 		ZIndex = 41,
 	})
 	local fitScale = new("UIScale", { Scale = 1 }, board)
-	local kicker = label(board, "STARTER ROLL  ·  YOUR KAIJU", 14, C.Gold, Enum.Font.GothamBlack)
+	local kicker = label(board, if boss then "BOSS REWARD  ·  A NEW KAIJU" else "STARTER ROLL  ·  YOUR KAIJU", 14, C.Gold, Enum.Font.GothamBlack)
 	kicker.TextXAlignment, kicker.ZIndex = Enum.TextXAlignment.Center, 42
 	kicker.Size = UDim2.new(1, 0, 0, 18)
 	local title = label(board, "ROLLING YOUR KAIJU", 40, C.Text, Enum.Font.GothamBlack)
@@ -857,8 +861,17 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 			return
 		end
 		finished = true
-		title.Text = "YOUR KAIJU ARE LOCKED IN"
+		title.Text = if boss then "IT JOINS YOUR KAIJU" else "YOUR KAIJU ARE LOCKED IN"
 		LotterySound.play("Attune")
+		if boss then
+			-- (No starter support with a boss roll: on by itself, as below.)
+			task.delay(AUTO, function()
+				if gui == screen then
+					claim()
+				end
+			end)
+			return
+		end
 		-- And the fourth, the starter support (Shared.Kaiju.StarterSupport),
 		-- named under the cards: it comes with them.
 		local starter = Kaiju.StarterSupport

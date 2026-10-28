@@ -273,6 +273,18 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 
 ![The starter roll: three reels spinning, then your three locked in](kaiju/roll.png)
 
+- **A boss roll.** Beating a boss (a Rift boss or a dungeon boss: each
+  player who gets its boss cache) also owes you **one kaiju roll**
+  (`KaijuBossRolls`, `Kaiju.bossRollsOwed`). Once you're back in the
+  Outpost with nothing over the screen, it plays on the starter roll's
+  screen with a single card, BOSS REWARD · A NEW KAIJU, its reel running
+  through every kind (any kind but a support one, any element, a Gemsoul
+  rolled like a mined gem). It reads IT JOINS YOUR KAIJU and moves on by
+  itself; the kaiju joins as a reserve (your team stays as it is: swap it
+  in from YOUR KAIJU). Several bosses beaten are several rolls, one after
+  another. None while your starter roll is still owed, or with no room
+  left (`Kaiju.MaxOwned`). A roll made and not yet taken is kept, so
+  leaving doesn't reroll it.
 - **The starter roll.** Everyone starts with three kaiju, rolled on the
   same reels as the gems in the intro: right after the move reveal (which
   goes on to it by itself, with no button of its own), three

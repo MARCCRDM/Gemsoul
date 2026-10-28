@@ -268,6 +268,9 @@ function ArenaStreaks.bossCache(player: Player, boss, gem, source: string?)
 	local cache = rollBossCache(boss, gem, source, duel)
 	table.insert(duel.StreakCaches, cache)
 	Remotes.Social:FireClient(player, "BossCache", { Id = cache.Id, Boss = boss.Name, Source = source })
+	-- And one kaiju roll for beating it (KaijuServer.grantBossRoll; required
+	-- here, as KaijuServer's chain comes back round to this module).
+	require(script.Parent.KaijuServer).grantBossRoll(player)
 	return cache
 end
 

@@ -3004,6 +3004,16 @@ local function refresh()
 			task.spawn(KaijuRoll.play)
 		end
 	end
+	-- A boss roll (one kaiju for each boss beaten: Kaiju.bossRollsOwed),
+	-- each in turn, once you're back in the Outpost with nothing over it.
+	if not heroUi.BossRolling and inOutpost and not blocked and not menu and Kaiju.bossRollsOwed(profile) > 0
+		and not LoadingFlow.active() and os.clock() >= (heroUi.BossRollAt or 0) then
+		heroUi.BossRolling = true
+		heroUi.BossRollAt = os.clock() + 4 -- (a beat between two, and no hammering if it fails)
+		task.spawn(KaijuRoll.play, function()
+			heroUi.BossRolling = false
+		end)
+	end
 	if window.Gui.Enabled then
 		liveRows()
 	end

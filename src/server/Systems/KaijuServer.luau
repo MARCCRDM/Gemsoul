@@ -572,9 +572,23 @@ local function prepareRoll(profile)
 	then
 		return roll
 	end
+	-- (A boss roll made and not yet taken: the same one again.)
+	if type(roll) == "table" and roll.Boss and type(roll.Rolls) == "table" and #roll.Rolls == 1
+		and Kaiju.bossRollsOwed(profile) > 0 then
+		return roll
+	end
 	local owed = Kaiju.rollsOwed(profile)
 	if owed <= 0 then
-		return nil
+		-- A boss roll owed (Kaiju.bossRollsOwed): one kaiju, any kind.
+		if Kaiju.bossRollsOwed(profile) <= 0 then
+			return nil
+		end
+		local random = Gems.random()
+		local pick = Kaiju.bossPick(random)
+		local soul = Kaiju.rollSoul(random, pick.Element, { Id = PlayerData.newGemId(), Time = os.time(), Species = pick.Species })
+		roll = { Rolls = { { Species = pick.Species, Element = pick.Element, Soul = soul } }, Version = Kaiju.RollVersion, Boss = true }
+		p.KaijuRoll = roll
+		return roll
 	end
 	local roster = Kaiju.roster(profile)
 	local owned = {}
@@ -634,6 +648,20 @@ local function claimRoll(player: Player): { any }
 	end
 	local roster = Kaiju.roster(profile)
 	local added = {}
+	if roll.Boss then
+		-- A boss roll: its one kaiju joins as a reserve (your team stays).
+		local entry = roll.Rolls[1]
+		local record = entry and Kaiju.add(roster, entry.Species, entry.Soul, Kaiju.StarterLevel)
+		local p = profile :: any
+		p.KaijuRoll = nil
+		p.KaijuBossRolls = math.max(0, math.floor(tonumber(p.KaijuBossRolls) or 0) - 1)
+		PlayerData.sync(player)
+		if record then
+			table.insert(added, record)
+			Remotes.Notify:FireClient(player, string.format("%s joins your kaiju. Swap it into a team from YOUR KAIJU.", Kaiju.nameOf(record)))
+		end
+		return added
+	end
 	for _, entry in roll.Rolls do
 		local record = Kaiju.add(roster, entry.Species, entry.Soul, Kaiju.StarterLevel)
 		if record then
@@ -2544,7 +2572,7 @@ local function rollRequest(player: Player)
 	if not roll then
 		return reply(true, "", { Rolls = {} })
 	end
-	return reply(true, "", { Rolls = roll.Rolls })
+	return reply(true, "", { Rolls = roll.Rolls, Boss = roll.Boss == true })
 end
 
 local function rollClaim(player: Player)
@@ -2554,6 +2582,19 @@ local function rollClaim(player: Player)
 	end
 	local added = claimRoll(player)
 	return reply(true, "", { Added = #added })
+end
+
+-- A boss beaten: one kaiju roll owed (Kaiju.bossRollsOwed), played on the
+-- player's screen once they're back where it can show (KaijuHud).
+function KaijuServer.grantBossRoll(player: Player)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return
+	end
+	local p = profile :: any
+	p.KaijuBossRolls = math.floor(tonumber(p.KaijuBossRolls) or 0) + 1
+	PlayerData.sync(player)
+	Remotes.Notify:FireClient(player, "Boss down: a kaiju roll is yours.")
 end
 
 local function left(player: Player)

@@ -737,6 +737,24 @@ check(
 	"An older roll isn't owed a full one"
 )
 check(Kaiju.rollsOwed({ KaijuRolled = Kaiju.RollVersion }) == 0, "Owed again once rolled")
+-- Boss rolls: one kaiju a boss, none while the starter roll's owed, only
+-- with room, never a support kind.
+check(Kaiju.bossRollsOwed({ KaijuBossRolls = 2 }) == 0, "A boss roll came before the starter roll")
+check(Kaiju.bossRollsOwed({ KaijuRolled = Kaiju.RollVersion, KaijuBossRolls = 2 }) == 2, "Boss rolls aren't owed")
+check(Kaiju.bossRollsOwed({ KaijuRolled = Kaiju.RollVersion }) == 0, "A boss roll owed with no boss beaten")
+do
+	local full = {}
+	for i = 1, Kaiju.MaxOwned do
+		full["k" .. i] = {}
+	end
+	check(Kaiju.bossRollsOwed({ KaijuRolled = Kaiju.RollVersion, KaijuBossRolls = 1, Kaiju = { List = full } }) == 0, "A boss roll with no room for it")
+	local rng = Random.new(7)
+	for _ = 1, 200 do
+		local pick = Kaiju.bossPick(rng)
+		check(Kaiju.Species[pick.Species] ~= nil and not Kaiju.isSupport(pick.Species), "A boss roll gave a support kind or none")
+		check(table.find(Kaiju.Elements, pick.Element) ~= nil, "A boss roll's element isn't one")
+	end
+end
 local crowded = { List = {} }
 for i = 1, Kaiju.MaxOwned - 1 do
 	crowded.List["k" .. i] = {}

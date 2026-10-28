@@ -1785,6 +1785,34 @@ function Kaiju.rollsOwed(profile): number
 	return math.max(0, math.min(Kaiju.StarterTeam, Kaiju.MaxOwned - Kaiju.count(profile.Kaiju)))
 end
 
+-- Boss rolls: one kaiju for each boss you beat (a Rift or dungeon boss:
+-- Server.ArenaStreaks.bossCache), rolled on the starter roll's screen,
+-- from every kind but the support ones, any element. It joins as a
+-- reserve. How many you're owed (profile.KaijuBossRolls), as many as you
+-- have room for; none while the starter roll is still owed (that comes
+-- first).
+function Kaiju.bossRollsOwed(profile): number
+	if not profile or Kaiju.rollsOwed(profile) > 0 then
+		return 0
+	end
+	local owed = math.floor(tonumber(profile.KaijuBossRolls) or 0)
+	return math.max(0, math.min(owed, Kaiju.MaxOwned - Kaiju.count(profile.Kaiju)))
+end
+
+-- A boss roll's kind and element: any kind of Order but a support one.
+function Kaiju.bossPick(rng): { Species: string, Element: string }
+	local kinds = {}
+	for _, id in Kaiju.Order do
+		if not Kaiju.isSupport(id) then
+			table.insert(kinds, id)
+		end
+	end
+	return {
+		Species = kinds[rng:NextInteger(1, #kinds)],
+		Element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)],
+	}
+end
+
 -- Kinds (of the first four, Starters) and elements for `count` starter
 -- rolls: none the same as another or as one of `taken` (records already
 -- owned).

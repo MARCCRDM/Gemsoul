@@ -160,6 +160,7 @@ local profile = {
 	Duel = { Rating = 1000, Wins = 0, Losses = 0, Streak = 0 },
 }
 local handlers, fired, vaulted, nextGem, previewCalls, notified = {}, {}, {}, 0, {}, {}
+local bossRolls = {}
 local stubs = {
 	PlayerData = {
 		get = function(p) return if p == player then profile else nil end,
@@ -183,6 +184,8 @@ local stubs = {
 	Equipment = { groupPreviews = function(_, group, items) previewCalls[#previewCalls + 1] = { group, items }; return true, 0 end },
 	MarketBoard = { vaultList = function(item, price, label, commission) table.insert(vaulted, { item, price, label, commission }); return true end },
 	ChatChannels = { announce = function() end },
+	-- (A boss beaten also owes a kaiju roll: KaijuServer.grantBossRoll.)
+	KaijuServer = { grantBossRoll = function(p) bossRolls[p] = (bossRolls[p] or 0) + 1 end },
 	-- (The boss's gem: Dungeons.bossGem.)
 	Dungeons = {
 		bossGem = function(element, tier)
@@ -477,7 +480,9 @@ do
 		for _ = 1, 8 do
 			local gem = stubs.Dungeons.bossGem(boss.Element, 4)
 			local before = #profile.Duel.StreakCaches
+			local rollsBefore = bossRolls[player] or 0
 			local c = Server.bossCache(player, boss, gem, "Rift")
+			check(bossRolls[player] == rollsBefore + 1, "A boss beaten didn't owe one kaiju roll")
 			check(c and #profile.Duel.StreakCaches == before + 1 and profile.Duel.StreakCaches[before + 1] == c, "A boss cache wasn't saved")
 			check(not ids[c.Id], "Two boss caches shared an id")
 			ids[c.Id] = true
