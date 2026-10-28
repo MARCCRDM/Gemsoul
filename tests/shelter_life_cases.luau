@@ -207,18 +207,19 @@ check(
 	life.Prompt and life.Prompt.ActionText ~= "" and life.Prompt.Parent.Name == "ProjectorConsole",
 	"The projector's console has no prompt"
 )
--- The stage it stands on: the server's arena disc.
+-- The stage it stands on: the server's arena disc (the Kaiju Kennel's bed
+-- now, ShelterLife.Hologram being off).
 do
 	local found = false
 	for _, d in shelter:GetDescendants() do
-		if d:IsA("BasePart") and d.Material == R.Enum.Material.Neon and d.Shape == R.Enum.PartType.Cylinder then
+		if d:IsA("BasePart") and d.Name == "KennelBed" and d.Shape == R.Enum.PartType.Cylinder then
 			local q = here(d.CFrame.Position)
 			if math.abs(q.X - stage.X) < 0.01 and math.abs(q.Z - stage.Z) < 0.01 and math.abs(q.Y - stage.Y) < 0.1 then
 				found = true
 			end
 		end
 	end
-	check(found, "The hologram isn't over the arena's stage")
+	check(found, "The hologram's stage (the kennel's bed) isn't where ShelterLife puts it")
 end
 
 -- The gallery: a gem in each of the server's cases, staying inside it as it

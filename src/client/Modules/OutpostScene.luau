@@ -54,6 +54,7 @@ local VehicleDrive = require(script.Parent.VehicleDrive)
 local Scenes = require(script.Parent.Scenes)
 local SkyRift = require(script.Parent.SkyRift)
 local ShelterLife = require(script.Parent.ShelterLife)
+local KennelLife = require(script.Parent.KennelLife)
 local StoreDisplays = require(script.Parent.StoreDisplays)
 local QuarryLife = require(script.Parent.QuarryLife)
 local RiftTear = require(script.Parent.RiftTear)
@@ -2186,17 +2187,20 @@ require(script.Parent.RiftClient).start()
 -- (The Shelter's frame: the quarry's, lifted onto its legs.)
 local shelterFrame = Rules.Location * CFrame.new(0, Rules.ShelterLift, 0)
 RunService.RenderStepped:Connect(function(dt)
-	-- The rift in the sky, the Shelter's life (the hologram, the gallery's
-	-- gems, the drones), the Store's stands and the quarry's life (road
-	-- lights, searchlights, meteors, the lifter) show only while you're here.
+	-- The rift in the sky, the Shelter's life (the gallery's gems, the
+	-- drones), the Kaiju Kennel's residents, the Store's stands and the
+	-- quarry's life (road lights, searchlights, meteors, the lifter) show
+	-- only while you're here.
 	if active then
 		SkyRift.mount(Rules.Location)
 		ShelterLife.mount(shelterFrame)
+		KennelLife.mount(shelterFrame)
 		StoreDisplays.mount(shelterFrame)
 		QuarryLife.mount(Rules.Location)
 	end
 	SkyRift.show(active)
 	ShelterLife.show(active)
+	KennelLife.show(active)
 	StoreDisplays.show(active)
 	QuarryLife.show(active)
 	if not active then
@@ -2204,6 +2208,7 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	SkyRift.step(dt)
 	ShelterLife.step(dt)
+	KennelLife.step(dt)
 	StoreDisplays.step(dt)
 	QuarryLife.step(dt)
 	RiftTear.step(workspace:GetServerTimeNow())

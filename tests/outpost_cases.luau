@@ -686,8 +686,9 @@ do
 		Foreman = "Garrick",
 		InfoBot = "INFO-9",
 		BountyClerk = "Marlo",
+		KaijuKeeper = "Wren",
 	}
-	check(#crewBuilt == 7 and #site.Crew == 7, "The Shelter's crew isn't all there: " .. #crewBuilt)
+	check(#crewBuilt == 8 and #site.Crew == 8, "The Shelter's crew isn't all there: " .. #crewBuilt)
 	check(Vendors.Foreman.Options[1].Action == "Exchange", "Garrick doesn't sell the refills first")
 	check(Vendors.ArenaMaster.Options[1].Action == "Duels", "Brutus doesn't set up a duel first")
 	check(Vendors.BountyClerk.Options[1].Action == "Bounties", "Marlo doesn't show the bounties first")

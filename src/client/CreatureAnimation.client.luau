@@ -77,7 +77,9 @@ RunService.PreSimulation:Connect(function(dt)
 	if now >= scanAt then
 		scanAt = now + 0.5
 		local found = {}
-		for _, name in { "Enemies", "Kaiju" } do -- creatures, wild kaiju; kaiju out with their players
+		-- (creatures and wild kaiju; kaiju out with their players; the
+		-- Kaiju Kennel's, drawn by this client alone: Client.KennelLife)
+		for _, name in { "Enemies", "Kaiju", "KaijuKennel" } do
 			local folder = workspace:FindFirstChild(name)
 			for _, model in if folder then folder:GetChildren() else {} do
 				table.insert(found, model)
@@ -125,8 +127,10 @@ RunService.PreSimulation:Connect(function(dt)
 			continue
 		end
 		rig.Active = true
+		-- (A kennel kaiju is moved, not pushed: it says how fast it walks.)
+		local paced = model:GetAttribute("PacedSpeed")
 		local v = rig.Root.AssemblyLinearVelocity
-		local speed = Vector2.new(v.X, v.Z).Magnitude
+		local speed = if type(paced) == "number" then paced else Vector2.new(v.X, v.Z).Magnitude
 		local step = math.min(dt, 0.1)
 		local scale = model:GetScale()
 		rig.Amount += (math.clamp(speed / 8, 0, 1) - rig.Amount) * (1 - math.exp(-10 * step))

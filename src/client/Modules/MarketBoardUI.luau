@@ -61,7 +61,7 @@ local content = new("Frame", {
 }, window.Panel)
 
 local tab = "Browse"
-local filter = "All" -- All / Gear / Gems / Powers
+local filter = "All" -- All / Gear / Gems / Powers / Kaiju
 local mode = "All" -- All / Sell / Trade (browse)
 local listings, shared, serverNow, fetchedAt = {}, true, os.time(), 0
 local sellPick = nil -- { Kind, Slot?, Id }
@@ -1242,12 +1242,15 @@ draw = function()
 	end
 end
 
-function MarketBoardUI.open(which: string?)
+-- `which`: the tab to open on; `only`: a filter to show (the Kaiju
+-- Kennel's keeper opens it on kaiju).
+function MarketBoardUI.open(which: string?, only: string?)
 	if Config.Features and Config.Features.Market == false then
 		UiKit.toast("The Market is closed for this playtest.")
 		return
 	end
 	tab = which or tab
+	filter = only or filter
 	offerFor, inspect = nil, nil
 	window.Gui.Enabled = true
 	window.Fit()

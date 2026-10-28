@@ -397,6 +397,24 @@ function actions.Market()
 	require(script.Parent.Modules.MarketBoardUI).open()
 end
 
+-- Wren's kaiju on the Market: the Browse tab, kaiju only.
+function actions.KaijuMarket()
+	close()
+	require(script.Parent.Modules.MarketBoardUI).open("Browse", "Kaiju")
+end
+
+-- Who's in the Kaiju Kennel today (Shared.KaijuKennel).
+function actions.KennelToday()
+	local Kennel = require(ReplicatedStorage.Shared.KaijuKennel)
+	local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+	local names = {}
+	for _, entry in Kennel.residents(Kennel.day(workspace:GetServerTimeNow())) do
+		local kind = Kaiju.Species[entry.Species]
+		table.insert(names, if kind then kind.Name else entry.Species)
+	end
+	say("In the pen today: " .. table.concat(names, ", ") .. ". They change every day.")
+end
+
 -- INFO-9's tips and insights, one after another from a random start.
 local tipAt = math.random(1, #Vendors.Tips) - 1
 function actions.Tip()

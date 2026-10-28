@@ -277,6 +277,46 @@ Vendors.BountyClerk = {
 		"Your kaiju come with you. In a boss fight their HYPERBEAM goes into the boss alone.",
 	},
 }
+-- Wren, the Kaiju Kennel's keeper (Shared.KaijuKennel), by the pen's gate:
+-- who's in the pen today, the Kaiju of the Day, kaiju on the Market.
+Vendors.KaijuKeeper = {
+	Name = "Wren",
+	Role = "Kaiju Keeper",
+	Color = Color3.fromRGB(124, 214, 98),
+	Tunic = UNIFORM,
+	Face = "",
+	Visor = true,
+	Greeting = "Wren, kennel keeper. The rarest kinds on the moon live in this pen, a different few every day. Look all you like: they don't bite through the fence.",
+	Options = {
+		{ Text = "Who's in the pen today?", Action = "KennelToday" },
+		{ Text = "Buy and sell kaiju", Action = "KaijuMarket" },
+		{
+			Text = "Kaiju and their kinds",
+			Options = {
+				{
+					Text = "Why are these ones rare?",
+					Reply = "They're from the first batch of kinds found past the starters: they turn up least in the wild and least in rolls. The pen only ever holds those.",
+				},
+				{
+					Text = "How do I get one?",
+					Reply = "Catch one out in the quarry when it's worn down, win it in a roll, or buy one from another miner on the Market. I can open the Market on kaiju for you.",
+				},
+				{
+					Text = "Can I sell a kaiju?",
+					Reply = "List it on the Market for coins or a trade. A kaiju on your team has to come off the team first.",
+				},
+			},
+		},
+		TIP,
+	},
+	Tips = {
+		"The kaiju in the pen change at midnight, server time. Come back tomorrow for a new few.",
+		"A kaiju's element decides what it resists and what it hits hardest. Mix elements in your team.",
+		"Catch a wild kaiju when its health is low: the lower it is, the better your chances.",
+		"A Warden heals and shields the rest of your team. Keep one in your support slot.",
+		"Kaiju of the rarest kinds are worth the most on the Market. Check the prices before you sell.",
+	},
+}
 Vendors.Broker = crew(
 	"Market",
 	"Trade Broker",

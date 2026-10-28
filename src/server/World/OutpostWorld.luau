@@ -2021,16 +2021,60 @@ local function shelter(parent, at: CFrame, rules)
 		part(m, at3(x, 3.9, SHELTER.Barrier), Vector3.new(len, 0.4, 1.7), HAZARD, Enum.Material.SmoothPlastic)
 	end
 
-	-- The kaiju arena: a steel stage with a hazard line round its edge and the
-	-- holo projector's lens in the middle, and floodlight pylons round it;
-	-- open floor all round (no stands).
+	-- The Kaiju Kennel (Shared.KaijuKennel): a steel stage with a hazard
+	-- line round its edge, floodlight pylons round it, and on it a pen: a
+	-- bed of packed earth with a rock to climb in the middle and troughs
+	-- round the edge, fenced in, the gate facing the hall's door under a
+	-- KAIJU KENNEL arch. Today's kaiju walk about in it (Client.KennelLife).
 	local arena = at3(0, 0.8, 18)
 	solid(disc(m, arena * CFrame.new(0, 0.5, 0), 12.6, 1, STEEL, Enum.Material.DiamondPlate))
 	solid(disc(m, arena * CFrame.new(0, 0.75, 0), 12, 1.5, Color3.fromRGB(56, 58, 64), Enum.Material.Concrete))
 	disc(m, arena * CFrame.new(0, 1.51, 0), 11.2, 0.04, HAZARD)
-	disc(m, arena * CFrame.new(0, 1.52, 0), 10.5, 0.05, Color3.fromRGB(56, 58, 64), Enum.Material.Concrete)
-	-- (the projector's lens, glowing faintly: the hologram stands on it)
-	disc(m, arena * CFrame.new(0, 1.54, 0), 2.2, 0.08, Color3.fromRGB(46, 78, 116), Enum.Material.Neon).Name = "ProjectorLens"
+	disc(m, arena * CFrame.new(0, 1.52, 0), 10.9, 0.06, Color3.fromRGB(88, 70, 52), Enum.Material.Ground).Name = "KennelBed"
+	do
+		local top = arena * CFrame.new(0, 1.55, 0)
+		local FENCE = Color3.fromRGB(70, 74, 82)
+		local fenceR = 11.6
+		-- (the rock in the middle, and a trough here and there by the fence)
+		for _, rock in { { 0, 0, 3.2, 2.2 }, { 1.4, -0.9, 2.2, 1.4 }, { -1.1, 1, 1.8, 1.1 } } do
+			local r = part(m, top * CFrame.new(rock[1], rock[4] / 2 - 0.2, rock[2]) * CFrame.Angles(0.2, rock[1], 0.15),
+				Vector3.new(rock[3], rock[4], rock[3] * 0.9), Color3.fromRGB(96, 90, 84), Enum.Material.Slate)
+			r.Name = "KennelRock"
+		end
+		for _, a in { 30, 150, 230, 310 } do
+			local spot = top * CFrame.Angles(0, math.rad(-a), 0) * CFrame.new(0, 0, -10)
+			part(m, spot * CFrame.new(0, 0.35, 0), Vector3.new(3, 0.7, 1.1), HULL_DARK, Enum.Material.Metal).Name = "KennelTrough"
+			part(m, spot * CFrame.new(0, 0.66, 0), Vector3.new(2.6, 0.06, 0.8), Color3.fromRGB(70, 120, 150), Enum.Material.Glass)
+		end
+		-- The fence: posts round the edge, two rails between each pair.
+		local posts = 28
+		local gate = 90 -- (degrees round from +X: the side facing the door)
+		for i = 0, posts - 1 do
+			local a = math.rad(i * 360 / posts)
+			local b = math.rad((i + 1) * 360 / posts)
+			local pa = top * CFrame.new(math.cos(a) * fenceR, 0, math.sin(a) * fenceR)
+			local pb = top * CFrame.new(math.cos(b) * fenceR, 0, math.sin(b) * fenceR)
+			solid(part(m, pa * CFrame.new(0, 1.6, 0), Vector3.new(0.45, 3.2, 0.45), FENCE, Enum.Material.Metal))
+			part(m, pa * CFrame.new(0, 3.28, 0), Vector3.new(0.6, 0.16, 0.6), HAZARD, Enum.Material.Metal)
+			local mid = (pa.Position + pb.Position) / 2
+			local span = (pb.Position - pa.Position).Magnitude
+			for _, h in { 1.1, 2.6 } do
+				local rail = CFrame.lookAt(mid, pb.Position) * CFrame.new(0, h, 0)
+				solid(part(m, rail, Vector3.new(0.18, 0.22, span), FENCE, Enum.Material.Metal))
+			end
+		end
+		-- The gate's arch, its name painted on a board across the top.
+		local g = math.rad(gate)
+		local front = top * CFrame.new(math.cos(g) * (fenceR + 0.2), 0, math.sin(g) * (fenceR + 0.2))
+		local facingDoor = CFrame.lookAt(front.Position, front.Position + (front.Position - top.Position) * Vector3.new(1, 0, 1))
+		for _, side in { -3.4, 3.4 } do
+			solid(part(m, facingDoor * CFrame.new(side, 3, 0), Vector3.new(0.8, 6, 0.8), HULL_DARK, Enum.Material.Metal))
+		end
+		local board = part(m, facingDoor * CFrame.new(0, 6.3, 0), Vector3.new(8.4, 1.6, 0.4), HULL_DARK, Enum.Material.Metal)
+		board.Name = "KennelSign"
+		painted(m, facingDoor * CFrame.new(0, 6.3, -0.22), Vector3.new(7.6, 1.1, 0.02), "KAIJU KENNEL", HAZARD)
+		light(board, Color3.fromRGB(255, 214, 150), 14, 0.6)
+	end
 	for k = 0, 3 do
 		local a = (k + 0.5) / 4 * math.pi * 2
 		local foot = arena * CFrame.new(math.cos(a) * 13.6, 0, math.sin(a) * 13.6)
@@ -2377,6 +2421,7 @@ local function shelter(parent, at: CFrame, rules)
 		{ Id = "Outfitter", CFrame = stand(-58, 25.5, 0, 25.5) }, -- Borin, by the Store's suits
 		{ Id = "Foreman", CFrame = stand(-24.5, 49, 0, 50) }, -- Garrick, by the door
 		{ Id = "InfoBot", CFrame = stand(15, 41, 0, D - 10) }, -- INFO-9, by its kiosk
+		{ Id = "KaijuKeeper", CFrame = stand(-6.5, 32.5, 0, D - 10) }, -- Wren, by the kennel's gate
 	}
 
 	-- Players arrive in the garage lane facing bay 04's Mole drill (the

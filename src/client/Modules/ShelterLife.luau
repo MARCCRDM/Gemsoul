@@ -4,7 +4,8 @@
 	clock, so everyone sees the same kaiju on the stage and the same drones
 	overhead.
 
-	  the hologram  a kaiju in light over the kaiju arena's stage, turning
+	  the hologram  (off: ShelterLife.Hologram; its stage is the Kaiju
+	                Kennel now) a kaiju in light over the stage, turning
 	                slowly. Every Hold seconds it flickers out and the next
 	                species and element flickers in, a scan of light
 	                sweeping up through it; its name hangs over it. The
@@ -53,6 +54,11 @@ ShelterLife.Stage = Vector3.new(0, 2.35, 18) -- the top of the kaiju arena's sta
 ShelterLife.Gallery = { Middle = Vector3.new(-44, 0.86, 46), Radius = 11, From = 40, Step = 25 }
 ShelterLife.Console = Vector3.new(-10.5, 0.86, 40.5) -- by the stage's way in, facing the door
 ShelterLife.Reach = 320 -- studs from the Shelter's middle: past this it's put away
+
+-- The hologram is off: its stage is the Kaiju Kennel now (Shared.KaijuKennel,
+-- Client.KennelLife). It's still built and posed when this is on, kept for
+-- another place.
+ShelterLife.Hologram = false
 
 -- The hologram: every kaiju, species and element both changing each time.
 ShelterLife.Kaiju = {}
@@ -197,6 +203,7 @@ export type Life = {
 	Model: Model,
 	At: CFrame,
 	Holograms: { [string]: { Model: Model, Group: Group, Glows: { [BasePart]: boolean } } },
+	HologramOff: boolean?, -- (ShelterLife.Hologram off: out of the world, not posed)
 	Shown: string?,
 	ShownIndex: number?,
 	Scan: BasePart,
@@ -485,41 +492,43 @@ function ShelterLife.pose(life: Life, t: number, stageTime: number?)
 		end
 	end
 
-	-- The kaiju on the stage: the next one flickers in (and its name with
-	-- it), the scan sweeping up through it.
-	local holoT = stageTime or t
-	local index, flicker = ShelterLife.kaijuAt(holoT)
-	local entry = ShelterLife.Kaiju[index]
-	local shown = life.Holograms[entry.Species]
-	if life.ShownIndex ~= index then
-		if life.Shown and life.Shown ~= entry.Species then
-			life.Holograms[life.Shown].Model.Parent = nil
+	if not life.HologramOff then
+		-- The kaiju on the stage: the next one flickers in (and its name with
+		-- it), the scan sweeping up through it. (Not while the hologram's off.)
+		local holoT = stageTime or t
+		local index, flicker = ShelterLife.kaijuAt(holoT)
+		local entry = ShelterLife.Kaiju[index]
+		local shown = life.Holograms[entry.Species]
+		if life.ShownIndex ~= index then
+			if life.Shown and life.Shown ~= entry.Species then
+				life.Holograms[life.Shown].Model.Parent = nil
+			end
+			shown.Model.Parent = life.Beam.Parent
+			local palette = KaijuModels.Palettes[entry.Element]
+			for _, p in shown.Group.Parts do
+				p.Color = if shown.Glows[p] then palette.Glow:Lerp(WHITE, 0.2) else palette.Glow:Lerp(palette.Plate, 0.35)
+			end
+			life.Beam.Color = palette.Glow
+			life.Scan.Color = palette.Glow
+			life.PlateName.Text = string.upper(entry.Species)
+			life.PlateLine.Text = string.upper(entry.Element) .. " KAIJU"
+			life.PlateLine.TextColor3 = palette.Glow
+			life.Shown, life.ShownIndex = entry.Species, index
 		end
-		shown.Model.Parent = life.Beam.Parent
-		local palette = KaijuModels.Palettes[entry.Element]
+		-- (On, off, on as it comes in; then steady.)
+		local on = flicker >= 1 or (math.floor(flicker * 9) % 2 == 0 and flicker > 0.15)
+		local fade = if flicker >= 1 then 0 else 0.35 * (1 - flicker)
 		for _, p in shown.Group.Parts do
-			p.Color = if shown.Glows[p] then palette.Glow:Lerp(WHITE, 0.2) else palette.Glow:Lerp(palette.Plate, 0.35)
+			local base = if shown.Glows[p] then 0.15 else 0.05
+			p.Transparency = if on then base + fade else 1
 		end
-		life.Beam.Color = palette.Glow
-		life.Scan.Color = palette.Glow
-		life.PlateName.Text = string.upper(entry.Species)
-		life.PlateLine.Text = string.upper(entry.Element) .. " KAIJU"
-		life.PlateLine.TextColor3 = palette.Glow
-		life.Shown, life.ShownIndex = entry.Species, index
+		local stage = at * CFrame.new(ShelterLife.Stage)
+		local spin = (t % ShelterLife.Turn) / ShelterLife.Turn * math.pi * 2
+		put(shown.Group, stage * CFrame.new(0, 0.35 + math.sin(t * 1.2) * 0.25, 0) * CFrame.Angles(0, spin, 0))
+		local sweep = ((holoT % ShelterLife.Hold) / 3) % 1
+		life.Scan.CFrame = stage * CFrame.new(0, 0.3 + sweep * 11, 0) * CFrame.Angles(0, 0, math.rad(90))
+		life.Scan.Transparency = 0.6 + 0.4 * sweep
 	end
-	-- (On, off, on as it comes in; then steady.)
-	local on = flicker >= 1 or (math.floor(flicker * 9) % 2 == 0 and flicker > 0.15)
-	local fade = if flicker >= 1 then 0 else 0.35 * (1 - flicker)
-	for _, p in shown.Group.Parts do
-		local base = if shown.Glows[p] then 0.15 else 0.05
-		p.Transparency = if on then base + fade else 1
-	end
-	local stage = at * CFrame.new(ShelterLife.Stage)
-	local spin = (t % ShelterLife.Turn) / ShelterLife.Turn * math.pi * 2
-	put(shown.Group, stage * CFrame.new(0, 0.35 + math.sin(t * 1.2) * 0.25, 0) * CFrame.Angles(0, spin, 0))
-	local sweep = ((holoT % ShelterLife.Hold) / 3) % 1
-	life.Scan.CFrame = stage * CFrame.new(0, 0.3 + sweep * 11, 0) * CFrame.Angles(0, 0, math.rad(90))
-	life.Scan.Transparency = 0.6 + 0.4 * sweep
 
 	-- The gems, each turning at its own pace and bobbing in its case.
 	local spec = ShelterLife.Gallery
@@ -549,6 +558,11 @@ function ShelterLife.mount(at: CFrame)
 		return
 	end
 	life = ShelterLife.build(at)
+	if not ShelterLife.Hologram then
+		-- (Off: out of the world, its console with it, and never posed.)
+		life.Beam.Parent.Parent = nil
+		life.HologramOff = true
+	end
 	life.Prompt.Triggered:Connect(function()
 		local now = workspace:GetServerTimeNow() + skip
 		skip += ShelterLife.Hold - now % ShelterLife.Hold
