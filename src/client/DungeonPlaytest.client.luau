@@ -89,7 +89,7 @@ if game:GetService("UserInputService").TouchEnabled then
 	fit.Parent = panel
 	local function shrink()
 		local height = gui.AbsoluteSize.Y
-		fit.Scale = if height > 0 then math.clamp((height - 70) / 394, 0.55, 1) else 1
+		fit.Scale = if height > 0 then math.clamp((height - 70) / 490, 0.4, 1) else 1
 	end
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(shrink)
 	shrink()
