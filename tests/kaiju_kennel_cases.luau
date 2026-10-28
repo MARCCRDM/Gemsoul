@@ -259,7 +259,18 @@ check(table.find(Store.Tabs, "Bundles") == nil, "The bundles have a tab of their
 local shopUi = fs.readFile(ROOT .. "/src/client/Modules/ShopUI.luau")
 check(shopUi:find("KaijuDeals.strip(list, 10)", 1, true) ~= nil, "Featured doesn't lead with the kaiju deals")
 check(shopUi:find("Featured = drawBundles", 1, true) ~= nil, "The bundles aren't on the front page")
-check(shopUi:find("KaijuDeals.daily(row", 1, true) ~= nil and shopUi:find("KaijuDeals.rare(row", 1, true) ~= nil, "The Kaiju page misses a sale")
+check(
+	shopUi:find("KaijuDeals.daily(list", 1, true) ~= nil
+		and shopUi:find("KaijuDeals.rare(row", 1, true) ~= nil
+		and shopUi:find("KaijuDeals.premium(row", 1, true) ~= nil,
+	"The Kaiju page misses a sale"
+)
+-- (the starter roll first, then the premium trio, on both pages)
+check(
+	shopUi:find("KaijuDeals.rare(row, cw, cardH, 1)\n\t\tKaijuDeals.premium(row, cw, cardH, 2)", 1, true) ~= nil,
+	"The Starter Rare Roll doesn't come before the premium trio"
+)
+check(shopUi:find("revive(list", 1, true) == nil, "The team revive is still on the Store's page")
 check(shopUi:find("which == \"Bundles\"", 1, true) ~= nil, "Old links to the Bundles tab go nowhere")
 check(fs.readFile(ROOT .. "/src/client/Modules/LobbyUI.luau"):find('tile("STORE"', 1, true) ~= nil, "The lobby's Store button isn't STORE")
 

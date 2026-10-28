@@ -92,7 +92,13 @@ local function elementFor(day: number, salt: string): string
 end
 
 function Kennel.special(day: number): { Species: string, Element: string }
-	local kinds = rarest()
+	-- (never a support kind: those are only caught)
+	local kinds = {}
+	for _, id in rarest() do
+		if not Kaiju.isSupport(id) then
+			table.insert(kinds, id)
+		end
+	end
 	-- (Each day steps through the batch in a shuffled order, so the same
 	-- kind doesn't come back for a month.)
 	local order = table.clone(kinds)

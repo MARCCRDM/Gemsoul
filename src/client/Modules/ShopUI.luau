@@ -3,7 +3,8 @@
 	categories, product grids with a product page beside them, and bundles
 	that show what they hold and what you save.
 
-	  Featured      the front page: the Kennel's kaiju deals (small), then
+	  Featured      the front page: the kaiju deals (small: the Starter Rare
+	                Roll, then the premium Triskull Trinity), then
 	                the bundles: the new-player offer (Starter Pack or Welcome
 	                Kit, while it's open), the player bundles (a whole look: suit, weapon
 	                skin, helmet, visor, pickaxe) and the premium sets (Royal
@@ -15,9 +16,10 @@
 	                you don't own) and the picked look's page: 3D preview,
 	                price, buy or wear, and the bundle that saves on it.
 	                Looks earned in play show after, saying how.
-	  Kaiju         the Kennel's sales (Shared.Kaiju.Sale): the Kaiju of the
-	                Day turning in its view, the Starter Rare Roll (once
-	                ever) with its odds, and the team revive.
+	  Kaiju         the kaiju sales (Shared.Kaiju.Sale): the Starter Rare
+	                Roll (once ever) with its odds, the Triskull Trinity
+	                (premium, once ever), and the Kaiju of the Day turning
+	                in its view.
 	  Free          the group, friends, the login streak and promo codes.
 
 	Buying: a product with a Developer Product id opens Roblox's purchase
@@ -1694,12 +1696,13 @@ local function premiumCard(parent: Instance, bundle: Store.Bundle, order: number
 end
 
 -- Kaiju ----------------------------------------------------------------------------------------------------------
--- The Kennel's sales (Shared.Kaiju.Sale), here as well as at the Kennel
--- (Client KennelSale): today's Kaiju of the Day, turning in its view, and
--- the Starter Rare Roll, once ever; and the team revive. The Kaiju page
--- shows them big, with what each brings; Featured leads with the two sales,
--- smaller. (A kaiju bought joins your reserves, or its roll plays on the
--- roll screen: showReceipt closes the store for it.)
+-- The kaiju sales (Shared.Kaiju.Sale), here as well as at the Kennel
+-- (Client KennelSale): the Starter Rare Roll, once ever, then the premium
+-- Triskull Trinity, once ever, then today's Kaiju of the Day, turning in its
+-- view. The Kaiju page shows them big, with what each brings; Featured
+-- leads with the first two, smaller. (A kaiju bought joins your reserves,
+-- or its roll plays on the roll screen: showReceipt closes the store for
+-- it. The team revive is sold from the kaiju panel, when one's down.)
 local KaijuDeals = {}
 do
 	local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
@@ -1828,12 +1831,11 @@ do
 		})
 	end
 
-	-- The Starter Rare Roll: four of the rare kinds in its well (a few
-	-- different ones each day).
+	-- The Starter Rare Roll: four of the rare kinds in its well (its
+	-- showcase, Kaiju.Sale.Showcase).
 	function KaijuDeals.rare(parent: Instance, w: number, h: number, order: number): Frame
 		local sale = Kaiju.Sale.Rare
 		local kinds = Kaiju.rareKinds()
-		local day = Kennel.day(now())
 		return saleCard(parent, w, h, order, {
 			Name = "KaijuRareRoll",
 			Key = sale.Product,
@@ -1843,7 +1845,7 @@ do
 			Title = "Starter Rare Roll",
 			Sub = string.format("%d kinds  ·  any element  ·  Traits %d+", #kinds, sale.TraitFloor),
 			About = string.format(
-				"One roll on the starter roll's reels. Every kind is as likely as the next (1 in %d), in any of the four elements.",
+				"One roll on the starter roll's reels, every rare kind as likely as the next (1 in %d). It comes with a Rare Gemsoul holding its element's best surge.",
 				#kinds
 			),
 			Fill = function(pic)
@@ -1853,38 +1855,51 @@ do
 					CellPadding = UDim2.fromOffset(0, 0),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}, grid)
-				for i = 1, math.min(4, #kinds) do
+				for i, shown in Kaiju.Sale.Showcase do
 					local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i }, grid)
-					local species = kinds[(day * 3 + (i - 1) * math.max(1, #kinds // 4)) % #kinds + 1]
-					view(cell, species, Kaiju.Elements[(day + i - 1) % #Kaiju.Elements + 1])
+					view(cell, shown.Species, shown.Element)
 				end
 			end,
 			Short = { Tag = "ONCE ONLY", Title = "Starter Rare Roll", Sub = string.format("%d rarest kinds", #kinds) },
 		})
 	end
 
-	-- The team revive: a wide, short row.
-	local function revive(parent: Instance, w: number, order: number)
-		local key = "KaijuRevive"
-		local card = box(parent, C.Surface, 0, 0, w, 96)
-		card.Name = key
-		card.LayoutOrder = order
-		round(card, 14)
-		stroke(card, C.Line, 1, 0.9)
-		local pic = well(card, C.Good, 8, 8, 80, 80)
-		-- (a plain cross, the medic's)
-		for _, size in { Vector2.new(14, 40), Vector2.new(40, 14) } do
-			local bar = box(pic, C.Good, 0, 0, size.X, size.Y)
-			bar.AnchorPoint = Vector2.new(0.5, 0.5)
-			bar.Position = UDim2.fromScale(0.5, 0.5)
-			round(bar, 4)
+	-- The premium trio: its three kaiju side by side in its well, one in
+	-- each element, turning.
+	function KaijuDeals.premium(parent: Instance, w: number, h: number, order: number): Frame
+		local sale = Kaiju.Sale.Premium
+		local kind = Kaiju.species(sale.Species)
+		local names = {}
+		for _, element in sale.Elements do
+			table.insert(names, GemConfig.elementName(element))
 		end
-		local bw = if SHORT then 150 else 190
-		local tw = w - 104 - bw - 32
-		text(card, "Team revive", 18, C.Text, BLACK, 104, 16, tw, 24)
-		wrap(text(card, "Every kaiju of yours that's knocked out, back on its feet now: no waiting for them to recover.", 12 + UP, C.Dim, MEDIUM, 104, 44, tw, 40))
-		priceRow(card, key, w - bw - 16, 10, 18, false)
-		buyButton(card, key, w - bw - 16, 44, bw, 40)
+		local gold = Color3.fromRGB(255, 196, 80)
+		return saleCard(parent, w, h, order, {
+			Name = "KaijuPremium",
+			Key = sale.Product,
+			Tint = gold,
+			Tag = "PREMIUM  ·  ONCE ONLY",
+			TagColor = gold,
+			Title = sale.Name,
+			Sub = string.format("3 %ss  ·  %s  ·  Traits %d+", kind and kind.Name or sale.Species, table.concat(names, ", "), sale.TraitFloor),
+			About = string.format(
+				"Three %ss, one in each element. Each comes with an Ultra Rare Gemsoul holding its element's best moves: Q, E and R.",
+				kind and kind.Name or sale.Species
+			),
+			Fill = function(pic)
+				local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, pic)
+				new("UIGridLayout", {
+					CellSize = UDim2.fromScale(1 / #sale.Elements, 1),
+					CellPadding = UDim2.fromOffset(0, 0),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}, row)
+				for i, element in sale.Elements do
+					local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i }, row)
+					view(cell, sale.Species, element, true)
+				end
+			end,
+			Short = { Tag = "PREMIUM", Title = sale.Name, Sub = "3 kaiju  ·  Ultra Rare Gemsouls" },
+		})
 	end
 
 	-- The Kaiju page.
@@ -1906,8 +1921,9 @@ do
 			PaddingBottom = UDim.new(0, 12),
 		}, list)
 		local w = PAGE_W - 12
-		sectionHead(list, 1, "Kaiju", "The rarest kinds, from the Kennel. Kaiju bought here join your reserves.")
-		-- (side by side on a computer, one under the other on a phone)
+		sectionHead(list, 1, "Kaiju", "The rarest kinds. Kaiju bought here join your reserves.")
+		-- (side by side on a computer, one under the other on a phone: the
+		-- starter roll first, then the premium trio)
 		local cardH = if SHORT then 210 else 312
 		local cw = if SHORT then w else math.floor((w - 14) / 2)
 		local row = new("Frame", {
@@ -1917,10 +1933,11 @@ do
 			LayoutOrder = 2,
 		}, list)
 		UiKit.list(row, 14, not SHORT)
-		KaijuDeals.daily(row, cw, cardH, 1)
-		KaijuDeals.rare(row, cw, cardH, 2)
-		sectionHead(list, 3, "For your team", "When the frontier gets the better of them.")
-		revive(list, w, 4)
+		KaijuDeals.rare(row, cw, cardH, 1)
+		KaijuDeals.premium(row, cw, cardH, 2)
+		sectionHead(list, 3, "Kaiju of the Day", "One of the rarest kinds, a new one every midnight (UTC).")
+		local daily = KaijuDeals.daily(list, w, if SHORT then 210 else 240, 4)
+		daily.LayoutOrder = 4
 		local note = wrap(
 			text(
 				list,
@@ -1940,7 +1957,7 @@ do
 	-- Featured's row of the two sales, smaller, with a way to the Kaiju page.
 	function KaijuDeals.strip(list: Instance, order: number)
 		local w = PAGE_W - 12
-		local head = sectionHead(list, order, "Kaiju deals", "Today's Kaiju of the Day and the Starter Rare Roll.")
+		local head = sectionHead(list, order, "Kaiju deals", "The Starter Rare Roll and the Triskull Trinity.")
 		local all = button(head, "See all kaiju  ›", "Quiet", w - 140, 6, 140, 28, function()
 			state.Tab = "Kaiju"
 			refresh()
@@ -1955,8 +1972,8 @@ do
 			LayoutOrder = order + 1,
 		}, list)
 		UiKit.list(row, 14, true)
-		KaijuDeals.daily(row, cw, cardH, 1)
-		KaijuDeals.rare(row, cw, cardH, 2)
+		KaijuDeals.rare(row, cw, cardH, 1)
+		KaijuDeals.premium(row, cw, cardH, 2)
 	end
 end
 

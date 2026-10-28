@@ -1133,13 +1133,42 @@ do
 		check(Kaiju.supportGuard(fighter) == nil and Kaiju.gemMove(fighter) == Kaiju.recordSurge(fighter), "A fighter's gem move changed")
 	end
 	check(Kaiju.supportId({ List = {}, Next = 1 }) == nil, "A support out of nowhere")
-	-- Owed once, after the roll, unless you have the kind.
+	-- Owed once, after the roll, unless you have the kind (while there's
+	-- a starter support at all: none now, Kaiju.StarterSupport.On).
 	local profile = { Kaiju = { List = {}, Next = 1 } }
 	check(not Kaiju.supportOwed(profile), "The support owed before the roll")
 	profile.KaijuRolled = Kaiju.RollVersion
-	check(Kaiju.supportOwed(profile), "The support not owed after the roll")
+	check(Kaiju.supportOwed(profile) == Kaiju.StarterSupport.On, "The support owed or not after the roll, against StarterSupport.On")
 	profile.KaijuSupport = Kaiju.SupportVersion
 	check(not Kaiju.supportOwed(profile), "The support owed twice")
+	-- No roll deals a support kind, nor the Kaiju of the Day.
+	for _, id in Kaiju.rareKinds() do
+		check(not Kaiju.isSupport(id), "A rare roll can deal a support kind")
+	end
+	for _, id in Kaiju.Starters do
+		check(not Kaiju.isSupport(id), "A starter can be a support kind")
+	end
+	-- The Store's kaiju come with their Gemsouls made to order: the Starter
+	-- Rare Roll's Rare with its element's best surge, the premium trio's
+	-- Ultra Rare with the best Q, E and R.
+	for _, element in Kaiju.Elements do
+		local best = Kaiju.BestMoves[element]
+		check(best ~= nil, "No best moves for " .. element)
+		for lane, id in best do
+			check(table.find(Kaiju.Moves[element][lane], id) ~= nil, element .. "'s best " .. lane .. " isn't one of its moves")
+		end
+		local rare = Kaiju.rollSoul(Random.new(5), element, { Id = "r", Time = 1, Species = "Emberjaw", Rarity = Kaiju.Sale.Rare.Rarity, Best = Kaiju.Sale.Rare.Best })
+		check(rare.Tier == "Rare" and rare.Traits.Ability == best.Ability, "The Starter Rare Roll's Gemsoul isn't Rare with the best surge")
+		local premium = Kaiju.rollSoul(Random.new(6), element, { Id = "p", Time = 1, Species = "Triskull", Rarity = Kaiju.Sale.Premium.Rarity, Best = Kaiju.Sale.Premium.Best })
+		check(
+			premium.Tier == "UltraRare" and premium.Traits.Ability == best.Ability and premium.Traits.Offense == best.Offense and premium.Traits.Defense == best.Defense,
+			"The premium trio's Gemsoul isn't Ultra Rare with the best Q, E and R"
+		)
+	end
+	check(#Kaiju.Sale.Premium.Elements == 3 and Kaiju.species(Kaiju.Sale.Premium.Species) ~= nil, "The premium trio isn't three of a kind")
+	for _, shown in Kaiju.Sale.Showcase do
+		check(table.find(Kaiju.rareKinds(), shown.Species) ~= nil, "The Starter Rare Roll shows a kind it can't roll: " .. shown.Species)
+	end
 	-- One past a full roster, for the starter support only.
 	local full = { List = {}, Next = 1 }
 	for i = 1, Kaiju.MaxOwned do

@@ -1,14 +1,18 @@
 --[[
 	The Kennel's sales, in the gilt look (Client GiltUi): opened from the
 	Daily Kaiju Sale's plinth (Client KennelLife) or from Wren, the kennel
-	keeper (Dialogue). Two offers, each for Robux (Shared.Store):
+	keeper (Dialogue). Three offers, each for Robux (Shared.Store), as the
+	Store has them:
 
+	  Starter Rare Roll   one roll on the rarest kinds, once ever: played on
+	                      the roll screen (Client KaijuRoll) as soon as you
+	                      have room; four of them in its picture
+	                      (Kaiju.Sale.Showcase)
+	  Triskull Trinity    the premium trio, once ever: three Triskulls, one
+	                      in each element, turning side by side
 	  Daily Kaiju Sale    today's Kaiju of the Day (Shared.KaijuKennel
 	                      .special), one each a day, turning in its view,
 	                      its kind, element, role and the time left
-	  Starter Rare Roll   one roll on the rarest kinds, once ever: played on
-	                      the roll screen (Client KaijuRoll) as soon as you
-	                      have room
 
 	Bought with Roblox's purchase prompt (the grant comes with the receipt:
 	Server StoreServer, KaijuServer.saleGrant), or with coins while testing
@@ -41,6 +45,8 @@ KennelSale.Width = 560
 
 local gui: ScreenGui? = nil
 local spin: RBXScriptConnection? = nil
+-- The kaiju turning in their views: { Model, Center, Rest }.
+local turning = {}
 
 local function screen(): ScreenGui
 	if not gui then
@@ -54,6 +60,7 @@ function KennelSale.close()
 		spin:Disconnect()
 		spin = nil
 	end
+	table.clear(turning)
 	if gui then
 		gui:ClearAllChildren()
 	end
@@ -84,8 +91,8 @@ local function untilMidnight(now: number): string
 	return if h > 0 then string.format("%dh %02dm", h, m) else string.format("%dm", math.max(1, m))
 end
 
--- A kaiju turning in a view the well's size.
-local function portrait(parent: Instance, species: string, element: string): ViewportFrame
+-- A kaiju in a view filling `parent`, turning unless `still`.
+local function portrait(parent: Instance, species: string, element: string, still: boolean?): ViewportFrame
 	local model = KaijuModels.forPortrait(KaijuModels.build(species, element))
 	local cf, size = model:GetBoundingBox()
 	local reach = math.max(size.X, size.Y * 1.2, size.Z)
@@ -103,12 +110,32 @@ local function portrait(parent: Instance, species: string, element: string): Vie
 	camera.Parent = view
 	view.CurrentCamera = camera
 	model.Parent = view
-	local rest, center = model:GetPivot(), CFrame.new(cf.Position)
-	spin = RunService.RenderStepped:Connect(function()
-		local angle = (os.clock() * 0.5) % (math.pi * 2)
-		model:PivotTo(center * CFrame.Angles(0, angle, 0) * center:Inverse() * rest)
-	end)
+	if not still then
+		table.insert(turning, { Model = model, Center = CFrame.new(cf.Position), Rest = model:GetPivot() })
+		spin = spin
+			or RunService.RenderStepped:Connect(function()
+				local angle = (os.clock() * 0.5) % (math.pi * 2)
+				for _, turn in turning do
+					turn.Model:PivotTo(turn.Center * CFrame.Angles(0, angle, 0) * turn.Center:Inverse() * turn.Rest)
+				end
+			end)
+	end
 	return view
+end
+
+-- Views laid out in a grid filling `parent`, `cols` across.
+local function gallery(parent: Instance, kaiju: { { Species: string, Element: string } }, cols: number, still: boolean?)
+	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, parent)
+	local rows = math.ceil(#kaiju / cols)
+	new("UIGridLayout", {
+		CellSize = UDim2.fromScale(1 / cols, 1 / rows),
+		CellPadding = UDim2.fromOffset(0, 0),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, grid)
+	for i, shown in kaiju do
+		local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i }, grid)
+		portrait(cell, shown.Species, shown.Element, still)
+	end
 end
 
 -- Buys `key`: Roblox's prompt, or coins while testing, or not yet on sale.
@@ -142,17 +169,18 @@ local function offer(body: Instance, order: number, opts)
 		Size = UDim2.new(1, 0, 0, opts.Height),
 		LayoutOrder = order,
 	}, body)
+	local wide = opts.WellWidth or opts.Height
 	local well = new("Frame", {
 		Name = "Well",
-		Size = UDim2.fromOffset(opts.Height, opts.Height),
+		Size = UDim2.fromOffset(wide, opts.Height),
 	}, row)
-	Gilt.well(well)
+	Gilt.well(well, opts.Edge)
 	opts.Art(well)
 	local words = new("Frame", {
 		Name = "Words",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(opts.Height + 16, 0),
-		Size = UDim2.new(1, -(opts.Height + 16), 1, 0),
+		Position = UDim2.fromOffset(wide + 16, 0),
+		Size = UDim2.new(1, -(wide + 16), 1, 0),
 	}, row)
 	local list = UiKit.list(words, 4)
 	-- (the row as tall as its words, if they run past the well)
@@ -233,16 +261,59 @@ function KennelSale.open()
 	end)
 	closeButton.Activated:Connect(KennelSale.close)
 
+	-- The Starter Rare Roll: four of the rarest kinds in its picture.
+	local rare = Kaiju.Sale.Rare
+	local tall = if phone then 112 else 132
+	Gilt.heading(body, "Starter Rare Roll  ·  once only", 2, false)
+	offer(body, 3, {
+		Name = "Rare",
+		Height = tall,
+		Key = rare.Product,
+		Art = function(well)
+			gallery(well, Kaiju.Sale.Showcase, 2, true)
+		end,
+		Title = "A roll on the rarest kinds",
+		Sub = string.format("%d kinds  ·  any element  ·  traits %d or better", #Kaiju.rareKinds(), rare.TraitFloor),
+		About = "One roll on the starter roll's reels. It comes with a Rare Gemsoul holding its element's best surge. Once per miner.",
+		Button = string.format("Roll  ·  R$ %d", Store.robuxPrice(rare.Product) or 0),
+		Owned = if profile[rare.Once] then "Claimed. Thank you for your support." else nil,
+	})
+
+	-- The premium trio, side by side, turning.
+	local premium = Kaiju.Sale.Premium
+	local trio = {}
+	local elements = {}
+	for _, element in premium.Elements do
+		table.insert(trio, { Species = premium.Species, Element = element })
+		table.insert(elements, GemConfig.elementName(element))
+	end
+	Gilt.heading(body, "Premium  ·  once only", 4, false)
+	offer(body, 5, {
+		Name = "Premium",
+		Height = tall,
+		WellWidth = math.floor(tall * 1.5),
+		Edge = Gilt.Gold,
+		Key = premium.Product,
+		Art = function(well)
+			gallery(well, trio, #trio)
+		end,
+		Title = premium.Name,
+		Sub = string.format("3 Triskulls  ·  %s  ·  traits %d or better", table.concat(elements, ", "), premium.TraitFloor),
+		About = "Three-headed breakers, one in each element, each with an Ultra Rare Gemsoul holding its element's best Q, E and R.",
+		Button = string.format("Buy  ·  R$ %d", Store.robuxPrice(premium.Product) or 0),
+		Owned = if profile[premium.Once] then "Yours. Thank you for your support." else nil,
+	})
+
 	-- The Daily Kaiju Sale.
 	local now = workspace:GetServerTimeNow()
 	local day = Kennel.day(now)
 	local special = Kennel.special(day)
 	local kind = Kaiju.species(special.Species)
 	local daily = Kaiju.Sale.Daily
-	Gilt.heading(body, "Daily Kaiju Sale", 2, false)
-	offer(body, 3, {
+	Gilt.heading(body, "Daily Kaiju Sale", 6, false)
+	offer(body, 7, {
 		Name = "Daily",
-		Height = if phone then 128 else 150,
+		Height = tall,
 		Key = daily.Product,
 		Art = function(well)
 			portrait(well, special.Species, special.Element)
@@ -257,37 +328,8 @@ function KennelSale.open()
 		Owned = if Kaiju.dailyBought(profile, day) then "Yours today. A new one comes at midnight." else nil,
 	})
 
-	-- The Starter Rare Roll.
-	local rare = Kaiju.Sale.Rare
-	Gilt.heading(body, "Starter Rare Roll  ·  once only", 4, false)
-	offer(body, 5, {
-		Name = "Rare",
-		Height = if phone then 96 else 112,
-		Key = rare.Product,
-		Art = function(well)
-			-- (an emblem: the gilt diamond, large, a glint of each element in it)
-			local mark = Gilt.stud(well, 44, UDim2.fromScale(0.5, 0.5))
-			mark.BackgroundColor3 = Gilt.Stone
-			for i, element in Kaiju.Elements do
-				local dot = new("Frame", {
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.fromScale(if i % 2 == 1 then 0.3 else 0.7, if i <= 2 then 0.3 else 0.7),
-					Size = UDim2.fromOffset(9, 9),
-					BackgroundColor3 = GemConfig.ElementColors[element] or Gilt.Gold,
-					Rotation = -45,
-				}, mark)
-				UiKit.round(dot, 2)
-			end
-		end,
-		Title = "A roll on the rarest kinds",
-		Sub = string.format("%d kinds  ·  any element  ·  traits %d or better", #Kaiju.rareKinds(), rare.TraitFloor),
-		About = "One roll, on the starter roll's reels, from the first batch of kinds found past the starters. Once per miner.",
-		Button = string.format("Roll  ·  R$ %d", Store.robuxPrice(rare.Product) or 0),
-		Owned = if profile[rare.Once] then "Claimed. Thank you for your support." else nil,
-	})
-
 	-- (what happens to them)
-	local note = prose(body, "Kaiju from the Kennel join your reserves: swap them into a team from YOUR KAIJU.", 12, Gilt.Dusk, 6)
+	local note = prose(body, "Kaiju from the Kennel join your reserves: swap them into a team from YOUR KAIJU.", 12, Gilt.Dusk, 8)
 	note.TextXAlignment = Enum.TextXAlignment.Center
 	task.defer(refit)
 	frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
@@ -299,7 +341,7 @@ MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, produc
 		return
 	end
 	local key = Store.productKey(productId)
-	if key == Kaiju.Sale.Daily.Product or key == Kaiju.Sale.Rare.Product then
+	if key == Kaiju.Sale.Daily.Product or key == Kaiju.Sale.Rare.Product or key == Kaiju.Sale.Premium.Product then
 		KennelSale.close()
 	end
 end)

@@ -5,8 +5,9 @@
 	sold by Garrick.)
 
 	  Featured     the front page: the kaiju deals, then every bundle
-	  Kaiju        the Kennel's sales (Kaiju.Sale: the Kaiju of the Day, the
-	               Starter Rare Roll) and the team revive
+	  Kaiju        the kaiju sales (Kaiju.Sale): the Starter Rare Roll, the
+	               Triskull Trinity (premium) and the Kaiju of the Day. (The
+	               team revive is sold from the kaiju panel, not here.)
 	  Bundles      (on Featured) new-player offers (the Welcome Kit, the
 	               Starter Pack), the player bundles (a whole look for
 	               your miner: suit, weapon skin, helmet, visor, pickaxe
@@ -43,7 +44,7 @@ export type Reward = {
 	XPBoostMinutes: number?,
 	Swings: number?,
 	KaijuRevive: boolean?, -- every kaiju of yours that's knocked out, back now
-	KaijuSale: string?, -- the Kennel's: "Daily" (the Kaiju of the Day) or "Rare" (a rare roll)
+	KaijuSale: string?, -- the Kennel's: "Daily" (the Kaiju of the Day), "Rare" (a rare roll) or "Premium" (the trio)
 }
 export type Bundle = {
 	Id: string,
@@ -428,10 +429,11 @@ Store.RobuxProducts = {
 	KaijuRevive = 3723018189,
 	-- Down at a Rift boss: back on your feet there, kaiju and all (RiftServer)
 	RiftRestore = 3723023347,
-	-- The Kennel's sales (Shared.Kaiju.Sale): the Kaiju of the Day, and the
-	-- one-time Starter Rare Roll
+	-- The Kennel's sales (Shared.Kaiju.Sale): the Kaiju of the Day, the
+	-- one-time Starter Rare Roll and the one-time premium trio
 	KaijuDaily = 0,
 	KaijuRareRoll = 0,
+	KaijuPremium = 0,
 }
 -- The Robux price of each bundle and offer (a cosmetic's is its own Robux).
 Store.RobuxPrices = {
@@ -458,6 +460,7 @@ Store.RobuxPrices = {
 	RiftRestore = 100,
 	KaijuDaily = 200,
 	KaijuRareRoll = 200,
+	KaijuPremium = 500,
 }
 -- (A refill's price is its own: Outpost.Refills.)
 for _, refill in Outpost.Refills do
@@ -592,8 +595,8 @@ function Store.contents(key: any): Reward?
 	if key == "KaijuRevive" then
 		return { KaijuRevive = true }
 	end
-	if key == "KaijuDaily" or key == "KaijuRareRoll" then
-		return { KaijuSale = if key == "KaijuDaily" then "Daily" else "Rare" }
+	if key == "KaijuDaily" or key == "KaijuRareRoll" or key == "KaijuPremium" then
+		return { KaijuSale = if key == "KaijuDaily" then "Daily" elseif key == "KaijuRareRoll" then "Rare" else "Premium" }
 	end
 	local bundle = Store.bundle(key)
 	if bundle then
@@ -741,6 +744,9 @@ function Store.productName(key: string): string
 	if key == "KaijuRareRoll" then
 		return "Starter Rare Roll"
 	end
+	if key == "KaijuPremium" then
+		return "Triskull Trinity"
+	end
 	local refill = Store.refill(key)
 	if refill then
 		return refill.Name
@@ -812,6 +818,12 @@ function Store.canBuy(key: string, profile: any, now: number): (boolean, string?
 	if key == "KaijuRareRoll" then
 		if profile.KaijuRareRollBought then
 			return false, "You've had the Starter Rare Roll already."
+		end
+		return true
+	end
+	if key == "KaijuPremium" then
+		if profile.KaijuPremiumBought then
+			return false, "The Triskull Trinity is yours already."
 		end
 		return true
 	end

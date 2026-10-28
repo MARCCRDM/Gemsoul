@@ -31,19 +31,35 @@ In front of the gate (`Kennel.Display`) the Kaiju of the Day
 KAIJU SALE, its kind, element and role, and the price. The plinth's prompt,
 or Wren's **Daily Kaiju Sale** option, opens the sale window
 (`src/client/Modules/KennelSale.luau`), in the Bounty Board's gilt look
-(`src/client/Modules/GiltUi.luau`). It has two offers, each **R$ 200**:
+(`src/client/Modules/GiltUi.luau`). It has three offers, shown in this
+order:
 
-- **Daily Kaiju Sale** (`KaijuDaily`): today's kaiju, one each a day
-  (`profile.KaijuDailyDay`). It comes with traits of 8 or better in all four
-  and a luckier Gemsoul (`Kaiju.Sale.Daily`). It joins your reserves, even
-  past a full roster. Paid for twice in one day, the second becomes a rare
-  roll, so nothing is lost.
-- **Starter Rare Roll** (`KaijuRareRoll`): once per miner
+- **Starter Rare Roll** (`KaijuRareRoll`, **R$ 200**): once per miner
   (`profile.KaijuRareRollBought`). One roll on the starter roll's screen
   from the rarest batch only (`Kaiju.rareKinds`), with traits of 6 or
-  better. It's owed as `profile.KaijuRareRolls` and plays like a boss roll,
-  as soon as you have room (`Kaiju.rareRollsOwed`, counted in
-  `bossRollsOwed`).
+  better. Its Gemsoul is a **Rare** stone, made to order with its element's
+  best E surge (`Kaiju.BestMoves`, `Kaiju.Sale.Rare.Best = "Ability"`).
+  It's owed as `profile.KaijuRareRolls` and plays like a boss roll, as soon
+  as you have room (`Kaiju.rareRollsOwed`, counted in `bossRollsOwed`). Its
+  card shows four of the rarest kinds turning (`Kaiju.Sale.Showcase`:
+  Emberjaw, Razorclaw, Dreadcrown and Brightsteel), in a 2x2 grid.
+- **Triskull Trinity** (`KaijuPremium`, **R$ 500**): once per miner
+  (`profile.KaijuPremiumBought`). Three Triskulls, the three-headed dragon,
+  one Fire, one Frost and one Shock (`Kaiju.Sale.Premium`), with traits of 8
+  or better. Each Gemsoul is an **Ultra Rare** stone with its element's best
+  Q, E and R surges (`Best = "All"`). They join your reserves, even past a
+  full roster. Its card is gold edged and shows the three turning.
+- **Daily Kaiju Sale** (`KaijuDaily`, **R$ 200**): today's kaiju, one each a
+  day (`profile.KaijuDailyDay`). It comes with traits of 8 or better in all
+  four and a luckier Gemsoul (`Kaiju.Sale.Daily`). It joins your reserves,
+  even past a full roster. Paid for twice in one day, the second becomes a
+  rare roll, so nothing is lost.
+
+**No roll deals a support kind** (the starter roll, the rare roll, boss
+rolls, the Kaiju of the Day): `Kaiju.rareKinds`, the starters and
+`Kennel.special` leave the support kinds out, and the starter roll's
+Skyjelly is off (`Kaiju.StarterSupport.On = false`). Supports come from
+catching them for now.
 
 Both are Roblox developer products (`Store.RobuxProducts`). Their ids are
 0 until the products are made: listed by `tools/dev_products_manifest.luau`,
@@ -90,8 +106,9 @@ By the gate, facing the door:
 
 ## The starter support
 
-The intro's roll stays the four starter kinds. The fourth kaiju, the
-support, is always a Skyjelly, but its element is now rolled with the roll
+Off for now (`Kaiju.StarterSupport.On = false`): the intro's roll deals the
+three starter kinds and no support. Switched back on, the fourth kaiju, the
+support, is a Skyjelly, its element rolled with the roll
 (`Kaiju.supportElement`), and the roll card shows it. Any support kind you
 own (a Warden) can take the support slot (SET AS SUPPORT in the kaiju
 panel, or drag it onto the slot), and swap with the one there.
@@ -104,6 +121,8 @@ every resident inside its wedge and the pen, no jumps or spins, every mood
 seen, no two ever touching, and every client working out the same. Also
 the pen (the client's) and its bed (the server's), Wren and her options,
 the hologram off, the animation hooks, the sale's rules and Store entries
-(R$ 200 each, once a day, once ever), every support kind in the slot, and
-the starter support's element. `tests/run_kaiju.py` (kaiju_server_cases)
-grants both sales and plays the rare roll.
+(R$ 200, R$ 500 and R$ 200; once ever, once ever, once a day), the made to
+order stones (Rare with the best E; Ultra Rare with the best Q, E and R),
+no support kind in any roll, every support kind in the slot, and the
+starter support's element. `tests/run_kaiju.py` (kaiju_server_cases)
+grants all three sales and plays the rare roll.

@@ -6849,18 +6849,36 @@ end)()
 	check(not Kaiju.supportOwed(profiles[c]), "The support came before the roll")
 	-- (its element rolled with the roll: the card shows the one that comes)
 	local shown = registered.KaijuRoll(c)
-	check(shown.Support and table.find(Kaiju.Elements, shown.Support.Element) ~= nil, "The roll doesn't show the support's element")
+	if Kaiju.StarterSupport.On then
+		check(shown.Support and table.find(Kaiju.Elements, shown.Support.Element) ~= nil, "The roll doesn't show the support's element")
+	else
+		check(shown.Support == nil, "The roll deals a support")
+	end
 	check(registered.KaijuRollClaim(c).Ok, "Couldn't claim the roll")
 	local roster = Kaiju.roster(profiles[c])
+	if not Kaiju.StarterSupport.On then
+		-- (no roll deals one now: caught, given here as if it were)
+		check(Kaiju.count(roster) == 3 and Kaiju.supportId(roster) == nil, "A support came with the roll")
+		local caught = Kaiju.add(
+			roster,
+			Kaiju.StarterSupport.Species,
+			Kaiju.rollSoul(Random.new(4), "Frost", { Id = "caught", Time = 1, Species = Kaiju.StarterSupport.Species }),
+			Kaiju.StarterLevel,
+			true
+		)
+		Kaiju.setSupport(roster, caught.Id)
+	end
 	local supportId = Kaiju.supportId(roster)
 	local support = supportId and roster.List[supportId]
-	check(Kaiju.count(roster) == 4 and support, "No support with the roll")
-	check(
-		support.Species == Kaiju.StarterSupport.Species and support.Element == shown.Support.Element,
-		"The wrong starter support, or not the element its card showed"
-	)
-	check(profiles[c].KaijuSupport == Kaiju.SupportVersion and not Kaiju.supportOwed(profiles[c]), "Owed a second")
-	check(noted(c, "your support"), "Nobody told them about their support")
+	check(Kaiju.count(roster) == 4 and support, "No support")
+	if Kaiju.StarterSupport.On then
+		check(
+			support.Species == Kaiju.StarterSupport.Species and support.Element == shown.Support.Element,
+			"The wrong starter support, or not the element its card showed"
+		)
+		check(profiles[c].KaijuSupport == Kaiju.SupportVersion and not Kaiju.supportOwed(profiles[c]), "Owed a second")
+		check(noted(c, "your support"), "Nobody told them about their support")
+	end
 	check(#Kaiju.teamIds(roster) == 3 and not table.find(Kaiju.teamIds(roster), supportId), "The support took a fighting slot")
 	-- Out: four, the support in its own slot, just behind its owner.
 	KaijuServer._upkeep(c, now)
@@ -6963,7 +6981,8 @@ end)()
 		check(pet.PulseAt[guardId] == before, "The support's own blow charged itself")
 	end
 	end
-	-- An older save (no support yet) is given one on its next visit.
+	-- An older save (no support yet) is given one on its next visit, while
+	-- there's a starter support (none now: it isn't).
 	profiles[c].KaijuSupport = nil
 	local held = Kaiju.count(roster)
 	for id, record in roster.List do
@@ -6973,9 +6992,13 @@ end)()
 	end
 	roster.Support = nil
 	KaijuServer._upkeep(c, now + 20)
-	check(Kaiju.count(roster) == held and Kaiju.supportId(roster) ~= nil, "An older save wasn't given its support")
+	if Kaiju.StarterSupport.On then
+		check(Kaiju.count(roster) == held and Kaiju.supportId(roster) ~= nil, "An older save wasn't given its support")
+	else
+		check(Kaiju.count(roster) == held - 1 and Kaiju.supportId(roster) == nil, "A support given with the starter support off")
+	end
 	KaijuServer._upkeep(c, now + 40)
-	check(Kaiju.count(roster) == held, "A second support given")
+	check(Kaiju.count(roster) == held - (if Kaiju.StarterSupport.On then 0 else 1), "A second support given")
 	c:SetAttribute("Outpost", nil)
 	KaijuServer._upkeep(c, now + 41)
 	local _ = rootC
@@ -6999,6 +7022,18 @@ end)()
 	profiles[d] = { Gems = {}, Coins = 0, Milestones = {} }
 	registered.KaijuRoll(d)
 	check(registered.KaijuRollClaim(d).Ok, "Couldn't claim a roll to defend you with")
+	if not Kaiju.StarterSupport.On then
+		-- (caught, as no roll deals one now)
+		local roster = Kaiju.roster(profiles[d])
+		local caught = Kaiju.add(
+			roster,
+			Kaiju.StarterSupport.Species,
+			Kaiju.rollSoul(Random.new(5), "Frost", { Id = "caught", Time = 1, Species = Kaiju.StarterSupport.Species }),
+			Kaiju.StarterLevel,
+			true
+		)
+		Kaiju.setSupport(roster, caught.Id)
+	end
 	local north = Vector3.new(0, 0, -1)
 	rootD.CFrame = CFrame.lookAt(home, home + north)
 	rootD.AssemblyLinearVelocity = Vector3.zero

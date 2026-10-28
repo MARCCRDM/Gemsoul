@@ -443,11 +443,12 @@ end
 -- only (KaijuRoles' Warden role, called SUPPORT: Moonmoth, Skyjelly). It
 -- floats in the middle of the three, ahead of you, mends you and your team and wards them
 -- (KaijuServer's support pulse); a support kind never takes one of the
--- three fighting slots. Everyone gets StarterSupport once (supportOwed):
--- a new player with the starter roll, everyone else on their next visit.
+-- three fighting slots. Everyone got StarterSupport once (supportOwed): a
+-- new player with the starter roll, everyone else on their next visit.
+-- That's off (On): no roll deals a support kind now; they're caught.
 Kaiju.SupportRole = "Warden"
 Kaiju.SupportSlot = 4
-Kaiju.StarterSupport = { Species = "Skyjelly" } -- (its element rolled with the roll: supportElement)
+Kaiju.StarterSupport = { Species = "Skyjelly", On = false } -- (its element rolled with the roll: supportElement)
 Kaiju.SupportVersion = 1
 -- Its pulse: only while you're in a fight (in danger: Kaiju.Danger; out of
 -- one it mends nobody, that's for gems), it reads the health of you and
@@ -1255,11 +1256,23 @@ function Kaiju.isSoul(gem): boolean
 	return type(gem) == "table" and type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju"
 end
 
+-- Each element's best Gemsoul moves, lane by lane (Q its Offense, E its
+-- Ability, R its Defense): the hardest-hitting strike, the biggest surge
+-- and the guard that does most. The Store's kaiju come with them
+-- (Kaiju.Sale: rollSoul's Best).
+Kaiju.BestMoves = {
+	Fire = { Offense = "Q_MeteorLeap", Ability = "E_Supernova", Defense = "R_HeatShield" },
+	Frost = { Offense = "Q_PermafrostSpire", Ability = "E_AbsoluteZero", Defense = "R_GlacialBulwark" },
+	Shock = { Offense = "Q_Skybreaker", Ability = "E_StormCall", Defense = "R_Capacitor" },
+	Poison = { Offense = "Q_ToxicFlask", Ability = "E_Maneater", Defense = "R_BioRegrowth" },
+}
+
 -- A Gemsoul for a kaiju of an element: rolled like any gem, its three
 -- moves its element's that a kaiju can cast (Kaiju.Moves). `opts` = { Luck,
--- Id, Time, Species }.
+-- Id, Time, Species, Rarity? (a set one, GemRoller's), Best? ("Ability":
+-- its element's best E; "All": its best Q, E and R, Kaiju.BestMoves) }.
 function Kaiju.rollSoul(rng, element: string, opts)
-	local rolled = GemRoller.roll(rng, opts.Luck or 0)
+	local rolled = GemRoller.roll(rng, opts.Luck or 0, opts.Rarity)
 	GemRoller.setElement(rolled, element)
 	local lanes = Kaiju.Moves[element]
 	if lanes then
@@ -1267,6 +1280,13 @@ function Kaiju.rollSoul(rng, element: string, opts)
 		-- (E first, as before, so a seed rolls the same E.)
 		for _, lane in { "Ability", "Offense", "Defense" } do
 			rolled.Traits[lane] = lanes[lane][rng:NextInteger(1, #lanes[lane])]
+		end
+		-- (a Store kaiju's made to order: its element's best E, or all three)
+		local best = Kaiju.BestMoves[element]
+		if best and opts.Best then
+			for _, lane in if opts.Best == "All" then { "Ability", "Offense", "Defense" } else { "Ability" } do
+				rolled.Traits[lane] = best[lane]
+			end
 		end
 	end
 	return {
@@ -1674,10 +1694,11 @@ function Kaiju.count(roster): number
 end
 
 -- Adds a kaiju (given its kind, Gemsoul and level) and returns its record,
--- or nil if the roster is full (`over`: one past full, for the starter
--- support). The first one becomes the one out.
-function Kaiju.add(roster, speciesId: string, soul, level: number?, over: boolean?, traits: { [string]: number }?)
-	if Kaiju.count(roster) >= Kaiju.MaxOwned + (if over then 1 else 0) or not Kaiju.Species[speciesId] then
+-- or nil if the roster is full (`over`: one past full, or that many, for
+-- one paid for). The first one becomes the one out.
+function Kaiju.add(roster, speciesId: string, soul, level: number?, over: (boolean | number)?, traits: { [string]: number }?)
+	local extra = if type(over) == "number" then over elseif over then 1 else 0
+	if Kaiju.count(roster) >= Kaiju.MaxOwned + extra or not Kaiju.Species[speciesId] then
 		return nil
 	end
 	local before = Kaiju.order(roster)
@@ -1928,6 +1949,9 @@ end
 -- once per SupportVersion): not before its starter roll is taken (that
 -- gives it), and not to one who already has that kind.
 function Kaiju.supportOwed(profile): boolean
+	if not Kaiju.StarterSupport.On then
+		return false
+	end
 	if not profile or profile.KaijuSupport == Kaiju.SupportVersion or Kaiju.rollsOwed(profile) > 0 then
 		return false
 	end
@@ -1969,10 +1993,39 @@ end
 --            its traits at least TraitFloor, its Gemsoul rolled with Luck
 --   Rare     the Starter Rare Roll, once ever (profile[Once]): a roll on the
 --            starter roll's screen from the rarest batch (Kaiju.batch 1)
---            only, its traits at least TraitFloor
+--            only, its traits at least TraitFloor, its Gemsoul a Rarity one
+--            with its element's best surge (Best: Kaiju.BestMoves)
+--   Premium  three of one kind (Species), one in each of Elements, once
+--            ever: each with a Rarity Gemsoul holding its element's best
+--            Q, E and R, traits at least TraitFloor; they join your
+--            reserves, past a full roster if they must
+-- Showcase: the four kaiju the Starter Rare Roll's picture shows.
 Kaiju.Sale = {
 	Daily = { Product = "KaijuDaily", TraitFloor = 8, Luck = 0.35 },
-	Rare = { Product = "KaijuRareRoll", Once = "KaijuRareRollBought", TraitFloor = 6, Luck = 0.25 },
+	Rare = {
+		Product = "KaijuRareRoll",
+		Once = "KaijuRareRollBought",
+		TraitFloor = 6,
+		Luck = 0.25,
+		Rarity = "Rare",
+		Best = "Ability",
+	},
+	Premium = {
+		Product = "KaijuPremium",
+		Once = "KaijuPremiumBought",
+		Name = "Triskull Trinity",
+		Species = "Triskull",
+		Elements = { "Fire", "Frost", "Shock" },
+		Rarity = "UltraRare",
+		Best = "All",
+		TraitFloor = 8,
+	},
+	Showcase = {
+		{ Species = "Emberjaw", Element = "Fire" },
+		{ Species = "Razorclaw", Element = "Frost" },
+		{ Species = "Dreadcrown", Element = "Shock" },
+		{ Species = "Brightsteel", Element = "Poison" },
+	},
 }
 
 -- Whether today's Kaiju of the Day is already yours (`day`: KaijuKennel.day).

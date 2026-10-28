@@ -256,7 +256,13 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 		ZIndex = 40,
 	}, screen)
 	local result = if preview
-		then { Ok = true, Rolls = previewRolls(), Support = { Species = Kaiju.StarterSupport.Species, Element = Kaiju.supportElement() } }
+		then {
+			Ok = true,
+			Rolls = previewRolls(),
+			Support = if Kaiju.StarterSupport.On
+				then { Species = Kaiju.StarterSupport.Species, Element = Kaiju.supportElement() }
+				else nil,
+		}
 		else GemClient.request("KaijuRoll")
 	local rolls = if result.Ok and type(result.Rolls) == "table" then result.Rolls else {}
 	local rare = result.Rare == true -- (a rare roll from the Kennel: the rarest batch only)
@@ -886,10 +892,20 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 			end)
 			return
 		end
+		-- (No support with the roll now, Kaiju.StarterSupport.On: on by
+		-- itself, as above.)
+		if not (Kaiju.StarterSupport.On and type(result.Support) == "table") then
+			task.delay(AUTO, function()
+				if gui == screen then
+					claim()
+				end
+			end)
+			return
+		end
 		-- And the fourth, the starter support (Shared.Kaiju.StarterSupport),
 		-- named under the cards: it comes with them.
 		-- (its element rolled with the roll: the server's, shown as it'll be)
-		local starter = if type(result.Support) == "table" and result.Support.Element
+		local starter = if result.Support.Element
 			then result.Support
 			else { Species = Kaiju.StarterSupport.Species, Element = nil }
 		local kind = Kaiju.species(starter.Species)

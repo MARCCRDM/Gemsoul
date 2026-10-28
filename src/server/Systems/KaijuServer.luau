@@ -604,6 +604,9 @@ local function prepareRoll(profile)
 			Time = os.time(),
 			Species = pick.Species,
 			Luck = if rare then sale.Luck else nil,
+			-- (a bought one's Gemsoul Rare, with its element's best surge)
+			Rarity = if rare then sale.Rarity else nil,
+			Best = if rare then sale.Best else nil,
 		})
 		local traits = Kaiju.rollTraits(random, if rare then sale.TraitFloor else nil)
 		roll = {
@@ -630,8 +633,11 @@ local function prepareRoll(profile)
 		)
 		table.insert(roll.Rolls, { Species = pick.Species, Element = pick.Element, Soul = soul, Traits = Kaiju.rollTraits(random) })
 	end
-	-- (and the starter support's element, rolled with them so the card shows it)
-	roll.Support = { Species = Kaiju.StarterSupport.Species, Element = Kaiju.supportElement(random) }
+	-- (and the starter support's element, rolled with them so the card shows
+	-- it, while there is one)
+	if Kaiju.StarterSupport.On then
+		roll.Support = { Species = Kaiju.StarterSupport.Species, Element = Kaiju.supportElement(random) }
+	end
 	p.KaijuRoll = roll
 	return roll
 end
@@ -2618,7 +2624,8 @@ end
 -- the Kaiju of the Day (KaijuKennel.special, today's) in your roster, its
 -- traits and Gemsoul better than a wild one's (Kaiju.Sale.Daily), even past
 -- a full roster (paid for); "Rare" owes you a rare roll, played on the roll
--- screen (Kaiju.rareRollsOwed). Returns whether it was given, and the lines
+-- screen (Kaiju.rareRollsOwed); "Premium" puts its three kaiju in your
+-- roster (Kaiju.Sale.Premium). Returns whether it was given, and the lines
 -- to show.
 function KaijuServer.saleGrant(player: Player, which: string): (boolean, { string }?)
 	local profile = PlayerData.get(player)
@@ -2674,6 +2681,37 @@ function KaijuServer.saleGrant(player: Player, which: string): (boolean, { strin
 		PlayerData.sync(player)
 		Remotes.Notify:FireClient(player, "Your Starter Rare Roll is ready: it plays as soon as you have room for a kaiju.")
 		return true, { "the Starter Rare Roll" }
+	elseif which == "Premium" then
+		-- Three of one kind, one in each element, each with an Ultra Rare
+		-- Gemsoul holding its element's best Q, E and R (Sale.Premium); into
+		-- your reserves, past a full roster if they must (paid for).
+		local sale = Kaiju.Sale.Premium
+		local roster = Kaiju.roster(profile)
+		local random = Gems.random()
+		local names = {}
+		for i, element in sale.Elements do
+			local soul = Kaiju.rollSoul(random, element, {
+				Id = PlayerData.newGemId(),
+				Time = os.time(),
+				Species = sale.Species,
+				Rarity = sale.Rarity,
+				Best = sale.Best,
+			})
+			local record = Kaiju.add(roster, sale.Species, soul, Kaiju.StarterLevel, i, Kaiju.rollTraits(random, sale.TraitFloor))
+			if record then
+				table.insert(names, Kaiju.nameOf(record))
+			end
+		end
+		if #names == 0 then
+			return false
+		end
+		p[sale.Once] = true
+		PlayerData.sync(player)
+		Remotes.Notify:FireClient(
+			player,
+			string.format("%s join your kaiju. Swap them into a team from YOUR KAIJU.", table.concat(names, ", "))
+		)
+		return true, names
 	end
 	return false
 end

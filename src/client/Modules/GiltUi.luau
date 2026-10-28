@@ -156,7 +156,8 @@ function Gilt.button(
 		Thickness = if primary then 1.5 else 1,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, b)
-	new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 1, Transparency = 0.35 }, b)
+	-- (its words lifted off the face: a soft shadow, never a dark outline)
+	b.TextStrokeColor3, b.TextStrokeTransparency = Color3.new(0, 0, 0), 0.75
 	-- (light catching its top edge)
 	new("Frame", {
 		Name = "Shine",
