@@ -196,37 +196,42 @@ end
 
 local barGui = UiKit.gui("SparKit", 7)
 barGui.IgnoreGuiInset = false
+-- (A slim bar of dark glass: a thin accent in the kit's red, the words,
+-- and its one button, the key on a cap and what it does: END in a spar,
+-- MINE with the kit out, in the pick's gold. The cap and its rim light up
+-- under the mouse.)
+local BAR = { W = 200, H = 34, ChipW = 84, ChipH = 24 }
 local bar = new("TextButton", {
 	Name = "SparBar",
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 10),
-	Size = UDim2.fromOffset(300, 44),
-	BackgroundColor3 = FIGHT:Lerp(GLASS, 0.82),
-	BackgroundTransparency = 0.1,
+	Size = UDim2.fromOffset(BAR.W, BAR.H),
+	BackgroundColor3 = GLASS,
+	BackgroundTransparency = 0.18,
 	AutoButtonColor = false,
 	Text = "",
 	Visible = false,
 }, barGui)
-UiKit.round(bar, 12)
-new("UIStroke", { Color = FIGHT, Thickness = 1.5, Transparency = 0.15 }, bar)
+UiKit.round(bar, 7)
+local barEdge = new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1, Transparency = 0.84 }, bar)
 local barScale = new("UIScale", { Scale = 1 }, bar)
-new("TextLabel", {
-	Position = UDim2.fromOffset(10, 0),
-	Size = UDim2.fromOffset(26, 44),
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamBold,
-	Text = "⚔",
-	TextSize = 18,
-	TextColor3 = FIGHT,
+local accent = new("Frame", {
+	Name = "Accent",
+	AnchorPoint = Vector2.new(0, 0.5),
+	Position = UDim2.new(0, 8, 0.5, 0),
+	Size = UDim2.fromOffset(3, 16),
+	BackgroundColor3 = FIGHT,
+	BorderSizePixel = 0,
 }, bar)
+UiKit.round(accent, 2)
 local versus = new("TextLabel", {
 	Name = "Versus",
-	Position = UDim2.fromOffset(40, 0),
-	Size = UDim2.new(1, -136, 1, 0),
+	Position = UDim2.fromOffset(18, 0),
+	Size = UDim2.new(1, -(18 + BAR.ChipW + 12), 1, 0),
 	BackgroundTransparency = 1,
-	Font = IronUi.Bold,
+	Font = Enum.Font.GothamBold,
 	Text = "SPAR",
-	TextSize = 13,
+	TextSize = 12,
 	TextColor3 = P.Text,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextTruncate = Enum.TextTruncate.AtEnd,
@@ -234,34 +239,48 @@ local versus = new("TextLabel", {
 local endChip = new("Frame", {
 	Name = "End",
 	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -6, 0.5, 0),
-	Size = UDim2.fromOffset(86, 32),
-	BackgroundColor3 = FIGHT:Lerp(GLASS, 0.55),
+	Position = UDim2.new(1, -5, 0.5, 0),
+	Size = UDim2.fromOffset(BAR.ChipW, BAR.ChipH),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BackgroundTransparency = 0.93,
 }, bar)
-UiKit.round(endChip, 9)
-new("UIStroke", { Color = FIGHT, Thickness = 1, Transparency = 0.3 }, endChip)
+UiKit.round(endChip, 5)
+local chipEdge = new("UIStroke", { Color = PICK, Thickness = 1, Transparency = 0.55 }, endChip)
 local keyCap = new("TextLabel", {
 	Name = "Key",
-	Position = UDim2.fromOffset(6, 5),
-	Size = UDim2.fromOffset(22, 22),
-	BackgroundColor3 = Color3.fromRGB(34, 38, 58),
-	Font = Enum.Font.GothamBlack,
+	AnchorPoint = Vector2.new(0, 0.5),
+	Position = UDim2.new(0, 5, 0.5, 0),
+	Size = UDim2.fromOffset(16, 16),
+	BackgroundColor3 = GLASS,
+	BackgroundTransparency = 0.2,
+	Font = Enum.Font.GothamBold,
 	Text = "X",
-	TextSize = 13,
+	TextSize = 10,
 	TextColor3 = P.Text,
 }, endChip)
-UiKit.round(keyCap, 6)
+UiKit.round(keyCap, 3)
+new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1, Transparency = 0.6 }, keyCap)
 local endLabel = new("TextLabel", {
 	Name = "Label",
-	Position = UDim2.fromOffset(32, 0),
-	Size = UDim2.new(1, -36, 1, 0),
+	Position = UDim2.fromOffset(26, 0),
+	Size = UDim2.new(1, -30, 1, 0),
 	BackgroundTransparency = 1,
-	Font = IronUi.Bold,
+	Font = Enum.Font.GothamBold,
 	Text = "END",
-	TextSize = 13,
+	TextSize = 12,
 	TextColor3 = P.Text,
 	TextXAlignment = Enum.TextXAlignment.Left,
 }, endChip)
+bar.MouseEnter:Connect(function()
+	endChip.BackgroundTransparency = 0.84
+	chipEdge.Transparency = 0.1
+	barEdge.Transparency = 0.7
+end)
+bar.MouseLeave:Connect(function()
+	endChip.BackgroundTransparency = 0.93
+	chipEdge.Transparency = 0.55
+	barEdge.Transparency = 0.84
+end)
 local caption = new("TextLabel", {
 	Name = "Caption",
 	AnchorPoint = Vector2.new(0.5, 0),
@@ -270,7 +289,7 @@ local caption = new("TextLabel", {
 	BackgroundTransparency = 1,
 	Font = IronUi.Bold,
 	Text = "FRIENDLY SPAR  ·  only you two can hit each other",
-	TextSize = 12,
+	TextSize = 11,
 	TextColor3 = P.Text,
 	TextStrokeColor3 = P.Ink,
 	TextStrokeTransparency = 0.45,
@@ -300,14 +319,16 @@ local function refreshBar()
 	local hunting = Spar.hunting(player)
 	versus.Text = if hunting then "KIT OUT" else "SPAR vs " .. string.upper(partnerName())
 	endLabel.Text = if hunting then "MINE" else "END"
+	-- (its button in what it brings out: the pick's gold to mine, the kit's red to end)
+	chipEdge.Color = if hunting then PICK else FIGHT
 	caption.Text = if hunting
 		then "KIT OUT  ·  only creatures can hit you  ·  X for your pick"
 		else "FRIENDLY SPAR  ·  only you two can hit each other"
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	-- (Touch: no key to show; the chip itself is the button.)
 	keyCap.Visible = not touch
-	endLabel.Position = UDim2.fromOffset(if touch then 0 else 32, 0)
-	endLabel.Size = if touch then UDim2.fromScale(1, 1) else UDim2.new(1, -36, 1, 0)
+	endLabel.Position = UDim2.fromOffset(if touch then 0 else 26, 0)
+	endLabel.Size = if touch then UDim2.fromScale(1, 1) else UDim2.new(1, -30, 1, 0)
 	endLabel.TextXAlignment = if touch then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
 	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
 	barScale.Scale = if viewport.Y < 430 then 0.82 else 1
