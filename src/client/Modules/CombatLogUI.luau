@@ -20,6 +20,10 @@ local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
 
 local CombatLogUI = {}
 
+-- Off for now (2026-10-28): the log sat behind the kaiju card, bottom left.
+-- Entries are still tallied; nothing's drawn and L does nothing.
+CombatLogUI.Enabled = false
+
 local LINES = 6
 local INK = Color3.fromRGB(12, 17, 28)
 local TEXT = Color3.fromRGB(226, 232, 242)
@@ -413,13 +417,16 @@ function CombatLogUI.new(parent: Instance)
 	end
 
 	function self.toggle()
+		if not CombatLogUI.Enabled then
+			return
+		end
 		local showDetails = not detailPanel.Visible
 		detailPanel.Visible, logPanel.Visible = showDetails, not showDetails
 		self.Dirty = true
 	end
 
 	function self.step(_, visible: boolean)
-		if not visible then
+		if not visible or not CombatLogUI.Enabled then
 			logPanel.Visible, detailPanel.Visible = false, false
 			return
 		end

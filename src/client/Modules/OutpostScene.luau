@@ -282,7 +282,24 @@ local kitAvailable = true
 local hintBlocked = UserInputService.TouchEnabled
 local function paintHint()
 	hint.Visible = kitAvailable and not hintBlocked
+	-- Beside the kaiju card when it's up (bottom left), else bottom middle.
+	local dock = hint.Visible and UiKit.besideKaiju(hud)
+	if dock then
+		hint.AnchorPoint = Vector2.new(0, 1)
+		hint.Position = UDim2.fromOffset(dock.X, dock.Y)
+	else
+		hint.AnchorPoint = Vector2.new(0.5, 1)
+		hint.Position = UDim2.new(0.5, 210, 1, -16)
+	end
 end
+task.spawn(function()
+	while true do
+		task.wait(0.3)
+		if hint.Visible or kitAvailable then
+			paintHint()
+		end
+	end
+end)
 OutpostScene.toggleKit = nil :: (() -> ())?
 -- X's button: what a press swaps to (FIGHT with the pick out, MINE with
 -- the kit out), in its colour; hidden where X does nothing.

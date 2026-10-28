@@ -570,7 +570,7 @@ for i, id in { "Charge", "Stamina" } do
 end
 local controlsHint = text(
 	gui,
-	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Switch Target | K Tree | L Log",
+	"LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Switch Target | K Tree",
 	10,
 	Color3.fromRGB(205, 198, 182)
 )
@@ -1770,8 +1770,8 @@ RunService.RenderStepped:Connect(function(dt)
 	if controlsHint.Visible and TargetLock.auto() ~= shown.ControlsAuto then
 		shown.ControlsAuto = not shown.ControlsAuto
 		controlsHint.Text = if shown.ControlsAuto
-			then "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Switch Target | K Tree | L Log"
-			else "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Lock On | K Tree | L Log"
+			then "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Switch Target | K Tree"
+			else "LMB Swing | Shift+LMB Off-hand | RMB Guard | Space Hop · Space×2 Roll | Q/E/R Surges | T Lock On | K Tree"
 	end
 	controlsHint.TextTransparency = if cursorFree then 0 else math.clamp(hintAge - 12, 0, 1)
 	cursorModal.Modal = cursorFree

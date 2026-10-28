@@ -320,7 +320,22 @@ local function refreshBar()
 	if riftStrip and riftStrip.Visible then
 		top = riftStrip.AbsolutePosition.Y + riftStrip.AbsoluteSize.Y - barGui.AbsolutePosition.Y + 6
 	end
-	bar.Position = UDim2.new(0.5, 0, 0, top)
+	-- Kit out on a computer: beside the kaiju card (bottom left), where the
+	-- X switch sits, with its line above it; else top middle.
+	local dock = if hunting and not touch and not (riftStrip and riftStrip.Visible) then UiKit.besideKaiju(barGui) else nil
+	if dock then
+		bar.AnchorPoint = Vector2.new(0, 1)
+		bar.Position = UDim2.fromOffset(dock.X, dock.Y)
+		caption.AnchorPoint = Vector2.new(0, 1)
+		caption.Position = UDim2.new(0, 0, 0, -6)
+		caption.TextXAlignment = Enum.TextXAlignment.Left
+	else
+		bar.AnchorPoint = Vector2.new(0.5, 0)
+		bar.Position = UDim2.new(0.5, 0, 0, top)
+		caption.AnchorPoint = Vector2.new(0.5, 0)
+		caption.Position = UDim2.new(0.5, 0, 1, 6)
+		caption.TextXAlignment = Enum.TextXAlignment.Center
+	end
 	-- The rule, for the first few seconds of a spar.
 	if not shown then
 		shown = true

@@ -142,6 +142,26 @@ function UiKit.gui(name: string, order: number?): ScreenGui
 	return gui
 end
 
+-- Just right of the kaiju card (bottom left: Client.KaijuHud), in `gui`'s
+-- own offsets: its left edge and its bottom, for a button docked beside it
+-- (the X kit switch, the KIT OUT bar). nil while the card isn't up.
+function UiKit.besideKaiju(gui: LayerCollector): Vector2?
+	local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	local hud = playerGui and playerGui:FindFirstChild("KaijuHud")
+	local card = hud and hud:FindFirstChild("KaijuCard")
+	if not (hud and hud:IsA("ScreenGui") and hud.Enabled and card and card:IsA("GuiObject") and card.Visible) then
+		return nil
+	end
+	if card.AbsoluteSize.X < 1 then
+		return nil
+	end
+	local origin = gui.AbsolutePosition
+	return Vector2.new(
+		card.AbsolutePosition.X + card.AbsoluteSize.X + 14 - origin.X,
+		card.AbsolutePosition.Y + card.AbsoluteSize.Y - origin.Y
+	)
+end
+
 function UiKit.round(parent: GuiObject, radius: number?)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, radius or 8)
