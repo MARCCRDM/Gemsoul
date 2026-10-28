@@ -12,10 +12,10 @@
 	                CATCH's place; opened, the chat is a column down the left
 	                that stops above the dock. Phones and tablets use
 	                Roblox's own chat instead (ChatFrame).
-	  bottom left   the team keys 1 to 4 (KaijuHud), in a row just above
+	  bottom left   the team keys 1 to 4 (KaijuHud), two by two just above
 	                the move stick (your left thumb), and the team's
 	                HYPERBEAM (KaijuBeamHud) just right of them, a button of
-	                its own over the kit switch
+	                its own as tall as they are, over the kit switch
 	  top middle    the live feed (LobbyFeed), between the pick card's place
 	                and the toasts' place (gone on a screen too narrow for it)
 	  top right     your level and coins (LobbyUI) in a pill, your health
@@ -69,9 +69,9 @@
 	                                       kaijuDesk(screen) on a computer
 	                                       (three by two), kaijuCells(card)
 	                                       its cells; keys(screen) the team
-	                                       keys above the move stick, and
-	                                       beam(screen) the HYPERBEAM right
-	                                       of them
+	                                       keys two by two above the move
+	                                       stick, and beam(screen) the
+	                                       HYPERBEAM right of them
 	  MobileLayout.foes(screen, viewY)     the fight's foe list (FoeBars):
 	                                       on the right at the top, down to
 	                                       just over DODGE
@@ -123,8 +123,12 @@ local function kaijuBottom(): number
 	local _, h = kaijuSize()
 	return 12 + h
 end
--- CATCH on a phone: under your kaiju's card, as wide.
-MobileLayout.Tame = { H = 38 }
+-- CATCH on a phone: Gap under your kaiju's card, as wide.
+MobileLayout.Tame = { H = 36, Gap = 4 }
+-- (Where CATCH ends.)
+local function tameBottom(): number
+	return kaijuBottom() + MobileLayout.Tame.Gap + MobileLayout.Tame.H
+end
 
 -- The pick card (only while you mine): beside your kaiju's card at the
 -- top, at CardScale (H: as tall as it opens).
@@ -172,7 +176,7 @@ end
 function MobileLayout.chat(screen: Vector2, open: boolean)
 	if not open then
 		-- (Under CATCH's place, under your kaiju's card.)
-		return { X = 12, Y = kaijuBottom() + 6 + MobileLayout.Tame.H + 6, W = 76, H = 44 }
+		return { X = 12, Y = tameBottom() + 6, W = 76, H = 44 }
 	end
 	local dock = MobileLayout.dock(screen, 5)
 	local width = math.floor(math.clamp(screen.X * 0.38, 240, 340))
@@ -314,7 +318,8 @@ end
 -- Your kaiju's card on a phone (KaijuHud), small, at the top left, in a
 -- fight too: two rows, the team's three and the support a little apart,
 -- AUTO HEAL under them. The team keys and the HYPERBEAM aren't on it:
--- keys(screen), above the move stick, and beam(screen), right of them.
+-- keys(screen), two by two above the move stick, and beam(screen), right
+-- of them.
 -- TameX, TameY, TameW, TameH: where CATCH goes on a touch screen, under it.
 -- (`_hunting`: the same place either way now.)
 function MobileLayout.kaiju(_screen: Vector2, _hunting: boolean?)
@@ -331,35 +336,50 @@ function MobileLayout.kaiju(_screen: Vector2, _hunting: boolean?)
 		Rows = { spec.Tile, spec.AutoH },
 		Grid = true,
 		TameX = 12,
-		TameY = kaijuBottom() + 6,
+		TameY = kaijuBottom() + MobileLayout.Tame.Gap,
 		TameW = w,
 		TameH = MobileLayout.Tame.H,
 	}
 end
 
--- The team keys 1 to 4 on a phone (KaijuHud): their own row, Size square,
--- just above the move stick, under your left thumb.
-MobileLayout.Keys = { Size = 34, Gap = 5, Above = 8, Count = 4 }
+-- The team keys 1 to 4 on a phone (KaijuHud): Across a row (two by two),
+-- Size square, Above the move stick, under your left thumb. On a short
+-- phone they're smaller (down to Min) and Near the stick, to keep Clear of
+-- CATCH under your kaiju's card.
+MobileLayout.Keys = { Size = 34, Min = 30, Gap = 4, Above = 8, Near = 4, Clear = 2, Count = 4, Across = 2 }
 function MobileLayout.keys(screen: Vector2)
 	local k, stick = MobileLayout.Keys, MobileLayout.stick(screen)
+	local down = math.ceil(k.Count / k.Across)
+	local room = stick.Y - (tameBottom() + k.Clear)
+	local size = math.clamp(math.floor((room - k.Near - k.Gap * (down - 1)) / down), k.Min, k.Size)
+	local h = size * down + k.Gap * (down - 1)
+	local above = math.clamp(room - h, k.Near, k.Above)
 	return {
 		X = stick.X,
-		Y = stick.Y - k.Above - k.Size,
-		W = k.Size * k.Count + k.Gap * (k.Count - 1),
-		H = k.Size,
-		Size = k.Size,
+		Y = stick.Y - above - h,
+		W = size * k.Across + k.Gap * (k.Across - 1),
+		H = h,
+		Size = size,
 		Gap = k.Gap,
+		Across = k.Across,
 	}
 end
 
 -- The team's HYPERBEAM on a phone (KaijuBeamHud): a button of its own, W
--- by H, just right of the team keys and level with their bottom (your
--- left thumb's row, over the kit switch). Its meter is its own rim (Rim
--- out round it), SAVE a strip along its bottom inside it.
-MobileLayout.Beam = { W = 60, H = 52, Gap = 12, Rim = 3 }
+-- wide, Gap right of the team keys, as tall as they are (your left thumb's
+-- block, over the kit switch). Its meter is its own rim (Rim out round it:
+-- level with the keys' top and bottom), SAVE a strip along its bottom
+-- inside it.
+MobileLayout.Beam = { W = 64, Gap = 8, Rim = 3 }
 function MobileLayout.beam(screen: Vector2)
 	local b, keys = MobileLayout.Beam, MobileLayout.keys(screen)
-	return { X = keys.X + keys.W + b.Gap, Y = keys.Y + keys.H - b.H, W = b.W, H = b.H, Rim = b.Rim }
+	return {
+		X = keys.X + keys.W + b.Gap + b.Rim,
+		Y = keys.Y + b.Rim,
+		W = b.W,
+		H = keys.H - 2 * b.Rim,
+		Rim = b.Rim,
+	}
 end
 
 -- The fight's foe list on a phone (FoeBars): on the right, at the top

@@ -25,8 +25,8 @@
 	                  by two (the kaiju two by two, AUTO HEAL over the team
 	                  keys). Phone: small, at the top left in a fight too,
 	                  two rows (the kaiju in a row, AUTO HEAL a slim row
-	                  under them); the team keys off the card, a row of their
-	                  own just above the move stick, under your left thumb,
+	                  under them); the team keys off the card, two by two
+	                  just above the move stick, under your left thumb,
 	                  and the HYPERBEAM just right of them (MobileLayout.kaiju,
 	                  keys, beam, kaijuDesk, kaijuCells).
 	  TAME            beside the strip (under it on a phone) when a wild
@@ -587,14 +587,14 @@ local function layout()
 		end
 	end
 	place(autoButton, cells.Auto)
-	-- The four team chips: on a computer two by two on the card, under AUTO
-	-- HEAL; on a phone off the card, a row of their own just above the move
-	-- stick, under your left thumb (MobileLayout.keys).
+	-- The four team chips, two by two: on a computer on the card, under AUTO
+	-- HEAL; on a phone off the card, just above the move stick, under your
+	-- left thumb (MobileLayout.keys).
 	do
 		local gap, across, rect = 3, 2, cells.Teams
 		if phone then
 			local keys = MobileLayout.keys(screen)
-			gap, across, rect = keys.Gap, Kaiju.Teams, keys
+			gap, across, rect = keys.Gap, keys.Across, keys
 			teamPad.Parent = gui
 		else
 			teamPad.Parent = card

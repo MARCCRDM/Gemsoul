@@ -639,20 +639,27 @@ above the combat HUD near the bottom center:
   the world shows round the tiles; the tiles and AUTO HEAL keep their
   solid backs.
 
-  **The team keys 1 2 3 4 are off the card**: a row of their own, 34
-  points square, just above the move stick, under your left thumb
-  (`MobileLayout.keys`). They used to sit at the end of the row; while you
-  hunted the whole row moved over to the right, across the middle of the
-  screen and onto DODGE.
+  **The team keys 1 2 3 4 are off the card**, two by two (*2026-10-28*;
+  a row of four before), 34 points square, just above the move stick,
+  under your left thumb (`MobileLayout.keys`). On the shortest phones
+  (812 by 375) they're 30 and sit a little nearer the stick, to keep clear
+  of CATCH under the card. They used to sit at the end of the card's row;
+  while you hunted the whole row moved over to the right, across the
+  middle of the screen and onto DODGE.
 
   **The HYPERBEAM is a button of its own**, *2026-10-27*: just right of
-  the team keys, level with their bottom, over the FIGHT / MINE switch
-  (`MobileLayout.beam`, 60 by 52). It reads HYPERBEAM over its percent
-  (READY! when it's full), with SAVE a strip along its bottom; its meter is
-  its own rim, filling from the bottom up in your team's colours. It sits
-  clear of the fight's vitals and moves on the smallest phone.
+  the team keys and as tall as they are (its rim level with their top and
+  bottom), 64 wide, over the FIGHT / MINE switch (`MobileLayout.beam`).
+  *2026-10-28:* with the keys two by two it moved left beside them; the
+  keys and the button take 150 points across, where the row of keys and
+  the button took 226. It reads HYPERBEAM over its percent (READY! when
+  it's full), with SAVE a strip along its bottom; its meter is its own
+  rim, filling from the bottom up in your team's colours. Its title keeps
+  well in from the tile's sides (on a phone it ran under the rim, cut off
+  as HYPERBEA). It sits clear of the fight's vitals and moves on the
+  smallest phone.
 
-  ![The kaiju grid on a phone, the team keys above the move stick](kaiju/hud-phone-grid.png)
+  ![The kaiju grid on a phone, the team keys two by two above the move stick and the HYPERBEAM beside them. Offline render, not a Roblox screenshot](kaiju/hud-phone-grid.png)
 
   ![In a fight: before and now](kaiju/hud-phone-grid-hunting.png)
 
@@ -753,8 +760,8 @@ blast together. It works the same in mining and in fights.
   - **Blasting:** BLASTING!
 
   On a phone it isn't on the card: it's a button of its own right of the
-  team keys, its rim the meter, filling from the bottom up (the slot's
-  `Apart` attribute; see [Your team](#your-team)).
+  team keys and as tall as they are, its rim the meter, filling from the
+  bottom up (the slot's `Apart` attribute; see [Your team](#your-team)).
 
   It's light to run: it redraws only when what it shows changes, and moves
   only while it's ready.
@@ -763,7 +770,7 @@ blast together. It works the same in mining and in fights.
 
   ![The kaiju card with its outline as the HYPERBEAM meter: charging, saving, ready and blasting, its pill on the bottom edge. Offline render of the game's UI code, not a Roblox screenshot](kaiju/hyperbeam-states.png)
 
-  ![On a phone: the HYPERBEAM's own button right of the team keys, charging at 63% and ready. Offline render, not a Roblox screenshot](kaiju/hyperbeam-phone.png)
+  ![On a phone: the team keys two by two and the HYPERBEAM's own button beside them, charging at 63% and ready. Offline render, not a Roblox screenshot](kaiju/hyperbeam-phone.png)
 - **The blast** (`KaijuBeamServer`, 6.1 seconds, `KaijuBeam.timeline`).
   Since 2026-10-26 it all happens in front of you, seen from your own
   view: no cinematic camera.

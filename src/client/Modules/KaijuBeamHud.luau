@@ -9,9 +9,9 @@
 	on the card's bottom edge (KaijuHud.beamSlot(): its cell, the card its
 	parent), says how far along it is and holds SAVE. On a phone the slot
 	is apart from the card (its Apart attribute: just right of the team
-	keys, MobileLayout.beam), and the button fills it, a tile: HYPERBEAM
-	over its percent, SAVE along its bottom, its meter its own rim, filling
-	from the bottom up.
+	keys and as tall, MobileLayout.beam), and the button fills it, a tile:
+	HYPERBEAM over its percent, SAVE along its bottom, its meter its own
+	rim, filling from the bottom up.
 
 	  Charging   HYPERBEAM and its percent.
 	  Ready      the outline full and bright, its colours flowing round it,
@@ -187,15 +187,16 @@ local function layout()
 		return
 	end
 	if apart then
-		-- A tile: HYPERBEAM across the top, its state big under it, SAVE a
-		-- strip along the bottom.
+		-- A tile: HYPERBEAM across the top (well in from its sides, so it
+		-- never runs under the rim), its state big in the room under it,
+		-- SAVE a strip along the bottom.
 		compact = true
 		save.Size = UDim2.new(1, -10, 0, 13)
 		save.Position = UDim2.new(0, 5, 1, -17)
 		save.TextSize = 8
 		ringStroke.Thickness = 3
-		title.Position, title.Size = UDim2.fromOffset(4, 5), UDim2.new(1, -8, 0, 11)
-		state.Position, state.Size = UDim2.fromOffset(3, 16), UDim2.new(1, -6, 0, 17)
+		title.Position, title.Size = UDim2.fromOffset(6, 6), UDim2.new(1, -12, 0, 11)
+		state.Position, state.Size = UDim2.fromOffset(3, 17), UDim2.new(1, -6, 1, -36)
 		title.TextXAlignment, state.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
 		drawn = ""
 		return

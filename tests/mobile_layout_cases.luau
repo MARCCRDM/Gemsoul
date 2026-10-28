@@ -202,16 +202,22 @@ for _, s in SCREENS do
 		check(cells.Auto.Y >= top[1].Y + top[1].H and cells.Auto.W >= kc.W - 2 * kc.Pad and cells.Auto.H >= 18,
 			what .. ": AUTO HEAL isn't a row across the card under the kaiju")
 	end
-	-- The team keys: off the card, a row of four just above the move stick
-	-- (under your left thumb), each big enough to tap, clear of everything
+	-- The team keys: off the card, two by two just above the move stick
+	-- (under your left thumb), each big enough to tap (full size wherever
+	-- there's room: the phones from 844 by 390 up), clear of everything
 	-- else there is (with your pick out, and with your kit out: the fight's
 	-- ring). (The CHAT button only comes with a keyboard, the keys only on
 	-- touch: never both.)
 	local keys = MobileLayout.keys(screen)
 	check(inside(keys), label .. ": the team keys run off the screen")
-	check(keys.Size >= 30 and keys.W == 4 * keys.Size + 3 * keys.Gap, label .. ": the team keys are too small to tap, or not four in a row")
+	check(
+		keys.Size >= 30 and keys.Across == 2 and keys.W == 2 * keys.Size + keys.Gap and keys.H == keys.W,
+		label .. ": the team keys are too small to tap, or not two by two"
+	)
+	check(s[2] < 330 or keys.Size == MobileLayout.Keys.Size, label .. ": the team keys are smaller than they need be: " .. keys.Size)
 	check(keys.X == stick.X and keys.Y + keys.H <= stick.Y and stick.Y - (keys.Y + keys.H) <= 12,
 		label .. ": the team keys aren't just above the move stick")
+	check(keys.Y >= k.TameY + k.TameH + 2, label .. ": the team keys are jammed against CATCH")
 	local fightRing = MobileLayout.ring(s[3])
 	local keyClear = {
 		["kaiju card"] = kWhole,
@@ -230,18 +236,25 @@ for _, s in SCREENS do
 	for name, r in keyClear do
 		check(not MobileLayout.overlaps(keys, r), label .. ": the team keys overlap the " .. name)
 	end
-	-- The HYPERBEAM: a button of its own just right of the team keys, level
-	-- with their bottom, bigger than a key; clear of the same (its rim
-	-- too), of the keys, and of the fight's vitals and the moves over them
-	-- (three at most) with your kit out.
+	-- The HYPERBEAM: a button of its own just right of the team keys, its
+	-- rim level with their top and bottom, bigger than a key; the two of
+	-- them a block of their own (no wider than the old row of keys alone);
+	-- clear of the same (its rim too), of the keys and the move stick, and
+	-- of the fight's vitals and the moves over them (three at most) with
+	-- your kit out.
 	local beam = MobileLayout.beam(screen)
 	local rimmed = { X = beam.X - beam.Rim, Y = beam.Y - beam.Rim, W = beam.W + 2 * beam.Rim, H = beam.H + 2 * beam.Rim }
 	check(inside(rimmed), label .. ": the HYPERBEAM runs off the screen")
 	check(beam.W >= 52 and beam.H >= 48 and beam.H > keys.Size, label .. ": the HYPERBEAM is too small to tap")
-	check(beam.X >= keys.X + keys.W + 8 and beam.X - (keys.X + keys.W) <= 16 and beam.Y + beam.H == keys.Y + keys.H,
-		label .. ": the HYPERBEAM isn't just right of the team keys, level with them")
+	check(
+		rimmed.X >= keys.X + keys.W + 6 and rimmed.X - (keys.X + keys.W) <= 12
+			and rimmed.Y == keys.Y and rimmed.Y + rimmed.H == keys.Y + keys.H,
+		label .. ": the HYPERBEAM isn't just right of the team keys, as tall as they are"
+	)
+	check(rimmed.X + rimmed.W - keys.X <= 4 * 34 + 3 * 5, label .. ": the team keys and the HYPERBEAM take up too much room: " .. (rimmed.X + rimmed.W - keys.X))
 	local beamClear = table.clone(keyClear)
 	beamClear["team keys"] = keys
+	beamClear["move stick"] = stick
 	do
 		-- (The fight's vitals and the moves over them, on the camera's
 		-- viewport: bottom-anchored, so the same bottom edge as the screen.)
