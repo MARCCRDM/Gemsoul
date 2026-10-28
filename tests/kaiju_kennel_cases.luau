@@ -252,5 +252,15 @@ check(Kaiju.Sale.Daily.Product == "KaijuDaily" and Kaiju.Sale.Rare.Product == "K
 local storeServer = fs.readFile(ROOT .. "/src/server/Systems/StoreServer.luau")
 check(storeServer:find("StoreServer.kaijuSale(player, reward.KaijuSale)", 1, true) ~= nil, "A Kennel receipt isn't granted")
 check(fs.readFile(ROOT .. "/src/server/Main.server.luau"):find("StoreServer.kaijuSale = KaijuServer.saleGrant", 1, true) ~= nil, "The Kennel's grant isn't wired")
+-- The Store sells them too: a Kaiju tab, and the Featured front page leads
+-- with the two sales above the bundles. The lobby's button says STORE.
+check(Store.Tabs[1] == "Featured" and table.find(Store.Tabs, "Kaiju") ~= nil, "The Store has no Featured front page or Kaiju tab")
+check(table.find(Store.Tabs, "Bundles") == nil, "The bundles have a tab of their own as well as the front page")
+local shopUi = fs.readFile(ROOT .. "/src/client/Modules/ShopUI.luau")
+check(shopUi:find("KaijuDeals.strip(list, 10)", 1, true) ~= nil, "Featured doesn't lead with the kaiju deals")
+check(shopUi:find("Featured = drawBundles", 1, true) ~= nil, "The bundles aren't on the front page")
+check(shopUi:find("KaijuDeals.daily(row", 1, true) ~= nil and shopUi:find("KaijuDeals.rare(row", 1, true) ~= nil, "The Kaiju page misses a sale")
+check(shopUi:find("which == \"Bundles\"", 1, true) ~= nil, "Old links to the Bundles tab go nowhere")
+check(fs.readFile(ROOT .. "/src/client/Modules/LobbyUI.luau"):find('tile("STORE"', 1, true) ~= nil, "The lobby's Store button isn't STORE")
 
-print(string.format("PASS: %d Kaiju Kennel checks (residents and the Kaiju of the Day by day, wedges, no collisions, smooth walks, moods, the pen, Wren, the Daily Kaiju Sale and the Starter Rare Roll, any support in the slot)", checks))
+print(string.format("PASS: %d Kaiju Kennel checks (residents and the Kaiju of the Day by day, wedges, no collisions, smooth walks, moods, the pen, Wren, the Daily Kaiju Sale and the Starter Rare Roll, in the Kennel and the Store, any support in the slot)", checks))

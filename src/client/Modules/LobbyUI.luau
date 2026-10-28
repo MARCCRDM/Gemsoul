@@ -1094,12 +1094,11 @@ local function inventoryUpgradeLabel(hints)
 end
 UpgradeHints.Changed:Connect(inventoryUpgradeLabel)
 inventoryUpgradeLabel(UpgradeHints.Current)
--- SKINS (the Store: skins, suits, helmets, visors, pickaxes, bundles),
--- right after INVENTORY (third on a phone, after PLAY), blue. (The shop
--- front in the Outpost is still signed STORE.)
+-- STORE (the Store: kaiju, bundles, skins, suits, helmets, visors,
+-- pickaxes), right after INVENTORY (third on a phone, after PLAY), blue.
 local SKINS_TOP, SKINS_BOTTOM = Color3.fromRGB(86, 156, 255), Color3.fromRGB(34, 92, 214)
 local SKINS_EDGE = Color3.fromRGB(10, 34, 92)
-local skinsTile = tile("SKINS", "Coins", Color3.new(1, 1, 1), function()
+local skinsTile = tile("STORE", "Coins", Color3.new(1, 1, 1), function()
 	require(script.Parent.ShopUI).toggle()
 end)
 do

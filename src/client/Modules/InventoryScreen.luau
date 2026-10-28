@@ -2400,7 +2400,7 @@ for order, spec in
 		{ "AUGMENT TREE  [K]", false, openModule("AugmentTreeUI", "toggle") },
 		{ "SEASON  [J]", false, openModule("SeasonUI", "toggle") },
 		{ "MARKET", false, openModule("MarketBoardUI", "open") },
-		{ "SKINS", false, openModule("ShopUI", "toggle") },
+		{ "STORE", false, openModule("ShopUI", "toggle") },
 	}
 do
 	-- Flat text tabs; the current screen is bright with a gold underline.

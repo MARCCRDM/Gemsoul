@@ -565,7 +565,7 @@ end
 -- and Page (rects), TabH, Close (a square) and Wallet (where the coins end,
 -- on the right, and their height).
 MobileLayout.Store =
-	{ Width = 844, MinH = 360, Edge = 10, Rail = 128, Gap = 10, TabMax = 48, TabGap = 4, Close = 40, Tabs = 7 }
+	{ Width = 844, MinH = 360, Edge = 10, Rail = 128, Gap = 10, TabMax = 48, TabGap = 3, Close = 40, Tabs = 8 }
 function MobileLayout.store(screen: Vector2, top: number, right: number)
 	local k = MobileLayout.Store
 	local s = math.min(screen.X / k.Width, screen.Y / k.MinH)

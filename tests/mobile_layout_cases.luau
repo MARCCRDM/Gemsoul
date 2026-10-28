@@ -36,7 +36,7 @@ local SCREENS = {
 	{ 932, 430 - 58, 430 },
 	{ 1024, 768 - 36, 768 },
 }
-local TILES = 7 -- PLAY, INVENTORY, SKINS, TASKS, MARKET, SOCIAL, INVITE (no RANKS on a phone)
+local TILES = 7 -- PLAY, INVENTORY, STORE, TASKS, MARKET, SOCIAL, INVITE (no RANKS on a phone)
 for _, s in SCREENS do
 	local screen = Vector2.new(s[1], s[2])
 	local label = s[1] .. "x" .. s[2]
@@ -419,7 +419,7 @@ check(not MobileLayout.topClaimed() and heard == 4, "The top middle wasn't given
 -- The Store on a phone (MobileLayout.store): the whole screen at every phone
 -- size (drawn 844 wide, as tall as the screen's shape leaves, scaled to fill
 -- it); the coins and the close button in Roblox's strip, at its right end,
--- clear of its buttons and of DEV; the seven categories down the rail, every
+-- clear of its buttons and of DEV; the eight categories down the rail, every
 -- tab a thumb's height, all of them in it; the page beside the rail, inside
 -- the screen; and a catalog page with at least two columns of looks beside a
 -- product page that keeps its width.
@@ -449,7 +449,8 @@ for _, s in {
 	check((close.X + close.W) * store.Scale <= right, label .. ": the close button is under DEV")
 	check(store.Wallet.Right <= close.X - 6, label .. ": the coins run into the close button")
 	check(rail.Y >= store.Strip, label .. ": the rail starts under Roblox's buttons")
-	check(store.TabH >= 36, label .. ": the tabs are short: " .. store.TabH)
+	-- (eight categories now, Featured and Kaiju first: a thumb's height still)
+	check(store.TabH >= 34, label .. ": the tabs are short: " .. store.TabH)
 	local tabs = MobileLayout.Store.Tabs
 	check(tabs * store.TabH + (tabs - 1) * MobileLayout.Store.TabGap <= rail.H, label .. ": the tabs don't fit the rail")
 	check(page.X >= rail.X + rail.W and page.Y == rail.Y, label .. ": the page isn't beside the rail")

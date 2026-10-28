@@ -1,9 +1,11 @@
 # The store (2026-10-15)
 
-The store sells looks only, never stats. It is built like a shop online:
+The store sells looks (never stats) and, since 2026-10-28, the Kennel's
+kaiju (see [kaiju-kennel.md](kaiju-kennel.md)). It is built like a shop online:
 categories along the top, product grids with a product page beside them, and
 bundles that show what they hold and how much you save. Nothing random is
-sold.
+sold but the Starter Rare Roll, whose odds it shows. The lobby's button for it
+says STORE (it said SKINS).
 
 On a phone it's the whole screen, with the categories down a rail on the
 left and the coins and close button in Roblox's strip at the top (see
@@ -18,7 +20,8 @@ Code:
 
 | Tab | What's there |
 | --- | --- |
-| **Bundles** | The new-player offer (while it's open), the player bundles and the premium sets. |
+| **Featured** | The front page: the new-player offer (while it's open), then the Kennel's two kaiju deals side by side (the Kaiju of the Day, turning in its view, and the Starter Rare Roll), then the player bundles and the premium sets. |
+| **Kaiju** | The Kennel's sales, big: the Kaiju of the Day (its kind, element, role, trait floor and the clock to the next one) and the Starter Rare Roll (once ever; every rare kind as likely as the next, odds shown), and the team revive. A kaiju bought joins your reserves, or its roll plays on the roll screen, so the store closes for it. |
 | **Weapon Skins**, **Suits**, **Helmets**, **Visors**, **Pickaxes** | A grid of every look, sorted by featured or by price, showing all of them or only the ones you don't own. Beside it is the picked look's page: a 3D preview, the price, buy (or wear), and the bundle that saves on it. Looks earned in play show after the ones for sale, each saying how to earn it. |
 | **Free** | The group, friends, the 7-day login streak and promo codes. |
 

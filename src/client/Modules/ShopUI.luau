@@ -3,8 +3,9 @@
 	categories, product grids with a product page beside them, and bundles
 	that show what they hold and what you save.
 
-	  Bundles       the new-player offer (Starter Pack or Welcome Kit, while
-	                it's open), the player bundles (a whole look: suit, weapon
+	  Featured      the front page: the Kennel's kaiju deals (small), then
+	                the bundles: the new-player offer (Starter Pack or Welcome
+	                Kit, while it's open), the player bundles (a whole look: suit, weapon
 	                skin, helmet, visor, pickaxe) and the premium sets (Royal
 	                Treasury, The Vault). Every bundle opens a
 	                page listing each piece, what it costs on its own, and
@@ -14,6 +15,9 @@
 	                you don't own) and the picked look's page: 3D preview,
 	                price, buy or wear, and the bundle that saves on it.
 	                Looks earned in play show after, saying how.
+	  Kaiju         the Kennel's sales (Shared.Kaiju.Sale): the Kaiju of the
+	                Day turning in its view, the Starter Rare Roll (once
+	                ever) with its odds, and the team revive.
 	  Free          the group, friends, the login streak and promo codes.
 
 	Buying: a product with a Developer Product id opens Roblox's purchase
@@ -133,7 +137,7 @@ local HOW_TO = {
 }
 
 local state = {
-	Tab = "Bundles",
+	Tab = "Featured",
 	Selected = {} :: { [string]: string }, -- the picked look, per catalog tab
 	Sort = "Low",
 	Filter = "All",
@@ -481,9 +485,9 @@ local scale = new("UIScale", {}, panel)
 -- the close button at its right end, and the categories run down a rail on
 -- the left, the picked one lit with a gold edge.)
 if not SHORT then
-	local brand = text(panel, "SUPPLY DEPOT", 20, C.Text, BLACK, 28, 14, 210, 26)
+	local brand = text(panel, "STORE", 20, C.Text, BLACK, 28, 14, 120, 26)
 	brand.Name = "Brand"
-	text(panel, "LOOKS ONLY  ·  NEVER STATS", 9, C.Faint, BOLD, 28, 40, 210, 12).Name = "Promise"
+	text(panel, "KAIJU  ·  LOOKS  ·  BUNDLES", 9, C.Faint, BOLD, 28, 40, 150, 12).Name = "Promise"
 end
 local band = if SHORT then box(panel, C.Ink, 0, 0, W, HEAD, 0.45) else nil
 if band then
@@ -492,18 +496,18 @@ end
 local nav = new("Frame", {
 	Name = if SHORT then "Rail" else "Nav",
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(240, 0),
-	Size = UDim2.fromOffset(560, HEAD),
+	Position = UDim2.fromOffset(196, 0),
+	Size = UDim2.fromOffset(600, HEAD),
 }, panel)
--- (Seven tabs: close together, so the offer's clock on the right never
+-- (Eight tabs: close together, so the offer's clock on the right never
 -- covers the last of them.)
-local navList = UiKit.list(nav, if SHORT then MobileLayout.Store.TabGap else 16, not SHORT)
+local navList = UiKit.list(nav, if SHORT then MobileLayout.Store.TabGap else 12, not SHORT)
 if not SHORT then
 	navList.VerticalAlignment = Enum.VerticalAlignment.Center
 end
 local navButtons = {}
 local navLabels = {} -- (the button itself, or on a phone the name in it)
-local dealTag: TextLabel? = nil -- (a phone: SALE on Bundles while the offer's open)
+local dealTag: TextLabel? = nil -- (a phone: SALE on Featured while the offer's open)
 for i, id in Store.Tabs do
 	local b = new("TextButton", {
 		Name = id .. "Tab",
@@ -529,7 +533,7 @@ for i, id in Store.Tabs do
 		underline.AnchorPoint = Vector2.new(0, 0.5)
 		underline.Position = UDim2.new(0, 5, 0.5, 0)
 		underline.Size = UDim2.new(0, 4, 0.55, 0)
-		if id == "Bundles" then
+		if id == "Featured" then
 			dealTag = pill(b, "SALE", C.Sale, true, 9)
 			local tag = dealTag :: TextLabel
 			tag.Name = "DealTag"
@@ -1043,6 +1047,17 @@ end
 -- Order confirmation ------------------------------------------------------------------------------------------------
 
 function showReceipt(key: string)
+	-- (A kaiju joins your reserves, or its roll plays on the roll screen:
+	-- the store gets out of its way. A revive is back on its feet now.)
+	local bought = Store.contents(key) or {}
+	if bought.KaijuSale then
+		ShopUI.close()
+		UiKit.toast("Thank you! " .. Store.productName(key) .. ": yours.", C.Good)
+		return
+	elseif bought.KaijuRevive then
+		UiKit.toast("Your kaiju are back on their feet.", C.Good)
+		return
+	end
 	if not gui.Enabled then
 		UiKit.toast("Thanks! " .. Store.productName(key) .. " is yours.", C.Good)
 		return
@@ -1398,7 +1413,7 @@ local function productPage(id: string, x: number)
 		wrap(about)
 		button(offer, "View", "Secondary", inner - 76, (Y.OfferH - 32) / 2, 64, 32, function()
 			if Store.kitsOf(key) then
-				state.Tab = "Bundles"
+				state.Tab = "Featured"
 				refresh()
 			end
 			showBundle(key)
@@ -1678,6 +1693,273 @@ local function premiumCard(parent: Instance, bundle: Store.Bundle, order: number
 	end)
 end
 
+-- Kaiju ----------------------------------------------------------------------------------------------------------
+-- The Kennel's sales (Shared.Kaiju.Sale), here as well as at the Kennel
+-- (Client KennelSale): today's Kaiju of the Day, turning in its view, and
+-- the Starter Rare Roll, once ever; and the team revive. The Kaiju page
+-- shows them big, with what each brings; Featured leads with the two sales,
+-- smaller. (A kaiju bought joins your reserves, or its roll plays on the
+-- roll screen: showReceipt closes the store for it.)
+local KaijuDeals = {}
+do
+	local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+	local Kennel = require(ReplicatedStorage.Shared.KaijuKennel)
+	local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
+	local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+
+	-- Kaiju turning in their views: { Model, Center, Rest } (cleared with
+	-- the page).
+	local turning = {}
+	KaijuDeals.Turning = turning
+	RunService.RenderStepped:Connect(function()
+		if #turning == 0 or not gui.Enabled then
+			return
+		end
+		local angle = (os.clock() * 0.5) % (math.pi * 2)
+		for _, spin in turning do
+			spin.Model:PivotTo(spin.Center * CFrame.Angles(0, angle, 0) * spin.Center:Inverse() * spin.Rest)
+		end
+	end)
+
+	-- A kaiju in a view filling `parent`, turning if `turn`.
+	local function view(parent: Instance, species: string, element: string, turn: boolean?): ViewportFrame
+		local model = KaijuModels.forPortrait(KaijuModels.build(species, element))
+		local cf, size = model:GetBoundingBox()
+		local reach = math.max(size.X, size.Y * 1.2, size.Z)
+		local frame = new("ViewportFrame", {
+			Name = "KaijuView",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			Ambient = KaijuModels.Portrait.Ambient,
+			LightColor = KaijuModels.Portrait.LightColor,
+			LightDirection = KaijuModels.Portrait.LightDirection,
+		}, parent)
+		local camera = Instance.new("Camera")
+		camera.FieldOfView = 34
+		camera.CFrame = CFrame.lookAt(cf.Position + Vector3.new(reach * 0.55, reach * 0.35, -reach * 1.45), cf.Position)
+		camera.Parent = frame
+		frame.CurrentCamera = camera
+		model.Parent = frame
+		if turn then
+			table.insert(turning, { Model = model, Center = CFrame.new(cf.Position), Rest = model:GetPivot() })
+		end
+		return frame
+	end
+
+	-- Seconds to the next Kaiju of the Day (midnight UTC: KaijuKennel.day).
+	local function untilNext(): number
+		return math.max(0, (Kennel.day(now()) + 1) * Kennel.DaySeconds - now())
+	end
+
+	-- A sale's card, `w` by `h`: its picture in a well on the left (`fill`
+	-- draws it), a tag, its name and lines on the right, the price and the
+	-- buy button at the foot. `opts`: { Name, Key, Tint, Tag, TagColor,
+	-- Title, Sub, About?, Clock? (a label to tick), Fill, Short = { Tag,
+	-- Title, Sub } (the words for a narrow card) }.
+	local function saleCard(parent: Instance, w: number, h: number, order: number, opts): Frame
+		local small = h < 240
+		local card = box(parent, Color3.new(1, 1, 1), 0, 0, w, h)
+		card.Name = opts.Name
+		card.LayoutOrder = order
+		round(card, 14)
+		new("UIGradient", {
+			Rotation = 0,
+			Color = ColorSequence.new(C.Surface:Lerp(opts.Tint, 0.2), C.Surface),
+		}, card)
+		stroke(card, opts.Tint, 1, 0.62)
+		local side = math.min(h - 16, math.floor(w * 0.42))
+		local pic = well(card, opts.Tint, 8, 8, side, h - 16)
+		opts.Fill(pic)
+		local x = side + 24
+		local tw = w - x - 16
+		local words = if tw < 200 and opts.Short then opts.Short else opts
+		pill(card, words.Tag, opts.TagColor, false, 9).Position = UDim2.fromOffset(x, 14)
+		local nameSize = if small then 20 else 26
+		-- (a long name shrinks to fit rather than run off)
+		local name = text(card, words.Title, nameSize, C.Text, BLACK, x, 40, tw, nameSize + 6)
+		name.TextScaled = true
+		new("UITextSizeConstraint", { MaxTextSize = nameSize, MinTextSize = 12 }, name)
+		local y = 40 + nameSize + 8
+		local sub = text(card, words.Sub, 12 + UP, C.Dim, BOLD, x, y, tw, 16)
+		sub.TextTruncate = Enum.TextTruncate.AtEnd
+		y += 22
+		if opts.About and not small then
+			wrap(text(card, opts.About, 12 + UP, C.Faint, MEDIUM, x, y, tw, 50))
+			y += 56
+		end
+		if opts.Clock then
+			local tick = text(card, "", 10 + UP, C.Gold, BOLD, x, y, tw, 14)
+			tick.Name = "Clock"
+			timer(tick, opts.Clock, "NEW KAIJU IN ")
+		end
+		local bh = if small then 38 else 44
+		local priceSize = if small then 20 else 24
+		priceRow(card, opts.Key, x, h - 12 - bh - 8 - (priceSize + 6), priceSize, false)
+		buyButton(card, opts.Key, x, h - 12 - bh, tw, bh)
+		return card
+	end
+
+	-- Today's Kaiju of the Day.
+	function KaijuDeals.daily(parent: Instance, w: number, h: number, order: number): Frame
+		local sale = Kaiju.Sale.Daily
+		local special = Kennel.special(Kennel.day(now()))
+		local kind = Kaiju.species(special.Species)
+		return saleCard(parent, w, h, order, {
+			Name = "KaijuDaily",
+			Key = sale.Product,
+			Tint = GemConfig.ElementColors[special.Element] or C.Gold,
+			Tag = "DAILY KAIJU SALE",
+			TagColor = C.Gold,
+			Title = kind and kind.Name or special.Species,
+			Sub = string.format("%s  ·  %s  ·  Traits %d+", GemConfig.elementName(special.Element), kind and kind.Role or "Kaiju", sale.TraitFloor),
+			About = string.format(
+				"One of the rarest kinds, on sale today only, one per miner. Its traits are never poor: %d or better in all four.",
+				sale.TraitFloor
+			),
+			Clock = untilNext,
+			Fill = function(pic)
+				view(pic, special.Species, special.Element, true)
+			end,
+			Short = {
+				Tag = "DAILY SALE",
+				Title = kind and kind.Name or special.Species,
+				Sub = GemConfig.elementName(special.Element) .. "  ·  " .. (kind and kind.Role or "Kaiju"),
+			},
+		})
+	end
+
+	-- The Starter Rare Roll: four of the rare kinds in its well (a few
+	-- different ones each day).
+	function KaijuDeals.rare(parent: Instance, w: number, h: number, order: number): Frame
+		local sale = Kaiju.Sale.Rare
+		local kinds = Kaiju.rareKinds()
+		local day = Kennel.day(now())
+		return saleCard(parent, w, h, order, {
+			Name = "KaijuRareRoll",
+			Key = sale.Product,
+			Tint = Color3.fromRGB(176, 120, 255),
+			Tag = "STARTER RARE ROLL  ·  ONCE ONLY",
+			TagColor = Color3.fromRGB(196, 160, 255),
+			Title = "Starter Rare Roll",
+			Sub = string.format("%d kinds  ·  any element  ·  Traits %d+", #kinds, sale.TraitFloor),
+			About = string.format(
+				"One roll on the starter roll's reels. Every kind is as likely as the next (1 in %d), in any of the four elements.",
+				#kinds
+			),
+			Fill = function(pic)
+				local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, pic)
+				new("UIGridLayout", {
+					CellSize = UDim2.fromScale(0.5, 0.5),
+					CellPadding = UDim2.fromOffset(0, 0),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}, grid)
+				for i = 1, math.min(4, #kinds) do
+					local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i }, grid)
+					local species = kinds[(day * 3 + (i - 1) * math.max(1, #kinds // 4)) % #kinds + 1]
+					view(cell, species, Kaiju.Elements[(day + i - 1) % #Kaiju.Elements + 1])
+				end
+			end,
+			Short = { Tag = "ONCE ONLY", Title = "Starter Rare Roll", Sub = string.format("%d rarest kinds", #kinds) },
+		})
+	end
+
+	-- The team revive: a wide, short row.
+	local function revive(parent: Instance, w: number, order: number)
+		local key = "KaijuRevive"
+		local card = box(parent, C.Surface, 0, 0, w, 96)
+		card.Name = key
+		card.LayoutOrder = order
+		round(card, 14)
+		stroke(card, C.Line, 1, 0.9)
+		local pic = well(card, C.Good, 8, 8, 80, 80)
+		-- (a plain cross, the medic's)
+		for _, size in { Vector2.new(14, 40), Vector2.new(40, 14) } do
+			local bar = box(pic, C.Good, 0, 0, size.X, size.Y)
+			bar.AnchorPoint = Vector2.new(0.5, 0.5)
+			bar.Position = UDim2.fromScale(0.5, 0.5)
+			round(bar, 4)
+		end
+		local bw = if SHORT then 150 else 190
+		local tw = w - 104 - bw - 32
+		text(card, "Team revive", 18, C.Text, BLACK, 104, 16, tw, 24)
+		wrap(text(card, "Every kaiju of yours that's knocked out, back on its feet now: no waiting for them to recover.", 12 + UP, C.Dim, MEDIUM, 104, 44, tw, 40))
+		priceRow(card, key, w - bw - 16, 10, 18, false)
+		buyButton(card, key, w - bw - 16, 44, bw, 40)
+	end
+
+	-- The Kaiju page.
+	function KaijuDeals.draw()
+		local list = new("ScrollingFrame", {
+			Name = "Kaiju",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(PAGE_W + 8, PAGE_H),
+			CanvasSize = UDim2.fromOffset(0, 0),
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollBarThickness = 4,
+			ScrollBarImageColor3 = C.Faint,
+		}, page)
+		UiKit.list(list, 14)
+		new("UIPadding", {
+			PaddingTop = UDim.new(0, 2),
+			PaddingLeft = UDim.new(0, 2),
+			PaddingBottom = UDim.new(0, 12),
+		}, list)
+		local w = PAGE_W - 12
+		sectionHead(list, 1, "Kaiju", "The rarest kinds, from the Kennel. Kaiju bought here join your reserves.")
+		-- (side by side on a computer, one under the other on a phone)
+		local cardH = if SHORT then 210 else 312
+		local cw = if SHORT then w else math.floor((w - 14) / 2)
+		local row = new("Frame", {
+			Name = "Sales",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(w, if SHORT then cardH * 2 + 14 else cardH),
+			LayoutOrder = 2,
+		}, list)
+		UiKit.list(row, 14, not SHORT)
+		KaijuDeals.daily(row, cw, cardH, 1)
+		KaijuDeals.rare(row, cw, cardH, 2)
+		sectionHead(list, 3, "For your team", "When the frontier gets the better of them.")
+		revive(list, w, 4)
+		local note = wrap(
+			text(
+				list,
+				"Also on sale from Wren at the Kennel, in the Shelter's hall. A new Kaiju of the Day comes at midnight (UTC). Swap kaiju into a team from YOUR KAIJU.",
+				11 + UP,
+				C.Faint,
+				MEDIUM,
+				0,
+				0,
+				w,
+				32
+			)
+		)
+		note.LayoutOrder = 5
+	end
+
+	-- Featured's row of the two sales, smaller, with a way to the Kaiju page.
+	function KaijuDeals.strip(list: Instance, order: number)
+		local w = PAGE_W - 12
+		local head = sectionHead(list, order, "Kaiju deals", "Today's Kaiju of the Day and the Starter Rare Roll.")
+		local all = button(head, "See all kaiju  ›", "Quiet", w - 140, 6, 140, 28, function()
+			state.Tab = "Kaiju"
+			refresh()
+		end)
+		all.TextXAlignment = Enum.TextXAlignment.Right
+		local cardH = if SHORT then 196 else 200
+		local cw = math.floor((w - 14) / 2)
+		local row = new("Frame", {
+			Name = "KaijuDeals",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(w, cardH),
+			LayoutOrder = order + 1,
+		}, list)
+		UiKit.list(row, 14, true)
+		KaijuDeals.daily(row, cw, cardH, 1)
+		KaijuDeals.rare(row, cw, cardH, 2)
+	end
+end
+
 local function drawBundles()
 	local list = new("ScrollingFrame", {
 		Name = "Bundles",
@@ -1699,6 +1981,7 @@ local function drawBundles()
 	if key then
 		offerBanner(list, key, PAGE_W - 12, 1)
 	end
+	KaijuDeals.strip(list, 10)
 	local looks, premium = {}, {}
 	for _, bundle in Store.Bundles do
 		if bundle.Section == "Look" then
@@ -2008,7 +2291,10 @@ end
 -- Drawing ----------------------------------------------------------------------------------------------------------
 
 local DRAW = {
-	Bundles = drawBundles,
+	Featured = drawBundles,
+	Kaiju = function()
+		KaijuDeals.draw()
+	end,
 	Skins = function()
 		drawCatalog("Skins")
 	end,
@@ -2043,7 +2329,7 @@ local function drawHeader()
 	end
 	walletValue.Text = commas(profile().Coins or 0)
 	local key = offerKey()
-	-- (a phone: the Bundles page leads with it, and its tab says SALE)
+	-- (a phone: the Featured page leads with it, and its tab says SALE)
 	deal.Visible = key ~= nil and not SHORT
 	if dealTag then
 		dealTag.Visible = key ~= nil
@@ -2059,6 +2345,7 @@ function refresh()
 		return
 	end
 	table.clear(timers)
+	table.clear(KaijuDeals.Turning)
 	drawHeader()
 	IronUi.clear(page)
 	DRAW[state.Tab]()
@@ -2070,14 +2357,15 @@ end
 ShopUI.refresh = refresh
 
 deal.Activated:Connect(function()
-	state.Tab = "Bundles"
+	state.Tab = "Featured"
 	refresh()
 end)
 
 function ShopUI.open(which: string?)
-	-- (Old names for the tabs, from other screens.)
-	if which == "Featured" or which == "Passes" or which == "Backs" or which == "Trims" then
-		which = "Bundles"
+	-- (Old names for the tabs, from other screens: the bundles are on
+	-- Featured, the front page.)
+	if which == "Bundles" or which == "Passes" or which == "Backs" or which == "Trims" then
+		which = "Featured"
 	end
 	if which and DRAW[which] then
 		state.Tab = which
@@ -2119,6 +2407,7 @@ function ShopUI.close()
 	closeOverlay()
 	IronUi.clear(page)
 	table.clear(timers)
+	table.clear(KaijuDeals.Turning)
 end
 
 function ShopUI.toggle()

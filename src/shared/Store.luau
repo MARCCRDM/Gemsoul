@@ -1,19 +1,24 @@
 --[[
 	The store: weapon skins, suits, pickaxes and bundles, sold for Robux,
-	plus the Free rewards. Looks only, never stats. (The swing refills are
-	Robux products too: Shared.Outpost.Refills, sold by Garrick.)
+	plus the Free rewards (looks only, never stats), and the Kennel's kaiju
+	sales. (The swing refills are Robux products too: Shared.Outpost.Refills,
+	sold by Garrick.)
 
-	  Bundles      new-player offers (the Welcome Kit, the Starter Pack), the
-	               player bundles (a whole look for your miner: suit, weapon
-	               skin, helmet, visor, pickaxe and often a trim or back
-	               piece), and the premium sets (Royal Treasury, The Vault:
+	  Featured     the front page: the kaiju deals, then every bundle
+	  Kaiju        the Kennel's sales (Kaiju.Sale: the Kaiju of the Day, the
+	               Starter Rare Roll) and the team revive
+	  Bundles      (on Featured) new-player offers (the Welcome Kit, the
+	               Starter Pack), the player bundles (a whole look for
+	               your miner: suit, weapon skin, helmet, visor, pickaxe
+	               and often a trim or back piece), and the premium sets (Royal Treasury, The Vault:
 	               everything in the store)
 	  Weapon Skins, Suits, Pickaxes
 	               every look sold on its own (Cosmetics, Robux)
 	  Free         the group, friends, the login streak and promo codes
 
 	Trims and back pieces aren't sold on their own: they come as extras in
-	bundles (and on the Season Path). Nothing random is sold.
+	bundles (and on the Season Path). Nothing random is sold but the
+	Starter Rare Roll, whose odds the Kennel shows (every rare kind alike).
 
 	Robux: every product key below needs a Developer Product. Create it on
 	the game's page on Roblox (Monetization > Developer Products) at the
@@ -66,9 +71,13 @@ local Outpost = require(script.Parent.Outpost)
 
 local Store = {}
 
-Store.Tabs = { "Bundles", "Skins", "Suits", "Helmets", "Visors", "Picks", "Free" }
+-- (Featured, the front page: the Kennel's kaiju deals, the new-player
+-- offer and every bundle. Kaiju: the Kennel's sales, here as well as at
+-- the Kennel, and the team revive.)
+Store.Tabs = { "Featured", "Kaiju", "Skins", "Suits", "Helmets", "Visors", "Picks", "Free" }
 Store.TabNames = {
-	Bundles = "Bundles",
+	Featured = "Featured",
+	Kaiju = "Kaiju",
 	Skins = "Weapon Skins",
 	Suits = "Suits",
 	Helmets = "Helmets",
