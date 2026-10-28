@@ -884,32 +884,6 @@ function Half.install(h)
 		wedge(m, torso, "TailFeathers", V(0.9, 0.3, 1.0), CF(0, 2.0, 1.0) * A(rad(-20), 0, 0), H2)
 	end
 
-	-- Drillmole: a robot mole, a stepped steel cone, a drill nose of its
-	-- element's colour (its jaw lifts it), lamp eyes, tread feet.
-	function B.Drillmole(m, pal, H, H2)
-		local r = root(m, V(1.8, 1.6, 1.8), 1.9)
-		local body = limb(m, r, "Hull", V(1.8, 1.2, 1.8), CF(0, 1.7, 0), V(0, 1.2, 0), "Body", 1, H)
-		for i, step in { { 1.5, 0.6, 2.6 }, { 1.1, 0.6, 3.2 }, { 0.7, 0.6, 3.8 }, { 0.3, 0.45, 4.3 } } do
-			make(m, body, "Cone", V(step[1], step[2], step[1]), CF(0, step[3], 0), if i % 2 == 1 then H2 else H)
-		end
-		make(m, body, "Band", V(1.86, 0.12, 1.86), CF(0, 2.05, 0), H2)
-		eyes(m, body, 0.42, 1.65, -0.92, V(0.26, 0.2, 0.06), pal)
-		local drill = limb(m, body, "Drill", V(0.85, 0.85, 0.35), CF(0, 2.3, -1.05) * A(0, 0, rad(45)), V(0, 2.3, -0.9), "Jaw", 1, pal.Plate)
-		for i, s in { 0.62, 0.42, 0.22 } do
-			plate(m, drill, "Drill", V(s, s, 0.32), CF(0, 2.3, -1.05 - i * 0.3) * A(0, 0, rad(45 + i * 15)), pal)
-		end
-		glow(m, drill, "Tip", V(0.1, 0.1, 0.25), CF(0, 2.3, -2.05), pal)
-		for _, s in { -1, 1 } do
-			local tread = limb(m, body, "Tread", V(0.55, 0.62, 1.8), CF(s * 0.98, 0.31, 0), V(s * 0.98, 0.9, 0), "Stride", s, H2)
-			for i = -1, 1 do
-				make(m, tread, "Cleat", V(0.58, 0.1, 0.2), CF(s * 0.98, 0.64, i * 0.6), H)
-			end
-			local hand = V(s * 1.15, 1.15, -0.85)
-			local p = arm(m, body, V(s * 0.9, 1.8, -0.4), V(s * 1.2, 1.45, -0.6), hand, 0.22, H, H)
-			h.talons(m, p, hand, 3, 0.22, CLAW)
-		end
-	end
-
 	-- Gulper: a hulking grey-green alien, a huge mouth on its shoulder lit
 	-- inside with its element's light, a cannon for one arm, spines in its
 	-- colour down its back.

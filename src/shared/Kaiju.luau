@@ -1635,6 +1635,11 @@ end
 
 Kaiju.MaxOwned = 12 -- kaiju one player can keep
 
+-- Kinds taken out of the game, and what one already caught becomes (its
+-- level, traits, Gemsoul and name kept): the nearest kind in role and
+-- rarity.
+Kaiju.Retired = { Drillmole = "Gulper" }
+
 -- A profile's roster, made if it has none: { List = { [id] = record },
 -- Order = { id } (your teams, one line: Kaiju.order), Out = the team out
 -- (Kaiju.outTeam), Team = { id } (the team out, Kaiju.teamIds), Active = id
@@ -1647,10 +1652,14 @@ function Kaiju.roster(profile)
 	end
 	roster.List = roster.List or {}
 	roster.Next = roster.Next or 1
-	-- (a save from before traits keeps the ones it was always going to have)
+	-- (a save from before traits keeps the ones it was always going to have;
+	-- one of a retired kind becomes its stand-in)
 	for _, record in roster.List do
-		if type(record) == "table" and not validTraits(record.Traits) then
-			record.Traits = Kaiju.traits(record)
+		if type(record) == "table" then
+			record.Species = Kaiju.Retired[record.Species] or record.Species
+			if not validTraits(record.Traits) then
+				record.Traits = Kaiju.traits(record)
+			end
 		end
 	end
 	return roster

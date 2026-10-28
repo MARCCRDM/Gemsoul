@@ -62,7 +62,13 @@ local GemTraits = shared("GemTraits")
 local ElementMatchup = shared("ElementMatchup")
 
 -- Species and stats ------------------------------------------------------------------------
-check(#Kaiju.Order == 94 and #Kaiju.Elements == 4, "Ninety-four species in four elements")
+check(#Kaiju.Order == 93 and #Kaiju.Elements == 4, "Ninety-three species in four elements")
+-- A retired kind (Kaiju.Retired) already caught becomes its stand-in.
+do
+	local profile = { Kaiju = { List = { k1 = { Id = "k1", Species = "Drillmole", Element = "Fire", Level = 7 } }, Next = 2 } }
+	local record = Kaiju.roster(profile).List.k1
+	check(Kaiju.Species.Drillmole == nil and record.Species == "Gulper" and record.Level == 7, "A retired kind wasn't swapped for its stand-in")
+end
 check(#Kaiju.Starters == 4, "Not four starters")
 for i, id in { "Bulwark", "Razorback", "Carapace", "Scythe" } do
 	check(Kaiju.Starters[i] == id and Kaiju.Order[i] == id, "The starters aren't the first four")

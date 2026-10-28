@@ -620,7 +620,7 @@ pattern, three moves of its own. Sim inputs, not final.
 - Q **Belly Beam**: fires what it ate down a 12-stud line.
 - R **Star Shell**: a shell of 30%.
 
-**85. Drillmole** (after Moguera). A robot mole kaiju: a drill nose, a cone body, tread feet, lamp eyes.
+**85. Drillmole** (after Moguera). Taken out of the game (2026-10-28); any already caught became Gulpers (`Kaiju.Retired`).
 235 / 17 / 1.3 / 12 / 0.20. Combo: Drill Jab x2. Heavy: Burrow Drill 1.9x (from below). Guard: plating locks, takes 25%.
 - E **Burrow Drill**: goes under and drills up under the foe with the highest Guard, bursting its shell.
 - Q **Eye Beams**: two lines.
@@ -662,7 +662,7 @@ pattern, three moves of its own. Sim inputs, not final.
 
 | Wave | Kinds |
 | --- | --- |
-| 11 | Gorebull, Gashclaw, Quillhorn, Skyrazor, Pipsqueak, Drillmole |
+| 11 | Gorebull, Gashclaw, Quillhorn, Skyrazor, Pipsqueak |
 | 12 | Yetihide, Mossgiant, Phasehorn, Inkstalk, Lumeballoon, Cleaverhead |
 | 13 | Barnacrab, Blackhorn, Pulsewing, Thornlash, Shadowsphere, Starcrop |
 | 14 | Longneck, Lashape, Lightbird, Flickerstripe, Twinsong, Gulper |

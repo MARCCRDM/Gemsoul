@@ -4,8 +4,9 @@
 That's the 61 left: Prisma and Clawtide from the first sheet, and kinds 31
 to 90 from the second and third (Skyjelly, 57, was already in as everyone's
 starter support). With the 33 before them (the first four, the first
-sheet's 28 and Skyjelly) the game has **94 kinds**, each in all four
-elements: 376 kaiju.
+sheet's 28 and Skyjelly) the game had 94 kinds. Drillmole has since been
+taken out (any already caught became a Gulper, `Kaiju.Retired`), so it's
+**93 kinds** now, each in all four elements: 372 kaiju.
 
 ![The 61 new kaiju](kaiju/roster-61.jpg)
 
@@ -48,7 +49,7 @@ roams is its Habitat, as for the first sheet:
 
 | Roams | Kinds |
 | --- | --- |
-| Fringe and Edge (anywhere past the core) | Tuskmound, Crestbull, Shrieker, Duskbat, Peelcroc, Capspore, Coinmaw, Gorebull, Gashclaw, Quillhorn, Skyrazor, Drillmole, Pipsqueak |
+| Fringe and Edge (anywhere past the core) | Tuskmound, Crestbull, Shrieker, Duskbat, Peelcroc, Capspore, Coinmaw, Gorebull, Gashclaw, Quillhorn, Skyrazor, Pipsqueak |
 | The Edge only | the 41 others not listed here |
 | The Rift Vein's guardian only | Prisma, Tritail, Tarrask, Gluttonjaw, Oculus, Dunemaw, Starcrop |
 
@@ -82,7 +83,7 @@ as Moonmoth and Skyjelly do.
 | Fathomweb | Ranged | the Edge | 185 / 13 / 1.0 / 15 / 0.05 | Freezing Web | Hood Beam | Burrow Back |
 | Spitgill | Ranged | the Edge | 185 / 12 / 1.0 / 16 / 0.05 | Pressure Jet | Gill Spray | Slick |
 | Duskbat | Assassin | Fringe and Edge | 170 / 16 / 0.9 / 21 / 0.00 | Dive Bite | Blackout | Vanish Wing |
-| Tendrilis | Assassin | the Edge | 165 / 17 / 0.9 / 19 / 0.05 | Spear Lunge | Four Tendrils | Absorb |
+| Tendrilis | Assassin | the Edge | 165 / 16 / 0.9 / 19 / 0.05 | Spear Lunge | Four Tendrils | Absorb |
 | Snipclaw | Assassin | the Edge | 170 / 15 / 0.9 / 19 / 0.05 | Split | Scissor Cut | Phase Out |
 | Needlewing | Assassin | the Edge | 160 / 17 / 0.8 / 22 / 0.00 | Hypersonic Pass | Siphon | Afterimage |
 | Hollowbone | Assassin | the Edge | 175 / 15 / 0.9 / 18 / 0.05 | Bone Spur | Gravity Beams | Hollow Form |
@@ -118,7 +119,6 @@ as Moonmoth and Skyjelly do.
 | Flickerstripe | Assassin | the Edge | 165 / 16 / 0.9 / 20 / 0.05 | Teleport Strike | Shrink Ray | Face Turn |
 | Cleaverhead | Breaker | the Edge | 245 / 18 / 1.4 / 13 / 0.15 | Head Cleave | Four-Fist | Brace Arms |
 | Starcrop | Breaker | Vein guardian | 240 / 16 / 1.3 / 13 / 0.15 | Belly Beam | Devour Energy | Star Shell |
-| Drillmole | Breaker | Fringe and Edge | 235 / 17 / 1.3 / 12 / 0.20 | Burrow Drill | Eye Beams | Spinning Shield |
 | Gulper | Breaker | the Edge | 265 / 18 / 1.5 / 11 / 0.15 | Absorb | Shoulder Cannon | Regenerate |
 | Pipsqueak | Warden | Fringe and Edge | 180 / 8 / 1.2 / 14 / 0.15 | Cheer | Pebble Toss | Brave Stand |
 | Shadowsphere | Warden | the Edge | 190 / 10 / 1.3 / 10 / 0.20 | Dirac Shade | Shadow Snap | Sea of Shadow |
@@ -292,9 +292,6 @@ as Moonmoth and Skyjelly do.
 | Starcrop | E | Belly Beam | Fires the energy it ate from its belly through a line: 150% damage to everyone in it, with its element's effect. |
 | Starcrop | Q | Devour Energy | Its belly mouth gulps at the foes round it: 80% damage to each, and it heals 10% of its health. |
 | Starcrop | R | Star Shell | Hard pressed or crowded: its wings fold over its belly, a shell of 30% of its health for 5s. |
-| Drillmole | E | Burrow Drill | Goes under (it can't be hurt for a moment) and drills up under its foe: 160% damage, leaving it Vulnerable. |
-| Drillmole | Q | Eye Beams | Beams from its lamp eyes through everyone in a line: 130% damage, with its element's effect. |
-| Drillmole | R | Spinning Shield | Hard pressed or crowded: its drill spins up into a shell of 30% of its health for 5s that grinds foes close to it each second. |
 | Gulper | E | Absorb | Its shoulder mouth bites down on its foe: 160% damage, leaving it Vulnerable, and it heals 10% of its health. |
 | Gulper | Q | Shoulder Cannon | Fires its cannon arm through a line: 140% damage to everyone in it, with its element's effect. |
 | Gulper | R | Regenerate | Hard pressed or crowded: its alien flesh knits, healing it 25% of its health over 4s. |
@@ -365,8 +362,7 @@ no combat code changed.
   - Oculus's eyelid is its Jaw.
   - Shadowsphere's sphere is its Body, and the maw in its shadow is its
     Jaw. The shadow stays on the ground while the sphere moves.
-  - Drillmole's drill and Tuskmound's trunk are their Jaws, so they lift
-    when it roars.
+  - Tuskmound's trunk is its Jaw, so it lifts when it roars.
   - Inkwrap's eight tentacles and Inkstalk's six are Stride legs.
   - Twinsong has two Head joints, one for each twin.
   - Longneck's and Dunemaw's necks sway on Tail joints. Silkling,

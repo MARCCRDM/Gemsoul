@@ -565,6 +565,14 @@ end
 local function prepareRoll(profile)
 	local p = profile :: any
 	local roll = p.KaijuRoll
+	-- (a pick of a kind since retired comes as its stand-in)
+	if type(roll) == "table" and type(roll.Rolls) == "table" then
+		for _, pick in roll.Rolls do
+			if type(pick) == "table" then
+				pick.Species = Kaiju.Retired[pick.Species] or pick.Species
+			end
+		end
+	end
 	if
 		type(roll) == "table"
 		and type(roll.Rolls) == "table"

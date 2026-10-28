@@ -609,12 +609,6 @@ F.Starcrop = like("Bulwark", {
 	Heavy = { Wind = { Pitch = -0.2, Lift = 0.1, Arm = 1.4 }, Hit = { Pitch = 0.15, Push = -0.3, Arm = 0.4 } },
 	Cast = ROAR,
 })
-F.Drillmole = like("Bulwark", {
-	Light = F.Drillhorn.Light,
-	Heavy = BURST,
-	-- Dig In: down, then driving forward drill first.
-	Lunge = { Wind = { Lift = -0.3, Pitch = -0.2 }, Hit = { Push = 0.8, Jaw = 0.6 } },
-})
 F.Gulper = like("Bulwark", {
 	-- Shoulder Swallow: the shoulder maw thrown open and down over it.
 	Heavy = { Wind = { Pitch = 0.3, Jaw = 1.1, Yaw = 0.3 }, Hit = { Pitch = -0.3, Jaw = 0.1, Push = 0.4, Yaw = -0.2 } },
