@@ -403,7 +403,8 @@ end
 -- The same card on a computer: bottom left, a fixed size, the pill's
 -- lower half clear above the screen's edge (ChatFeed keeps its bottom
 -- clear above it).
-MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 58, 58 }, Notch = 24 }
+-- (Tabs: the team keys' tabs along its top edge, above it: KaijuHud.)
+MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 58, 58 }, Notch = 24, Tabs = 26 }
 -- The card's strip under its rows: the pill's upper half and a little air.
 function MobileLayout.under(notch: number): number
 	return math.floor(notch / 2) + 3

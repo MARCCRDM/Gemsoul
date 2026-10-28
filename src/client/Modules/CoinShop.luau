@@ -765,26 +765,37 @@ function CoinShop.open(short: number?)
 end
 
 -- A click on `widget` (a coin total) opens the coin packs: the widget itself
--- if it's a button, else a clear button laid over it.
-function CoinShop.hook(widget: GuiObject): GuiButton
-	local button: GuiButton
+-- if it's a button, else a clear button laid over it. (Not over one that
+-- lays its children out in a row or grid: the button would be laid out
+-- too, and stretch it. That one is clicked through its own input.)
+function CoinShop.hook(widget: GuiObject)
 	if widget:IsA("GuiButton") then
-		button = widget :: GuiButton
-	else
-		button = new("TextButton", {
-			Name = "CoinShopHit",
-			Text = "",
-			AutoButtonColor = false,
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = widget.ZIndex + 5,
-		}, widget)
-		widget.Active = true
+		(widget :: GuiButton).Activated:Connect(function()
+			CoinShop.open()
+		end)
+		return
 	end
+	if widget:FindFirstChildWhichIsA("UIGridStyleLayout") then
+		widget.InputBegan:Connect(function(input: InputObject)
+			local kind = input.UserInputType
+			if kind == Enum.UserInputType.MouseButton1 or kind == Enum.UserInputType.Touch then
+				CoinShop.open()
+			end
+		end)
+		return
+	end
+	local button = new("TextButton", {
+		Name = "CoinShopHit",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = widget.ZIndex + 5,
+	}, widget)
+	widget.Active = true
 	button.Activated:Connect(function()
 		CoinShop.open()
 	end)
-	return button
 end
 
 -- Short of coins for something: the packs, saying how many more.

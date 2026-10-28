@@ -593,8 +593,11 @@ local corner = new("Frame", {
 local cornerList = UiKit.list(corner, 10, true)
 cornerList.HorizontalAlignment = Enum.HorizontalAlignment.Right
 cornerList.VerticalAlignment = Enum.VerticalAlignment.Center
-local wallet = new("Frame", {
+-- (a button: your coins open the coin packs, Client CoinShop)
+local wallet = new("TextButton", {
 	Name = "Wallet",
+	Text = "",
+	AutoButtonColor = true,
 	BackgroundColor3 = C.Surface,
 	Size = UDim2.fromOffset(0, 36),
 	AutomaticSize = Enum.AutomaticSize.X,

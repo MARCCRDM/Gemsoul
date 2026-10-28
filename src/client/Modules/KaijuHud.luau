@@ -473,10 +473,98 @@ for n = 1, Kaiju.Teams do
 	local number = label(chip, tostring(n), 14, P.Text, Enum.Font.GothamBlack)
 	number.Size, number.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
 	number:SetAttribute("NoTranslate", true)
+	-- (On a computer a tab over the card: its number on a key cap, a key
+	-- to press, and what the team is doing beside it. See KaijuHud._tabs.shape.)
+	local cap = new("Frame", {
+		Name = "Cap",
+		BackgroundColor3 = Color3.fromRGB(8, 10, 16),
+		Size = UDim2.fromOffset(18, 18),
+		Visible = false,
+		ZIndex = 3,
+	}, chip)
+	UiKit.round(cap, 4)
+	local face = new("Frame", {
+		Name = "Face",
+		BackgroundColor3 = Color3.fromRGB(58, 66, 88),
+		Size = UDim2.new(1, 0, 1, -3),
+		ZIndex = 3,
+	}, cap)
+	UiKit.round(face, 4)
+	local word = label(chip, "TEAM", 9, P.Dim, Enum.Font.GothamBlack)
+	word.Name, word.Visible, word.ZIndex = "Word", false, 3
 	chip.Activated:Connect(function()
 		pressTeam(n)
 	end)
-	teamChips[n] = { Button = chip, Edge = edge, Number = number }
+	teamChips[n] = { Button = chip, Edge = edge, Number = number, Cap = cap, Face = face, Word = word, State = "Empty" }
+end
+-- The seam where the team out's tab joins the card (a computer's): the
+-- card's top edge hidden under it, so tab and card are one.
+-- (On the module's table, not a local: its top is at Luau's 200 locals.)
+KaijuHud._tabs = { OnTop = false, H = 26, Seam = nil :: Frame?, shape = nil :: any }
+KaijuHud._tabs.Seam = new("Frame", {
+	Name = "Seam",
+	BackgroundColor3 = INK,
+	BackgroundTransparency = 0.12,
+	BorderSizePixel = 0,
+	Visible = false,
+	ZIndex = 4,
+}, card)
+
+-- The team keys as tabs along the card's top edge (a computer's): each a key
+-- cap with its number and a word (OUT, TEAM, AWAY, DOWN, EMPTY); the team out
+-- taller, in the card's own colour and outlined in gold, merged into the
+-- card. On a phone they stay chips (drawTeams colours them).
+function KaijuHud._tabs.shape()
+	local tabs = KaijuHud._tabs
+	local seam = tabs.Seam :: Frame
+	local tabsOnTop, TAB_H = tabs.OnTop, tabs.H
+	seam.Visible = false
+	for n, chip in teamChips do
+		chip.Cap.Visible, chip.Word.Visible = tabsOnTop, tabsOnTop
+		chip.Number.Parent = if tabsOnTop then chip.Face else chip.Button
+	end
+	if not tabsOnTop then
+		return
+	end
+	local width = teamPad.Size.X.Offset
+	local gap = 4
+	local w = math.floor((width - gap * (Kaiju.Teams - 1)) / Kaiju.Teams)
+	for n, chip in teamChips do
+		local out = chip.State == "Out"
+		local h = if out then TAB_H + 1 else TAB_H - 4
+		local x = (n - 1) * (w + gap)
+		local button = chip.Button
+		button.Position = UDim2.fromOffset(x, TAB_H - h)
+		button.Size = UDim2.fromOffset(w, h + (if out then 0 else 0))
+		-- (the team out: the card's own colour and a gold outline)
+		if out then
+			button.BackgroundColor3, button.BackgroundTransparency = INK, 0.12
+			chip.Edge.Color, chip.Edge.Transparency, chip.Edge.Thickness = P.Gold, 0, 1.5
+			seam.Visible = true
+			seam.Position = UDim2.fromOffset(x + 1, -2)
+			seam.Size = UDim2.fromOffset(w - 2, 5)
+		end
+		local cap = chip.Cap
+		cap.AnchorPoint = Vector2.new(0, 0.5)
+		cap.Position = UDim2.new(0, 6, 0.5, if out then -1 else 0)
+		local face = chip.Face
+		face.BackgroundColor3 = if out then P.Gold elseif chip.State == "Away" then P.Gold:Lerp(TILE_BACK, 0.55) else Color3.fromRGB(58, 66, 88)
+		chip.Number.Size = UDim2.fromScale(1, 1)
+		chip.Number.TextSize = 12
+		chip.Number.TextColor3 = if out then INK elseif chip.State == "Empty" then P.Dim else P.Text
+		chip.Number.TextTransparency = 0
+		local word = chip.Word
+		word.AnchorPoint = Vector2.new(0, 0.5)
+		word.Position = UDim2.new(0, 28, 0.5, if out then -1 else 0)
+		word.Size = UDim2.new(1, -30, 0, 12)
+		word.TextSize = if out then 10 else 9
+		word.Text = ({ Out = "OUT", Away = "AWAY", Down = "DOWN", Empty = "EMPTY", Ready = "TEAM" })[chip.State] or "TEAM"
+		word.TextColor3 = if out or chip.State == "Away" then P.Gold
+			elseif chip.State == "Down" then P.Bad:Lerp(P.Text, 0.3)
+			elseif chip.State == "Empty" then P.Dim
+			else P.Text
+		word.TextTransparency = if chip.State == "Empty" then 0.35 else 0
+	end
 end
 
 -- The team's HYPERBEAM: on a computer its pill, on the card's bottom edge
@@ -586,19 +674,16 @@ local function layout()
 			end
 		end
 	end
-	place(autoButton, cells.Auto)
-	-- The four team chips, two by two: on a computer on the card, under AUTO
-	-- HEAL; on a phone off the card, just above the move stick, under your
-	-- left thumb (MobileLayout.keys).
-	do
-		local gap, across, rect = 3, 2, cells.Teams
-		if phone then
-			local keys = MobileLayout.keys(screen)
-			gap, across, rect = keys.Gap, keys.Across, keys
-			teamPad.Parent = gui
-		else
-			teamPad.Parent = card
-		end
+	-- The four team keys: on a computer tabs along the card's top edge, the
+	-- team out's merged into it (_tabs.shape), AUTO HEAL down the whole right
+	-- column; on a phone two by two off the card, just above the move
+	-- stick, under your left thumb (MobileLayout.keys).
+	KaijuHud._tabs.OnTop = not phone
+	if phone then
+		place(autoButton, cells.Auto)
+		local keys = MobileLayout.keys(screen)
+		local gap, across, rect = keys.Gap, keys.Across, keys
+		teamPad.Parent = gui
 		place(teamPad, rect)
 		local down = math.ceil(Kaiju.Teams / across)
 		local w = math.floor((rect.W - gap * (across - 1)) / across)
@@ -609,7 +694,17 @@ local function layout()
 			chip.Button.Size = UDim2.fromOffset(w, h)
 			chip.Number.TextSize = math.clamp(math.floor(math.min(w, h) * 0.55), 10, 18)
 		end
+	else
+		place(autoButton, {
+			X = cells.Auto.X,
+			Y = cells.Auto.Y,
+			W = cells.Auto.W,
+			H = cells.Teams.Y + cells.Teams.H - cells.Auto.Y,
+		})
+		teamPad.Parent = card
+		place(teamPad, { X = 0, Y = -KaijuHud._tabs.H, W = spot.W, H = KaijuHud._tabs.H })
 	end
+	KaijuHud._tabs.shape()
 	-- The HYPERBEAM: on a computer its pill on the card's bottom edge; on a
 	-- phone off the card, just right of the team keys (MobileLayout.beam).
 	if phone then
@@ -773,7 +868,20 @@ local function drawTeams()
 		chip.Button.AutoButtonColor = filled
 		chip.Edge.Color, chip.Edge.Transparency = edge, if filled then 0 else 0.55
 		chip.Number.TextColor3, chip.Number.TextTransparency = text, if filled then 0 else 0.45
+		chip.State = if not filled then "Empty"
+			elseif n == out and not away then "Out"
+			elseif n == out then "Away"
+			elseif standing == 0 then "Down"
+			else "Ready"
+		-- (as a tab, not the team out: dark, set back from the card)
+		if KaijuHud._tabs.OnTop and chip.State ~= "Out" then
+			chip.Button.BackgroundColor3 = TILE_BACK
+			chip.Button.BackgroundTransparency = if filled then 0.15 else 0.45
+			chip.Edge.Color = if chip.State == "Away" then P.Gold else edge
+			chip.Edge.Transparency = if filled then 0.2 else 0.6
+		end
 	end
+	KaijuHud._tabs.shape()
 end
 
 local function drawTile(tile, record, model: Model?, lead: boolean)

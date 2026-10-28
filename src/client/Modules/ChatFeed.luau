@@ -41,7 +41,8 @@ local LEFT = 24
 -- Its bottom sits above the kaiju card (KaijuHud's computer layout,
 -- MobileLayout.kaijuDesk: its team and buttons, the HYPERBEAM's pill
 -- hanging off its bottom edge).
-local BOTTOM = -MobileLayout.kaijuDesk(Vector2.zero).Y + 12
+-- (and above its team tabs, MobileLayout.KaijuDesk.Tabs)
+local BOTTOM = -MobileLayout.kaijuDesk(Vector2.zero).Y + (MobileLayout.KaijuDesk.Tabs or 0) + 12
 -- Its top stays under the lobby's PLAY stack (LobbyUI: from 54 down, 272
 -- tall on a computer).
 local STACK_BOTTOM = 340
