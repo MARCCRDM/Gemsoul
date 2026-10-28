@@ -215,7 +215,7 @@ local function fit()
 		return
 	end
 	local size = gui.AbsoluteSize
-	local mobile = UserInputService.TouchEnabled or (size.Y > 0 and size.Y < 540)
+	local mobile = UiKit.handheld(size)
 	local spot = if mobile then MobileLayout.loot(size) else nil
 	local dims = DESK
 	if spot then

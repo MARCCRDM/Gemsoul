@@ -280,9 +280,10 @@ hint.Activated:Connect(function()
 end)
 local kitChip = { Item = hint, Cap = cap, Does = does, Edge = hintEdge }
 local kitAvailable = true
-local hintBlocked = UserInputService.TouchEnabled
 local function paintHint()
-	hint.Visible = kitAvailable and not hintBlocked
+	-- (Touch only has the thumb switch instead, SparKit's: anything with a
+	-- keyboard, a touch-screen computer too, has this one.)
+	hint.Visible = kitAvailable and not UiKit.touchOnly()
 	-- Beside the kaiju card when it's up (bottom left), else bottom middle.
 	local dock = hint.Visible and UiKit.besideKaiju(hud)
 	if dock then
@@ -423,7 +424,7 @@ local openScreens = {}
 local miningPrompts = {}
 local function fitOutpostHud()
 	local size = hud.AbsoluteSize
-	local mobile = UserInputService.TouchEnabled or size.Y < 540
+	local mobile = UiKit.handheld(size)
 	-- (A fight or a spar has the screen: the pick card and mining prompts go.)
 	local blocked = next(openScreens) ~= nil or Spar.fighting(player)
 		or (mobile and player:GetAttribute("ChatOpen") == true)

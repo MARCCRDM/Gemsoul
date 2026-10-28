@@ -1539,7 +1539,7 @@ RunService.RenderStepped:Connect(function(dt)
 	local viewport = camera.ViewportSize
 	local portrait = viewport.X < 600
 	local short = viewport.Y < 430 and not portrait
-	local touch = UserInputService.TouchEnabled
+	local touch = UiKit.touchOnly()
 	if
 		viewport.X ~= shown.LayoutW
 		or viewport.Y ~= shown.LayoutH
@@ -1819,7 +1819,7 @@ RunService.RenderStepped:Connect(function(dt)
 	else
 		hint.TextTransparency = math.clamp(1 - (feedbackUntil - now) / 0.3, 0, 1)
 	end
-	tabKey.step(cursorFree and not UserInputService.TouchEnabled, now)
+	tabKey.step(cursorFree and not UiKit.touchOnly(), now)
 	comboLabel.Visible = now < comboUntil
 	if comboLabel.Visible then
 		local fadeOut = math.clamp(1 - (comboUntil - now) / 0.4, 0, 1)
@@ -1831,7 +1831,7 @@ RunService.RenderStepped:Connect(function(dt)
 	FirstPerson.setPose(blockHeld, elapsed / Actions.OverchargeAt)
 	-- Key reminder: shown for the first seconds of a fight, or with a free cursor.
 	local hintAge = now - fightSince
-	controlsHint.Visible = not UserInputService.TouchEnabled and (cursorFree or hintAge < 13)
+	controlsHint.Visible = not UiKit.touchOnly() and (cursorFree or hintAge < 13)
 	-- (T switches targets where the lock is automatic, and locks on where you aim yourself.)
 	if controlsHint.Visible and TargetLock.auto() ~= shown.ControlsAuto then
 		shown.ControlsAuto = not shown.ControlsAuto
@@ -1907,7 +1907,7 @@ RunService.RenderStepped:Connect(function(dt)
 		if id == "Basic" or id == "Heavy" then
 			remaining = math.max(0, nextAttack - now)
 		end
-		local key = if UserInputService.TouchEnabled then shown.TouchKeys[id] else shown.Keys[id]
+		local key = if UiKit.touchOnly() then shown.TouchKeys[id] else shown.Keys[id]
 		if slot.ShownKey ~= key then
 			slot.ShownKey = key
 			slot.Key.Text = key

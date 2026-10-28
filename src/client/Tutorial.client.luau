@@ -371,7 +371,7 @@ local function run()
 			})[beat.Id]
 		card.Size = UDim2.fromOffset(math.min(480, size.X - 32), 116)
 		card.Position = UDim2.new(0.5, 0, 0, cardTop())
-		title.Text = if Input.TouchEnabled then beat.Mobile or beat.Prompt else beat.Prompt
+		title.Text = if UiKit.touchOnly() then beat.Mobile or beat.Prompt else beat.Prompt
 		body.Text = beat.Detail or ""
 		nextButton.Visible = beat.Id == "GemIntro"
 		marker.Adornee = nil

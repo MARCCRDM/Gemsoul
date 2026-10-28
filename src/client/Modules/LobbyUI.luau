@@ -949,7 +949,7 @@ end)
 local inventoryLook -- (below: INVENTORY yellow on a phone)
 local function fitDock()
 	local size = gui.AbsoluteSize
-	local mobile = game:GetService("UserInputService").TouchEnabled or size.Y < 540
+	local mobile = UiKit.handheld(size)
 	-- (On a phone: PLAY a green tile first, no RANKS; on a computer the
 	-- other way round.)
 	local buttons = {}

@@ -420,7 +420,7 @@ end
 -- above the lobby dock and leaves the middle of the screen clear. While it's
 -- open the pick card steps aside (the "ChatOpen" attribute).
 local function fitChat()
-	local mobile = UserInputService.TouchEnabled or gui.AbsoluteSize.X < 700 or gui.AbsoluteSize.Y < 540
+	local mobile = UiKit.handheld(gui.AbsoluteSize) or gui.AbsoluteSize.X < 700
 	local width = math.min(WIDTH, math.max(240, gui.AbsoluteSize.X - 24))
 	frame.AnchorPoint = if mobile then Vector2.zero else Vector2.new(0, 1)
 	if mobile then

@@ -130,6 +130,8 @@ local UiKit = { gui = function(name) return new("ScreenGui", { Name = name }, ro
 UiKit.ToastBottom, UiKit.ToastMoved = 0, signal()
 function UiKit.toastBottom() return UiKit.ToastBottom end
 function UiKit.onToastMoved(listener) UiKit.ToastMoved:Connect(listener) end
+-- (as the real one: a phone by its short side; this harness has no touch)
+function UiKit.handheld(size) return size ~= nil and size.Y > 2 and math.min(size.X, size.Y) < 500 end
 local GemArt = {
 	viewport = function(parent, gem)
 		local view = new("ViewportFrame", { Gem = gem }, parent)

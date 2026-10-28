@@ -97,7 +97,7 @@ for i = 1, 3 do
 end
 
 local function touch(): boolean
-	return UserInputService.TouchEnabled
+	return UiKit.touchOnly()
 end
 
 -- Every on-screen control tagged for this lesson that's showing now.

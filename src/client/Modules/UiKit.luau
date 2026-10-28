@@ -41,6 +41,29 @@ function UiKit.short(): boolean
 	return math.min(size.X, size.Y) < UiKit.PhoneSide
 end
 
+-- A touch screen with no keyboard: a phone or a tablet, played with thumbs.
+-- (A touch-screen computer, or Studio on one, has a keyboard: it gets the
+-- computer's layout, its keys shown and its buttons clickable.)
+function UiKit.touchOnly(): boolean
+	local ok, touch = pcall(function()
+		local input = game:GetService("UserInputService")
+		return input.TouchEnabled and not input.KeyboardEnabled
+	end)
+	return ok and touch
+end
+
+-- Laid out as a phone: touch only, or a screen a phone's size (UiKit.short,
+-- of `size` if given, else the camera's).
+function UiKit.handheld(size: Vector2?): boolean
+	if UiKit.touchOnly() then
+		return true
+	end
+	if size and size.Y > 2 then
+		return math.min(size.X, size.Y) < UiKit.PhoneSide
+	end
+	return UiKit.short()
+end
+
 -- Roblox's own buttons along the top of the screen: the Roblox button, then
 -- its menu, chat and voice, on the left. GuiService.TopbarInset is the rest
 -- of that strip: Min.X is where those buttons end, Max.Y how tall it is. It
@@ -378,9 +401,7 @@ end
 -- for that), as wide as its words, clear of the fight in the middle and
 -- the thumb buttons lower down.
 local function phone(): boolean
-	local camera = workspace.CurrentCamera
-	return game:GetService("UserInputService").TouchEnabled
-		or (camera ~= nil and camera.ViewportSize.Y > 0 and camera.ViewportSize.Y < 540)
+	return UiKit.handheld()
 end
 local TOAST_LIMIT = 3
 local PHONE_TOAST_LIMIT = 1
