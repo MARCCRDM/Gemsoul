@@ -4244,6 +4244,18 @@ return {
 	["RATING  {1}"] = "VALOR  {1}",
 	["SURGES"] = "IMPULSOS",
 	["ADD A GEM"] = "AÑADE UNA GEMA",
+	-- (kaiju on the Market)
+	["Lv {1} {*}"] = "Nv. {1} {*}",
+	["{*} soul"] = "alma {*}",
+	["★ rare kind"] = "★ especie rara",
+	["◆ Gemsoul: {*} (goes with it)"] = "◆ Alma de gema: {*} (va con él)",
+	["{1} health"] = "{1} de vida",
+	["{1} damage"] = "{1} de daño",
+	["{1} speed"] = "{1} de velocidad",
+	["Keep at least one kaiju."] = "Quédate al menos con un kaiju.",
+	["Swap it out of the team that's out first."] = "Primero sácalo del equipo que tienes fuera.",
+	["You don't have that kaiju."] = "No tienes ese kaiju.",
+	["You have as many kaiju as you can keep."] = "Ya tienes todos los kaiju que puedes guardar.",
 	-- (the Inventory's item window)
 	["PIECE"] = "PIEZA",
 	["SPARE PIECE"] = "PIEZA DE REPUESTO",

@@ -20,6 +20,8 @@ local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemFacts = require(ReplicatedStorage.Shared.GemFacts)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
+local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local Rules = require(ReplicatedStorage.Shared.Market)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearArt = require(script.Parent.GearArt)
@@ -209,6 +211,9 @@ local KEY_COLORS = {
 local function itemName(payload): string
 	if payload.Kind == "Gem" then
 		return GemConfig.displayName(payload.Gem)
+	elseif payload.Kind == "Kaiju" then
+		local record = payload.Record or {}
+		return if type(record.Name) == "string" and record.Name ~= "" then record.Name else Kaiju.title(record)
 	end
 	local gear = gearOf(payload)
 	return if gear then gear.Name else tostring(payload.Id)
@@ -217,6 +222,8 @@ end
 local function itemColor(payload): Color3
 	if payload.Kind == "Gem" then
 		return GemConfig.shade(payload.Gem).Color
+	elseif payload.Kind == "Kaiju" then
+		return GemConfig.ElementColors[(payload.Record or {}).Element] or P.Teal
 	end
 	local rarity = GearRolls.Rarities[payload.Roll and payload.Roll.Rarity or 1] or GearRolls.Rarities[1]
 	return rarity.Color
@@ -232,6 +239,13 @@ local function itemLine(payload): string
 			.. "  ·  "
 			.. (if gem.Cut then GemRoller.levelLabel(gem) else "Rough")
 		return if payload.Where then line .. "  ·  " .. payload.Where else line
+	elseif payload.Kind == "Kaiju" then
+		-- "Lv 7 Warrior  ·  Rare soul  ·  ★ rare kind" (two lines on a card at most)
+		local record = payload.Record or {}
+		local kind = Kaiju.Species[record.Species or ""]
+		local soul = record.Soul and (GemConfig.TierLabels[record.Soul.Tier] or record.Soul.Tier) or "Common"
+		return string.format("Lv %d %s  ·  %s soul%s", record.Level or 1, kind and kind.Role or "kaiju", soul,
+			if Kaiju.batch(record.Species or "") == 1 then "  ·  ★ rare kind" else "")
 	end
 	local rarity = GearRolls.Rarities[payload.Roll and payload.Roll.Rarity or 1] or GearRolls.Rarities[1]
 	local def = Slots.Definitions[payload.Slot]
@@ -260,6 +274,31 @@ local function itemIcon(parent, payload, x, y, size, preview: string?)
 			local swatch = UiKit.swatch(stage, GemConfig.shade(payload.Gem), math.floor(size * 0.46))
 			swatch.AnchorPoint = Vector2.new(0.5, 0.5)
 			swatch.Position = UDim2.fromScale(0.5, 0.5)
+		end
+		return stage
+	elseif payload.Kind == "Kaiju" then
+		-- (its model, framed from the front quarter, as the kaiju panel draws it)
+		local record = payload.Record or {}
+		local look = KaijuModels.Portrait
+		local view = new("ViewportFrame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			Ambient = look.Ambient,
+			LightColor = look.LightColor,
+			LightDirection = look.LightDirection,
+		}, stage)
+		local ok, model = pcall(function()
+			return KaijuModels.forPortrait(KaijuModels.build(record.Species, record.Element))
+		end)
+		if ok and model then
+			model.Parent = view
+			local camera = Instance.new("Camera")
+			local cf, extent = model:GetBoundingBox()
+			local reach = math.max(extent.X, extent.Y, extent.Z)
+			camera.FieldOfView = 40
+			camera.CFrame = CFrame.lookAt(cf.Position + Vector3.new(reach * 0.9, reach * 0.35, -reach * 1.25), cf.Position)
+			camera.Parent = view
+			view.CurrentCamera = camera
 		end
 		return stage
 	end
@@ -308,6 +347,28 @@ local function detailLines(payload)
 		end
 		if payload.Where then
 			add("Now " .. payload.Where .. " (listing takes it out)", 12, P.Dim)
+		end
+		return lines
+	elseif payload.Kind == "Kaiju" then
+		-- Who it is, how strong, and its Gemsoul (it moves with it).
+		local record = payload.Record or {}
+		local kind = Kaiju.Species[record.Species or ""]
+		add(itemName(payload), 16, itemColor(payload), BOLD)
+		add(itemLine(payload), 12, P.Dim, BOLD)
+		local ok, stats = pcall(Kaiju.recordStats, record)
+		if ok and type(stats) == "table" then
+			add(string.format("%d health  ·  %d damage  ·  %d speed", math.floor((stats.Health or 0) + 0.5),
+				math.floor((stats.Damage or 0) + 0.5), math.floor((stats.Speed or 0) + 0.5)), 14, P.Good, BOLD)
+		end
+		if kind and kind.Blurb then
+			add(kind.Blurb, 13, P.Text)
+		end
+		if record.Soul then
+			add("◆ Gemsoul: " .. GemConfig.displayName(record.Soul) .. " (goes with it)", 13,
+				GemConfig.ElementColors[record.Soul.Element] or P.Teal, BOLD)
+		end
+		if payload.Where then
+			add(payload.Where, 12, P.Dim)
 		end
 		return lines
 	end
@@ -434,6 +495,13 @@ local function myItems()
 			end
 		end
 	end
+	-- Your kaiju (not the team out or your support out: swap them out first).
+	local kaiju = profile.Kaiju
+	for id, record in kaiju and kaiju.List or {} do
+		if Rules.whyNot(profile, "Kaiju", nil, id) == nil then
+			table.insert(items, { Kind = "Kaiju", Id = id, Record = record })
+		end
+	end
 	table.sort(items, function(a, b)
 		if Rules.rank(a) ~= Rules.rank(b) then
 			return Rules.rank(a) > Rules.rank(b)
@@ -507,7 +575,7 @@ end
 
 local function filters(parent, y, withMode)
 	local x = 0
-	for _, f in { { "All", "ALL" }, { "Gear", "GEAR" }, { "Gems", "GEMS" }, { "Powers", "POWERS" } } do
+	for _, f in { { "All", "ALL" }, { "Gear", "GEAR" }, { "Gems", "GEMS" }, { "Powers", "POWERS" }, { "Kaiju", "KAIJU" } } do
 		chip(parent, f[2], filter == f[1], GOLD, x, y, 76, function()
 			filter = f[1]
 			draw()
@@ -804,7 +872,7 @@ local function drawSell()
 		12,
 		if up >= Rules.MaxListings then P.Bad else P.Dim,
 		BOLD,
-		340,
+		424,
 		4,
 		180,
 		18

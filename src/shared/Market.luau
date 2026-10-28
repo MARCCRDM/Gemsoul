@@ -13,10 +13,20 @@
 	An item on the move (a "payload"):
 	  { Kind = "Gem", Gem = <gem> }
 	  { Kind = "Gear", Slot = "Weapon", Id = <gear id>, Quality, Roll }
+	  { Kind = "Kaiju", Record = <its record: kind, element, level, Gemsoul> }
+	A kaiju moves as it is (its level, EXP and Gemsoul with it) and gets a
+	new id in its new roster. One in the team out (or your support out) has
+	to be swapped out first, and you always keep at least one.
 	Gear always moves with an empty socket: its gem goes back to the owner's
 	gem bag first (Market.stripGem), so no one gets a gem along with a piece.
 ]]
 local Slots = require(script.Parent.EquipmentSlots)
+-- (Shared.Kaiju only when a kaiju moves: loaded on first use)
+local kaijuRules = nil
+local function Kaiju()
+	kaijuRules = kaijuRules or require(script.Parent.Kaiju)
+	return kaijuRules
+end
 
 local Market = {}
 
@@ -32,6 +42,7 @@ Market.Wants = {
 	{ Id = "Any", Label = "Any offer" },
 	{ Id = "Gear", Label = "Gear" },
 	{ Id = "Gems", Label = "Gems" },
+	{ Id = "Kaiju", Label = "Kaiju" },
 	{ Id = "Rare", Label = "Rare or better" },
 }
 Market.WantLabels = {}
@@ -142,6 +153,19 @@ function Market.whyNot(profile, kind: any, slot: any, id: any): string?
 			return "Take it off first: you can't sell what you're wearing."
 		end
 		return nil
+	elseif kind == "Kaiju" then
+		local roster = Kaiju().roster(profile)
+		local record = roster.List[id]
+		if type(record) ~= "table" then
+			return "You don't have that kaiju."
+		end
+		if Kaiju().count(roster) <= 1 then
+			return "Keep at least one kaiju."
+		end
+		if table.find(Kaiju().teamIds(roster), id) or Kaiju().supportId(roster) == id then
+			return "Swap it out of the team that's out first."
+		end
+		return nil
 	end
 	return "Pick an item."
 end
@@ -171,6 +195,24 @@ function Market.take(profile, kind: any, slot: any, id: any)
 			c.ItemGems[a][b] = nil
 		end
 		return { Kind = "Gem", Gem = gem }
+	end
+	if kind == "Kaiju" then
+		local roster = Kaiju().roster(profile)
+		local record = roster.List[id]
+		roster.List[id] = nil
+		if type(roster.Order) == "table" then
+			local at = table.find(roster.Order, id)
+			if at then
+				table.remove(roster.Order, at)
+			end
+		end
+		if roster.Active == id then
+			roster.Active = Kaiju().order(roster)[1]
+		end
+		if roster.Support == id then
+			roster.Support = nil
+		end
+		return { Kind = "Kaiju", Record = copy(record) }
 	end
 	local gearType = gearKind(slot)
 	local c = profile.Character
@@ -219,6 +261,16 @@ function Market.cantReceive(profile, payload, maxGems: number, maxGear: number?)
 			return "Your gear bag is full."
 		end
 		return nil
+	elseif payload.Kind == "Kaiju" then
+		local record = payload.Record
+		if type(record) ~= "table" or not Kaiju().Species[record.Species] then
+			return "That item is gone."
+		end
+		-- (one coming home from escrow, `give` forced, always fits back)
+		if maxGems ~= math.huge and Kaiju().count(Kaiju().roster(profile)) >= Kaiju().MaxOwned then
+			return "You have as many kaiju as you can keep."
+		end
+		return nil
 	end
 	return "That item is gone."
 end
@@ -233,6 +285,26 @@ function Market.give(profile, payload, maxGems: number, force: boolean?): boolea
 	if payload.Kind == "Gem" then
 		profile.Gems = profile.Gems or {}
 		table.insert(profile.Gems, copy(payload.Gem))
+		return true
+	end
+	if payload.Kind == "Kaiju" then
+		-- (a new id in this roster; it joins the end of the line, as one caught)
+		local roster = Kaiju().roster(profile)
+		local record = copy(payload.Record)
+		local id = "k" .. roster.Next
+		roster.Next += 1
+		record.Id = id
+		roster.List[id] = record
+		if not roster.Active or not roster.List[roster.Active] then
+			roster.Active = id
+		end
+		if not Kaiju().isSupport(record.Species) then
+			local line = Kaiju().order(roster)
+			if not table.find(line, id) then
+				table.insert(line, id)
+			end
+			roster.Order = line
+		end
 		return true
 	end
 	local gearType = gearKind(payload.Slot)
@@ -280,6 +352,8 @@ end
 function Market.tab(payload): string
 	if payload.Kind == "Gear" then
 		return "Gear"
+	elseif payload.Kind == "Kaiju" then
+		return "Kaiju"
 	end
 	return if payload.Gem and payload.Gem.Cut then "Powers" else "Gems"
 end
@@ -289,6 +363,11 @@ local GEM_RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary 
 function Market.rank(payload): number
 	if payload.Kind == "Gem" then
 		return GEM_RANK[payload.Gem and payload.Gem.Tier] or 1
+	elseif payload.Kind == "Kaiju" then
+		-- (its Gemsoul's rarity, a step up for the rarest batch of kinds)
+		local record = payload.Record or {}
+		local soul = GEM_RANK[record.Soul and record.Soul.Tier] or 1
+		return math.min(5, soul + (if Kaiju().batch(record.Species or "") == 1 then 1 else 0))
 	end
 	return payload.Roll and payload.Roll.Rarity or 1
 end
@@ -299,6 +378,8 @@ function Market.fits(want: string?, payload): boolean
 		return payload.Kind == "Gear"
 	elseif want == "Gems" then
 		return payload.Kind == "Gem"
+	elseif want == "Kaiju" then
+		return payload.Kind == "Kaiju"
 	elseif want == "Rare" then
 		return Market.rank(payload) >= 3
 	end

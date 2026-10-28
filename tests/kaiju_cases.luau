@@ -781,6 +781,50 @@ do
 	end
 	check(early > 150 and early < 450, "pickKind's odds are off: " .. early)
 end
+-- Kaiju on the Market (Shared.Market): listed out of your roster (never the
+-- last one, nor one in the team out), handed over whole with a new id.
+do
+	local Market = shared("Market")
+	local seller = { Kaiju = nil }
+	local roster = Kaiju.roster(seller)
+	local a = Kaiju.add(roster, "Bulwark", { Element = "Fire", Tier = "Rare" }, 7)
+	local others = {}
+	for i = 1, Kaiju.slots(roster) do
+		table.insert(others, Kaiju.add(roster, "Carapace", { Element = "Frost", Tier = "Common" }, 2).Id)
+	end
+	Kaiju.setTeam(roster, others)
+	check(Market.whyNot(seller, "Kaiju", nil, others[1]) ~= nil, "A kaiju in the team out was listed")
+	check(Market.whyNot(seller, "Kaiju", nil, "k999") ~= nil, "A kaiju you don't have was listed")
+	check(Market.whyNot(seller, "Kaiju", nil, a.Id) == nil, "A spare kaiju can't be listed: " .. tostring(Market.whyNot(seller, "Kaiju", nil, a.Id)))
+	local before = Kaiju.count(roster)
+	local payload = Market.take(seller, "Kaiju", nil, a.Id)
+	check(payload and payload.Kind == "Kaiju" and payload.Record.Species == "Bulwark" and payload.Record.Level == 7, "The listed kaiju isn't whole")
+	check(Kaiju.count(roster) == before - 1 and roster.List[a.Id] == nil and not table.find(Kaiju.order(roster), a.Id), "The listed kaiju is still in the roster")
+	check(Market.tab(payload) == "Kaiju" and Market.fits("Kaiju", payload) and not Market.fits("Gems", payload), "A kaiju listing's tab or want")
+	local buyer = {}
+	local theirs = Kaiju.roster(buyer)
+	Kaiju.add(theirs, "Scythe", { Element = "Shock", Tier = "Common" }, 1)
+	check(Market.cantReceive(buyer, payload, 10) == nil, "A buyer with room can't take a kaiju")
+	check(Market.give(buyer, payload, 10), "The bought kaiju wasn't given")
+	local got
+	for id, record in theirs.List do
+		if record.Species == "Bulwark" then
+			got = record
+			check(record.Id == id and id ~= "k1", "The bought kaiju kept a clashing id")
+		end
+	end
+	check(got and got.Level == 7 and got.Soul.Tier == "Rare" and table.find(Kaiju.order(theirs), got.Id), "The bought kaiju isn't whole or not in the line")
+	local full = {}
+	local fullRoster = Kaiju.roster(full)
+	for i = 1, Kaiju.MaxOwned do
+		Kaiju.add(fullRoster, "Scythe", { Element = "Fire", Tier = "Common" }, 1)
+	end
+	check(Market.cantReceive(full, payload, 10) ~= nil, "A full roster took a kaiju")
+	check(Market.give(full, payload, 10, true), "A kaiju coming home from escrow didn't fit back")
+	local one = {}
+	local lone = Kaiju.add(Kaiju.roster(one), "Scythe", { Element = "Fire", Tier = "Common" }, 1)
+	check(Market.whyNot(one, "Kaiju", nil, lone.Id) ~= nil, "Your last kaiju was listed")
+end
 local crowded = { List = {} }
 for i = 1, Kaiju.MaxOwned - 1 do
 	crowded.List["k" .. i] = {}
