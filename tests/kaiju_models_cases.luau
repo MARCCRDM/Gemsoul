@@ -370,55 +370,6 @@ check(math.abs(Motion.fight("Razorback", { Mood = "Nope", MoodAt = 100 }, 102).L
 	end
 end)()
 
--- The finish on the rest of the roster (Shared.KaijuShapesMore.finish): lit
--- caps on their hide, a pupil in every eye, and for most a ridge, veins or a
--- belly; all of it on the parts it dresses, within the budget.
-do
-	local More = load("KaijuShapesMore")
-	local capped, dressed, kinds = 0, 0, 0
-	for kind in More.Hides do
-		kinds += 1
-		local model = KaijuModels.build(kind, "Frost")
-		local caps, extra, parts = 0, 0, 0
-		local eyes, seen = {}, {}
-		for _, d in model:GetDescendants() do
-			if d:IsA("BasePart") then
-				parts += 1
-				if d.Name == "Bevel" then
-					caps += 1
-					check(d:GetAttribute("HideShade") == true, kind .. ": a cap isn't lifted with the hide in a portrait")
-				elseif d.Name == "Pupil" then
-					local weld = d:FindFirstChildOfClass("WeldConstraint")
-					if weld and weld.Part0 then
-						table.insert(seen, weld.Part0)
-					end
-				elseif d.Name == "Eye" and d.Material == roblox.Enum.Material.Neon then
-					table.insert(eyes, d)
-				elseif d.Name == "Vein" or d.Name == "Ridge" or d.Name == "Belly" then
-					extra += 1
-				end
-			end
-		end
-		check(parts <= More.Finish.Budget, kind .. ": the finish ran over its budget")
-		-- (compared with ==: Lune's handles to one part aren't one table key)
-		for _, eye in eyes do
-			local found = false
-			for _, on in seen do
-				found = found or on == eye
-			end
-			check(found or parts == More.Finish.Budget, kind .. ": an eye without a pupil")
-		end
-		if caps > 0 then
-			capped += 1
-		end
-		if extra > 0 then
-			dressed += 1
-		end
-	end
-	check(capped >= kinds - 4, string.format("Only %d of %d kinds have lit caps", capped, kinds))
-	check(dressed >= kinds * 0.7, string.format("Only %d of %d kinds have veins, a ridge or a belly", dressed, kinds))
-end
-
 print(
 	string.format(
 		"PASS: %d kaiju model checks (94 kinds x 4 elements, joints, ground, budget, motions, fight poses, gait, moods)",

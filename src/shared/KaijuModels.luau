@@ -514,9 +514,6 @@ function KaijuModels.forPortrait(model: Model): Model
 			part.Color = part.Color:Lerp(look.Hide, look.Lift)
 		elseif hide and (sameColor(part.Color, hide[1]) or sameColor(part.Color, hide[2])) then
 			part.Color = part.Color:Lerp(look.Hide, look.Lift * darkness(part.Color))
-		elseif part:GetAttribute("HideShade") then
-			-- (a lit cap on the hide: KaijuShapesMore.finish; lifted with it)
-			part.Color = part.Color:Lerp(look.Hide, look.Lift * darkness(part.Color))
 		end
 	end
 	return model

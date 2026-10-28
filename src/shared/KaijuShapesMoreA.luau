@@ -16,6 +16,34 @@ function Half.install(h)
 	local CLAW = h.Claw
 	local B = {}
 
+	-- A part in its plates' colour, lit: the lines, cracks and crystals the
+	-- concepts draw glowing in each element's colour.
+	local function lit(p)
+		p.Material = Enum.Material.Neon
+		p.CastShadow = false
+		return p
+	end
+
+	-- Blocks of hide `thick` laid over a lit core, `cols` by `rows`, a crack
+	-- of the core's light left between each and each a little askew
+	-- (Ashcrawler's lava): `face` a frame on the core's face, its Y out of
+	-- it, `w` across its X and `d` across its Z.
+	local function crust(m, core, face: CFrame, w, d, cols, rows, thick, color, seed)
+		for i = 1, cols do
+			for j = 1, rows do
+				local k = ((seed * 5 + i * 7 + j * 11) % 9) / 8 - 0.5
+				make(
+					m,
+					core,
+					"Crust",
+					V(w / cols - 0.09, thick, d / rows - 0.09),
+					face * CF((i - (cols + 1) / 2) * w / cols, thick / 2, (j - (rows + 1) / 2) * d / rows) * A(rad(k * 4), rad(k * 7), rad(-k * 4)),
+					color
+				)
+			end
+		end
+	end
+
 	-- Prisma: a floating octahedron of blue glass, a cube of its element's
 	-- light turning in it, a band round its middle that tilts as it speaks
 	-- (its jaw), and a ring of small cubes orbiting it in two halves (its
@@ -107,141 +135,183 @@ function Half.install(h)
 		end
 	end
 
-	-- Tuskmound: a woolly mammoth, shaggy brown, a humped back crusted in
-	-- its element's colour, glowing tusks curving up, its trunk (its jaw)
-	-- raised when it roars.
+	-- Tuskmound: a woolly mammoth, shaggy brown, a high domed head and a
+	-- humped back stepped like a hill, long hair hanging in a fringe, two
+	-- great tusks of its element's light curving out and up, eyes of it
+	-- under a heavy brow, a trunk (its jaw) that swings up as it roars.
 	function B.Tuskmound(m, pal, H, H2)
-		local r = root(m, V(2.0, 1.6, 2.4), 1.9)
-		local body = limb(m, r, "Body", V(2.2, 1.9, 3.0), CF(0, 2.5, 0.2), V(0, 2.0, 0.2), "Body", 1, H)
-		make(m, body, "Hump", V(1.8, 0.75, 1.7), CF(0, 3.65, -0.35), H)
-		wedge(m, body, "Back", V(1.9, 0.6, 1.4), CF(0, 3.55, 1.0), H)
+		local r = root(m, V(2.0, 1.6, 2.4), 2.0)
+		local body = limb(m, r, "Body", V(2.5, 1.8, 3.0), CF(0, 2.55, 0.35), V(0, 2.1, 0.35), "Body", 1, H)
+		make(m, body, "Hump", V(2.1, 0.55, 1.8), CF(0, 3.72, -0.1), H)
+		make(m, body, "Hump", V(1.4, 0.3, 1.1), CF(0, 4.12, -0.25), H)
+		make(m, body, "Rump", V(2.2, 0.4, 1.3), CF(0, 3.6, 1.1), H)
 		for _, s in { -1, 1 } do
-			make(m, body, "Shag", V(0.22, 1.0, 2.7), CF(s * 1.15, 1.8, 0.2), H2)
-			make(m, body, "Shag", V(0.2, 0.6, 1.2), CF(s * 1.12, 3.1, -0.4), H2)
+			for i, z in { -0.75, 0.25, 1.2 } do
+				make(m, body, "Shag", V(0.24, 1.15, 0.98), CF(s * 1.27, 1.75 - ({ 0.15, 0, 0.1 })[i], z), H2)
+			end
+			make(m, body, "Shag", V(0.2, 0.62, 1.4), CF(s * 1.12, 3.55, -0.15), H2)
 		end
-		make(m, body, "Shag", V(1.9, 0.5, 0.2), CF(0, 1.75, -1.32), H2)
-		for i = 0, 3 do
-			plate(m, body, "Crust", V(0.5 - i * 0.05, 0.22, 0.45), CF(0, 4.07 - i * 0.12, -0.8 + i * 0.45) * A(0, rad(45), 0), pal)
-		end
-		local head = make(m, body, "Head", V(1.3, 1.3, 1.0), CF(0, 2.95, -1.7), H)
-		make(m, head, "Dome", V(1.1, 0.5, 0.8), CF(0, 3.75, -1.6), H2)
-		eyes(m, head, 0.5, 3.15, -2.22, V(0.12, 0.1, 0.06), pal)
+		make(m, body, "Shag", V(2.2, 1.1, 0.24), CF(0, 1.9, -1.23), H2)
+		local head = make(m, body, "Head", V(1.6, 1.45, 1.15), CF(0, 3.0, -1.75), H)
+		make(m, head, "Dome", V(1.35, 0.5, 1.0), CF(0, 3.95, -1.65), H)
+		make(m, head, "Dome", V(0.9, 0.25, 0.7), CF(0, 4.3, -1.6), H)
 		for _, s in { -1, 1 } do
-			make(m, head, "Ear", V(0.16, 0.8, 0.6), CF(s * 0.72, 2.95, -1.45) * A(0, rad(s * 15), 0), H2)
-			local base = V(s * 0.45, 2.45, -2.1)
-			local bend = V(s * 0.62, 1.55, -2.65)
-			local tip = V(s * 0.42, 1.95, -3.2)
-			litBeam(m, head, "Tusk", base, bend, 0.22, pal)
-			litBeam(m, head, "Tusk", bend, tip, 0.17, pal)
+			make(m, head, "Brow", V(0.72, 0.2, 0.28), CF(s * 0.38, 3.38, -2.33) * A(0, 0, rad(s * 10)), H2)
+			glow(m, head, "Eye", V(0.3, 0.1, 0.05), CF(s * 0.4, 3.24, -2.34) * A(0, 0, rad(s * 10)), pal)
+			make(m, head, "Ear", V(0.2, 1.05, 0.85), CF(s * 0.9, 2.95, -1.5) * A(0, rad(s * 18), 0), H2)
+			-- a tusk: down and out, forward, then up and in
+			local pts = { V(s * 0.5, 2.6, -2.2), V(s * 0.85, 1.85, -2.75), V(s * 0.95, 1.6, -3.35), V(s * 0.8, 2.15, -3.85), V(s * 0.55, 2.7, -3.8) }
+			for i = 1, 4 do
+				local w = 0.42 - i * 0.05
+				local d = (pts[i + 1] - pts[i]).Unit
+				litBeam(m, head, "Tusk", pts[i] - d * w * 0.3, pts[i + 1] + d * w * 0.3, w, pal)
+			end
 		end
-		-- The trunk.
-		local trunk = h.beam(m, head, "Trunk", V(0, 2.55, -2.25), V(0, 1.6, -2.45), 0.42, 0.42, H, "Jaw")
-		beam(m, trunk, "Trunk", V(0, 1.6, -2.45), V(0, 0.95, -2.35), 0.32, 0.32, H)
-		beam(m, trunk, "TrunkTip", V(0, 0.95, -2.35), V(0, 0.75, -2.0), 0.26, 0.26, H2)
+		local trunk = beam(m, head, "Trunk", V(0, 2.65, -2.3), V(0, 1.75, -2.5), 0.5, 0.46, H, "Jaw")
+		beam(m, trunk, "Trunk", V(0, 1.8, -2.45), V(0, 1.05, -2.4), 0.38, 0.36, H)
+		beam(m, trunk, "Trunk", V(0, 1.1, -2.4), V(0, 0.75, -2.15), 0.3, 0.3, H2)
 		for _, spot in { { 1, -1 }, { -1, -1 }, { 1, 1 }, { -1, 1 } } do
-			pillar(m, body, spot[1] * 0.68, 1.65, if spot[2] < 0 then -0.85 else 1.2, 0.72, H, H2, 3, -spot[1] * spot[2])
+			local x, z = spot[1] * 0.8, if spot[2] < 0 then -0.7 else 1.35
+			local l = pillar(m, body, x, 1.75, z, 0.86, H, H2, 0, -spot[1] * spot[2])
+			for i = -1, 1 do
+				plate(m, l, "Nail", V(0.2, 0.16, 0.12), CF(x + i * 0.27, 0.1, z - 0.6), pal)
+			end
 		end
-		tail(m, body, { V(0, 2.6, 1.7), V(0, 2.1, 2.05), V(0, 1.7, 2.15) }, { 0.22, 0.16 }, H2)
+		tail(m, body, { V(0, 2.7, 1.8), V(0, 2.2, 2.1), V(0, 1.8, 2.2) }, { 0.22, 0.16 }, H2)
 	end
 
-	-- Steamhide: a skinless red giant, all muscle blocks, a lipless grin,
-	-- vents of its element's colour on its shoulders and back breathing
-	-- light.
+	-- Steamhide: a skinless red titan, blocks of muscle on a darker frame, a
+	-- stern face with its element's light in its eyes, two stacks on its
+	-- back grilled in that light and breathing steam, long arms hanging to
+	-- heavy fists.
 	function B.Steamhide(m, pal, H, H2)
 		local r = root(m, V(1.8, 1.8, 1.4), 2.6)
-		local torso = limb(m, r, "Torso", V(2.0, 1.9, 1.15), CF(0, 3.45, 0), V(0, 2.45, 0), "Body", 1, H)
-		make(m, torso, "Waist", V(1.5, 0.55, 1.0), CF(0, 2.4, 0), H)
-		make(m, torso, "Hips", V(1.6, 0.45, 1.05), CF(0, 2.08, 0.02), H2)
-		make(m, torso, "Traps", V(1.3, 0.35, 0.8), CF(0, 4.48, 0.12), H)
+		local torso = limb(m, r, "Torso", V(1.9, 1.5, 1.1), CF(0, 3.75, 0.05), V(0, 2.6, 0.05), "Body", 1, H2)
+		make(m, torso, "Waist", V(1.4, 0.6, 0.95), CF(0, 2.85, 0.05), H2)
+		make(m, torso, "Hips", V(1.6, 0.45, 1.05), CF(0, 2.4, 0.05), H)
+		make(m, torso, "Traps", V(1.2, 0.35, 0.85), CF(0, 4.55, 0.15), H)
+		make(m, torso, "Neck", V(0.5, 0.35, 0.5), CF(0, 4.62, -0.05), H2)
 		for _, s in { -1, 1 } do
-			make(m, torso, "Pec", V(0.86, 0.55, 0.16), CF(s * 0.45, 4.0, -0.6), H2)
+			make(m, torso, "Pec", V(0.8, 0.55, 0.3), CF(s * 0.44, 4.15, -0.5), H)
 			for row = 0, 2 do
-				make(m, torso, "Abs", V(0.4, 0.3, 0.12), CF(s * 0.22, 3.4 - row * 0.36, -0.6), H2)
+				make(m, torso, "Abs", V(0.36, 0.28, 0.26), CF(s * 0.21, 3.6 - row * 0.33, -0.5), H)
 			end
-			make(m, torso, "Lat", V(0.18, 1.1, 0.8), CF(s * 1.05, 3.45, 0.05), H2)
-			make(m, torso, "Delt", V(0.72, 0.62, 0.85), CF(s * 1.2, 4.2, 0), H2)
-			-- The stacks on its shoulders, breathing light.
-			plate(m, torso, "Vent", V(0.38, 0.42, 0.38), CF(s * 0.52, 4.75, 0.45), pal)
-			plate(m, torso, "Vent", V(0.3, 0.22, 0.3), CF(s * 0.52, 5.06, 0.45), pal)
-			for i, d in { 0.32, 0.44 } do
-				local puff = h.ball(m, torso, "Steam", d, V(s * (0.52 + i * 0.06), 5.08 + i * 0.26, 0.45 + i * 0.05), pal.Glow, Enum.Material.Neon)
-				puff.Transparency, puff.CastShadow = 0.45, false
+			make(m, torso, "Oblique", V(0.26, 1.1, 0.8), CF(s * 0.9, 3.45, 0.05), H)
+			make(m, torso, "Delt", V(0.75, 0.7, 0.9), CF(s * 1.15, 4.25, 0.05), H)
+			-- a stack on its back, grilled in light, steaming
+			local stack = make(m, torso, "Stack", V(0.56, 0.7, 0.5), CF(s * 0.62, 4.65, 0.62), H2)
+			make(m, stack, "Vent", V(0.44, 0.56, 0.02), CF(s * 0.62, 4.65, 0.36), C(36, 20, 18))
+			for i = -1, 1 do
+				lit(make(m, stack, "Grille", V(0.42, 0.08, 0.04), CF(s * 0.62, 4.65 + i * 0.17, 0.345), pal.Plate))
 			end
-			plate(m, torso, "Vent", V(0.3, 0.22, 0.3), CF(s * 0.3, 3.7, 0.6), pal)
+			plate(m, stack, "Chimney", V(0.24, 0.25, 0.24), CF(s * 0.62, 5.12, 0.66), pal)
+			local rim = plate(m, stack, "Chimney", V(0.32, 0.07, 0.32), CF(s * 0.62, 5.26, 0.66), pal)
+			local steam = Instance.new("Smoke")
+			steam.Color, steam.Opacity, steam.RiseVelocity, steam.Size = C(220, 216, 212), 0.18, 2.5, 0.5
+			steam.Parent = rim
 		end
-		local head = make(m, torso, "Head", V(0.78, 0.85, 0.78), CF(0, 4.98, -0.12), H)
-		make(m, head, "Brow", V(0.82, 0.18, 0.22), CF(0, 5.22, -0.46), H2)
-		eyes(m, head, 0.18, 5.08, -0.52, V(0.15, 0.08, 0.06), pal)
-		make(m, head, "Teeth", V(0.54, 0.08, 0.05), CF(0, 4.78, -0.52), CLAW)
-		local jaw = limb(m, head, "Jaw", V(0.62, 0.22, 0.5), CF(0, 4.54, -0.25), V(0, 4.64, -0.02), "Jaw", 1, H2)
-		make(m, jaw, "Teeth", V(0.5, 0.07, 0.05), CF(0, 4.67, -0.51), CLAW)
+		local head = make(m, torso, "Head", V(0.74, 0.72, 0.7), CF(0, 4.98, -0.15), H)
+		make(m, head, "Crown", V(0.62, 0.14, 0.56), CF(0, 5.4, -0.1), H2)
 		for _, s in { -1, 1 } do
-			local hand = V(s * 1.42, 2.3, -0.1)
-			local p = arm(m, torso, V(s * 1.28, 4.15, 0), V(s * 1.45, 3.2, 0.05), hand, 0.62, H, H2)
-			make(m, p, "Bicep", V(0.7, 0.62, 0.72), CF(s * 1.37, 3.65, -0.04), H)
-			make(m, p, "Bracer", V(0.66, 0.55, 0.66), CF(s * 1.44, 2.82, -0.03), H2)
-			make(m, p, "Fist", V(0.6, 0.56, 0.62), CF(hand + V(0, -0.2, 0)), H2)
-			local l = leg(m, torso, s * 0.48, 2.05, 0.05, 0.7, H, H2, 3, 0.12)
-			make(m, l, "Knee", V(0.58, 0.4, 0.24), CF(s * 0.51, 1.07, -0.38), H2)
+			make(m, head, "Brow", V(0.38, 0.14, 0.2), CF(s * 0.19, 5.13, -0.52) * A(0, 0, rad(s * 12)), H2)
+			glow(m, head, "Eye", V(0.2, 0.08, 0.05), CF(s * 0.17, 5.02, -0.51) * A(0, 0, rad(s * 8)), pal)
+			make(m, head, "Cheek", V(0.12, 0.26, 0.45), CF(s * 0.38, 4.88, -0.3), H2)
+		end
+		make(m, head, "Nose", V(0.14, 0.24, 0.12), CF(0, 4.9, -0.55), H2)
+		make(m, head, "Teeth", V(0.42, 0.06, 0.04), CF(0, 4.68, -0.51), CLAW)
+		local jaw = limb(m, head, "Jaw", V(0.62, 0.2, 0.55), CF(0, 4.55, -0.25), V(0, 4.65, -0.02), "Jaw", 1, H2)
+		make(m, jaw, "Teeth", V(0.4, 0.05, 0.04), CF(0, 4.63, -0.53), CLAW)
+		for _, s in { -1, 1 } do
+			local hand = V(s * 1.45, 2.3, 0)
+			local p = arm(m, torso, V(s * 1.2, 4.2, 0.05), V(s * 1.38, 3.2, 0.12), hand, 0.55, H2, H2)
+			make(m, p, "Bicep", V(0.62, 0.62, 0.64), CF(s * 1.3, 3.72, -0.04), H)
+			make(m, p, "Brachial", V(0.64, 0.6, 0.64), CF(s * 1.42, 2.88, 0.04), H)
+			make(m, p, "Wrist", V(0.58, 0.14, 0.6), CF(s * 1.45, 2.42, 0), H2)
+			make(m, p, "Fist", V(0.6, 0.56, 0.64), CF(s * 1.47, 2.08, -0.02), H)
+			make(m, p, "Knuckles", V(0.5, 0.2, 0.14), CF(s * 1.47, 2.14, -0.38), H2)
+			local l = leg(m, torso, s * 0.46, 2.35, 0.05, 0.66, H2, H2, 0, 0.12)
+			make(m, l, "Quad", V(0.66, 0.85, 0.6), CF(s * 0.47, 1.85, -0.1), H)
+			make(m, l, "Knee", V(0.48, 0.3, 0.22), CF(s * 0.48, 1.22, -0.3), H2)
+			make(m, l, "Calf", V(0.54, 0.7, 0.5), CF(s * 0.48, 0.78, 0.15), H)
+			for i = -1, 1 do
+				make(m, l, "Toe", V(0.18, 0.2, 0.22), CF(s * 0.48 + i * 0.2, 0.1, -0.58), H2)
+			end
 		end
 	end
 
-	-- Hillback: a walking hillside, a mossy slab of a back cracked through
-	-- with its element's light, boulders and crystals on it, grey stone
-	-- legs and a short stone snout.
+	-- Hillback: a walking hillside, a great square slab of turf broken in
+	-- four and cracked open in the middle to its element's light,
+	-- moss-capped boulders on it, under it a grey stone body on four stumps
+	-- and a blunt stone head.
 	function B.Hillback(m, pal, H, H2)
-		local r = root(m, V(2.4, 1.4, 2.6), 1.5)
-		local body = limb(m, r, "Slab", V(3.0, 0.9, 3.4), CF(0, 1.95, 0.1), V(0, 1.6, 0.1), "Body", 1, H)
-		make(m, body, "Skirt", V(3.2, 0.4, 3.6), CF(0, 1.45, 0.1), H)
-		for _, q in { { -1, -1, 0.1 }, { 1, -1, 0 }, { -1, 1, -0.05 }, { 1, 1, 0.08 } } do
-			make(m, body, "Turf", V(1.42, 0.35, 1.62), CF(q[1] * 0.74, 2.55 + q[3], 0.1 + q[2] * 0.83) * A(rad(q[3] * 20), 0, rad(-q[3] * 25)), H)
+		local r = root(m, V(2.4, 1.0, 2.6), 1.1)
+		local body = limb(m, r, "Body", V(2.4, 0.7, 2.8), CF(0, 1.1, 0.1), V(0, 1.0, 0.1), "Body", 1, H2)
+		make(m, body, "Crust", V(3.2, 0.3, 3.6), CF(0, 1.6, 0.1), H:Lerp(C(0, 0, 0), 0.45))
+		lit(make(m, body, "Heart", V(0.7, 0.3, 0.7), CF(0, 1.85, 0.1), pal.Plate))
+		for _, t in { { -1, -1, 2, -1.5 }, { 1, -1, -1.5, 2 }, { -1, 1, 1.5, 1 }, { 1, 1, -2, -1 } } do
+			make(m, body, "Turf", V(1.72, 0.5, 1.9), CF(t[1] * 0.89, 1.98, 0.1 + t[2] * 0.98) * A(rad(t[3]), 0, rad(t[4])), H)
 		end
-		glow(m, body, "Crack", V(0.12, 0.3, 3.1), CF(0, 2.5, 0.1), pal)
-		glow(m, body, "Crack", V(2.9, 0.3, 0.12), CF(0, 2.5, 0.1), pal)
-		glow(m, body, "Crack", V(0.1, 0.28, 1.1), CF(0.4, 2.5, -0.4) * A(0, rad(50), 0), pal)
-		plate(m, body, "Heart", V(0.42, 0.42, 0.42), CF(0, 2.55, 0.1) * A(rad(45), rad(45), 0), pal)
-		for _, b in { { -0.9, 2.95, -0.8, 0.5 }, { 0.95, 2.95, 0.9, 0.42 }, { -0.75, 2.95, 1.1, 0.34 } } do
-			make(m, body, "Boulder", V(b[4], b[4] * 0.8, b[4]), CF(b[1], b[2], b[3]) * A(rad(10), rad(30), 0), H2)
+		for _, c in { { 0.3, -0.15, 0.7, 35 }, { -0.35, 0.25, 0.8, -50 }, { 0.15, 0.45, 0.6, 100 }, { -0.25, -0.4, 0.65, 150 }, { 0.6, 0.3, 0.45, -20 }, { -0.62, -0.05, 0.5, 80 } } do
+			lit(make(m, body, "Crack", V(0.07, 0.06, c[3]), CF(c[1], 2.25, 0.1 + c[2]) * A(0, rad(c[4]), 0), pal.Plate))
 		end
-		for _, c in { { 1.0, -1.0 }, { -1.15, 0.35 }, { 0.6, 1.35 } } do
-			plate(m, body, "Crystal", V(0.2, 0.5, 0.2), CF(c[1], 3.0, c[2]) * A(rad(15), 0, rad(-12)), pal)
+		for _, b in { { -1.0, -0.95, 0.62, 20 }, { 1.05, 0.85, 0.55, -35 }, { -0.95, 1.15, 0.42, 50 }, { 0.6, -1.25, 0.36, 10 } } do
+			local rock = make(m, body, "Boulder", V(b[3], b[3] * 0.7, b[3] * 0.9), CF(b[1], 2.22 + b[3] * 0.3, 0.1 + b[2]) * A(rad(8), rad(b[4]), rad(-6)), H2)
+			make(m, rock, "Moss", V(b[3] * 0.7, 0.08, b[3] * 0.6), CF(b[1], 2.24 + b[3] * 0.65, 0.1 + b[2]) * A(0, rad(b[4]), 0), H)
 		end
-		local head = make(m, body, "Head", V(1.0, 0.8, 0.9), CF(0, 1.5, -1.95), H2)
-		make(m, head, "Snout", V(0.8, 0.55, 0.5), CF(0, 1.38, -2.6), H2)
-		make(m, head, "Moss", V(1.05, 0.2, 0.7), CF(0, 1.98, -1.95), H)
-		eyes(m, head, 0.36, 1.68, -2.42, V(0.14, 0.1, 0.06), pal)
-		limb(m, head, "Jaw", V(0.72, 0.2, 0.6), CF(0, 1.02, -2.3), V(0, 1.12, -1.95), "Jaw", 1, H2)
+		for _, b in { { 0.2, 1.35 }, { -1.4, 0.2 }, { 1.35, -0.4 } } do
+			make(m, body, "Pebble", V(0.2, 0.16, 0.22), CF(b[1], 2.27, 0.1 + b[2]) * A(0, rad(30), rad(10)), H2)
+		end
+		local head = make(m, body, "Head", V(1.05, 0.75, 0.95), CF(0, 1.12, -1.6), H2)
+		make(m, head, "Snout", V(0.88, 0.55, 0.62), CF(0, 1.02, -2.25), H2)
+		make(m, head, "Brow", V(1.08, 0.14, 0.32), CF(0, 1.45, -1.95), H2)
+		eyes(m, head, 0.32, 1.32, -2.08, V(0.12, 0.1, 0.06), pal)
+		limb(m, head, "Jaw", V(0.78, 0.18, 0.62), CF(0, 0.66, -2.15), V(0, 0.75, -1.8), "Jaw", 1, H2)
 		for _, spot in { { 1, -1 }, { -1, -1 }, { 1, 1 }, { -1, 1 } } do
-			pillar(m, body, spot[1] * 1.05, 1.35, if spot[2] < 0 then -1.0 else 1.2, 0.8, H2, H2, 2, -spot[1] * spot[2])
+			pillar(m, body, spot[1] * 1.1, 0.95, if spot[2] < 0 then -1.0 else 1.2, 0.85, H2, H2, 3, -spot[1] * spot[2])
 		end
-		tail(m, body, { V(0, 1.6, 1.85), V(0, 1.2, 2.45) }, { 0.6 }, H2)
+		tail(m, body, { V(0, 1.05, 1.5), V(0, 0.8, 2.15) }, { 0.5 }, H2)
 	end
 
-	-- Inkwrap: a boxy purple octopus, a domed mantle, two great lamp eyes,
-	-- eight thick tentacles (its legs) lined in its element's light.
+	-- Inkwrap: a purple octopus, a stepped dome of a mantle, two great square
+	-- lamp eyes of its element's light, eight thick tentacles arching out
+	-- and down to curl on the ground, each lit along its underside.
 	function B.Inkwrap(m, pal, H, H2)
 		local r = root(m, V(1.6, 1.6, 1.6), 2.0)
-		local body = limb(m, r, "Mantle", V(1.8, 1.6, 1.7), CF(0, 2.85, 0.1), V(0, 2.1, 0.1), "Body", 1, H)
-		make(m, body, "Dome", V(1.45, 0.6, 1.35), CF(0, 3.9, 0.15), H)
-		make(m, body, "Crown", V(0.95, 0.35, 0.85), CF(0, 4.36, 0.2), H2)
-		make(m, body, "Skirt", V(1.95, 0.45, 1.85), CF(0, 2.0, 0.1), H2)
+		local body = limb(m, r, "Mantle", V(2.1, 1.0, 2.0), CF(0, 2.3, 0.1), V(0, 1.9, 0.1), "Body", 1, H)
+		make(m, body, "Dome", V(2.0, 0.6, 1.9), CF(0, 3.1, 0.12), H)
+		make(m, body, "Dome", V(1.7, 0.35, 1.65), CF(0, 3.57, 0.14), H)
+		make(m, body, "Crown", V(1.2, 0.22, 1.2), CF(0, 3.86, 0.15), H)
+		make(m, body, "Skirt", V(1.8, 0.3, 1.75), CF(0, 1.68, 0.1), H2)
 		for _, s in { -1, 1 } do
-			make(m, body, "EyeFrame", V(0.6, 0.66, 0.1), CF(s * 0.45, 2.95, -0.76), H2)
-			glow(m, body, "Eye", V(0.44, 0.5, 0.1), CF(s * 0.45, 2.95, -0.8), pal)
-			make(m, body, "Pupil", V(0.1, 0.34, 0.06), CF(s * 0.45, 2.95, -0.86), H2)
+			make(m, body, "Socket", V(0.72, 0.78, 0.25), CF(s * 0.5, 2.4, -0.95), H)
+			lit(make(m, body, "Eye", V(0.52, 0.58, 0.06), CF(s * 0.5, 2.4, -1.1), pal.Plate))
+			make(m, body, "Pupil", V(0.18, 0.36, 0.04), CF(s * 0.5, 2.4, -1.135), C(26, 22, 34))
 		end
-		limb(m, body, "Beak", V(0.42, 0.3, 0.42), CF(0, 1.72, -0.35), V(0, 1.9, -0.2), "Jaw", 1, H2)
+		limb(m, body, "Beak", V(0.35, 0.22, 0.35), CF(0, 1.6, -0.1), V(0, 1.7, 0), "Jaw", 1, H2)
+		local up = V(0, 1, 0)
 		for i = 0, 7 do
 			local a = rad(i * 45 + 22.5)
 			local out = V(math.sin(a), 0, -math.cos(a))
-			local side = if i % 2 == 0 then 1 else -1
-			local hip = V(0, 1.9, 0.1) + out * 0.7
-			local knee = V(0, 1.0, 0.1) + out * 1.55
-			local tip = V(0, 0.16, 0.1) + out * 1.95
-			local p = h.spindle(m, body, hip, knee, tip, 0.36, H, H, side)
-			plate(m, p, "Band", V(0.42, 0.12, 0.42), CF((hip + knee) / 2) * A(0, -a, 0), pal)
-			litBeam(m, p, "Line", knee + V(0, 0.05, 0), tip + out * -0.05 + V(0, 0.1, 0), 0.08, pal)
-			make(m, p, "Curl", V(0.24, 0.16, 0.34), CF(tip + out * 0.12 + V(0, -0.04, 0)) * A(0, -a, 0), H2)
+			local across = out:Cross(up).Unit
+			local base = V(0, 0, 0.1)
+			local pts = { base + out * 0.75 + up * 1.7, base + out * 1.6 + up * 2.05, base + out * 2.3 + up * 1.25, base + out * 2.5 + up * 0.28, base + out * 2.9 + up * 0.15 }
+			local widths = { 0.56, 0.48, 0.4, 0.3 }
+			local first
+			for k = 1, 4 do
+				local p0, p1, w = pts[k], pts[k + 1], widths[k]
+				local d = (p1 - p0).Unit
+				if k == 1 then
+					first = beam(m, body, "Tentacle", p0 - d * w * 0.3, p1 + d * w * 0.3, w, w, H, "Stride", if i % 2 == 0 then 1 else -1)
+				else
+					beam(m, first, "Tentacle", p0 - d * w * 0.3, p1 + d * w * 0.3, w, w, H)
+				end
+				if k <= 3 then
+					-- the inside of its arch lit, its edges showing either side
+					local n = d:Cross(across).Unit
+					local line = make(m, first, "Line", V(w + 0.1, (p1 - p0).Magnitude + w * 0.3, 0.08), CFrame.fromMatrix((p0 + p1) / 2 + n * w * 0.5, across, d), pal.Plate)
+					lit(line)
+				end
+			end
 		end
 	end
 
@@ -322,39 +392,51 @@ function Half.install(h)
 	end
 
 
-	-- Rubbleking: a hunched golem of stacked sand-coloured stone, its small
-	-- head sunk between huge shoulders under a crest of spikes lit in its
-	-- element's colour, long arms ending in boulder fists by the ground,
+	-- Rubbleking: a hunched golem of stacked sandstone, its chest built up in
+	-- slabs like a cliff's strata, a small head sunk between huge shoulders
+	-- with angry eyes of its element's light, a crest of crystals of that
+	-- light breaking out of its back, long arms down to boulder fists,
 	-- short thick legs.
 	function B.Rubbleking(m, pal, H, H2)
 		local r = root(m, V(2.2, 1.8, 2.0), 2.0)
-		local lean = CF(0, 3.0, 0.1) * A(rad(-10), 0, 0)
-		local torso = limb(m, r, "Torso", V(2.8, 2.2, 2.0), lean, V(0, 1.9, 0.2), "Body", 1, H)
-		make(m, torso, "Pelvis", V(1.9, 0.7, 1.5), CF(0, 1.85, 0.25), H2)
-		for i = 0, 3 do
-			make(m, torso, "Ridge", V(2.6 - i * 0.12, 0.26, 0.3), lean * CF(0, -0.8 + i * 0.48, -1.0), H2)
-		end
-		make(m, torso, "Hump", V(2.2, 0.6, 1.4), CF(0, 4.2, 0.4), H)
-		for _, s in { -1, 1 } do
-			make(m, torso, "Shoulder", V(1.2, 1.1, 1.3), CF(s * 1.5, 3.75, 0.1) * A(0, 0, rad(s * -8)), H)
-			make(m, torso, "Stone", V(0.7, 0.5, 0.8), CF(s * 0.9, 2.55, 0.85) * A(rad(10), rad(s * 15), 0), H2)
-		end
-		local head = make(m, torso, "Head", V(0.8, 0.7, 0.75), CF(0, 3.95, -0.85), H)
-		make(m, head, "Brow", V(0.86, 0.16, 0.2), CF(0, 4.18, -1.18), H2)
-		eyes(m, head, 0.2, 4.02, -1.23, V(0.18, 0.08, 0.06), pal)
-		limb(m, head, "Jaw", V(0.66, 0.22, 0.5), CF(0, 3.58, -1.0), V(0, 3.68, -0.8), "Jaw", 1, H2)
-		for i = 0, 5 do
-			local spike = plate(m, torso, "Crest", V(0.13, 0.48 - math.abs(i - 2) * 0.06, 0.26), CF((i % 2 - 0.5) * 0.14, 4.48 - i * 0.03, -0.75 + i * 0.3) * A(rad(-20), 0, 0), pal)
-			spike.Material = Enum.Material.Neon
+		local lean = CF(0, 3.0, 0.25) * A(rad(-12), 0, 0)
+		local torso = limb(m, r, "Torso", V(2.3, 2.0, 1.8), lean, V(0, 2.0, 0.3), "Body", 1, H2)
+		make(m, torso, "Pelvis", V(1.8, 0.6, 1.4), CF(0, 1.9, 0.4), H2)
+		for i, w in { 1.9, 2.25, 2.45, 2.1 } do
+			make(m, torso, "Strata", V(w, 0.42, 0.4), lean * CF(0, -1.19 + i * 0.47, if i == 3 then -0.94 else -0.88), H)
 		end
 		for _, s in { -1, 1 } do
-			local hand = V(s * 1.95, 1.05, -0.55)
-			local p = arm(m, torso, V(s * 1.6, 3.7, -0.05), V(s * 2.0, 2.55, -0.25), hand, 0.9, H, H2)
-			make(m, p, "Forearm", V(0.95, 0.85, 0.95), CF(s * 1.98, 1.75, -0.42) * A(rad(-8), 0, 0), H)
-			make(m, p, "Boulder", V(1.25, 1.1, 1.25), CF(hand + V(0, -0.35, -0.05)) * A(rad(10), rad(18), rad(6)), H2)
-			make(m, p, "Boulder", V(0.7, 0.55, 0.7), CF(hand + V(s * 0.35, 0.1, -0.45)) * A(rad(30), rad(10), 0), H)
-			plate(m, p, "Knuckle", V(0.3, 0.3, 0.3), CF(hand + V(0, -0.15, -0.68)) * A(rad(45), rad(45), 0), pal)
-			leg(m, torso, s * 0.72, 1.75, 0.35, 0.88, H, H2, 3, 0.12)
+			for i = 0, 2 do
+				make(m, torso, "Strata", V(0.3, 0.42, 1.6), lean * CF(s * (1.16 + (i % 2) * 0.05), -0.48 + i * 0.47, 0.05), H)
+			end
+			make(m, torso, "Shoulder", V(1.2, 1.15, 1.4), CF(s * 1.45, 3.85, 0.25) * A(rad(-8), 0, rad(s * -10)), H)
+			make(m, torso, "Shoulder", V(0.9, 0.3, 1.1), CF(s * 1.4, 4.5, 0.3) * A(0, 0, rad(s * -10)), H2)
+		end
+		make(m, torso, "Hump", V(2.0, 0.7, 1.4), CF(0, 4.15, 0.6), H)
+		local head = make(m, torso, "Head", V(0.8, 0.7, 0.75), CF(0, 3.85, -0.95), H)
+		for _, s in { -1, 1 } do
+			make(m, head, "Brow", V(0.44, 0.16, 0.26), CF(s * 0.2, 4.1, -1.28) * A(0, 0, rad(s * 14)), H2)
+			lit(make(m, head, "Eye", V(0.22, 0.07, 0.05), CF(s * 0.2, 3.97, -1.335) * A(0, 0, rad(s * 14)), pal.Plate))
+		end
+		limb(m, head, "Jaw", V(0.72, 0.24, 0.6), CF(0, 3.45, -1.05), V(0, 3.55, -0.8), "Jaw", 1, H2)
+		for _, c in { { 0, 4.1, -0.5, 0.75, -25, 0 }, { 0.22, 4.12, -0.32, 0.65, -20, 20 }, { -0.2, 4.14, -0.28, 0.6, -20, -18 }, { 0.06, 4.8, 0.05, 0.8, -15, 6 }, { -0.24, 4.74, 0.25, 0.6, -10, -22 }, { 0.3, 4.72, 0.4, 0.55, -5, 24 }, { -0.05, 4.7, 0.62, 0.5, 0, -8 }, { 0.18, 4.66, 0.85, 0.4, 10, 15 } } do
+			lit(make(m, torso, "Crest", V(0.16, c[4], 0.22), CF(c[1], c[2], c[3]) * A(rad(c[5]), 0, rad(c[6])), pal.Plate))
+		end
+		for _, s in { -1, 1 } do
+			local hand = V(s * 2.0, 1.2, -0.45)
+			local p = arm(m, torso, V(s * 1.55, 3.7, 0.15), V(s * 1.95, 2.55, -0.1), hand, 0.8, H, H)
+			make(m, p, "Bicep", V(0.95, 1.0, 0.95), CF(s * 1.78, 3.1, 0.02) * A(0, 0, rad(s * 18)), H)
+			make(m, p, "Forearm", V(1.1, 1.1, 1.1), CF(s * 1.98, 1.95, -0.28) * A(rad(-8), 0, 0), H)
+			make(m, p, "Band", V(1.16, 0.14, 1.16), CF(s * 1.98, 2.2, -0.25) * A(rad(-8), 0, 0), H2)
+			make(m, p, "Fist", V(1.3, 1.15, 1.3), CF(s * 2.02, 0.72, -0.5) * A(rad(8), rad(s * 20), rad(s * 5)), H)
+			make(m, p, "Fist", V(1.1, 1.1, 1.1), CF(s * 2.02, 0.74, -0.5) * A(rad(35), rad(s * 45), rad(s * 20)), H)
+			make(m, p, "Knuckle", V(0.8, 0.5, 0.45), CF(s * 1.98, 0.85, -1.18) * A(rad(10), rad(s * 10), 0), H2)
+			make(m, p, "Stone", V(0.55, 0.45, 0.55), CF(s * 2.55, 0.95, -0.35) * A(rad(25), rad(15), rad(10)), H2)
+			local l = pillar(m, torso, s * 0.72, 1.8, 0.45, 0.9, H, H2, 0)
+			make(m, l, "Knee", V(0.7, 0.45, 0.3), CF(s * 0.72, 1.0, 0.02), H2)
+			for i = -1, 1 do
+				make(m, l, "Toe", V(0.26, 0.24, 0.28), CF(s * 0.72 + i * 0.3, 0.12, -0.2), H2)
+			end
 		end
 	end
 
@@ -388,45 +470,49 @@ function Half.install(h)
 		tail(m, torso, { V(0, 2.4, 0.9), V(0, 2.05, 1.7), V(0, 1.65, 2.5), V(0, 1.35, 3.2) }, { 0.55, 0.42, 0.3 }, H)
 	end
 
-	-- Ogretoad: a squat, pear-shaped warty toad of an ogre, its wide head one
-	-- with its body, a wide mouth, one great eye of its element's light on
-	-- top, a pale belly, short arms and legs, hands and toes aglow.
+	-- Ogretoad: a squat warty toad of an ogre, a pear of a body bulging
+	-- into a pale belly, a wide head split by a wide open mouth, two great
+	-- heavy-lidded eyes of its element's light on top, short thick arms
+	-- and legs, its fingers and toes aglow.
 	function B.Ogretoad(m, pal, H, H2)
-		local r = root(m, V(2.0, 1.4, 1.8), 1.5)
-		-- Its pear of a body in rounded steps, widest at the belly.
-		local body = limb(m, r, "Belly", V(2.5, 0.9, 2.1), CF(0, 1.55, 0.1), V(0, 1.2, 0.1), "Body", 1, H)
-		make(m, body, "Under", V(1.9, 0.35, 1.6), CF(0, 0.95, 0.15), H)
-		make(m, body, "Chest", V(2.2, 0.55, 1.85), CF(0, 2.25, 0.1), H)
-		make(m, body, "Neck", V(2.1, 0.3, 1.0), CF(0, 2.65, 0.4), H)
+		local r = root(m, V(2.0, 1.4, 1.8), 1.4)
+		local body = limb(m, r, "Belly", V(2.5, 1.2, 2.1), CF(0, 1.15, 0.15), V(0, 0.9, 0.15), "Body", 1, H)
+		make(m, body, "Seat", V(2.1, 0.4, 1.8), CF(0, 0.45, 0.25), H)
+		make(m, body, "Chest", V(2.1, 0.5, 1.8), CF(0, 2.0, 0.2), H)
 		for _, s in { -1, 1 } do
-			make(m, body, "Flank", V(0.2, 0.7, 1.6), CF(s * 1.32, 1.55, 0.15), H)
+			make(m, body, "Flank", V(0.3, 0.9, 1.6), CF(s * 1.35, 1.1, 0.15), H)
 		end
-		make(m, body, "Paunch", V(1.8, 1.1, 0.25), CF(0, 1.62, -1.02), H2)
-		local head = make(m, body, "Head", V(2.35, 0.55, 1.95), CF(0, 3.05, -0.05), H)
-		make(m, head, "Crown", V(1.7, 0.25, 1.5), CF(0, 3.45, 0.05), H)
-		make(m, head, "Lip", V(2.3, 0.07, 0.1), CF(0, 2.79, -1.04), C(40, 44, 36))
-		local jaw = limb(m, body, "Jaw", V(2.4, 0.3, 1.0), CF(0, 2.62, -0.55), V(0, 2.72, -0.1), "Jaw", 1, H)
-		make(m, jaw, "Chin", V(1.9, 0.12, 0.12), CF(0, 2.5, -1.06), H2)
-		-- The great eye.
-		make(m, head, "EyeBump", V(0.95, 0.65, 0.85), CF(0, 3.6, -0.4), H)
-		glow(m, head, "Eye", V(0.68, 0.5, 0.1), CF(0, 3.62, -0.85), pal)
-		make(m, head, "Pupil", V(0.1, 0.42, 0.06), CF(0, 3.62, -0.91), C(28, 30, 26))
-		for _, w in { { -0.6, 3.62, 0.5 }, { 0.95, 3.4, 0.3 }, { -1.15, 2.4, 0.65 }, { 1.47, 1.7, 0.8 } } do
-			plate(m, body, "Wart", V(0.24, 0.2, 0.24), CF(w[1], w[2], w[3]), pal)
+		make(m, body, "Paunch", V(1.9, 1.15, 0.3), CF(0, 1.15, -1.0), H2)
+		make(m, body, "Paunch", V(1.4, 0.22, 0.25), CF(0, 1.8, -0.95), H2)
+		make(m, body, "Paunch", V(1.4, 0.22, 0.25), CF(0, 0.5, -0.92), H2)
+		local jaw = limb(m, body, "Jaw", V(2.35, 0.3, 1.75), CF(0, 2.4, -0.05), V(0, 2.45, 0.7), "Jaw", 1, H)
+		make(m, jaw, "Lip", V(2.25, 0.08, 0.1), CF(0, 2.53, -0.93), H2)
+		make(m, body, "Mouth", V(2.15, 0.22, 1.3), CF(0, 2.66, -0.25), C(44, 30, 34))
+		local head = make(m, body, "Head", V(2.25, 0.5, 1.85), CF(0, 3.02, 0.05), H)
+		make(m, head, "Lip", V(2.15, 0.08, 0.1), CF(0, 2.79, -0.9), H2)
+		make(m, head, "Crown", V(1.6, 0.2, 1.3), CF(0, 3.37, 0.15), H)
+		for _, s in { -1, 1 } do
+			make(m, head, "EyeBump", V(0.66, 0.52, 0.66), CF(s * 0.62, 3.45, -0.4), H)
+			lit(make(m, head, "Eye", V(0.48, 0.4, 0.06), CF(s * 0.62, 3.46, -0.75), pal.Plate))
+			make(m, head, "Pupil", V(0.09, 0.32, 0.04), CF(s * 0.62, 3.46, -0.785), C(28, 30, 26))
+			make(m, head, "Lid", V(0.7, 0.12, 0.34), CF(s * 0.62, 3.68, -0.6) * A(0, 0, rad(-s * 8)), H)
 		end
-		for _, w in { { -0.95, 3.35, -0.2 }, { 0.95, 3.35, -0.35 }, { 0.2, 3.62, 0.65 }, { -1.45, 1.5, 0.5 }, { 1.2, 2.3, -0.1 }, { -0.4, 2.2, 1.08 } } do
-			make(m, body, "Wart", V(0.3, 0.26, 0.3), CF(w[1], w[2], w[3]), H2)
+		for _, w in { { -0.4, 3.48, 0.55, 0.22 }, { 0.45, 3.48, 0.4, 0.2 }, { -1.0, 3.28, 0.4, 0.24 }, { 1.0, 3.28, 0.2, 0.2 }, { -1.05, 2.26, 0.55, 0.26 }, { 1.05, 2.26, 0.35, 0.22 }, { 1.5, 1.3, 0.5, 0.22 }, { -1.5, 1.0, 0.2, 0.2 } } do
+			h.ball(m, body, "Wart", w[4], V(w[1], w[2], w[3]), H2)
 		end
 		for _, s in { -1, 1 } do
-			local hand = V(s * 1.45, 1.15, -0.8)
-			local p = arm(m, body, V(s * 1.2, 2.2, -0.2), V(s * 1.5, 1.65, -0.5), hand, 0.48, H, H2)
-			glow(m, p, "Hand", V(0.5, 0.3, 0.5), CF(hand + V(0, -0.12, -0.05)), pal)
+			local hand = V(s * 1.6, 0.85, -0.8)
+			local p = arm(m, body, V(s * 1.2, 1.95, -0.1), V(s * 1.65, 1.35, -0.35), hand, 0.5, H, H)
+			make(m, p, "Shoulder", V(0.62, 0.6, 0.62), CF(s * 1.3, 1.95, -0.1), H)
+			make(m, p, "Hand", V(0.5, 0.26, 0.5), CF(hand + V(0, -0.05, -0.05)), H)
 			for i = -1, 1 do
-				glow(m, p, "Claw", V(0.12, 0.3, 0.12), CF(hand + V(i * 0.17, -0.34, -0.25)) * A(rad(-35), 0, 0), pal)
+				lit(make(m, p, "Finger", V(0.13, 0.13, 0.3), CF(hand + V(i * 0.16, -0.12, -0.38)) * A(rad(-25), 0, 0), pal.Plate))
 			end
-			local l = leg(m, body, s * 0.85, 1.15, 0.3, 0.72, H, H2, 0, 0.12)
+			lit(make(m, p, "Thumb", V(0.12, 0.12, 0.24), CF(hand + V(-s * 0.28, -0.05, -0.2)) * A(0, rad(s * 30), 0), pal.Plate))
+			local l = leg(m, body, s * 0.8, 0.85, 0.0, 0.55, H, H, 0, 0.12)
+			make(m, l, "Haunch", V(0.72, 0.58, 0.9), CF(s * 0.9, 0.6, -0.05), H)
 			for i = -1, 1 do
-				glow(m, l, "Toe", V(0.16, 0.14, 0.24), CF(s * 0.9 + i * 0.22, 0.07, -0.42), pal)
+				lit(make(m, l, "Toe", V(0.14, 0.12, 0.3), CF(s * 0.85 + i * 0.18, 0.06, -0.6) * A(0, rad(i * 15), 0), pal.Plate))
 			end
 		end
 	end
@@ -468,70 +554,107 @@ function Half.install(h)
 		end
 	end
 
-	-- Ashcrawler: a hunched, half-molten black reptile cracked with its
-	-- element's light, scutes down its back, small arms, a tail longer than
-	-- its body.
+	-- Ashcrawler: a black lava titan on two legs, a Godzilla of cooled rock
+	-- split all over by cracks of its element's light (blocks of hide laid
+	-- over a lit core), jagged plates down its back, a blunt head with eyes
+	-- of that light, small arms, a long heavy tail seamed in it.
 	function B.Ashcrawler(m, pal, H, H2)
-		local r = root(m, V(1.6, 1.4, 2.0), 1.7)
-		local hunch = CF(0, 2.0, 0.2) * A(rad(-12), 0, 0)
-		local body = limb(m, r, "Body", V(1.5, 1.4, 2.2), hunch, V(0, 1.5, 0.5), "Body", 1, H)
-		for i, c in { { 0.76, 0.1, -0.3, 30 }, { -0.76, -0.2, 0.2, -25 }, { 0.76, -0.25, 0.55, -40 }, { -0.76, 0.2, -0.5, 35 } } do
-			glow(m, body, "Crack", V(0.05, 0.08, 0.9), hunch * CF(c[1], c[2], c[3]) * A(rad(c[4]), 0, 0), pal)
-		end
-		glow(m, body, "Crack", V(0.9, 0.06, 0.06), hunch * CF(0, 0.71, -0.3) * A(0, rad(25), 0), pal)
-		for i = 0, 3 do
-			plate(m, body, "Scute", V(0.5 - i * 0.05, 0.2, 0.42), hunch * CF(0, 0.78, -0.75 + i * 0.5), pal)
-			make(m, body, "Bump", V(0.3, 0.26, 0.3), hunch * CF(0.4 * (if i % 2 == 0 then 1 else -1), 0.72, -0.5 + i * 0.5), H2)
-		end
-		local head = make(m, body, "Head", V(0.95, 0.8, 1.1), CF(0, 2.55, -1.45), H)
-		make(m, head, "Snout", V(0.7, 0.5, 0.55), CF(0, 2.42, -2.2), H2)
-		glow(m, head, "Crack", V(0.05, 0.06, 0.8), CF(0.48, 2.6, -1.5), pal)
-		eyes(m, head, 0.4, 2.7, -2.0, V(0.12, 0.08, 0.06), pal)
-		limb(m, head, "Jaw", V(0.66, 0.2, 0.9), CF(0, 2.08, -1.95), V(0, 2.16, -1.5), "Jaw", 1, H2)
+		local r = root(m, V(1.6, 1.6, 1.6), 2.2)
+		local frame = CF(0, 2.65, 0.25) * A(rad(-14), 0, 0)
+		local body = lit(limb(m, r, "Body", V(1.3, 1.8, 1.2), frame, V(0, 1.9, 0.35), "Body", 1, pal.Plate))
+		crust(m, body, frame * CF(0, 0, -0.6) * A(rad(-90), 0, 0), 1.3, 1.8, 2, 3, 0.14, H, 1)
 		for _, s in { -1, 1 } do
-			local hand = V(s * 0.8, 1.25, -1.25)
-			local p = arm(m, body, V(s * 0.7, 2.1, -0.8), V(s * 0.85, 1.6, -1.05), hand, 0.28, H, H2)
-			h.talons(m, p, hand, 2, 0.24, CLAW)
-			leg(m, body, s * 0.6, 1.5, 0.6, 0.6, H, H2, 3, 0.2)
+			crust(m, body, frame * CF(s * 0.65, 0, 0) * A(0, 0, rad(-s * 90)), 1.8, 1.2, 3, 2, 0.14, H, 4 + s)
 		end
-		tail(
-			m,
-			body,
-			{ V(0, 1.8, 1.2), V(0, 1.45, 2.1), V(0, 1.05, 3.0), V(0, 0.72, 3.9), V(0, 0.5, 4.7) },
-			{ 0.8, 0.62, 0.46, 0.32 },
-			H,
-			function(seg, i, at, w)
-				glow(m, seg, "Crack", V(0.05, 0.06, 0.7), CF(at + V(w * 0.5, 0, 0)), pal)
+		crust(m, body, frame * CF(0, 0, 0.6) * A(rad(90), 0, 0), 1.3, 1.8, 1, 2, 0.14, H, 7)
+		crust(m, body, frame * CF(0, 0.9, 0), 1.3, 1.2, 1, 1, 0.14, H, 3)
+		for i, c in { { 0.12, 0.7, 0.6 }, { -0.12, 0.28, 0.68 }, { 0.12, -0.16, 0.6 }, { -0.12, -0.58, 0.5 } } do
+			make(m, body, "Spike", V(0.14, c[3], c[3]), frame * CF(c[1], c[2], 0.78) * A(rad(45), 0, 0), H2)
+		end
+		local hf = CF(0, 3.75, -0.75)
+		local head = lit(make(m, body, "Skull", V(0.9, 0.75, 1.1), hf, pal.Plate))
+		crust(m, head, hf * CF(0, 0.375, 0), 0.9, 1.1, 2, 2, 0.13, H, 2)
+		for _, s in { -1, 1 } do
+			crust(m, head, hf * CF(s * 0.45, 0, 0) * A(0, 0, rad(-s * 90)), 0.75, 1.1, 1, 1, 0.13, H, 5 - s)
+		end
+		make(m, head, "Face", V(0.9, 0.5, 0.12), hf * CF(0, 0.12, -0.6), H)
+		make(m, head, "Muzzle", V(0.9, 0.2, 0.12), hf * CF(0, -0.27, -0.6), H)
+		make(m, head, "Spike", V(0.14, 0.46, 0.46), hf * CF(0, 0.42, 0.5) * A(rad(45), 0, 0), H2)
+		for _, s in { -1, 1 } do
+			glow(m, head, "Eye", V(0.24, 0.12, 0.06), hf * CF(s * 0.24, 0.05, -0.68), pal)
+		end
+		local jaw = limb(m, head, "Jaw", V(0.95, 0.28, 1.05), hf * CF(0, -0.52, -0.05), (hf * CF(0, -0.45, 0.45)).Position, "Jaw", 1, H)
+		for _, s in { -1, 1 } do
+			make(m, jaw, "Fang", V(0.1, 0.14, 0.1), hf * CF(s * 0.3, -0.33, -0.5), CLAW)
+		end
+		for _, s in { -1, 1 } do
+			local hand = V(s * 0.75, 2.2, -1.0)
+			local p = arm(m, body, V(s * 0.72, 3.0, -0.35), V(s * 0.85, 2.55, -0.7), hand, 0.3, H, H)
+			h.talons(m, p, hand, 3, 0.22, CLAW)
+			local thigh = lit(beam(m, body, "Thigh", V(s * 0.55, 1.95, 0.45), V(s * 0.6, 1.05, 0.15), 0.7, 0.8, pal.Plate, "Stride", s))
+			local tf, len = thigh.CFrame, thigh.Size.Y
+			crust(m, thigh, tf * CF(s * 0.35, 0, 0) * A(0, 0, rad(-s * 90)), len, 0.8, 2, 1, 0.12, H, 2 + s)
+			crust(m, thigh, tf * CF(0, 0, 0.4) * A(rad(90), 0, 0), 0.7, len, 1, 1, 0.12, H, 6)
+			crust(m, thigh, tf * CF(0, 0, -0.4) * A(rad(-90), 0, 0), 0.7, len, 1, 1, 0.12, H, 8)
+			beam(m, thigh, "Shin", V(s * 0.6, 1.1, 0.15), V(s * 0.6, 0.28, 0.3), 0.52, 0.58, H)
+			make(m, thigh, "Foot", V(0.62, 0.28, 0.85), CF(s * 0.6, 0.14, 0.12), H)
+			for i = -1, 1 do
+				make(m, thigh, "Toe", V(0.16, 0.18, 0.26), CF(s * 0.6 + i * 0.2, 0.09, -0.38), H2)
 			end
-		)
+		end
+		local pts = { V(0, 1.85, 0.95), V(0, 1.4, 1.75), V(0, 0.95, 2.6), V(0, 0.6, 3.4), V(0, 0.4, 4.1) }
+		local widths = { 0.85, 0.68, 0.5, 0.34 }
+		local parent = body
+		for i = 1, 4 do
+			local a, b, w = pts[i], pts[i + 1], widths[i]
+			local d = (b - a).Unit
+			local seg = beam(m, parent, "Tail", a + d * 0.05, b - d * 0.05, w, w * 0.9, H, "Tail")
+			if i < 4 then
+				lit(beam(m, seg, "Seam", b - d * 0.1, b + d * 0.1, w * 0.8, w * 0.72, pal.Plate))
+				make(m, seg, "Spike", V(0.12, w * 0.5, w * 0.5), CF((a + b) / 2 + V(0, w * 0.48, 0)) * A(rad(45), 0, 0), H2)
+			end
+			parent = seg
+		end
 	end
 
-	-- Shrieker: a bat-bird hovering on leathery wings edged in its
-	-- element's light, a flat triangle of a head, hooked feet hanging.
+	-- Shrieker: a pterosaur of a bat, a long crested head with eyes of its
+	-- element's light, wide leathery wings whose bones (its arms and the
+	-- long fingers through the skin) are lit in that light, talons hanging
+	-- under it as it hovers.
 	function B.Shrieker(m, pal, H, H2)
 		local r = root(m, V(1.2, 1.2, 1.2), 1.7)
-		local tilt = CF(0, 2.15, 0.1) * A(rad(-20), 0, 0)
-		local body = limb(m, r, "Body", V(0.8, 1.3, 0.75), tilt, V(0, 1.6, 0.2), "Body", 1, H)
-		make(m, body, "Chest", V(0.6, 0.85, 0.12), tilt * CF(0, 0.05, -0.42), H2)
-		local head = make(m, body, "Head", V(0.7, 0.42, 0.62), CF(0, 2.98, -0.28), H)
-		wedge(m, head, "Crest", V(1.15, 0.2, 1.0), CF(0, 3.25, -0.05), H2)
-		wedge(m, head, "Beak", V(0.32, 0.26, 0.42), CF(0, 2.86, -0.75) * A(0, math.pi, 0), H2)
-		eyes(m, head, 0.24, 3.05, -0.6, V(0.14, 0.08, 0.06), pal)
-		limb(m, head, "Jaw", V(0.36, 0.12, 0.42), CF(0, 2.7, -0.6), V(0, 2.76, -0.35), "Jaw", 1, H2)
+		local tilt = CF(0, 2.2, 0.1) * A(rad(-12), 0, 0)
+		local body = limb(m, r, "Body", V(0.85, 1.25, 0.8), tilt, V(0, 1.65, 0.2), "Body", 1, H)
+		make(m, body, "Chest", V(0.65, 0.85, 0.14), tilt * CF(0, 0.05, -0.44), H2)
+		make(m, body, "Neck", V(0.45, 0.4, 0.45), CF(0, 2.85, -0.12), H)
+		local head = make(m, body, "Head", V(0.55, 0.5, 0.75), CF(0, 3.12, -0.32), H)
+		h.triangle(m, head, "Crest", V(0, 3.3, -0.45), V(0, 3.95, 0.75), V(0, 3.2, 0.25), 0.16, H)
+		wedge(m, head, "Beak", V(0.3, 0.3, 0.8), CF(0, 3.05, -1.05) * A(0, math.pi, 0), H2)
 		for _, s in { -1, 1 } do
-			local a, b = V(s * 0.38, 2.5, 0.15), V(s * 1.45, 3.35, 0.2)
-			local c, d = V(s * 2.7, 2.35, 0.35), V(s * 1.25, 1.6, 0.35)
+			lit(make(m, head, "Eye", V(0.06, 0.09, 0.2), CF(s * 0.28, 3.2, -0.52) * A(rad(s * 0), 0, rad(s * 15)), pal.Plate))
+		end
+		limb(m, head, "Jaw", V(0.26, 0.12, 0.7), CF(0, 2.85, -0.9), V(0, 2.9, -0.45), "Jaw", 1, H2)
+		for _, s in { -1, 1 } do
+			local a, b = V(s * 0.38, 2.6, 0.05), V(s * 1.55, 3.5, 0.0)
+			local c, d = V(s * 3.0, 1.95, 0.45), V(s * 0.9, 1.55, 0.4)
 			local w = h.batWing(m, body, a, b, c, d, H, H2)
-			litBeam(m, w, "WingEdge", b, c, 0.07, pal)
-			litBeam(m, w, "WingEdge", c, d, 0.07, pal)
-			plate(m, w, "WingClaw", V(0.1, 0.24, 0.1), CF(b + V(0, 0.16, 0)), pal)
-			plate(m, head, "Ear", V(0.1, 0.24, 0.16), CF(s * 0.3, 3.4, 0.1) * A(rad(-20), 0, rad(-s * 15)), pal)
-			local l = beam(m, body, "Leg", V(s * 0.24, 1.6, 0.25), V(s * 0.3, 0.42, 0.2), 0.16, 0.18, H2, "Stride", s)
+			local n = (c - a):Cross(b - a).Unit
+			if n.Y < 0 then
+				n = -n
+			end
+			lit(beam(m, w, "WingBone", a + n * 0.07, b + n * 0.07, 0.11, 0.11, pal.Plate))
+			lit(beam(m, w, "WingBone", b + n * 0.06, c + n * 0.06, 0.1, 0.1, pal.Plate))
+			for _, t in { 0.4, 0.75 } do
+				lit(beam(m, w, "WingBone", b + n * 0.05, c:Lerp(d, t) + n * 0.05, 0.08, 0.08, pal.Plate))
+			end
+			wedge(m, w, "WingClaw", V(0.06, 0.16, 0.1), CF(b + V(s * 0.02, 0.14, -0.04)), CLAW)
+			local l = beam(m, body, "Leg", V(s * 0.26, 1.7, 0.3), V(s * 0.32, 1.0, 0.05), 0.2, 0.22, H, "Stride", s)
+			beam(m, l, "Shin", V(s * 0.32, 1.0, 0.05), V(s * 0.34, 0.45, 0.2), 0.14, 0.16, H2)
 			for i = -1, 1 do
-				beam(m, l, "Talon", V(s * 0.3 + i * 0.08, 0.42, 0.2), V(s * 0.3 + i * 0.1, 0.06, 0.02), 0.06, 0.08, CLAW)
+				beam(m, l, "Talon", V(s * 0.34, 0.45, 0.2), V(s * 0.34 + i * 0.12, 0.06, 0.02), 0.06, 0.08, CLAW)
 			end
 		end
-		tail(m, body, { V(0, 1.6, 0.55), V(0, 1.25, 1.05), V(0, 1.05, 1.45) }, { 0.22, 0.15 }, H)
+		tail(m, body, { V(0, 1.6, 0.6), V(0, 1.3, 1.05), V(0, 1.15, 1.45) }, { 0.2, 0.14 }, H)
 	end
 
 	-- Tonguefrost: a pale, low lizard, a spiked back, a long horn of its

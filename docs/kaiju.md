@@ -1193,25 +1193,6 @@ alone, less the more you've mined lately ([levelling.md](levelling.md)).
 Your kaiju still level while you mine by fighting the critters your swings
 bring out past the core: those kills pay EXP as before.
 
-## The finish on the newer kinds (2026-10-28)
-
-The 61 kinds from Prisma to Lumeballoon (`src/shared/KaijuShapesMore.luau`)
-were plain blocks of one colour. Each now gets a finish after it's built
-(`More.finish`, tuned in `More.Finish`), within an 86-part budget:
-
-- **Eyes**: a dark pupil on the front of every glowing eye.
-- **Trunk**: lying along the ground, two veins of its element down each
-  flank, lit (unless it glows already); standing up, a paler belly panel
-  down its chest with bands across it. A trunk with fewer than 8 plates of
-  its element gets a ridge of them along its back.
-- **Blocks**: its seven biggest blocks of hide with a face turned up get a
-  lighter cap on top, as if bevelled and lit from above, and the long ones
-  seam lines across it, banded like scales. The caps and bellies are
-  marked `HideShade`, so a portrait lifts them with the hide.
-
-`tests/kaiju_models_cases.luau` checks every eye has its pupil, the caps
-are there, most kinds have veins, a ridge or a belly, and the budget holds.
-
 ## Healing
 
 ![Reviving a kaiju that's down, and healing a hurt one](kaiju/heal.png)
