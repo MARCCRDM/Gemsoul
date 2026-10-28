@@ -2372,7 +2372,8 @@ for _ = 1, 40 do
 	FrontierServer._step(0.5)
 	runDelayed()
 end
-check(#critterFor(b) <= Frontier.incursion("Fringe", 0.99, nil, true), "Standing still drew critters like mining")
+-- (A later wave of their run is a few bigger: Frontier.Adapt.)
+check(#critterFor(b) <= Frontier.incursion("Fringe", 0.99, nil, true) + Frontier.adaptExtra(math.huge), "Standing still drew critters like mining")
 
 -- Out at the edge: tougher critters, from level 9 (on a calm frontier:
 -- stirred up, they come higher still, below).

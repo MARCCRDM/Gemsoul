@@ -2848,6 +2848,8 @@ return {
 	["Invite friends to the game"] = "Invita amigos al juego",
 	["Enter together"] = "Entrar juntos",
 	["{1} of {2} ready"] = "{1} de {2} listos",
+	-- Waves that learn you (Shared.Frontier.Adapt).
+	["The frontier is learning your team: {*} critters are coming for you."] = "La frontera está aprendiendo de tu equipo: vienen a por ti bichos {*}.",
 	-- The Kaiju Kennel (Shared.KaijuKennel) and Wren, its keeper (Vendors.KaijuKeeper).
 	["KAIJU KENNEL"] = "PERRERA DE KAIJU",
 	["Kaiju Keeper"] = "Cuidadora de kaiju",

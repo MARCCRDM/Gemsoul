@@ -99,6 +99,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
@@ -120,7 +121,8 @@ local nextSeed = 0
 -- [player] = { Noise, LastEncounter (os.clock), Shown (the FrontierNoise last
 -- set), Stir, LastSwing (os.clock), ShownStir (the FrontierStir last set),
 -- Told (the stage they were last told of), ToldAlone (when they were last
--- told they're out alone, os.clock) }
+-- told they're out alone, os.clock), Wave (this run of waves' last, 0 none:
+-- Frontier.Adapt) }
 local states: { [Player]: any } = {}
 -- [player] = { enemy }: the critters out for them (encounters and wandering rifts)
 local critters: { [Player]: { any } } = {}
@@ -210,6 +212,7 @@ local function stateOf(player: Player)
 			LastSwing = -math.huge,
 			ShownStir = nil,
 			Told = 1,
+			Wave = 0,
 		}
 		states[player] = state
 	end
@@ -365,10 +368,48 @@ end
 -- still open (Rift.Apart), Frontier.Swarm.PerRift critters out of each once
 -- it has crackled its warning, any ranged ones last (KaijuWilds.pickWave:
 -- mostly the kind of the biome they're in).
-local function incursion(player: Player, band: string, count: number, raider: boolean?)
+-- The kind of critter that counters `player`'s side best (Frontier.read,
+-- Frontier.counter): what they and their kaiju hit with, what they're weak to.
+local function readSide(player: Player): string?
+	local loadout = PlayerData.character(player)
+	local weapon = loadout and loadout.WeaponGem and loadout.WeaponGem.Element
+	local kaiju = {}
+	local profile = PlayerData.get(player)
+	if profile then
+		for _, record in Kaiju.team(Kaiju.roster(profile)) do
+			if not record.Down then
+				table.insert(kaiju, record.Element)
+			end
+		end
+	end
+	return KaijuWilds.critterKind(Frontier.counter(Frontier.read(weapon, ElementMatchup.profile(loadout), kaiju)))
+end
+local function counterOf(player: Player): string?
+	-- (A side that can't be read, the wave comes as it is.)
+	local ok, kind = pcall(readSide, player)
+	return if ok then kind else nil
+end
+
+-- A swarm of `count` comes for `player`, trickling in (see above). Wave
+-- `wave` of their run (Frontier.Adapt): from the second on, more of it is the
+-- kind that counters them, and higher-levelled.
+local function incursion(player: Player, band: string, count: number, raider: boolean?, waveNumber: number?)
 	pending[player] = (pending[player] or 0) + count
 	local here = rootOf(player)
 	local wave = KaijuWilds.pickWave(count, rng, if here then homeAt(here.Position) else nil)
+	local n = waveNumber or 1
+	if n > 1 then
+		local kind = counterOf(player)
+		wave = Frontier.adapt(wave, n, kind, rng, Kaiju.isRanged)
+		-- (Told once a run, as it starts to answer them.)
+		if kind and n == 2 then
+			local spec = KaijuWilds.critterSpec and KaijuWilds.critterSpec(kind)
+			Remotes.Notify:FireClient(
+				player,
+				string.format("The frontier is learning your team: %s critters are coming for you.", GemConfig.elementName(spec and spec.Element or ""))
+			)
+		end
+	end
 	local swarm = Frontier.Swarm
 	local tears = math.ceil(#wave / swarm.PerRift)
 	local times = Frontier.trickle(tears, rng)
@@ -421,7 +462,7 @@ local function incursion(player: Player, band: string, count: number, raider: bo
 						Prey = player,
 						Band = band,
 						Critter = critter,
-						Level = Frontier.critterLevel(band, rng, stateOf(player).Stir, alone(player)),
+						Level = Frontier.critterLevel(band, rng, stateOf(player).Stir, alone(player)) + Frontier.adaptLevels(n),
 						Facing = target.Position,
 						Hop = toward * (if Kaiju.isRanged(critter) then 10 else 24) + side + Vector3.new(0, 26, 0),
 						Raider = raider,
@@ -447,8 +488,11 @@ local function consider(player: Player, state, band: string)
 		return
 	end
 	state.Noise = rng:NextNumber(0, Frontier.Noise.Restart)
+	-- (The next wave of their run, or a first again after a long quiet.)
+	state.Wave = if now - state.LastEncounter > Frontier.Adapt.Reset then 1 else state.Wave + 1
 	state.LastEncounter = now
-	incursion(player, band, math.min(room, Frontier.incursion(band, rng:NextNumber(), state.Stir, alone(player))))
+	local size = Frontier.incursion(band, rng:NextNumber(), state.Stir, alone(player)) + Frontier.adaptExtra(state.Wave)
+	incursion(player, band, math.min(room, size), nil, state.Wave)
 end
 
 -- A swing (or a mech's strike of `swings` swings) by `player`: noise, out
@@ -708,6 +752,7 @@ function FrontierServer.knockedOut(player: Player)
 		end
 	end
 	player:SetAttribute("Killed", true)
+	stateOf(player).Wave = 0
 	if Frontier.band(Frontier.distance(root.Position, center())) == "Core" then
 		player:SetAttribute("SparDown", serverNow() + Spar.DeadSeconds)
 		local character = player.Character
@@ -969,6 +1014,7 @@ local function step(dt: number)
 			-- and the trip's haul is safe.)
 			state.Noise = math.max(0, state.Noise - dt / 60)
 			hauls[player], raiding[player] = nil, nil
+			state.Wave = 0 -- (home: the next run of waves starts afresh)
 		else
 			table.insert(out, { Player = player, Root = root, Band = band })
 			state.Noise = Frontier.noise(state.Noise, band, 0, dt, nil, nil, lone, fighting)

@@ -128,6 +128,8 @@
 	  KaijuWilds.engagedWith(player, within) -> boolean   in a fight with a wild
 	                                            kaiju (or taming one): fewer rifts
 	  KaijuWilds.critterOf(model) -> enemy?     the rift's critter a model is
+	  KaijuWilds.critterKind(element) -> roster id?   the critter of an element
+	                                            (FrontierServer's waves that adapt)
 	  KaijuWilds.bonk(enemy, player, from) -> boolean   a pickaxe's bonk on a critter
 	  KaijuWilds.rift(at, facing, opts?) -> timeline?  opens a rift (FrontierServer
 	                                            sets it; a bug slips back through one)
@@ -2803,10 +2805,23 @@ local function bugDied(enemy)
 end
 
 -- The critter whose element is `element` (DungeonRules.Roster), if any.
+-- (KaijuWilds.critterKind: FrontierServer's, the kind its later waves send to counter you.)
 local function critterOf(element: string?): string?
 	for _, spec in DungeonRules.Roster do
 		if spec.Element == element and table.find(Kaiju.Critters, spec.Id) then
 			return spec.Id
+		end
+	end
+	return nil
+end
+
+KaijuWilds.critterKind = critterOf
+
+-- A critter's roster entry (its Element, Name...) by its id.
+function KaijuWilds.critterSpec(id: string?)
+	for _, spec in DungeonRules.Roster do
+		if spec.Id == id then
+			return spec
 		end
 	end
 	return nil

@@ -432,6 +432,40 @@ The giggles are synthesized by `tools/make_critter_sounds.py`
 (`critter_giggle_1..3.mp3`, `critter_cackle.mp3`); until they're uploaded,
 the old "uuhhh" sped up into squeaky "hee"s stands in.
 
+## Waves that learn you (2026-10-28)
+
+More critters come through: a swarm is now 4-5 in the fringe and 6-7 at the
+edge (was 3-4 and 5-6), the caps round one player are 7 and 9 (was 5 and 7)
+and the Outpost's is 28 (was 22). Wandering rifts open every 30-60 seconds
+(was 40-80), up to 8 critters out of them (was 6).
+
+The encounters that come for you one after another out past the core are a
+**run of waves** (`Frontier.Adapt`):
+
+| Wave | Turned into your counter | More critters | Levels up |
+|---|---|---|---|
+| 1 | none (the biome's usual mix) | 0 | 0 |
+| 2 | half | +1 | +1 |
+| 3 and on | 85% | +2 | +2 |
+
+The counter is worked out from your side (`Frontier.read`, `Frontier.counter`):
+
+- **What you hit with**: your weapon gem's element and every kaiju you have
+  out. A critter of an element resists hits of its own element, and takes
+  more from the element that beats it.
+- **What you're weak to**: each kaiju is weak to the element that beats
+  its own, and your armor's main element is too. Armor that resists an
+  element counts against it.
+
+The critter kind (each has one element: Sahur Thermal, Tralalero Cryo,
+Patapim Corrosive, Crocodilo Ion) that shrugs off the most of what you hit
+with and hits the most of what you're weak to is the one the later waves
+send. A ranged one still comes last. On the second wave you're told:
+"The frontier is learning your team: Thermal critters are coming for you."
+
+The run starts again from wave 1 when you're back in the core, when you're
+killed, or after two minutes without an encounter (`Adapt.Reset`).
+
 ## Performance
 
 The Outpost was already a big scene: about 8,600 parts, nearly 4,700 of

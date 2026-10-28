@@ -301,9 +301,9 @@ check(Frontier.noise(0, "Edge", 3, 0, 0.5) > Frontier.noise(0, "Edge", 1, 0, 0.5
 check(Frontier.incursion("Core", 0.5) == 0, "Critters in the core")
 for roll = 0, 0.99, 0.01 do
 	local fringe, edge = Frontier.incursion("Fringe", roll), Frontier.incursion("Edge", roll)
-	-- (A swarm: three or four in the fringe, five or six at the edge.)
-	check(fringe >= 3 and fringe <= 4 and fringe <= Frontier.Caps.Fringe, "A fringe incursion's size")
-	check(edge >= 5 and edge <= 6 and edge <= Frontier.Caps.Edge, "An edge incursion's size")
+	-- (A swarm: four or five in the fringe, six or seven at the edge.)
+	check(fringe >= 4 and fringe <= 5 and fringe <= Frontier.Caps.Fringe, "A fringe incursion's size")
+	check(edge >= 6 and edge <= 7 and edge <= Frontier.Caps.Edge, "An edge incursion's size")
 end
 check(Frontier.Caps.Edge > Frontier.Caps.Fringe and Frontier.Caps.Server >= Frontier.Caps.Edge * 3, "The caps")
 check(Frontier.Boost.Edge.Health > 1 and Frontier.Boost.Edge.Exp > 1, "Edge critters aren't worth more")
@@ -1082,6 +1082,68 @@ end)()
 	check(Frontier.robOver({ EndAt = 100, Taken = 0, Max = 3, Empty = true, LastAt = 5 }, 5 + Rob.Settle), "Not over with nothing found")
 	check(Frontier.robOver({ EndAt = 100, Taken = 0, Max = 3 }, 100), "Not over when its time ran out")
 end)()
+
+-- Waves that learn you (Frontier.Adapt): the first is the usual mix; later
+-- ones turn more of the swarm into the kind that counters the side, bigger
+-- and tougher each time, up to the last step.
+do
+	local ElementMatchup = shared("ElementMatchup")
+	local A = Frontier.Adapt
+	check(A.Lean[1] == 0 and A.Lean[2] > 0 and A.Lean[3] > A.Lean[2], "Waves don't learn more each time")
+	check(Frontier.adaptExtra(1) == 0 and Frontier.adaptExtra(2) > 0 and Frontier.adaptExtra(3) > Frontier.adaptExtra(2), "Later waves aren't bigger")
+	check(Frontier.adaptLevels(1) == 0 and Frontier.adaptLevels(3) > Frontier.adaptLevels(2), "Later waves aren't tougher")
+	check(Frontier.adaptExtra(9) == Frontier.adaptExtra(3) and Frontier.adaptLevels(9) == Frontier.adaptLevels(3), "Past the third, waves keep growing")
+	-- A Thermal side (weapon and kaiju all Thermal): Thermal critters shrug
+	-- it off (Resist), and its kaiju are weak to Corrosive: the counter is
+	-- one of those, never Cryo (which Thermal beats).
+	local fire = Frontier.read("Fire", nil, { "Fire", "Fire", "Fire" })
+	local counter = Frontier.counter(fire)
+	check(counter == "Fire" or counter == "Poison", "A Thermal side isn't countered: " .. tostring(counter))
+	check(counter ~= "Frost", "A Thermal side is sent the critter it beats")
+	-- Armor resisting what its kaiju are weak to counts against it.
+	local armored = Frontier.read("Fire", { Resist = { Poison = 0.35 }, Main = "Poison" }, { "Fire", "Fire", "Fire" })
+	check(armored.Weak.Poison < fire.Weak.Poison, "Armor resisting it doesn't count")
+	for _, element in { "Fire", "Frost", "Shock", "Poison" } do
+		local side = Frontier.read(element, nil, { element, element })
+		local c = Frontier.counter(side)
+		check(c ~= nil and ElementMatchup.versus(element, c) <= 1, "The counter to a " .. element .. " side takes more from it")
+	end
+	check(Frontier.counter(Frontier.read(nil, nil, {})) == nil, "A counter with nothing to go on")
+	-- Adapting a wave: the first untouched, then more and more of the
+	-- counter kind, the ranged ones still last.
+	local rng = Random.new(7)
+	local base = { "Sahur", "Tralalero", "Patapim", "Sahur", "Tralalero", "Patapim" }
+	local function isRanged(id)
+		return id == "Crocodilo"
+	end
+	local function count(list, id)
+		local n = 0
+		for _, x in list do
+			n += if x == id then 1 else 0
+		end
+		return n
+	end
+	check(table.concat(Frontier.adapt(base, 1, "Crocodilo", rng, isRanged), ",") == table.concat(base, ","), "The first wave was changed")
+	local two = Frontier.adapt(base, 2, "Sahur", rng, isRanged)
+	local three = Frontier.adapt(base, 3, "Sahur", rng, isRanged)
+	check(#two == #base and #three == #base, "Adapting changed a wave's size")
+	check(count(two, "Sahur") > count(base, "Sahur") and count(three, "Sahur") > count(two, "Sahur"), "Later waves aren't more of the counter kind")
+	local ranged = Frontier.adapt(base, 3, "Crocodilo", rng, isRanged)
+	local seenRanged = false
+	for _, id in ranged do
+		if isRanged(id) then
+			seenRanged = true
+		else
+			check(not seenRanged, "A ranged critter leads an adapted wave")
+		end
+	end
+	check(count(ranged, "Crocodilo") >= 1, "The counter kind never came")
+	-- The server: runs of waves, reset at home or killed, counter by the side.
+	local server = fs.readFile(ROOT .. "/src/server/Systems/FrontierServer.luau")
+	check(server:find("Frontier.adapt(wave, n, kind, rng, Kaiju.isRanged)", 1, true) ~= nil and server:find("local kind = counterOf(player)", 1, true) ~= nil, "The server doesn't adapt its waves")
+	check(server:find("Frontier.adaptExtra(state.Wave)", 1, true) ~= nil and server:find("Frontier.adaptLevels(n)", 1, true) ~= nil, "Later waves aren't bigger or tougher")
+	check(select(2, server:gsub("Wave = 0", "")) >= 3, "A run of waves never starts again")
+end
 
 print(
 	string.format(

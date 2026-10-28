@@ -114,7 +114,13 @@
 	  Frontier.timeline(at, linger?) -> { OpenAt, HopAt, CloseAt, EndAt }
 	  Frontier.openness(timeline, now) -> 0..1   how wide a tear is
 	  Frontier.tear(seed, height) -> shape   a tear's ragged outline
+	  Frontier.read(weapon, armor, kaiju) -> { Hits, Weak }   a player's side
+	  Frontier.counter(read) -> element?   the critter element that counters it
+	  Frontier.adapt(critters, wave, kind, rng, isRanged) -> critters   a later wave
+	  Frontier.adaptExtra(wave), Frontier.adaptLevels(wave)   more, and tougher
 ]]
+local ElementMatchup = require(script.Parent.ElementMatchup)
+
 local Frontier = {}
 
 Frontier.Core = 150 -- studs from the middle: inside, no rifts
@@ -328,7 +334,7 @@ Frontier.Noise = {
 -- Outpost, shared fairly between those out there. They come as swarms
 -- (each one weak: Shared.Kaiju.Bug), but each is a whole brainrot body:
 -- the Outpost's cap keeps them from lagging it.
-Frontier.Caps = { Fringe = 5, Edge = 7, Server = 22 }
+Frontier.Caps = { Fringe = 7, Edge = 9, Server = 28 }
 -- Out past the core with no kaiju of yours out you're alone, and the
 -- frontier knows it: your swings and your seconds out there make Noise
 -- times the noise, the next encounter can come Gap seconds after one (not
@@ -419,7 +425,7 @@ Frontier.CritterCoins = { Min = 2, Max = 5 }
 -- studs from whoever it's tied to. Its critters roam Roam studs round it
 -- for Life seconds, going for anyone who comes within Notice; it seals
 -- empty if its player is further than Seal studs off when they'd hop out.
-Frontier.Wander = { Every = { 40, 80 }, Max = 6, Near = 35, Far = 70, Roam = 26, Notice = 30, Life = 60, Seal = 110 }
+Frontier.Wander = { Every = { 30, 60 }, Max = 8, Near = 35, Far = 70, Roam = 26, Notice = 30, Life = 60, Seal = 110 }
 -- Clearing a wandering rift: everyone who helped is Rift Charged, gems
 -- this much luckier for Seconds.
 Frontier.Charged = { Luck = 0.1, Seconds = 60 }
@@ -1001,11 +1007,117 @@ function Frontier.incursion(band: string, roll: number, stir: number?, alone: bo
 	local _, stage = Frontier.stage(stir)
 	local extra = stage.Extra + (if alone then Frontier.Alone.Extra else 0)
 	if band == "Edge" then
-		return (if roll < 0.6 then 5 else 6) + extra
+		return (if roll < 0.6 then 6 else 7) + extra
 	elseif band == "Fringe" then
-		return (if roll < 0.6 then 3 else 4) + extra
+		return (if roll < 0.6 then 4 else 5) + extra
 	end
 	return 0
+end
+
+-- Waves that learn you -----------------------------------------------------------------------
+-- The encounters that come for you one after another out past the core are
+-- waves: the first is the biome's usual mix; from the second on, the
+-- frontier answers what you've got. It reads your side (Frontier.read):
+-- the elements you and your kaiju hit with, and the elements your team and
+-- your armor are weak to; and sends the kind of critter that counters it
+-- best (Frontier.counter: one that shrugs off what you hit with and hits
+-- what you're weak to). Wave n turns Lean[n] of its critters into that
+-- kind, brings Extra[n] more and comes Levels[n] levels higher (n past the
+-- end: the last). The run of waves starts again once you're back in the
+-- core, killed, or Reset seconds pass without one.
+Frontier.Adapt = {
+	Reset = 120,
+	Lean = { 0, 0.5, 0.85 },
+	Extra = { 0, 1, 2 },
+	Levels = { 0, 1, 2 },
+}
+
+local function adaptStep(field: { number }, wave: number): number
+	return field[math.clamp(math.floor(wave), 1, #field)]
+end
+
+-- The wave `wave` of a run: how many more critters, and how many levels up.
+function Frontier.adaptExtra(wave: number): number
+	return adaptStep(Frontier.Adapt.Extra, wave)
+end
+function Frontier.adaptLevels(wave: number): number
+	return adaptStep(Frontier.Adapt.Levels, wave)
+end
+
+-- Your side, read: `weapon` the element your weapon hits with, `armor` your
+-- armor's ElementMatchup profile ({ Resist, Main }), `kaiju` the elements of
+-- the kaiju you have out. Hits: element -> how much of your side hits with
+-- it (each kaiju 1, your weapon 1). Weak: element -> how much your side
+-- suffers from it (each kaiju weak to it 1, your armor's main element weak
+-- to it 1, less what your armor resists of it).
+function Frontier.read(weapon: string?, armor, kaiju: { string }?)
+	local hits, weak = {}, {}
+	local function add(into, element: string?, amount: number)
+		if element then
+			into[element] = (into[element] or 0) + amount
+		end
+	end
+	add(hits, weapon, 1)
+	for _, element in kaiju or {} do
+		add(hits, element, 1)
+		add(weak, ElementMatchup.weakTo(element), 1)
+	end
+	if armor then
+		add(weak, armor.Main and ElementMatchup.weakTo(armor.Main), 1)
+		for element, share in armor.Resist or {} do
+			add(weak, element, -2 * share)
+		end
+	end
+	return { Hits = hits, Weak = weak }
+end
+
+-- The element that counters a read side best: a critter of it takes less
+-- from what the side hits with (ElementMatchup.versus) and deals more to
+-- what it's weak to. Nil when the side gives nothing to go on.
+function Frontier.counter(read): string?
+	local best, bestScore = nil, 0
+	for _, element in ELEMENTS do
+		local score = read.Weak[element] or 0
+		for attack, weight in read.Hits do
+			score += weight * (1 - ElementMatchup.versus(attack, element))
+		end
+		if score > bestScore + 1e-9 then
+			best, bestScore = element, score
+		end
+	end
+	return best
+end
+
+-- Wave `wave` of a run, adapted: Lean of its critters (kept in order, a
+-- ranged one still last) turned into `kind`, the critter that counters the
+-- side (its roster id). `rng` picks which.
+function Frontier.adapt(critters: { string }, wave: number, kind: string?, rng, isRanged: (string) -> boolean): { string }
+	local lean = adaptStep(Frontier.Adapt.Lean, wave)
+	if not kind or lean <= 0 or #critters == 0 then
+		return critters
+	end
+	local out = table.clone(critters)
+	local turn = math.floor(#out * lean + 0.5)
+	local open = {}
+	for i, id in out do
+		if id ~= kind then
+			table.insert(open, i)
+		end
+	end
+	for _ = 1, math.min(turn, #open) do
+		local i = table.remove(open, rng:NextInteger(1, #open))
+		out[i] = kind
+	end
+	-- (A ranged one never leads the swarm: they go to the back.)
+	local melee, ranged = {}, {}
+	for _, id in out do
+		table.insert(if isRanged(id) then ranged else melee, id)
+	end
+	if #melee == 0 then
+		return out
+	end
+	table.move(ranged, 1, #ranged, #melee + 1, melee)
+	return melee
 end
 
 local function gapTo(spot: Vector3, points: { Vector3 }?): number
