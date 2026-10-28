@@ -1275,12 +1275,196 @@ local tabButtons = {}
 local rowLive = {} -- [id] = the bits of its row that change while you look
 local drawPanel
 
+-- DRAG AND DROP: every kaiju in the panel, a card on the left (team,
+-- support, reserves) or a place in TEAMS, can be picked up and dropped on
+-- another: two of your fighters swap places (KaijuSwap: teams and
+-- reserves alike); a support kind dropped on the support card takes the
+-- support slot (KaijuSupport). A press that doesn't move past teamsUi.Drag.Slop
+-- stays a tap (pick it / tap-to-swap, as before).
+local teamsUi = {} -- (one table: this file is at Luau's 200 locals)
+teamsUi.Drag = { Slop = 8, Targets = {}, Active = nil :: any, SuppressUntil = 0 }
+function teamsUi.Drag.point(input: InputObject): Vector2
+	if input.UserInputType == Enum.UserInputType.Touch then
+		return Vector2.new(input.Position.X, input.Position.Y) + game:GetService("GuiService"):GetGuiInset()
+	end
+	return UserInputService:GetMouseLocation() -- (the panel ignores the inset)
+end
+function teamsUi.Drag.inside(f: GuiObject, point: Vector2): boolean
+	local p, size = f.AbsolutePosition, f.AbsoluteSize
+	return point.X >= p.X and point.Y >= p.Y and point.X < p.X + size.X and point.Y < p.Y + size.Y
+end
+-- A kaiju's card or place to drop on: `clip`, if given, is what it scrolls
+-- in (a drop only counts where it shows); `support` for the support card.
+function teamsUi.Drag.target(frame: GuiObject, id: string?, clip: GuiObject?, support: boolean?)
+	for i = #teamsUi.Drag.Targets, 1, -1 do
+		if not teamsUi.Drag.Targets[i].Frame.Parent then
+			table.remove(teamsUi.Drag.Targets, i)
+		end
+	end
+	table.insert(teamsUi.Drag.Targets, { Frame = frame, Id = id, Clip = clip, Support = support == true })
+end
+function teamsUi.Drag.under(point: Vector2)
+	for _, t in teamsUi.Drag.Targets do
+		local f = t.Frame
+		if f.Parent and f.Visible and f:IsDescendantOf(window.Gui) and teamsUi.Drag.inside(f, point) and (not t.Clip or teamsUi.Drag.inside(t.Clip, point)) then
+			local hidden = false
+			local up = f.Parent
+			while up and up:IsA("GuiObject") do
+				if not up.Visible then
+					hidden = true
+					break
+				end
+				up = up.Parent
+			end
+			if not hidden then
+				return t
+			end
+		end
+	end
+	return nil
+end
+-- Makes `frame` (a kaiju's) draggable.
+function teamsUi.Drag.source(frame: GuiObject, id: string)
+	frame.InputBegan:Connect(function(input)
+		local kind = input.UserInputType
+		if kind ~= Enum.UserInputType.MouseButton1 and kind ~= Enum.UserInputType.Touch then
+			return
+		end
+		if teamsUi.Drag.Active then
+			return
+		end
+		teamsUi.Drag.Active = { Id = id, Input = input, From = teamsUi.Drag.point(input), Started = false }
+	end)
+end
+function teamsUi.Drag.paintHover(target)
+	if teamsUi.Drag.Glow then
+		teamsUi.Drag.Glow:Destroy()
+		teamsUi.Drag.Glow = nil
+	end
+	if target and target.Id ~= (teamsUi.Drag.Active and teamsUi.Drag.Active.Id) then
+		teamsUi.Drag.Glow = new("UIStroke", { Name = "DropGlow", Color = P.Gold, Thickness = 2.5, Transparency = 0 }, target.Frame)
+	end
+end
+function teamsUi.Drag.begin(drag, point: Vector2)
+	local data = roster()
+	local record = data and data.List[drag.Id]
+	if not record then
+		teamsUi.Drag.Active = nil
+		return
+	end
+	drag.Started = true
+	teamsUi.Drag.SuppressUntil = math.huge -- (no taps till it's dropped)
+	listFrame.ScrollingEnabled = false
+	local color = elementColor(record.Element)
+	local ghost = new("Frame", {
+		Name = "KaijuDragGhost",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.fromOffset(150, 34),
+		BackgroundColor3 = color:Lerp(INK, 0.7),
+		BackgroundTransparency = 0.05,
+		ZIndex = 60,
+	}, window.Gui)
+	UiKit.round(ghost, 8)
+	new("UIStroke", { Color = color, Thickness = 2 }, ghost)
+	local name = label(ghost, Kaiju.nameOf(record), 12, color:Lerp(P.Text, 0.4), IronUi.Bold)
+	name.Size, name.TextXAlignment, name.ZIndex = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, 61
+	drag.Ghost = ghost
+	teamsUi.Drag.move(point)
+end
+function teamsUi.Drag.move(point: Vector2)
+	local drag = teamsUi.Drag.Active
+	if drag and drag.Ghost then
+		drag.Ghost.Position = UDim2.fromOffset(point.X, point.Y - 22)
+		teamsUi.Drag.paintHover(teamsUi.Drag.under(point))
+	end
+end
+function teamsUi.Drag.finish(point: Vector2?)
+	local drag = teamsUi.Drag.Active
+	teamsUi.Drag.Active = nil
+	listFrame.ScrollingEnabled = true
+	teamsUi.Drag.paintHover(nil)
+	if not drag or not drag.Started then
+		return
+	end
+	teamsUi.Drag.SuppressUntil = os.clock() + 0.25 -- (the release isn't a tap)
+	if drag.Ghost then
+		drag.Ghost:Destroy()
+	end
+	local target = point and teamsUi.Drag.under(point)
+	if not target or target.Id == drag.Id then
+		return
+	end
+	local data = roster()
+	local a = data and data.List[drag.Id]
+	local b = target.Id and data.List[target.Id]
+	if not a then
+		return
+	end
+	local aSupport = Kaiju.isSupport(a.Species)
+	local request, args
+	if target.Support or (b and Kaiju.isSupport(b.Species)) then
+		if not aSupport then
+			UiKit.toast("Only a support kind goes in the support slot.", P.Gold)
+			return
+		end
+		request, args = "KaijuSupport", { drag.Id }
+	elseif aSupport then
+		UiKit.toast("A support goes in the support slot, not a team.", P.Gold)
+		return
+	elseif b then
+		request, args = "KaijuSwap", { drag.Id, target.Id }
+	else
+		return
+	end
+	task.spawn(function()
+		local result = GemClient.request(request, table.unpack(args))
+		if result and not result.Ok and result.Message and result.Message ~= "" then
+			UiKit.toast(result.Message, P.Bad)
+		end
+		if window.Gui.Enabled and drawPanel then
+			drawPanel()
+		end
+	end)
+end
+UserInputService.InputChanged:Connect(function(input)
+	local drag = teamsUi.Drag.Active
+	if not drag then
+		return
+	end
+	local kind = input.UserInputType
+	if kind ~= Enum.UserInputType.MouseMovement and not (kind == Enum.UserInputType.Touch and input == drag.Input) then
+		return
+	end
+	local point = teamsUi.Drag.point(input)
+	if not drag.Started then
+		if (point - drag.From).Magnitude >= teamsUi.Drag.Slop then
+			teamsUi.Drag.begin(drag, point)
+		end
+		return
+	end
+	teamsUi.Drag.move(point)
+end)
+UserInputService.InputEnded:Connect(function(input)
+	local drag = teamsUi.Drag.Active
+	if not drag then
+		return
+	end
+	local kind = input.UserInputType
+	if kind == Enum.UserInputType.MouseButton1 or (kind == Enum.UserInputType.Touch and input == drag.Input) then
+		teamsUi.Drag.finish(teamsUi.Drag.point(input))
+	end
+end)
+window.Gui:GetPropertyChangedSignal("Enabled"):Connect(function()
+	if not window.Gui.Enabled and teamsUi.Drag.Active then
+		teamsUi.Drag.finish(nil)
+	end
+end)
+
 -- TEAMS: your four teams (Kaiju.Teams), a row each with its places
 -- (Kaiju.slots). They fill in order (Kaiju.order): a team past the one
 -- filling is LOCKED till that one's full. Tap a kaiju, then another in any
 -- team, and they swap places (KaijuSwap); tap the one picked again to let
 -- it go. SEND OUT brings a team out, as its number key does (pressTeam).
-local teamsUi = {} -- (one table: this file is at Luau's 200 locals)
 teamsUi.Pane = new("Frame", {
 	Name = "Teams",
 	BackgroundTransparency = 1,
@@ -1312,7 +1496,7 @@ function teamsUi.draw(data)
 	end
 	teamsUi.Hint.Text = if teamsUi.Pick
 		then "Now tap the kaiju to swap it with (or tap it again to let go)."
-		else "Tap a kaiju, then another, to swap them. Press 1 to 4 to bring a team out."
+		else "Drag a kaiju onto another (or tap one, then another) to swap them. Press 1 to 4 to bring a team out."
 	teamsUi.Hint.TextColor3 = if teamsUi.Pick then P.Gold else P.Dim
 	local gap = 4
 	local rowH = if SHORT then 48 else 84
@@ -1382,7 +1566,12 @@ function teamsUi.draw(data)
 				level.Position, level.Size = UDim2.fromOffset(4, face + 21), UDim2.new(1, -8, 0, 12)
 				name.TextXAlignment, level.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
 			end
+			teamsUi.Drag.source(cell, id)
+			teamsUi.Drag.target(cell, id)
 			cell.Activated:Connect(function()
+				if os.clock() < teamsUi.Drag.SuppressUntil then
+					return
+				end
 				if teamsUi.Pick == nil then
 					teamsUi.Pick = id
 					teamsUi.draw(roster())
@@ -1741,7 +1930,12 @@ local function kaijuRow(order: number, record, slot: number?, models)
 	expBar.Position, expBar.Size = UDim2.fromOffset(112, 67), UDim2.new(1, -124, 0, 3)
 	expBarFill.Size = UDim2.fromScale(expShare(record.Level, record.Exp or 0), 1)
 	rowLive[record.Id] = live
+	teamsUi.Drag.source(row, record.Id)
+	teamsUi.Drag.target(row, record.Id, listFrame, slot == Kaiju.SupportSlot)
 	row.Activated:Connect(function()
+		if os.clock() < teamsUi.Drag.SuppressUntil then
+			return
+		end
 		if swapping and slot then
 			swapTarget = record.Id
 		else
