@@ -359,6 +359,16 @@ do
 	check(AutoEquip.power(legendary) > AutoEquip.power(common), "A perfect Common out-powered a rough Legendary")
 	check(AutoEquip.power(gem("r9", "Fire", "Rare", 9)) > AutoEquip.power(gem("r3", "Fire", "Rare", 3)), "Better grades, no more power")
 	check(AutoEquip.power(nil) == 0 and AutoEquip.power({ Id = "x", Element = "Nope", Tier = "Rare" }) == 0, "A gem with no moves has power")
+	-- Then the surge's tier (Master moves, the showiest) and its rank, but
+	-- never past the next rarity: a T1 I Legendary still beats a T4 III Ultra Rare.
+	local function surge(id, tier, t, r)
+		local g = gem(id, "Fire", tier, 5)
+		g.SurgeTier, g.SurgeRank = t, r
+		return g
+	end
+	check(AutoEquip.power(surge("t4", "Rare", 4, 1)) > AutoEquip.power(surge("t1", "Rare", 1, 3)), "A Master surge didn't beat a Novice one of the same rarity")
+	check(AutoEquip.power(surge("r3", "Rare", 2, 3)) > AutoEquip.power(surge("r1", "Rare", 2, 1)), "A higher rank didn't beat a lower one")
+	check(AutoEquip.power(surge("leg", "Legendary", 1, 1)) > AutoEquip.power(surge("ur", "UltraRare", 4, 3)), "A Master Ultra Rare out-ranked a Legendary")
 	-- Best never trades a stronger Q for a weaker one, even one worth more.
 	local profile = gemProfile()
 	profile.Character.WeaponGem = gem("q", "Fire", "Legendary", 10)

@@ -161,13 +161,17 @@ ABILITIES are new gems on Q, E and R, GEMS the rest.
 
 - The sword's, chest's and shield's gems are Q, E and R. A gem's moves are
   as strong as its rarity first (the "% power" they show: Common 60% up to
-  Legendary 100%, with its Flourish), then its Size, Clarity and Cut
-  (`AutoEquip.power`). BEST puts the strongest of your loose gems on Q,
+  Legendary 100%, with its Flourish), then its surge tier (a T4 Master
+  move is the showiest: biggest effects, more hits), then its rank, then
+  its Size, Clarity and Cut (`AutoEquip.power`). The rarest gem always
+  wins; tier, rank and grades only order gems of the same rarity. BEST puts the strongest of your loose gems on Q,
   the next on E, then R, each only when it's stronger than what's there,
   whatever its element. An element build does the same with that element's
   gems only, so it upgrades a weaker gem of its own element too. The gem
   that comes out goes back in your pouch and can fill another socket.
   *2026-10-27*: BEST used to leave Q, E and R alone once they were full.
+  *2026-10-28*: surge tier and rank now break ties between gems of the
+  same rarity, ahead of Size, Clarity and Cut.
 - Only gear you own, of your class, not another miner's; no shield under a
   two-handed weapon (the weapon goes on first).
 - Not mid-match (the same rule as changing gear by hand), and the gems only

@@ -208,11 +208,13 @@ local function value(gem): number
 	return if ok and type(worth) == "number" then worth else 0
 end
 
--- How strong a gem's moves are, whichever key it's on (GemTraits.stats):
--- its rarity first (its output, the "% power" its moves show, and a
--- Legendary's Flourish), then its grades within that rarity, each as much
--- as it adds (Size's potency, Clarity's durations, Cut's cooldown). The
--- grades never lift a gem past the next rarity.
+-- How a gem ranks for a key socket (Q, E, R), whichever key it's on: its
+-- rarity first, always (the rarest gem's moves are the flashiest and hit
+-- hardest: its output, the "% power" its moves show, and a Legendary's
+-- Flourish), then its surge's tier (T4 Master moves are the showiest, the
+-- most fun), then the surge's rank (I to III), then its grades (Size's
+-- potency, Clarity's durations, Cut's cooldown). None of the rest ever
+-- lifts a gem past the next rarity (they add under its 0.1 step).
 function AutoEquip.power(gem): number
 	if type(gem) ~= "table" or not GemTraits.traitsOf(gem) then
 		return 0
@@ -226,7 +228,9 @@ function AutoEquip.power(gem): number
 		+ GemTraits.ClarityDuration * grade("Clarity")
 		+ GemTraits.CutCooldown * grade("Cut")
 	) / weights
-	return GemTraits.output(gem) + 0.09 * grades
+	local tier = (math.clamp(tonumber(gem.SurgeTier) or 1, 1, 4) - 1) / 3
+	local rank = (math.clamp(tonumber(gem.SurgeRank) or 1, 1, 3) - 1) / 2
+	return GemTraits.output(gem) + 0.06 * tier + 0.02 * rank + 0.015 * grades
 end
 
 local function planGems(profile, loadout, mode: string): { { Slot: string, Gem: string } }
