@@ -1685,10 +1685,19 @@ function Duels.start()
 		end
 		player:GetAttributeChangedSignal("Outpost"):Connect(arrive)
 		arrive()
-		local wasDungeon = player:GetAttribute("DungeonId") or player:GetAttribute("RiftRun")
+		-- Away: a dungeon, the Rift, or an Arena session of your own (1v1
+		-- PRACTICE, the training ring: "Training" / "PvP"). Back in the lobby
+		-- from any of them, you're searching again (the match-ready window
+		-- still asks before a match pulls you in).
+		local function away()
+			local session = player:GetAttribute("CombatSession")
+			return player:GetAttribute("DungeonId") or player:GetAttribute("RiftRun")
+				or session == "Training" or session == "PvP"
+		end
+		local wasDungeon = away()
 		local pendingReturn = false
 		local function returned()
-			local inDungeon = player:GetAttribute("DungeonId") or player:GetAttribute("RiftRun")
+			local inDungeon = away()
 			if inDungeon then
 				wasDungeon = true
 				pendingReturn = false

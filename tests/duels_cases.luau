@@ -1014,5 +1014,13 @@ do
 	check(not handlers.DuelReturnQueue(c).Ok and c:GetAttribute("DuelQueue") == nil, "Auto queued with it off")
 	check(handlers.DuelAuto(c, true).Ok and handlers.DuelReturnQueue(c).Ok and c:GetAttribute("DuelQueue") == "1v1", "Back on, no search")
 	check(handlers.DuelAuto(c, false).Ok and c:GetAttribute("DuelQueue") == nil, "Turning auto queue off left them searching")
-	print("PASS: auto queue (dungeon blocking, back from a dungeon, paired after MATCH READY), off means no search")
+	-- Back from 1v1 PRACTICE (an Arena session of your own): searching again.
+	local d = makePlayer(84, "PracticeDone")
+	d:SetAttribute("Outpost", true)
+	d:SetAttribute("CombatSession", "Training")
+	check(d:GetAttribute("DuelQueue") == nil, "Searching while in practice")
+	d:SetAttribute("CombatSession", nil)
+	check(d:GetAttribute("DuelQueue") == "1v1", "Leaving practice didn't queue ranked again")
+	check(last(d, "FillIn") == nil, "Asked before auto queuing after practice")
+	print("PASS: auto queue (dungeon blocking, back from a dungeon or practice, paired after MATCH READY), off means no search")
 end
