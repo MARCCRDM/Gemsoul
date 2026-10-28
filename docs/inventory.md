@@ -1,5 +1,59 @@
 # The Inventory: your gems, your gear, AUTO EQUIP
 
+## The paper doll (current layout)
+
+The Inventory is now laid out like the old CharacterUI panel, updated for
+today's game: your miner in the middle of a paper doll, the six slots around
+it, a summary column, and the two backpacks on the right.
+
+![The Inventory, desktop](inventory/doll-desktop.png)
+
+| Before | Now |
+| --- | --- |
+| ![Before](inventory/doll-before.png) | ![Now](inventory/doll-desktop.png) |
+
+- **Header**: level badge, name and sets; EQUIP BEST and the four element
+  buttons (AUTO EQUIP); GEM VAULT and SKINS.
+- **Paper doll**: Helmet, Chest and Gloves on the left; Sword, Shield and
+  Boots on the right; the miner in the middle (drag to turn). Each slot is a
+  card tinted by the piece's rarity, with its gem socket underneath ("ADD A
+  GEM" when the socket is empty, otherwise the gem and the Q/E/R move it
+  gives). The Sword, Chest and Shield cards show their Q / E / R surge tile.
+- **Summary**: portrait, GEAR SCORE, the set bonus, the Q / E / R SURGES
+  cards, COMBAT RATINGS (health, power, defense, speed, strong vs / weak to
+  / resists), and ALL STATS · AUTO EQUIP, which opens the full stats sheet.
+- **GEM BACKPACK**: every loose gem by element. Drag one onto a slot, card
+  or socket, or onto a Q / E / R card, to enchant it.
+- **EQUIPMENT INVENTORY**: spare pieces by slot, with the gear-score change
+  if you wear each one.
+
+### Click anything for its window
+
+Clicking a slot card, its socket, or a Q / E / R card opens a **detail
+window** over the screen. It has the piece and its gem side by side, the
+enchantment it gives, and a list on the right: **PIECES** (spares for that
+slot) or **GEMS** (gems that fit it, filtered by element). Clicking the
+socketed gem opens it in the Gem Vault. Tabs across the top jump to any other
+slot or key. Close it with ×, Escape, or a click outside. Dragging a gem
+still works with the window open: it closes and the doll takes the drop.
+
+| A piece | A key (E) |
+| --- | --- |
+| ![Piece window](inventory/doll-window-piece.png) | ![Key window](inventory/doll-window-key.png) |
+
+### On a phone
+
+The doll fills the left side. The right side has three tabs: **STATS**
+(score, surges, ratings, EQUIP BEST, ALL STATS, SKINS, elements), **GEMS**
+(the backpack) and **GEAR** (spare pieces). Tapping a slot opens the same
+window.
+
+| Phone | Phone, a slot's window |
+| --- | --- |
+| ![Phone](inventory/doll-phone.png) | ![Phone window](inventory/doll-window-phone.png) |
+
+## Earlier layout (kept for reference)
+
 The Inventory (Modules/InventoryV2) on a computer, laid out as the sketch asked:
 weapons and gems on the left, who you are and AUTO EQUIP left of the miner,
 armor and spare gear on the right, Q / E / R along the bottom.

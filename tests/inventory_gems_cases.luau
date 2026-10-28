@@ -190,6 +190,8 @@ GemVault.close()
 local RIGHT_W,HEADING=420,Enum.Font.GothamBold
 C.Faint,C.Text,C.Line=Color3.new(.3,.3,.3),Color3.new(1,1,1),Color3.new(1,1,1)
 local NumberSequence={new=function(...) return {...} end}
+local CARD_W,CARD_H,COMPACT,HEAVY=168,128,false,Enum.Font.GothamBold
+local function gemName(gem) return gem.Name or "Gem" end
 local function place(o,x,y,w,h) o.Position=UDim2.fromOffset(x,y); o.Size=UDim2.fromOffset(w,h); return o end
 local function text(parent,value) return new("TextLabel",{Text=value},parent) end
 local function openDetail() end
@@ -208,13 +210,13 @@ local TweenService={Create=function() return {Play=function() end} end}
 local task={delay=function() end}
 -- ROW BUILD
 -- ROW DRAW
-ui.Rows={Helmet=buildRow(ui.List,"Helmet",26)}
+ui.Rows={Helmet=buildRow(ui.List,"Helmet",16,26)}
 local row=ui.Rows.Helmet
 drawRows({Helmet="Helm"})
 check(row.Enchant.Visible and row.Halo.Visible and row.Plus.Visible,"Empty socket missing enchant/glow cues")
-check(row.Enchant.Text=="ADD STONE TO ENCHANT  ·  DRAG & DROP","Missing drag instructions")
+check(row.Enchant.Text=="ADD A GEM","Missing the add-a-gem ask")
 check(row.Edge.Transparency<1 and row.Ring.Color==C.Gold,"Empty equipment not highlighted")
-check(row.Name.Position.Y<row.Meta.Position.Y and row.Meta.Position.Y<row.Enchant.Position.Y,"Empty row text overlaps")
+check(row.Name.Position.Y<row.Meta.Position.Y and row.Socket.Position.Y>=row.Row.Position.Y+row.Row.Size.Y,"Empty card text overlaps")
 drawRows({Helmet="Helm",HelmetGem=worn})
 check(not row.Enchant.Visible and not row.Halo.Visible and not row.Plus.Visible,"Filled socket still asks for enchantment")
 drawRows({})

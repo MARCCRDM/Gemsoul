@@ -144,8 +144,18 @@ local W, H = 1600, 840
 local TOPBAR, BOTTOM = 58, 36 -- Roblox's own buttons above (UiKit.topbar); chat and DEV below
 local RIGHT_X, RIGHT_W = 1170, 390
 local LEFT_X, LEFT_W = 40, 390 -- (full: the sword and shield, then your gems)
-local STATS_X, STATS_W = 460, 262 -- (full: you, your stats and AUTO EQUIP, left of the miner)
+local STATS_X, STATS_W = 460, 262 -- (the stats card's own frame, slid into its sheet)
 local COMPACT = false
+-- The paper doll's layout (full; chooseLayout sets the compact one): the
+-- panel under the top bar and its header, then the doll, the summary column
+-- and the bags (full), or the doll and a tabbed side panel (compact).
+local PANEL_Y, HEAD_H = 60, 62
+local BODY_Y = PANEL_Y + HEAD_H + 14
+local DOLL_X, DOLL_W, DOLL_PAD = 16, 600, 18
+local MID_X, MID_W = 632, 380
+local BAG_X, BAG_W = 1028, 556
+local CARD_W, CARD_H = 168, 128
+local SIDE_X, SIDE_W = 0, 0 -- (compact: the STATS / GEMS / GEAR panel)
 
 -- Small builders ---------------------------------------------------------------------------------------
 
@@ -465,7 +475,7 @@ local state = {
 	AutoMode = "Best", -- AUTO EQUIP's mode (Shared.AutoEquip.Modes)
 	StatsOpen = false, -- (full) the stats card open, or folded to STATS, EQUIP BEST and the elements
 	PouchFilter = "All", -- your gems (full, left): "All" or an element
-	GemsPane = false, -- compact: your gems in the rows' place (the GEMS tab)
+	SideTab = "Stats", -- compact: the side panel's page, "Stats", "Gems" or "Gear"
 	BagFilter = "All", -- your spare gear (full, right): "All" or a slot
 }
 local gui: ScreenGui? = nil
@@ -511,16 +521,17 @@ end
 local function openDetail(target: string?)
 	local was = state.Detail
 	state.Detail = target
-	state.Tab = "Gems"
+	state.Tab = nil -- (drawDetail picks the tab)
 	state.Pick, state.Hover = nil, nil
 	if InventoryV2.hideTip then
 		InventoryV2.hideTip()
 	end
-	-- The column slides a little as it changes, so the change reads.
-	local panel = if target then ui.Detail else ui.List
-	if panel and (was == nil) ~= (target == nil) then
-		panel.Position = UDim2.fromOffset(if target then 22 else -22, 0)
-		TweenService:Create(panel, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Position = UDim2.new() }):Play()
+	-- The window grows in a little as it opens, so it reads.
+	local panel = ui.ModalPanel
+	if panel and was == nil and target ~= nil then
+		local scale = panel:FindFirstChildOfClass("UIScale") or new("UIScale", {}, panel)
+		scale.Scale = 0.94
+		TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 	end
 	draw()
 end
@@ -536,9 +547,9 @@ local function buildBackground(parent: Instance)
 	new("UIGradient", {
 		Rotation = 90,
 		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 11, 19)),
-			ColorSequenceKeypoint.new(0.6, Color3.fromRGB(6, 9, 15)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 6, 10)),
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(14, 11, 30)),
+			ColorSequenceKeypoint.new(0.6, Color3.fromRGB(8, 8, 19)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 5, 11)),
 		}),
 	}, back)
 	return back
@@ -743,44 +754,6 @@ local function buildAuto(parent: Instance, x: number, y: number, w: number): num
 		end
 		return b
 	end
-	if COMPACT then
-		-- AUTO over the miner; its six modes drop under it, a tap puts one on.
-		ui.AutoGo = new("TextButton", {
-			Name = "AutoEquip",
-			Text = "AUTO",
-			TextSize = 13,
-			Font = HEAVY,
-			TextColor3 = Color3.fromRGB(26, 18, 6),
-			AutoButtonColor = true,
-			BackgroundColor3 = C.Gold,
-		}, parent)
-		place(ui.AutoGo, x, y, w, 30)
-		round(ui.AutoGo, 8)
-		ui.AutoGo:SetAttribute("UiSound", "Click")
-		local menu = frame(parent, C.Deep, 0.04)
-		menu.Name = "AutoMenu"
-		menu.Visible = false
-		menu.ZIndex = 8
-		place(menu, x + w - 212, y + 36, 212, 158)
-		round(menu, 10)
-		stroke(menu, C.Gold, 1, 0.5)
-		ui.AutoMenu = menu
-		for i, mode in AutoEquip.Modes do
-			local b = chip(menu, mode, 8 + ((i - 1) % 2) * 100, 8 + math.floor((i - 1) / 2) * 36, 96, 30)
-			b.ZIndex = 9
-			b.Activated:Connect(function()
-				state.AutoMode = mode
-				menu.Visible = false
-				request("AutoEquip", mode)
-			end)
-		end
-		ui.AutoGo.Activated:Connect(function()
-			menu.Visible = not menu.Visible
-		end)
-		surgeButton(menu, 8, 120, 196).ZIndex = 9
-		UpgradeHints.bind(ui.AutoGo, function(hints) return hints.Any end, C.Gold)
-		return y + 30
-	end
 	place(text(parent, "AUTO EQUIP", 11, C.Gold, HEAVY), x, y, 110, 14)
 	ui.AutoPreview = place(text(parent, "", 10, C.Dim, HEADING), x + 96, y, w - 96, 14)
 	ui.AutoPreview.TextXAlignment = Enum.TextXAlignment.Right
@@ -847,6 +820,7 @@ local function buildStatsSheet(canvas: Frame): Frame
 	ui.StatsSheet = scrim
 	local panel = frame(scrim, C.Deep, 0.02)
 	panel.Name = "Panel"
+	ui.StatsSheetPanel = panel
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Size = UDim2.fromOffset(SHEET_W, H - 12)
@@ -886,54 +860,14 @@ local function buildStatsSheet(canvas: Frame): Frame
 	return box
 end
 
+-- The full stats card: in a sheet over the screen (both layouts), opened by
+-- ALL STATS. It holds every number the summary can't: the level bonus,
+-- max stamina and charge, the set and its next bonus, the elements, and
+-- AUTO EQUIP with its modes.
 local function buildLeft(canvas: Frame)
 	local x, w = STATS_X, STATS_W
-	-- Compact keeps only miner 1 / 2 / 3 and the name (over the miner): the
-	-- rest is built in the stats sheet (buildStatsSheet), which STATS opens.
-	local box = canvas
-	if COMPACT then
-		box = buildStatsSheet(canvas)
-	else
-		-- (full: the card in a layer of its own, folded away by default; see
-		-- buildStatsMini and setStatsOpen)
-		box = new("Frame", { Name = "StatsPanel", BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H) }, canvas)
-		ui.StatsPanel = box
-	end
-	-- Miner 1 / 2 / 3 (none while the roster is off: one miner).
-	ui.Miners = {}
-	for index = 1, if MinerRoster.Enabled then MinerRoster.Count else 0 do
-		local b = new("TextButton", {
-			Text = tostring(index),
-			TextSize = 13,
-			Font = HEADING,
-			TextColor3 = C.Faint,
-			AutoButtonColor = false,
-			BackgroundColor3 = C.Gold,
-			BackgroundTransparency = 1,
-		}, canvas)
-		if COMPACT then
-			place(b, (index - 1) * 38, 54, 32, 32)
-		else
-			place(b, x + (index - 1) * 40, 96, 32, 32)
-		end
-		round(b, 8)
-		local edge = stroke(b, C.Line, 1, 0.9)
-		b:SetAttribute("UiSound", "Tab")
-		b.Activated:Connect(function()
-			InventoryV2.cancelDrag()
-			state.Pick, state.Hover = nil, nil
-			request("MinerSelect", index)
-		end)
-		ui.Miners[index] = { Button = b, Edge = edge }
-	end
-	local nameY = if MinerRoster.Enabled then 134 else 96
-	if COMPACT then
-		local nameX = if MinerRoster.Enabled then 116 else 0
-		ui.Name = place(text(canvas, "", 22, C.Text, HEAVY), nameX, 54, RIGHT_X - 12 - nameX, 32)
-	else
-		ui.Name = place(text(canvas, "", 32, C.Text, HEAVY), x, nameY, w + 40, 38)
-	end
-	ui.Sub = place(text(if COMPACT then box else canvas, "", 11, C.Dim, HEADING), x, nameY + 40, w, 16)
+	local box = buildStatsSheet(canvas)
+	local nameY = 96
 	ui.LevelBonus = place(text(box, "", 10, C.Teal, BODY), x, nameY + 58, w + 40, 13)
 	UiKit.fit(ui.LevelBonus)
 	-- The card: the rating and four stats, the set, the elements, AUTO EQUIP,
@@ -1026,219 +960,104 @@ local function buildLeft(canvas: Frame)
 	ui.Mix = text(box, "", 11, C.Dim, HEADING)
 	ui.Mix.Visible = false
 	-- AUTO EQUIP, right under the rest; the card ends with it.
-	if COMPACT then
-		-- (over the miner, top right of its column; STATS, with your rating
-		-- on it, at the top left: it opens the sheet)
-		buildAuto(canvas, RIGHT_X - 12 - 96, 92, 96)
-		local open = new("TextButton", {
-			Name = "StatsButton",
-			Text = "STATS",
-			TextSize = 12,
-			Font = HEAVY,
-			TextColor3 = C.Teal,
-			AutoButtonColor = true,
-			BackgroundColor3 = C.Deep,
-			BackgroundTransparency = 0.1,
-		}, canvas)
-		place(open, 0, 92, 96, 30)
-		round(open, 8)
-		stroke(open, C.Teal, 1, 0.45)
-		UiKit.fit(open)
-		open:SetAttribute("UiSound", "Click")
-		open.Activated:Connect(function()
-			InventoryV2.cancelDrag()
-			if ui.AutoMenu then
-				ui.AutoMenu.Visible = false
-			end
-			ui.StatsSheet.Visible = true
-		end)
-		ui.StatsButton = open
-		-- The box slid into the sheet, the sheet scrolling as far as the card.
-		local top = nameY + 40 - 10
-		box.Position = UDim2.fromOffset(-(x - 16) + 12, -top)
-		ui.StatsScroller.CanvasSize = UDim2.fromOffset(0, y + 10 - top + 12)
-	else
-		place(frame(box, C.Line, 0.93), x, y, w, 1)
-		y += 8
-		y = buildAuto(box, x, y, w)
-	end
+	place(frame(box, C.Line, 0.93), x, y, w, 1)
+	y += 8
+	y = buildAuto(box, x, y, w)
 	card.Size = UDim2.fromOffset(w + 32, y + 10 - cardY)
-	if not COMPACT then
-		-- HIDE, top right of the card, folds it back to STATS.
-		local hide = new("TextButton", {
-			Name = "HideStats",
-			Text = "HIDE",
-			TextSize = 10,
-			Font = HEAVY,
-			TextColor3 = C.Dim,
-			AutoButtonColor = true,
-			BackgroundColor3 = C.Ink,
-			BackgroundTransparency = 0.4,
-		}, box)
-		place(hide, x + w - 44, cardY + 10, 48, 22)
-		round(hide, 6)
-		stroke(hide, C.Line, 1, 0.8)
-		hide:SetAttribute("UiSound", "Back")
-		hide.Activated:Connect(function()
-			ui.SetStatsOpen(false)
-		end)
-		ui.StatsCardTop = cardY
-	end
+	-- The box slid into the sheet, the sheet as tall as the card (up to the
+	-- screen), scrolling as far as the card.
+	local top = nameY + 58 - 10
+	box.Position = UDim2.fromOffset(-(x - 16) + 12, -top)
+	local inner = y + 10 - top + 12
+	ui.StatsScroller.CanvasSize = UDim2.fromOffset(0, inner)
+	local sheetH = math.min(H - 12, inner + 34 + 6)
+	ui.StatsSheetPanel.Size = UDim2.fromOffset(SHEET_W, sheetH)
+	ui.StatsScroller.Size = UDim2.fromOffset(SHEET_W, sheetH - 34)
+end
+local function openStats()
+	InventoryV2.cancelDrag()
+	ui.StatsSheet.Visible = true
 end
 
--- Full layout, folded (the default): the stats card gives way to a STATS
--- button with your rating on it, EQUIP BEST under it and an element each
--- (a tap puts that build on at once: the best gems of that element). The
--- miner moves to the middle and the armor rows grow a little. STATS opens
--- the card again (which has all of this in its AUTO EQUIP), so these hide.
-local MINI_W = 220
-local function buildStatsMini(canvas: Frame)
-	local x, y = STATS_X - 16, ui.StatsCardTop or 212
-	local mini = new("Frame", { Name = "StatsMini", BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H), ZIndex = 2 }, canvas)
-	ui.StatsMini = mini
-	local open = new("TextButton", {
-		Name = "OpenStats",
-		Text = "",
-		AutoButtonColor = true,
-		BackgroundColor3 = C.Deep,
-		BackgroundTransparency = 0.1,
-	}, mini)
-	place(open, x, y, MINI_W, 46)
-	round(open, 10)
-	stroke(open, C.Teal, 1, 0.45)
-	open:SetAttribute("UiSound", "Click")
-	place(text(open, "STATS", 13, C.Teal, HEAVY), 14, 0, 80, 46)
-	local rating = place(text(open, "", 22, C.Gold, HEAVY), 84, 0, MINI_W - 98 - 18, 46)
-	rating.TextXAlignment = Enum.TextXAlignment.Right
-	local more = place(text(open, "+", 18, C.Dim, HEAVY), MINI_W - 26, 0, 16, 46)
-	more.TextXAlignment = Enum.TextXAlignment.Center
-	ui.MiniRating = rating
-	open.Activated:Connect(function()
-		ui.SetStatsOpen(true)
-	end)
-	y += 54
-	local best = new("TextButton", {
-		Name = "EquipBest",
-		Text = "EQUIP BEST",
-		TextSize = 13,
+-- The look: a deep violet panel under the top bar, its boxes framed in a
+-- thin line, the paper doll's corners marked in gold.
+local P = {
+	Panel = Color3.fromRGB(14, 15, 31),
+	Box = Color3.fromRGB(9, 10, 22),
+	Edge = Color3.fromRGB(104, 86, 186),
+	BoxEdge = Color3.fromRGB(62, 58, 112),
+	HeadA = Color3.fromRGB(62, 38, 118),
+	HeadB = Color3.fromRGB(24, 19, 50),
+	Bracket = Color3.fromRGB(222, 184, 112),
+}
+local function panelBox(parent: Instance, x: number, y: number, w: number, h: number): Frame
+	local f = frame(parent, P.Box, 0.1)
+	place(f, x, y, w, h)
+	round(f, 12)
+	stroke(f, P.BoxEdge, 1, 0.2)
+	return f
+end
+local function boxTitle(parent: Instance, value: string, x: number, y: number, w: number): TextLabel
+	local t = place(text(parent, value, if COMPACT then 12 else 12, C.Text, HEAVY), x, y, w, 16)
+	return t
+end
+-- An L of gold at each corner of the paper doll.
+local function brackets(parent: Instance, w: number, h: number)
+	local arm, inset = 22, 8
+	for _, corner in { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } } do
+		local cx = if corner[1] == 0 then inset else w - inset - arm
+		local cy = if corner[2] == 0 then inset else h - inset - arm
+		local across = frame(parent, P.Bracket, 0.15)
+		place(across, cx, if corner[2] == 0 then cy else cy + arm - 2, arm, 2)
+		local down = frame(parent, P.Bracket, 0.15)
+		place(down, if corner[1] == 0 then cx else cx + arm - 2, cy, 2, arm)
+	end
+end
+-- A plain button (the header's, the STATS tab's).
+local function plainButton(parent: Instance, label: string, x: number, y: number, w: number, h: number, primary: boolean?, tint: Color3?): TextButton
+	local b = new("TextButton", {
+		Text = label,
+		TextSize = if COMPACT then 12 else 12,
 		Font = HEAVY,
-		TextColor3 = Color3.fromRGB(26, 18, 6),
+		TextColor3 = if primary then Color3.fromRGB(26, 18, 6) else tint or C.Text,
 		AutoButtonColor = true,
-		BackgroundColor3 = C.Gold,
-	}, mini)
-	place(best, x, y, MINI_W, 36)
-	round(best, 9)
-	best:SetAttribute("UiSound", "Confirm")
+		BackgroundColor3 = if primary then C.Gold else C.Ink,
+		BackgroundTransparency = if primary then 0 else 0.25,
+	}, parent)
+	place(b, x, y, w, h)
+	round(b, 9)
+	if not primary then
+		stroke(b, tint or C.Line, 1, if tint then 0.45 else 0.75)
+	end
+	UiKit.fit(b)
+	b:SetAttribute("UiSound", if primary then "Confirm" else "Click")
+	return b
+end
+
+-- EQUIP BEST, then a build per element (a tap puts it on at once: the best
+-- gems of that element), as AUTO EQUIP's modes in the stats sheet do.
+local function buildQuickEquip(parent: Instance, x: number, y: number, bestW: number, chipW: number, h: number, gap: number)
+	local best = plainButton(parent, "EQUIP BEST", x, y, bestW, h, true)
+	best.Name = "EquipBest"
 	UpgradeHints.bind(best, function(hints) return hints.Equipment end, C.Gold)
 	best.Activated:Connect(function()
 		state.AutoMode = "Best"
 		request("AutoEquip", "Best")
 	end)
-	y += 42
-	local half = (MINI_W - 6) / 2
 	for i, element in ELEMENTS do
 		local tint = GemConfig.ElementColors[element] or C.Text
-		local b = new("TextButton", {
-			Name = "Equip" .. element,
-			Text = AutoEquip.label(element),
-			TextSize = 11,
-			Font = HEAVY,
-			TextColor3 = tint,
-			AutoButtonColor = true,
-			BackgroundColor3 = C.Ink,
-			BackgroundTransparency = 0.3,
-		}, mini)
-		place(b, x + ((i - 1) % 2) * (half + 6), y + (i - 1) // 2 * 36, half, 30)
-		round(b, 8)
-		stroke(b, tint, 1, 0.55)
-		UiKit.fit(b)
-		b:SetAttribute("UiSound", "Click")
+		local b = plainButton(parent, AutoEquip.label(element), x + bestW + gap + (i - 1) * (chipW + gap), y, chipW, h, false, tint)
+		b.Name = "Equip" .. element
+		b.TextSize = if COMPACT then 11 else 11
 		b.Activated:Connect(function()
 			state.AutoMode = element
 			request("AutoEquip", element)
 		end)
 	end
-	y += 72
-	local caption = place(text(mini, "A TAP PUTS THE BEST GEMS OF IT ON", 9, C.Faint, HEADING), x, y, MINI_W, 12)
-	caption.TextXAlignment = Enum.TextXAlignment.Center
 end
 
-local function buildStage(canvas: Frame)
-	-- (full: the stage is a layer of its own, slid to the middle while the
-	-- stats card is folded: setStatsOpen)
-	if not COMPACT then
-		canvas = new("Frame", { Name = "Stage", BackgroundTransparency = 1, Size = UDim2.fromOffset(W, H) }, canvas)
-		ui.Stage = canvas
-	end
-	-- (compact, the miner stands in the left column, under the name: the
-	-- same stage at about a third of the size)
-	local k = if COMPACT then 0.36 else 1
-	-- (full: right of the stats card, between it and your armor)
-	local cx, floorY = if COMPACT then (RIGHT_X - 12) / 2 else 942, if COMPACT then 306 else 714
-	glow(canvas, cx, if COMPACT then 210 else 430, (if COMPACT then 360 else 290) * k, C.Teal, 1)
-	-- The floor: a soft pool of light under the feet and a thin bright line.
-	for i = 1, 8 do
-		local pool = frame(canvas, C.Teal, 0.975)
-		pool.AnchorPoint = Vector2.new(0.5, 0.5)
-		place(pool, cx, floorY, (if COMPACT then 140 + i * 60 else 100 + i * 40) * k, (10 + i * 7) * k)
-		pool.Position = UDim2.fromOffset(cx, floorY)
-		round(pool, 9999)
-	end
-	local line = frame(canvas, C.Teal, 0.2)
-	line.AnchorPoint = Vector2.new(0.5, 0.5)
-	place(line, cx, floorY, (if COMPACT then 520 else 400) * k, 2)
-	line.Position = UDim2.fromOffset(cx, floorY)
-	new("UIGradient", {
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.5, 0),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-	}, line)
-	local horizon = frame(canvas, C.Line, 0.95)
-	local reach = if COMPACT then 380 else 220
-	place(horizon, cx - reach * k, floorY - 64 * k, 2 * reach * k, 1)
-	new("UIGradient", {
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.5, 0),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-	}, horizon)
-	ui.MinerView = new("ViewportFrame", {
-		Name = "MinerView",
-		BackgroundTransparency = 1,
-		Ambient = Color3.fromRGB(150, 165, 190),
-		LightColor = Color3.fromRGB(235, 245, 255),
-		LightDirection = Vector3.new(-0.5, -0.8, 0.6),
-	}, canvas)
-	if COMPACT then
-		place(ui.MinerView, 0, 90, RIGHT_X - 12, 230)
-	else
-		place(ui.MinerView, cx - 300, 80, 600, 650)
-	end
-	ui.MinerSource = nil
-	ui.MinerYaw = 0
-	-- Drag across the miner to turn them.
-	local turn = new("TextButton", { Name = "TurnMiner", Text = "", AutoButtonColor = false, BackgroundTransparency = 1 }, canvas)
-	if COMPACT then
-		place(turn, 0, 90, RIGHT_X - 12, 230)
-	else
-		place(turn, cx - 220, 110, 440, 600)
-	end
-	turn.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			ui.Turning = { X = input.Position.X, Touch = input.UserInputType == Enum.UserInputType.Touch }
-		end
-	end)
-	local hint = place(text(canvas, "DRAG TO TURN", 10, C.Faint, HEADING), cx - 100, 728, 200, 14)
-	hint.TextXAlignment = Enum.TextXAlignment.Center
-	hint.TextTransparency = 0.3
-	hint.Visible = not COMPACT
-end
-
--- GEMS (the gem window, GemVault) and SKINS (the Wardrobe), side by side.
--- (full: under the sword and shield; compact: under the miner)
+-- GEMS (the gem window, GemVault) and SKINS (the Wardrobe), side by side
+-- (full: the header's right end).
 local function buildButtons(holder: Instance, x: number, buttonY: number, totalW: number, buttonH: number, gap: number)
 	local gems = new("TextButton", {
 		Name = "GemsButton",
@@ -1247,7 +1066,7 @@ local function buildButtons(holder: Instance, x: number, buttonY: number, totalW
 		BackgroundColor3 = Color3.new(1, 1, 1),
 	}, holder)
 	local half = (totalW - gap) / 2
-	local iconAt, iconSize, labelX = if COMPACT then 6 else 10, if COMPACT then 32 else 36, if COMPACT then 44 else 58
+	local iconAt, iconSize, labelX = 8, 34, 50
 	place(gems, x, buttonY, half, buttonH)
 	round(gems, 10)
 	new("UIGradient", {
@@ -1259,15 +1078,10 @@ local function buildButtons(holder: Instance, x: number, buttonY: number, totalW
 	place(gemsIcon, iconAt, (buttonH - iconSize) / 2, iconSize, iconSize)
 	round(gemsIcon, 20)
 	ui.GemsIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, gemsIcon)
-	local gemsTitle = place(text(gems, "GEMS", 15, C.Text, HEAVY), labelX, buttonH / 2 - 18, math.min(160, half - labelX - 6), 20)
-	ui.GemsCount = place(text(gems, "", 10, C.Dim, HEADING), labelX, buttonH / 2 + 3, half - labelX - 8, 14)
-	if COMPACT then
-		UiKit.fit(gemsTitle)
-		UiKit.fit(ui.GemsCount)
-	end
-	local review = place(text(gems, "›", 18, Color3.fromRGB(200, 150, 255), HEAVY), half - 26, buttonH / 2 - 12, 16, 22)
+	place(text(gems, "GEM VAULT", 14, C.Text, HEAVY), labelX, buttonH / 2 - 17, half - labelX - 24, 18)
+	ui.GemsCount = place(text(gems, "", 10, C.Dim, HEADING), labelX, buttonH / 2 + 2, half - labelX - 24, 14)
+	local review = place(text(gems, "›", 18, Color3.fromRGB(200, 150, 255), HEAVY), half - 22, buttonH / 2 - 12, 14, 22)
 	review.TextXAlignment = Enum.TextXAlignment.Right
-	review.Visible = not COMPACT
 	gems:SetAttribute("UiSound", "Click")
 	gems.MouseEnter:Connect(function()
 		gemsEdge.Transparency = 0.1
@@ -1276,12 +1090,7 @@ local function buildButtons(holder: Instance, x: number, buttonY: number, totalW
 		gemsEdge.Transparency = 0.55
 	end)
 	gems.Activated:Connect(function()
-		if COMPACT then
-			-- (a phone: your gems in the rows' place, and back)
-			state.GemsPane = not state.GemsPane
-			state.Detail, state.Pick, state.Hover = nil, nil, nil
-			draw()
-		elseif ui.Popups then
+		if ui.Popups then
 			GemVault.open(ui.Popups, nil, InventoryV2.beginGemDrag)
 		end
 	end)
@@ -1302,16 +1111,12 @@ local function buildButtons(holder: Instance, x: number, buttonY: number, totalW
 	place(skinsIcon, iconAt, (buttonH - iconSize) / 2, iconSize, iconSize)
 	round(skinsIcon, 20)
 	ui.SkinsIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, skinsIcon)
-	local skinsTitle = place(text(skins, "SKINS", 15, C.Text, HEAVY), labelX, buttonH / 2 - 18, math.min(120, half - labelX - 6), 20)
-	if COMPACT then
-		UiKit.fit(skinsTitle)
-	end
-	ui.SkinsCount = place(text(skins, "", 10, C.Dim, HEADING), labelX, buttonH / 2 + 3, half - labelX - 8, 14)
+	place(text(skins, "SKINS", 14, C.Text, HEAVY), labelX, buttonH / 2 - 17, half - labelX - 24, 18)
+	ui.SkinsCount = place(text(skins, "", 10, C.Dim, HEADING), labelX, buttonH / 2 + 2, half - labelX - 24, 14)
 	ui.SkinsCount.TextScaled = true
 	new("UITextSizeConstraint", { MaxTextSize = ui.SkinsCount.TextSize }, ui.SkinsCount)
-	local wardrobe = place(text(skins, "›", 18, Color3.fromRGB(255, 150, 205), HEAVY), half - 26, buttonH / 2 - 12, 16, 22)
+	local wardrobe = place(text(skins, "›", 18, Color3.fromRGB(255, 150, 205), HEAVY), half - 22, buttonH / 2 - 12, 14, 22)
 	wardrobe.TextXAlignment = Enum.TextXAlignment.Right
-	wardrobe.Visible = not COMPACT
 	skins:SetAttribute("UiSound", "Click")
 	skins.MouseEnter:Connect(function()
 		skinsEdge.Transparency = 0.1
@@ -1326,7 +1131,608 @@ local function buildButtons(holder: Instance, x: number, buttonY: number, totalW
 	end)
 end
 
--- A row of filter tabs (full: over your gems and over your spare gear):
+-- The panel and (full) its header: your level, name and sets, EQUIP BEST and
+-- a build per element, then the gem vault and the wardrobe.
+local function buildHeader(canvas: Frame)
+	local panel = frame(canvas, P.Panel, 0.08)
+	panel.Name = "InventoryPanel"
+	place(panel, 0, PANEL_Y, W, H - PANEL_Y)
+	round(panel, 16)
+	stroke(panel, P.Edge, 1.5, 0.35)
+	ui.Miners = {}
+	if COMPACT then
+		return
+	end
+	local head = frame(panel, Color3.new(1, 1, 1))
+	head.Name = "Header"
+	place(head, 0, 0, W, HEAD_H)
+	round(head, 16)
+	new("UIGradient", { Color = ColorSequence.new(P.HeadA, P.HeadB) }, head)
+	-- (its lower corners square, a line under it)
+	local foot = frame(head, Color3.new(1, 1, 1))
+	place(foot, 0, HEAD_H - 16, W, 16)
+	new("UIGradient", { Color = ColorSequence.new(P.HeadA, P.HeadB) }, foot)
+	local rule = frame(head, P.Edge, 0.4)
+	place(rule, 0, HEAD_H - 1, W, 1)
+	-- Your level in a gold ring.
+	local badge = frame(head, C.Ink, 0.2)
+	place(badge, 16, 10, 42, 42)
+	round(badge, 21)
+	stroke(badge, C.Gold, 2, 0.1)
+	ui.LevelBadge = text(badge, "1", 16, C.Gold, HEAVY)
+	ui.LevelBadge.Size = UDim2.fromScale(1, 1)
+	ui.LevelBadge.TextXAlignment = Enum.TextXAlignment.Center
+	ui.Name = place(text(head, "", 24, C.Text, HEAVY), 72, 8, 420, 28)
+	ui.Sub = place(text(head, "", 11, Color3.fromRGB(196, 182, 240), HEADING), 72, 36, 460, 16)
+	UiKit.fit(ui.Sub)
+	-- Miner 1 / 2 / 3 (none while the roster is off: one miner).
+	for index = 1, if MinerRoster.Enabled then MinerRoster.Count else 0 do
+		local b = new("TextButton", {
+			Text = tostring(index),
+			TextSize = 13,
+			Font = HEADING,
+			TextColor3 = C.Faint,
+			AutoButtonColor = false,
+			BackgroundColor3 = C.Gold,
+			BackgroundTransparency = 1,
+		}, head)
+		place(b, 500 + (index - 1) * 38, 15, 32, 32)
+		round(b, 8)
+		local edge = stroke(b, C.Line, 1, 0.9)
+		b:SetAttribute("UiSound", "Tab")
+		b.Activated:Connect(function()
+			InventoryV2.cancelDrag()
+			state.Pick, state.Hover = nil, nil
+			request("MinerSelect", index)
+		end)
+		ui.Miners[index] = { Button = b, Edge = edge }
+	end
+	buildQuickEquip(head, 616, 12, 150, 94, 38, 8)
+	buildButtons(head, W - 16 - 380, 7, 380, 48, 10)
+end
+
+-- The paper doll: your miner in the middle, your armor on the left and your
+-- weapons on the right, each piece a card with its gem socket under it.
+-- Click a card for the piece's window; drop a gem on it to socket it.
+local DOLL_SLOTS = {
+	{ "Helmet", 1, 1 },
+	{ "Armor", 1, 2 },
+	{ "Gloves", 1, 3 },
+	{ "Weapon", 2, 1 },
+	{ "Shield", 2, 2 },
+	{ "Boots", 2, 3 },
+}
+
+-- One slot's card: its piece (art, name, rarity), its key's surge for Q / E /
+-- R, and the gem socket (full: a line under the card; compact: its foot).
+local function buildRow(parent: Instance, slot: string, x: number, y: number)
+	local cw, ch = CARD_W, CARD_H
+	if not COMPACT then
+		local label = place(text(parent, SLOT_NAME[slot], 11, C.Dim, HEAVY), x, y - 18, cw, 14)
+		label.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	local row = new("TextButton", {
+		Name = "Row" .. slot,
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0,
+	}, parent)
+	place(row, x, y, cw, ch)
+	round(row, 10)
+	local tint = new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(26, 26, 44), Color3.fromRGB(12, 12, 24)),
+		Transparency = NumberSequence.new(0.05, 0.15),
+	}, row)
+	local edge = stroke(row, C.Gold, 1.5, 1)
+	-- (a bar in the piece's rarity along the top)
+	local rail = frame(row, C.Text)
+	place(rail, 12, 0, cw - 24, 3)
+	round(rail, 2)
+	local well = frame(row, Color3.fromRGB(255, 255, 255), 0.95)
+	if COMPACT then
+		place(well, 8, 8, 46, 46)
+	else
+		place(well, (cw - 66) / 2, 10, 66, 66)
+	end
+	round(well, 8)
+	local art = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, well)
+	local name, meta
+	if COMPACT then
+		local slotName = place(text(row, SLOT_NAME[slot], 9, C.Dim, HEAVY), 60, 7, cw - 66, 11)
+		slotName.Name = "SlotName"
+		name = place(text(row, "", 12, C.Text, HEADING), 60, 19, cw - 66, 28)
+		meta = place(text(row, "", 9, C.Dim, HEADING), 60, 47, cw - 66, 11)
+	else
+		name = place(text(row, "", 12, C.Text, HEADING), 8, 80, cw - 16, 30)
+		name.TextXAlignment = Enum.TextXAlignment.Center
+		meta = place(text(row, "", 10, C.Dim, HEADING), 8, 110, cw - 16, 13)
+		meta.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	name.TextWrapped = true
+	name.TextYAlignment = Enum.TextYAlignment.Top
+	meta.RichText = true
+	-- The sword's, chest's and shield's cards show the surge their gem gives
+	-- Q, E or R (its icon, its key, a line in the gem's colour), top right.
+	local key = Traits.KeyOfSocket[slot]
+	local surgeTile, surgeGlyph, surgeBadge, surgeLine, surgeEdge
+	if key then
+		local size = if COMPACT then 26 else 32
+		surgeTile = frame(row, C.Ink, 0.3)
+		surgeTile.Name = "SurgeTile"
+		place(surgeTile, cw - size - 6, 8, size, size)
+		round(surgeTile, 7)
+		surgeEdge = stroke(surgeTile, C.Line, 1, 0.4)
+		surgeGlyph = text(surgeTile, "+", 14, C.Faint, HEADING)
+		surgeGlyph.Name = "Glyph"
+		surgeGlyph.Size = UDim2.fromScale(1, 1)
+		surgeGlyph.TextXAlignment = Enum.TextXAlignment.Center
+		surgeBadge = text(surgeTile, key, 9, C.Ink, HEAVY)
+		surgeBadge.Name = "Key"
+		surgeBadge.BackgroundTransparency = 0
+		surgeBadge.BackgroundColor3 = KEY_COLORS[key]
+		surgeBadge.TextXAlignment = Enum.TextXAlignment.Center
+		surgeBadge.ZIndex = 4
+		place(surgeBadge, -5, -5, 14, 14)
+		round(surgeBadge, 4)
+		surgeLine = frame(surgeTile, C.Faint, 0.6)
+		surgeLine.Name = "Line"
+		surgeLine.ZIndex = 4
+		place(surgeLine, 5, size - 4, size - 10, 2)
+		round(surgeLine, 1)
+	end
+	-- The gem socket: the stone (or a +), then its name (or the ask).
+	local socketRow = new("TextButton", { Name = "Socket", Text = "", AutoButtonColor = false, BackgroundTransparency = 1 }, if COMPACT then row else parent)
+	if COMPACT then
+		place(socketRow, 8, ch - 30, cw - 16, 24)
+	else
+		place(socketRow, x, y + ch + 6, cw, 24)
+	end
+	local socket = frame(socketRow, C.Ink, 0.4)
+	place(socket, 0, 0, 24, 24)
+	round(socket, 12)
+	local halo = frame(socket, C.Gold, 0.9)
+	halo.Name = "EmptySocketGlow"
+	halo.Position = UDim2.fromOffset(-4, -4)
+	halo.Size = UDim2.new(1, 8, 1, 8)
+	round(halo, 16)
+	halo.Visible = false
+	local ring = stroke(socket, C.Faint, 1.5, 0.3)
+	local gemHolder = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(1, 1), Size = UDim2.new(1, -2, 1, -2) }, socket)
+	local plus = text(socket, "+", 14, C.Faint, HEADING)
+	plus.Size = UDim2.fromScale(1, 1)
+	plus.TextXAlignment = Enum.TextXAlignment.Center
+	local enchant = place(text(socketRow, "ADD A GEM", 10, C.Gold, HEADING), 30, 0, cw - (if COMPACT then 46 else 30), 24)
+	enchant.Name, enchant.Visible = "EnchantHint", false
+	-- (the gem in it, and with the triad the move it gives this key)
+	local moveLine = place(text(socketRow, "", 10, C.Dim, HEADING), 30, 0, cw - (if COMPACT then 46 else 30), 24)
+	moveLine.Name, moveLine.RichText, moveLine.Visible = "SurgeName", true, false
+	local function open()
+		if os.clock() < suppressClickUntil then
+			return
+		end
+		if state.Detail ~= slot then
+			openDetail(slot)
+		end
+	end
+	row:SetAttribute("UiSound", "Click")
+	row.Activated:Connect(open)
+	socketRow.Activated:Connect(open)
+	local entry = { Row = row, Tint = tint, Edge = edge, Rail = rail, Art = art, Name = name, Meta = meta, Ring = ring, Gem = gemHolder, Plus = plus, Halo = halo, Enchant = enchant }
+	entry.Key, entry.SurgeTile, entry.SurgeGlyph, entry.SurgeBadge, entry.SurgeLine, entry.SurgeEdge =
+		key, surgeTile, surgeGlyph, surgeBadge, surgeLine, surgeEdge
+	entry.MoveLine, entry.Socket = moveLine, socketRow
+	row.MouseEnter:Connect(function()
+		entry.Hovered = true
+		InventoryV2.paintRow(slot)
+		if not drag and InventoryV2.showTip then
+			InventoryV2.showTip(slot, row)
+		end
+	end)
+	row.MouseLeave:Connect(function()
+		entry.Hovered = false
+		InventoryV2.paintRow(slot)
+		if InventoryV2.hideTip then
+			InventoryV2.hideTip()
+		end
+	end)
+	for _, target in { row, socketRow } do
+		table.insert(dropTargets, {
+			Frame = target,
+			Stroke = edge,
+			Accepts = function(item: Item)
+				return acceptsSlot(slot, item)
+			end,
+			Drop = function(item: Item)
+				socketInto(slot, item)
+			end,
+		})
+	end
+	return entry
+end
+
+local function buildDoll(canvas: Frame)
+	local y0 = if COMPACT then PANEL_Y else BODY_Y
+	local h = H - y0 - (if COMPACT then 0 else 14)
+	local doll = new("Frame", { Name = "Doll", BackgroundTransparency = 1 }, canvas)
+	place(doll, DOLL_X, y0, DOLL_W, h)
+	ui.List = doll
+	local back = panelBox(doll, 0, 0, DOLL_W, h)
+	back.Name = "DollBox"
+	brackets(back, DOLL_W, h)
+	-- The miner, in the middle, on a lit floor.
+	local cx = DOLL_W / 2
+	local floorY = h - (if COMPACT then 26 else 44)
+	glow(doll, cx, h * 0.45, if COMPACT then 120 else 210, C.Teal, 1)
+	for i = 1, 6 do
+		local pool = frame(doll, C.Teal, 0.975)
+		pool.AnchorPoint = Vector2.new(0.5, 0.5)
+		place(pool, cx, floorY, (if COMPACT then 60 else 90) + i * (if COMPACT then 18 else 30), 8 + i * 5)
+		pool.Position = UDim2.fromOffset(cx, floorY)
+		round(pool, 9999)
+	end
+	local line = frame(doll, C.Teal, 0.2)
+	line.AnchorPoint = Vector2.new(0.5, 0.5)
+	place(line, cx, floorY, if COMPACT then 150 else 260, 2)
+	line.Position = UDim2.fromOffset(cx, floorY)
+	new("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, line)
+	ui.MinerView = new("ViewportFrame", {
+		Name = "MinerView",
+		BackgroundTransparency = 1,
+		Ambient = Color3.fromRGB(150, 165, 190),
+		LightColor = Color3.fromRGB(235, 245, 255),
+		LightDirection = Vector3.new(-0.5, -0.8, 0.6),
+	}, doll)
+	local viewW = if COMPACT then 220 else 330
+	place(ui.MinerView, cx - viewW / 2, if COMPACT then 4 else 24, viewW, floorY - (if COMPACT then 0 else 16))
+	ui.MinerSource = nil
+	ui.MinerYaw = 0
+	-- Drag across the miner to turn them.
+	local turn = new("TextButton", { Name = "TurnMiner", Text = "", AutoButtonColor = false, BackgroundTransparency = 1 }, doll)
+	local turnW = DOLL_W - 2 * (CARD_W + 2 * DOLL_PAD)
+	place(turn, cx - turnW / 2, 20, turnW, floorY - 20)
+	turn.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			ui.Turning = { X = input.Position.X, Touch = input.UserInputType == Enum.UserInputType.Touch }
+		end
+	end)
+	if not COMPACT then
+		local hint = place(text(doll, "DRAG TO TURN  ·  CLICK A SLOT FOR DETAILS", 10, C.Faint, HEADING), cx - 160, h - 26, 320, 14)
+		hint.TextXAlignment = Enum.TextXAlignment.Center
+		hint.TextTransparency = 0.3
+	end
+	-- The six slots, three a side.
+	ui.Rows = {}
+	local blockH = if COMPACT then CARD_H else CARD_H + 18 + 30
+	local gap = (h - 3 * blockH) / 4
+	for _, spec in DOLL_SLOTS do
+		local slot, column, rowIndex = spec[1], spec[2], spec[3]
+		local x = if column == 1 then DOLL_PAD else DOLL_W - DOLL_PAD - CARD_W
+		local y = gap + (rowIndex - 1) * (blockH + gap) + (if COMPACT then 0 else 18)
+		ui.Rows[slot] = buildRow(doll, slot, x, y)
+	end
+end
+
+-- Q / E / R: a card each, side by side (in the summary column, or the
+-- STATS tab on a phone). Click one for its window; drop a gem on it.
+local function buildSurges(parent: Instance, x0: number, y0: number, totalW: number, cardH: number)
+	ui.Keys = {}
+	local gap = 8
+	local cardW = math.floor((totalW - 2 * gap) / 3)
+	for i, key in KEYS do
+		local card = new("TextButton", {
+			Name = "Key" .. key,
+			Text = "",
+			AutoButtonColor = false,
+			BackgroundColor3 = KEY_COLORS[key]:Lerp(C.Ink, 0.86),
+			BackgroundTransparency = 0.05,
+		}, parent)
+		place(card, x0 + (i - 1) * (cardW + gap), y0, cardW, cardH)
+		round(card, 10)
+		local edge = stroke(card, C.Line, 1, 0.9)
+		local iconSize = if COMPACT then 30 else 34
+		local icon = frame(card, C.Ink, 0.3)
+		place(icon, 7, 7, iconSize, iconSize)
+		round(icon, 8)
+		local glyph = text(icon, "+", 16, C.Faint, HEADING)
+		glyph.Size = UDim2.fromScale(1, 1)
+		glyph.TextXAlignment = Enum.TextXAlignment.Center
+		local textX = 7 + iconSize + 7
+		local lane = place(text(card, "", 9, C.Dim, HEAVY), textX, 9, cardW - textX - 6, 11)
+		lane.TextTransparency = 0.1
+		UiKit.fit(lane)
+		local name = place(text(card, "", 12, C.Text, HEADING), textX, 22, cardW - textX - 6, 16)
+		UiKit.fit(name)
+		local info = place(text(card, "", 9, C.Dim, MEDIUM), 7, cardH - 20, cardW - 14, 12)
+		UiKit.fit(info)
+		local badge = text(card, key, 10, C.Text, HEAVY)
+		badge.Position = UDim2.fromOffset(2, 2)
+		badge.Size = UDim2.fromOffset(16, 15)
+		badge.ZIndex = icon.ZIndex + 2
+		badge.TextXAlignment = Enum.TextXAlignment.Center
+		badge.BackgroundTransparency = 0
+		badge.BackgroundColor3 = C.Ink
+		round(badge, 4)
+		stroke(badge, C.Faint, 1, 0)
+		local line = frame(card, C.Faint)
+		line.AnchorPoint = Vector2.new(0, 1)
+		line.Position = UDim2.new(0, 12, 1, 0)
+		line.Size = UDim2.new(1, -24, 0, 2)
+		round(line, 1)
+		card:SetAttribute("UiSound", "Click")
+		card.Activated:Connect(function()
+			if os.clock() < suppressClickUntil then
+				return
+			end
+			if state.Detail ~= key then
+				openDetail(key)
+			end
+		end)
+		table.insert(dropTargets, {
+			Frame = card,
+			Stroke = edge,
+			Accepts = function(item: Item)
+				return acceptsKey(key, item)
+			end,
+			Drop = function(item: Item)
+				-- (with the triad on, the server sockets it in the sword, the chest or the shield)
+				socketInto(key, item)
+			end,
+		})
+		ui.Keys[key] = { Card = card, Edge = edge, Icon = icon, Glyph = glyph, Name = name, Info = info, Line = line, Badge = badge, Lane = lane, Fixed = true }
+		UpgradeHints.bind(card, function(hints) return hints.Surges.Keys[key] == true end, C.Teal)
+	end
+end
+
+-- A stat tile: its icon in a ring of its colour, its name, its value and a bar.
+local STAT_GLYPH = { Health = "+", Power = "⚡", Defense = "◆", Speed = "»" }
+local function statTile(parent: Instance, stat: string, x: number, y: number, w: number, h: number)
+	local color = STAT_COLOR[stat]
+	local tile = new("TextButton", { Name = "Tile" .. stat, Text = "", AutoButtonColor = false, BackgroundColor3 = color:Lerp(C.Ink, 0.88), BackgroundTransparency = 0.05 }, parent)
+	place(tile, x, y, w, h)
+	round(tile, 10)
+	stroke(tile, color, 1, 0.6)
+	local size = h - (if COMPACT then 12 else 24)
+	local ring = frame(tile, color:Lerp(C.Ink, 0.6), 0)
+	place(ring, 8, (h - size) / 2, size, size)
+	round(ring, size / 2)
+	stroke(ring, color, 1.5, 0.1)
+	local glyph = text(ring, STAT_GLYPH[stat] or "•", math.floor(size * 0.5), color, HEAVY)
+	glyph.Size = UDim2.fromScale(1, 1)
+	glyph.TextXAlignment = Enum.TextXAlignment.Center
+	local tx = 8 + size + 10
+	local label = place(text(tile, string.upper(stat), 10, color, HEAVY), tx, if COMPACT then 4 else 10, w - tx - 8, 12)
+	label.Name = "Label"
+	local value = place(text(tile, "0", if COMPACT then 16 else 22, C.Text, HEAVY), tx, if COMPACT then 15 else 23, w - tx - 8, if COMPACT then 18 else 26)
+	local track = frame(tile, C.Line, 0.9)
+	place(track, tx, h - (if COMPACT then 8 else 14), w - tx - 10, if COMPACT then 3 else 5)
+	round(track, 3)
+	local fill = frame(track, color)
+	fill.Size = UDim2.fromScale(0, 1)
+	round(fill, 3)
+	tile:SetAttribute("UiSound", "Click")
+	tile.Activated:Connect(openStats)
+	return { Value = value, Fill = fill, Last = nil }
+end
+
+-- Full, the middle: who you are (your avatar, name, gear score and sets),
+-- Q / E / R, then your combat ratings, the elements, and ALL STATS (the
+-- sheet). Compact: the STATS tab of the panel right of the doll.
+local function buildSummary(canvas: Frame)
+	ui.Tiles = {}
+	if COMPACT then
+		local side = new("Frame", { Name = "Side", BackgroundTransparency = 1 }, canvas)
+		place(side, SIDE_X, PANEL_Y + 6, SIDE_W, H - PANEL_Y - 8)
+		ui.Side = side
+		-- The tabs: STATS, GEMS, GEAR.
+		ui.SideTabs = {}
+		local tabW = (SIDE_W - 16) / 3
+		for i, spec in { { "Stats", "STATS" }, { "Gems", "GEMS" }, { "Gear", "GEAR" } } do
+			local b = new("TextButton", {
+				Name = "Tab" .. spec[1],
+				Text = spec[2],
+				TextSize = 13,
+				Font = HEAVY,
+				TextColor3 = C.Dim,
+				AutoButtonColor = false,
+				BackgroundColor3 = C.Ink,
+				BackgroundTransparency = 0.3,
+			}, side)
+			place(b, (i - 1) * (tabW + 8), 0, tabW, 30)
+			round(b, 8)
+			local edge = stroke(b, C.Line, 1, 0.8)
+			b:SetAttribute("UiSound", "Tab")
+			b.Activated:Connect(function()
+				InventoryV2.cancelDrag()
+				state.SideTab = spec[1]
+				draw()
+			end)
+			ui.SideTabs[spec[1]] = { Button = b, Edge = edge }
+		end
+		local pageH = H - PANEL_Y - 8 - 38
+		local function page(name: string): Frame
+			local f = new("Frame", { Name = name, BackgroundTransparency = 1, Visible = false }, side)
+			place(f, 0, 38, SIDE_W, pageH)
+			return f
+		end
+		local stats = page("StatsPage")
+		ui.StatsPage = stats
+		ui.Name = place(text(stats, "", 18, C.Text, HEAVY), 0, 0, 250, 22)
+		ui.Sub = place(text(stats, "", 10, Color3.fromRGB(196, 182, 240), HEADING), 0, 23, 260, 14)
+		UiKit.fit(ui.Sub)
+		local cap = place(text(stats, "GEAR SCORE", 9, C.Dim, HEAVY), SIDE_W - 170, 0, 170, 11)
+		cap.TextXAlignment = Enum.TextXAlignment.Right
+		ui.Score = place(text(stats, "0", 24, C.Gold, HEAVY), SIDE_W - 170, 10, 170, 28)
+		ui.Score.TextXAlignment = Enum.TextXAlignment.Right
+		buildSurges(stats, 0, 44, SIDE_W, 56)
+		local tileW = (SIDE_W - 8) / 2
+		for i, stat in Classes.StatNames do
+			ui.Tiles[stat] = statTile(stats, stat, ((i - 1) % 2) * (tileW + 8), 106 + (i - 1) // 2 * 44, tileW, 38)
+		end
+		local by = 196
+		local best = plainButton(stats, "EQUIP BEST", 0, by, 150, 32, true)
+		best.Name = "EquipBest"
+		UpgradeHints.bind(best, function(hints) return hints.Equipment end, C.Gold)
+		best.Activated:Connect(function()
+			state.AutoMode = "Best"
+			request("AutoEquip", "Best")
+		end)
+		local all = plainButton(stats, "ALL STATS", 158, by, 146, 32, false, C.Teal)
+		all.Name = "AllStats"
+		all.Activated:Connect(openStats)
+		local skins = plainButton(stats, "SKINS", 312, by, SIDE_W - 312, 32, false, Color3.fromRGB(255, 150, 205))
+		skins.Name = "SkinsButton"
+		skins.Activated:Connect(function()
+			if ui.Popups then
+				Wardrobe.open(ui.Popups)
+			end
+		end)
+		local chipW = (SIDE_W - 24) / 4
+		for i, element in ELEMENTS do
+			local tint = GemConfig.ElementColors[element] or C.Text
+			local b = plainButton(stats, AutoEquip.label(element), (i - 1) * (chipW + 8), by + 38, chipW, 28, false, tint)
+			b.Name = "Equip" .. element
+			b.TextSize = 11
+			b.Activated:Connect(function()
+				state.AutoMode = element
+				request("AutoEquip", element)
+			end)
+		end
+		-- GEMS: your loose gems (drag one onto a slot, tap one for the gem
+		-- window); VAULT opens the gem window on them all.
+		local gems = page("GemsPage")
+		ui.GemsPage = gems
+		ui.PouchTabs = new("Frame", { Name = "PouchTabs", BackgroundTransparency = 1 }, gems)
+		place(ui.PouchTabs, 0, 0, SIDE_W - 96, 26)
+		local vault = plainButton(gems, "VAULT  ›", SIDE_W - 88, 0, 88, 26, false, Color3.fromRGB(200, 150, 255))
+		vault.Name = "GemsButton"
+		vault.Activated:Connect(function()
+			if ui.Popups then
+				GemVault.open(ui.Popups, nil, InventoryV2.beginGemDrag)
+			end
+		end)
+		ui.PouchCount = place(text(gems, "", 10, C.Faint, HEADING), 0, 30, SIDE_W, 14)
+		ui.Pouch = new("ScrollingFrame", {
+			Name = "Pouch",
+			BackgroundTransparency = 1,
+			ScrollBarThickness = 4,
+			ScrollBarImageColor3 = C.Faint,
+			CanvasSize = UDim2.new(),
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+		}, gems)
+		place(ui.Pouch, 0, 48, SIDE_W, pageH - 48)
+		-- GEAR: your spare pieces, a tab per slot.
+		local gear = page("GearPage")
+		ui.GearPage = gear
+		ui.BagTabs = new("Frame", { Name = "BagTabs", BackgroundTransparency = 1 }, gear)
+		place(ui.BagTabs, 0, 0, SIDE_W - 90, 26)
+		ui.BagCount = place(text(gear, "", 10, C.Faint, HEADING), SIDE_W - 90, 0, 90, 26)
+		ui.BagCount.TextXAlignment = Enum.TextXAlignment.Right
+		ui.Bag = new("ScrollingFrame", {
+			Name = "Bag",
+			BackgroundTransparency = 1,
+			ScrollBarThickness = 4,
+			ScrollBarImageColor3 = C.Faint,
+			CanvasSize = UDim2.new(),
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+		}, gear)
+		place(ui.Bag, 0, 32, SIDE_W, pageH - 32)
+		return
+	end
+	-- Who you are.
+	local card = panelBox(canvas, MID_X, BODY_Y, MID_W, 196)
+	card.Name = "Portrait"
+	local face = new("ImageLabel", {
+		Name = "Avatar",
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 0.2,
+		Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=150&h=150", player.UserId),
+	}, card)
+	place(face, 14, 14, 116, 116)
+	round(face, 12)
+	stroke(face, C.Gold, 1.5, 0.35)
+	ui.PName = place(text(card, "", 20, C.Text, HEAVY), 144, 14, MID_W - 156, 24)
+	ui.PTitle = place(text(card, "", 10, C.Teal, HEAVY), 144, 40, MID_W - 156, 13)
+	place(text(card, "GEAR SCORE", 10, C.Dim, HEAVY), 144, 64, 160, 12)
+	ui.Score = place(text(card, "0", 40, C.Gold, HEAVY), 144, 76, MID_W - 156, 44)
+	ui.PSets = place(text(card, "", 10, C.Dim, HEADING), 144, 118, MID_W - 156, 13)
+	UiKit.fit(ui.PSets)
+	-- The set you wear most of: its name, six pips, its bonus.
+	local setRule = frame(card, C.Line, 0.92)
+	place(setRule, 14, 142, MID_W - 28, 1)
+	ui.SumSetName = place(text(card, "", 11, C.Teal, HEAVY), 14, 150, 200, 14)
+	ui.SumPips = {}
+	for i = 1, 6 do
+		local pip = frame(card, C.Line, 0.9)
+		place(pip, MID_W - 14 - 6 * 17 + (i - 1) * 17, 155, 12, 4)
+		round(pip, 2)
+		ui.SumPips[i] = pip
+	end
+	ui.SumSetBonus = place(text(card, "", 11, C.Text, HEADING), 14, 170, MID_W - 28, 14)
+	ui.SumSetBonus.RichText = true
+	UiKit.fit(ui.SumSetBonus)
+	-- Q / E / R.
+	local sy = BODY_Y + 206
+	place(text(canvas, "SURGES", 11, C.Dim, HEAVY), MID_X + 2, sy, 120, 14)
+	local hint = place(text(canvas, "Q · E · R", 10, C.Faint, HEADING), MID_X + MID_W - 120, sy, 118, 14)
+	hint.TextXAlignment = Enum.TextXAlignment.Right
+	buildSurges(canvas, MID_X, sy + 18, MID_W, 72)
+	-- Combat ratings.
+	local cy = sy + 18 + 72 + 12
+	local box = panelBox(canvas, MID_X, cy, MID_W, H - 14 - cy)
+	box.Name = "CombatRatings"
+	boxTitle(box, "COMBAT RATINGS", 14, 12, 200)
+	local pill = frame(box, C.Gold, 0.85)
+	place(pill, MID_W - 14 - 150, 8, 150, 24)
+	round(pill, 12)
+	stroke(pill, C.Gold, 1, 0.3)
+	ui.Pill = text(pill, "", 12, C.Gold, HEAVY)
+	ui.Pill.Size = UDim2.fromScale(1, 1)
+	ui.Pill.TextXAlignment = Enum.TextXAlignment.Center
+	local tileW = (MID_W - 28 - 10) / 2
+	for i, stat in Classes.StatNames do
+		ui.Tiles[stat] = statTile(box, stat, 14 + ((i - 1) % 2) * (tileW + 10), 42 + (i - 1) // 2 * 80, tileW, 72)
+	end
+	-- What you're strong against, weak to and resist.
+	local vy = 210
+	ui.SumVerdict = {}
+	for i, caption in { "STRONG VS", "WEAK TO", "RESISTS" } do
+		UiKit.fit(place(text(box, caption, 10, C.Dim, HEAVY), 14, vy + 1, 90, 14))
+		local value = place(text(box, "", 12, C.Text, HEADING), 108, vy, MID_W - 122, 16)
+		value.RichText = true
+		UiKit.fit(value)
+		ui.SumVerdict[i] = value
+		vy += 20
+	end
+	-- Max stamina, max charge and what your level adds.
+	ui.Chips = {}
+	local chipW = (MID_W - 28 - 16) / 3
+	for i = 1, 3 do
+		local chip = frame(box, C.Teal, 0.9)
+		place(chip, 14 + (i - 1) * (chipW + 8), vy + 6, chipW, 24)
+		round(chip, 12)
+		stroke(chip, C.Teal, 1, 0.55)
+		local label = text(chip, "", 10, C.Teal, HEAVY)
+		label.Size = UDim2.fromScale(1, 1)
+		label.TextXAlignment = Enum.TextXAlignment.Center
+		UiKit.fit(label)
+		ui.Chips[i] = label
+	end
+	local all = plainButton(box, "ALL STATS  ·  AUTO EQUIP  ›", 14, vy + 40, MID_W - 28, 34, false, C.Teal)
+	all.Name = "AllStats"
+	all.Activated:Connect(openStats)
+end
+
+-- A row of filter tabs (over your gems and over your spare gear):
 -- { key, label, colour? }; the one picked is lit, with a line under it.
 local function filterTabs(holder: Frame, entries: { { any } }, picked: string, pick: (string) -> ())
 	clear(holder)
@@ -1359,15 +1765,39 @@ local function filterTabs(holder: Frame, entries: { { any } }, picked: string, p
 	end
 end
 
--- Full, under your armor: your spare gear (every slot), a tab per slot.
--- Each piece shows the rating it would add; click one and the column
--- turns into its slot, with it picked (EQUIP).
-local function buildBag(list: Frame, y: number)
-	place(text(list, "SPARE GEAR", 11, C.Dim, HEADING), 0, y, 200, 16)
-	ui.BagCount = place(text(list, "", 10, C.Faint, HEADING), RIGHT_W - 220, y, 220, 16)
+-- Full, the right: your gem backpack (every loose gem, a tab per element)
+-- over your equipment inventory (every spare piece, a tab per slot).
+local function buildBags(canvas: Frame)
+	if COMPACT then
+		return -- (the GEMS and GEAR tabs: buildSummary)
+	end
+	local gemH = 330
+	local gems = panelBox(canvas, BAG_X, BODY_Y, BAG_W, gemH)
+	gems.Name = "GemBackpack"
+	boxTitle(gems, "GEM BACKPACK", 14, 12, 220)
+	ui.PouchCount = place(text(gems, "", 10, C.Faint, HEADING), BAG_W - 14 - 300, 13, 300, 14)
+	ui.PouchCount.TextXAlignment = Enum.TextXAlignment.Right
+	ui.PouchTabs = new("Frame", { Name = "PouchTabs", BackgroundTransparency = 1 }, gems)
+	place(ui.PouchTabs, 14, 34, BAG_W - 28, 24)
+	ui.Pouch = new("ScrollingFrame", {
+		Name = "Pouch",
+		BackgroundTransparency = 1,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = C.Faint,
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+	}, gems)
+	place(ui.Pouch, 14, 66, BAG_W - 22, gemH - 76)
+	local by = BODY_Y + gemH + 12
+	local bagH = H - 14 - by
+	local bag = panelBox(canvas, BAG_X, by, BAG_W, bagH)
+	bag.Name = "EquipmentInventory"
+	boxTitle(bag, "EQUIPMENT INVENTORY", 14, 12, 260)
+	ui.BagCount = place(text(bag, "", 10, C.Faint, HEADING), BAG_W - 14 - 200, 13, 200, 14)
 	ui.BagCount.TextXAlignment = Enum.TextXAlignment.Right
-	ui.BagTabs = new("Frame", { Name = "BagTabs", BackgroundTransparency = 1 }, list)
-	place(ui.BagTabs, 0, y + 20, RIGHT_W, 26)
+	ui.BagTabs = new("Frame", { Name = "BagTabs", BackgroundTransparency = 1 }, bag)
+	place(ui.BagTabs, 14, 34, BAG_W - 28, 24)
 	ui.Bag = new("ScrollingFrame", {
 		Name = "Bag",
 		BackgroundTransparency = 1,
@@ -1376,238 +1806,77 @@ local function buildBag(list: Frame, y: number)
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
-	}, list)
-	place(ui.Bag, 0, y + 54, RIGHT_W, 644 - (y + 54))
+	}, bag)
+	place(ui.Bag, 14, 66, BAG_W - 22, bagH - 76)
 end
 
--- One equipment row: art, name, rarity / slot / perk, and the gem socket.
-local function buildRow(parent: Instance, slot: string, y: number)
-	local row = new("TextButton", {
-		Name = "Row" .. slot,
+-- The window: one piece (or one surge key) over the screen. Along its top
+-- every slot and key (hop between them); on the left the piece and its gem
+-- (or the move and its gem) with its perk; on the right the spare pieces
+-- and the gems you could put in, what a pick would change, and the buttons.
+-- A tap outside, × or Backspace closes it.
+local DETAIL_W = 0 -- (set as it's built: two columns and the gap)
+local function buildRight(canvas: Frame)
+	DETAIL_W = RIGHT_W * 2 + 10
+	local scrim = new("TextButton", {
+		Name = "DetailWindow",
 		Text = "",
 		AutoButtonColor = false,
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = 0,
-	}, parent)
-	place(row, 0, y, RIGHT_W, 72)
-	round(row, 10)
-	local tint = new("UIGradient", {
-		Color = ColorSequence.new(Color3.fromRGB(20, 25, 34), Color3.fromRGB(11, 14, 21)),
-		Transparency = NumberSequence.new(0.15, 0.55),
-	}, row)
-	local edge = stroke(row, C.Gold, 1, 1)
-	local rail = frame(row, C.Text)
-	place(rail, 0, 14, 3, 44)
-	round(rail, 2)
-	local well = frame(row, Color3.fromRGB(255, 255, 255), 0.96)
-	place(well, 8, 6, 60, 60)
-	round(well, 8)
-	local art = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, well)
-	-- The sword's, chest's and shield's rows show the surge their gem gives
-	-- Q, E or R (its icon, its key, a line in the gem's colour), left of the
-	-- socket.
-	local key = Traits.KeyOfSocket[slot]
-	local tileW = if key then 54 else 0
-	local name = place(text(row, "", 15, C.Text, HEADING), 82, 16, RIGHT_W - 82 - 56 - tileW, 20)
-	local meta = place(text(row, "", 10, C.Dim, HEADING), 82, 40, RIGHT_W - 82 - 56 - tileW, 14)
-	meta.RichText = true
-	local surgeTile, surgeGlyph, surgeBadge, surgeLine, surgeEdge
-	if key then
-		surgeTile = frame(row, C.Ink, 0.3)
-		surgeTile.Name = "SurgeTile"
-		surgeTile.AnchorPoint = Vector2.new(1, 0.5)
-		place(surgeTile, RIGHT_W - 14 - 36 - 10, 36, 46, 46)
-		surgeTile.Position = UDim2.fromOffset(RIGHT_W - 14 - 36 - 10, 36)
-		round(surgeTile, 8)
-		surgeEdge = stroke(surgeTile, C.Line, 1, 0.4)
-		surgeGlyph = text(surgeTile, "+", 16, C.Faint, HEADING)
-		surgeGlyph.Name = "Glyph"
-		surgeGlyph.Size = UDim2.fromScale(1, 1)
-		surgeGlyph.TextXAlignment = Enum.TextXAlignment.Center
-		surgeBadge = text(surgeTile, key, 10, C.Ink, HEAVY)
-		surgeBadge.Name = "Key"
-		surgeBadge.BackgroundTransparency = 0
-		surgeBadge.BackgroundColor3 = KEY_COLORS[key]
-		surgeBadge.TextXAlignment = Enum.TextXAlignment.Center
-		surgeBadge.ZIndex = 4
-		place(surgeBadge, -5, -5, 16, 16)
-		round(surgeBadge, 4)
-		surgeLine = frame(surgeTile, C.Faint, 0.6)
-		surgeLine.Name = "Line"
-		surgeLine.ZIndex = 4
-		place(surgeLine, 7, 41, 32, 3)
-		round(surgeLine, 2)
-	end
-	local socket = frame(row, C.Ink, 0.4)
-	socket.AnchorPoint = Vector2.new(1, 0.5)
-	place(socket, RIGHT_W - 14, 36, 36, 36)
-	socket.Position = UDim2.fromOffset(RIGHT_W - 14, 36)
-	round(socket, 18)
-	local halo = frame(socket, C.Gold, 0.9)
-	halo.Name = "EmptySocketGlow"
-	halo.Position = UDim2.fromOffset(-5, -5)
-	halo.Size = UDim2.new(1, 10, 1, 10)
-	round(halo, 23)
-	halo.Visible = false
-	local ring = stroke(socket, C.Faint, 1.5, 0.3)
-	local gemHolder = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(2, 2), Size = UDim2.new(1, -4, 1, -4) }, socket)
-	local plus = text(socket, "+", 16, C.Faint, HEADING)
-	plus.Size = UDim2.fromScale(1, 1)
-	plus.TextXAlignment = Enum.TextXAlignment.Center
-	local enchant = place(text(row, "ADD STONE TO ENCHANT  ·  DRAG & DROP", 10, C.Gold, HEADING), 82, 52, RIGHT_W - 96 - tileW, 14)
-	enchant.Name, enchant.Visible = "EnchantHint", false
-	-- (its surge's name, on a line of its own under the tile's row)
-	local moveLine = place(text(row, "", 10, C.Dim, HEADING), 82, 52, RIGHT_W - 96 - tileW, 14)
-	moveLine.Name, moveLine.RichText, moveLine.Visible = "SurgeName", true, false
-	row:SetAttribute("UiSound", "Click")
-	row.Activated:Connect(function()
-		if os.clock() < suppressClickUntil then
-			return
-		end
-		if state.Detail ~= slot then
-			openDetail(slot)
-		end
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 0.3,
+		Visible = false,
+		ZIndex = 20,
+	}, canvas)
+	-- (past the canvas, so the whole screen dims)
+	place(scrim, -W, -H, W * 3, H * 3)
+	scrim.Activated:Connect(function()
+		openDetail(nil)
 	end)
-	local entry = { Row = row, Tint = tint, Edge = edge, Rail = rail, Art = art, Name = name, Meta = meta, Ring = ring, Gem = gemHolder, Plus = plus, Halo = halo, Enchant = enchant }
-	entry.Key, entry.SurgeTile, entry.SurgeGlyph, entry.SurgeBadge, entry.SurgeLine, entry.SurgeEdge =
-		key, surgeTile, surgeGlyph, surgeBadge, surgeLine, surgeEdge
-	entry.MoveLine = moveLine
-	row.MouseEnter:Connect(function()
-		entry.Hovered = true
-		InventoryV2.paintRow(slot)
-		if not drag and InventoryV2.showTip then
-			InventoryV2.showTip(slot, row)
-		end
-	end)
-	row.MouseLeave:Connect(function()
-		entry.Hovered = false
-		InventoryV2.paintRow(slot)
-		if InventoryV2.hideTip then
-			InventoryV2.hideTip()
-		end
-	end)
-	table.insert(dropTargets, {
-		Frame = row,
-		Stroke = edge,
-		Accepts = function(item: Item)
-			return acceptsSlot(slot, item)
-		end,
-		Drop = function(item: Item)
-			socketInto(slot, item)
-		end,
-	})
-	return entry
-end
-
-local function buildRight(canvas: Frame)
-	local column = new("Frame", { Name = "Equipment", BackgroundTransparency = 1 }, canvas)
-	ui.Rows = {}
-	local y = 26
-	-- (compact: the middle of the screen, two columns of three rows over Q/E/R)
-	if COMPACT then
-		place(column, RIGHT_X, 56, W - RIGHT_X, 324)
-	else
-		place(column, RIGHT_X, 96, RIGHT_W, 640)
-		ui.EquipColumn = column
-		ui.EquipScale = new("UIScale", {}, column)
-	end
-	-- The list.
-	local list = new("Frame", { Name = "List", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, column)
-	if COMPACT then
-		for i, slot in { "Helmet", "Armor", "Gloves", "Boots", "Weapon", "Shield" } do
-			local entry = buildRow(list, slot, ((i - 1) % 3) * 78)
-			entry.Row.Position = UDim2.fromOffset(if i > 3 then RIGHT_W + 10 else 0, ((i - 1) % 3) * 78)
-			entry.Enchant.Text = "TAP + TO ADD A GEM"
-			ui.Rows[slot] = entry
-		end
-	else
-		place(text(list, "EQUIPMENT", 11, C.Dim, HEADING), 0, 0, 200, 16)
-		local hint = place(text(list, "CLICK TO CHANGE", 10, C.Faint, HEADING), RIGHT_W - 200, 0, 200, 16)
-		hint.TextXAlignment = Enum.TextXAlignment.Right
-		-- (the sword and shield are in the left column: buildWeapons)
-		for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
-			ui.Rows[slot] = buildRow(list, slot, y)
-			y += 80
-		end
-	end
-	-- Under the rows (full): your spare gear. (Compact: GEMS and SKINS under
-	-- the miner, in the left column.)
-	if COMPACT then
-		buildButtons(canvas, 0, 326, RIGHT_X - 12, 54, 8)
-		-- The GEMS tab (GEMS under the miner, ‹ GEAR to go back): your loose
-		-- gems in the rows' place, a tab per element, as the full layout's
-		-- left column has them. Drag one onto a key below; as a drag starts
-		-- the rows come back, to drop it on a piece. Tap one for the gem
-		-- window.
-		local paneW = W - RIGHT_X
-		local pane = new("Frame", { Name = "GemsPane", BackgroundTransparency = 1, Visible = false }, column)
-		place(pane, 0, 0, paneW, 230)
-		local gear = new("TextButton", {
-			Name = "GearTab",
-			Text = "‹  GEAR",
-			TextSize = 13,
-			Font = HEADING,
-			TextColor3 = C.Text,
-			AutoButtonColor = false,
-			BackgroundColor3 = Color3.fromRGB(10, 14, 22),
-			BackgroundTransparency = 0.2,
-		}, pane)
-		place(gear, 0, 0, 96, 28)
-		round(gear, 8)
-		stroke(gear, C.Line, 1, 0.5)
-		gear:SetAttribute("UiSound", "Back")
-		gear.Activated:Connect(function()
-			state.GemsPane = false
-			draw()
-		end)
-		place(text(pane, "YOUR GEMS", 13, C.Text, HEAVY), 110, 5, 200, 18)
-		ui.PouchCount = place(text(pane, "", 10, C.Faint, HEADING), paneW - 340, 7, 340, 16)
-		ui.PouchCount.TextXAlignment = Enum.TextXAlignment.Right
-		ui.PouchTabs = new("Frame", { Name = "PouchTabs", BackgroundTransparency = 1 }, pane)
-		place(ui.PouchTabs, 0, 36, paneW, 26)
-		ui.Pouch = new("ScrollingFrame", {
-			Name = "Pouch",
-			BackgroundTransparency = 1,
-			ScrollBarThickness = 4,
-			ScrollBarImageColor3 = C.Faint,
-			CanvasSize = UDim2.new(),
-			AutomaticCanvasSize = Enum.AutomaticSize.Y,
-			ScrollingDirection = Enum.ScrollingDirection.Y,
-		}, pane)
-		place(ui.Pouch, 0, 70, paneW, 160)
-		ui.GemsPane = pane
-	else
-		buildBag(list, y + 6)
-	end
-	ui.List = list
-	-- The detail (one piece, or one surge key).
-	local detail = new("Frame", { Name = "Detail", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false }, column)
-	ui.Detail = detail
-	-- Along the top: back, then every slot and key, so you can hop between
-	-- them without going back to the list.
-	local back = new("TextButton", {
-		Name = "Back",
-		Text = "‹",
-		TextSize = 24,
+	ui.Modal = scrim
+	local padX, titleH = 20, 50
+	local contentH = 318
+	local panelW, panelH = DETAIL_W + 2 * padX, titleH + contentH + 14
+	local panel = new("TextButton", { Name = "Panel", Text = "", AutoButtonColor = false, BackgroundColor3 = P.Panel, BackgroundTransparency = 0.02 }, scrim)
+	place(panel, W + (W - panelW) / 2, H + math.max(2, (H - panelH) / 2), panelW, panelH)
+	round(panel, 16)
+	stroke(panel, P.Edge, 1.5, 0.2)
+	ui.ModalPanel = panel
+	local band = frame(panel, Color3.new(1, 1, 1))
+	place(band, 0, 0, panelW, titleH)
+	round(band, 16)
+	new("UIGradient", { Color = ColorSequence.new(P.HeadA, P.HeadB) }, band)
+	local bandFoot = frame(band, Color3.new(1, 1, 1))
+	place(bandFoot, 0, titleH - 16, panelW, 16)
+	new("UIGradient", { Color = ColorSequence.new(P.HeadA, P.HeadB) }, bandFoot)
+	ui.ModalTitle = place(text(band, "", 16, C.Text, HEAVY), padX, 7, panelW - 2 * padX - 50, 20)
+	ui.ModalSub = place(text(band, "", 10, Color3.fromRGB(196, 182, 240), HEADING), padX, 28, panelW - 2 * padX - 50, 14)
+	UiKit.fit(ui.ModalSub)
+	local close = new("TextButton", {
+		Name = "Close",
+		Text = "×",
+		TextSize = 26,
 		Font = HEADING,
 		TextColor3 = C.Dim,
 		AutoButtonColor = false,
 		BackgroundTransparency = 1,
-	}, detail)
-	place(back, 0, 0, 32, 34)
-	back:SetAttribute("UiSound", "Back")
-	back.MouseEnter:Connect(function()
-		back.TextColor3 = C.Text
+	}, band)
+	place(close, panelW - 48, 3, 44, 44)
+	close:SetAttribute("UiSound", "Back")
+	close.MouseEnter:Connect(function()
+		close.TextColor3 = C.Text
 	end)
-	back.MouseLeave:Connect(function()
-		back.TextColor3 = C.Dim
+	close.MouseLeave:Connect(function()
+		close.TextColor3 = C.Dim
 	end)
-	back.Activated:Connect(function()
+	close.Activated:Connect(function()
 		openDetail(nil)
 	end)
+	local detail = new("Frame", { Name = "Detail", BackgroundTransparency = 1, Visible = false }, panel)
+	place(detail, padX, titleH + 8, DETAIL_W, contentH)
+	ui.Detail = detail
+	-- Along the top: every slot and key, so you can hop between them.
 	ui.Strip = {}
-	-- (compact, a little tighter: R ran past the card into the grid's column)
-	local sx, group = if COMPACT then 34 else 40, if COMPACT then 4 else 8
+	local sx, group = 0, if COMPACT then 4 else 8
 	for _, slot in Slots.Order do
 		local tile = new("TextButton", {
 			Name = "Hop" .. slot,
@@ -1747,6 +2016,9 @@ local function buildRight(canvas: Frame)
 	ui.GemWell.Tap.Activated:Connect(function()
 		if state.Detail and table.find(KEYS, state.Detail) then
 			openKeyGem()
+		elseif state.Detail and loadoutNow()[state.Detail .. "Gem"] and ui.Popups then
+			-- (a socketed gem: the gem window on it, with every property)
+			GemVault.open(ui.Popups, loadoutNow()[state.Detail .. "Gem"].Id, InventoryV2.beginGemDrag)
 		else
 			state.Tab, state.Pick, state.Hover = "Gems", nil, nil
 			draw()
@@ -1782,15 +2054,11 @@ local function buildRight(canvas: Frame)
 	ui.PerkText.TextYAlignment = Enum.TextYAlignment.Top
 	ui.PerkValue = place(text(card, "", 18, C.Good, HEAVY), 18, 228, RIGHT_W - 36, 26)
 	ui.PerkValue.RichText = true
-	-- Under the card (compact: beside it): the tabs and the element filter,
-	-- the grid, what a pick would change, and the buttons.
+	-- Beside the card: the tabs and the element filter, the grid, what a
+	-- pick would change, and the buttons.
 	local lower = new("Frame", { Name = "Lower", BackgroundTransparency = 1 }, detail)
-	if COMPACT then
-		place(lower, RIGHT_W + 10, 0, RIGHT_W, 324)
-	else
-		place(lower, 0, 320, RIGHT_W, 296)
-	end
-	local gridH = if COMPACT then 160 else 144
+	place(lower, RIGHT_W + 10, 0, RIGHT_W, contentH)
+	local gridH = contentH - 32 - 76 - 44 - 6
 	ui.ButtonY = 32 + gridH + 76
 	ui.Tabs = new("Frame", { BackgroundTransparency = 1 }, lower)
 	place(ui.Tabs, 0, 0, 230, 24)
@@ -1866,119 +2134,6 @@ local function buildRight(canvas: Frame)
 			request("UnsocketGem", target)
 		end
 	end)
-end
-
--- Full, the left column: your sword and shield, GEMS and SKINS, then every
--- loose gem you have (a tab per element). Drag a gem onto a piece or a key;
--- click one for the gem window.
-local function buildWeapons(canvas: Frame)
-	local column = new("Frame", { Name = "Weapons", BackgroundTransparency = 1 }, canvas)
-	place(column, LEFT_X, 96, LEFT_W, 728)
-	place(text(column, "WEAPONS", 11, C.Dim, HEADING), 0, 0, 200, 16)
-	local hint = place(text(column, "CLICK TO CHANGE", 10, C.Faint, HEADING), LEFT_W - 200, 0, 200, 16)
-	hint.TextXAlignment = Enum.TextXAlignment.Right
-	local y = 26
-	for _, slot in { "Weapon", "Shield" } do
-		ui.Rows[slot] = buildRow(column, slot, y)
-		y += 80
-	end
-	buildButtons(column, 0, y + 2, LEFT_W, 50, 10)
-	y += 66
-	place(text(column, "YOUR GEMS", 11, C.Dim, HEADING), 0, y, 200, 16)
-	ui.PouchCount = place(text(column, "", 10, C.Faint, HEADING), LEFT_W - 240, y, 240, 16)
-	ui.PouchCount.TextXAlignment = Enum.TextXAlignment.Right
-	ui.PouchTabs = new("Frame", { Name = "PouchTabs", BackgroundTransparency = 1 }, column)
-	place(ui.PouchTabs, 0, y + 20, LEFT_W, 26)
-	ui.Pouch = new("ScrollingFrame", {
-		Name = "Pouch",
-		BackgroundTransparency = 1,
-		ScrollBarThickness = 3,
-		ScrollBarImageColor3 = C.Faint,
-		CanvasSize = UDim2.new(),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollingDirection = Enum.ScrollingDirection.Y,
-	}, column)
-	place(ui.Pouch, 0, y + 54, LEFT_W, 728 - (y + 54))
-end
-
--- Q / E / R.
-local function buildSurges(canvas: Frame)
-	ui.Keys = {}
-	-- Left edge clear of the elements panel; they reach right under the
-	-- equipment column (which ends above them), room for the whole info line.
-	local cardW, gap = 248, 12
-	local x0, y0 = 441, 750
-	if COMPACT then
-		-- (a row under the equipment, as wide as it)
-		gap = 10
-		cardW = math.floor((W - RIGHT_X - 2 * gap) / 3)
-		x0, y0 = RIGHT_X, 292
-	end
-	for i, key in KEYS do
-		local card = new("TextButton", {
-			Name = "Key" .. key,
-			Text = "",
-			AutoButtonColor = false,
-			BackgroundColor3 = Color3.fromRGB(10, 14, 22),
-			BackgroundTransparency = 0.2,
-		}, canvas)
-		place(card, x0 + (i - 1) * (cardW + gap), y0, cardW, 66)
-		round(card, 12)
-		local edge = stroke(card, C.Line, 1, 0.9)
-		local icon = frame(card, C.Ink, 0.3)
-		place(icon, 9, 9, 48, 48)
-		round(icon, 9)
-		local glyph = text(icon, "+", 18, C.Faint, HEADING)
-		glyph.Size = UDim2.fromScale(1, 1)
-		glyph.TextXAlignment = Enum.TextXAlignment.Center
-		local name = place(text(card, "", 14, C.Text, HEADING), 68, 14, cardW - 80, 18)
-		local info = place(text(card, "", 10, C.Dim, MEDIUM), 68, 36, cardW - 80, 14)
-		if COMPACT then
-			UiKit.fit(info)
-		end
-		local badge = text(card, key, 11, C.Text, HEAVY)
-		badge.Position = UDim2.fromOffset(3, 3)
-		badge.Size = UDim2.fromOffset(20, 18)
-		badge.ZIndex = icon.ZIndex + 2
-		badge.TextXAlignment = Enum.TextXAlignment.Center
-		badge.BackgroundTransparency = 0
-		badge.BackgroundColor3 = C.Ink
-		round(badge, 5)
-		stroke(badge, C.Faint, 1, 0)
-		local line = frame(card, C.Faint)
-		line.AnchorPoint = Vector2.new(0, 1)
-		line.Position = UDim2.new(0, 16, 1, 0)
-		line.Size = UDim2.new(1, -32, 0, 2)
-		round(line, 1)
-		card:SetAttribute("UiSound", "Click")
-		card.Activated:Connect(function()
-			if os.clock() < suppressClickUntil then
-				return
-			end
-			if state.Detail ~= key then
-				openDetail(key)
-			end
-		end)
-		table.insert(dropTargets, {
-			Frame = card,
-			Stroke = edge,
-			Accepts = function(item: Item)
-				return acceptsKey(key, item)
-			end,
-			Drop = function(item: Item)
-				-- (with the triad on, the server sockets it in the sword, the chest or the shield)
-				socketInto(key, item)
-			end,
-		})
-		-- The key's job, above its name (OFFENSE / ABILITY / DEFENSE).
-		local lane = place(text(card, "", 9, C.Dim, HEAVY), 68, 4, cardW - 80, 12)
-		lane.TextTransparency = 0.1
-		if COMPACT then
-			UiKit.fit(lane)
-		end
-		ui.Keys[key] = { Card = card, Edge = edge, Icon = icon, Glyph = glyph, Name = name, Info = info, Line = line, Badge = badge, Lane = lane }
-		UpgradeHints.bind(card, function(hints) return hints.Surges.Keys[key] == true end, C.Teal)
-	end
 end
 
 -- Drag and drop ----------------------------------------------------------------------------------------
@@ -2093,11 +2248,9 @@ UserInputService.InputChanged:Connect(function(input)
 			GemVault.close()
 			state.Detail, state.Pick, state.Hover = nil, nil, nil
 			ui.List.Visible, ui.Detail.Visible = true, false
-		end
-		-- (Compact, from the GEMS tab: the rows come back to drop it on.)
-		if ui.GemsPane and state.GemsPane then
-			state.GemsPane = false
-			ui.GemsPane.Visible, ui.List.Visible = false, state.Detail == nil
+			if ui.Modal then
+				ui.Modal.Visible = false
+			end
 		end
 		local ghost = frame(gui, C.Ink, 0.15)
 		ghost.Name = "V2DragGhost"
@@ -2235,9 +2388,15 @@ local function drawLeft(profile, loadout)
 	end
 	ui.Name.Text = string.upper(player.DisplayName)
 	local level = Tree.level(profile.Augments and profile.Augments.XP or 0)
-	ui.Sub.Text = if MinerRoster.Enabled
-		then string.format("MINER %d  ·  LEVEL %d", active, level)
-		else string.format("LEVEL %d", level)
+	if ui.LevelBadge then
+		ui.LevelBadge.Text = tostring(level)
+	end
+	if ui.PName then
+		ui.PName.Text = string.upper(player.DisplayName)
+		ui.PTitle.Text = if MinerRoster.Enabled
+			then string.format("SAGA MINER %d  ·  LEVEL %d", active, level)
+			else string.format("SAGA MINER  ·  LEVEL %d", level)
+	end
 	local vitals = Tree.vitals(profile, player:GetAttribute("MatchStats"))
 	ui.LevelBonus.Text = if player:GetAttribute("MatchStats") == "Even" then "EVEN STATS · LEVEL BONUSES NORMALIZED"
 		else string.format("LEVEL BONUS  +%d HP · +%d STAMINA · +%d CHARGE", vitals.Health, vitals.Stamina - 100, vitals.Charge - 100)
@@ -2252,13 +2411,24 @@ local function drawLeft(profile, loadout)
 		entry.Value.Text = whole(value)
 		entry.Fill.Size = UDim2.fromScale(math.clamp(value / 140, 0, 1), 1)
 		flashValue(entry, value)
+		local tile = ui.Tiles and ui.Tiles[stat]
+		if tile then
+			tile.Value.Text = whole(value)
+			tile.Fill.Size = entry.Fill.Size
+			flashValue(tile, value)
+		end
 	end
 	ui.Rating.Text = whole(total)
-	if ui.MiniRating then
-		ui.MiniRating.Text = whole(total)
+	if ui.Score then
+		ui.Score.Text = whole(total)
 	end
-	if ui.StatsButton then
-		ui.StatsButton.Text = string.format("STATS  ·  %s", whole(total))
+	if ui.Pill then
+		ui.Pill.Text = "RATING  " .. whole(total)
+	end
+	if ui.Chips then
+		ui.Chips[1].Text = string.format("MAX STAMINA %d", vitals.Stamina)
+		ui.Chips[2].Text = string.format("MAX CHARGE %d", vitals.Charge)
+		ui.Chips[3].Text = if player:GetAttribute("MatchStats") == "Even" then "EVEN STATS" else string.format("LEVEL +%d HP", vitals.Health)
 	end
 	if ui.RatingLast and math.abs(total - ui.RatingLast) >= 0.5 then
 		ui.Rating.TextColor3 = if total > ui.RatingLast then C.Good else C.Bad
@@ -2275,6 +2445,26 @@ local function drawLeft(profile, loadout)
 		end
 	end
 	local color = if best then ArmorFamilies.Families[best].Color else C.Dim
+	-- Every set you wear two or more of, most first ("PROSPECTOR 3/6").
+	local worn = {}
+	for _, family in ArmorFamilies.Order do
+		local s = ok and setState.Active[family]
+		if s and s.Count >= 2 then
+			table.insert(worn, { Name = family, Count = s.Count })
+		end
+	end
+	table.sort(worn, function(a, b)
+		return a.Count > b.Count
+	end)
+	local setParts = {}
+	for _, entry in worn do
+		table.insert(setParts, string.format("%s %d/6", string.upper(entry.Name), entry.Count))
+	end
+	local setsText = table.concat(setParts, "  ·  ")
+	ui.Sub.Text = string.format("LEVEL %d", level) .. (if setsText ~= "" then "  ·  " .. setsText else "")
+	if ui.PSets then
+		ui.PSets.Text = if setsText ~= "" then "SETS  " .. setsText else "SETS  wear two of a family"
+	end
 	ui.SetName.Text = if best then string.upper(best) .. " SET" else "NO ARMOR SET"
 	ui.SetName.TextColor3 = color
 	for i, pip in ui.Pips do
@@ -2293,6 +2483,17 @@ local function drawLeft(profile, loadout)
 	else
 		ui.SetBonus.Text = ""
 		ui.SetNext.Text = "Wear two pieces of one family for a set bonus."
+	end
+	-- (the summary's set line: the same name, pips and bonus)
+	if ui.SumSetName then
+		ui.SumSetName.Text = ui.SetName.Text
+		ui.SumSetName.TextColor3 = color
+		for i, pip in ui.SumPips do
+			pip.BackgroundColor3 = ui.Pips[i].BackgroundColor3
+			pip.BackgroundTransparency = ui.Pips[i].BackgroundTransparency
+		end
+		ui.SumSetBonus.Text = if ui.SetBonus.Text ~= "" then ui.SetBonus.Text else ui.SetNext.Text
+		ui.SumSetBonus.TextColor3 = if ui.SetBonus.Text ~= "" and ui.SetBonus.Text ~= "No bonus yet" then C.Text else C.Dim
 	end
 	-- Elements: what you attack with (the sword's gem, and the surges' a
 	-- little), what your armor gems resist, and the matchups that follow
@@ -2389,6 +2590,9 @@ local function drawLeft(profile, loadout)
 	local shownParts = { parts[1], parts[2] }
 	resists.Value.Text = if #parts > 0 then table.concat(shownParts, "  ") else "NONE YET"
 	resists.Detail.Text = if #parts > 0 then "Half strength on perk pieces" else "Gems in armor add resists"
+	for i, value in ui.SumVerdict or {} do
+		value.Text = ui.Verdict[i].Value.Text
+	end
 	-- The mix: every socketed gem (armor, sword and surges), by element.
 	local counts = {}
 	for _, slot in Slots.Order do
@@ -2442,21 +2646,22 @@ local function drawWallet(profile)
 	ui.PickCap.Text = if nextIn then "FREE PICK  ·  " .. OutpostRules.clock(nextIn) else "FREE PICK  ·  FULL"
 end
 
--- A row's frame: gold while it's open, lighter under the pointer.
 function InventoryV2.paintRow(slot: string)
 	local row = ui.Rows and ui.Rows[slot]
 	if not row then
 		return
 	end
+	-- A card in its piece's rarity: lit gold while its window is open, a
+	-- little lighter under the pointer, edged gold while its socket is empty.
 	local picked = state.Detail == slot
-	row.Rail.BackgroundColor3 = if picked then C.Gold else row.Color or C.Faint
-	row.Edge.Color = C.Gold
-	row.Edge.Transparency = if picked then 0.35 elseif row.Hovered then 0.45 elseif row.EmptySocket then 0.65 else 1
+	local color = row.Color or C.Faint
+	row.Rail.BackgroundColor3 = if picked then C.Gold else color
+	row.Edge.Color = if picked or (row.EmptySocket and not row.Hovered) then C.Gold else color
+	row.Edge.Transparency = if picked then 0.1 elseif row.Hovered then 0.15 elseif row.EmptySocket then 0.5 else 0.55
 	row.Tint.Color = if picked
-		then ColorSequence.new(Color3.fromRGB(58, 46, 22), Color3.fromRGB(16, 14, 12))
-		elseif row.Hovered then ColorSequence.new(Color3.fromRGB(32, 40, 54), Color3.fromRGB(14, 18, 27))
-		elseif row.EmptySocket then ColorSequence.new(Color3.fromRGB(38, 33, 24), Color3.fromRGB(13, 17, 25))
-		else ColorSequence.new(Color3.fromRGB(20, 25, 34), Color3.fromRGB(11, 14, 21))
+		then ColorSequence.new(Color3.fromRGB(70, 54, 24), Color3.fromRGB(24, 18, 12))
+		elseif row.Hovered then ColorSequence.new(color:Lerp(C.Ink, 0.6), color:Lerp(C.Ink, 0.8))
+		else ColorSequence.new(color:Lerp(C.Ink, 0.74), color:Lerp(C.Ink, 0.9))
 end
 
 local function drawRows(loadout)
@@ -2465,35 +2670,29 @@ local function drawRows(loadout)
 		local gear = gearOf(loadout, slot)
 		local gem = loadout[slot .. "Gem"]
 		local rarity = if gear then rarityOf(loadout, slot) else 1
-		local color = rarityColor(rarity)
-		local picked = state.Detail == slot
-		row.Name.Text = if gear then gear.Name else "Empty"
-		row.Name.TextColor3 = if gear then C.Text else C.Faint
+		local color = if gear then rarityColor(rarity) else C.Faint
+		row.Name.Text = if gear then gear.Name else "Nothing worn"
+		row.Name.TextColor3 = if gear then color:Lerp(C.Text, 0.35) else C.Faint
 		local signature = gear and perkOf(loadout, slot, nil, gem)
-		local tail: string = if signature then "  ·  " .. string.upper(signature.Definition.Name)
-			elseif gear and gear.BuffReady and gear.Passive and gear.Passive.Name and gear.Passive.Name ~= "Signature" then "  ·  " .. string.upper(gear.Passive.Name)
-			else ""
-		-- The triad: the sword gives Q its move, the chest E, the shield R.
-		-- (its own line, under the rest: the surge tile shows its icon)
-		local rowKey = if triadOn(loadout) then Traits.KeyOfSocket[slot] else nil
-		local moveText = nil
-		if rowKey and gem then
-			local move = Tech.Catalog[Traits.traitFor(gem, rowKey) or ""]
-			if move then
-				moveText = string.format('<font color="#%s">%s  ·  %s</font>', KEY_COLORS[rowKey]:ToHex(), rowKey, string.upper(move.Name))
-			end
-		end
-		row.MoveLine.Text = moveText or ""
-		row.MoveLine.Visible = moveText ~= nil
 		row.Meta.Text = if gear
-			then string.format('<font color="#%s">%s</font>  ·  %s%s', color:ToHex(), rarityName(rarity), SLOT_NAME[slot], tail)
-			else SLOT_NAME[slot] .. "  ·  NOTHING WORN"
+			then rarityName(rarity) .. (if signature and not COMPACT then "  ·  " .. string.upper(signature.Definition.Name) else "")
+			else "EMPTY SLOT"
+		row.Meta.TextColor3 = if gear then color else C.Faint
+		-- The socket line: the gem in it (with the triad, the move it gives
+		-- the key: the sword's is Q, the chest's E, the shield's R), or the ask.
+		local rowKey = if triadOn(loadout) then Traits.KeyOfSocket[slot] else nil
+		local socketText = nil
+		if gem then
+			local move = rowKey and Tech.Catalog[Traits.traitFor(gem, rowKey) or ""]
+			socketText = if move
+				then string.format('<font color="#%s">%s</font>  <font color="#%s">%s</font>', KEY_COLORS[rowKey]:ToHex(), rowKey, gemColor(gem):ToHex(), string.upper(move.Name))
+				else string.format('<font color="#%s">%s</font>', gemColor(gem):ToHex(), string.upper(gemName(gem)))
+		end
+		row.MoveLine.Text = socketText or ""
+		row.MoveLine.Visible = socketText ~= nil
 		row.Color = color
 		row.EmptySocket = gear ~= nil and gem == nil
 		row.Enchant.Visible, row.Halo.Visible = row.EmptySocket, row.EmptySocket
-		local third = row.EmptySocket or moveText ~= nil
-		row.Name.Position = UDim2.fromOffset(82, if third then 9 else 16)
-		row.Meta.Position = UDim2.fromOffset(82, if third then 31 else 40)
 		InventoryV2.paintRow(slot)
 		-- Something changed in this slot (a piece or a gem): a gold flash says it took.
 		local shown = tostring(id) .. "|" .. (if gem then gem.Id else "")
@@ -2599,10 +2798,12 @@ local function drawKeys(loadout)
 		local keyColor = if triad then KEY_COLORS[key] else C.Text
 		entry.Badge.BackgroundColor3 = if triad then keyColor else C.Ink
 		entry.Badge.TextColor3 = if triad then C.Ink else C.Text
-		entry.Lane.Text = if triad then LANE_WORDS[key] .. "  ·  " .. string.upper(Traits.SocketNames[key]) .. " GEM" else ""
+		entry.Lane.Text = if triad then LANE_WORDS[key] .. (if entry.Fixed then "" else "  ·  " .. string.upper(Traits.SocketNames[key]) .. " GEM") else ""
 		entry.Lane.TextColor3 = keyColor
-		entry.Name.Position = UDim2.fromOffset(68, if triad then 18 else 14)
-		entry.Info.Position = UDim2.fromOffset(68, if triad then 38 else 36)
+		if not entry.Fixed then
+			entry.Name.Position = UDim2.fromOffset(68, if triad then 18 else 14)
+			entry.Info.Position = UDim2.fromOffset(68, if triad then 38 else 36)
+		end
 		entry.Name.Text = if surge then surge.Name elseif triad then "No gem in your " .. string.lower(Traits.SocketNames[key]) else "Add a surge"
 		entry.Name.TextColor3 = if surge then C.Text else C.Dim
 		entry.Info.Text = if surge
@@ -2614,6 +2815,7 @@ local function drawKeys(loadout)
 				if surge.Triad then "  ·  " .. whole((surge.Output or 1) * 100) .. "% power" else ""
 			)
 			elseif COMPACT then "TAP TO ADD A GEM"
+			elseif entry.Fixed then "CLICK OR DROP A GEM"
 			else "ADD STONE  ·  CLICK OR DRAG & DROP"
 		entry.Line.BackgroundColor3 = tint
 		entry.Line.BackgroundTransparency = if gem then 0.15 else 0.7
@@ -2975,24 +3177,32 @@ end
 local previewAsked = ""
 local function drawDetail(loadout)
 	local target = state.Detail
-	local pane = COMPACT and state.GemsPane and target == nil
-	ui.List.Visible = target == nil and not pane
 	ui.Detail.Visible = target ~= nil
-	if ui.GemsPane then
-		ui.GemsPane.Visible = pane
-		ui.GemsEdge.Color = if pane then C.Gold else Color3.fromRGB(190, 120, 255)
-		ui.GemsEdge.Transparency = if pane then 0 else 0.55
-	end
-	-- (compact, the open piece takes the Q / E / R row's place too: its strip
-	-- still hops to them)
-	for _, entry in ui.Keys do
-		entry.Card.Visible = not (COMPACT and target ~= nil)
+	if ui.Modal then
+		ui.Modal.Visible = target ~= nil
 	end
 	if not target then
 		return
 	end
 	paintStrip(loadout)
 	local isKey = table.find(KEYS, target) ~= nil
+	-- The window's title: the slot and what's in it, or the key and its job.
+	if ui.ModalTitle then
+		if isKey then
+			local gem = Tech.surgeGem(loadout, target)
+			local surge = gem and Tech.surgeStats(gem)
+			ui.ModalTitle.Text = target .. "  ·  " .. (if surge then surge.Name else "No surge")
+			ui.ModalSub.Text = if triadOn(loadout)
+				then LANE_WORDS[target] .. "  ·  FROM YOUR " .. string.upper(Traits.SocketNames[target]) .. "'S GEM"
+				else "SURGE"
+		else
+			local gear = gearOf(loadout, target)
+			ui.ModalTitle.Text = SLOT_NAME[target] .. "  ·  " .. (if gear then gear.Name else "Nothing worn")
+			ui.ModalSub.Text = if gear
+				then rarityName(rarityOf(loadout, target)) .. "  ·  SWAP THE PIECE OR ITS GEM"
+				else "PICK A SPARE PIECE"
+		end
+	end
 	-- (both show the same two wells: a key's move and its gem, or a piece and
 	-- its gem)
 	ui.PieceWell.Art.Visible = not isKey
@@ -3101,6 +3311,7 @@ local function drawDetail(loadout)
 			ui.PerkText.TextSize = 11
 		end
 		ui.PerkValue.Text = ""
+		state.Tab = "Gems"
 		drawTabs({ { "Gems", if triadOn(loadout) then string.upper(Traits.SocketNames[target]) .. " GEMS" else "SURGE GEMS" } })
 		drawFilters(true)
 		local items = {}
@@ -3110,7 +3321,11 @@ local function drawDetail(loadout)
 		drawGrid(items, "No surge gems yet. Cut a gem at the Outpost to unlock its surge.")
 	else
 		local slot = target
-		state.Tab = "Pieces" -- gems are selected from the main bag, not duplicated here
+		-- Two tabs: its spare pieces, and the gems that fit its socket (first
+		-- when the socket is empty and there's a gem to put in it).
+		if state.Tab ~= "Pieces" and state.Tab ~= "Gems" then
+			state.Tab = if loadout[slot] and not loadout[slot .. "Gem"] and #gemsFor(false, "All") > 0 then "Gems" else "Pieces"
+		end
 		local wornId = loadout[slot]
 		local wornGem = loadout[slot .. "Gem"]
 		-- A pick is tried on in place: its piece (with the slot's gem, which
@@ -3249,10 +3464,15 @@ local function drawDetail(loadout)
 			ui.PerkText.Text = "Nothing worn here. Pick a spare piece below."
 			ui.PerkValue.Text = ""
 		end
-		drawTabs({ { "Pieces", SLOT_NAME[slot] .. " PIECES" } })
-		drawFilters(false)
+		drawTabs({ { "Pieces", SLOT_NAME[slot] .. " PIECES" }, { "Gems", "GEMS" } })
+		drawFilters(state.Tab == "Gems")
 		local items = {}
-		if state.Tab == "Pieces" then
+		if state.Tab == "Gems" then
+			for _, g in gemsFor(false, state.Filter) do
+				table.insert(items, { Kind = "Gem", Gem = g })
+			end
+			drawGrid(items, "No loose gems that fit. Mine some at the Outpost.")
+		elseif state.Tab == "Pieces" then
 			for _, spare in sparesFor(slot) do
 				table.insert(items, { Kind = "Piece", Slot = slot, Id = spare.Id, Gear = spare.Gear } :: any)
 			end
@@ -3369,12 +3589,15 @@ do
 			local count = ok and setState.Active[family.ArmorFamily] and setState.Active[family.ArmorFamily].Count or 0
 			line(string.format("%s SET  %d/6", string.upper(family.ArmorFamily), count), 10, ArmorFamilies.Families[family.ArmorFamily].Color, HEADING, 12)
 		end
-		line("CLICK TO CHANGE  ·  DROP A GEM TO SOCKET", 9, C.Faint, HEADING, 12)
+		line("CLICK FOR DETAILS  ·  DROP A GEM TO SOCKET", 9, C.Faint, HEADING, 12)
 		y += 6
-		-- Beside the row, inside the screen.
-		local rowY = (row.Position.Y.Offset or 0) + 96
-		local top = math.clamp(rowY - 8, 70, H - 40 - y)
-		card.Position = UDim2.fromOffset(RIGHT_X - TIP_W - 14, top)
+		-- Beside the card (outward of the doll's middle), inside the screen.
+		local doll = ui.List
+		local rx = doll.Position.X.Offset + row.Position.X.Offset
+		local ry = doll.Position.Y.Offset + row.Position.Y.Offset
+		local leftColumn = row.Position.X.Offset < DOLL_W / 2
+		local top = math.clamp(ry - 8, 70, H - 40 - y)
+		card.Position = UDim2.fromOffset(if leftColumn then rx + CARD_W + 14 else rx - TIP_W - 14, top)
 		card.Size = UDim2.fromOffset(TIP_W, y)
 		card.Visible = true
 	end
@@ -3383,6 +3606,7 @@ end
 local queued = false
 local profileStamp = 0 -- (counts profile changes: AUTO EQUIP's plan is worked out again after one)
 local drawIntro -- (below, with the intro card)
+local drawSide -- (below)
 local introDone = false -- dismissed this session (survives the screen being rebuilt)
 -- The GEMS button: available stones and the best loose stone on its icon.
 local gemsShown = nil
@@ -3484,8 +3708,8 @@ local function drawPouch(profile)
 		end)
 	end
 	ui.PouchCount.Text = if counts.All == 0 then ""
-		elseif COMPACT then "DRAG TO SOCKET  ·  TAP FOR DETAILS"
-		else "DRAG ONTO A PIECE OR A KEY"
+		elseif COMPACT then "DRAG ONTO A SLOT  ·  TAP FOR DETAILS"
+		else string.format("%d LOOSE  ·  DRAG ONTO A SLOT", counts.All)
 	local shown, levels = {}, {}
 	for _, gem in all do
 		if filter == "All" or gem.Element == filter then
@@ -3611,7 +3835,7 @@ local function drawBag(loadout)
 			draw()
 		end)
 	end
-	ui.BagCount.Text = if total == 1 then "1 PIECE" else string.format("%d PIECES", total)
+	ui.BagCount.Text = string.format("%d STORED", total)
 	table.sort(items, function(a, b)
 		if a.Gain ~= b.Gain then
 			return a.Gain > b.Gain
@@ -3722,9 +3946,6 @@ local function drawAuto(profile)
 		chip.Edge.Color = tint
 		chip.Edge.Transparency = if on then 1 else 0.7
 	end
-	if COMPACT then
-		return
-	end
 	local plan = ui.AutoPlan
 	local changes = plan and plan.Changes or 0
 	local ready = changes > 0
@@ -3759,6 +3980,23 @@ local function drawAuto(profile)
 	end
 end
 
+-- Compact: the side panel shows one page (STATS, GEMS or GEAR), its tab lit.
+function drawSide()
+	if not ui.SideTabs then
+		return
+	end
+	for name, tab in ui.SideTabs do
+		local on = state.SideTab == name
+		tab.Button.TextColor3 = if on then C.Ink else C.Dim
+		tab.Button.BackgroundColor3 = if on then C.Gold else C.Ink
+		tab.Button.BackgroundTransparency = if on then 0 else 0.3
+		tab.Edge.Transparency = if on then 1 else 0.8
+	end
+	ui.StatsPage.Visible = state.SideTab == "Stats"
+	ui.GemsPage.Visible = state.SideTab == "Gems"
+	ui.GearPage.Visible = state.SideTab == "Gear"
+end
+
 function draw()
 	if queued then
 		return
@@ -3772,6 +4010,7 @@ function draw()
 		end
 		local loadout = profile.Character or {}
 		drawWallet(profile)
+		drawSide()
 		drawLeft(profile, loadout)
 		drawRows(loadout)
 		drawGemsButton(profile, loadout)
@@ -3899,29 +4138,6 @@ drawIntro = function(profile, loadout)
 	end
 end
 
--- Full: the stats card open, or folded (the default). Folded, the miner
--- stands in the middle (between the weapons and the armor) and the armor
--- column grows a little, its spare gear shortened to fit.
-local STAGE_MID = 800 -- (the canvas's middle; the stage is drawn about 942)
-local ARMOR_GROW = 1.1
-local function setStatsOpen(open: boolean)
-	state.StatsOpen = open
-	if COMPACT or not ui.StatsPanel then
-		return
-	end
-	InventoryV2.cancelDrag()
-	ui.StatsPanel.Visible = open
-	ui.StatsMini.Visible = not open
-	ui.Stage.Position = UDim2.fromOffset(if open then 0 else STAGE_MID - 942, 0)
-	local k = if open then 1 else ARMOR_GROW
-	ui.EquipScale.Scale = k
-	ui.EquipColumn.Position = UDim2.fromOffset(RIGHT_X + RIGHT_W - RIGHT_W * k, 96)
-	-- (the bag ends about where it did, 96 + 644 on the canvas, clear of Q / E / R)
-	local bagY = ui.Bag.Position.Y.Offset
-	ui.Bag.Size = UDim2.fromOffset(RIGHT_W, math.floor((if open then 644 else 628) / k - bagY))
-end
-ui.SetStatsOpen = setStatsOpen
-
 -- Mount ------------------------------------------------------------------------------------------------
 
 -- Compact when the full layout would show at under 70% of its size (a
@@ -3937,6 +4153,13 @@ local function chooseLayout(host: ScreenGui)
 		W, H = 990, 380
 		RIGHT_X, RIGHT_W = 236, 372
 		BOTTOM = 12 -- (no chat box under it on a phone)
+		-- The doll on the left (no header: your name is on the STATS page),
+		-- the STATS / GEMS / GEAR panel on the right.
+		PANEL_Y, HEAD_H = 52, 0
+		BODY_Y = PANEL_Y
+		DOLL_X, DOLL_W, DOLL_PAD = 0, 530, 8
+		CARD_W, CARD_H = 168, 100
+		SIDE_X, SIDE_W = 542, 448
 	end
 end
 
@@ -4004,18 +4227,13 @@ function InventoryV2.mount(host: ScreenGui)
 	host:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 	UiKit.onTopbar(fit)
 	fit()
-	buildStage(canvas)
+	buildHeader(canvas)
+	buildDoll(canvas)
 	buildTop(canvas)
+	buildSummary(canvas)
+	buildBags(canvas)
 	buildLeft(canvas)
-	if not COMPACT then
-		buildStatsMini(canvas)
-	end
 	buildRight(canvas)
-	if not COMPACT then
-		buildWeapons(canvas)
-		setStatsOpen(state.StatsOpen)
-	end
-	buildSurges(canvas)
 	buildIntro(ui.Popups)
 	host:GetPropertyChangedSignal("Enabled"):Connect(function()
 		if host.Enabled then
@@ -4138,6 +4356,10 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 	if input.KeyCode == Enum.KeyCode.Escape and drag then
 		InventoryV2.cancelDrag()
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.Escape and state.Active and gui and gui.Enabled and state.Detail then
+		openDetail(nil)
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.Backspace and state.Active and gui and gui.Enabled and state.Detail then
