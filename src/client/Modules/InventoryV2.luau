@@ -1194,6 +1194,370 @@ end
 -- The paper doll: your miner in the middle, your armor on the left and your
 -- weapons on the right, each piece a card with its gem socket under it.
 -- Click a card for the piece's window; drop a gem on it to socket it.
+-- Item window -----------------------------------------------------------------------------------------
+-- A click on anything (a worn piece or its socket, a Q / E / R card, a
+-- backpack gem, a spare piece) opens just that item, laid out to read: a
+-- slot shows its piece and its gem side by side, a backpack gem its grades
+-- and every move it gives. Changing things is drag and drop; the window's
+-- one button EQUIPs a spare piece or TAKEs a socketed gem OUT.
+local Info: any = { Window = nil, Roman = { "I", "II", "III" } }
+function Info.close()
+	if Info.Window then
+		Info.Window:Destroy()
+		Info.Window = nil
+	end
+end
+-- A card: its title, then rows top to bottom (it scrolls when they're long).
+function Info.card(parent: Instance, x: number, y: number, w: number, h: number, title: string)
+	local box = panelBox(parent, x, y, w, h)
+	place(text(box, title, 11, C.Dim, HEAVY), 16, 10, w - 32, 16)
+	local list = new("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(16, 34),
+		Size = UDim2.new(1, -24, 1, -42),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = C.Faint,
+	}, box)
+	new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }, list)
+	return { List = list, W = w - 40, N = 0 }
+end
+function Info.row(c, h: number): Frame
+	c.N += 1
+	return new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(c.W, h), LayoutOrder = c.N }, c.List)
+end
+-- Wrapped text, as tall as it needs.
+function Info.para(c, value: string, size: number, color: Color3, font: Enum.Font?, rich: boolean?)
+	c.N += 1
+	local t = text(c.List, value, size, color, font or BODY)
+	t.LayoutOrder = c.N
+	t.TextWrapped, t.TextTruncate, t.RichText = true, Enum.TextTruncate.None, rich == true
+	t.TextYAlignment = Enum.TextYAlignment.Top
+	t.Size = UDim2.fromOffset(c.W, 0)
+	t.AutomaticSize = Enum.AutomaticSize.Y
+	return t
+end
+function Info.heading(c, value: string, color: Color3?)
+	local r = Info.row(c, 24)
+	place(text(r, value, 11, color or C.Gold, HEAVY), 0, 6, c.W, 14)
+	place(frame(r, color or C.Gold, 0.75), 0, 23, c.W, 1)
+end
+-- A label on the left, its value on the right.
+function Info.pair(c, label: string, value: string, color: Color3?)
+	local r = Info.row(c, 20)
+	place(text(r, label, 13, C.Dim, MEDIUM), 0, 0, c.W * 0.62, 20)
+	local v = place(text(r, value, 13, color or C.Text, HEAVY), c.W * 0.38, 0, c.W * 0.62, 20)
+	v.TextXAlignment = Enum.TextXAlignment.Right
+end
+-- The item itself: its art in a well, its name, a few lines under it.
+function Info.top(c, color: Color3, art: (Frame) -> (), name: string, lines: { { any } })
+	local r = Info.row(c, 104)
+	local well = frame(r, C.Ink, 0.35)
+	place(well, 0, 0, 100, 100)
+	round(well, 12)
+	stroke(well, color, 1.5, 0.3)
+	art(well)
+	local title = place(text(r, name, 18, color, HEAVY), 114, 2, c.W - 114, 44)
+	title.TextWrapped, title.TextTruncate = true, Enum.TextTruncate.AtEnd
+	title.TextYAlignment = Enum.TextYAlignment.Top
+	for i, line in lines do
+		local l = place(text(r, line[1], 12, line[2] or C.Dim, HEADING), 114, 34 + i * 17, c.W - 114, 16)
+		UiKit.fit(l)
+	end
+end
+-- A grade (Size, Clarity, Cut) as a bar out of 10 and what it does.
+function Info.grade(c, label: string, value: number?, effect: string, color: Color3)
+	local r = Info.row(c, 30)
+	place(text(r, label, 13, C.Text, HEADING), 0, 0, 80, 16)
+	local note = place(text(r, effect, 11, C.Dim, MEDIUM), 80, 0, c.W - 140, 16)
+	note.TextXAlignment = Enum.TextXAlignment.Right
+	local num = place(text(r, if value then tostring(value) .. "/10" else "—", 13, color, HEAVY), c.W - 56, 0, 56, 16)
+	num.TextXAlignment = Enum.TextXAlignment.Right
+	local track = frame(r, C.Ink, 0.1)
+	place(track, 0, 21, c.W, 6)
+	round(track, 3)
+	local fill = frame(track, color)
+	fill.Size = UDim2.fromScale(math.clamp((value or 0) / 10, 0, 1), 1)
+	round(fill, 3)
+end
+-- A move a gem gives a key: its icon with the key on the corner, its name,
+-- tier and rank, cost and cooldown, then what it does.
+function Info.move(c, key: string?, gem, loadout)
+	local triad = triadOn(loadout)
+	local cast = if key then keyGem(gem, key, loadout) else gem
+	local surge = cast and Tech.surgeStats(cast)
+	local tint = gemColor(gem)
+	local keyColor = if key and triad then KEY_COLORS[key] else C.Gold
+	local r = Info.row(c, 54)
+	local tile = frame(r, C.Ink, 0.2)
+	place(tile, 0, 2, 50, 50)
+	round(tile, 10)
+	stroke(tile, keyColor, 1.5, 0.2)
+	local glyph = text(tile, if surge then "◆" else "–", 22, tint, HEAVY)
+	glyph.Size = UDim2.fromScale(1, 1)
+	glyph.TextXAlignment = Enum.TextXAlignment.Center
+	if surge then
+		pcall(SurgeIcons.apply, glyph, surge, tint)
+	end
+	if key then
+		local badge = text(tile, key, 10, C.Ink, HEAVY)
+		badge.BackgroundTransparency, badge.BackgroundColor3, badge.ZIndex = 0, keyColor, 6
+		badge.TextXAlignment = Enum.TextXAlignment.Center
+		place(badge, -5, -5, 18, 16)
+		round(badge, 4)
+	end
+	place(text(r, if surge then surge.Name else "No move for " .. (key or "this key"), 15, C.Text, HEAVY), 62, 2, c.W - 62, 20)
+	if not surge then
+		return
+	end
+	local tier = math.clamp(tonumber(surge.Tier) or 1, 1, 4)
+	local rank = math.clamp(tonumber(surge.Rank) or 1, 1, 3)
+	local move = Tech.Catalog[cast.Surge or ""]
+	local sub = place(text(r, string.format(
+		"%sT%d %s  ·  RANK %s%s",
+		if key then (if triad then LANE_WORDS[key] else "SURGE") .. "  ·  " else "",
+		tier,
+		string.upper(GemRoller.TierNames[tier] or ""),
+		Info.Roman[rank],
+		if move and move.Rare then "  ·  ★ SIGNATURE" else ""
+	), 11, keyColor, HEADING), 62, 23, c.W - 62, 14)
+	UiKit.fit(sub)
+	place(text(r, string.format(
+		"%s %s  ·  %ss COOLDOWN%s",
+		whole(surge.Cost or 0),
+		string.upper(surge.Resource or "Charge"),
+		whole(surge.Cooldown or 0),
+		if surge.Triad then string.format("  ·  %s%% POWER", whole((surge.Output or 1) * 100)) else ""
+	), 11, C.Dim, MEDIUM), 62, 38, c.W - 62, 14)
+	if (surge.Description or "") ~= "" then
+		Info.para(c, surge.Description, 12, C.Text)
+	end
+	if surge.Flourished and surge.Flourish and surge.Flourish.Text then
+		Info.para(c, "✦ " .. surge.Flourish.Text, 12, C.Gold, HEADING)
+	end
+end
+-- A piece: what it is, every stat on it, its perk, what makes this roll its own.
+function Info.piece(c, slot: string, id: string?, spare: boolean, gem, loadout)
+	local gear = id and gearOf(loadout, slot, id)
+	if not gear then
+		Info.para(c, "Nothing worn here.", 15, C.Text, HEAVY)
+		Info.para(c, "Spare pieces wait in your bag on the right: open one to wear it.", 13, C.Dim, MEDIUM)
+		return
+	end
+	local rarity = rarityOf(loadout, slot, id)
+	local color = rarityColor(rarity)
+	local roll = GearRolls.get(loadout, slot, id)
+	local lines = { { rarityName(rarity) .. "  ·  " .. SLOT_NAME[slot], color } }
+	if spare then
+		local gain = ratingGain(loadout, slot, id :: string)
+		table.insert(lines, { string.format("RATING %s%d IF WORN", if gain >= 0 then "+" else "", gain), if gain >= 0 then C.Good else C.Bad })
+	else
+		table.insert(lines, { "WORN", C.Good })
+	end
+	Info.top(c, color, function(well)
+		gearArt(well, slot, id :: string, not spare, color)
+	end, gear.Name, lines)
+	Info.heading(c, "STATS")
+	local stats = {}
+	for stat, amount in roll and roll.Stats or {} do
+		local percent = stat == "Critical" or stat == "Cooldown"
+		table.insert(stats, { Stat = stat, Text = if percent then "+" .. whole(amount * 100) .. "%" else "+" .. whole(amount), Weight = if percent then amount * 100 else amount })
+	end
+	table.sort(stats, function(a, b)
+		if a.Weight ~= b.Weight then
+			return a.Weight > b.Weight
+		end
+		return a.Stat < b.Stat
+	end)
+	for _, s in stats do
+		Info.pair(c, (s.Stat:gsub("(%l)(%u)", "%1 %2")), s.Text, STAT_COLOR[s.Stat] or C.Good)
+	end
+	if #stats == 0 then
+		Info.para(c, "No stats on this piece.", 12, C.Dim, MEDIUM)
+	end
+	if spare then
+		local deltas = statDeltas(loadout, slot, id :: string)
+		if deltas ~= "" then
+			Info.heading(c, "IF YOU WEAR IT", C.Teal)
+			Info.para(c, deltas, 13, C.Text, HEADING, true)
+		end
+	end
+	local signature = perkOf(loadout, slot, id, gem)
+	if signature then
+		Info.heading(c, "PERK")
+		Info.pair(c, signature.Definition.Name, perkValue(signature), C.Gold)
+		Info.para(c, signature.Definition.Trigger or "", 12, C.Text)
+	elseif type(gear.Passive) == "table" and gear.Passive.Name then
+		Info.heading(c, "PERK")
+		Info.para(c, gear.Passive.Name, 14, C.Gold, HEAVY)
+		Info.para(c, gear.Passive.Text or "", 12, C.Text)
+	end
+	local identity = GearRolls.identity(roll)
+	if identity ~= "" then
+		Info.heading(c, "THIS ROLL", C.Dim)
+		Info.para(c, identity, 12, C.Dim, MEDIUM)
+	end
+end
+-- A gem: what it is, its grades, and (in a sword, chest or shield) the move
+-- it gives that key.
+function Info.gem(c, gem, slot: string?, key: string?, loadout)
+	if not gem then
+		Info.para(c, "Empty socket.", 15, C.Text, HEAVY)
+		Info.para(c, "Drag a gem from your backpack onto this piece to fill it."
+			.. (if key then " Its " .. string.lower(LANE_WORDS[key]) .. " move becomes your " .. key .. "." else ""), 13, C.Dim, MEDIUM)
+		return
+	end
+	local color = gemColor(gem)
+	local lines = { { rarityName(gemRarity(gem)) .. "  ·  " .. string.upper(GemConfig.elementName(gem.Element)), color } }
+	if gem.Cut == nil then
+		table.insert(lines, { "ROUGH: CUT IT TO USE IT", C.Gold })
+	end
+	local okWorth, worth = pcall(GemConfig.value, gem)
+	if okWorth and type(worth) == "number" then
+		table.insert(lines, { "WORTH " .. commas(worth) .. " COINS", C.Dim })
+	end
+	if slot and not key then
+		table.insert(lines, { "POWERS THIS PIECE'S PERK", C.Teal })
+	end
+	Info.top(c, color, function(well)
+		gemArt(well, gem)
+	end, gemName(gem), lines)
+	Info.heading(c, "GRADES")
+	local function share(value: number?, weight: number): string
+		return string.format("%.1f%%", weight * (math.clamp(tonumber(value) or 1, 1, 10) - 1) / 9 * 100)
+	end
+	Info.grade(c, "Size", gem.Size, "+" .. share(gem.Size, Traits.SizePotency) .. " potency", color)
+	Info.grade(c, "Clarity", gem.Clarity, "+" .. share(gem.Clarity, Traits.ClarityDuration) .. " duration", color)
+	Info.grade(c, "Cut", gem.Cut, "−" .. share(gem.Cut, Traits.CutCooldown) .. " cooldown", color)
+	if key then
+		Info.heading(c, key .. "  ·  YOUR " .. LANE_WORDS[key] .. " MOVE", KEY_COLORS[key])
+		Info.move(c, key, gem, loadout)
+	end
+end
+-- item: { Slot } a worn slot, { Slot, Id } a spare piece, { Gem } a backpack
+-- gem; Key, when a Q / E / R card opened it.
+function Info.open(item)
+	Info.close()
+	local canvas = ui.Canvas
+	if not canvas then
+		return
+	end
+	if InventoryV2.hideTip then
+		InventoryV2.hideTip()
+	end
+	local loadout = loadoutNow()
+	local triad = triadOn(loadout)
+	local slot, spareId = item.Slot, item.Id
+	local pieceId = if slot then spareId or loadout[slot] else nil
+	local gem = item.Gem
+	if slot then
+		gem = if spareId then slotGemFor(loadout, slot, spareId) else loadout[slot .. "Gem"]
+	end
+	local key = item.Key or (if slot and triad then Traits.KeyOfSocket[slot] else nil)
+	local gear = slot and pieceId and gearOf(loadout, slot, pieceId)
+	local color = if gear then rarityColor(rarityOf(loadout, slot, pieceId)) elseif gem then gemColor(gem) else C.Text
+	local scrim = new("TextButton", {
+		Name = "ItemWindow",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 0.3,
+		ZIndex = 30,
+	}, canvas)
+	place(scrim, -W, -H, W * 3, H * 3)
+	scrim.Activated:Connect(Info.close)
+	Info.Window = scrim
+	local pw, ph = math.min(940, W - 20), math.min(600, H - 8)
+	local panel = new("TextButton", { Name = "Panel", Text = "", AutoButtonColor = false, BackgroundColor3 = P.Panel, BackgroundTransparency = 0.02 }, scrim)
+	place(panel, W + (W - pw) / 2, H + (H - ph) / 2, pw, ph)
+	round(panel, 16)
+	stroke(panel, P.Edge, 1.5, 0.2)
+	local grow = new("UIScale", { Scale = 0.94 }, panel)
+	TweenService:Create(grow, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	-- The title: what kind of item and where it is, then its name.
+	local headH = if COMPACT then 50 else 62
+	local band = frame(panel, Color3.new(1, 1, 1))
+	place(band, 0, 0, pw, headH)
+	round(band, 16)
+	new("UIGradient", { Color = ColorSequence.new(P.HeadA, P.HeadB) }, band)
+	place(frame(band, color, 0.2), 0, headH - 2, pw, 2)
+	local kicker = if slot
+		then SLOT_NAME[slot] .. (if spareId then "  ·  IN YOUR BAG" else "  ·  WORN")
+			.. (if key then "  ·  " .. key .. " " .. LANE_WORDS[key] else "")
+		else "GEM  ·  IN YOUR BACKPACK"
+	place(text(band, kicker, 11, Color3.fromRGB(196, 182, 240), HEAVY), 20, if COMPACT then 6 else 10, pw - 90, 14)
+	local title = if slot then (if gear then gear.Name else "Nothing worn") else gemName(gem)
+	local titleLabel = place(text(band, title, if COMPACT then 18 else 22, color, HEAVY), 20, if COMPACT then 22 else 28, pw - 90, if COMPACT then 22 else 26)
+	UiKit.fit(titleLabel)
+	local close = new("TextButton", {
+		Name = "Close",
+		Text = "×",
+		TextSize = 28,
+		Font = HEADING,
+		TextColor3 = C.Dim,
+		AutoButtonColor = false,
+		BackgroundTransparency = 1,
+	}, band)
+	place(close, pw - 52, (headH - 44) / 2, 44, 44)
+	close:SetAttribute("UiSound", "Back")
+	close.MouseEnter:Connect(function()
+		close.TextColor3 = C.Text
+	end)
+	close.MouseLeave:Connect(function()
+		close.TextColor3 = C.Dim
+	end)
+	close.Activated:Connect(Info.close)
+	-- The one thing to do here, if there is one.
+	local action, primary, act = nil, false, nil
+	if slot and spareId then
+		action, primary = "EQUIP", true
+		act = function()
+			request("EquipGear", Slots.Definitions[slot].Kind, spareId)
+		end
+	elseif slot and gem then
+		action = "TAKE GEM OUT"
+		act = function()
+			request("UnsocketGem", slot)
+		end
+	end
+	local footH = if action then (if COMPACT then 46 else 58) else 0
+	local bodyY = headH + 12
+	local bodyH = ph - bodyY - 12 - footH
+	local gap = 14
+	local cw = (pw - 28 - gap) / 2
+	local left = Info.card(panel, 14, bodyY, cw, bodyH, if slot then (if spareId then "SPARE PIECE" else "PIECE") else "GEM")
+	local right = Info.card(panel, 14 + cw + gap, bodyY, cw, bodyH, if slot then "ITS GEM" else "ITS MOVES")
+	if slot then
+		Info.piece(left, slot, pieceId, spareId ~= nil, gem, loadout)
+		Info.gem(right, gem, slot, key, loadout)
+	elseif gem then
+		Info.gem(left, gem, nil, nil, loadout)
+		if gem.Cut == nil then
+			Info.para(right, "A rough gem has no moves yet. Cut it, then drag it onto your sword (Q), chest (E) or shield (R).", 13, C.Dim, MEDIUM)
+		elseif triad then
+			for _, k in KEYS do
+				Info.heading(right, k .. "  ·  " .. LANE_WORDS[k] .. "  ·  IN YOUR " .. string.upper(Traits.SocketNames[k]), KEY_COLORS[k])
+				Info.move(right, k, gem, loadout)
+			end
+		else
+			Info.move(right, nil, gem, loadout)
+		end
+	end
+	if action and act then
+		local bw = if primary then 220 else 200
+		local b = plainButton(panel, action, pw - 14 - bw, ph - footH, bw, footH - 14, primary, if primary then nil else C.Bad)
+		b.Activated:Connect(function()
+			act()
+			Info.close()
+		end)
+	end
+end
+InventoryV2.openItem = Info.open
+InventoryV2.closeItem = Info.close
+
 local DOLL_SLOTS = {
 	{ "Helmet", 1, 1 },
 	{ "Armor", 1, 2 },
@@ -1312,9 +1676,7 @@ local function buildRow(parent: Instance, slot: string, x: number, y: number)
 		if os.clock() < suppressClickUntil then
 			return
 		end
-		if state.Detail ~= slot then
-			openDetail(slot)
-		end
+		Info.open({ Slot = slot })
 	end
 	row:SetAttribute("UiSound", "Click")
 	row.Activated:Connect(open)
@@ -1471,8 +1833,16 @@ local function buildSurges(parent: Instance, x0: number, y0: number, totalW: num
 			if os.clock() < suppressClickUntil then
 				return
 			end
-			if state.Detail ~= key then
-				openDetail(key)
+			local loadout = loadoutNow()
+			if triadOn(loadout) then
+				-- (R with no shield reads the weapon's gem)
+				local socket = if key == "R" and not loadout.Shield then "Weapon" else Traits.Sockets[key]
+				Info.open({ Slot = socket, Key = key })
+			else
+				local gem = Tech.surgeGem(loadout, key)
+				if gem then
+					Info.open({ Gem = gem })
+				end
 			end
 		end)
 		table.insert(dropTargets, {
@@ -1651,20 +2021,12 @@ local function buildSummary(canvas: Frame)
 	-- Who you are.
 	local card = panelBox(canvas, MID_X, BODY_Y, MID_W, 196)
 	card.Name = "Portrait"
-	local face = new("ImageLabel", {
-		Name = "Avatar",
-		BackgroundColor3 = C.Ink,
-		BackgroundTransparency = 0.2,
-		Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=150&h=150", player.UserId),
-	}, card)
-	place(face, 14, 14, 116, 116)
-	round(face, 12)
-	stroke(face, C.Gold, 1.5, 0.35)
-	ui.PName = place(text(card, "", 20, C.Text, HEAVY), 144, 14, MID_W - 156, 24)
-	ui.PTitle = place(text(card, "", 10, C.Teal, HEAVY), 144, 40, MID_W - 156, 13)
-	place(text(card, "GEAR SCORE", 10, C.Dim, HEAVY), 144, 64, 160, 12)
-	ui.Score = place(text(card, "0", 40, C.Gold, HEAVY), 144, 76, MID_W - 156, 44)
-	ui.PSets = place(text(card, "", 10, C.Dim, HEADING), 144, 118, MID_W - 156, 13)
+	-- (no avatar picture: your name, then your gear score, across the card)
+	ui.PName = place(text(card, "", 20, C.Text, HEAVY), 16, 14, MID_W - 32, 24)
+	ui.PTitle = place(text(card, "", 10, C.Teal, HEAVY), 16, 40, MID_W - 32, 13)
+	place(text(card, "GEAR SCORE", 10, C.Dim, HEAVY), 16, 64, 160, 12)
+	ui.Score = place(text(card, "0", 40, C.Gold, HEAVY), 16, 76, MID_W - 32, 44)
+	ui.PSets = place(text(card, "", 10, C.Dim, HEADING), 16, 118, MID_W - 32, 13)
 	UiKit.fit(ui.PSets)
 	-- The set you wear most of: its name, six pips, its bonus.
 	local setRule = frame(card, C.Line, 0.92)
@@ -3798,9 +4160,7 @@ local function drawPouch(profile)
 			if os.clock() < suppressClickUntil then
 				return
 			end
-			if ui.Popups then
-				GemVault.open(ui.Popups, gem.Id, InventoryV2.beginGemDrag)
-			end
+			Info.open({ Gem = gem })
 		end)
 	end
 end
@@ -3909,10 +4269,7 @@ local function drawBag(loadout)
 			edge.Transparency = 0.6
 		end)
 		cell.Activated:Connect(function()
-			openDetail(spare.Slot)
-			state.Tab = "Pieces"
-			state.Pick = { Kind = "Piece", Slot = spare.Slot, Id = spare.Id, Gear = spare.Gear } :: any
-			draw()
+			Info.open({ Slot = spare.Slot, Id = spare.Id })
 		end)
 	end
 end
@@ -4260,6 +4617,7 @@ function InventoryV2.setActive(on: boolean)
 		InventoryV2.cancelDrag()
 		GemVault.close()
 		Wardrobe.close()
+		Info.close()
 	end
 	draw()
 end
@@ -4356,6 +4714,10 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 	if input.KeyCode == Enum.KeyCode.Escape and drag then
 		InventoryV2.cancelDrag()
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.Escape and Info.Window then
+		Info.close()
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.Escape and state.Active and gui and gui.Enabled and state.Detail then

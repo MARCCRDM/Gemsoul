@@ -19,7 +19,7 @@ it, a summary column, and the two backpacks on the right.
   card tinted by the piece's rarity, with its gem socket underneath ("ADD A
   GEM" when the socket is empty, otherwise the gem and the Q/E/R move it
   gives). The Sword, Chest and Shield cards show their Q / E / R surge tile.
-- **Summary**: portrait, GEAR SCORE, the set bonus, the Q / E / R SURGES
+- **Summary**: your name, GEAR SCORE (no avatar picture), the set bonus, the Q / E / R SURGES
   cards, COMBAT RATINGS (health, power, defense, speed, strong vs / weak to
   / resists), and ALL STATS · AUTO EQUIP, which opens the full stats sheet.
 - **GEM BACKPACK**: every loose gem by element. Drag one onto a slot, card
@@ -29,24 +29,32 @@ it, a summary column, and the two backpacks on the right.
 
 ### Click anything for its window
 
-Clicking a slot card, its socket, or a Q / E / R card opens a **detail
-window** over the screen. It has the piece and its gem side by side, the
-enchantment it gives, and a list on the right: **PIECES** (spares for that
-slot) or **GEMS** (gems that fit it, filtered by element). Clicking the
-socketed gem opens it in the Gem Vault. Tabs across the top jump to any other
-slot or key. Close it with ×, Escape, or a click outside. Dragging a gem
-still works with the window open: it closes and the doll takes the drop.
+Clicking anything opens an **item window** with just that item, laid out to
+read (`Info.open` in InventoryV2). Nothing else opens from a click: not the
+old swap window, not the Gem Vault.
 
-| A piece | A key (E) |
-| --- | --- |
-| ![Piece window](inventory/doll-window-piece.png) | ![Key window](inventory/doll-window-key.png) |
+- **A slot card, its socket, or a Q / E / R card**: the piece and its gem
+  side by side. The piece card has its rarity, every stat on its own line,
+  its perk and what makes the roll its own. The gem card has its rarity,
+  element and worth, its Size / Clarity / Cut as bars with what each does,
+  and (sword, chest, shield) the move it gives that key: icon, tier, rank,
+  cost, cooldown, power and description.
+- **A backpack gem**: the gem card, and every move it gives Q, E and R.
+- **A spare piece in the bag**: the piece with its gear-score change and
+  stat changes if worn, the gem it would wear, and **EQUIP**.
+
+A worn gem has **TAKE GEM OUT**. Everything else is drag and drop. Close the
+window with ×, Escape, or a click outside.
+*2026-10-28*: replaces the detail window with tabs and swap lists.
+
+![Item window](inventory/item-window-slot.png)
 
 ### On a phone
 
 The doll fills the left side. The right side has three tabs: **STATS**
 (score, surges, ratings, EQUIP BEST, ALL STATS, SKINS, elements), **GEMS**
-(the backpack) and **GEAR** (spare pieces). Tapping a slot opens the same
-window.
+(the backpack) and **GEAR** (spare pieces). Tapping anything opens the same
+item window.
 
 | Phone | Phone, a slot's window |
 | --- | --- |
