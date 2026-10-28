@@ -285,6 +285,14 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   another. None while your starter roll is still owed, or with no room
   left (`Kaiju.MaxOwned`). A roll made and not yet taken is kept, so
   leaving doesn't reroll it.
+- **Rarity by batch.** *2026-10-28.* Past the first four (the starters),
+  a kind is as rare as the batch it joined the roster in
+  (`Kaiju.Batch`, `Kaiju.batch`, `Kaiju.kindWeight`): the roster's first
+  30 kinds (`Shared.KaijuRoster`'s own) the rarest (weight 1), the next 30
+  less so (3), the last 30 the most often met (6). The boss roll
+  (`bossPick`) and every wild kaiju, den and pack out in the Outpost
+  (`pickKind` in `KaijuWilds`) pick by those weights; they used to pick
+  every kind evenly. The starter roll is unchanged.
 - **The starter roll.** Everyone starts with three kaiju, rolled on the
   same reels as the gems in the intro: right after the move reveal (which
   goes on to it by itself, with no button of its own), three

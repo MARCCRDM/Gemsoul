@@ -175,6 +175,40 @@ function Kaiju.wildKinds(band: string?): { string }
 	return out
 end
 
+-- How rare a kind is, by the batch it joined the roster in (the first four
+-- aside: they're the starters). The roster's first Batch.Size kinds (Shared.
+-- KaijuRoster) are the rarest, the next Size less so, the last the most
+-- often met: Weights, by batch, in the boss roll (bossPick) and out in the
+-- wild (pickKind: KaijuWilds' dens and spawns). A kind past the last batch
+-- (or a starter) counts as the last.
+Kaiju.Batch = { Size = 30, Weights = { 1, 3, 6 } }
+local batchOf = {}
+for index, id in KaijuRoster.Order do
+	batchOf[id] = math.min(math.ceil(index / Kaiju.Batch.Size), #Kaiju.Batch.Weights)
+end
+function Kaiju.batch(id: string): number?
+	return batchOf[id]
+end
+function Kaiju.kindWeight(id: string): number
+	local weights = Kaiju.Batch.Weights
+	return weights[batchOf[id] or #weights]
+end
+-- One of `kinds`, by kindWeight (the rarest batch least often).
+function Kaiju.pickKind(kinds: { string }, rng): string
+	local total = 0
+	for _, id in kinds do
+		total += Kaiju.kindWeight(id)
+	end
+	local roll = rng:NextNumber(0, total)
+	for _, id in kinds do
+		roll -= Kaiju.kindWeight(id)
+		if roll <= 0 then
+			return id
+		end
+	end
+	return kinds[#kinds]
+end
+
 Kaiju.MaxLevel = 30
 Kaiju.Growth = 0.08 -- each level adds this share of the level-1 stats
 -- A finer Gemsoul makes a stronger kaiju (and a stronger E).
@@ -1808,7 +1842,7 @@ function Kaiju.bossPick(rng): { Species: string, Element: string }
 		end
 	end
 	return {
-		Species = kinds[rng:NextInteger(1, #kinds)],
+		Species = Kaiju.pickKind(kinds, rng),
 		Element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)],
 	}
 end

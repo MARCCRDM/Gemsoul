@@ -755,6 +755,32 @@ do
 		check(table.find(Kaiju.Elements, pick.Element) ~= nil, "A boss roll's element isn't one")
 	end
 end
+-- Rarity by batch: the roster's first 30 kinds the rarest, the next 30
+-- less so, the last 30 the most often met (boss rolls and the wild).
+do
+	local roster = shared("KaijuRoster").Order
+	check(Kaiju.batch(roster[1]) == 1 and Kaiju.batch(roster[30]) == 1, "The first batch isn't the first 30")
+	check(Kaiju.batch(roster[31]) == 2 and Kaiju.batch(roster[60]) == 2, "The second batch isn't the next 30")
+	check(Kaiju.batch(roster[61]) == 3 and Kaiju.batch(roster[#roster]) == 3, "The third batch isn't the last")
+	check(Kaiju.batch("Bulwark") == nil, "A starter has a batch")
+	check(Kaiju.kindWeight(roster[1]) < Kaiju.kindWeight(roster[31]) and Kaiju.kindWeight(roster[31]) < Kaiju.kindWeight(roster[61]), "The batches aren't rarer the earlier they came")
+	local counts = { 0, 0, 0 }
+	local rng = Random.new(11)
+	for _ = 1, 6000 do
+		local pick = Kaiju.bossPick(rng)
+		local b = Kaiju.batch(pick.Species)
+		if b then
+			counts[b] += 1
+		end
+	end
+	check(counts[1] < counts[2] and counts[2] < counts[3], "Boss rolls don't favour the later batches: " .. table.concat(counts, "/"))
+	local one = { roster[1], roster[61] }
+	local early = 0
+	for _ = 1, 2000 do
+		early += if Kaiju.pickKind(one, rng) == roster[1] then 1 else 0
+	end
+	check(early > 150 and early < 450, "pickKind's odds are off: " .. early)
+end
 local crowded = { List = {} }
 for i = 1, Kaiju.MaxOwned - 1 do
 	crowded.List["k" .. i] = {}

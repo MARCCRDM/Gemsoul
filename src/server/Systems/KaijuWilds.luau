@@ -2064,7 +2064,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		local band = if guard then "Vein" else Frontier.band(Frontier.distance(at, Outpost.Location.Position))
 		local kinds = Kaiju.wildKinds(band)
 		kinds = if #kinds > 0 then kinds else Kaiju.Starters
-		species = kinds[rng:NextInteger(1, #kinds)]
+		species = Kaiju.pickKind(kinds, rng)
 	end
 	-- (Out in one of the biomes, mostly of its element: Frontier.Biome.)
 	local biome = Frontier.biomeAt(at - Outpost.Location.Position)
@@ -2321,7 +2321,7 @@ local function packFor(): Pack?
 						Rocks = seam,
 						Heading = a,
 						MoveAt = math.huge,
-						Species = roams[rng:NextInteger(1, #roams)],
+						Species = Kaiju.pickKind(roams, rng),
 						Members = {},
 					}
 					table.insert(packs, pack)
@@ -2355,7 +2355,7 @@ local function packFor(): Pack?
 				Den = den,
 				Heading = rng:NextNumber(0, math.pi * 2),
 				MoveAt = os.clock() + rng:NextNumber(roam.Every[1], roam.Every[2]),
-				Species = kinds[rng:NextInteger(1, #kinds)],
+				Species = Kaiju.pickKind(kinds, rng),
 				Members = {},
 			}
 			table.insert(packs, pack)

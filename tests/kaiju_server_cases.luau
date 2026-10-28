@@ -2114,8 +2114,16 @@ check(
 	a:GetAttribute("TameResult") == "Fled" and not enemy.Alive and KaijuWilds._wilds[enemy] == nil,
 	"Three failed tries and it stayed"
 )
--- The next one: a lucky try.
+-- The next one: a lucky try. (A fighting kind: a caught support would take
+-- the support slot and change the team checks below.)
 local target = wilds[2]
+for i = 2, #wilds do
+	local entry = KaijuWilds._wilds[wilds[i]]
+	if entry and wilds[i].Alive and not Kaiju.isSupport(entry.Species) then
+		target = wilds[i]
+		break
+	end
+end
 local wild2 = KaijuWilds._wilds[target]
 target.Root.CFrame = CFrame.new(rootA.Position + Vector3.new(4, 0, 0))
 target.Humanoid.Health = target.Humanoid.MaxHealth * 0.1
