@@ -447,7 +447,7 @@ end
 -- a new player with the starter roll, everyone else on their next visit.
 Kaiju.SupportRole = "Warden"
 Kaiju.SupportSlot = 4
-Kaiju.StarterSupport = { Species = "Skyjelly", Element = "Shock" }
+Kaiju.StarterSupport = { Species = "Skyjelly" } -- (its element rolled with the roll: supportElement)
 Kaiju.SupportVersion = 1
 -- Its pulse: only while you're in a fight (in danger: Kaiju.Danger; out of
 -- one it mends nobody, that's for gems), it reads the health of you and
@@ -520,6 +520,12 @@ function Kaiju.supportChoice(view): string?
 		return "Strike"
 	end
 	return nil
+end
+
+-- The starter support's element: any of the four, rolled with the starter
+-- roll (so its card shows it), or now for a save that had no roll.
+function Kaiju.supportElement(rng): string
+	return Kaiju.Elements[if rng then rng:NextInteger(1, #Kaiju.Elements) else math.random(1, #Kaiju.Elements)]
 end
 
 -- Whether a kind is a support kind (it goes in the support slot).
@@ -1944,8 +1950,55 @@ function Kaiju.bossRollsOwed(profile): number
 	if not profile or Kaiju.rollsOwed(profile) > 0 then
 		return 0
 	end
-	local owed = math.floor(tonumber(profile.KaijuBossRolls) or 0)
+	-- (a rare roll bought plays on the same screen, in turn: counted here)
+	local owed = math.floor(tonumber(profile.KaijuBossRolls) or 0) + math.floor(tonumber(profile.KaijuRareRolls) or 0)
 	return math.max(0, math.min(owed, Kaiju.MaxOwned - Kaiju.count(profile.Kaiju)))
+end
+
+-- The Kennel's sales (Shared.KaijuKennel, sold for Robux: Shared.Store):
+--   Daily    the Kaiju of the Day (KaijuKennel.special), one a day each:
+--            its traits at least TraitFloor, its Gemsoul rolled with Luck
+--   Rare     the Starter Rare Roll, once ever (profile[Once]): a roll on the
+--            starter roll's screen from the rarest batch (Kaiju.batch 1)
+--            only, its traits at least TraitFloor
+Kaiju.Sale = {
+	Daily = { Product = "KaijuDaily", TraitFloor = 8, Luck = 0.35 },
+	Rare = { Product = "KaijuRareRoll", Once = "KaijuRareRollBought", TraitFloor = 6, Luck = 0.25 },
+}
+
+-- Whether today's Kaiju of the Day is already yours (`day`: KaijuKennel.day).
+function Kaiju.dailyBought(profile, day: number): boolean
+	return profile ~= nil and profile.KaijuDailyDay == day
+end
+
+-- Rare rolls owed (the Starter Rare Roll: profile.KaijuRareRolls), as many
+-- as you have room for; none while the starter roll is still owed.
+function Kaiju.rareRollsOwed(profile): number
+	if not profile or Kaiju.rollsOwed(profile) > 0 then
+		return 0
+	end
+	local owed = math.floor(tonumber(profile.KaijuRareRolls) or 0)
+	return math.max(0, math.min(owed, Kaiju.MaxOwned - Kaiju.count(profile.Kaiju)))
+end
+
+-- The kinds a rare roll deals: the rarest batch, no support kinds.
+function Kaiju.rareKinds(): { string }
+	local kinds = {}
+	for _, id in Kaiju.Order do
+		if Kaiju.batch(id) == 1 and not Kaiju.isSupport(id) then
+			table.insert(kinds, id)
+		end
+	end
+	return kinds
+end
+
+-- A rare roll's kind (any of rareKinds, evenly) and element.
+function Kaiju.rarePick(rng): { Species: string, Element: string }
+	local kinds = Kaiju.rareKinds()
+	return {
+		Species = kinds[rng:NextInteger(1, #kinds)],
+		Element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)],
+	}
 end
 
 -- A boss roll's kind and element: any kind of Order but a support one.

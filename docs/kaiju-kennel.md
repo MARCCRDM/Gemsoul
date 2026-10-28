@@ -11,12 +11,43 @@ Switched off, not deleted: `ShelterLife.Hologram = false`
 name plate and its projector console are taken out of the world and never
 posed. Set it to `true` to bring it back somewhere else.
 
-## The pen (`src/server/World/OutpostWorld.luau`)
+## The pen (`src/client/Modules/KennelLife.luau`)
 
-On the old stage: a bed of packed earth, a rock to climb in the middle,
-troughs by the fence, a fence of 28 posts with two rails between each pair
-(it collides: players stay outside), and a **KAIJU KENNEL** arch over the
-gate, facing the hall's main door.
+The server builds only the stage and its bed of packed earth
+(`OutpostWorld`, `KennelBed`): the Shelter's server-built parts were at their
+budget (`tests/run_moon_quarry_scene.py`, under 4000). The rest is built by
+each player's own client, next to today's kaiju, and shown and hidden with
+them: a rock to climb in the middle, troughs by the fence, a fence of 28
+posts with two rails between each pair (solid to your own character, so
+players stay outside), and a **KENNEL** arch over the gate, facing the
+hall's main door. One word, like the hall's other signs.
+
+## The Daily Kaiju Sale
+
+In front of the gate (`Kennel.Display`) the Kaiju of the Day
+(`Kennel.special`) turns slowly on a plinth, its board beside it: DAILY
+KAIJU SALE, its kind, element and role, and the price. The plinth's prompt,
+or Wren's **Daily Kaiju Sale** option, opens the sale window
+(`src/client/Modules/KennelSale.luau`), in the Bounty Board's gilt look
+(`src/client/Modules/GiltUi.luau`). It has two offers, each **R$ 200**:
+
+- **Daily Kaiju Sale** (`KaijuDaily`): today's kaiju, one each a day
+  (`profile.KaijuDailyDay`). It comes with traits of 8 or better in all four
+  and a luckier Gemsoul (`Kaiju.Sale.Daily`). It joins your reserves, even
+  past a full roster. Paid for twice in one day, the second becomes a rare
+  roll, so nothing is lost.
+- **Starter Rare Roll** (`KaijuRareRoll`): once per miner
+  (`profile.KaijuRareRollBought`). One roll on the starter roll's screen
+  from the rarest batch only (`Kaiju.rareKinds`), with traits of 6 or
+  better. It's owed as `profile.KaijuRareRolls` and plays like a boss roll,
+  as soon as you have room (`Kaiju.rareRollsOwed`, counted in
+  `bossRollsOwed`).
+
+Both are Roblox developer products (`Store.RobuxProducts`). Their ids are
+0 until the products are made: listed by `tools/dev_products_manifest.luau`,
+then pasted in. Until then, the window says they're coming soon (or takes
+coins while testing). A receipt is granted by `StoreServer.grantProduct`
+through `KaijuServer.saleGrant`.
 
 ## Who lives there (`src/shared/KaijuKennel.luau`)
 
@@ -49,10 +80,19 @@ the wild kaiju's (`KaijuMood`).
 
 By the gate, facing the door:
 
-- **Who's in the pen today?** names today's six.
+- **Daily Kaiju Sale** opens the sale window.
 - **Buy and sell kaiju** opens the Market on kaiju.
-- **Kaiju and their kinds**: why these are rare, how to get one, selling.
+- **Kaiju and their kinds**: why these are rare, how to get one, what the
+  Daily Kaiju Sale is, and who's in the pen today.
 - **Give me a tip**: kennel and kaiju tips.
+
+## The starter support
+
+The intro's roll stays the four starter kinds. The fourth kaiju, the
+support, is always a Skyjelly, but its element is now rolled with the roll
+(`Kaiju.supportElement`), and the roll card shows it. Any support kind you
+own (a Warden) can take the support slot (SET AS SUPPORT in the kaiju
+panel, or drag it onto the slot), and swap with the one there.
 
 ## Tests
 
@@ -60,5 +100,8 @@ By the gate, facing the door:
 (rarest batch, no overlap, changing daily, cycling through the batch),
 every resident inside its wedge and the pen, no jumps or spins, every mood
 seen, no two ever touching, and every client working out the same. Also
-the pen in the world, Wren and her options, the hologram off, and the
-animation hooks.
+the pen (the client's) and its bed (the server's), Wren and her options,
+the hologram off, the animation hooks, the sale's rules and Store entries
+(R$ 200 each, once a day, once ever), every support kind in the slot, and
+the starter support's element. `tests/run_kaiju.py` (kaiju_server_cases)
+grants both sales and plays the rare roll.

@@ -288,7 +288,7 @@ Vendors.KaijuKeeper = {
 	Visor = true,
 	Greeting = "Wren, kennel keeper. The rarest kinds on the moon live in this pen, a different few every day. Look all you like: they don't bite through the fence.",
 	Options = {
-		{ Text = "Who's in the pen today?", Action = "KennelToday" },
+		{ Text = "Daily Kaiju Sale", Action = "KennelSale" },
 		{ Text = "Buy and sell kaiju", Action = "KaijuMarket" },
 		{
 			Text = "Kaiju and their kinds",
@@ -299,12 +299,13 @@ Vendors.KaijuKeeper = {
 				},
 				{
 					Text = "How do I get one?",
-					Reply = "Catch one out in the quarry when it's worn down, win it in a roll, or buy one from another miner on the Market. I can open the Market on kaiju for you.",
+					Reply = "Catch one out in the quarry when it's worn down, win it in a roll, buy one from another miner on the Market, or take today's from the plinth by the gate.",
 				},
 				{
-					Text = "Can I sell a kaiju?",
-					Reply = "List it on the Market for coins or a trade. A kaiju on your team has to come off the team first.",
+					Text = "What's the Daily Kaiju Sale?",
+					Reply = "Each day one of the rarest kinds stands on the plinth by the gate, and you can take one home, that day only. And once, a Starter Rare Roll: one roll on the rarest kinds.",
 				},
+				{ Text = "Who's in the pen today?", Action = "KennelToday" },
 			},
 		},
 		TIP,

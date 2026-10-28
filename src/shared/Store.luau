@@ -38,6 +38,7 @@ export type Reward = {
 	XPBoostMinutes: number?,
 	Swings: number?,
 	KaijuRevive: boolean?, -- every kaiju of yours that's knocked out, back now
+	KaijuSale: string?, -- the Kennel's: "Daily" (the Kaiju of the Day) or "Rare" (a rare roll)
 }
 export type Bundle = {
 	Id: string,
@@ -418,6 +419,10 @@ Store.RobuxProducts = {
 	KaijuRevive = 3723018189,
 	-- Down at a Rift boss: back on your feet there, kaiju and all (RiftServer)
 	RiftRestore = 3723023347,
+	-- The Kennel's sales (Shared.Kaiju.Sale): the Kaiju of the Day, and the
+	-- one-time Starter Rare Roll
+	KaijuDaily = 0,
+	KaijuRareRoll = 0,
 }
 -- The Robux price of each bundle and offer (a cosmetic's is its own Robux).
 Store.RobuxPrices = {
@@ -442,6 +447,8 @@ Store.RobuxPrices = {
 	SeasonPremium = 399,
 	KaijuRevive = 25,
 	RiftRestore = 100,
+	KaijuDaily = 200,
+	KaijuRareRoll = 200,
 }
 -- (A refill's price is its own: Outpost.Refills.)
 for _, refill in Outpost.Refills do
@@ -575,6 +582,9 @@ function Store.contents(key: any): Reward?
 	end
 	if key == "KaijuRevive" then
 		return { KaijuRevive = true }
+	end
+	if key == "KaijuDaily" or key == "KaijuRareRoll" then
+		return { KaijuSale = if key == "KaijuDaily" then "Daily" else "Rare" }
 	end
 	local bundle = Store.bundle(key)
 	if bundle then
@@ -716,6 +726,12 @@ function Store.productName(key: string): string
 	if key == "KaijuRevive" then
 		return "Kaiju Revive"
 	end
+	if key == "KaijuDaily" then
+		return "Kaiju of the Day"
+	end
+	if key == "KaijuRareRoll" then
+		return "Starter Rare Roll"
+	end
 	local refill = Store.refill(key)
 	if refill then
 		return refill.Name
@@ -774,6 +790,21 @@ function Store.canBuy(key: string, profile: any, now: number): (boolean, string?
 			end
 		end
 		return false, "None of your kaiju is knocked out."
+	end
+	-- The Kennel's: the Kaiju of the Day once a day (its day as
+	-- Shared.KaijuKennel.day counts them, from midnight UTC), the Starter
+	-- Rare Roll once ever.
+	if key == "KaijuDaily" then
+		if profile.KaijuDailyDay == math.floor(now / 86400) then
+			return false, "Today's kaiju is yours already. A new one comes at midnight."
+		end
+		return true
+	end
+	if key == "KaijuRareRoll" then
+		if profile.KaijuRareRollBought then
+			return false, "You've had the Starter Rare Roll already."
+		end
+		return true
 	end
 	local bundle = Store.bundle(key)
 	if key == "StarterPack" and not Store.starterOpen(profile.StarterOfferAt, profile.StarterBought, now) then

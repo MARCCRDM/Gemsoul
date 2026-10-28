@@ -127,6 +127,7 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			KaijuServer.start()
 			-- Revives for Robux (the KaijuRevive product) and Revive coupons.
 			StoreServer.reviveKaiju = KaijuServer.reviveAll
+			StoreServer.kaijuSale = KaijuServer.saleGrant
 			CouponServer.reviveKaiju = KaijuServer.reviveAll
 			-- The team's HYPERBEAM: their mana, SAVE CHARGE and the blast.
 			require(script.Parent.Systems.KaijuBeamServer).start()

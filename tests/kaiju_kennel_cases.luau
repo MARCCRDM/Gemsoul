@@ -13,6 +13,22 @@ local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 
 local ROOT = process.args[1] or "."
+-- (Lune has no Random: a small seeded one with the same methods)
+local Random = {
+	new = function(seed)
+		local state = (seed or 1) % 2147483647
+		local r = {}
+		function r:NextNumber(a, b)
+			state = (state * 16807) % 2147483647
+			local x = state / 2147483647
+			return if a then a + (b - a) * x else x
+		end
+		function r:NextInteger(a, b)
+			return a + math.floor(self:NextNumber() * (b - a + 1))
+		end
+		return r
+	end,
+}
 local checks = 0
 local function check(value, message)
 	checks += 1
@@ -31,7 +47,16 @@ end
 env = setmetatable({
 	Color3 = roblox.Color3,
 	Vector3 = roblox.Vector3,
+	Vector2 = roblox.Vector2,
 	CFrame = roblox.CFrame,
+	Enum = roblox.Enum,
+	UDim2 = roblox.UDim2,
+	NumberRange = roblox.NumberRange,
+	NumberSequence = roblox.NumberSequence,
+	NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
+	ColorSequence = roblox.ColorSequence,
+	ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,
+	game = { GetService = function() return setmetatable({}, { __index = function() return {} end }) end },
 	script = { Parent = setmetatable({}, {
 		__index = function(_, k)
 			return k
@@ -137,8 +162,10 @@ end
 
 -- The world and the client ------------------------------------------------------------------
 local world = fs.readFile(ROOT .. "/src/server/World/OutpostWorld.luau")
-check(world:find('"KENNEL"', 1, true) ~= nil and world:find('"KennelBed"', 1, true) ~= nil, "The kennel isn't built on the stage")
+check(world:find('"KennelBed"', 1, true) ~= nil, "The kennel's bed isn't on the stage")
 check(world:find('"ProjectorLens"', 1, true) == nil, "The hologram's lens is still on the stage")
+-- (The pen itself is each player's own: the Shelter's server parts are at their budget.)
+check(world:find("KennelSign", 1, true) == nil and world:find("KennelRock", 1, true) == nil, "The pen is built by the server again")
 check(world:find('Id = "KaijuKeeper"', 1, true) ~= nil, "No keeper by the kennel")
 local vendors = fs.readFile(ROOT .. "/src/shared/Vendors.luau")
 check(vendors:find("Vendors.KaijuKeeper", 1, true) ~= nil and vendors:find('Action = "KennelToday"', 1, true) ~= nil, "Wren can't say who's in the pen")
@@ -152,5 +179,78 @@ local scene = fs.readFile(ROOT .. "/src/client/Modules/OutpostScene.luau")
 check(scene:find("KennelLife.mount(shelterFrame)", 1, true) ~= nil and scene:find("KennelLife.step(dt)", 1, true) ~= nil, "The kennel's kaiju aren't drawn")
 local client = fs.readFile(ROOT .. "/src/client/Modules/KennelLife.luau")
 check(client:find("CanQuery", 1, true) ~= nil and client:find("root.Anchored = true", 1, true) ~= nil, "Kennel kaiju can be clicked or fall")
+check(client:find('"KENNEL"', 1, true) ~= nil and client:find("buildPen", 1, true) ~= nil, "The client doesn't build the pen and its KENNEL arch")
+check(client:find('"DAILY KAIJU SALE"', 1, true) ~= nil and client:find("Kennel.special(day)", 1, true) ~= nil, "No Daily Kaiju Sale display")
+check(client:find("KennelSale.open()", 1, true) ~= nil and client:find("ProximityPrompt", 1, true) ~= nil, "The display's prompt doesn't open the sale")
+check(client:find("pen.Parent = parent", 1, true) ~= nil, "The pen isn't shown and hidden with its kaiju")
+-- (the fence is solid to you: built on your screen, for your own character)
+check(client:find("Vector3.new(0.45, 3.2, 0.45), STEEL, Enum.Material.Metal, true)", 1, true) ~= nil, "The fence posts aren't solid")
+local sale = fs.readFile(ROOT .. "/src/client/Modules/KennelSale.luau")
+check(sale:find("PromptProductPurchase", 1, true) ~= nil and sale:find("Gilt.frame", 1, true) ~= nil, "The sale window doesn't buy, or isn't in the gilt look")
+check(sale:find("Kaiju.dailyBought(profile, day)", 1, true) ~= nil and sale:find("profile[rare.Once]", 1, true) ~= nil, "The sale window offers what's yours already")
+check(dialogue:find("function actions.KennelSale", 1, true) ~= nil and vendors:find('Action = "KennelSale"', 1, true) ~= nil, "Wren doesn't open the sale")
 
-print(string.format("PASS: %d Kaiju Kennel checks (residents and the Kaiju of the Day by day, wedges, no collisions, smooth walks, moods, the pen, Wren)", checks))
+-- The sales' rules (Shared.Kaiju.Sale) --------------------------------------------------------
+local rareKinds = Kaiju.rareKinds()
+check(#rareKinds >= 20, "Too few kinds for a rare roll")
+for _, id in rareKinds do
+	check(Kaiju.batch(id) == 1 and not Kaiju.isSupport(id), "A rare roll can deal " .. id)
+end
+local rng = Random.new(9)
+local dealt = {}
+for _ = 1, 600 do
+	local pick = Kaiju.rarePick(rng)
+	check(table.find(rareKinds, pick.Species) ~= nil and table.find(Kaiju.Elements, pick.Element) ~= nil, "A rare pick out of the batch")
+	dealt[pick.Species] = true
+end
+local dealtKinds = 0
+for _ in dealt do
+	dealtKinds += 1
+end
+check(dealtKinds == #rareKinds, "A rare roll never deals some kinds")
+check(Kaiju.Sale.Daily.TraitFloor > Kaiju.Sale.Rare.TraitFloor and Kaiju.Sale.Rare.TraitFloor > 0, "The sales' trait floors")
+check(Kaiju.dailyBought({ KaijuDailyDay = 5 }, 5) and not Kaiju.dailyBought({ KaijuDailyDay = 4 }, 5) and not Kaiju.dailyBought({}, 5), "dailyBought")
+-- Rare rolls owed: only after the starter roll, and counted as boss rolls (they play there).
+local fresh = { Kaiju = { List = {}, Next = 1 }, KaijuRareRolls = 1 }
+check(Kaiju.rareRollsOwed(fresh) == 0, "A rare roll before the starter roll")
+local done = { Kaiju = { List = {}, Next = 1 }, KaijuRolled = Kaiju.RollVersion, KaijuRareRolls = 1, KaijuBossRolls = 1 }
+check(Kaiju.rollsOwed(done) == 0, "(the starter roll should be taken)")
+check(Kaiju.rareRollsOwed(done) == 1 and Kaiju.bossRollsOwed(done) == 2, "A rare roll isn't owed, or isn't played on the roll screen")
+-- The starter support: Skyjelly, any element.
+check(Kaiju.StarterSupport.Species == "Skyjelly" and Kaiju.StarterSupport.Element == nil, "The starter support's element is fixed")
+local elements = {}
+for _ = 1, 200 do
+	elements[Kaiju.supportElement(rng)] = true
+end
+for _, element in Kaiju.Elements do
+	check(elements[element], "The starter support never comes " .. element)
+end
+-- Every support kind goes in the support slot, and swaps with another.
+local roster = { List = {}, Next = 1 }
+local supports = {}
+for _, id in Kaiju.Order do
+	if Kaiju.isSupport(id) then
+		local soul = Kaiju.rollSoul(rng, "Frost", { Id = "s" .. id, Time = 1, Species = id })
+		table.insert(supports, Kaiju.add(roster, id, soul, 1, true))
+	end
+end
+check(#supports >= 2, "Only one support kind")
+for _, record in supports do
+	check(Kaiju.setSupport(roster, record.Id) and Kaiju.supportId(roster) == record.Id, record.Species .. " can't go in the support slot")
+end
+-- The Store's two (200 R$ each, the day counted as KaijuKennel counts it).
+local Store = shared("Store")
+check(Store.robuxPrice("KaijuDaily") == 200 and Store.robuxPrice("KaijuRareRoll") == 200, "The Kennel's sales aren't R$ 200")
+check(Store.RobuxProducts.KaijuDaily ~= nil and Store.RobuxProducts.KaijuRareRoll ~= nil, "No product slots for the Kennel's sales")
+check(Store.contents("KaijuDaily").KaijuSale == "Daily" and Store.contents("KaijuRareRoll").KaijuSale == "Rare", "What the sales give")
+local now = 86400 * 20000 + 3600
+check(Store.canBuy("KaijuDaily", {}, now), "Today's kaiju can't be bought")
+check(not Store.canBuy("KaijuDaily", { KaijuDailyDay = Kennel.day(now) }, now), "Today's kaiju bought twice")
+check(Store.canBuy("KaijuDaily", { KaijuDailyDay = Kennel.day(now) - 1 }, now), "Yesterday's purchase blocks today's")
+check(Store.canBuy("KaijuRareRoll", {}, now) and not Store.canBuy("KaijuRareRoll", { KaijuRareRollBought = true }, now), "The Starter Rare Roll isn't once only")
+check(Kaiju.Sale.Daily.Product == "KaijuDaily" and Kaiju.Sale.Rare.Product == "KaijuRareRoll", "The sales' product keys")
+local storeServer = fs.readFile(ROOT .. "/src/server/Systems/StoreServer.luau")
+check(storeServer:find("StoreServer.kaijuSale(player, reward.KaijuSale)", 1, true) ~= nil, "A Kennel receipt isn't granted")
+check(fs.readFile(ROOT .. "/src/server/Main.server.luau"):find("StoreServer.kaijuSale = KaijuServer.saleGrant", 1, true) ~= nil, "The Kennel's grant isn't wired")
+
+print(string.format("PASS: %d Kaiju Kennel checks (residents and the Kaiju of the Day by day, wedges, no collisions, smooth walks, moods, the pen, Wren, the Daily Kaiju Sale and the Starter Rare Roll, any support in the slot)", checks))

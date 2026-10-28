@@ -14,7 +14,8 @@
 	bundle, squad kits, the Starter Pack, the Season premium track, a
 	swing refill's swings (StoreServer.addSwings: OutpostServer's) or a
 	kaiju revive (StoreServer.reviveKaiju: KaijuServer.reviveAll; with none
-	down by then, a Revive coupon, Shared.Coupons).
+	down by then, a Revive coupon, Shared.Coupons) or a Kennel sale
+	(StoreServer.kaijuSale: KaijuServer.saleGrant).
 
 	What you buy goes on: a look you buy is worn at once; a bundle puts its
 	first suit, skin and pickaxe on the miner you're playing; squad kits go
@@ -48,6 +49,9 @@ StoreServer.reviveKaiju = nil :: ((Player) -> number)?
 -- Down at a Rift boss: back on your feet there, kaiju and all
 -- (RiftServer.restoreBought, wired in by Main); false when not down.
 StoreServer.riftRestore = nil :: ((Player) -> boolean)?
+-- The Kennel's sales (KaijuServer.saleGrant, wired in by Main): the Kaiju
+-- of the Day or the Starter Rare Roll; false when it can't be given now.
+StoreServer.kaijuSale = nil :: ((Player, string) -> (boolean, { string }?))?
 
 local function cosmeticName(id: string): string
 	local cosmetic = Cosmetics.get(id)
@@ -193,6 +197,13 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 	local reward = Store.contents(key)
 	if not reward then
 		return false
+	end
+	-- A Kennel sale: a kaiju, or a rare roll to play (KaijuServer).
+	if reward.KaijuSale then
+		if not StoreServer.kaijuSale then
+			return false
+		end
+		return StoreServer.kaijuSale(player, reward.KaijuSale)
 	end
 	local lines = StoreServer.grant(player, reward)
 	local bundle = Store.bundle(key)

@@ -99,6 +99,7 @@
 	  KaijuServer.hurt(pet, amount, element, status?, heavy?) -> outcome   a creature's blow
 	  KaijuServer.reward(player, exp)        EXP for each kaiju out
 	  KaijuServer.adopt(player, species, soul, level, traits?) -> record?   a tamed one
+	  KaijuServer.saleGrant(player, "Daily" | "Rare") -> (ok, lines?)   a Kennel sale paid for
 
 	The store and coupons ask here:
 	  KaijuServer.reviveAll(player) -> count   every one of theirs that's down, back now
@@ -133,6 +134,7 @@ local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+local KaijuKennel = require(ReplicatedStorage.Shared.KaijuKennel)
 local Aggro = require(ReplicatedStorage.Shared.Aggro)
 local KaijuFight = require(ReplicatedStorage.Shared.KaijuFight)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
@@ -579,17 +581,28 @@ local function prepareRoll(profile)
 	end
 	local owed = Kaiju.rollsOwed(profile)
 	if owed <= 0 then
-		-- A boss roll owed (Kaiju.bossRollsOwed): one kaiju, any kind.
+		-- A boss roll owed (Kaiju.bossRollsOwed): one kaiju, any kind. A
+		-- rare roll bought at the Kennel (Kaiju.rareRollsOwed) comes first:
+		-- one of the rarest batch, its traits and Gemsoul better (Sale.Rare).
 		if Kaiju.bossRollsOwed(profile) <= 0 then
 			return nil
 		end
 		local random = Gems.random()
-		local pick = Kaiju.bossPick(random)
-		local soul = Kaiju.rollSoul(random, pick.Element, { Id = PlayerData.newGemId(), Time = os.time(), Species = pick.Species })
+		local rare = Kaiju.rareRollsOwed(profile) > 0
+		local sale = Kaiju.Sale.Rare
+		local pick = if rare then Kaiju.rarePick(random) else Kaiju.bossPick(random)
+		local soul = Kaiju.rollSoul(random, pick.Element, {
+			Id = PlayerData.newGemId(),
+			Time = os.time(),
+			Species = pick.Species,
+			Luck = if rare then sale.Luck else nil,
+		})
+		local traits = Kaiju.rollTraits(random, if rare then sale.TraitFloor else nil)
 		roll = {
-			Rolls = { { Species = pick.Species, Element = pick.Element, Soul = soul, Traits = Kaiju.rollTraits(random) } },
+			Rolls = { { Species = pick.Species, Element = pick.Element, Soul = soul, Traits = traits } },
 			Version = Kaiju.RollVersion,
 			Boss = true,
+			Rare = rare or nil,
 		}
 		p.KaijuRoll = roll
 		return roll
@@ -609,6 +622,8 @@ local function prepareRoll(profile)
 		)
 		table.insert(roll.Rolls, { Species = pick.Species, Element = pick.Element, Soul = soul, Traits = Kaiju.rollTraits(random) })
 	end
+	-- (and the starter support's element, rolled with them so the card shows it)
+	roll.Support = { Species = Kaiju.StarterSupport.Species, Element = Kaiju.supportElement(random) }
 	p.KaijuRoll = roll
 	return roll
 end
@@ -616,16 +631,18 @@ end
 -- The starter support (Kaiju.StarterSupport), once: added (past a full
 -- roster if it must be), put in the support slot. Returns it, or nil if
 -- it isn't owed.
-local function giveSupport(player: Player)
+local function giveSupport(player: Player, element: string?)
 	local profile = PlayerData.get(player)
 	if not profile or not Kaiju.supportOwed(profile) then
 		return nil
 	end
 	local roster = Kaiju.roster(profile)
 	local starter = Kaiju.StarterSupport
+	-- (its element the roll's, or any for a save that had no roll)
+	element = if element and table.find(Kaiju.Elements, element) then element else Kaiju.supportElement()
 	local soul = Kaiju.rollSoul(
 		Gems.random(),
-		starter.Element,
+		element :: string,
 		{ Id = PlayerData.newGemId(), Time = os.time(), Species = starter.Species }
 	)
 	local record = Kaiju.add(roster, starter.Species, soul, Kaiju.StarterLevel, true)
@@ -658,7 +675,8 @@ local function claimRoll(player: Player): { any }
 		local record = entry and Kaiju.add(roster, entry.Species, entry.Soul, Kaiju.StarterLevel, nil, entry.Traits)
 		local p = profile :: any
 		p.KaijuRoll = nil
-		p.KaijuBossRolls = math.max(0, math.floor(tonumber(p.KaijuBossRolls) or 0) - 1)
+		local counter = if roll.Rare then "KaijuRareRolls" else "KaijuBossRolls"
+		p[counter] = math.max(0, math.floor(tonumber(p[counter]) or 0) - 1)
 		PlayerData.sync(player)
 		if record then
 			table.insert(added, record)
@@ -683,7 +701,7 @@ local function claimRoll(player: Player): { any }
 	owedSince[player] = nil
 	PlayerData.sync(player)
 	-- (And the support, the fourth, comes with them.)
-	giveSupport(player)
+	giveSupport(player, roll.Support and roll.Support.Element)
 	if #added > 0 then
 		local names = {}
 		for _, record in added do
@@ -2576,7 +2594,7 @@ local function rollRequest(player: Player)
 	if not roll then
 		return reply(true, "", { Rolls = {} })
 	end
-	return reply(true, "", { Rolls = roll.Rolls, Boss = roll.Boss == true })
+	return reply(true, "", { Rolls = roll.Rolls, Boss = roll.Boss == true, Rare = roll.Rare == true, Support = roll.Support })
 end
 
 local function rollClaim(player: Player)
@@ -2586,6 +2604,70 @@ local function rollClaim(player: Player)
 	end
 	local added = claimRoll(player)
 	return reply(true, "", { Added = #added })
+end
+
+-- A Kennel sale paid for (StoreServer, a Robux receipt): "Daily" puts
+-- the Kaiju of the Day (KaijuKennel.special, today's) in your roster, its
+-- traits and Gemsoul better than a wild one's (Kaiju.Sale.Daily), even past
+-- a full roster (paid for); "Rare" owes you a rare roll, played on the roll
+-- screen (Kaiju.rareRollsOwed). Returns whether it was given, and the lines
+-- to show.
+function KaijuServer.saleGrant(player: Player, which: string): (boolean, { string }?)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return false
+	end
+	local p = profile :: any
+	if which == "Daily" then
+		local day = KaijuKennel.day(os.time())
+		if Kaiju.dailyBought(p, day) then
+			-- (Paid for twice in one day: the second's a rare roll instead,
+			-- not lost.)
+			p.KaijuRareRolls = math.floor(tonumber(p.KaijuRareRolls) or 0) + 1
+			PlayerData.sync(player)
+			return true, { "a rare kaiju roll (today's kaiju was yours already)" }
+		end
+		local special = KaijuKennel.special(day)
+		local sale = Kaiju.Sale.Daily
+		local random = Gems.random()
+		local soul = Kaiju.rollSoul(random, special.Element, {
+			Id = PlayerData.newGemId(),
+			Time = os.time(),
+			Species = special.Species,
+			Luck = sale.Luck,
+		})
+		local record = Kaiju.add(
+			Kaiju.roster(profile),
+			special.Species,
+			soul,
+			Kaiju.StarterLevel,
+			true,
+			Kaiju.rollTraits(random, sale.TraitFloor)
+		)
+		if not record then
+			return false
+		end
+		p.KaijuDailyDay = day
+		PlayerData.sync(player)
+		local grade = Kaiju.grade(Kaiju.traits(record))
+		Remotes.Notify:FireClient(
+			player,
+			string.format("%s joins your kaiju (Grade %s). Swap it into a team from YOUR KAIJU.", Kaiju.nameOf(record), grade)
+		)
+		return true, { string.format("%s, Grade %s", Kaiju.nameOf(record), grade) }
+	elseif which == "Rare" then
+		if p[Kaiju.Sale.Rare.Once] then
+			-- (Bought twice somehow: the roll's given all the same, paid for.)
+			p.KaijuRareRolls = math.floor(tonumber(p.KaijuRareRolls) or 0) + 1
+		else
+			p[Kaiju.Sale.Rare.Once] = true
+			p.KaijuRareRolls = math.floor(tonumber(p.KaijuRareRolls) or 0) + 1
+		end
+		PlayerData.sync(player)
+		Remotes.Notify:FireClient(player, "Your Starter Rare Roll is ready: it plays as soon as you have room for a kaiju.")
+		return true, { "the Starter Rare Roll" }
+	end
+	return false
 end
 
 -- A boss beaten: one kaiju roll owed (Kaiju.bossRollsOwed), played on the

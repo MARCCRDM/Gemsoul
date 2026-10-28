@@ -255,10 +255,13 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 40,
 	}, screen)
-	local result = if preview then { Ok = true, Rolls = previewRolls() } else GemClient.request("KaijuRoll")
+	local result = if preview
+		then { Ok = true, Rolls = previewRolls(), Support = { Species = Kaiju.StarterSupport.Species, Element = Kaiju.supportElement() } }
+		else GemClient.request("KaijuRoll")
 	local rolls = if result.Ok and type(result.Rolls) == "table" then result.Rolls else {}
+	local rare = result.Rare == true -- (a rare roll from the Kennel: the rarest batch only)
 	if result.Boss then
-		boss, kinds = true, Kaiju.Order
+		boss, kinds = true, if rare then Kaiju.rareKinds() else Kaiju.Order
 	end
 	if #rolls == 0 then
 		screen:Destroy()
@@ -392,7 +395,15 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 		ZIndex = 41,
 	})
 	local fitScale = new("UIScale", { Scale = 1 }, board)
-	local kicker = label(board, if boss then "BOSS REWARD  ·  A NEW KAIJU" else "STARTER ROLL  ·  YOUR KAIJU", 14, C.Gold, Enum.Font.GothamBlack)
+	local kicker = label(
+		board,
+		if rare then "STARTER RARE ROLL  ·  THE RAREST KINDS"
+			elseif boss then "BOSS REWARD  ·  A NEW KAIJU"
+			else "STARTER ROLL  ·  YOUR KAIJU",
+		14,
+		C.Gold,
+		Enum.Font.GothamBlack
+	)
 	kicker.TextXAlignment, kicker.ZIndex = Enum.TextXAlignment.Center, 42
 	kicker.Size = UDim2.new(1, 0, 0, 18)
 	local title = label(board, "ROLLING YOUR KAIJU", 40, C.Text, Enum.Font.GothamBlack)
@@ -877,7 +888,10 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 		end
 		-- And the fourth, the starter support (Shared.Kaiju.StarterSupport),
 		-- named under the cards: it comes with them.
-		local starter = Kaiju.StarterSupport
+		-- (its element rolled with the roll: the server's, shown as it'll be)
+		local starter = if type(result.Support) == "table" and result.Support.Element
+			then result.Support
+			else { Species = Kaiju.StarterSupport.Species, Element = nil }
 		local kind = Kaiju.species(starter.Species)
 		local support = frame(board, {
 			Name = "SupportNote",
@@ -893,9 +907,11 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 		local supportText = label(
 			support,
 			string.format(
-				"+ SUPPORT  ·  %s %s joins you: it heals you and your team",
-				string.upper(GemConfig.ElementLabels[starter.Element] or starter.Element),
-				string.upper(kind and kind.Name or starter.Species)
+				"+ SUPPORT  ·  %s joins you: it heals you and your team",
+				string.upper(
+					(if starter.Element then (GemConfig.ElementLabels[starter.Element] or starter.Element) .. " " else "")
+						.. (kind and kind.Name or starter.Species)
+				)
 			),
 			14,
 			SUPPORT,

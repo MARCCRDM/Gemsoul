@@ -666,6 +666,9 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		KaijuRoll = (profile :: any).KaijuRoll, -- the starter roll prepared and not yet claimed (KaijuServer)
 		KaijuRolled = (profile :: any).KaijuRolled, -- the starter roll was taken (Shared.Kaiju.rollsOwed)
 		KaijuBossRolls = (profile :: any).KaijuBossRolls, -- boss kaiju rolls owed (Shared.Kaiju.bossRollsOwed)
+		KaijuRareRolls = (profile :: any).KaijuRareRolls, -- rare rolls bought at the Kennel, owed (Shared.Kaiju.rareRollsOwed)
+		KaijuRareRollBought = (profile :: any).KaijuRareRollBought, -- the Starter Rare Roll, once (Shared.Kaiju.Sale)
+		KaijuDailyDay = (profile :: any).KaijuDailyDay, -- the day the Kaiju of the Day was last bought (Shared.Kaiju.dailyBought)
 		Referrals = (profile :: any).Referrals, -- friends who joined through your invite (see Referrals)
 		Coupons = (profile :: any).Coupons, -- reward coupons from invites, not yet used (Shared.Coupons, CouponServer)
 		FirstJoin = profile.FirstJoin,

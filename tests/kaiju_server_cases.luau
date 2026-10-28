@@ -6847,15 +6847,17 @@ end)()
 	local c, rootC = makePlayer(3, spot)
 	profiles[c] = { Gems = {}, Coins = 0, Milestones = {} }
 	check(not Kaiju.supportOwed(profiles[c]), "The support came before the roll")
-	registered.KaijuRoll(c)
+	-- (its element rolled with the roll: the card shows the one that comes)
+	local shown = registered.KaijuRoll(c)
+	check(shown.Support and table.find(Kaiju.Elements, shown.Support.Element) ~= nil, "The roll doesn't show the support's element")
 	check(registered.KaijuRollClaim(c).Ok, "Couldn't claim the roll")
 	local roster = Kaiju.roster(profiles[c])
 	local supportId = Kaiju.supportId(roster)
 	local support = supportId and roster.List[supportId]
 	check(Kaiju.count(roster) == 4 and support, "No support with the roll")
 	check(
-		support.Species == Kaiju.StarterSupport.Species and support.Element == Kaiju.StarterSupport.Element,
-		"The wrong starter support"
+		support.Species == Kaiju.StarterSupport.Species and support.Element == shown.Support.Element,
+		"The wrong starter support, or not the element its card showed"
 	)
 	check(profiles[c].KaijuSupport == Kaiju.SupportVersion and not Kaiju.supportOwed(profiles[c]), "Owed a second")
 	check(noted(c, "your support"), "Nobody told them about their support")
@@ -7223,9 +7225,62 @@ end
 check(Kaiju.mood(Kaiju.Roam.Moods, 0.37) == Kaiju.mood(Kaiju.Roam.Moods, 0.37), "The same roll, another mood")
 check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale.Pet, "The sizes")
 
+-- The Kennel's sales (KaijuServer.saleGrant, from a Robux receipt): the
+-- Kaiju of the Day once a day, the Starter Rare Roll once ever. (In a
+-- function of its own: this file is out of room for locals.)
+;(function()
+	local Kennel = shared("KaijuKennel")
+	local d = makePlayer(41, outpost + Vector3.new(60, 0, 900))
+	profiles[d] = { Gems = {}, Coins = 0, Milestones = {} }
+	registered.KaijuRoll(d)
+	check(registered.KaijuRollClaim(d).Ok, "Couldn't take the starter roll")
+	local roster = Kaiju.roster(profiles[d])
+	local before = Kaiju.count(roster)
+	local day = Kennel.day(clock.time()) -- (the server's wall clock: the test's)
+	local special = Kennel.special(day)
+	local ok = KaijuServer.saleGrant(d, "Daily")
+	check(ok and Kaiju.count(roster) == before + 1, "The Kaiju of the Day wasn't given")
+	local got
+	for _, record in roster.List do
+		if record.Species == special.Species and record.Element == special.Element then
+			got = record
+		end
+	end
+	check(got ~= nil, "Not today's kaiju")
+	for _, name in Kaiju.Traits.Names do
+		check(got.Traits[name] >= Kaiju.Sale.Daily.TraitFloor, "The Kaiju of the Day has a poor trait")
+	end
+	check(Kaiju.dailyBought(profiles[d], day), "Today's sale isn't marked bought")
+	check(noted(d, "joins your kaiju"), "Nobody told them their kaiju came")
+	-- (paid for twice in a day: not lost, a rare roll instead)
+	check(KaijuServer.saleGrant(d, "Daily") and profiles[d].KaijuRareRolls == 1, "A second purchase in a day was lost")
+	check(Kaiju.count(roster) == before + 1, "Two of today's kaiju in a day")
+	check(KaijuServer.saleGrant(d, "Rare") and profiles[d].KaijuRareRollBought == true and profiles[d].KaijuRareRolls == 2, "The Starter Rare Roll wasn't owed")
+	check(not KaijuServer.saleGrant(d, "Nothing"), "An unknown sale was given")
+	-- The rare roll plays on the roll screen: one of the rarest batch, its
+	-- traits at least the floor, taken from the rare rolls (not boss rolls).
+	local bossBefore = profiles[d].KaijuBossRolls or 0
+	local shown = registered.KaijuRoll(d)
+	check(shown.Boss and shown.Rare and #shown.Rolls == 1, "The rare roll isn't a one-kaiju rare roll")
+	local entry = shown.Rolls[1]
+	check(table.find(Kaiju.rareKinds(), entry.Species) ~= nil, "A rare roll dealt a kind not of the rarest batch: " .. entry.Species)
+	for _, name in Kaiju.Traits.Names do
+		check(entry.Traits[name] >= Kaiju.Sale.Rare.TraitFloor, "A rare roll's trait under its floor")
+	end
+	check(registered.KaijuRollClaim(d).Ok, "Couldn't take the rare roll")
+	check(profiles[d].KaijuRareRolls == 1 and (profiles[d].KaijuBossRolls or 0) == bossBefore, "The rare roll took the wrong count")
+	local caught = false
+	for _, record in roster.List do
+		if record.Species == entry.Species and record.Soul.Id == entry.Soul.Id then
+			caught = record.Traits.Might == entry.Traits.Might
+		end
+	end
+	check(caught, "The rare roll's kaiju didn't join with its traits")
+end)()
+
 print(
 	string.format(
-		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together, ADJUST ARMOR, invites that take you in, your support, defending you)",
+		"PASS: %d kaiju server checks (E abilities, the starter roll, your team, enchanting (its own element), naming, auto heal, fighting as a team, wild kaiju, duels, taming, kills, rifts, critters, stirring it up, the vein guardian, claimed patches, a wild kaiju's day, kaiju battles, the Kaiju Arena downstairs (its stairs, pads, stakes and courts, full health and back, rematches), gem raids, robbed while down, the Rift and its healing crystals, going in together, ADJUST ARMOR, invites that take you in, your support, defending you, the Kennel's sales)",
 		checks
 	)
 )

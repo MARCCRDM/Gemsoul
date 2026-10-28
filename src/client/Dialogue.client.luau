@@ -403,6 +403,12 @@ function actions.KaijuMarket()
 	require(script.Parent.Modules.MarketBoardUI).open("Browse", "Kaiju")
 end
 
+-- The Kennel's sales: the Daily Kaiju Sale and the Starter Rare Roll.
+function actions.KennelSale()
+	close()
+	require(script.Parent.Modules.KennelSale).open()
+end
+
 -- Who's in the Kaiju Kennel today (Shared.KaijuKennel).
 function actions.KennelToday()
 	local Kennel = require(ReplicatedStorage.Shared.KaijuKennel)
