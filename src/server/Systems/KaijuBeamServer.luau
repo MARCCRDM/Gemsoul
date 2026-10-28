@@ -4,9 +4,8 @@
 
 	The charge: one meter for your whole team, its own (KaijuBeam.Charge),
 	kept on your profile (Kaiju.roster(profile).BeamCharge) so it isn't lost
-	when the team's put away. It fills, slowly, while your team's out
-	(mining or not), faster while any of them fights, and with every blow
-	of theirs that lands (KaijuServer's onStrike hook). Their Q / E / R cost
+	when the team's put away. Nothing fills it on its own: only blows of
+	theirs that land (KaijuServer's onStrike hook). Their Q / E / R cost
 	it nothing. SAVE CHARGE (your switch, on your profile:
 	Kaiju.roster(profile).SaveCharge): your fighters cast none of their
 	moves, blows alone (KaijuServer's holding hook, KaijuFighter.hold), and
@@ -128,22 +127,11 @@ local function publish(player: Player, team)
 	end
 end
 
--- One tick of the charge: a trickle with your team out, a little more
--- while any of them fights (blows landing add theirs as they land:
--- onStrike). Not while they're blasting.
-function KaijuBeamServer._charge(dt: number)
-	local rules = KaijuBeam.Charge
+-- One tick: the HUD's charge. Time adds nothing (it's earned: blows
+-- landing add theirs as they land, onStrike).
+function KaijuBeamServer._charge(_dt: number)
 	for _, player in Players:GetPlayers() do
-		local team = standing(player)
-		if #team > 0 and not casts[player] then
-			local fighting = false
-			for _, pet in team do
-				fighting = fighting or pet.Target ~= nil
-			end
-			local rate = rules.Trickle + (if fighting then rules.Fight else 0)
-			setCharge(player, KaijuBeam.gain(chargeOf(player), rate * dt, saving(player)))
-		end
-		publish(player, team)
+		publish(player, standing(player))
 	end
 end
 

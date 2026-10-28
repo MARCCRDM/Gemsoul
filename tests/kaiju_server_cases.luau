@@ -4424,24 +4424,21 @@ local function teamFights()
 		reset()
 		rootA.CFrame = CFrame.new(spot)
 		check(KaijuBeam.Mana == nil and KaijuBeam.spend == nil, "The HYPERBEAM still runs on each kaiju's mana")
-		-- Charging: a trickle with the team out, on your profile and the HUD.
-		roster.BeamCharge = 0
+		-- Earned, never passive: time adds nothing, following you or in a
+		-- fight; the HUD shows the profile's charge.
+		roster.BeamCharge = 12
 		for _, pet in team do
 			pet.Target = nil
 		end
 		Beam._charge(10)
-		check(math.abs(roster.BeamCharge - rules.Trickle * 10) < 1e-6, "Your team out doesn't charge it as it follows you")
-		check(a:GetAttribute("KaijuCharge") == math.floor(rules.Trickle * 10), "The HUD's charge isn't the team's")
+		check(roster.BeamCharge == 12, "The HYPERBEAM fills on its own as the team follows you")
+		check(a:GetAttribute("KaijuCharge") == 12, "The HUD's charge isn't the team's")
 		local res = Beam._fire(a, { X = 0, Z = 1 }, now)
 		check(not res.Ok and string.find(res.Message, "charged") ~= nil, "A HYPERBEAM half charged")
-		-- A long charge: minutes following you about, not seconds.
-		check(rules.Max / rules.Trickle >= 300, "The HYPERBEAM charges too fast following you about")
-		-- In a fight, a little more.
-		roster.BeamCharge = 0
 		team[1].Target = { Root = team[1].Root }
 		Beam._charge(10)
 		team[1].Target = nil
-		check(math.abs(roster.BeamCharge - (rules.Trickle + rules.Fight) * 10) < 1e-6, "A fight doesn't charge it faster")
+		check(roster.BeamCharge == 12, "The HYPERBEAM fills on its own in a fight")
 		-- A blow landing adds to it; a move costs nothing.
 		local dummy = bugAt(spot + Vector3.new(40, 0, 40))
 		roster.BeamCharge = 0
@@ -4462,8 +4459,10 @@ local function teamFights()
 		KaijuFighter.hold(f, now)
 		check(f.NextQ > now and f.NextR > now and f.NextSurge > now and f.NextGem > now, "Saving, its moves are still due")
 		roster.BeamCharge = 0
-		Beam._charge(10)
-		check(math.abs(roster.BeamCharge - rules.Trickle * 10 * rules.Save) < 1e-6, "Saving doesn't charge faster")
+		local blow = KaijuServer.strike(team[2] or team[1], dummy, 1, nil, false)
+		if blow == "Hit" or blow == "Broken" then
+			check(math.abs(roster.BeamCharge - rules.Hit * rules.Save) < 1e-6, "Saving doesn't charge faster")
+		end
 		registered.KaijuSaveCharge(a, false)
 		check(not KaijuServer.holding(team[1]) and a:GetAttribute("KaijuSave") == nil, "SAVE CHARGE didn't switch off")
 		-- Full: the blast. One creature in front, one behind, one off to the

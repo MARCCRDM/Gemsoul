@@ -746,12 +746,12 @@ blast together. It works the same in mining and in fights.
 - **The charge.** *2026-10-26:* one meter for the whole team, separate from
   anything else (it used to be each kaiju's own mana, which their Q, E and
   R spent). It runs 0 to 100, kept on your profile
-  (`Kaiju.roster(profile).BeamCharge`), and only fills while your team's
-  out: 0.3 a second (about five and a half minutes from empty following
-  you about, twice as long as before), 0.15 a second more while any of them
-  fights, and 0.6 for every blow of theirs that lands (1.6 times that for a
-  heavy). Their moves cost it nothing (`KaijuBeam.Charge`). A minute or so
-  of steady fighting fills it, where it used to take about 40 seconds.
+  (`Kaiju.roster(profile).BeamCharge`). It's earned, never passive: only
+  0.6 for every blow of your team's that lands (1.6 times that for a
+  heavy). Following you about or standing by adds nothing. Their moves
+  cost it nothing (`KaijuBeam.Charge`). About a minute and a half of
+  steady fighting fills it. *2026-10-28:* it used to trickle in on its own
+  (0.3 a second, 0.15 more in a fight).
 - **SAVE CHARGE.** The button's SAVE switch, kept on your profile
   (`KaijuSaveCharge`). While it's on, your fighters cast none of their Q, E
   or R moves (`KaijuFighter.hold`). They fight with blows alone and charge

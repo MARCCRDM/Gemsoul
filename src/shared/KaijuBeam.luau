@@ -23,11 +23,10 @@
 
 	The charge (Charge): one meter for the whole team, its own, apart from
 	anything a kaiju spends on its moves (their Q, E and R cost it nothing).
-	With your team out it gains Trickle a second (so it fills while you
-	mine), Fight a second more while any of them fights, and Hit for every
-	blow of theirs that lands (Heavy times that for a heavy). It's a long
-	charge: about five and a half minutes from empty following you about,
-	a minute or so of steady fighting. SAVE CHARGE (your switch, kept on
+	Nothing fills it on its own: it's earned, Hit for every blow of your
+	team's that lands (Heavy times that for a heavy), so about a minute
+	and a half of steady fighting from empty. Following you about or
+	standing by, it doesn't move. SAVE CHARGE (your switch, kept on
 	your profile): your kaiju fight with blows alone, casting none of their
 	moves, and it fills Save times as fast; the support's heals still go
 	out.
@@ -85,8 +84,6 @@ local KaijuBeam = {}
 
 KaijuBeam.Charge = {
 	Max = 100,
-	Trickle = 0.3, -- a second, your team out (about five and a half minutes from empty)
-	Fight = 0.15, -- a second more, while any of them fights
 	Hit = 0.6, -- a blow of any of theirs that lands
 	Heavy = 1.6, -- times that for a heavy
 	Save = 1.6, -- times as fast, saving its charge

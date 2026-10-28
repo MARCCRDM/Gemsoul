@@ -1099,9 +1099,8 @@ do
 	check(not ready and share == 0.5, "Ready half charged")
 	ready, share = Beam.ready(nil)
 	check(not ready and share == 0, "Ready with no charge")
-	-- A long charge: minutes from empty out of a fight; a fight fills it faster.
-	local fill = M.Max / M.Trickle
-	check(fill >= 300, "The trickle fills too fast")
+	-- Earned, never passive: no time-based fill, only blows landing.
+	check(M.Trickle == nil and M.Fight == nil, "The HYPERBEAM still fills on its own")
 	check(M.Hit * 20 < M.Max, "A handful of blows fill it")
 
 	local at = Beam.timeline()
