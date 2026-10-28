@@ -29,9 +29,10 @@ local Kennel = {}
 -- The pen: the floor of the stage in the Shelter's hall (its middle, in
 -- the Shelter's frame) and how far out from it the kaiju walk. The fence
 -- stands at Fence; the Kaiju of the Day's display at Display, in front of
--- the gate, facing the hall's door (+Z).
+-- the gate. Both face the garage (-Z): players come into the hall through
+-- the barrier from there, the gate and Wren the first things they see.
 Kennel.Pen = { Middle = Vector3.new(0, 2.35, 18), Inner = 4.5, Outer = 8.6, Fence = 11.6 }
-Kennel.Display = Vector3.new(0, 0.86, 33.5)
+Kennel.Display = Vector3.new(0, 0.86, 2.5)
 Kennel.Count = 6 -- kaiju in the pen
 Kennel.Scale = 0.75 -- their size (a pet is Kaiju.Scale.Pet, a wild one Wild)
 Kennel.DaySeconds = 86400

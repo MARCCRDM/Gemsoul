@@ -19,8 +19,10 @@ budget (`tests/run_moon_quarry_scene.py`, under 4000). The rest is built by
 each player's own client, next to today's kaiju, and shown and hidden with
 them: a rock to climb in the middle, troughs by the fence, a fence of 28
 posts with two rails between each pair (solid to your own character, so
-players stay outside), and a **KENNEL** arch over the gate, facing the
-hall's main door. One word, like the hall's other signs.
+players stay outside), and a **KENNEL** arch over the gate. The gate, the
+sale's display in front of it and Wren all face the garage: players come
+into the hall through the barrier from there, so they're the first things
+you see. One word, like the hall's other signs.
 
 ## The Daily Kaiju Sale
 

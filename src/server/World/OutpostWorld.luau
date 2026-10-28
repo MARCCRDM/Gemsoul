@@ -2378,7 +2378,7 @@ local function shelter(parent, at: CFrame, rules)
 		{ Id = "Outfitter", CFrame = stand(-58, 25.5, 0, 25.5) }, -- Borin, by the Store's suits
 		{ Id = "Foreman", CFrame = stand(-24.5, 49, 0, 50) }, -- Garrick, by the door
 		{ Id = "InfoBot", CFrame = stand(15, 41, 0, D - 10) }, -- INFO-9, by its kiosk
-		{ Id = "KaijuKeeper", CFrame = stand(-6.5, 32.5, 0, D - 10) }, -- Wren, by the kennel's gate
+		{ Id = "KaijuKeeper", CFrame = stand(-6.5, 3.5, 0, SHELTER.Barrier) }, -- Wren, by the kennel's gate, facing the garage
 	}
 
 	-- Players arrive in the garage lane facing bay 04's Mole drill (the

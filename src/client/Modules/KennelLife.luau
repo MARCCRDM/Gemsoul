@@ -144,7 +144,8 @@ end
 
 -- The pen: a fence of posts and two rails round the bed, a rock in the
 -- middle, troughs by the fence, the KENNEL arch over the gate (facing the
--- hall's door, +Z). And the sale's plinth and board in front of it.
+-- garage, -Z, where players come into the hall). And the sale's plinth and
+-- board in front of it.
 local function buildPen(frame: CFrame): Folder
 	local made = Instance.new("Folder")
 	made.Name = "KennelPen"
@@ -174,24 +175,24 @@ local function buildPen(frame: CFrame): Folder
 		end
 	end
 	-- The arch over the gate, KENNEL across its board.
-	local front = top * CFrame.new(0, 0, fenceR + 0.2)
-	local facingDoor = CFrame.lookAt(front.Position, front.Position + (front.Position - top.Position) * Vector3.new(1, 0, 1))
+	local front = top * CFrame.new(0, 0, -(fenceR + 0.2))
+	local facingOut = CFrame.lookAt(front.Position, front.Position + (front.Position - top.Position) * Vector3.new(1, 0, 1))
 	for _, side in { -3.4, 3.4 } do
-		piece(made, facingDoor * CFrame.new(side, 3, 0), Vector3.new(0.8, 6, 0.8), DARK, Enum.Material.Metal, true)
+		piece(made, facingOut * CFrame.new(side, 3, 0), Vector3.new(0.8, 6, 0.8), DARK, Enum.Material.Metal, true)
 	end
-	local sign = piece(made, facingDoor * CFrame.new(0, 6.3, 0), Vector3.new(8.4, 1.6, 0.4), DARK, Enum.Material.Metal)
+	local sign = piece(made, facingOut * CFrame.new(0, 6.3, 0), Vector3.new(8.4, 1.6, 0.4), DARK, Enum.Material.Metal)
 	sign.Name = "KennelSign"
 	line(surface(sign, 40), "KENNEL", 0.12, 0.76, 60, HAZARD, Enum.Font.GothamBlack)
 	local glow = Instance.new("PointLight")
 	glow.Color, glow.Range, glow.Brightness = Color3.fromRGB(255, 214, 150), 14, 0.6
 	glow.Parent = sign
 	-- The Daily Kaiju Sale: a plinth (its kaiju put on it by stockDisplay)
-	-- and its board beside it, both turned to the door.
+	-- and its board beside it, both turned to the garage.
 	local base = frame * CFrame.new(Kennel.Display)
 	cylinder(made, base * CFrame.new(0, 0.3, 0), 2.3, 0.6, DARK, Enum.Material.Metal, true).Name = "SalePlinth"
 	cylinder(made, base * CFrame.new(0, 0.63, 0), 2.1, 0.06, GOLD, Enum.Material.Metal)
 	cylinder(made, base * CFrame.new(0, 0.67, 0), 1.9, 0.04, Color3.fromRGB(28, 24, 20), Enum.Material.Slate)
-	local stand = base * CFrame.new(4.6, 0, 0.6) * CFrame.Angles(0, math.rad(180 + 18), 0)
+	local stand = base * CFrame.new(4.6, 0, -0.6) * CFrame.Angles(0, math.rad(-18), 0)
 	for _, side in { -2.5, 2.5 } do
 		piece(made, stand * CFrame.new(side, 1.9, 0.12), Vector3.new(0.28, 3.8, 0.28), DARK, Enum.Material.Metal)
 	end
