@@ -1061,8 +1061,8 @@ Little creatures that tear through reality at you, in **swarms**: three or
 four at a time in the Fringe, five or six at the Edge, more when it's
 stirred up. They pour out of ragged tears in the air (up to three out of
 each, one after another) that crackle for a second and a half first, then
-seal. Each one alone is weak (30 health and a 1.6 bite at level 1, where
-one used to have 60 and 4), so a swarm hits about as hard as one or two
+seal. Each one alone is weak (36 health and a 1.92 bite at level 1, after
+a 20% buff from 30 and 1.6; one used to have 60 and 4), so a swarm hits about as hard as one or two
 used to, from all sides. Mining out past the Outpost's core draws them
 (about 1 in 35 swings in the Fringe, 1 in 17 at the Edge), and now and
 then the frontier tears open by itself and a swarm roams round it; see

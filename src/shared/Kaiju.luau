@@ -601,8 +601,8 @@ Kaiju.Spread = { 0.6, 1.4 }
 -- small bite, little health. A little EXP for your kaiju, a coin. Leash:
 -- how far from its rift one chases.
 Kaiju.Bug = {
-	Health = 30,
-	Damage = 1.6,
+	Health = 36, -- (30 and 1.6 before the critters' 20% buff)
+	Damage = 1.92,
 	Rate = 1.4,
 	Speed = 13,
 	Reach = 4.5,
