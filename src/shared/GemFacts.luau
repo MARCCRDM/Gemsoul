@@ -49,10 +49,10 @@ local function short(n: number): string
 	return if tenth == math.floor(tenth) then tostring(math.floor(tenth)) else string.format("%.1f", tenth)
 end
 
-function GemFacts.lines(gem): { { Text: string, Kind: string, Key: string? } }
+function GemFacts.lines(gem): { { Text: string, Kind: string, Key: string?, Move: string? } }
 	local lines = {}
-	local function add(text: string, kind: string, key: string?)
-		table.insert(lines, { Text = text, Kind = kind, Key = key })
+	local function add(text: string, kind: string, key: string?, move: string?)
+		table.insert(lines, { Text = text, Kind = kind, Key = key, Move = move })
 	end
 	if not gem then
 		return lines
@@ -92,7 +92,8 @@ function GemFacts.lines(gem): { { Text: string, Kind: string, Key: string? } }
 				add(
 					key .. SEP .. GemFacts.Sockets[key] .. SEP .. move.Name .. SEP .. GemTraits.typeOf(id),
 					"Move",
-					key
+					key,
+					id -- (its icon: Client SurgeIcons)
 				)
 				local ok, stats = pcall(GemTraits.stats, id, gem)
 				if ok and stats then

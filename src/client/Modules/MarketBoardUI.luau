@@ -19,12 +19,14 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemFacts = require(ReplicatedStorage.Shared.GemFacts)
+local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 local Rules = require(ReplicatedStorage.Shared.Market)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local CoinShop = require(script.Parent.CoinShop)
+local SurgeIcons = require(script.Parent.SurgeIcons)
 local GearArt = require(script.Parent.GearArt)
 local GemArt = require(script.Parent.GemArt)
 local GemClient = require(script.Parent.GemClient)
@@ -336,8 +338,8 @@ end
 -- socket in their element's colour, then the roll's finish and serial.
 local function detailLines(payload)
 	local lines = {}
-	local function add(value, size, color, font, gap)
-		table.insert(lines, { value, size, color, font or BODY, gap })
+	local function add(value, size, color, font, gap, move)
+		table.insert(lines, { value, size, color, font or BODY, gap, move })
 	end
 	if payload.Kind == "Gem" then
 		-- Every property, as the gem window shows it (Shared.GemFacts).
@@ -347,7 +349,7 @@ local function detailLines(payload)
 				then itemColor(payload)
 				elseif fact.Key then KEY_COLORS[fact.Key]:Lerp(P.Text, if fact.Kind == "Stats" then 0.55 else 0)
 				else style[2]
-			add(fact.Text, style[1], color, style[3], if fact.Kind == "Head" then 6 else nil)
+			add(fact.Text, style[1], color, style[3], if fact.Kind == "Head" then 6 else nil, fact.Move)
 		end
 		if payload.Where then
 			add("Now " .. payload.Where .. " (listing takes it out)", 12, P.Dim)
@@ -435,23 +437,80 @@ local function details(parent, payload, x, y, w, h, skipHeader: boolean?)
 		if skipHeader and i <= 2 then
 			continue
 		end
+		-- A move: its surge icon, then its line.
+		local holder: Instance = box
+		local iconSize = 22
+		if line[6] then
+			holder = new("Frame", {
+				Name = "Move",
+				BackgroundTransparency = 1,
+				Size = UDim2.fromOffset(w - 10, iconSize),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				LayoutOrder = i,
+			}, box)
+			local icon = new("TextLabel", {
+				Name = "Icon",
+				BackgroundColor3 = P.Inset,
+				Text = "◆",
+				TextSize = 12,
+				Font = BOLD,
+				TextColor3 = line[3],
+				Position = UDim2.fromOffset(0, 1),
+				Size = UDim2.fromOffset(iconSize, iconSize),
+			}, holder)
+			UiKit.round(icon, 5)
+			new("UIStroke", { Color = line[3], Transparency = 0.35, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, icon)
+			SurgeIcons.apply(icon, line[6])
+		end
 		local row = new("TextLabel", {
 			BackgroundTransparency = 1,
 			Text = line[1],
 			TextSize = line[2],
 			TextColor3 = line[3],
 			Font = line[4],
-			Size = UDim2.fromOffset(w - 10, 0),
+			Position = if line[6] then UDim2.fromOffset(iconSize + 6, 3) else UDim2.new(),
+			Size = UDim2.fromOffset(w - 10 - (if line[6] then iconSize + 6 else 0), 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			LayoutOrder = i,
-		}, box)
-		if line[5] then
+		}, holder)
+		if line[5] and not line[6] then
 			new("UIPadding", { PaddingTop = UDim.new(0, line[5]) }, row)
 		end
 	end
 	return box
+end
+
+-- What it's likely to fetch on the Market: the middle price of the same
+-- thing for sale now (a gem of its rarity and element, the same piece of
+-- gear, a kaiju of its kind), else what it's worth (a gem's value; gear by
+-- its rarity and quality, as the Arena Vault prices it).
+local function estimate(item): number
+	local prices = {}
+	for _, row in listings do
+		local other = row.Item
+		if row.Mode == "Sell" and type(row.Price) == "number" and other and other.Kind == item.Kind then
+			local same = if item.Kind == "Gem"
+				then other.Gem and item.Gem and other.Gem.Tier == item.Gem.Tier and other.Gem.Element == item.Gem.Element
+				elseif item.Kind == "Kaiju" then (other.Record or {}).Species == (item.Record or {}).Species
+				else other.Id == item.Id
+			if same then
+				table.insert(prices, row.Price)
+			end
+		end
+	end
+	local price
+	if #prices > 0 then
+		table.sort(prices)
+		price = prices[math.ceil(#prices / 2)]
+	elseif item.Kind == "Gem" and item.Gem then
+		price = GemConfig.value(item.Gem)
+	elseif item.Kind == "Gear" then
+		local rarity = GearRolls.Rarities[item.Roll and item.Roll.Rarity or 1] or GearRolls.Rarities[1]
+		price = ArenaStreak.vaultPrice({ Kind = "Gear", Quality = item.Quality }, nil, (string.gsub(rarity.Name, " ", "")))
+	end
+	return math.clamp(math.floor(price or 100), Rules.MinPrice, Rules.MaxPrice)
 end
 
 -- Everything you could put up (not worn, not socketed), in payload shape.
@@ -917,6 +976,8 @@ local function drawSell()
 			l.TextYAlignment = Enum.TextYAlignment.Top
 			cell.Activated:Connect(function()
 				sellPick = item
+				-- (its price starts at the market's estimate)
+				sellPrice = estimate(item)
 				draw()
 			end)
 		end
@@ -1009,19 +1070,30 @@ local function drawSell()
 			end)
 			x += 64
 		end
-		if item.Kind == "Gem" then
-			local worth = GemConfig.value(item.Gem)
-			label(
-				form,
-				"Shop pays about " .. math.floor(worth * Config.MarketSellRate) .. " · worth ~" .. worth,
-				11,
-				P.Dim,
-				BODY,
-				14,
-				330 + dy,
-				316,
-				14
-			)
+		-- The market's estimate (where the price starts), and back to it.
+		local guess = estimate(item)
+		local shop = if item.Kind == "Gem" then "  ·  shop pays ~" .. math.floor(GemConfig.value(item.Gem) * Config.MarketSellRate) else ""
+		local guide = label(
+			form,
+			"Market estimate ~" .. commas(guess) .. shop .. (if sellPrice ~= guess then "  ·  USE IT" else ""),
+			11,
+			if sellPrice ~= guess then P.Gold else P.Dim,
+			BODY,
+			14,
+			330 + dy,
+			316,
+			14
+		)
+		if sellPrice ~= guess then
+			local back = new("TextButton", {
+				Text = "",
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+			}, guide)
+			back.Activated:Connect(function()
+				sellPrice = guess
+				draw()
+			end)
 		end
 		label(
 			form,
