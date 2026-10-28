@@ -430,6 +430,8 @@ local function showTab(name: string)
 	end
 end
 
+-- (With coupons off, the friend rewards alone, and no tabs.)
+tabRow.Visible = Coupons.Enabled
 for order, entry in { { "Rewards", "FRIEND REWARDS" }, { "Coupons", "COUPONS" } } do
 	local b = new("TextButton", {
 		AutoButtonColor = true,
@@ -458,7 +460,7 @@ function ReferralUI.open(onTab: string?)
 	drawCoupons()
 	-- (Coupons first while you hold any.)
 	local first = onTab or (if Coupons.total(GemClient.Profile) > 0 then "Coupons" else "Rewards")
-	showTab(if first == "Coupons" then "Coupons" else "Rewards")
+	showTab(if first == "Coupons" and Coupons.Enabled then "Coupons" else "Rewards")
 end
 
 function ReferralUI.close()

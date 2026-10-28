@@ -270,20 +270,25 @@ check(owned.Skin == "SkinKindred" and owned.Pick == "PickTwinStar" and owned.Vis
 join(makePlayer(34, 30))
 check(owned.Owned.SkinCrusader and owned.Skin == "SkinCrusader", "The fourth friend didn't unlock (and put on) Crusader Gold")
 check(owned.Owned.SkinKindred, "Kindred Edge was lost on reaching the next tier")
--- Reward coupons (Shared.Coupons): one of each per friend, once.
+-- Reward coupons (Shared.Coupons): one of each per friend, once, while
+-- coupons are on; none at all while they're off.
 local held = profiles[recruiter]
-check(
-	Coupons.count(held, "Swings") == 4 and Coupons.count(held, "Revive") == 4 and Coupons.count(held, "XPBoost") == 4,
-	"Four friends didn't give four of each coupon"
-)
-check(held.Referrals.CouponsPaid == 4, "The friends paid for weren't kept")
-handlers.ReferralState(recruiter)
-check(Coupons.count(held, "Swings") == 4, "A check paid the same friends' coupons again")
 local told = false
 for _, note in notes do
 	told = told or (note.Player == recruiter and string.find(note.Text, "coupons", 1, true) ~= nil)
 end
-check(told, "The inviter wasn't told about the coupons")
+if Coupons.Enabled then
+	check(
+		Coupons.count(held, "Swings") == 4 and Coupons.count(held, "Revive") == 4 and Coupons.count(held, "XPBoost") == 4,
+		"Four friends didn't give four of each coupon"
+	)
+	check(held.Referrals.CouponsPaid == 4, "The friends paid for weren't kept")
+	handlers.ReferralState(recruiter)
+	check(Coupons.count(held, "Swings") == 4, "A check paid the same friends' coupons again")
+	check(told, "The inviter wasn't told about the coupons")
+else
+	check(Coupons.total(held) == 0 and not told, "Coupons are off, but friends still gave them")
+end
 for friendId = 301, 306 do join(makePlayer(friendId, 30)) end
 check(owned.Owned.ShieldAegis and owned.Shield == "ShieldAegis", "Ten friends must unlock and wear the shield")
 check(owned.Visor == "VisorStarlink" and owned.Skin == "SkinCrusader", "Shield reward replaced another cosmetic slot")

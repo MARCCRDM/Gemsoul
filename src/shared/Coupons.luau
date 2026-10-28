@@ -46,6 +46,10 @@ Coupons.Kinds = {
 	},
 }
 Coupons.Order = { "Swings", "Revive", "XPBoost" }
+-- Off for now: no coupons for friends who join, and no COUPONS tab. (A
+-- Revive coupon bought with Robux while none of your kaiju was down still
+-- waits for you, and the kaiju panel's COUPON still spends it.)
+Coupons.Enabled = false
 Coupons.PerFriend = { Swings = 1, Revive = 1, XPBoost = 1 }
 -- (No more than this of one kind waits on a profile.)
 Coupons.Most = 99

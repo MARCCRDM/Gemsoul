@@ -96,14 +96,17 @@ local function settle(player: Player, known: number?): (any, number?)
 			granted = reward
 		end
 	end
-	-- A coupon of each kind for every friend not paid for yet.
-	local owed, paid = Coupons.owed(profile.Referrals.Count, profile.Referrals.CouponsPaid)
+	-- A coupon of each kind for every friend not paid for yet (while
+	-- coupons are on).
 	local given = 0
-	for kind, n in owed do
-		Coupons.add(profile, kind, n)
-		given += n
+	if Coupons.Enabled then
+		local owed, paid = Coupons.owed(profile.Referrals.Count, profile.Referrals.CouponsPaid)
+		for kind, n in owed do
+			Coupons.add(profile, kind, n)
+			given += n
+		end
+		profile.Referrals.CouponsPaid = paid
 	end
-	profile.Referrals.CouponsPaid = paid
 	PlayerData.sync(player)
 	if given > 0 then
 		Remotes.Notify:FireClient(

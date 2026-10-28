@@ -627,13 +627,10 @@ local function buildTop(canvas: Frame)
 	UiKit.shrinkRow(row, list)
 	-- The keyboard keys the Dashboard binds (K, L, J), shown where there's a keyboard.
 	local keyboard = UserInputService.KeyboardEnabled
-	for order, spec in {
+	-- (SURGES, AUGMENTS, SEASON, MARKET and STORE are off the strip for now:
+	-- the Market and Store are in the lobby, the rest a key away.)
+	for order, spec: { any } in {
 		{ "INVENTORY", nil },
-		{ "SURGES", open("SurgeArrayUI", "toggle"), "L" },
-		{ "AUGMENTS", open("AugmentTreeUI", "toggle"), "K" },
-		{ "SEASON", open("SeasonUI", "toggle"), "J" },
-		{ "MARKET", open("MarketBoardUI", "open") },
-		{ "STORE", open("ShopUI", "toggle") },
 	} do
 		local on = spec[2] == nil
 		-- The tab: its name, then (with a keyboard) its key in a small keycap.

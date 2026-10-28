@@ -540,7 +540,6 @@ Vendors.Tips = {
 	"The Store's stands change every 40 seconds. Wait a few minutes to see everything on sale.",
 	"Mechs are parked in Bays 1 to 8. Drive out either garage door and down its ramp.",
 	"Mechs are for getting around. They can't mine or fight.",
-	"Invite a friend: when they join, you get a swing restore, a kaiju revive and a double XP coupon.",
 	"Daily challenges change every day. Finish all three for a bonus.",
 }
 

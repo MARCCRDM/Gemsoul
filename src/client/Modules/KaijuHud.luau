@@ -2500,7 +2500,8 @@ local function drawHeal(record)
 		)
 		reviveCoupon.Text = if coupons > 0
 			then string.format("You have %d Revive coupon%s: COUPON brings it back free.", coupons, if coupons == 1 then "" else "s")
-			else "Invite a friend: a free Revive coupon for each one who joins."
+			elseif Coupons.Enabled then "Invite a friend: a free Revive coupon for each one who joins."
+			else ""
 		healSummary.Text = "Knocked out"
 		healNote.Text = "Revive now: every one of yours that's down, back at once, at half health."
 		healReady = onSale
