@@ -244,7 +244,7 @@ local function itemLine(payload): string
 		local record = payload.Record or {}
 		local kind = Kaiju.Species[record.Species or ""]
 		local soul = record.Soul and (GemConfig.TierLabels[record.Soul.Tier] or record.Soul.Tier) or "Common"
-		return string.format("Lv %d %s  ·  %s soul%s", record.Level or 1, kind and kind.Role or "kaiju", soul,
+		return string.format("Lv %d  ·  %s  ·  %s soul%s", record.Level or 1, kind and kind.Role or "kaiju", soul,
 			if Kaiju.batch(record.Species or "") == 1 then "  ·  ★ rare kind" else "")
 	end
 	local rarity = GearRolls.Rarities[payload.Roll and payload.Roll.Rarity or 1] or GearRolls.Rarities[1]

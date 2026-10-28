@@ -734,3 +734,32 @@ Boss and move names stay in English (they're names).
 | `run_outpost` | Each vein has its gate, prompt, arch, glow, cracks in its colour and its index |
 | `run_lang` | The gate in Spanish: the lobby's lines, its biome and element, the ladder's heading and lines, a locked card, BRING FRIENDS and its warning, an unlock, joining your party, the strip's level |
 | `run_topbar` | The crossing is a cover; the card, strip and down window keep clear of Roblox's buttons |
+
+## The Bounty Board's look, 2026-10-28
+
+The Bounty Board and every Rift Gate's lobby (`RiftClient.openGate`) are
+drawn like a fantasy MMO's dialog window, not a stack of coloured pills:
+
+- **The frame** (`giltFrame`): dark stone, a bronze border, a gold
+  hairline inside it with a small stud at each corner. `modal(..., gilt)`
+  builds it; the backup and down cards keep the plain card.
+- **Words**: serif (Merriweather) headings in old gold over a gilt rule
+  fading out (`Gilt.heading`), sentence case, no numbered steps.
+- **Colour means something**: the boss's element ("Deals Thermal damage"),
+  green for what beats it and for ready, the level in its danger's colour
+  (green, amber, red), red for what a locked boss needs.
+- **The boss picked** reads like a tooltip: name and level, what it hits
+  with, who it's for, what it's weak to, how to beat it, then your armor
+  against it and **Adjust Armor**.
+- **Buttons** (`Gilt.button`): crimson in a gold rim for the one that
+  matters (Enter, Go In Now), dark stone in brass for the rest; the rim
+  brightens under the mouse.
+- **Party**: members in recessed wells, faces in gilt rings (gold for the
+  leader), "Ready · Leader" in words; the people list has underlined tabs.
+
+On a phone the frame's padding is tighter and the boss's name (already on
+its card) isn't repeated, so the whole window fits a 390-tall screen.
+
+![Before](rift/bounty-board-before.png)
+![After](rift/bounty-board-gilt.png)
+![Phone](rift/bounty-board-gilt-phone.png)

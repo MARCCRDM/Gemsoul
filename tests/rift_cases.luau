@@ -1079,7 +1079,7 @@ do
 	-- The board: ADJUST ARMOR against the boss picked ("RiftGear"), and an
 	-- invite says which boss; the invite's card (Client.SocialUI) has its
 	-- own ADJUST MY ARMOR, and PartyUI no longer puts up a second card.
-	check(client:find('GemClient.request("RiftGear", chosen.Id, true)', 1, true) ~= nil and client:find('"ADJUST ARMOR"', 1, true) ~= nil, "No ADJUST ARMOR on the board")
+	check(client:find('GemClient.request("RiftGear", chosen.Id, true)', 1, true) ~= nil and client:find('"Adjust Armor"', 1, true) ~= nil, "No Adjust Armor on the board")
 	check(client:find('GemClient.request("PartyInvite", person.UserId, { Rift = picked })', 1, true) ~= nil, "A board invite doesn't say which boss")
 	local social = fs.readFile(ROOT .. "/src/client/Modules/SocialUI.luau")
 	local partyUi = fs.readFile(ROOT .. "/src/client/Modules/PartyUI.luau")

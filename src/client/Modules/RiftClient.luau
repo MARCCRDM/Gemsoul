@@ -78,6 +78,167 @@ local HELL = Color3.fromRGB(214, 52, 30)
 local WARN = Color3.fromRGB(255, 186, 72)
 local BOLD, BODY = IronUi.Bold, IronUi.Body
 
+-- The Bounty Board's look (a fantasy MMO's dialog window): a gilt frame
+-- on dark stone, serif headings in old gold, words in sentence case, and
+-- colour kept for what it means (the boss's element, a level's danger,
+-- ready or not).
+local Gilt = {
+	Gold = Color3.fromRGB(228, 188, 100),
+	Bright = Color3.fromRGB(255, 226, 150),
+	Brass = Color3.fromRGB(140, 110, 60),
+	Bronze = Color3.fromRGB(70, 50, 28),
+	Stone = Color3.fromRGB(27, 22, 18),
+	Deep = Color3.fromRGB(11, 9, 8),
+	Well = Color3.fromRGB(16, 13, 11),
+	Ink = Color3.fromRGB(236, 224, 200),
+	Faded = Color3.fromRGB(162, 146, 118),
+	Dusk = Color3.fromRGB(112, 100, 82),
+	Green = Color3.fromRGB(124, 214, 98),
+	Red = Color3.fromRGB(214, 92, 70),
+	Serif = Enum.Font.Merriweather,
+}
+
+-- A recessed well: darker stone in a brass hairline.
+function Gilt.well(frame: GuiObject, edge: Color3?): UIStroke
+	frame.BackgroundColor3 = Gilt.Well
+	UiKit.round(frame, 3)
+	return new("UIStroke", {
+		Color = edge or Gilt.Brass,
+		Thickness = 1,
+		Transparency = 0.5,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, frame)
+end
+
+-- A small gilt diamond: the frame's corners, a divider's middle.
+function Gilt.stud(parent: Instance, size: number, at: UDim2): Frame
+	local stud = new("Frame", {
+		Name = "Stud",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = at,
+		Size = UDim2.fromOffset(size, size),
+		Rotation = 45,
+		BackgroundColor3 = Gilt.Deep,
+		ZIndex = 3,
+	}, parent)
+	new("UIStroke", { Color = Gilt.Gold, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, stud)
+	return stud
+end
+
+-- A gilt hairline: fading out to the right, or to both ends (`both`).
+function Gilt.rule(parent: Instance, both: boolean?): Frame
+	local line = new("Frame", {
+		Name = "Rule",
+		BackgroundColor3 = Gilt.Gold,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 1),
+	}, parent)
+	new("UIGradient", {
+		Transparency = if both
+			then NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.5, 0.2),
+				NumberSequenceKeypoint.new(1, 1),
+			})
+			else NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.25),
+				NumberSequenceKeypoint.new(0.7, 0.85),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+	}, line)
+	return line
+end
+
+-- Serif words (a heading, a name, a button's), with a thin dark edge.
+function Gilt.words(parent: Instance, value: string, size: number, color: Color3): TextLabel
+	local label = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = value,
+		TextSize = size,
+		TextColor3 = color,
+		Font = Gilt.Serif,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Size = UDim2.new(1, 0, 0, size + 6),
+	}, parent)
+	new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 1, Transparency = 0.55 }, label)
+	return label
+end
+
+-- A section's heading: gold serif words over a gilt rule fading out.
+function Gilt.heading(parent: Instance, label: string, order: number, small: boolean): TextLabel
+	local row = new("Frame", {
+		Name = "Heading",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, if small then 18 else 27),
+		LayoutOrder = order,
+	}, parent)
+	local words = Gilt.words(row, label, if small then 12 else 16, Gilt.Gold)
+	words.Size = UDim2.new(1, 0, 1, -3)
+	local rule = Gilt.rule(row)
+	rule.AnchorPoint = Vector2.new(0, 1)
+	rule.Position = UDim2.fromScale(0, 1)
+	return words
+end
+
+-- A button: crimson in a gold rim for the one that matters (`primary`),
+-- dark stone in brass for the rest. The rim brightens under the mouse.
+function Gilt.button(
+	parent: Instance,
+	label: string,
+	primary: boolean,
+	order: number,
+	onClick: (() -> ())?,
+	tall: number?,
+	size: number?
+): TextButton
+	local b = new("TextButton", {
+		Name = "Button",
+		Text = label,
+		TextSize = size or 16,
+		Font = Gilt.Serif,
+		TextColor3 = if primary then Gilt.Bright else Gilt.Ink,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		AutoButtonColor = false,
+		Size = UDim2.new(1, 0, 0, tall or 40),
+		LayoutOrder = order,
+	}, parent)
+	UiKit.round(b, 3)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = if primary
+			then ColorSequence.new(Color3.fromRGB(158, 34, 22), Color3.fromRGB(82, 14, 10))
+			else ColorSequence.new(Color3.fromRGB(56, 46, 36), Color3.fromRGB(28, 22, 17)),
+	}, b)
+	local rim = new("UIStroke", {
+		Color = if primary then Gilt.Gold else Gilt.Brass,
+		Thickness = if primary then 1.5 else 1,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, b)
+	new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 1, Transparency = 0.35 }, b)
+	-- (light catching its top edge)
+	new("Frame", {
+		Name = "Shine",
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = if primary then 0.8 else 0.9,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(2, 1),
+		Size = UDim2.new(1, -4, 0, 1),
+	}, b)
+	local rest = rim.Color
+	b.MouseEnter:Connect(function()
+		rim.Color = Gilt.Bright
+	end)
+	b.MouseLeave:Connect(function()
+		rim.Color = rest
+	end)
+	if onClick then
+		b.Activated:Connect(onClick)
+	end
+	return b
+end
+
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
 end
@@ -210,23 +371,88 @@ local function screen(): ScreenGui
 	return gui :: ScreenGui
 end
 
+-- Closes a card: the whole of it, from its holder on the screen down.
 local function close(card: Frame?)
-	if card and card.Parent then
-		card.Parent:Destroy()
+	local node: Instance? = card
+	while node and node.Parent and node.Parent ~= gui do
+		node = node.Parent
+	end
+	if node and node.Parent then
+		node:Destroy()
 	end
 end
 
+-- The gilt frame round the Bounty Board (Gilt): dark stone in a bronze
+-- border, a gold hairline inside it with a stud at each corner. Its body
+-- (a list) to fill.
+local function giltFrame(holder: Frame, width: number, compact: boolean?): Frame
+	local frame = new("Frame", {
+		Name = "Frame",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(0, width, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+	}, holder)
+	UiKit.round(frame, 4)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 30, 23)),
+			ColorSequenceKeypoint.new(0.3, Gilt.Stone),
+			ColorSequenceKeypoint.new(1, Gilt.Deep),
+		}),
+	}, frame)
+	new("UIStroke", { Color = Gilt.Bronze, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
+	local rim = new("Frame", {
+		Name = "Rim",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(5, 5),
+		Size = UDim2.new(1, -10, 1, -10),
+	}, frame)
+	UiKit.round(rim, 2)
+	new("UIStroke", { Color = Gilt.Gold, Thickness = 1, Transparency = 0.4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, rim)
+	for _, corner in { UDim2.fromScale(0, 0), UDim2.fromScale(1, 0), UDim2.fromScale(0, 1), UDim2.fromScale(1, 1) } do
+		Gilt.stud(rim, 7, corner)
+	end
+	local body = new("Frame", {
+		Name = "Panel",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+	}, frame)
+	UiKit.pad(body, if compact then 8 else 20)
+	UiKit.list(body, if compact then 4 else 10)
+	return body
+end
+
 -- A card in the middle of the screen over a dimmed backdrop: its panel's
--- body (a list) to fill. `dismiss` closes it from the backdrop.
-local function modal(name: string, width: number, accent: Color3, dismiss: boolean, compact: boolean?): (Frame, Frame)
+-- body (a list) to fill. `dismiss` closes it from the backdrop; `gilt`
+-- frames it the Bounty Board's way (giltFrame).
+local function modal(
+	name: string,
+	width: number,
+	accent: Color3,
+	dismiss: boolean,
+	compact: boolean?,
+	gilt: boolean?
+): (Frame, Frame)
 	local holder = new("Frame", { Name = name, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, screen())
 	local backdrop = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.4,
+		BackgroundTransparency = if gilt then 0.3 else 0.4,
 		Size = UDim2.fromScale(1, 1),
 	}, holder)
+	if dismiss then
+		backdrop.Activated:Connect(function()
+			holder:Destroy()
+		end)
+	end
+	if gilt then
+		return giltFrame(holder, width, compact), holder
+	end
 	local panel = new("Frame", {
 		Name = "Panel",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -243,11 +469,6 @@ local function modal(name: string, width: number, accent: Color3, dismiss: boole
 	}, panel)
 	UiKit.pad(panel, if compact then 10 else 14)
 	UiKit.list(panel, if compact then 5 else 8)
-	if dismiss then
-		backdrop.Activated:Connect(function()
-			holder:Destroy()
-		end)
-	end
 	return panel, holder
 end
 
@@ -456,28 +677,29 @@ local function portraitInto(view: ViewportFrame, id: string)
 	end)
 end
 
--- One boss on the gate's ladder, as a card: its portrait over a glow of its
--- element, its threat as pips and its level, its name, its favourite gear
--- and how often you've beaten it. Locked, it's a silhouette with what opens
--- it. Picking it selects it (a locked one just says what opens it).
+-- One boss on the gate's ladder, as a framed portrait: the boss over a
+-- faint glow of its element, its level in its danger's colour, its name
+-- and a line under it (its favourite gear, how often you've beaten it).
+-- Locked, it's a silhouette with what opens it. Picking it selects it (a
+-- locked one just says what opens it).
 local function bossCard(parent: Instance, entry, order: number, compact: boolean, onPick: () -> ())
 	local accent = GemConfig.ElementColors[entry.Element] or EMBER
 	local card = new("TextButton", {
 		Name = "Boss_" .. tostring(entry.Id),
 		Text = "",
 		AutoButtonColor = false,
-		BackgroundColor3 = Color3.fromRGB(20, 16, 20),
+		BackgroundColor3 = Color3.fromRGB(190, 190, 190),
 		ClipsDescendants = true,
 		LayoutOrder = order,
 	}, parent)
-	UiKit.round(card, 10)
+	UiKit.round(card, 3)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(accent:Lerp(Color3.new(0, 0, 0), 0.62), Color3.fromRGB(16, 12, 16)),
+		Color = ColorSequence.new(accent:Lerp(Gilt.Deep, 0.78), Gilt.Deep),
 	}, card)
 	local edge = new(
 		"UIStroke",
-		{ Color = P.Dim, Thickness = 1, Transparency = 0.55, ApplyStrokeMode = Enum.ApplyStrokeMode.Border },
+		{ Color = Gilt.Brass, Thickness = 1, Transparency = 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border },
 		card
 	)
 	local foot = if compact then 34 else 50
@@ -485,9 +707,9 @@ local function bossCard(parent: Instance, entry, order: number, compact: boolean
 	local glow = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0.5, -foot / 2 + 6),
-		Size = UDim2.fromScale(0.86, 0.86),
+		Size = UDim2.fromScale(0.8, 0.8),
 		BackgroundColor3 = accent,
-		BackgroundTransparency = if entry.Unlocked then 0.8 else 0.92,
+		BackgroundTransparency = if entry.Unlocked then 0.86 else 0.95,
 	}, card)
 	new("UIAspectRatioConstraint", { AspectRatio = 1 }, glow)
 	UiKit.round(glow, 999)
@@ -512,62 +734,32 @@ local function bossCard(parent: Instance, entry, order: number, compact: boolean
 		ImageTransparency = if entry.Unlocked then 0 else 0.15,
 	}, card)
 	portraitInto(view, tostring(entry.Id))
-	-- Its threat (pips) and its level, along the top.
-	local color = THREAT_COLORS[entry.Threat] or P.Text
-	local pips = new("Frame", {
-		Name = "Threat",
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(if compact then 8 else 10, if compact then 8 else 11),
-		Size = UDim2.fromOffset(60, 10),
-	}, card)
-	for i = 1, 3 do
-		local lit = i <= (entry.Threat or 1)
-		new("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromOffset(4 + (i - 1) * (if compact then 11 else 13), 5),
-			Size = UDim2.fromOffset(if compact then 7 else 8, if compact then 7 else 8),
-			Rotation = 45,
-			BackgroundColor3 = if lit then color else Color3.fromRGB(60, 54, 60),
-			BackgroundTransparency = if entry.Unlocked or not lit then 0 else 0.5,
-		}, pips)
-	end
-	local level = new("TextLabel", {
-		Name = "Level",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -6, 0, 6),
-		Size = UDim2.fromOffset(if compact then 44 else 54, if compact then 18 else 22),
-		BackgroundColor3 = Color3.fromRGB(12, 10, 14),
-		BackgroundTransparency = 0.15,
-		Text = string.format("LV %d", entry.Level or 1),
-		TextSize = if compact then 11 else 13,
-		Font = BOLD,
-		TextColor3 = if entry.Unlocked then P.Text else P.Dim,
-	}, card)
-	UiKit.round(level, 6)
-	new("UIStroke", {
-		Color = color,
-		Thickness = 1,
-		Transparency = if entry.Unlocked then 0.2 else 0.7,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, level)
-	-- Its name and its line, along the bottom.
+	-- Its level, top right, coloured by how dangerous it is.
+	local level = Gilt.words(card, string.format("Level %d", entry.Level or 1), if compact then 10 else 12, if entry.Unlocked
+		then THREAT_COLORS[entry.Threat] or Gilt.Ink
+		else Gilt.Dusk)
+	level.Name = "Level"
+	level.TextXAlignment = Enum.TextXAlignment.Right
+	level.AnchorPoint = Vector2.new(1, 0)
+	level.Position = UDim2.new(1, -8, 0, if compact then 3 else 6)
+	level.Size = UDim2.new(1, -16, 0, if compact then 14 else 18)
+	-- Its name and its line, along the bottom, under a gilt hairline.
 	local shade = new("Frame", {
+		Name = "Foot",
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.new(1, 0, 0, foot),
-		BackgroundColor3 = Color3.fromRGB(10, 8, 12),
-		BackgroundTransparency = 0.2,
+		BackgroundColor3 = Gilt.Deep,
+		BackgroundTransparency = 0.12,
 	}, card)
-	local name = text(shade, entry.Name, if compact then 12 else 15, if entry.Unlocked then P.Text else P.Dim, BOLD)
-	name.AutomaticSize = Enum.AutomaticSize.None
-	name.TextWrapped = false
-	name.TextTruncate = Enum.TextTruncate.AtEnd
+	Gilt.rule(shade, true)
+	local name = Gilt.words(shade, entry.Name, if compact then 12 else 15, if entry.Unlocked then Gilt.Ink else Gilt.Dusk)
 	name.TextXAlignment = Enum.TextXAlignment.Center
-	name.Position = UDim2.fromOffset(6, if compact then 3 else 7)
-	name.Size = UDim2.new(1, -12, 0, if compact then 15 else 19)
+	name.Position = UDim2.fromOffset(6, if compact then 2 else 6)
+	name.Size = UDim2.new(1, -12, 0, if compact then 16 else 20)
 	local parts = {}
 	if entry.Starter then
-		table.insert(parts, "RECOMMENDED SOLO")
+		table.insert(parts, "Recommended solo")
 	end
 	if entry.Unlocked then
 		local favour = Slots.Definitions[Slots.ByKind[entry.Loot or ""] or ""]
@@ -580,20 +772,19 @@ local function bossCard(parent: Instance, entry, order: number, compact: boolean
 	else
 		table.insert(parts, string.format("Beat %s to unlock", entry.Need or "the one before"))
 	end
-	local sub = text(shade, table.concat(parts, "  ·  "), if compact then 9 else 11, if entry.Unlocked then P.Dim else WARN)
+	local sub = text(shade, table.concat(parts, "  ·  "), if compact then 9 else 11, if entry.Unlocked then Gilt.Faded else Gilt.Red)
 	sub.AutomaticSize = Enum.AutomaticSize.None
 	sub.TextWrapped = false
 	sub.TextTruncate = Enum.TextTruncate.AtEnd
 	sub.TextXAlignment = Enum.TextXAlignment.Center
-	sub.Position = UDim2.fromOffset(6, if compact then 18 else 28)
+	sub.Position = UDim2.fromOffset(6, if compact then 19 else 29)
 	sub.Size = UDim2.new(1, -12, 0, if compact then 11 else 14)
 	if not entry.Unlocked then
-		local lock = text(card, "LOCKED", if compact then 11 else 13, P.Dim, BOLD)
-		lock.AutomaticSize = Enum.AutomaticSize.None
+		local lock = Gilt.words(card, "Locked", if compact then 11 else 14, Gilt.Faded)
 		lock.TextXAlignment = Enum.TextXAlignment.Center
 		lock.AnchorPoint = Vector2.new(0.5, 0.5)
 		lock.Position = UDim2.new(0.5, 0, 0.5, -foot / 2)
-		lock.Size = UDim2.new(1, 0, 0, 16)
+		lock.Size = UDim2.new(1, 0, 0, 20)
 	end
 	card.Activated:Connect(onPick)
 	return card, edge
@@ -673,149 +864,144 @@ local function headshot(parent: Instance, userId: number, name: string, size: nu
 	return holder
 end
 
--- A small pill: a word on a tint of `color`.
-local function pill(parent: Instance, value: string, color: Color3, size: number): TextLabel
-	local label = new("TextLabel", {
-		Name = "Pill",
-		BackgroundColor3 = color:Lerp(P.Frame, 0.72),
-		Size = UDim2.fromOffset(0, size + 8),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Text = value,
-		TextSize = size,
-		Font = BOLD,
-		TextColor3 = color,
-	}, parent)
-	UiKit.round(label, 6)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, label)
-	return label
-end
-
--- One of your party's places: a member, or an open place to invite into.
--- In a party, your own card has LEAVE (`acts.Leave`), and the leader sees a
--- red × on each of the others' to remove them (`acts.Kick`).
+-- One of your party's places: a member in a recessed well (their face in
+-- a gilt ring, gold for the leader; their name; where they are; ready or
+-- not), or an empty place to invite into. In a party, your own has Leave
+-- (`acts.Leave`), and the leader sees a red × on each of the others' to
+-- remove them (`acts.Kick`).
 local function partySlot(parent: Instance, slot, order: number, compact: boolean, acts)
 	local card = new("Frame", {
 		Name = if slot then "Member" else "Open",
-		BackgroundColor3 = if slot then Color3.fromRGB(26, 22, 30) else Color3.fromRGB(16, 14, 20),
 		LayoutOrder = order,
 	}, parent)
-	UiKit.round(card, 8)
-	new("UIStroke", {
-		Color = if not slot then P.Edge elseif slot.Ready or slot.You then P.Good else P.Edge,
-		Thickness = if slot and (slot.Ready or slot.You) then 1.5 else 1,
-		Transparency = if slot then 0.15 else 0.6,
-	}, card)
+	local edge = Gilt.well(card, if slot and slot.Leader then Gilt.Gold else Gilt.Brass)
 	if not slot then
-		local open = text(card, "OPEN", if compact then 11 else 12, P.Dim, BOLD)
+		card.BackgroundTransparency = 0.4
+		edge.Transparency = 0.75
+		local open = Gilt.words(card, "Empty", if compact then 11 else 13, Gilt.Dusk)
 		open.TextXAlignment = Enum.TextXAlignment.Center
-		open.AutomaticSize = Enum.AutomaticSize.None
 		open.AnchorPoint = Vector2.new(0.5, 0.5)
 		open.Position = UDim2.new(0.5, 0, 0.5, if compact then -6 else -8)
-		open.Size = UDim2.new(1, -8, 0, 14)
-		local hint = text(card, "Invite from the list", if compact then 9 else 10, P.Dim)
+		open.Size = UDim2.new(1, -8, 0, 18)
+		local hint = text(card, "Invite from the list", if compact then 9 else 10, Gilt.Dusk)
 		hint.TextXAlignment = Enum.TextXAlignment.Center
 		hint.AutomaticSize = Enum.AutomaticSize.None
 		hint.AnchorPoint = Vector2.new(0.5, 0.5)
-		hint.Position = UDim2.new(0.5, 0, 0.5, if compact then 7 else 9)
+		hint.Position = UDim2.new(0.5, 0, 0.5, if compact then 7 else 10)
 		hint.Size = UDim2.new(1, -8, 0, 12)
 		return card
 	end
 	local face = if compact then 24 else 34
-	local pic = headshot(card, slot.UserId, slot.Name or "?", face, if slot.Leader then P.Gold else P.Edge)
+	local pic = headshot(card, slot.UserId, slot.Name or "?", face, if slot.Leader then Gilt.Gold else Gilt.Brass)
 	pic.Position = UDim2.fromOffset(if compact then 6 else 8, if compact then 5 else 9)
 	local left = face + (if compact then 11 else 14)
-	local name = text(card, slot.Name or "?", if compact then 12 else 14, P.Text, BOLD)
-	name.AutomaticSize = Enum.AutomaticSize.None
-	name.TextWrapped = false
-	name.TextTruncate = Enum.TextTruncate.AtEnd
-	name.Position = UDim2.fromOffset(left, if compact then 3 else 8)
-	name.Size = UDim2.new(1, -left - 6, 0, if compact then 15 else 18)
-	local where = text(card, if slot.You then "YOU" else string.upper(slot.Where), if compact then 9 else 10, P.Dim, BOLD)
+	local name = Gilt.words(card, slot.Name or "?", if compact then 12 else 14, Gilt.Ink)
+	name.Position = UDim2.fromOffset(left, if compact then 2 else 6)
+	name.Size = UDim2.new(1, -left - 6, 0, if compact then 16 else 20)
+	local where = text(card, if slot.You then "You" else slot.Where, if compact then 9 else 11, Gilt.Faded)
 	where.AutomaticSize = Enum.AutomaticSize.None
 	where.TextWrapped = false
 	where.TextTruncate = Enum.TextTruncate.AtEnd
-	where.Position = UDim2.fromOffset(left, if compact then 17 else 27)
-	where.Size = UDim2.new(1, -left - 6, 0, 12)
+	where.Position = UDim2.fromOffset(left, if compact then 18 else 27)
+	where.Size = UDim2.new(1, -left - 6, 0, 13)
 	-- (Along the bottom: ready or not, and who leads.)
-	local pills = new("Frame", {
+	local ready = slot.Ready or (slot.Leader and slot.You)
+	local marks = new("Frame", {
+		Name = "Marks",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, if compact then 6 else 8, 1, if compact then -4 else -8),
-		Size = UDim2.new(1, -12, 0, if compact then 15 else 18),
+		Position = UDim2.new(0, if compact then 6 else 8, 1, if compact then -3 else -7),
+		Size = UDim2.new(1, -40, 0, 14),
 	}, card)
-	UiKit.list(pills, 4, true)
-	local ready = slot.Ready or (slot.Leader and slot.You)
-	pill(pills, if ready then "READY" else "NOT READY", if ready then P.Good else P.Dim, if compact then 8 else 10).LayoutOrder = 1
-	if slot.Leader then
-		pill(pills, "LEADER", P.Gold, if compact then 8 else 10).LayoutOrder = 2
+	UiKit.list(marks, 0, true)
+	for i, mark in {
+		{ if ready then "Ready" else "Not ready", if ready then Gilt.Green else Gilt.Dusk },
+		if slot.Leader then { "  ·  ", Gilt.Dusk } else nil,
+		if slot.Leader then { "Leader", Gilt.Gold } else nil,
+	} do
+		local word = text(marks, mark[1], if compact then 9 else 11, mark[2], BOLD)
+		word.AutomaticSize = Enum.AutomaticSize.X
+		word.TextWrapped = false
+		word.Size = UDim2.new(0, 0, 1, 0)
+		word.LayoutOrder = i
 	end
-	-- (LEAVE top right on yours; × bottom right on theirs, by the READY pill,
-	-- so where they are keeps the whole line.)
+	-- (Leave top right on yours; × bottom right on theirs.)
 	local act = if slot.You then acts and acts.Leave else acts and acts.Kick
 	if act then
 		local side = if compact then 18 else 22
 		local inset = if compact then 4 else 6
-		local b = new("TextButton", {
-			Name = if slot.You then "Leave" else "Kick",
-			AnchorPoint = if slot.You then Vector2.new(1, 0) else Vector2.new(1, 1),
-			Position = if slot.You then UDim2.new(1, -inset, 0, inset) else UDim2.new(1, -inset, 1, -inset),
-			Size = if slot.You then UDim2.fromOffset(if compact then 40 else 46, side) else UDim2.fromOffset(side, side),
-			BackgroundColor3 = P.Bad:Lerp(P.Frame, 0.6),
-			Text = if slot.You then "LEAVE" else "",
-			TextSize = if compact then 9 else 10,
-			Font = BOLD,
-			TextColor3 = P.Text,
-			AutoButtonColor = true,
-		}, card)
-		UiKit.round(b, 6)
-		new("UIStroke", { Color = P.Bad, Thickness = 1, Transparency = 0.35 }, b)
-		b.Activated:Connect(function()
-			act(slot)
-		end)
+		local b
 		if slot.You then
-			-- (your name makes room for it)
-			name.Size = UDim2.new(1, -left - 6 - b.Size.X.Offset - 4, 0, if compact then 15 else 18)
+			b = Gilt.button(card, "Leave", false, 0, function()
+				act(slot)
+			end, side, if compact then 10 else 11)
+			b.Name = "Leave"
+			b.AnchorPoint = Vector2.new(1, 0)
+			b.Position = UDim2.new(1, -inset, 0, inset)
+			b.Size = UDim2.fromOffset(if compact then 42 else 50, side)
+			name.Size = UDim2.new(1, -left - 6 - b.Size.X.Offset - 4, 0, if compact then 16 else 20)
 		else
-			IronUi.cross(b, if compact then 7 else 9, P.Text)
+			b = new("TextButton", {
+				Name = "Kick",
+				AnchorPoint = Vector2.new(1, 1),
+				Position = UDim2.new(1, -inset, 1, -inset),
+				Size = UDim2.fromOffset(side, side),
+				BackgroundColor3 = Color3.fromRGB(52, 16, 12),
+				Text = "",
+				AutoButtonColor = true,
+			}, card)
+			UiKit.round(b, 3)
+			new("UIStroke", { Color = Gilt.Red, Thickness = 1, Transparency = 0.3 }, b)
+			IronUi.cross(b, if compact then 7 else 9, Gilt.Ink)
+			b.Activated:Connect(function()
+				act(slot)
+			end)
 		end
 	end
 	return card
 end
 
--- A row in the people list: a face, a name and where they are, an action.
--- (FRIEND after where they are in the Outpost's list; the Friends tab is
--- all friends.)
+-- A row in the people list: a face, a name and level, where they are,
+-- and Invite (or why not). (Friend after where they are in the Outpost's
+-- list; the Friends tab is all friends.)
 local function personRow(parent: Instance, row, order: number, compact: boolean, tagFriend: boolean, onInvite: (any) -> ())
 	local tall = if compact then 34 else 42
 	local line = new("Frame", {
 		Name = "Row",
-		BackgroundColor3 = Color3.fromRGB(22, 20, 28),
-		BackgroundTransparency = if order % 2 == 0 then 0.35 else 0,
+		BackgroundColor3 = Gilt.Ink,
+		BackgroundTransparency = if order % 2 == 0 then 1 else 0.96,
 		Size = UDim2.new(1, 0, 0, tall),
 		LayoutOrder = order,
 	}, parent)
-	UiKit.round(line, 6)
+	UiKit.round(line, 2)
 	local face = tall - 10
-	local pic = headshot(line, row.UserId, row.Name, face, if row.Friend then P.Teal else P.Edge)
+	local pic = headshot(line, row.UserId, row.Name, face, if row.Friend then Gilt.Green else Gilt.Brass)
 	pic.Position = UDim2.fromOffset(6, 5)
-	local actionW = if compact then 74 else 88
-	local name = text(
-		line,
-		row.Name .. (if row.Level then string.format("  ·  LV %d", row.Level) else ""),
-		if compact then 12 else 13,
-		P.Text,
-		BOLD
-	)
-	name.AutomaticSize = Enum.AutomaticSize.None
-	name.TextWrapped = false
-	name.TextTruncate = Enum.TextTruncate.AtEnd
-	name.Position = UDim2.fromOffset(face + 12, if compact then 3 else 5)
-	name.Size = UDim2.new(1, -face - actionW - 22, 0, if compact then 15 else 17)
+	local actionW = if compact then 70 else 82
+	-- (Their name, then their level in a quieter colour.)
+	local head = new("Frame", {
+		Name = "Head",
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Position = UDim2.fromOffset(face + 12, if compact then 2 else 4),
+		Size = UDim2.new(1, -face - actionW - 22, 0, if compact then 16 else 18),
+	}, line)
+	UiKit.list(head, 8, true)
+	local name = Gilt.words(head, row.Name, if compact then 12 else 13, Gilt.Ink)
+	name.AutomaticSize = Enum.AutomaticSize.X
+	name.Size = UDim2.new(0, 0, 1, 0)
+	name.LayoutOrder = 1
+	if row.Level then
+		local level = Gilt.words(head, string.format("Level %d", row.Level), if compact then 11 else 12, Gilt.Dusk)
+		level.AutomaticSize = Enum.AutomaticSize.X
+		level.Size = UDim2.new(0, 0, 1, 0)
+		level.LayoutOrder = 2
+	end
 	local where = text(
 		line,
-		row.Where .. (if tagFriend and row.Friend then "  ·  FRIEND" else ""),
+		row.Where .. (if tagFriend and row.Friend then "  ·  Friend" else ""),
 		if compact then 9 else 11,
-		if row.Where == "At the gate" then P.Good else P.Dim
+		if row.Where == "At the gate" then Gilt.Green else Gilt.Faded
 	)
 	where.AutomaticSize = Enum.AutomaticSize.None
 	where.TextWrapped = false
@@ -823,53 +1009,22 @@ local function personRow(parent: Instance, row, order: number, compact: boolean,
 	where.Position = UDim2.fromOffset(face + 12, if compact then 18 else 23)
 	where.Size = UDim2.new(1, -face - actionW - 22, 0, 13)
 	if row.Invite == "Party" or row.Invite == "Game" then
-		local b, f = IronUi.chunk(line, {
-			Color = P.Teal,
-			Size = UDim2.fromOffset(actionW, tall - 10),
-			Radius = 6,
-			Stripes = "None",
-			Lip = 3,
-		})
-		IronUi.label(b, f, if row.Invite == "Party" then "INVITE" else "INVITE ↗", if compact then 11 else 12, BOLD)
+		local b = Gilt.button(line, if row.Invite == "Party" then "Invite" else "Invite ↗", false, 0, function()
+			onInvite(row)
+		end, tall - 12, if compact then 11 else 13)
+		b.Size = UDim2.fromOffset(actionW, tall - 12)
 		b.AnchorPoint = Vector2.new(1, 0.5)
 		b.Position = UDim2.new(1, -6, 0.5, 0)
-		b.Activated:Connect(function()
-			onInvite(row)
-		end)
 	elseif row.Invite then
-		local word = if row.Invite == "Invited" then "INVITED" elseif row.Where == "In the Rift" then "IN THE RIFT" else "IN A PARTY"
-		local tag = pill(line, word, if row.Invite == "Invited" then P.Teal else P.Dim, if compact then 9 else 10)
+		local word = if row.Invite == "Invited" then "Invited" elseif row.Where == "In the Rift" then "In the Rift" else "In a party"
+		local tag = text(line, word, if compact then 10 else 11, if row.Invite == "Invited" then Gilt.Gold else Gilt.Dusk, BOLD)
+		tag.AutomaticSize = Enum.AutomaticSize.None
+		tag.TextXAlignment = Enum.TextXAlignment.Right
 		tag.AnchorPoint = Vector2.new(1, 0.5)
-		tag.Position = UDim2.new(1, -8, 0.5, 0)
+		tag.Position = UDim2.new(1, -10, 0.5, 0)
+		tag.Size = UDim2.fromOffset(actionW, 14)
 	end
 	return line
-end
-
--- A step's heading: its number in a ring, then what it is.
-local function stepHead(parent: Instance, n: number, label: string, order: number, small: boolean): TextLabel
-	local row = new("Frame", {
-		Name = "Step" .. n,
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, if small then 16 else 22),
-		LayoutOrder = order,
-	}, parent)
-	local ring = new("TextLabel", {
-		BackgroundColor3 = EMBER:Lerp(P.Frame, 0.55),
-		Size = UDim2.fromOffset(if small then 16 else 22, if small then 16 else 22),
-		Text = tostring(n),
-		TextSize = if small then 10 else 13,
-		Font = BOLD,
-		TextColor3 = P.Text,
-	}, row)
-	UiKit.round(ring, 999)
-	new("UIStroke", { Color = EMBER, Thickness = 1 }, ring)
-	local words = text(row, label, if small then 11 else 13, P.Gold, BOLD)
-	words.AutomaticSize = Enum.AutomaticSize.None
-	words.TextWrapped = false
-	words.TextTruncate = Enum.TextTruncate.AtEnd
-	words.Position = UDim2.fromOffset(if small then 22 else 30, 0)
-	words.Size = UDim2.new(1, if small then -22 else -30, 1, 0)
-	return words
 end
 
 -- "100%" from a CounterGear.expected value (1 = every bit of its hits).
@@ -895,52 +1050,58 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	local s = screen()
 	local small = narrow(s)
 	local width = math.min(if small then 820 else 1000, s.AbsoluteSize.X - 24)
-	local panel, holder = modal("RiftGate", width, EMBER, true, small)
+	local panel, holder = modal("RiftGate", width, EMBER, true, small, true)
 	gateCard = panel
 
-	-- The header: what this is and where, a close button on the right.
+	-- The header: its name in gold serif, centred, where it is under it,
+	-- a gilt divider; a close button on the right.
 	local header = new("Frame", {
 		Name = "Header",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, if small then 34 else 46),
+		Size = UDim2.new(1, 0, 0, if small then 34 else 56),
 		LayoutOrder = 1,
 	}, panel)
-	local title = text(header, if info.Bounty then "BOUNTY BOARD" else "RIFT GATE", if small then 18 else 24, EMBER, IronUi.Heading)
-	title.AutomaticSize = Enum.AutomaticSize.None
-	title.Size = UDim2.new(1, -50, 0, if small then 20 else 28)
+	local title = Gilt.words(header, if info.Bounty then "Bounty Board" else "Rift Gate", if small then 17 else 26, Gilt.Gold)
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	title.Size = UDim2.new(1, 0, 0, if small then 19 else 32)
 	local where = if info.Bounty
-		then "BRUTUS'S BOUNTIES  ·  EVERY BOSS BEHIND THE RIFT GATES"
-		else string.upper(string.format("%s  ·  %s Rift", info.Biome or "", GemConfig.elementName(info.Element or "")))
-			.. (if small then "" else string.format("  ·  %d CAVES, THEN THE BOSS", RiftRun.Rooms))
-	local sub = text(
-		header,
-		where,
-		if small then 10 else 12,
-		if info.Bounty then WARN else GemConfig.ElementColors[info.Element or ""] or P.Text,
-		BOLD
-	)
+		then "Brutus's bounties  ·  Every boss behind the Rift Gates"
+		else string.format("%s  ·  %s Rift", info.Biome or "", GemConfig.elementName(info.Element or ""))
+			.. (if small then "" else string.format("  ·  %d caves, then the boss", RiftRun.Rooms))
+	local sub = text(header, where, if small then 10 else 12, if info.Bounty then Gilt.Faded else GemConfig.ElementColors[info.Element or ""] or Gilt.Faded)
 	sub.AutomaticSize = Enum.AutomaticSize.None
-	sub.Position = UDim2.fromOffset(0, if small then 21 else 29)
-	sub.Size = UDim2.new(1, -50, 0, 14)
-	local side = if small then 30 else 36
+	sub.TextXAlignment = Enum.TextXAlignment.Center
+	sub.Position = UDim2.fromOffset(0, if small then 18 else 32)
+	sub.Size = UDim2.new(1, 0, 0, 14)
+	local divider = Gilt.rule(header, true)
+	divider.AnchorPoint = Vector2.new(0, 1)
+	divider.Position = UDim2.fromScale(0, 1)
+	Gilt.stud(header, 7, UDim2.new(0.5, 0, 1, 0))
+	local side = if small then 24 else 28
 	local cancel = new("TextButton", {
 		Name = "Close",
 		Text = "",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.fromScale(1, 0),
 		Size = UDim2.fromOffset(side, side),
-		BackgroundColor3 = Color3.fromRGB(26, 22, 30),
-		AutoButtonColor = true,
+		BackgroundColor3 = Gilt.Deep,
+		AutoButtonColor = false,
 	}, header)
-	UiKit.round(cancel, 8)
-	new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.3 }, cancel)
-	IronUi.cross(cancel, if small then 10 else 12, P.Dim)
+	UiKit.round(cancel, 3)
+	local cancelRim = new("UIStroke", { Color = Gilt.Brass, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, cancel)
+	IronUi.cross(cancel, if small then 9 else 11, Gilt.Faded)
+	cancel.MouseEnter:Connect(function()
+		cancelRim.Color = Gilt.Bright
+	end)
+	cancel.MouseLeave:Connect(function()
+		cancelRim.Color = Gilt.Brass
+	end)
 	cancel.Activated:Connect(function()
 		close(gateCard)
 	end)
 
 	-- Two columns: the boss and getting ready (left), your party (right).
-	local gap = if small then 8 else 14
+	local gap = if small then 10 else 20
 	local right = if small then 268 else 320
 	local body = new("Frame", {
 		Name = "Body",
@@ -985,7 +1146,7 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		return nil
 	end
 
-	stepHead(left, 1, if info.Joining then "YOUR PARTY'S BOSS" elseif info.Ladders then "CHOOSE A BIOME, THEN YOUR BOSS" else "CHOOSE YOUR BOSS", 1, small)
+	Gilt.heading(left, if info.Joining then "Your party's boss" elseif info.Ladders then "Choose a biome, then your boss" else "Choose your boss", 1, small)
 	local readyHead = nil
 	local readyCard = nil
 	local redrawReady
@@ -998,7 +1159,7 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 				info.Boss or "the boss"
 			),
 			if small then 11 else 13,
-			P.Good,
+			Gilt.Green,
 			BOLD
 		)
 		l.LayoutOrder = 3
@@ -1009,12 +1170,12 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 			biomeRow = new("Frame", {
 				Name = "Biomes",
 				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, if small then 22 else 30),
+				Size = UDim2.new(1, 0, 0, if small then 24 else 32),
 				LayoutOrder = 2,
 			}, left)
 			new("UIGridLayout", {
-				CellSize = UDim2.new(1 / #info.Ladders, -6, 1, 0),
-				CellPadding = UDim2.fromOffset(8, 0),
+				CellSize = UDim2.new(1 / #info.Ladders, -5, 1, 0),
+				CellPadding = UDim2.fromOffset(6, 0),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 			}, biomeRow)
 		end
@@ -1033,10 +1194,11 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		local function redrawCards()
 			for id, c in cards do
 				local on = id == picked
-				c.Edge.Color = if on then EMBER else P.Dim
-				c.Edge.Thickness = if on then 2.5 else 1
-				c.Edge.Transparency = if on then 0 else 0.55
-				c.Card.BackgroundColor3 = if on then Color3.fromRGB(44, 26, 22) else Color3.fromRGB(20, 16, 20)
+				c.Edge.Color = if on then Gilt.Gold else Gilt.Brass
+				c.Edge.Thickness = if on then 2 else 1
+				c.Edge.Transparency = if on then 0 else 0.3
+				-- (the one picked lit up, the rest a shade darker)
+				c.Card.BackgroundColor3 = if on then Color3.new(1, 1, 1) else Color3.fromRGB(170, 170, 170)
 			end
 		end
 		local function buildCards()
@@ -1074,25 +1236,35 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 					child:Destroy()
 				end
 			end
+			-- Engraved tabs: the one open lit, in gold, over its element's bar.
 			for i, entry in info.Ladders do
 				local on = i == biome
-				local tint = GemConfig.ElementColors[entry.Element] or P.Text
+				local tint = GemConfig.ElementColors[entry.Element] or Gilt.Ink
 				local b = new("TextButton", {
 					Name = entry.Biome,
-					Text = string.upper(entry.Biome),
-					TextSize = if small then 10 else 12,
-					Font = BOLD,
-					TextColor3 = if on then P.Text else tint,
-					BackgroundColor3 = if on then tint:Lerp(Color3.new(0, 0, 0), 0.62) else Color3.fromRGB(20, 16, 20),
+					Text = entry.Biome,
+					TextSize = if small then 11 else 14,
+					Font = Gilt.Serif,
+					TextColor3 = if on then Gilt.Gold else Gilt.Faded,
+					BackgroundColor3 = if on then Color3.fromRGB(44, 36, 28) else Gilt.Well,
 					AutoButtonColor = false,
 					LayoutOrder = i,
 				}, biomeRow)
-				UiKit.round(b, 6)
+				UiKit.round(b, 3)
 				new("UIStroke", {
-					Color = tint,
-					Thickness = if on then 2 else 1,
-					Transparency = if on then 0 else 0.6,
+					Color = if on then Gilt.Gold else Gilt.Brass,
+					Thickness = 1,
+					Transparency = if on then 0.2 else 0.6,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border, -- (round the tab, not its word)
+				}, b)
+				new("Frame", {
+					Name = "Bar",
+					AnchorPoint = Vector2.new(0.5, 1),
+					Position = UDim2.new(0.5, 0, 1, -2),
+					Size = UDim2.new(1, -8, 0, if on then 2 else 1),
+					BackgroundColor3 = tint,
+					BackgroundTransparency = if on then 0 else 0.55,
+					BorderSizePixel = 0,
 				}, b)
 				b.Activated:Connect(function()
 					biome = i
@@ -1109,22 +1281,13 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	end
 
 	-- 2: getting ready for the boss picked.
-	readyHead = stepHead(left, 2, "GET READY", 4, small)
+	readyHead = Gilt.heading(left, "Get ready", 4, small)
 	readyCard = new("Frame", {
 		Name = "Ready",
-		BackgroundColor3 = Color3.fromRGB(18, 16, 24),
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 5,
 	}, left)
-	UiKit.round(readyCard, 10)
-	local readyEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, readyCard)
-	new("UIPadding", {
-		PaddingTop = UDim.new(0, if small then 6 else 10),
-		PaddingBottom = UDim.new(0, if small then 6 else 10),
-		PaddingLeft = UDim.new(0, if small then 8 else 12),
-		PaddingRight = UDim.new(0, if small then 8 else 12),
-	}, readyCard)
 
 	-- ADJUST ARMOR's plan for `element` (asked for once, then kept).
 	local function planOf(chosen)
@@ -1176,128 +1339,144 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		end)
 	end
 
+	-- The boss picked, read like a tooltip: its name and level, what it
+	-- hits with, what it's weak to, who it's for, how to beat it; then your
+	-- armor against it, and Adjust Armor.
 	redrawReady = function()
 		local chosen = entryOf(picked)
 		readyCard:ClearAllChildren()
-		readyEdge = new("UIStroke", { Color = P.Edge, Thickness = 1.5 }, readyCard)
+		local readyEdge = Gilt.well(readyCard)
 		new("UIPadding", {
 			PaddingTop = UDim.new(0, if small then 6 else 10),
 			PaddingBottom = UDim.new(0, if small then 6 else 10),
-			PaddingLeft = UDim.new(0, if small then 8 else 12),
-			PaddingRight = UDim.new(0, if small then 8 else 12),
+			PaddingLeft = UDim.new(0, if small then 8 else 14),
+			PaddingRight = UDim.new(0, if small then 8 else 14),
 		}, readyCard)
-		UiKit.list(readyCard, if small then 4 else 6)
-		readyHead.Text = if chosen then "GET READY FOR " .. string.upper(chosen.Name) else "GET READY"
+		UiKit.list(readyCard, if small then 2 else 4)
 		if not chosen then
-			readyEdge.Color = P.Edge
-			text(readyCard, "Pick a boss to see what it takes.", if small then 11 else 12, P.Dim).LayoutOrder = 1
+			text(readyCard, "Pick a boss to see what it takes.", if small then 11 else 12, Gilt.Faded).LayoutOrder = 1
 			return
 		end
 		local tint = GemConfig.ElementColors[chosen.Element or ""] or EMBER
-		readyEdge.Color = tint
-		-- What it is: its element, what beats it, its level, built for how many.
-		local chips = new("Frame", {
-			Name = "Chips",
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 0, if small then 16 else 20),
-			LayoutOrder = 1,
-		}, readyCard)
-		UiKit.list(chips, 5, true)
-		local size = if small then 9 else 11
-		pill(chips, "HITS WITH " .. string.upper(GemConfig.elementName(chosen.Element or "")), tint, size).LayoutOrder = 1
-		if chosen.Weakness then
-			local weak = GemConfig.ElementColors[chosen.Weakness] or P.Good
-			pill(chips, "WEAK TO " .. string.upper(GemConfig.elementName(chosen.Weakness)), weak, size).LayoutOrder = 2
+		readyEdge.Color = tint:Lerp(Gilt.Brass, 0.5)
+		-- Two words to a line, one left and one right, like a tooltip's.
+		local function line(order: number, tall: number, leftWords: TextLabel, rightWords: TextLabel?)
+			local row = new("Frame", {
+				Name = "Line",
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, tall),
+				LayoutOrder = order,
+			}, readyCard)
+			leftWords.Parent = row
+			leftWords.AutomaticSize = Enum.AutomaticSize.None
+			leftWords.TextWrapped = false
+			leftWords.TextTruncate = Enum.TextTruncate.AtEnd
+			leftWords.Size = UDim2.new(if rightWords then 0.66 else 1, 0, 1, 0)
+			if rightWords then
+				rightWords.Parent = row
+				rightWords.AutomaticSize = Enum.AutomaticSize.None
+				rightWords.TextWrapped = false
+				rightWords.TextXAlignment = Enum.TextXAlignment.Right
+				rightWords.AnchorPoint = Vector2.new(1, 0)
+				rightWords.Position = UDim2.fromScale(1, 0)
+				rightWords.Size = UDim2.new(0.34, 0, 1, 0)
+			end
+			return row
 		end
-		if chosen.Level then
-			pill(chips, string.format("LV %d", chosen.Level), THREAT_COLORS[chosen.Threat or 1] or P.Text, size).LayoutOrder = 3
+		local levelWords = if chosen.Level
+			then Gilt.words(readyCard, string.format("Level %d", chosen.Level), if small then 12 else 14, THREAT_COLORS[chosen.Threat or 1] or Gilt.Ink)
+			else nil
+		-- (On a phone the card picked above already names it: its level
+		-- goes on the next line instead.)
+		if not small then
+			line(1, 25, Gilt.words(readyCard, chosen.Name, 19, Gilt.Ink), levelWords)
 		end
-		if chosen.Starter then
-			pill(chips, "FIRST BOSS · SOLO", P.Good, size).LayoutOrder = 4
+		local size = if small then 11 else 13
+		local who, whoColor
+		if small then
+			who, whoColor = nil, nil
+		elseif chosen.Starter then
+			who, whoColor = "First boss  ·  Solo", Gilt.Faded
 		elseif chosen.Group then
 			local alone = view and view.Size <= 1
-			pill(chips, if alone then "BRING FRIENDS · 2-4" else "FOR 2-4", if alone then WARN else P.Dim, size).LayoutOrder = 4
+			who = string.format("%s  ·  %d-%d players", if alone then "Bring friends" else "Group", RiftRun.Party - 2, RiftRun.Party)
+			whoColor = if alone then WARN else Gilt.Faded
+		end
+		line(
+			2,
+			size + 5,
+			text(readyCard, string.format("Deals %s damage", GemConfig.elementName(chosen.Element or "")), size, tint),
+			if small then levelWords elseif who then text(readyCard, who, size, whoColor) else nil
+		)
+		if chosen.Weakness then
+			line(3, size + 5, text(readyCard, "Vulnerable to " .. GemConfig.elementName(chosen.Weakness), size, Gilt.Green))
 		end
 		-- How to beat it, and what it punishes (the computer's card).
 		if not small and chosen.Tips then
-			for i, line in { chosen.Tips[3], chosen.Tips[4] } do
-				if line then
-					local l = text(readyCard, "•  " .. line, 12, P.Text)
-					l.LayoutOrder = 1 + i
+			for i, tip in { chosen.Tips[3], chosen.Tips[4] } do
+				if tip then
+					local l = text(readyCard, tip, 12, Gilt.Faded)
+					l.LayoutOrder = 3 + i
 				end
 			end
 		end
-		-- ADJUST ARMOR: what your armor takes of its hits now, and after.
+		-- Your armor against it: what it takes of its hits now, and after.
 		local bar = new("Frame", {
 			Name = "Armor",
-			BackgroundColor3 = Color3.fromRGB(26, 24, 34),
-			Size = UDim2.new(1, 0, 0, if small then 36 else 48),
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, if small then 38 else 50),
 			LayoutOrder = 10,
 		}, readyCard)
-		UiKit.round(bar, 8)
-		new("UIStroke", { Color = P.Teal, Thickness = 1, Transparency = 0.55 }, bar)
-		local buttonW = if small then 112 else 156
-		local head = text(
-			bar,
-			"YOUR ARMOR VS " .. string.upper(GemConfig.elementName(chosen.Element or "")),
-			if small then 10 else 12,
-			P.Text,
-			BOLD
-		)
-		head.AutomaticSize = Enum.AutomaticSize.None
-		head.TextWrapped = false
-		head.TextTruncate = Enum.TextTruncate.AtEnd
-		head.Position = UDim2.fromOffset(10, if small then 3 else 6)
-		head.Size = UDim2.new(1, -buttonW - 24, 0, if small then 14 else 16)
+		local rule = Gilt.rule(bar)
+		rule.Position = UDim2.fromOffset(0, if small then 3 else 5)
+		local buttonW = if small then 112 else 150
+		local head = Gilt.words(bar, "Your armor vs " .. GemConfig.elementName(chosen.Element or ""), if small then 11 else 13, Gilt.Gold)
+		head.Position = UDim2.fromOffset(0, if small then 6 else 11)
+		head.Size = UDim2.new(1, -buttonW - 12, 0, if small then 15 else 18)
 		local plan = planOf(chosen)
-		local line, lineColor
+		local words, wordsColor
 		if not plan then
-			line, lineColor = "Checking your gear...", P.Dim
+			words, wordsColor = "Checking your gear...", Gilt.Dusk
 		elseif plan.Changes > 0 then
-			line = string.format(
+			words = string.format(
 				"Takes %s of its hits  ·  %s after (%d change%s)",
 				share(plan.Before),
 				share(plan.After),
 				plan.Changes,
 				if plan.Changes == 1 then "" else "s"
 			)
-			lineColor = P.Teal
+			wordsColor = Gilt.Ink
 		elseif plan.Before < 0.995 then
-			line, lineColor = string.format("Takes %s of its hits: as little as your gems allow", share(plan.Before)), P.Good
+			words, wordsColor = string.format("Takes %s of its hits: as little as your gems allow", share(plan.Before)), Gilt.Green
 		else
-			line, lineColor = plan.Note or "No gems in your bag resist it", WARN
+			words, wordsColor = plan.Note or "No gems in your bag resist it", WARN
 		end
-		local what = text(bar, line, if small then 9 else 11, lineColor)
+		local what = text(bar, words, if small then 9 else 11, wordsColor)
 		what.AutomaticSize = Enum.AutomaticSize.None
 		what.TextWrapped = false
 		what.TextTruncate = Enum.TextTruncate.AtEnd
-		what.Position = UDim2.fromOffset(10, if small then 18 else 25)
-		what.Size = UDim2.new(1, -buttonW - 24, 0, if small then 12 else 15)
+		what.Position = UDim2.fromOffset(0, if small then 22 else 31)
+		what.Size = UDim2.new(1, -buttonW - 12, 0, if small then 12 else 15)
 		if plan and plan.Changes == 0 then
 			local ready = plan.Before < 0.995
-			local done = pill(bar, if ready then "✓ ARMOR READY" else "NO GEMS FOR IT", if ready then P.Good else WARN, if small then 10 else 12)
+			local done = Gilt.words(bar, if ready then "Armor ready" else "No gems for it", if small then 11 else 13, if ready then Gilt.Green else WARN)
+			done.TextXAlignment = Enum.TextXAlignment.Right
 			done.AnchorPoint = Vector2.new(1, 0.5)
-			done.Position = UDim2.new(1, -8, 0.5, 0)
+			done.Position = UDim2.new(1, 0, 0.5, if small then 3 else 5)
+			done.Size = UDim2.fromOffset(buttonW, 20)
 		else
-			local b, f = IronUi.chunk(bar, {
-				Color = P.Teal,
-				Size = UDim2.fromOffset(buttonW, if small then 28 else 36),
-				Radius = 6,
-				Stripes = "None",
-				Lip = 3,
-			})
-			b.Name = "Adjust"
-			IronUi.label(b, f, "ADJUST ARMOR", if small then 11 else 13, BOLD)
-			b.AnchorPoint = Vector2.new(1, 0.5)
-			b.Position = UDim2.new(1, -6, 0.5, 0)
-			b.Activated:Connect(function()
+			local b = Gilt.button(bar, "Adjust Armor", false, 0, function()
 				adjust(chosen)
-			end)
+			end, if small then 26 else 32, if small then 12 else 14)
+			b.Name = "Adjust"
+			b.Size = UDim2.fromOffset(buttonW, if small then 26 else 32)
+			b.AnchorPoint = Vector2.new(1, 0.5)
+			b.Position = UDim2.new(1, 0, 0.5, if small then 3 else 5)
 		end
 	end
 
 	-- 3: your party, and who's about to invite.
-	local partyHead = stepHead(column, 3, "YOUR PARTY", 1, small)
+	local partyHead = Gilt.heading(column, "Your party", 1, small)
 	local slotRow = new("Frame", {
 		Name = "Party",
 		BackgroundTransparency = 1,
@@ -1312,12 +1491,10 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 	local listTall = if small then 98 else (if info.Ladders then 240 else 200)
 	local people = new("Frame", {
 		Name = "People",
-		BackgroundColor3 = Color3.fromRGB(14, 12, 18),
 		Size = UDim2.new(1, 0, 0, listTall),
 		LayoutOrder = 3,
 	}, column)
-	UiKit.round(people, 10)
-	new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.5 }, people)
+	Gilt.well(people)
 	UiKit.pad(people, if small then 5 else 8)
 	local tabTall = if small then 22 else 28
 	local tabs = new("Frame", {
@@ -1326,8 +1503,8 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		Size = UDim2.new(1, 0, 0, tabTall),
 	}, people)
 	new("UIGridLayout", {
-		CellSize = UDim2.new(0.5, -3, 1, 0),
-		CellPadding = UDim2.fromOffset(6, 0),
+		CellSize = UDim2.new(0.5, 0, 1, 0),
+		CellPadding = UDim2.fromOffset(0, 0),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, tabs)
 	local inviteAllTall = if small then 24 else 32
@@ -1339,18 +1516,12 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 4,
-		ScrollBarImageColor3 = P.Dim,
+		ScrollBarImageColor3 = Gilt.Brass,
 		BorderSizePixel = 0,
 	}, people)
 	UiKit.list(scroller, 4)
-	local inviteAll, inviteFace = IronUi.chunk(people, {
-		Color = P.Teal,
-		Size = UDim2.new(1, 0, 0, inviteAllTall),
-		Radius = 6,
-		Stripes = "None",
-		Lip = 3,
-	})
-	IronUi.label(inviteAll, inviteFace, "INVITE FRIENDS TO THE GAME", if small then 10 else 13, BOLD)
+	local inviteAll = Gilt.button(people, "Invite Friends to the Game", false, 0, nil, inviteAllTall, if small then 11 else 14)
+	inviteAll.Name = "InviteAll"
 	inviteAll.AnchorPoint = Vector2.new(0, 1)
 	inviteAll.Position = UDim2.fromScale(0, 1)
 	inviteAll.Activated:Connect(function()
@@ -1376,7 +1547,8 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		CellPadding = UDim2.fromOffset(8, 8),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, row)
-	local hint = text(panel, "", 11, P.Dim)
+	local hint = text(panel, "", 11, Gilt.Dusk)
+	hint.TextXAlignment = Enum.TextXAlignment.Center
 	hint.LayoutOrder = 5
 	hint.Visible = not small
 
@@ -1464,7 +1636,7 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		end
 		drawn = signature
 		view = now
-		partyHead.Text = string.format("YOUR PARTY  ·  %d/%d", view.Size, RiftRun.Party)
+		partyHead.Text = string.format("Your party  ·  %d/%d", view.Size, RiftRun.Party)
 		for _, child in slotRow:GetChildren() do
 			if child:IsA("GuiObject") then
 				child:Destroy()
@@ -1487,25 +1659,31 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 			end
 		end
 		local friendsKnown = view.Known
+		-- (Words for tabs, the open one in gold over a gold underline.)
 		for i, spec in {
-			{ "Outpost", string.format("IN THE OUTPOST  %d", #view.Outpost) },
-			{ "Friends", if friendsKnown then string.format("FRIENDS  %d", #view.Friends) else "FRIENDS" },
+			{ "Outpost", string.format("In the Outpost  %d", #view.Outpost) },
+			{ "Friends", if friendsKnown then string.format("Friends  %d", #view.Friends) else "Friends" },
 		} do
 			local on = tab == spec[1]
 			local b = new("TextButton", {
 				Name = spec[1],
 				Text = spec[2],
-				TextSize = if small then 10 else 12,
-				Font = BOLD,
-				TextColor3 = if on then P.Text else P.Dim,
-				BackgroundColor3 = if on then P.Slot else Color3.fromRGB(18, 16, 24),
+				TextSize = if small then 11 else 13,
+				Font = Gilt.Serif,
+				TextColor3 = if on then Gilt.Gold else Gilt.Dusk,
+				BackgroundTransparency = 1,
 				AutoButtonColor = false,
 				LayoutOrder = i,
 			}, tabs)
-			UiKit.round(b, 6)
-			if on then
-				new("UIStroke", { Color = P.Teal, Thickness = 1, Transparency = 0.3 }, b)
-			end
+			new("Frame", {
+				Name = "Underline",
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.fromScale(0.5, 1),
+				Size = UDim2.new(1, -12, 0, if on then 2 else 1),
+				BackgroundColor3 = if on then Gilt.Gold else Gilt.Brass,
+				BackgroundTransparency = if on then 0 else 0.7,
+				BorderSizePixel = 0,
+			}, b)
 			b.Activated:Connect(function()
 				tab = spec[1]
 				draw(true)
@@ -1528,7 +1706,7 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 					elseif not friendsKnown then "Looking for your friends..."
 					else "None of your friends are online. Invite some to the game.",
 				if small then 11 else 12,
-				P.Dim
+				Gilt.Faded
 			)
 			empty.LayoutOrder = 1
 		end
@@ -1544,29 +1722,30 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 				CellPadding = UDim2.fromOffset(8, 8),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 			}, row)
+			local size = if small then 15 else 19
 			if how == "Member" then
 				if mine and mine.Ready then
-					button(row, "NOT READY", P.Edge, 1, function()
+					Gilt.button(row, "Not Ready", false, 1, function()
 						ready(false)
-					end, tall)
+					end, tall, size)
 				else
-					button(row, "READY", P.Good, 1, function()
+					Gilt.button(row, "Ready", false, 1, function()
 						ready(true)
-					end, tall)
+					end, tall, size)
 				end
-				button(row, "GO IN NOW", HELL, 2, go, tall)
+				Gilt.button(row, "Go In Now", true, 2, go, tall, size)
 			else
-				local enter = button(row, "ENTER", HELL, 1, go, tall)
+				local enter = Gilt.button(row, "Enter", true, 1, go, tall, size)
 				enter.Name = "Enter"
 			end
 		end
 		local enter = row:FindFirstChild("Enter") :: TextButton?
 		if enter then
 			enter.Text = if how == "Join"
-				then "JOIN THEM"
-				elseif how == "Alone" then "ENTER ALONE"
-				elseif view.Ready >= view.Size - 1 then "ENTER TOGETHER"
-				else string.format("ENTER  ·  %d OF %d READY", view.Ready + 1, view.Size)
+				then "Join Them"
+				elseif how == "Alone" then "Enter Alone"
+				elseif view.Ready >= view.Size - 1 then "Enter Together"
+				else string.format("Enter  ·  %d of %d ready", view.Ready + 1, view.Size)
 		end
 		hint.Text = if how == "Join"
 			then "Through the gate and you're with them, wherever they've got to."
