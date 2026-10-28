@@ -983,9 +983,43 @@ for order, key in { "Strong", "Weak" } do
 	text.TextTruncate = Enum.TextTruncate.None
 	heroUi[key] = { Chip = chip, Edge = edge, Text = text }
 end
-local heroBlurb = label(info, "", 11, P.Dim, IronUi.Body)
-heroBlurb.Position, heroBlurb.Size = UDim2.fromOffset(0, 88), UDim2.new(1, 0, 0, 28)
-heroBlurb.TextWrapped = true
+-- Its traits (Shared Kaiju.traits): what makes it unlike any other of its
+-- kind and level. Its Grade, then each of the four, coloured by how good.
+-- (Grade chips: S gold, A violet, B blue, C grey; a poor trait's red. On
+-- heroUi: this file is out of room for top-level locals.)
+heroUi.TraitColors = {
+	Low = Color3.fromRGB(240, 120, 110),
+	S = Color3.fromRGB(255, 204, 92),
+	A = Color3.fromRGB(200, 150, 255),
+	B = Color3.fromRGB(120, 190, 255),
+	C = Color3.fromRGB(170, 170, 178),
+}
+heroUi.Traits = new("Frame", {
+	Name = "Traits",
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 89),
+	Size = UDim2.new(1, 0, 0, 16),
+}, info)
+UiKit.list(heroUi.Traits, 4, true)
+heroUi.TraitChips = {}
+for order, key in { "Grade", table.unpack(Kaiju.Traits.Names) } do
+	local chip = new("Frame", {
+		Name = key,
+		LayoutOrder = order,
+		BackgroundColor3 = if key == "Grade" then P.Gold else P.Inset,
+		Size = UDim2.fromOffset(0, 16),
+		AutomaticSize = Enum.AutomaticSize.X,
+	}, heroUi.Traits)
+	UiKit.round(chip, 5)
+	new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, chip)
+	local text = label(chip, "", 9, if key == "Grade" then INK else P.Text, Enum.Font.GothamBlack)
+	text.Size, text.AutomaticSize = UDim2.new(0, 0, 1, 0), Enum.AutomaticSize.X
+	text.TextTruncate = Enum.TextTruncate.None
+	heroUi.TraitChips[key] = { Chip = chip, Text = text }
+end
+local heroBlurb = label(info, "", 10, P.Dim, IronUi.Body)
+heroBlurb.Position, heroBlurb.Size = UDim2.fromOffset(0, 107), UDim2.new(1, 0, 0, 12)
+heroBlurb.TextTruncate = Enum.TextTruncate.AtEnd
 heroBlurb.TextYAlignment = Enum.TextYAlignment.Top
 -- Health, damage, speed.
 local statRow = new("Frame", {
@@ -2178,6 +2212,22 @@ local function drawDetail(data, record, team: { string })
 		end
 	end
 	heroBlurb.Text = if species then species.Blurb else ""
+	local traits = Kaiju.traits(record)
+	if traits then
+		local grade = Kaiju.grade(traits)
+		heroUi.TraitChips.Grade.Text.Text = "Grade " .. grade
+		heroUi.TraitChips.Grade.Chip.BackgroundColor3 = heroUi.TraitColors[grade] or P.Gold
+		for _, name in Kaiju.Traits.Names do
+			local chip = heroUi.TraitChips[name]
+			local n = traits[name]
+			chip.Text.Text = string.format("%s %d", name, n)
+			-- (over Mid green, under it red, about Mid plain)
+			chip.Text.TextColor3 = if n >= Kaiju.Traits.Mid + 4
+				then P.Good
+				elseif n <= Kaiju.Traits.Mid - 4 then heroUi.TraitColors.Low
+				else P.Text
+		end
+	end
 	local stats = Kaiju.recordStats(record)
 	if stats then
 		-- (Its health as it is: kept, out or home, none while it's down.)

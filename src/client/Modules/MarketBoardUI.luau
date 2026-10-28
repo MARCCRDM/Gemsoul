@@ -240,12 +240,14 @@ local function itemLine(payload): string
 			.. (if gem.Cut then GemRoller.levelLabel(gem) else "Rough")
 		return if payload.Where then line .. "  ·  " .. payload.Where else line
 	elseif payload.Kind == "Kaiju" then
-		-- "Lv 7 Warrior  ·  Rare soul  ·  ★ rare kind" (two lines on a card at most)
+		-- "Lv 7  ·  Warrior  ·  Rare soul  ·  Grade A  ·  ★ rare kind" (two lines on a card at most)
 		local record = payload.Record or {}
 		local kind = Kaiju.Species[record.Species or ""]
 		local soul = record.Soul and (GemConfig.TierLabels[record.Soul.Tier] or record.Soul.Tier) or "Common"
-		return string.format("Lv %d  ·  %s  ·  %s soul%s", record.Level or 1, kind and kind.Role or "kaiju", soul,
-			if Kaiju.batch(record.Species or "") == 1 then "  ·  ★ rare kind" else "")
+		-- (its Grade too: a kaiju's traits are its own, whatever its level)
+		local grade = Kaiju.grade(Kaiju.traits(record))
+		return string.format("Lv %d  ·  %s  ·  %s soul  ·  Grade %s%s", record.Level or 1, kind and kind.Role or "kaiju", soul,
+			grade, if Kaiju.batch(record.Species or "") == 1 then "  ·  ★ rare kind" else "")
 	end
 	local rarity = GearRolls.Rarities[payload.Roll and payload.Roll.Rarity or 1] or GearRolls.Rarities[1]
 	local def = Slots.Definitions[payload.Slot]

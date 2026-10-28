@@ -47,6 +47,39 @@ the other 61 in [kaiju-roster-more.md](kaiju-roster-more.md).
 
 ![The other 61](kaiju/roster-61.jpg)
 
+## Traits: no two alike
+
+Two kaiju of one kind at one level are no longer the same. Each is born
+with four **traits**, 0 to 20, which never change (`Kaiju.Traits`,
+`Kaiju.traits`, `Kaiju.withTraits`):
+
+| Trait | What it moves | Each point over or under 10 |
+|---|---|---|
+| Might | its damage | ±1.2% |
+| Vigor | its health | ±1.2% |
+| Guard | the share of each blow it shrugs off (added to its kind's) | ±0.6 points |
+| Speed | how fast it runs | ±1% |
+
+A kaiju with all 20s hits and lasts about 12% more than an everyday one
+(all 10s), and about 27% more than one with all 0s: enough to matter,
+never more than a couple of levels. The four add up to its **Grade**:
+S (a total of 66 or more: about 1 kaiju in 60), A (52 or more: 1 in 6), B (36 or more: nearly half) or C.
+
+- **Where they're rolled:** each roll card's kaiju (the server rolls them
+  with the roll, so the card shows the kaiju you get), every wild kaiju
+  (its Grade is on its plate, so you can tell a fine one before you catch
+  it, and it keeps its traits when caught), and anything else that
+  adds a kaiju (`Kaiju.new` rolls them when none are given).
+- **Old saves:** a kaiju from before traits gets its own, worked out from
+  what never changes on it (its id, kind, element and Gemsoul), and keeps
+  them from then on (`Kaiju.roster`).
+- **Where they count:** `Kaiju.recordStats` (health, damage, speed and
+  Guard in every fight, revive and heal), and the blows a kaiju takes
+  (`Kaiju.taken` with its own Guard).
+- **Where they show:** the kaiju panel (Grade and the four, green when
+  good, red when poor), the roll card ("WARRIOR · LV 1 · GRADE A"), the
+  Market's kaiju lines ("Grade A") and a wild kaiju's plate.
+
 ## A kaiju's moves: its own, and its gem surge
 
 Every kaiju carries an **enchant** (in the code its `Soul`, the gem it

@@ -110,7 +110,7 @@ end
 -- The places' words; a bay's or a court's number; nothing else.
 local ALLOWED = {
 	SHELTER = true, QUARRY = true, ARENA = true, EXIT = true, INFO = true, STORE = true, MARKET = true,
-	BOUNTIES = true, DUELS = true,
+	BOUNTIES = true, DUELS = true, KENNEL = true,
 }
 local function allowed(text: string): boolean
 	return ALLOWED[text] == true or text:match("^%d%d?$") ~= nil

@@ -98,7 +98,7 @@
 	  KaijuServer.petOf(model)               the pet a model is
 	  KaijuServer.hurt(pet, amount, element, status?, heavy?) -> outcome   a creature's blow
 	  KaijuServer.reward(player, exp)        EXP for each kaiju out
-	  KaijuServer.adopt(player, species, soul, level) -> record?   a tamed one
+	  KaijuServer.adopt(player, species, soul, level, traits?) -> record?   a tamed one
 
 	The store and coupons ask here:
 	  KaijuServer.reviveAll(player) -> count   every one of theirs that's down, back now
@@ -586,7 +586,11 @@ local function prepareRoll(profile)
 		local random = Gems.random()
 		local pick = Kaiju.bossPick(random)
 		local soul = Kaiju.rollSoul(random, pick.Element, { Id = PlayerData.newGemId(), Time = os.time(), Species = pick.Species })
-		roll = { Rolls = { { Species = pick.Species, Element = pick.Element, Soul = soul } }, Version = Kaiju.RollVersion, Boss = true }
+		roll = {
+			Rolls = { { Species = pick.Species, Element = pick.Element, Soul = soul, Traits = Kaiju.rollTraits(random) } },
+			Version = Kaiju.RollVersion,
+			Boss = true,
+		}
 		p.KaijuRoll = roll
 		return roll
 	end
@@ -603,7 +607,7 @@ local function prepareRoll(profile)
 			pick.Element,
 			{ Id = PlayerData.newGemId(), Time = os.time(), Species = pick.Species }
 		)
-		table.insert(roll.Rolls, { Species = pick.Species, Element = pick.Element, Soul = soul })
+		table.insert(roll.Rolls, { Species = pick.Species, Element = pick.Element, Soul = soul, Traits = Kaiju.rollTraits(random) })
 	end
 	p.KaijuRoll = roll
 	return roll
@@ -651,7 +655,7 @@ local function claimRoll(player: Player): { any }
 	if roll.Boss then
 		-- A boss roll: its one kaiju joins as a reserve (your team stays).
 		local entry = roll.Rolls[1]
-		local record = entry and Kaiju.add(roster, entry.Species, entry.Soul, Kaiju.StarterLevel)
+		local record = entry and Kaiju.add(roster, entry.Species, entry.Soul, Kaiju.StarterLevel, nil, entry.Traits)
 		local p = profile :: any
 		p.KaijuRoll = nil
 		p.KaijuBossRolls = math.max(0, math.floor(tonumber(p.KaijuBossRolls) or 0) - 1)
@@ -663,7 +667,7 @@ local function claimRoll(player: Player): { any }
 		return added
 	end
 	for _, entry in roll.Rolls do
-		local record = Kaiju.add(roster, entry.Species, entry.Soul, Kaiju.StarterLevel)
+		local record = Kaiju.add(roster, entry.Species, entry.Soul, Kaiju.StarterLevel, nil, entry.Traits)
 		if record then
 			table.insert(added, record)
 		end
@@ -697,7 +701,7 @@ end
 -- Kaiju.Revive.Health of its health, to be healed with gems), or bought
 -- (at Revive.Bought).
 local function wake(record, bought: boolean?, into: any?)
-	local _, most = Kaiju.health({ Species = record.Species, Level = record.Level, Soul = record.Soul })
+	local _, most = Kaiju.health({ Id = record.Id, Species = record.Species, Level = record.Level, Soul = record.Soul, Traits = record.Traits })
 	local target = into or record
 	target.Down, target.DownUntil = nil, nil
 	local share = if bought then Kaiju.Revive.Bought else Kaiju.Revive.Health
@@ -1145,7 +1149,7 @@ function KaijuServer.hurt(pet: Pet, amount: number, element: string?, status: st
 		petFx("BlockSpark", pet.Root.Position, false)
 		model:SetAttribute("BlockedAt", serverNow())
 	end
-	local mult, tag = Kaiju.taken(pet.Record.Species, pet.Element, element)
+	local mult, tag = Kaiju.taken(pet.Record.Species, pet.Element, element, pet.Stats and pet.Stats.Guard)
 	if now < pet.VulnerableUntil then
 		mult *= 1.15
 	end
@@ -1834,12 +1838,12 @@ end
 
 -- A tamed kaiju joins `player`. Returns its record, or nil if they have
 -- room for no more.
-function KaijuServer.adopt(player: Player, speciesId: string, soul, level: number)
+function KaijuServer.adopt(player: Player, speciesId: string, soul, level: number, traits: { [string]: number }?)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return nil
 	end
-	local record = Kaiju.add(Kaiju.roster(profile), speciesId, soul, level)
+	local record = Kaiju.add(Kaiju.roster(profile), speciesId, soul, level, nil, traits)
 	if record then
 		PlayerData.sync(player)
 	end
@@ -2187,7 +2191,7 @@ function KaijuServer.battleStart(player: Player): number
 			if not record.BattleKeep then
 				record.BattleKeep = { Health = record.Health, Down = record.Down, DownUntil = record.DownUntil }
 			end
-			local _, most = Kaiju.health({ Species = record.Species, Level = record.Level, Soul = record.Soul })
+			local _, most = Kaiju.health({ Id = record.Id, Species = record.Species, Level = record.Level, Soul = record.Soul, Traits = record.Traits })
 			record.Down, record.DownUntil, record.Health = nil, nil, most
 			count += 1
 		end

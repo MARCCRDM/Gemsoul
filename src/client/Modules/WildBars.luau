@@ -47,6 +47,13 @@ local EDGE = Color3.fromRGB(70, 66, 84)
 local GOLD = Color3.fromRGB(255, 204, 92)
 local TRAIL = Color3.fromRGB(255, 236, 200)
 local NAME = Color3.fromRGB(242, 240, 236)
+-- (A kaiju's Grade: S gold, A violet, B blue, C grey.)
+local GRADE = {
+	S = Color3.fromRGB(255, 204, 92),
+	A = Color3.fromRGB(200, 150, 255),
+	B = Color3.fromRGB(120, 190, 255),
+	C = Color3.fromRGB(190, 190, 196),
+}
 
 -- Which of `entries` ({ Distance, Share }) show: the nearest `budget`
 -- within `range`, none knocked out.
@@ -127,6 +134,26 @@ function WildBars.plate(model: Model, phone: boolean?): BillboardGui
 	}, plate)
 	-- (A long name, the guardian's, shrinks a little before it's cut short.)
 	make("UITextSizeConstraint", { MaxTextSize = px(14), MinTextSize = math.min(px(14), if phone then 8 else 10) }, name)
+	-- Its Grade (Shared Kaiju.grade), at the end of the name: a fine one is
+	-- worth catching.
+	local grade = model:GetAttribute("KaijuGrade")
+	if type(grade) == "string" then
+		name.Size = UDim2.new(1, -px(20), 0, px(17))
+		local chip = make("TextLabel", {
+			Name = "Grade",
+			BackgroundColor3 = INK,
+			BackgroundTransparency = 0.15,
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, 0, 0, px(1)),
+			Size = UDim2.fromOffset(px(17), px(15)),
+			Font = Enum.Font.GothamBlack,
+			TextSize = math.max(px(11), 8),
+			TextColor3 = GRADE[grade] or GOLD,
+			Text = grade,
+		}, plate)
+		make("UICorner", { CornerRadius = UDim.new(0, px(4)) }, chip)
+	end
 	local level = make("Frame", {
 		Name = "Level",
 		BackgroundColor3 = INK,

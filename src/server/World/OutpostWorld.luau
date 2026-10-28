@@ -2072,7 +2072,7 @@ local function shelter(parent, at: CFrame, rules)
 		end
 		local board = part(m, facingDoor * CFrame.new(0, 6.3, 0), Vector3.new(8.4, 1.6, 0.4), HULL_DARK, Enum.Material.Metal)
 		board.Name = "KennelSign"
-		painted(m, facingDoor * CFrame.new(0, 6.3, -0.22), Vector3.new(7.6, 1.1, 0.02), "KAIJU KENNEL", HAZARD)
+		painted(m, facingDoor * CFrame.new(0, 6.3, -0.22), Vector3.new(7.6, 1.1, 0.02), "KENNEL", HAZARD)
 		light(board, Color3.fromRGB(255, 214, 150), 14, 0.6)
 	end
 	for k = 0, 3 do

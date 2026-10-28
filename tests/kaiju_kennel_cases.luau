@@ -137,7 +137,7 @@ end
 
 -- The world and the client ------------------------------------------------------------------
 local world = fs.readFile(ROOT .. "/src/server/World/OutpostWorld.luau")
-check(world:find('"KAIJU KENNEL"', 1, true) ~= nil and world:find('"KennelBed"', 1, true) ~= nil, "The kennel isn't built on the stage")
+check(world:find('"KENNEL"', 1, true) ~= nil and world:find('"KennelBed"', 1, true) ~= nil, "The kennel isn't built on the stage")
 check(world:find('"ProjectorLens"', 1, true) == nil, "The hologram's lens is still on the stage")
 check(world:find('Id = "KaijuKeeper"', 1, true) ~= nil, "No keeper by the kennel")
 local vendors = fs.readFile(ROOT .. "/src/shared/Vendors.luau")

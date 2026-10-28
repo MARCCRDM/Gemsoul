@@ -119,7 +119,16 @@
 	  Frontier.adapt(critters, wave, kind, rng, isRanged) -> critters   a later wave
 	  Frontier.adaptExtra(wave), Frontier.adaptLevels(wave)   more, and tougher
 ]]
-local ElementMatchup = require(script.Parent.ElementMatchup)
+-- (ElementMatchup, for reading a side and countering it, is loaded the
+-- first time a wave is adapted: the world builders that only want the
+-- bands, trails and ground never pull in its armor and gem tables.)
+local matchup = nil
+local function ElementMatchup()
+	if not matchup then
+		matchup = require(script.Parent.ElementMatchup)
+	end
+	return matchup
+end
 
 local Frontier = {}
 
@@ -1060,10 +1069,10 @@ function Frontier.read(weapon: string?, armor, kaiju: { string }?)
 	add(hits, weapon, 1)
 	for _, element in kaiju or {} do
 		add(hits, element, 1)
-		add(weak, ElementMatchup.weakTo(element), 1)
+		add(weak, ElementMatchup().weakTo(element), 1)
 	end
 	if armor then
-		add(weak, armor.Main and ElementMatchup.weakTo(armor.Main), 1)
+		add(weak, armor.Main and ElementMatchup().weakTo(armor.Main), 1)
 		for element, share in armor.Resist or {} do
 			add(weak, element, -2 * share)
 		end
@@ -1079,7 +1088,7 @@ function Frontier.counter(read): string?
 	for _, element in ELEMENTS do
 		local score = read.Weak[element] or 0
 		for attack, weight in read.Hits do
-			score += weight * (1 - ElementMatchup.versus(attack, element))
+			score += weight * (1 - ElementMatchup().versus(attack, element))
 		end
 		if score > bestScore + 1e-9 then
 			best, bestScore = element, score

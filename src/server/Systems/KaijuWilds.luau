@@ -180,6 +180,7 @@ type Wild = {
 	Element: string,
 	Level: number,
 	Soul: any,
+	Traits: { [string]: number }?,
 	Ability: string?,
 	Born: number,
 	Tries: number,
@@ -2078,7 +2079,9 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Species = species,
 		Luck = math.clamp(level / 60, 0, 0.5),
 	})
-	local stats = Kaiju.stats(species, level, soul.Tier)
+	-- (its own traits: the ones it keeps when it's caught)
+	local traits = Kaiju.rollTraits(rng)
+	local stats = Kaiju.withTraits(Kaiju.stats(species, level, soul.Tier), traits)
 	local model, _, _ = KaijuServer.body(species, element, scale)
 	local named = Kaiju.title({ Species = species, Element = element })
 	local title = (if guard then "Vein Guardian " else "Wild ") .. named
@@ -2097,6 +2100,8 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Luck = 0,
 		Respawn = 0,
 	}
+	-- (its Grade shows on it, so you can tell a fine one before you catch it)
+	model:SetAttribute("KaijuGrade", (Kaiju.grade(traits)))
 	local enemy = Enemies.adopt(model, kind, {
 		Element = element,
 		Title = string.format("%s · Lv %d", title, level),
@@ -2116,7 +2121,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		if held and held.Taming then
 			return 0, nil -- (held by a tame: nothing hurts it)
 		end
-		local mult, tag = Kaiju.taken(species, element, hitElement)
+		local mult, tag = Kaiju.taken(species, element, hitElement, stats.Guard)
 		return mult * Kaiju.spread(), tag
 	end
 	-- Its R's shell or ward takes its share of a blow (Enemies.damage).
@@ -2219,6 +2224,7 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 		Element = element,
 		Level = level,
 		Soul = soul,
+		Traits = traits,
 		Ability = ability,
 		Born = os.clock(),
 		Tries = 0,
@@ -2611,7 +2617,7 @@ local function resolveTame(enemy, wild: Wild, player: Player, now: number)
 	if rng:NextNumber() < chance then
 		local soul = table.clone(wild.Soul)
 		soul.Id = PlayerData.newGemId()
-		local record = KaijuServer.adopt(player, wild.Species, soul, Kaiju.Tame.Level)
+		local record = KaijuServer.adopt(player, wild.Species, soul, Kaiju.Tame.Level, wild.Traits)
 		if not record then
 			tell(player, "Couldn't catch it right now.")
 			tameResult(player, "Interrupted")

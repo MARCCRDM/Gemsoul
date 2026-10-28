@@ -2851,7 +2851,7 @@ return {
 	-- Waves that learn you (Shared.Frontier.Adapt).
 	["The frontier is learning your team: {*} critters are coming for you."] = "La frontera está aprendiendo de tu equipo: vienen a por ti bichos {*}.",
 	-- The Kaiju Kennel (Shared.KaijuKennel) and Wren, its keeper (Vendors.KaijuKeeper).
-	["KAIJU KENNEL"] = "PERRERA DE KAIJU",
+	["KENNEL"] = "PERRERA",
 	["Kaiju Keeper"] = "Cuidadora de kaiju",
 	["Wren, kennel keeper. The rarest kinds on the moon live in this pen, a different few every day. Look all you like: they don't bite through the fence."] = "Wren, cuidadora de la perrera. Las especies más raras de la luna viven en este corral, unas distintas cada día. Mira todo lo que quieras: no muerden a través de la valla.",
 	["Who's in the pen today?"] = "¿Quién está hoy en el corral?",
@@ -2869,6 +2869,13 @@ return {
 	["A Warden heals and shields the rest of your team. Keep one in your support slot."] = "Un Guardián cura y protege al resto de tu equipo. Ten uno en tu hueco de apoyo.",
 	["Kaiju of the rarest kinds are worth the most on the Market. Check the prices before you sell."] = "Los kaiju de las especies más raras son los que más valen en el Mercado. Mira los precios antes de vender.",
 	["In the pen today: {=}. They change every day."] = "Hoy en el corral: {=}. Cambian cada día.",
+	-- A kaiju's traits (Shared Kaiju.Traits): its panel, the roll card, the Market and wild ones.
+	["Grade {=}"] = "Grado {=}",
+	["GRADE {=}"] = "GRADO {=}",
+	["Might {1}"] = "Fuerza {1}",
+	["Vigor {1}"] = "Vigor {1}",
+	["Guard {1}"] = "Defensa {1}",
+	["No two kaiju are the same: each is born with its own Might, Vigor, Guard and Speed. Grade S is the best there is."] = "No hay dos kaiju iguales: cada uno nace con su propia Fuerza, Vigor, Defensa y Velocidad. El grado S es lo mejor que hay.",
 	-- The Bounty Board's gilt look (RiftClient.openGate): words in sentence case.
 	["Rift Gate"] = "Puerta de la Grieta",
 	["Brutus's bounties"] = "Las recompensas de Brutus",

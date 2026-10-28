@@ -236,7 +236,7 @@ end
 -- Its health: kept, full if never hurt, none if down.
 local _, most = Kaiju.health(fireKaiju)
 check(
-	select(1, Kaiju.health(fireKaiju)) == most and most == Kaiju.stats("Bulwark", 5, "Common").Health,
+	select(1, Kaiju.health(fireKaiju)) == most and most == Kaiju.withTraits(Kaiju.stats("Bulwark", 5, "Common"), Kaiju.traits(fireKaiju)).Health,
 	"Never hurt isn't full"
 )
 fireKaiju.Health = 30
@@ -560,7 +560,9 @@ check(Kaiju.GemSurge.Every > Kaiju.AbilityEvery and Kaiju.GemSurge.First > 0, "T
 -- can't cast giving way to its element's first). It keeps its element.
 do
 	local born = Kaiju.rollSoul(Random.new(5), "Frost", { Id = "s1", Time = 1, Species = "Bulwark" })
-	local rec = Kaiju.new("k1", "Bulwark", born, 6)
+	-- (everyday traits, all Mid, so its stats are its kind's: Traits below)
+	local mid = { Might = Kaiju.Traits.Mid, Vigor = Kaiju.Traits.Mid, Guard = Kaiju.Traits.Mid, Speed = Kaiju.Traits.Mid }
+	local rec = Kaiju.new("k1", "Bulwark", born, 6, mid)
 	check(Kaiju.attuned(rec) and rec.Element == "Frost", "A kaiju isn't attuned to the enchant it was born with")
 	local plainStats = Kaiju.stats("Bulwark", 6, born.Tier)
 	local attunedStats = Kaiju.recordStats(rec)
@@ -1318,9 +1320,124 @@ do
 	check(Beam.damage({}) == 0, "Damage with no one")
 end
 
+-- Traits: no two kaiju alike, whatever their level -----------------------------------------
+do
+	local T = Kaiju.Traits
+	check(#T.Names == 4, "Not four traits")
+	local rng = Random.new(77)
+	local seen = {}
+	for _ = 1, 400 do
+		local t = Kaiju.rollTraits(rng)
+		local key = ""
+		for _, name in T.Names do
+			check(t[name] >= 0 and t[name] <= T.Max and t[name] == math.floor(t[name]), "A trait rolled out of range")
+			key ..= t[name] .. ","
+		end
+		seen[key] = true
+		local good = Kaiju.rollTraits(rng, 14)
+		for _, name in T.Names do
+			check(good[name] >= 14, "A trait rolled under its floor")
+		end
+	end
+	local kinds = 0
+	for _ in seen do
+		kinds += 1
+	end
+	check(kinds > 390, "Kaiju roll the same traits")
+	-- (with no rng: math.random, as a server does)
+	local any = Kaiju.rollTraits()
+	check(any.Might >= 0 and any.Speed <= T.Max, "No rng: traits out of range")
+	-- A new kaiju has its own; given ones are copied, not shared.
+	local soul = Kaiju.rollSoul(Random.new(3), "Fire", { Id = "t1", Time = 1, Species = "Bulwark" })
+	local born = Kaiju.new("k1", "Bulwark", soul, 1)
+	check(born.Traits and born.Traits.Vigor ~= nil, "A new kaiju has no traits")
+	local given = { Might = 20, Vigor = 20, Guard = 20, Speed = 20 }
+	local copy = Kaiju.new("k2", "Bulwark", soul, 1, given)
+	check(copy.Traits.Might == 20 and copy.Traits ~= given, "Given traits weren't kept (or were shared)")
+	-- A save from before traits: its own, the same every time, kept on load.
+	local old = { Id = "k7", Species = "Razorback", Element = "Shock", Level = 4, Exp = 0, Soul = { Id = "g9", Found = 123, Tier = "Rare" } }
+	local a, b = Kaiju.traits(old), Kaiju.traits(old)
+	for _, name in T.Names do
+		check(a[name] == b[name] and a[name] >= 0 and a[name] <= T.Max, "An old save's traits change or run out of range")
+	end
+	local differ = 0
+	for n = 1, 50 do
+		local other = table.clone(old)
+		other.Id = "k" .. n
+		local o = Kaiju.traits(other)
+		if o.Might ~= a.Might or o.Vigor ~= a.Vigor or o.Guard ~= a.Guard or o.Speed ~= a.Speed then
+			differ += 1
+		end
+	end
+	check(differ >= 45, "Old saves all get the same traits")
+	local profile = { Kaiju = { List = { k7 = old }, Next = 8 } }
+	Kaiju.roster(profile)
+	check(old.Traits and old.Traits.Might == a.Might and old.Traits.Speed == a.Speed, "An old save's traits weren't kept on load")
+	check(Kaiju.traits({ Traits = { Might = 99, Vigor = -4, Guard = 7.6, Speed = 3 } }).Might == T.Max, "Traits past Max weren't clamped")
+	-- What they do: everyday (Mid) changes nothing; the best and worst by Per.
+	local base = Kaiju.stats("Bulwark", 10, "Rare")
+	local midT = { Might = T.Mid, Vigor = T.Mid, Guard = T.Mid, Speed = T.Mid }
+	local same = Kaiju.withTraits(Kaiju.stats("Bulwark", 10, "Rare"), midT)
+	check(same.Health == base.Health and same.Damage == base.Damage and same.Speed == base.Speed and same.Guard == base.Guard, "Everyday traits changed its stats")
+	local best = Kaiju.withTraits(Kaiju.stats("Bulwark", 10, "Rare"), given)
+	local worst = Kaiju.withTraits(Kaiju.stats("Bulwark", 10, "Rare"), { Might = 0, Vigor = 0, Guard = 0, Speed = 0 })
+	local span = T.Max - T.Mid
+	check(math.abs(best.Health / base.Health - (1 + span * T.Per.Vigor)) < 0.01, "Vigor doesn't raise its health by Per")
+	check(math.abs(best.Damage / base.Damage - (1 + span * T.Per.Might)) < 0.01, "Might doesn't raise its damage by Per")
+	check(math.abs(best.Guard - (base.Guard + span * T.Per.Guard)) < 0.002, "Guard isn't added to its kind's")
+	check(best.Speed > base.Speed and worst.Speed < base.Speed, "Speed doesn't move its speed")
+	check(worst.Health < base.Health and worst.Damage < base.Damage and worst.Guard <= base.Guard, "Poor traits didn't lower its stats")
+	check(best.Health / worst.Health < 1.3 and best.Damage / worst.Damage < 1.3, "Traits outweigh levels")
+	-- (a kaiju of a level above is still stronger than the best of the one below, mostly)
+	local next = Kaiju.withTraits(Kaiju.stats("Bulwark", 12, "Rare"), { Might = 0, Vigor = 0, Guard = 0, Speed = 0 })
+	check(next.Health < best.Health, "Traits do too little: two levels outweigh the best and worst")
+	-- In its stats as it stands: two of one kind and level, unlike.
+	local strong = Kaiju.new("k3", "Bulwark", soul, 8, given)
+	local weak = Kaiju.new("k4", "Bulwark", soul, 8, { Might = 1, Vigor = 2, Guard = 0, Speed = 3 })
+	local sa, sb = Kaiju.recordStats(strong), Kaiju.recordStats(weak)
+	check(sa.Health > sb.Health and sa.Damage > sb.Damage and sa.Guard > sb.Guard and sa.Speed > sb.Speed, "Two of one kind and level fight the same")
+	check(select(2, Kaiju.health(strong)) == sa.Health, "Its full health isn't its traits' health")
+	-- Its Guard in the hits it takes.
+	local plainTaken = Kaiju.taken("Bulwark", "Fire", nil)
+	check(math.abs(Kaiju.taken("Bulwark", "Fire", nil, sa.Guard) - (1 - sa.Guard)) < 1e-9 and Kaiju.taken("Bulwark", "Fire", nil, sa.Guard) < plainTaken, "Its own Guard didn't soak more")
+	-- Its Grade.
+	check(Kaiju.grade(given) == "S" and Kaiju.grade({ Might = 0, Vigor = 0, Guard = 0, Speed = 0 }) == "C", "Grades at the ends")
+	local last = math.huge
+	for _, step in T.Grades do
+		check(step[2] < last, "Grades aren't in order")
+		last = step[2]
+		local at = step[2]
+		local t = { Might = math.min(T.Max, at), Vigor = math.clamp(at - T.Max, 0, T.Max), Guard = math.clamp(at - 2 * T.Max, 0, T.Max), Speed = math.clamp(at - 3 * T.Max, 0, T.Max) }
+		check(Kaiju.grade(t) == step[1], "A total of " .. at .. " isn't Grade " .. step[1])
+	end
+	local grades = {}
+	for _ = 1, 2000 do
+		local g = Kaiju.grade(Kaiju.rollTraits(rng))
+		grades[g] = (grades[g] or 0) + 1
+	end
+	check((grades.S or 0) > 0 and (grades.S or 0) < 200, "Grade S isn't rare")
+	check((grades.B or 0) > (grades.S or 0) and (grades.A or 0) > (grades.S or 0), "Grade S is commoner than A or B")
+	-- Where they're used.
+	local server = fs.readFile(ROOT .. "/src/server/Systems/KaijuServer.luau")
+	check(server:find("pet.Stats and pet.Stats.Guard", 1, true) ~= nil, "A pet's own Guard isn't used in the hits it takes")
+	check(server:find("Traits = Kaiju.rollTraits(random)", 1, true) ~= nil and server:find("entry.Traits)", 1, true) ~= nil, "The roll's traits aren't the kaiju's")
+	check(server:find("Traits = record.Traits", 1, true) ~= nil, "A revive works out health without its traits")
+	local wilds = fs.readFile(ROOT .. "/src/server/Systems/KaijuWilds.luau")
+	check(wilds:find("Traits = traits", 1, true) ~= nil and wilds:find("wild.Traits)", 1, true) ~= nil, "A caught kaiju doesn't keep its wild traits")
+	check(wilds:find('"KaijuGrade"', 1, true) ~= nil and wilds:find("stats.Guard)", 1, true) ~= nil, "A wild kaiju's traits don't show or count")
+	local hud = fs.readFile(ROOT .. "/src/client/Modules/KaijuHud.luau")
+	check(hud:find("Kaiju.traits(record)", 1, true) ~= nil and hud:find("TraitChips", 1, true) ~= nil, "The kaiju panel doesn't show its traits")
+	local market = fs.readFile(ROOT .. "/src/client/Modules/MarketBoardUI.luau")
+	check(market:find("Grade %s", 1, true) ~= nil, "The Market doesn't show a kaiju's Grade")
+	local roll = fs.readFile(ROOT .. "/src/client/Modules/KaijuRoll.luau")
+	check(roll:find("entry.Traits", 1, true) ~= nil, "The roll card doesn't show its traits")
+	local bars = fs.readFile(ROOT .. "/src/client/Modules/WildBars.luau")
+	check(bars:find('"KaijuGrade"', 1, true) ~= nil, "A wild kaiju's plate doesn't show its Grade")
+end
+
 print(
 	string.format(
-		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), names, your team, the support slot, the starter roll, fighting as a team, sizes, follow-the-leader jumps, the HYPERBEAM)",
+		"PASS: %d kaiju rule checks (stats, EXP, infusing, revives and danger, healPick and auto heal, taming, spread, slots, enchants (its own element only), traits and grades, names, your team, the support slot, the starter roll, fighting as a team, sizes, follow-the-leader jumps, the HYPERBEAM)",
 		checks
 	)
 )

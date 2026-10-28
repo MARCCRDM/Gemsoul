@@ -975,7 +975,7 @@ local pet = KaijuServer.pets()[a]
 check(pet and pet.Model.Parent == kaijuFolder, "The kaiju isn't out")
 check(pet.Model:GetAttribute("KaijuOwner") == 1 and pet.Model:GetAttribute("KaijuLevel") == 1, "Its attributes")
 check(pet.Record == starter, "The lead isn't the one out")
-check(pet.Humanoid.MaxHealth == Kaiju.stats(starter.Species, 1, starter.Soul.Tier).Health, "Its health")
+check(pet.Humanoid.MaxHealth == Kaiju.recordStats(starter).Health, "Its health")
 check((pet.Root.Position - rootA.Position).Magnitude < 19, "It came out far from its owner") -- (the lead walks 16 ahead: Kaiju.TeamSpots)
 check(KaijuServer.petOf(pet.Model) == pet, "petOf doesn't find it")
 
@@ -1017,7 +1017,7 @@ local function hurtBy(element)
 	KaijuServer.hurt(pet, 40, element, nil)
 	return pet.Humanoid.MaxHealth - pet.Humanoid.Health
 end
-local guard = 1 - Kaiju.Species[pet.Record.Species].Guard
+local guard = 1 - pet.Stats.Guard -- (its kind's, with its traits)
 local weak = shared("ElementMatchup").weakTo(pet.Element)
 check(hurtBy(pet.Element) == math.floor(40 * 0.75 * guard + 0.5), "Its own element isn't 75%")
 check(hurtBy(weak) == math.floor(40 * 1.25 * guard + 0.5), "Its weakness isn't 125%")
@@ -1312,7 +1312,7 @@ do
 	check(done.Message:find("enchanted with a Legendary Cryo gem", 1, true) ~= nil, "The reply: " .. tostring(done.Message))
 	check(second.Element == "Frost" and pet.Element == "Frost", "Enchanting changed its element")
 	check(pet.GemSurge == Kaiju.recordSurge(second) and pet.Fighter.GemSurge == pet.GemSurge, "Enchanted: no surge")
-	check(pet.Stats.Health == Kaiju.stats("Carapace", second.Level, "Legendary").Health, "A Legendary enchant didn't make it stronger")
+	check(pet.Stats.Health == Kaiju.withTraits(Kaiju.stats("Carapace", second.Level, "Legendary"), Kaiju.traits(second)).Health, "A Legendary enchant didn't make it stronger")
 	local back = nil
 	for _, gem in profiles[a].Gems do
 		if gem.Id == frostSoul.Id then
@@ -1414,7 +1414,7 @@ check(enemy.OutpostCreature and enemy.Model:GetAttribute("KaijuWild") == true, "
 check(math.abs(wild.Level - pet.Record.Level) <= Kaiju.Wild.LevelSpread, "A wild kaiju far from the kaiju out's level")
 check(
 	enemy.Humanoid.MaxHealth
-		== math.floor(Kaiju.stats(wild.Species, wild.Level, wild.Soul.Tier).Health * Kaiju.Wild.Health + 0.5),
+		== math.floor(Kaiju.withTraits(Kaiju.stats(wild.Species, wild.Level, wild.Soul.Tier), wild.Traits).Health * Kaiju.Wild.Health + 0.5),
 	"A wild kaiju's health"
 )
 -- Every blow on it lands 60%-140%, times its element and Guard.
@@ -1423,7 +1423,7 @@ for _ = 1, 400 do
 	local scale = enemy.TakenScale(nil)
 	lo, hi = math.min(lo, scale), math.max(hi, scale)
 end
-local wildGuard = 1 - Kaiju.Species[wild.Species].Guard
+local wildGuard = 1 - Kaiju.withTraits(Kaiju.stats(wild.Species, wild.Level, wild.Soul.Tier), wild.Traits).Guard
 check(
 	lo >= 0.6 * wildGuard - 1e-9 and hi <= 1.4 * wildGuard + 1e-9 and hi - lo > 0.5 * wildGuard,
 	"No spread on a wild kaiju"
@@ -1735,7 +1735,7 @@ check(
 now += 1
 wf.Action = { Kind = "Light", At = now, Hits = 1 }
 enemy.StunUntil = 0
-local taken = 1 - Kaiju.Species[pet.Record.Species].Guard
+local taken = 1 - pet.Stats.Guard
 KaijuServer.hurt(pet, 100, nil, nil, false)
 local dealt = before - pet.Humanoid.Health
 check(dealt == math.floor(100 * fighter.Style.GuardMult * taken + 0.5), "A blocked blow: " .. dealt)
@@ -2034,10 +2034,10 @@ KaijuServer._think(pet, now, 0.15)
 check(not fighter.Engaged and not KaijuFight.guarding(pet, now), "Still braced out of the fight")
 check(pet.Model:GetAttribute("ActionKind") == nil and pet.Model:GetAttribute("GuardUntil") == 0, "Its pose stuck")
 now += Kaiju.RecallSeconds + 1
-pet.Humanoid.MaxHealth = Kaiju.stats(pet.Record.Species, pet.Record.Level, pet.Record.Soul.Tier).Health
+pet.Humanoid.MaxHealth = Kaiju.recordStats(pet.Record).Health
 pet.Humanoid.Health = pet.Humanoid.MaxHealth
 enemy.Humanoid.MaxHealth =
-	math.floor(Kaiju.stats(wild.Species, wild.Level, wild.Soul.Tier).Health * Kaiju.Wild.Health + 0.5)
+	math.floor(Kaiju.withTraits(Kaiju.stats(wild.Species, wild.Level, wild.Soul.Tier), wild.Traits).Health * Kaiju.Wild.Health + 0.5)
 enemy.Humanoid.Health = enemy.Humanoid.MaxHealth
 
 -- Taming ------------------------------------------------------------------------------------------------------------
@@ -2892,7 +2892,7 @@ for _, pack in KaijuWilds._packs do
 end
 check(keeper.Model:GetAttribute("KaijuGuardian") == true, "The guardian isn't marked")
 check(keeper.Model:GetAttribute("KaijuWild") == true, "The guardian can't be tamed")
-local guardHealth = Kaiju.stats(guard.Species, guard.Level, guard.Soul.Tier).Health * Kaiju.Wild.Health
+local guardHealth = Kaiju.withTraits(Kaiju.stats(guard.Species, guard.Level, guard.Soul.Tier), guard.Traits).Health * Kaiju.Wild.Health
 check(keeper.Humanoid.MaxHealth == math.floor(guardHealth + 0.5), "The guardian's health")
 local sleepAt = veinScar.Position + Vector3.new(0, 0, Frontier.Guardian.Home)
 check(across(keeper.Home - sleepAt).Magnitude < 1, "It doesn't sleep in front of its vein")

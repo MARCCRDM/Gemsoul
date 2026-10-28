@@ -615,7 +615,9 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 		name.TextScaled, name.TextTruncate = true, Enum.TextTruncate.None
 		new("UITextSizeConstraint", { MaxTextSize = 24, MinTextSize = 14 }, name)
 		name.Position, name.Size = UDim2.fromOffset(12, nameY), UDim2.new(1, -24, 0, 30)
-		local startStats = Kaiju.stats(entry.Species, Kaiju.StarterLevel, tier)
+		-- (with its own traits, rolled with it: Shared Kaiju.traits)
+		local startStats = Kaiju.withTraits(Kaiju.stats(entry.Species, Kaiju.StarterLevel, tier), entry.Traits)
+		local grade = if entry.Traits then (Kaiju.grade(entry.Traits)) else nil
 		local stats = label(card, "", 12, color, Enum.Font.GothamBlack)
 		stats.TextXAlignment = Enum.TextXAlignment.Center
 		stats.Position, stats.Size = UDim2.fromOffset(12, statsY), UDim2.new(1, -24, 0, 16)
@@ -761,6 +763,7 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 			recolor(color)
 			which.TextColor3 = color
 			kind.Text = string.format("%s  ·  LV %d", string.upper(species and species.Role or ""), Kaiju.StarterLevel)
+				.. (if grade then "  ·  GRADE " .. grade else "")
 			if not quick then
 				LotterySound.play("Lock")
 			end

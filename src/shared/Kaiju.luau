@@ -1313,11 +1313,12 @@ function Kaiju.wildLevel(levels: { number }, rng): number
 end
 
 -- The damage a kaiju takes from a blow of `element`: its own element 75%,
--- its weakness 125% (ElementMatchup), less its kind's Guard.
-function Kaiju.taken(speciesId: string, kaijuElement: string?, element: string?): (number, string?)
+-- its weakness 125% (ElementMatchup), less its kind's Guard (or `guard`:
+-- its own, with its traits: recordStats).
+function Kaiju.taken(speciesId: string, kaijuElement: string?, element: string?, guard: number?): (number, string?)
 	local mult, tag = ElementMatchup.versus(element, kaijuElement)
 	local s = Kaiju.Species[speciesId]
-	return mult * (1 - (s and s.Guard or 0)), tag
+	return mult * (1 - (guard or (s and s.Guard) or 0)), tag
 end
 
 -- Daily coin cap for moon bugs: coins still to earn today.
@@ -1350,13 +1351,120 @@ function Kaiju.attuned(record): boolean
 	return type(soul) == "table" and soul.Element ~= nil and soul.Element == record.Element
 end
 
+-- Traits: what makes one kaiju unlike another of its kind and level. Each
+-- kaiju is born with four, 0 to Max (rolled when it's caught, rolled or
+-- bought; a wild one shows its own before you catch it), and they never
+-- change. Mid is an everyday kaiju; each point over or under it moves its
+-- stat by Per: Might its damage, Vigor its health, Guard the share of each
+-- blow it shrugs off (added to its kind's), Speed how fast it runs. The
+-- four together give it a Grade (Grades: the least total for each).
+Kaiju.Traits = {
+	Names = { "Might", "Vigor", "Guard", "Speed" },
+	Max = 20,
+	Mid = 10,
+	Per = { Might = 0.012, Vigor = 0.012, Guard = 0.006, Speed = 0.01 },
+	Grades = { { "S", 66 }, { "A", 52 }, { "B", 36 }, { "C", 0 } },
+}
+
+-- A fresh set of traits (each at least `floor`: the Kaiju of the Day's are
+-- never poor). With no `rng`, math.random.
+function Kaiju.rollTraits(rng, floor: number?)
+	local t = Kaiju.Traits
+	local lo = math.clamp(math.floor(floor or 0), 0, t.Max)
+	local out = {}
+	for _, name in t.Names do
+		out[name] = if rng then rng:NextInteger(lo, t.Max) else math.random(lo, t.Max)
+	end
+	return out
+end
+
+-- A save from before traits: its own, worked out from what never changes on
+-- it (its id, kind, element and its Gemsoul's id and when it was found), so
+-- it always comes out the same.
+local function traitHash(...): number
+	local h = 2166136
+	for _, part in { ... } do
+		local text = tostring(part)
+		for i = 1, #text do
+			h = (h * 31 + string.byte(text, i)) % 2147483647
+			h = bit32.bxor(h, bit32.rshift(h, 13))
+		end
+		h = (h * 48271) % 2147483647
+	end
+	return h
+end
+
+local function validTraits(traits): boolean
+	if type(traits) ~= "table" then
+		return false
+	end
+	for _, name in Kaiju.Traits.Names do
+		if type(traits[name]) ~= "number" then
+			return false
+		end
+	end
+	return true
+end
+
+-- A kaiju's traits (record.Traits, or for an old save its own worked out).
+function Kaiju.traits(record)
+	local t = Kaiju.Traits
+	if not record then
+		return nil
+	end
+	if validTraits(record.Traits) then
+		local out = {}
+		for _, name in t.Names do
+			out[name] = math.clamp(math.floor(record.Traits[name]), 0, t.Max)
+		end
+		return out
+	end
+	local soul = record.Soul or {}
+	local out = {}
+	for _, name in t.Names do
+		out[name] = traitHash(record.Id, record.Species, record.Element, soul.Id, soul.Found, name) % (t.Max + 1)
+	end
+	return out
+end
+
+-- Its Grade (S, A, B or C) and the four traits' total.
+function Kaiju.grade(traits): (string, number)
+	local total = 0
+	for _, name in Kaiju.Traits.Names do
+		total += (traits and traits[name]) or Kaiju.Traits.Mid
+	end
+	for _, step in Kaiju.Traits.Grades do
+		if total >= step[2] then
+			return step[1], total
+		end
+	end
+	return "C", total
+end
+
+-- Stats (Kaiju.stats) with a set of traits on them.
+function Kaiju.withTraits(stats, traits)
+	if not (stats and traits) then
+		return stats
+	end
+	local t = Kaiju.Traits
+	local function by(name: string): number
+		return ((traits[name] or t.Mid) - t.Mid) * t.Per[name]
+	end
+	stats.Health = math.max(1, math.floor(stats.Health * (1 + by("Vigor")) + 0.5))
+	stats.Damage = math.floor(stats.Damage * (1 + by("Might")) * 10 + 0.5) / 10
+	stats.Guard = math.clamp(math.floor(((stats.Guard or 0) + by("Guard")) * 1000 + 0.5) / 1000, 0, 0.6)
+	stats.Speed = math.floor(stats.Speed * (1 + by("Speed")) * 10 + 0.5) / 10
+	return stats
+end
+
 -- Its stats as it stands: its kind's at its level, by its Gemsoul's rarity,
--- its damage Attuned.Power more when attuned.
+-- with its traits, its damage Attuned.Power more when attuned.
 function Kaiju.recordStats(record)
 	if not record then
 		return nil
 	end
 	local stats = Kaiju.stats(record.Species, record.Level, record.Soul and record.Soul.Tier)
+	stats = Kaiju.withTraits(stats, Kaiju.traits(record))
 	if stats and Kaiju.attuned(record) then
 		stats.Damage = math.floor(stats.Damage * Kaiju.Attuned.Power * 10 + 0.5) / 10
 	end
@@ -1504,8 +1612,8 @@ function Kaiju.moves(gem, level: number?): { [string]: string }
 	return out
 end
 
--- A new kaiju record.
-function Kaiju.new(id: string, speciesId: string, soul, level: number?)
+-- A new kaiju record (its traits given, or rolled: Kaiju.rollTraits).
+function Kaiju.new(id: string, speciesId: string, soul, level: number?, traits: { [string]: number }?)
 	return {
 		Id = id,
 		Species = speciesId,
@@ -1513,6 +1621,7 @@ function Kaiju.new(id: string, speciesId: string, soul, level: number?)
 		Level = math.clamp(level or 1, 1, Kaiju.MaxLevel),
 		Exp = 0,
 		Soul = soul,
+		Traits = if validTraits(traits) then table.clone(traits :: any) else Kaiju.rollTraits(),
 	}
 end
 
@@ -1532,6 +1641,12 @@ function Kaiju.roster(profile)
 	end
 	roster.List = roster.List or {}
 	roster.Next = roster.Next or 1
+	-- (a save from before traits keeps the ones it was always going to have)
+	for _, record in roster.List do
+		if type(record) == "table" and not validTraits(record.Traits) then
+			record.Traits = Kaiju.traits(record)
+		end
+	end
 	return roster
 end
 
@@ -1546,14 +1661,14 @@ end
 -- Adds a kaiju (given its kind, Gemsoul and level) and returns its record,
 -- or nil if the roster is full (`over`: one past full, for the starter
 -- support). The first one becomes the one out.
-function Kaiju.add(roster, speciesId: string, soul, level: number?, over: boolean?)
+function Kaiju.add(roster, speciesId: string, soul, level: number?, over: boolean?, traits: { [string]: number }?)
 	if Kaiju.count(roster) >= Kaiju.MaxOwned + (if over then 1 else 0) or not Kaiju.Species[speciesId] then
 		return nil
 	end
 	local before = Kaiju.order(roster)
 	local id = "k" .. roster.Next
 	roster.Next += 1
-	local record = Kaiju.new(id, speciesId, soul, level)
+	local record = Kaiju.new(id, speciesId, soul, level, traits)
 	roster.List[id] = record
 	if not roster.Active or not roster.List[roster.Active] then
 		roster.Active = id

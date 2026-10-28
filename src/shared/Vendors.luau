@@ -315,6 +315,7 @@ Vendors.KaijuKeeper = {
 		"Catch a wild kaiju when its health is low: the lower it is, the better your chances.",
 		"A Warden heals and shields the rest of your team. Keep one in your support slot.",
 		"Kaiju of the rarest kinds are worth the most on the Market. Check the prices before you sell.",
+		"No two kaiju are the same: each is born with its own Might, Vigor, Guard and Speed. Grade S is the best there is.",
 	},
 }
 Vendors.Broker = crew(
