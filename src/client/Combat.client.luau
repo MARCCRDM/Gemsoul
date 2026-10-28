@@ -204,6 +204,62 @@ local hint = shadowed(text(gui, "", 15, P.Text, IronUi.Bold))
 hint.AutomaticSize, hint.TextWrapped = Enum.AutomaticSize.None, false
 hint.AnchorPoint, hint.Position, hint.Size = Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0.5, 30), UDim2.fromOffset(460, 22)
 hint.TextXAlignment = Enum.TextXAlignment.Center
+-- The cursor's free (TAB): a see-through TAB key under the crosshair,
+-- breathing softly, "press TAB to return". A click on it does the same.
+local tabKey: any = {}
+do
+	local button = Instance.new("TextButton")
+	button.Name = "TabReturn"
+	button.AnchorPoint = Vector2.new(0.5, 0)
+	button.Position = UDim2.new(0.5, 0, 0.5, 34)
+	button.Size = UDim2.fromOffset(250, 40)
+	button.BackgroundColor3 = Color3.fromRGB(10, 13, 22)
+	button.BackgroundTransparency = 0.55
+	button.AutoButtonColor = false
+	button.Text = ""
+	button.Visible = false
+	button.Parent = gui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+	local edge = Instance.new("UIStroke")
+	edge.Color, edge.Thickness, edge.Transparency = P.Gold, 1.5, 0.5
+	edge.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	edge.Parent = button
+	local cap = Instance.new("TextLabel")
+	cap.Name = "Cap"
+	cap.Position, cap.Size = UDim2.fromOffset(8, 7), UDim2.fromOffset(52, 26)
+	cap.BackgroundColor3, cap.BackgroundTransparency = P.Gold, 0.15
+	cap.Font, cap.TextSize, cap.Text = Enum.Font.GothamBlack, 14, "TAB"
+	cap.TextColor3 = Color3.fromRGB(20, 16, 8)
+	cap:SetAttribute("NoTranslate", true)
+	cap.Parent = button
+	local capCorner = Instance.new("UICorner")
+	capCorner.CornerRadius = UDim.new(0, 6)
+	capCorner.Parent = cap
+	local words = Instance.new("TextLabel")
+	words.Name = "Words"
+	words.BackgroundTransparency = 1
+	words.Position, words.Size = UDim2.fromOffset(70, 0), UDim2.new(1, -78, 1, 0)
+	words.Font, words.TextSize, words.Text = IronUi.Bold, 13, "press TAB to return"
+	words.TextColor3, words.TextTransparency = P.Text, 0.1
+	words.TextXAlignment = Enum.TextXAlignment.Left
+	words.Parent = button
+	local scale = Instance.new("UIScale")
+	scale.Parent = button
+	tabKey.Button, tabKey.Edge, tabKey.Cap, tabKey.Scale = button, edge, cap, scale
+	-- (a slow breath: the edge and the key brighten and dim, a touch of size)
+	function tabKey.step(show: boolean, now: number)
+		button.Visible = show
+		if not show then
+			return
+		end
+		local breath = (math.sin(now * 3) + 1) / 2
+		edge.Transparency = 0.65 - 0.4 * breath
+		cap.BackgroundTransparency = 0.35 - 0.25 * breath
+		scale.Scale = 1 + 0.03 * breath
+	end
+end
 local function centered(parent, size, color)
 	local label = text(parent, "", size, color, IronUi.Bold)
 	label.AutomaticSize, label.TextWrapped, label.TextTruncate = Enum.AutomaticSize.None, false, Enum.TextTruncate.AtEnd
@@ -1233,6 +1289,15 @@ ContextActionService:BindActionAtPriority("CombatCursor", function(_, state)
 	end
 	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Tab)
+tabKey.Button.Activated:Connect(function()
+	if not cursorFree then
+		return
+	end
+	CombatGuide.close()
+	AugmentTreeUI.close()
+	cursorFree = false
+	FirstPerson.setCursorFree(false)
+end)
 -- Switch between the targets close around you (within TargetLockRules.SwitchRange).
 ContextActionService:BindActionAtPriority("SwitchTarget", function(_, state)
 	if not canFight() or UserInputService:GetFocusedTextBox() then
@@ -1749,11 +1814,12 @@ RunService.RenderStepped:Connect(function(dt)
 		else P.Text
 	-- Callouts fade out; idle shows only states that need attention.
 	if now > feedbackUntil then
-		hint.Text = if cursorFree then "TAB  ·  return to combat" elseif blockHeld then "GUARD UP" else ""
+		hint.Text = if blockHeld and not cursorFree then "GUARD UP" else ""
 		hint.TextTransparency = 0
 	else
 		hint.TextTransparency = math.clamp(1 - (feedbackUntil - now) / 0.3, 0, 1)
 	end
+	tabKey.step(cursorFree and not UserInputService.TouchEnabled, now)
 	comboLabel.Visible = now < comboUntil
 	if comboLabel.Visible then
 		local fadeOut = math.clamp(1 - (comboUntil - now) / 0.4, 0, 1)

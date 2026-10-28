@@ -1539,6 +1539,7 @@ return {
 	["RELEASE!  PERFECT"] = "¡SUELTA!  PERFECTO",
 	["Channel"] = "Canalizar",
 	["TAB  ·  return to combat"] = "TAB  ·  volver al combate",
+	["press TAB to return"] = "pulsa TAB para volver",
 	["Guard up"] = "En guardia",
 	["◎ LOCKED"] = "◎ FIJADO",
 	["Player"] = "Jugador",
