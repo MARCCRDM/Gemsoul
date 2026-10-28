@@ -2,7 +2,7 @@
 	Before an Outpost duel challenge goes out, the challenger picks its stats
 	(Shared.PvPRules): FULL PROGRESSION (everything both of you have earned,
 	which the other player accepts by accepting) or EVEN STATS (the same base
-	stats as Casual and Ranked). Used by every "Duel" button: the Outpost
+	stats for both: level bonuses and the Augment Tree left out). Used by every "Duel" button: the Outpost
 	prompt, the Social window and the chat.
 
 	  ChallengeChooser.open(userId, name?)  shows the choice, then sends
@@ -96,7 +96,7 @@ local function option(x, heading, line, color, stats)
 	end)
 	return b
 end
-option(16, "EVEN STATS", "Same base stats as Casual and Ranked. Gear, gems and skill decide it.", P.Teal, "Even")
+option(16, "EVEN STATS", "The same base stats for both. Gear, gems and skill decide it.", P.Teal, "Even")
 option(
 	238,
 	"FULL PROGRESSION",

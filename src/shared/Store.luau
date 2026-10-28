@@ -4,9 +4,10 @@
 	Robux products too: Shared.Outpost.Refills, sold by Garrick.)
 
 	  Bundles      new-player offers (the Welcome Kit, the Starter Pack), the
-	               squad kits (one, two or all three miners), themed
-	               collections, and the premium sets (Royal Treasury, The
-	               Vault: everything in the store)
+	               player bundles (a whole look for your miner: suit, weapon
+	               skin, helmet, visor, pickaxe and often a trim or back
+	               piece), and the premium sets (Royal Treasury, The Vault:
+	               everything in the store)
 	  Weapon Skins, Suits, Pickaxes
 	               every look sold on its own (Cosmetics, Robux)
 	  Free         the group, friends, the login streak and promo codes
@@ -42,7 +43,7 @@ export type Bundle = {
 	Id: string,
 	Name: string,
 	Tagline: string,
-	Section: string, -- "Offer", "Collection" or "Premium"
+	Section: string, -- "Offer", "Look" (a whole look for your miner), "Premium", or "Retired" (no longer sold)
 	Color: Color3,
 	Hero: string, -- the cosmetic shown big on its card
 	Contents: Reward,
@@ -97,10 +98,93 @@ Store.Bundles = {
 		},
 	},
 	{
+		Id = "Scrapyard",
+		Name = "Scrapyard Hauler",
+		Tagline = "Hauler gear from the scrap heaps: rusted rig, rust blade, hard hat, hi-vis visor, bone pick and a survey pack.",
+		Section = "Look",
+		Color = Color3.fromRGB(196, 110, 58),
+		Hero = "SuitRust",
+		Contents = { Cosmetics = { "SuitRust", "SkinRust", "HelmetHardHat", "VisorLime", "PickBone", "BackPack" } },
+	},
+	{
+		Id = "CopperShogun",
+		Name = "Copper Shogun",
+		Tagline = "Copper coil plate under a shogun's kabuto, a gold mirror visor, the gilded pick and a war banner.",
+		Section = "Look",
+		Color = Color3.fromRGB(214, 140, 70),
+		Hero = "HelmetShogun",
+		Contents = { Cosmetics = { "SuitCopper", "SkinCopper", "HelmetShogun", "VisorGoldMirror", "PickGilded", "BackBanner" } },
+	},
+	{
+		Id = "ToxicProspector",
+		Name = "Toxic Prospector",
+		Tagline = "Hazmat from head to pick: Biohazard suit, Toxic Ooze blade, Deep Diver helmet, Toxic Bloom visor and Venom trim.",
+		Section = "Look",
+		Color = Color3.fromRGB(120, 220, 90),
+		Hero = "SuitBiohazard",
+		Contents = { Cosmetics = { "SuitBiohazard", "SkinToxic", "HelmetDeepDiver", "VisorToxic", "PickGeode", "TrimVenom" } },
+	},
+	{
+		Id = "GlacierJuggernaut",
+		Name = "Glacier Juggernaut",
+		Tagline = "Cold and heavy: Arctic Ops, the Glacier Shard blade, Jarl's Horns, a Cryo Frost visor, Glacier Fang and Glacier trim.",
+		Section = "Look",
+		Color = Color3.fromRGB(150, 225, 255),
+		Hero = "SuitArctic",
+		Contents = { Cosmetics = { "SuitArctic", "SkinGlacier", "HelmetJarlHorns", "VisorCryo", "PickGlacier", "TrimGlacier" } },
+	},
+	{
+		Id = "ReaperHarvest",
+		Name = "Reaper's Harvest",
+		Tagline = "For Halloween and after: Stealth Black, the Void Crystal blade, the Grim Reaper hood, a Twilight visor and the Void Reaper pick.",
+		Section = "Look",
+		Color = Color3.fromRGB(150, 90, 220),
+		Hero = "HelmetGrimReaper",
+		Contents = { Cosmetics = { "SuitStealth", "SkinVoid", "HelmetGrimReaper", "VisorTwilight", "PickVoid" } },
+	},
+	{
+		Id = "StormCaller",
+		Name = "Storm Caller",
+		Tagline = "Storm Conductor plate, the Plasma Edge blade, a Mech Ace helmet, the Ion Storm visor, Stormbreaker and Storm trim.",
+		Section = "Look",
+		Color = Color3.fromRGB(90, 170, 255),
+		Hero = "SuitStorm",
+		Contents = { Cosmetics = { "SuitStorm", "SkinPlasma", "HelmetMechAce", "VisorIon", "PickStorm", "TrimStorm" } },
+	},
+	{
+		Id = "NeonRush",
+		Name = "Neon Rush",
+		Tagline = "Lit up head to toe: the Neon Runner suit and pick, the Circuit Board blade, Shark Bite and the Spectrum visor.",
+		Section = "Look",
+		Color = Color3.fromRGB(255, 80, 200),
+		Hero = "SuitNeon",
+		Contents = { Cosmetics = { "SuitNeon", "SkinCircuit", "HelmetSharkBite", "VisorSpectrum", "PickNeon" } },
+	},
+	{
+		Id = "DeepSpaceExplorer",
+		Name = "Deep Space Explorer",
+		Tagline = "Nebula suit and blade, a Star Bubble helmet, the Aurora visor and the Prism Shard pick.",
+		Section = "Look",
+		Color = Color3.fromRGB(130, 90, 255),
+		Hero = "SuitNebula",
+		Contents = { Cosmetics = { "SuitNebula", "SkinNebula", "HelmetStarBubble", "VisorAurora", "PickPrism" } },
+	},
+	{
+		Id = "SolarWarlord",
+		Name = "Solar Warlord",
+		Tagline = "The store's hottest look: Obsidian Lava, the Solar Flare blade, the Wyrmking helm, a Supernova visor, Magma Heart and the Ember Cape.",
+		Section = "Look",
+		Color = Color3.fromRGB(255, 120, 40),
+		Hero = "SuitObsidian",
+		Contents = { Cosmetics = { "SuitObsidian", "SkinSolar", "HelmetWyrmking", "VisorSupernova", "PickMagma", "BackCape" } },
+	},
+	-- No longer sold (the launch collections): kept so a purchase still
+	-- going through is granted.
+	{
 		Id = "Rustbucket",
 		Name = "Rustbucket Set",
 		Tagline = "Scrapyard chic: a rusted rig, a matching blade and a survey pack.",
-		Section = "Collection",
+		Section = "Retired",
 		Color = Color3.fromRGB(196, 110, 58),
 		Hero = "SuitRust",
 		Contents = { Cosmetics = { "SuitRust", "SkinRust", "BackPack" } },
@@ -109,7 +193,7 @@ Store.Bundles = {
 		Id = "Brainrot",
 		Name = "Brainrot Duo",
 		Tagline = "Two of the silliest weapons in the arena. Bonk them both.",
-		Section = "Collection",
+		Section = "Retired",
 		Color = Color3.fromRGB(255, 196, 64),
 		Hero = "SkinBanana",
 		Contents = { Cosmetics = { "SkinBanana", "SkinBonk" } },
@@ -118,7 +202,7 @@ Store.Bundles = {
 		Id = "Circuit",
 		Name = "Circuit & Copper",
 		Tagline = "Two wired-up looks, suit and blade each: circuit green and copper coil.",
-		Section = "Collection",
+		Section = "Retired",
 		Color = Color3.fromRGB(60, 200, 140),
 		Hero = "SuitCircuit",
 		Contents = { Cosmetics = { "SuitCircuit", "SkinCircuit", "SuitCopper", "SkinCopper" } },
@@ -127,7 +211,7 @@ Store.Bundles = {
 		Id = "DeepSpace",
 		Name = "Deep Space Set",
 		Tagline = "Nebula suit and blade, a void crystal edge and the Void Reaper pick.",
-		Section = "Collection",
+		Section = "Retired",
 		Color = Color3.fromRGB(130, 90, 255),
 		Hero = "SuitNebula",
 		Contents = { Cosmetics = { "SuitNebula", "SkinNebula", "SkinVoid", "PickVoid" } },
@@ -136,7 +220,7 @@ Store.Bundles = {
 		Id = "SolarForge",
 		Name = "Solar Forge Set",
 		Tagline = "Obsidian plate, the Solar Flare blade and the Magma Heart pick.",
-		Section = "Collection",
+		Section = "Retired",
 		Color = Color3.fromRGB(255, 120, 40),
 		Hero = "SuitObsidian",
 		Contents = { Cosmetics = { "SuitObsidian", "SkinSolar", "PickMagma" } },
@@ -175,8 +259,9 @@ Store.Bundles = {
 	},
 } :: { Bundle }
 
--- Squad kits: one look per fighting style (a suit, a weapon skin, a pickaxe
--- and a trim). Buy one, two or all three: each goes on one of your miners.
+-- Squad kits, from when every player had three miners: one look per
+-- fighting style. No longer sold (Store.retired), kept so a purchase still
+-- going through is granted.
 Store.Kits = {
 	{
 		Id = "Prospector",
@@ -230,6 +315,16 @@ Store.StarterPack = {
 Store.RobuxProducts = {
 	-- Bundles
 	Welcome = 3723018588,
+	Scrapyard = 0,
+	CopperShogun = 0,
+	ToxicProspector = 0,
+	GlacierJuggernaut = 0,
+	ReaperHarvest = 0,
+	StormCaller = 0,
+	NeonRush = 0,
+	DeepSpaceExplorer = 0,
+	SolarWarlord = 0,
+	-- (no longer sold, kept for purchases still going through: Store.retired)
 	Rustbucket = 3723018366,
 	Brainrot = 3723018237,
 	Circuit = 3723018242,
@@ -237,7 +332,7 @@ Store.RobuxProducts = {
 	SolarForge = 3723018447,
 	Royal = 3723018359,
 	Vault = 3723018522,
-	-- Squad kits: one, two or all three
+	-- Squad kits: one, two or all three (no longer sold either)
 	KitProspector = 3723018297,
 	KitSkirmisher = 3723018310,
 	KitJuggernaut = 3723018293,
@@ -327,6 +422,15 @@ Store.RobuxProducts = {
 -- The Robux price of each bundle and offer (a cosmetic's is its own Robux).
 Store.RobuxPrices = {
 	Welcome = 49,
+	Scrapyard = 199,
+	CopperShogun = 349,
+	ToxicProspector = 399,
+	GlacierJuggernaut = 449,
+	ReaperHarvest = 449,
+	StormCaller = 499,
+	NeonRush = 499,
+	DeepSpaceExplorer = 549,
+	SolarWarlord = 799,
 	Rustbucket = 99,
 	Brainrot = 199,
 	Circuit = 349,
@@ -403,8 +507,8 @@ for i = 1, #Store.Kits do
 	assert(Store.KitPrices[i], "Store.KitPrices needs a price for every number of kits")
 end
 
--- The Vault: everything sold on its own, every extra the bundles and kits
--- carry (not the exclusives), and its own title.
+-- The Vault: everything sold on its own, every extra the bundles carry
+-- (not the exclusives), and its own title.
 do
 	local vault = Store.Bundles[#Store.Bundles]
 	assert(vault.Id == "Vault")
@@ -434,9 +538,6 @@ do
 	for _, bundle in Store.Bundles do
 		extras(bundle.Contents)
 	end
-	for _, kit in Store.Kits do
-		extras(kit.Contents)
-	end
 	extras(Store.StarterPack.Contents)
 	table.insert(list, "TitleCollector")
 	vault.Contents.Cosmetics = list
@@ -451,6 +552,13 @@ function Store.bundle(id: any): Bundle?
 		end
 	end
 	return nil
+end
+
+-- Is this a product no longer sold (a retired bundle, the squad kits)? It's
+-- still granted when a purchase of it goes through, never offered again.
+function Store.retired(key: any): boolean
+	local bundle = Store.bundle(key)
+	return (bundle ~= nil and bundle.Section == "Retired") or Store.kitsOf(key) ~= nil
 end
 
 -- What a product grants (a cosmetic, a bundle, kits, the Starter Pack, a
@@ -571,21 +679,16 @@ function Store.ownedCount(reward: Reward, owned: { [string]: boolean }?): (numbe
 	return have, total
 end
 
--- Bundles (and kits) that include a cosmetic, best saving first: for the
--- "save with a bundle" note on a product. (Not The Vault, which holds
--- everything, nor the one-time offers.)
+-- Bundles that include a cosmetic, best saving first: for the "save with
+-- a bundle" note on a product. (Not The Vault, which holds everything, nor
+-- the one-time offers, nor anything no longer sold.)
 function Store.bundlesWith(cosmeticId: string): { string }
 	local keys = {}
 	for _, bundle in Store.Bundles do
-		if bundle.Section == "Collection" or bundle.Id == "Royal" then
+		if bundle.Section == "Look" or bundle.Id == "Royal" then
 			if table.find(bundle.Contents.Cosmetics or {}, cosmeticId) then
 				table.insert(keys, bundle.Id)
 			end
-		end
-	end
-	for _, kit in Store.Kits do
-		if table.find(kit.Contents.Cosmetics or {}, cosmeticId) then
-			table.insert(keys, "Kit" .. kit.Id)
 		end
 	end
 	table.sort(keys, function(a, b)
@@ -659,6 +762,9 @@ function Store.canBuy(key: string, profile: any, now: number): (boolean, string?
 	local reward = Store.contents(key)
 	if not reward or not Store.robuxPrice(key) then
 		return false, "That isn't for sale."
+	end
+	if Store.retired(key) then
+		return false, "That isn't sold any more."
 	end
 	if key == "KaijuRevive" then
 		-- (Only with one of yours knocked out.)

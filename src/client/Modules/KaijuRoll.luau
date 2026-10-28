@@ -17,6 +17,10 @@
 	  KaijuRoll.play(after)   the roll you're owed, then after() (at once if
 	                          there's none): in the intro after the gem roll,
 	                          and once in the Outpost for a player from before
+	  KaijuRoll.preview()     a test roll (the DEV panel's ALL KAIJU): three
+	                          rolled here from every kind (Kaiju.Order), the
+	                          reels running through all of them; START just
+	                          closes it, nothing is claimed or saved
 	  KaijuRoll.showing()     true while it's up
 	  KaijuRoll.Frame         how a kaiju is framed in its window: the camera
 	                          round it, by its size (Side, Up, Back, Aim; Fov)
@@ -203,7 +207,25 @@ function KaijuRoll.showing(): boolean
 	return gui ~= nil and gui.Parent ~= nil
 end
 
-function KaijuRoll.play(after: (() -> ())?)
+-- A test roll's three, rolled here from every kind (KaijuRoll.preview).
+local function previewRolls(): { any }
+	local rng = Random.new()
+	local rolls, used = {}, {}
+	while #rolls < 3 and #rolls < #Kaiju.Order do
+		local species = Kaiju.Order[rng:NextInteger(1, #Kaiju.Order)]
+		if not used[species] then
+			used[species] = true
+			local element = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
+			local soul = Kaiju.rollSoul(rng, element, { Id = "Preview" .. #rolls + 1, Time = os.time(), Species = species })
+			table.insert(rolls, { Species = species, Element = element, Soul = soul })
+		end
+	end
+	return rolls
+end
+
+function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
+	-- (The kinds the reels run through: the starters, or every kind in a test.)
+	local kinds = if preview then Kaiju.Order else Kaiju.Starters
 	local function done()
 		if after then
 			after()
@@ -232,7 +254,7 @@ function KaijuRoll.play(after: (() -> ())?)
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 40,
 	}, screen)
-	local result = GemClient.request("KaijuRoll")
+	local result = if preview then { Ok = true, Rolls = previewRolls() } else GemClient.request("KaijuRoll")
 	local rolls = if result.Ok and type(result.Rolls) == "table" then result.Rolls else {}
 	if #rolls == 0 then
 		screen:Destroy()
@@ -476,7 +498,7 @@ function KaijuRoll.play(after: (() -> ())?)
 			if #decoys >= 3 then
 				break
 			end
-			local s = Kaiju.Starters[rng:NextInteger(1, #Kaiju.Starters)]
+			local s = kinds[rng:NextInteger(1, #kinds)]
 			local e = Kaiju.Elements[rng:NextInteger(1, #Kaiju.Elements)]
 			if not used[s .. "/" .. e] then
 				used[s .. "/" .. e] = true
@@ -812,7 +834,7 @@ function KaijuRoll.play(after: (() -> ())?)
 		end
 		claiming = true
 		go.Text = "STARTING…"
-		local reply = GemClient.request("KaijuRollClaim")
+		local reply = if preview then { Ok = true } else GemClient.request("KaijuRollClaim")
 		claiming = false
 		if gui ~= screen then
 			return
@@ -1030,6 +1052,10 @@ function KaijuRoll.play(after: (() -> ())?)
 			gui = nil
 		end)
 	)
+end
+
+function KaijuRoll.preview()
+	KaijuRoll.play(nil, true)
 end
 
 return KaijuRoll

@@ -125,15 +125,13 @@ check(
 check(resets[ana] and resets[ben], "Combat state not reset for the duel")
 local info = last(ana, "Match")[2]
 check(info.Mode == "1v1" and info.Ranked and #info.Teams == 2 and info.Teams[2][1].Name == "Ben", "Match info wrong")
--- Ranked: even stats, rarity capped at Ultra Rare, said on the match screen.
+-- Ranked: your current stats (full progression, no rarity cap), said on
+-- the match screen.
 check(
-	ana:GetAttribute("MatchStats") == "Even" and ana:GetAttribute("MatchRarityCap") == PvPRules.UltraRare,
-	"Ranked isn't even stats with rarity capped"
+	ana:GetAttribute("MatchStats") == "Full" and ana:GetAttribute("MatchRarityCap") == nil,
+	"Ranked isn't full stats without a cap"
 )
-check(
-	info.Rules and info.Rules.Stats == "Even" and string.find(info.Rules.Label, "RARITY CAPPED", 1, true),
-	"Ranked rules not shown"
-)
+check(info.Rules and info.Rules.Stats == "Full" and info.Rules.Label == "FULL PROGRESSION", "Ranked rules not shown")
 check(
 	not handlers.DuelQueue(ana, "1v1").Ok and not handlers.DuelChallenge(ana, ben.UserId).Ok,
 	"Queued or challenged mid-duel"
@@ -290,7 +288,7 @@ partyAB.Members = { ana }
 advance(0.25)
 check(ana:GetAttribute("DuelQueue") == nil, "A broken party stayed queued")
 
--- Casual: matched like Ranked, but unrated, even stats and no rarity cap -------
+-- Casual: matched like Ranked, but unrated; current stats, no rarity cap -------
 local eve, fay = makePlayer(5, "Eve"), makePlayer(6, "Fay")
 check(handlers.DuelQueue(eve, "casual").Ok and handlers.DuelQueue(fay, "casual").Ok, "Casual queue refused")
 advance(0.25)
@@ -298,8 +296,8 @@ joinAll()
 match = Duels.matchOf(eve)
 check(match and match == Duels.matchOf(fay) and not match.Ranked, "Casual didn't start an unrated match")
 check(
-	eve:GetAttribute("MatchStats") == "Even" and eve:GetAttribute("MatchRarityCap") == nil,
-	"Casual isn't even stats without a cap"
+	eve:GetAttribute("MatchStats") == "Full" and eve:GetAttribute("MatchRarityCap") == nil,
+	"Casual isn't full stats without a cap"
 )
 local eveCoins, fayCoins = profiles[eve].Coins, profiles[fay].Coins
 advance(Matchmaking.Countdown)
@@ -340,8 +338,9 @@ check(
 	PvPRules.profile("Challenge", "Full").Stats == "Full" and PvPRules.profile("Challenge").Stats == "Even",
 	"Challenge stats choice"
 )
-check(PvPRules.profile("Casual", "Full").Stats == "Even", "Casual let full progression in")
-check(PvPRules.label(PvPRules.profile("Casual")) == "EVEN STATS", "Casual label")
+check(PvPRules.profile("Casual", "Even").Stats == "Full", "Casual took a stats choice")
+check(PvPRules.label(PvPRules.profile("Casual")) == "FULL PROGRESSION", "Casual label")
+check(PvPRules.profile("Ranked").RarityCap == nil and PvPRules.profile("FirstFight").Stats == "Even", "Ranked capped, or a first fight not even")
 do
 	local roll5 = { Rarity = 5, Stats = { Health = 20, Power = 10 } }
 	local roll3 = { Rarity = 3, Stats = { Health = 9 } }

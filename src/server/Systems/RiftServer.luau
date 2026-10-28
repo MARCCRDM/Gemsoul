@@ -6,7 +6,8 @@
 
 	  Going in    "RiftEnter", vein, bossId, together: through a gate you're
 	              standing at, or (vein "Bounty", Shared.Bounties) from
-	              Brutus's bounty counter in the Shelter, against any boss
+	              the bounty board (Brutus's counter, or the PLAY menu's
+	              BOUNTY BOARD bar: anywhere in the Outpost), against any boss
 	              on any biome's ladder (its element the ladder's). You join your party's trip if one of them is still on
 	              the way (up to RiftRun.Party), whatever boss they chose;
 	              or start one against `bossId`, from the gate's biome's
@@ -1304,12 +1305,15 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 	if why then
 		return reply(false, why)
 	end
-	-- (At the gate itself, or at the bounty office's counter for a bounty.)
+	-- (At the gate itself. A bounty from anywhere in the Outpost: its board
+	-- is at Brutus's counter and on the PLAY menu.)
 	local bounty = vein == Bounties.Gate
-	local gate = if bounty then RiftServer.bountyAt() elseif type(vein) == "number" then RiftServer.gateAt(vein) else nil
-	local root = rootOf(player) :: BasePart
-	if not gate or (root.Position - gate.Position).Magnitude > (if bounty then Bounties.Reach else RiftServer.Reach) then
-		return reply(false, if bounty then "Walk up to the bounty counter first." else "Walk up to a Rift Gate first.")
+	if not bounty then
+		local gate = if type(vein) == "number" then RiftServer.gateAt(vein) else nil
+		local root = rootOf(player) :: BasePart
+		if not gate or (root.Position - gate.Position).Magnitude > RiftServer.Reach then
+			return reply(false, "Walk up to a Rift Gate first.")
+		end
 	end
 	local run = partyRun(player)
 	local boss, element = nil, nil
@@ -1388,7 +1392,7 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 					elseif not runOf[member] then
 						notify(
 							member,
-							player.DisplayName .. " went through a Rift Gate: walk up to any gate, or the bounty counter, to follow."
+							player.DisplayName .. " went through a Rift Gate: walk up to any gate, or open the bounty board, to follow."
 						)
 					end
 				end

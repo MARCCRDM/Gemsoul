@@ -18,7 +18,7 @@ Code:
 
 | Tab | What's there |
 | --- | --- |
-| **Bundles** | The new-player offer (while it's open), the squad kits, the collections and the premium sets. |
+| **Bundles** | The new-player offer (while it's open), the player bundles and the premium sets. |
 | **Weapon Skins**, **Suits**, **Helmets**, **Visors**, **Pickaxes** | A grid of every look, sorted by featured or by price, showing all of them or only the ones you don't own. Beside it is the picked look's page: a 3D preview, the price, buy (or wear), and the bundle that saves on it. Looks earned in play show after the ones for sale, each saying how to earn it. |
 | **Free** | The group, friends, the 7-day login streak and promo codes. |
 
@@ -46,35 +46,34 @@ this honestly:
 | --- | --- | --- | --- | --- |
 | Welcome Kit | new players, once, within 24 h of joining | 49 | Camo suit + skin, War Banner, 1 h 2x XP | 75% |
 | Starter Pack | once, for 48 h after your first win | 99 | Ignition suit (only here), Molten Core, Bone Crusher, Ember Trim, 1,000 coins | 44% + exclusive |
-| Rustbucket Set | small | 99 | Rust Rig, Rust Bucket, Prospector's Pack | 33% |
-| Brainrot Duo | small | 199 | Banana Blade, Bonk Bat | 33% |
-| Circuit & Copper | medium | 349 | Circuit Rig + Board, Copper Coil + Wire | 39% |
-| Deep Space Set | medium | 599 | Nebula suit + skin, Void Crystal, Void Reaper | 36% |
-| Solar Forge Set | medium | 699 | Obsidian Lava, Solar Flare, Magma Heart | 29% |
 | Royal Treasury | large | 1,499 | Royal Gold, Chrome Knight, Stealth Black, Galaxy, Stormbreaker, Prism Shard, Gilded Prospector, Ember Cape, 5,000 coins, 24 h 2x XP | 24% |
 | The Vault | largest, once per account | 4,999 | Every weapon skin, suit, helmet, visor and pickaxe in the store (63), every bundle extra, the COLLECTOR title, 10,000 coins, 24 h 2x XP | 53% |
 
-### Squad kits (one, two or all three miners)
+### Player bundles (2026-10-28)
 
-Each kit is one look per fighting style: a suit, a weapon skin, a pickaxe and
-a trim. In the squad builder you tick the kits you want, and the price follows
-the ladder.
+Each player bundle is one whole look for your miner: a suit, a weapon skin, a
+helmet, a visor and a pickaxe (one of each), most with a trim or back piece
+too. Buying one puts the whole look on.
 
-| Kit | Suit | Skin | Pickaxe | Trim |
-| --- | --- | --- | --- | --- |
-| Toxic Prospector | Biohazard | Toxic Ooze | Amethyst Geode | Venom |
-| Storm Skirmisher | Storm Conductor | Plasma Edge | Neon Runner | Storm |
-| Glacier Juggernaut | Arctic Ops | Glacier Shard | Glacier Fang | Glacier |
+| Bundle | Robux | Suit | Weapon skin | Helmet | Visor | Pickaxe | Extra | Saves |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Scrapyard Hauler | 199 | Rust Rig | Rust Bucket | Hard Hat | Hi-Vis Lime | Bone Crusher | Prospector's Pack | 43% |
+| Copper Shogun | 349 | Copper Coil | Copper Wire | Shogun Kabuto | Gold Mirror | Gilded Prospector | War Banner | 44% |
+| Toxic Prospector | 399 | Biohazard | Toxic Ooze | Deep Diver | Toxic Bloom | Amethyst Geode | Venom Trim | 47% |
+| Glacier Juggernaut | 449 | Arctic Ops | Glacier Shard | Jarl's Horns | Cryo Frost | Glacier Fang | Glacier Trim | 44% |
+| Reaper's Harvest | 449 | Stealth Black | Void Crystal | Grim Reaper | Twilight | Void Reaper | | 45% |
+| Storm Caller | 499 | Storm Conductor | Plasma Edge | Mech Ace | Ion Storm | Stormbreaker | Storm Trim | 46% |
+| Neon Rush | 499 | Neon Runner | Circuit Board | Shark Bite | Spectrum | Neon Runner | | 46% |
+| Deep Space Explorer | 549 | Nebula Suit | Nebula | Star Bubble | Aurora | Prism Shard | | 46% |
+| Solar Warlord | 799 | Obsidian Lava | Solar Flare | Wyrmking | Supernova | Magma Heart | Ember Cape | 48% |
 
-| Kits | Robux | Saves |
-| --- | --- | --- |
-| 1 | 349 | 29–36% |
-| 2 | 599 | 39–42% |
-| 3 (Squad Bundle) | 799 | 48%, plus the FULL SQUAD title, which only comes with all three |
-
-**Each kit dresses one miner.** The first kit goes on the miner you're
-playing, the next on the following miner, and so on. You can change any of it
-in the Wardrobe.
+**No longer sold.** The squad kits (one look per miner, from when every
+player had three) and the five launch collections (Rustbucket, Brainrot,
+Circuit & Copper, Deep Space, Solar Forge) are off the store. They stay in
+`Store.luau` with `Section = "Retired"` (the kits in `Store.Kits`):
+`Store.retired` says so, `Store.canBuy` refuses them, and a purchase of one
+still going through is granted. Their Developer Products can be taken off
+sale on Roblox. The FULL SQUAD title stays with whoever bought it.
 
 ## Buying
 
@@ -84,10 +83,11 @@ The flow:
 - Every bundle opens a page listing each piece, what it costs on its own, the totals and the saving.
 - **What goes on:**
   - A look you buy is worn at once.
-  - A bundle puts its first suit, skin and pickaxe on the miner you're playing.
+  - A bundle puts its look on the miner you're playing (its first suit, skin, helmet, visor and pickaxe).
   - The Vault leaves your looks as they are.
 - **What can't be bought** (`Store.canBuy`, used by both the buttons and the server):
   - a one-time offer that's closed or already bought;
+  - a bundle no longer sold (`Store.retired`);
   - a product whose every look you already own.
 
 ### While testing
@@ -105,11 +105,12 @@ Nothing sells for Robux until its Developer Product exists.
    Create one product per key in `Store.RobuxProducts`, at the price shown:
    - a look's own `Robux` (in `Cosmetics.luau`);
    - otherwise `Store.RobuxPrices`;
-   - for kits, `Store.KitPrices` (1 kit 349, 2 kits 599, 3 kits 799).
    - for PROBE-7's swing refills, their own `Robux` in `Outpost.Refills`
      (`SwingRefill` R$ 100 for 600 swings, `SwingMega` R$ 225 for 2,000).
 2. Paste each product's id into `Store.RobuxProducts`.
-   - The squad kits need seven products, one per choice: `KitProspector`, `KitSkirmisher`, `KitJuggernaut`, `KitProspectorSkirmisher`, `KitProspectorJuggernaut`, `KitSkirmisherJuggernaut` and `KitProspectorSkirmisherJuggernaut`.
+   - Or let `tools/create_dev_products.py` do it: it creates every product
+     whose id is 0 (by name, at its price) and writes the ids in.
+   - **The nine player bundles are new: their ids are 0 until that's done.**
 3. Until a product's id is set, its button says "Coming soon" (or buys for coins while testing).
 
 Purchases are safe to retry:
@@ -130,7 +131,8 @@ Purchases are safe to retry:
 - **Bundles:**
   - every bundle holds real looks, sells no gems or crates, and costs less than its looks one by one;
   - The Vault holds every look sold on its own.
-- **Kits:** all seven choices have a product and the ladder's price; all three add the squad title; the kits dress the right miners.
+- **Player bundles:** one suit, weapon skin, helmet, visor and pickaxe each, a product slot, a name no other product has, at least 40% off, and the whole look put on.
+- **Retired bundles and kits:** never buyable or suggested, still granted when a purchase goes through.
 - **Who can buy what:** the Welcome Kit's 24 hours, the Starter Pack's window, The Vault once, things you own.
 - **Receipts:** once each, every product type, and owned looks refunded as coins.
 - **Old crates:** refunded at cost, once.

@@ -7,19 +7,19 @@ local checks=0
 local function check(value,message) checks+=1;assert(value,message) end
 local p={Coins=100,Intro={Done=true}}
 check(#Training.record(p,"Fake",10000)==0 and p.Coins==100,"Unknown event paid")
-check(#Training.record(p,"Mine")==1 and p.Coins==125,"First rock")
-Training.record(p,"Mine");check(p.Coins==125,"Second rock paid early")
-Training.record(p,"Mine");check(p.Coins==160,"Third rock reward")
+check(#Training.record(p,"Mine")==1 and p.Coins==225,"First rock")
+Training.record(p,"Mine");check(p.Coins==225,"Second rock paid early")
+Training.record(p,"Mine");check(p.Coins==400,"Third rock reward")
 for i=1,100 do Training.record(p,"Mine") end
-check(p.Coins==160 and p.TrainingRewards.Counts.Mine==3,"Repeat farming")
+check(p.Coins==400 and p.TrainingRewards.Counts.Mine==3,"Repeat farming")
 Training.record(p,"Enchant")
 Training.record(p,"Slot","Armor");Training.record(p,"Slot","Armor")
 Training.record(p,"Slot","MadeUp")
 check(p.TrainingRewards.Counts.Slot==1,"Duplicate/invalid socket counted")
 Training.record(p,"Slot","Weapon");Training.record(p,"Slot","Shield")
-check(p.Coins==235,"Distinct gear reward")
+check(p.Coins==775,"Distinct gear reward")
 for _,event in {"EquipSurge","Heavy","Block","Surge","RivalWin"} do Training.record(p,event) end
-check(p.Coins==390,"Total reward budget must be 290")
+check(p.Coins==1550,"Total reward budget must be 1450 (5x the beta's 290)")
 local extraEvents={"MineGem","RareGem","LegendGem","TimedBlock","PvPPlayed","PvPWin","Boss","DungeonComplete","MarketBuy","MarketSale"}
 for _,event in extraEvents do Training.record(p,event) end
 local total=100
@@ -42,7 +42,7 @@ for _,event in extraEvents do Training.record(rejoined,event) end
 check(rejoined.Coins==total,"Reconnect or Dev replay repaid rewards")
 local outOfOrder={Coins=0}
 Training.record(outOfOrder,"RivalWin")
-check(outOfOrder.Coins==50 and not outOfOrder.TrainingRewards.Paid.FirstRock,"Objectives forced into order")
+check(outOfOrder.Coins==250 and not outOfOrder.TrainingRewards.Paid.FirstRock,"Objectives forced into order")
 local _,changed=Training.record(outOfOrder,"RivalWin")
 check(not changed,"Completed action should not keep syncing")
 local paid={}

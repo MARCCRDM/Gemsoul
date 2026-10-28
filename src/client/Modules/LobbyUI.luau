@@ -132,8 +132,8 @@ local function heading(value, color, x, align)
 	l.Position, l.Size, l.ZIndex = UDim2.fromOffset(x, 0), UDim2.fromOffset(420, 44), 21
 	return l
 end
-heading("PRACTICE", P.Text, 0, Enum.TextXAlignment.Left)
-heading("VS PLAYERS", RED, 700, Enum.TextXAlignment.Right)
+heading("VS PLAYERS", RED, 0, Enum.TextXAlignment.Left)
+heading("MORE MODES", P.Text, 700, Enum.TextXAlignment.Right)
 -- Auto queue (Shared.AutoQueue): on call for 1v1s while you're in the
 -- lobby, asked when a queue needs an opponent. The player's
 -- DuelAuto attribute says where it stands; the switch asks the server.
@@ -171,10 +171,10 @@ autoButton.Activated:Connect(function()
 end)
 player:GetAttributeChangedSignal("DuelAuto"):Connect(refreshAuto)
 refreshAuto()
--- The divider between practice and the player modes.
+-- The divider between Ranked and the other modes.
 new("Frame", {
 	Position = UDim2.fromOffset(806, 60),
-	Size = UDim2.fromOffset(2, 500),
+	Size = UDim2.fromOffset(2, 440),
 	BackgroundColor3 = RED,
 	BackgroundTransparency = 0.6,
 	BorderSizePixel = 0,
@@ -331,20 +331,25 @@ local function card(spec)
 	return b
 end
 
+-- Ranked first, the big card where the eye lands; Casual and Practice
+-- stacked beside it; the Bounty Board a bar along the bottom. Casual and
+-- Ranked fight on your current stats (Shared.PvPRules: full progression).
 card({
-	Title = "1v1 PRACTICE",
-	Art = "Duel",
-	Kicker = "VS A RIVAL",
-	Sub = "Warm up against a rival miner with their own random kit. Coins on a win.",
+	Title = "1v1 RANKED",
+	Art = "Ranked",
+	Kicker = "RATING 1000",
+	Sub = "First to 2 rounds, on your current stats. Swap presets between rounds. Rating on the line.",
 	Emblem = "Equipment",
-	Color = P.Gold,
-	Reward = string.format("WIN +%d ◆", Matchmaking.RivalWinCoins),
+	Color = RED,
+	Reward = string.format("WIN +%d ◆", PvPRules.Kinds.Ranked.Rewards.Win),
+	Queue = "1v1",
 	X = 0,
 	Y = 60,
 	W = if LobbyUI.DungeonsOpen then 340 else 782,
-	H = 500,
+	H = 440,
+	Unlock = "Ranked",
 	Go = function()
-		require(script.Parent.ArenaScene).enter(true)
+		run("DuelQueue", "1v1")
 	end,
 })
 if LobbyUI.DungeonsOpen then
@@ -358,19 +363,18 @@ if LobbyUI.DungeonsOpen then
 		X = 362,
 		Y = 60,
 		W = 420,
-		H = 500,
+		H = 440,
 		Unlock = "Dungeon",
 		Go = function()
 			run("DungeonFind")
 		end,
 	})
 end
--- Player modes: both fight on even stats (Shared.PvPRules), stacked.
 card({
 	Title = "1v1 CASUAL",
 	Art = "Casual",
-	Kicker = "EVEN STATS · NO RATING",
-	Sub = "Real players, same base stats. Just for the fight.",
+	Kicker = "NO RATING",
+	Sub = "Real players, your current stats. Just for the fight.",
 	Emblem = "Equipment",
 	Color = P.Teal,
 	Reward = string.format("WIN +%d ◆", PvPRules.Kinds.Casual.Rewards.Win),
@@ -378,30 +382,66 @@ card({
 	X = 830,
 	Y = 60,
 	W = 290,
-	H = 240,
+	H = 210,
 	Unlock = "Casual",
 	Go = function()
 		run("DuelQueue", "casual")
 	end,
 })
 card({
-	Title = "1v1 RANKED",
-	Art = "Ranked",
-	Kicker = "RATING 1000",
-	Sub = "First to 2 rounds. Swap presets between rounds. Rating on the line.",
+	Title = "1v1 PRACTICE",
+	Art = "Duel",
+	Kicker = "VS A RIVAL",
+	Sub = "A rival miner with their own random kit. Coins on a win.",
 	Emblem = "Equipment",
-	Color = RED,
-	Reward = string.format("WIN +%d ◆", PvPRules.Kinds.Ranked.Rewards.Win),
-	Queue = "1v1",
+	Color = P.Gold,
+	Reward = string.format("WIN +%d ◆", Matchmaking.RivalWinCoins),
 	X = 830,
-	Y = 320,
+	Y = 290,
 	W = 290,
-	H = 240,
-	Unlock = "Ranked",
+	H = 210,
 	Go = function()
-		run("DuelQueue", "1v1")
+		require(script.Parent.ArenaScene).enter(true)
 	end,
 })
+
+-- The Bounty Board (Client.RiftClient: every Rift boss, alone or with your
+-- party), a bar along the bottom: the same board as Brutus's counter.
+do
+	local EMBER = Color3.fromRGB(255, 150, 60)
+	local bounty = new("TextButton", {
+		Name = "Bounty",
+		Text = "",
+		AutoButtonColor = false,
+		Position = UDim2.fromOffset(0, 516),
+		Size = UDim2.fromOffset(1120, 44),
+		BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
+		ZIndex = 21,
+	}, stage)
+	UiKit.round(bounty, 10)
+	new("UIGradient", { Rotation = 0, Color = ColorSequence.new(EMBER:Lerp(CARD, 0.55), CARD) }, bounty)
+	local rim = new("UIStroke", { Color = EMBER, Thickness = 2, Transparency = 0.3 }, bounty)
+	local name = text(bounty, "BOUNTY BOARD", 20, P.Text, IronUi.Heading)
+	name.Position, name.Size, name.ZIndex = UDim2.fromOffset(20, 0), UDim2.fromOffset(220, 44), 22
+	name.TextXAlignment = Enum.TextXAlignment.Left
+	local what = text(bounty, "RIFT BOSSES  ·  ALONE OR WITH YOUR PARTY", 13, EMBER, IronUi.Heading)
+	what.Position, what.Size, what.ZIndex = UDim2.fromOffset(240, 0), UDim2.fromOffset(600, 44), 22
+	what.TextXAlignment = Enum.TextXAlignment.Left
+	local go = text(bounty, "OPEN  ›", 16, EMBER, IronUi.Heading)
+	go.AnchorPoint = Vector2.new(1, 0)
+	go.Position, go.Size, go.ZIndex = UDim2.new(1, -20, 0, 0), UDim2.fromOffset(120, 44), 22
+	go.TextXAlignment = Enum.TextXAlignment.Right
+	bounty.MouseEnter:Connect(function()
+		rim.Thickness, rim.Transparency = 3, 0
+	end)
+	bounty.MouseLeave:Connect(function()
+		rim.Thickness, rim.Transparency = 2, 0.3
+	end)
+	bounty.Activated:Connect(function()
+		LobbyUI.closePicker()
+		require(script.Parent.RiftClient).openGate("Bounty")
+	end)
+end
 
 -- (The round X every window closes with: IronUi.window, the Store.)
 local close = new("TextButton", {
@@ -543,7 +583,7 @@ IronUi.juice(play, 1.015, 0.98)
 play.Activated:Connect(LobbyUI.openPicker)
 local modes = text(
 	bar,
-	if LobbyUI.DungeonsOpen then "1v1 PRACTICE, DUNGEON, RANKED" else "1v1 PRACTICE, CASUAL, RANKED",
+	if LobbyUI.DungeonsOpen then "1v1 RANKED, DUNGEON, PRACTICE" else "1v1 RANKED, CASUAL, PRACTICE",
 	11,
 	P.Text,
 	IronUi.Heading

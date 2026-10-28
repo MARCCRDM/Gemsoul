@@ -4,9 +4,9 @@
 	that show what they hold and what you save.
 
 	  Bundles       the new-player offer (Starter Pack or Welcome Kit, while
-	                it's open), the squad kits (pick one, two or all three:
-	                each dresses one miner), the collections and the premium
-	                sets (Royal Treasury, The Vault). Every bundle opens a
+	                it's open), the player bundles (a whole look: suit, weapon
+	                skin, helmet, visor, pickaxe) and the premium sets (Royal
+	                Treasury, The Vault). Every bundle opens a
 	                page listing each piece, what it costs on its own, and
 	                what you save.
 	  Weapon Skins, Suits, Pickaxes
@@ -128,7 +128,7 @@ local HOW_TO = {
 	Ranked = "A Ranked reward.",
 	Raid = "A raid reward.",
 	Mining = "Found while mining, by luck.",
-	Squad = "Only in the Squad Bundle.",
+	Squad = "From the launch Squad Bundle: no longer sold.",
 	Vault = "Only in The Vault.",
 }
 
@@ -137,7 +137,6 @@ local state = {
 	Selected = {} :: { [string]: string }, -- the picked look, per catalog tab
 	Sort = "Low",
 	Filter = "All",
-	Kits = { Prospector = true, Skirmisher = true, Juggernaut = true },
 	Busy = false,
 }
 
@@ -1603,261 +1602,7 @@ local function offerBanner(parent: Instance, key: string, w: number, order: numb
 	return banner
 end
 
--- A squad kit's card. (A phone: the three fill a row, sized as the page is
--- drawn, and the squad's summary goes under them.)
-local KIT_W = 236
-local SLOT = if SHORT then 40 else 50
-
-local function kitCard(parent: Instance, kit: Store.Kit, order: number)
-	local on = state.Kits[kit.Id] == true
-	local reward = kit.Contents
-	local have, total = Store.ownedCount(reward, profile().Cosmetics and profile().Cosmetics.Owned)
-	local card = new("TextButton", {
-		Name = "Kit" .. kit.Id,
-		Text = "",
-		AutoButtonColor = false,
-		BackgroundColor3 = if on then C.Raised else C.Surface,
-		Size = UDim2.fromOffset(KIT_W, 262),
-		LayoutOrder = order,
-	}, parent)
-	round(card, 14)
-	local edge = stroke(card, if on then kit.Color else C.Line, if on then 2 else 1, if on then 0.1 else 0.9)
-	if not on then
-		hoverEdge(card, edge, C.Line, 0.9)
-	end
-	local pic = well(card, kit.Color, 8, 8, KIT_W - 16, 132)
-	art(pic, "Cosmetic", reward.Cosmetics[1], 112)
-	local check = box(card, if on then kit.Color else C.Window, KIT_W - 40, 16, 26, 26, if on then 0 else 0.2)
-	check.Name = "Check"
-	round(check, 13)
-	stroke(check, if on then kit.Color else C.Line, 1.5, if on then 0 else 0.6)
-	if on then
-		local tick = text(check, "✓", 15, C.Ink, BLACK, 0, 0, 26, 26)
-		tick.TextXAlignment = Enum.TextXAlignment.Center
-	end
-	text(card, kit.Name, 16, C.Text, BLACK, 14, 148, KIT_W - 28, 20)
-	text(card, string.upper(kit.Style) .. " STYLE", 10, kit.Color, BOLD, 14, 170, KIT_W - 28, 14)
-	for i, id in reward.Cosmetics do
-		local slot = box(card, C.Well, 14 + (i - 1) * SLOT, 192, SLOT - 6, SLOT - 6)
-		round(slot, 8)
-		art(slot, "Cosmetic", id, SLOT - 12)
-	end
-	local separate = Store.separatePrice(reward)
-	text(
-		card,
-		if have > 0 then string.format("You own %d of %d", have, total) else robux(separate) .. " if bought one by one",
-		11,
-		if have > 0 then C.Gold else C.Faint,
-		MEDIUM,
-		14,
-		240,
-		KIT_W - 28,
-		14
-	)
-	card:SetAttribute("UiSound", "Click")
-	card.Activated:Connect(function()
-		state.Kits[kit.Id] = not state.Kits[kit.Id] or nil
-		refresh()
-	end)
-end
-
--- A phone's squad summary: a bar under the kits, the picked squad and its
--- note on the left, its price and the ladder in the middle, buy and details
--- on the right.
-local function phoneSquad(parent: Instance, order: number, picked: { string })
-	local w = PAGE_W - 12
-	local summary = box(parent, C.Surface, 0, 0, w, 112)
-	summary.Name = "SquadSummary"
-	summary.LayoutOrder = order
-	round(summary, 14)
-	local midX, rightW = 272, 156
-	local midW = w - midX - rightW - 36
-	text(summary, "YOUR SQUAD", 10, C.Dim, BOLD, 18, 14, 240, 14)
-	local key = Store.kitKey(picked)
-	if not key then
-		text(summary, "Pick a kit", 20, C.Text, BLACK, 18, 30, 240, 26)
-		wrap(text(summary, "Tap the kits you want: one, two or all three.", 12, C.Dim, MEDIUM, 18, 60, 240, 34))
-		local b = button(summary, "Pick a kit", "Secondary", w - 18 - rightW, 14, rightW, 44)
-		b.TextColor3 = C.Dim
-		return
-	end
-	local reward = Store.contents(key) or {}
-	text(
-		summary,
-		string.format("%d kit%s  ·  %d items", #picked, if #picked == 1 then "" else "s", #(reward.Cosmetics or {})),
-		20,
-		C.Text,
-		BLACK,
-		18,
-		30,
-		240,
-		26
-	)
-	wrap(
-		text(
-			summary,
-			if MinerRoster.Enabled
-				then "Each goes on one miner: the one you're playing first, then the next."
-				else "Your miner wears the first; the rest wait in your Wardrobe.",
-			11,
-			C.Dim,
-			MEDIUM,
-			18,
-			60,
-			240,
-			34
-		)
-	)
-	priceRow(summary, key, midX, 10, 24)
-	-- The ladder: what one, two and three cost.
-	local stepW = math.floor(midW / #Store.KitPrices)
-	for n, price in Store.KitPrices do
-		local here = n == #picked
-		local step = text(
-			summary,
-			string.format("%d kit%s  %s", n, if n == 1 then "" else "s", robux(price)),
-			10,
-			if here then C.Text else C.Faint,
-			if here then BOLD else MEDIUM,
-			midX + (n - 1) * stepW,
-			50,
-			stepW,
-			16
-		)
-		step.Name = "Ladder" .. n
-	end
-	wrap(
-		text(
-			summary,
-			if #picked == #Store.Kits
-				then "Includes the FULL SQUAD title, only in this bundle."
-				else "All three adds the FULL SQUAD title.",
-			11,
-			C.Gold,
-			BOLD,
-			midX,
-			72,
-			midW,
-			30
-		)
-	)
-	buyButton(summary, key, w - 18 - rightW, 14, rightW, 44)
-	button(summary, "Details", "Secondary", w - 18 - rightW, 64, rightW, 34, function()
-		showBundle(key)
-	end)
-end
-
-local function squadSection(parent: Instance, order: number)
-	sectionHead(
-		parent,
-		order,
-		"Squad kits",
-		if MinerRoster.Enabled
-			then "One look per fighting style: a suit, a weapon skin, a pickaxe and a trim. Each kit dresses one of your three miners."
-			else "One look per fighting style: a suit, a weapon skin, a pickaxe and a trim."
-	)
-	local row = new("Frame", {
-		Name = "Squad",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(PAGE_W - 12, 262),
-		LayoutOrder = order + 1,
-	}, parent)
-	local gap = if SHORT then 10 else 14
-	UiKit.list(row, gap, true)
-	if SHORT then
-		KIT_W = math.floor((PAGE_W - 12 - (#Store.Kits - 1) * gap) / #Store.Kits)
-	end
-	local picked = {}
-	for i, kit in Store.Kits do
-		kitCard(row, kit, i)
-		if state.Kits[kit.Id] then
-			table.insert(picked, kit.Id)
-		end
-	end
-	if SHORT then
-		phoneSquad(parent, order + 2, picked)
-		return
-	end
-	local summary = box(row, C.Surface, 0, 0, PAGE_W - 12 - 3 * KIT_W - 3 * 14, 262)
-	summary.Name = "SquadSummary"
-	summary.LayoutOrder = 9
-	round(summary, 14)
-	local sw = PAGE_W - 12 - 3 * KIT_W - 3 * 14 - 36
-	text(summary, "YOUR SQUAD", 10, C.Dim, BOLD, 18, 16, sw, 14)
-	local key = Store.kitKey(picked)
-	if not key then
-		text(summary, "Pick a kit", 20, C.Text, BLACK, 18, 34, sw, 26)
-		wrap(text(summary, "Tap the kits you want: one, two or all three.", 12, C.Dim, MEDIUM, 18, 64, sw, 40))
-		local b = button(summary, "Pick a kit", "Secondary", 18, 202, sw, 44)
-		b.TextColor3 = C.Dim
-		return
-	end
-	local reward = Store.contents(key) or {}
-	text(
-		summary,
-		string.format("%d kit%s  ·  %d items", #picked, if #picked == 1 then "" else "s", #(reward.Cosmetics or {})),
-		20,
-		C.Text,
-		BLACK,
-		18,
-		34,
-		sw,
-		26
-	)
-	wrap(
-		text(
-			summary,
-			if MinerRoster.Enabled
-				then "Each goes on one miner: the one you're playing first, then the next."
-				else "Your miner wears the first; the rest wait in your Wardrobe.",
-			11,
-			C.Dim,
-			MEDIUM,
-			18,
-			62,
-			sw,
-			30
-		)
-	)
-	priceRow(summary, key, 18, 98, 28)
-	-- The ladder: what one, two and three cost.
-	for n, price in Store.KitPrices do
-		local here = n == #picked
-		local step = text(
-			summary,
-			string.format("%d kit%s  %s", n, if n == 1 then "" else "s", robux(price)),
-			11,
-			if here then C.Text else C.Faint,
-			if here then BOLD else MEDIUM,
-			18 + (n - 1) * math.floor(sw / 3),
-			140,
-			math.floor(sw / 3),
-			16
-		)
-		step.Name = "Ladder" .. n
-	end
-	wrap(
-		text(
-			summary,
-			if #picked == #Store.Kits
-				then "Includes the FULL SQUAD title, only in this bundle."
-				else "All three adds the FULL SQUAD title.",
-			11,
-			C.Gold,
-			BOLD,
-			18,
-			164,
-			sw,
-			30
-		)
-	)
-	buyButton(summary, key, 18, 202, sw - 96, 44)
-	button(summary, "Details", "Secondary", 18 + sw - 88, 202, 88, 44, function()
-		showBundle(key)
-	end)
-end
-
-local function collectionCard(parent: Instance, bundle: Store.Bundle, order: number, w: number)
+local function lookCard(parent: Instance, bundle: Store.Bundle, order: number, w: number)
 	local reward = bundle.Contents
 	local have, total = Store.ownedCount(reward, profile().Cosmetics and profile().Cosmetics.Owned)
 	local card = new("TextButton", {
@@ -1954,22 +1699,21 @@ local function drawBundles()
 	if key then
 		offerBanner(list, key, PAGE_W - 12, 1)
 	end
-	squadSection(list, 10)
-	local collections, premium = {}, {}
+	local looks, premium = {}, {}
 	for _, bundle in Store.Bundles do
-		if bundle.Section == "Collection" then
-			table.insert(collections, bundle)
+		if bundle.Section == "Look" then
+			table.insert(looks, bundle)
 		elseif bundle.Section == "Premium" then
 			table.insert(premium, bundle)
 		end
 	end
-	sectionHead(list, 20, "Collections", "Matching looks, cheaper together than one by one.")
-	-- (a phone: three to a row, then the premium sets one to a row)
-	local perRow = if SHORT then math.min(3, #collections) else #collections
-	local rows = math.ceil(#collections / math.max(1, perRow))
+	sectionHead(list, 20, "Player bundles", "A whole look for your miner: suit, weapon skin, helmet, visor and pickaxe.")
+	-- (three to a row; then the premium sets, one to a row on a phone)
+	local perRow = math.min(3, #looks)
+	local rows = math.ceil(#looks / math.max(1, perRow))
 	local cw = math.floor((PAGE_W - 12 - (perRow - 1) * 12) / math.max(1, perRow))
 	local row = new("Frame", {
-		Name = "Collections",
+		Name = "Looks",
 		BackgroundTransparency = 1,
 		Size = UDim2.fromOffset(PAGE_W - 12, rows * 318 + (rows - 1) * 12),
 		LayoutOrder = 21,
@@ -1979,8 +1723,8 @@ local function drawBundles()
 		CellPadding = UDim2.fromOffset(12, 12),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, row)
-	for i, bundle in collections do
-		collectionCard(row, bundle, i, cw)
+	for i, bundle in looks do
+		lookCard(row, bundle, i, cw)
 	end
 	sectionHead(list, 30, "Premium", "The biggest sets in the store, at the biggest savings.")
 	local pw = if SHORT then PAGE_W - 12 else math.floor((PAGE_W - 12 - 14) / 2)

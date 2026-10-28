@@ -205,24 +205,100 @@ local buttons = new("Frame", {
 	Size = UDim2.fromOffset(272, 40),
 }, card)
 UiKit.list(buttons, 8, true)
-local hint = text(
-	hud,
-	"Walk into a rock or click to mine  ·  Z spar  ·  G duel  ·  F invite  ·  E talk to the crew",
-	14,
-	Color3.fromRGB(230, 238, 250),
-	IronUi.Bold,
-	0,
-	0,
-	900,
-	22,
-	Enum.TextXAlignment.Center
-)
-hint.AnchorPoint = Vector2.new(0.5, 1)
-hint.Position = UDim2.new(0.5, 210, 1, -18)
-hint.TextSize = 12
-hint.Size = UDim2.new(1, -500, 0, 32)
-hint.TextWrapped = true
-hint.TextStrokeTransparency = 0.4
+-- The keys, along the bottom on a computer: each a bold key cap and what it
+-- does, on a dark strip so they read over any ground. X's is a button too
+-- (the kit switch: SparKit sets OutpostScene.toggleKit and shows what it
+-- swaps to, FIGHT or MINE, with showKit).
+OutpostScene.Keys = {
+	{ Key = "CLICK", Does = "MINE" },
+	{ Key = "X", Does = "FIGHT / MINE", Kit = true },
+	{ Key = "Z", Does = "SPAR" },
+	{ Key = "G", Does = "DUEL" },
+	{ Key = "F", Does = "INVITE" },
+	{ Key = "E", Does = "TALK" },
+}
+local hint = new("Frame", {
+	Name = "KeyHints",
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 210, 1, -14),
+	Size = UDim2.fromOffset(0, 40),
+	AutomaticSize = Enum.AutomaticSize.X,
+	BackgroundColor3 = Color3.fromRGB(8, 10, 18),
+	BackgroundTransparency = 0.25,
+}, hud)
+UiKit.round(hint, 10)
+new("UIStroke", { Color = Color3.fromRGB(70, 80, 96), Thickness = 1, Transparency = 0.3 }, hint)
+new("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, hint)
+local keyRow = new("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	VerticalAlignment = Enum.VerticalAlignment.Center,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	Padding = UDim.new(0, 16),
+}, hint)
+keyRow.HorizontalAlignment = Enum.HorizontalAlignment.Center
+local kitChip: { Item: GuiObject, Cap: TextLabel, Does: TextLabel }? = nil
+for i, entry in OutpostScene.Keys do
+	local item = new(if entry.Kit then "TextButton" else "Frame", {
+		Name = entry.Key,
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(0, 28),
+		AutomaticSize = Enum.AutomaticSize.X,
+		LayoutOrder = i,
+	}, hint)
+	new("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 7),
+	}, item)
+	local cap = new("TextLabel", {
+		Name = "Cap",
+		BackgroundColor3 = Color3.fromRGB(236, 240, 248),
+		Size = UDim2.fromOffset(if #entry.Key > 1 then 54 else 28, 28),
+		Font = Enum.Font.GothamBlack,
+		Text = entry.Key,
+		TextSize = if #entry.Key > 1 then 12 else 16,
+		TextColor3 = Color3.fromRGB(14, 16, 26),
+		LayoutOrder = 1,
+	}, item)
+	UiKit.round(cap, 6)
+	new("UIStroke", { Color = Color3.fromRGB(150, 160, 180), Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, cap)
+	local does = new("TextLabel", {
+		Name = "Does",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(0, 28),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Font = Enum.Font.GothamBlack,
+		Text = entry.Does,
+		TextSize = 15,
+		TextColor3 = Color3.fromRGB(240, 244, 252),
+		TextStrokeColor3 = Color3.new(0, 0, 0),
+		TextStrokeTransparency = 0.5,
+	}, item)
+	does.LayoutOrder = 2
+	if entry.Kit then
+		item.Text, item.AutoButtonColor = "", false
+		item:SetAttribute("UiSound", "Click")
+		item.Activated:Connect(function()
+			if OutpostScene.toggleKit then
+				OutpostScene.toggleKit()
+			end
+		end)
+		kitChip = { Item = item, Cap = cap, Does = does }
+	end
+end
+OutpostScene.toggleKit = nil :: (() -> ())?
+-- X's chip: what a press swaps to (FIGHT with the pick out, MINE with the
+-- kit out), in its colour; hidden where X does nothing.
+function OutpostScene.showKit(armed: boolean, available: boolean)
+	if not kitChip then
+		return
+	end
+	kitChip.Item.Visible = available
+	kitChip.Does.Text = if armed then "MINE" else "FIGHT"
+	kitChip.Does.TextColor3 = if armed then Color3.fromRGB(255, 202, 91) else Color3.fromRGB(255, 120, 104)
+	kitChip.Cap.BackgroundColor3 = if armed then Color3.fromRGB(255, 202, 91) else Color3.fromRGB(255, 120, 104)
+end
 
 -- Keep the field clear; navigation lives in the lobby dock and world prompts.
 findsLabel.Visible, recordLabel.Visible, buttons.Visible = false, false, false

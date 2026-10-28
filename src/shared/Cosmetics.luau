@@ -31,7 +31,7 @@
 	             "Starter"  the one-time Starter Pack (Shared.Store)
 	             "Season"   the Season Path (Shared.Season)
 	             "Default"  every miner has it from the start
-	             "Squad"    the Squad Bundle (all three kits, Store.Kits)
+	             "Squad"    the launch Squad Bundle (all three kits, Store.Kits; no longer sold)
 	             "Vault"    The Vault, the store's complete collection
 	             "Achievement", "Ranked", "Raid", "Mining"
 	                        earned in play; How says exactly how
@@ -1959,7 +1959,7 @@ Cosmetics.SourceText = {
 	Streak = "7-day login streak",
 	Code = "Promo code",
 	Starter = "Starter Pack",
-	Squad = "Squad Bundle",
+	Squad = "Squad Bundle (no longer sold)",
 	Vault = "The Vault",
 	Season = "Season Path",
 	Default = "Everyone",

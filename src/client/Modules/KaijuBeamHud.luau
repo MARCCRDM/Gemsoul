@@ -137,6 +137,21 @@ local titleGradient = new("UIGradient", {
 	Enabled = false,
 }, title)
 local state = words("State", IronUi.Bold, Enum.TextXAlignment.Right)
+-- Ready on a computer: its key, a bold gold cap beside READY!
+local keyCap = new("TextLabel", {
+	Name = "KeyCap",
+	BackgroundColor3 = READY_GOLD,
+	Font = Enum.Font.GothamBlack,
+	Text = "Z",
+	TextScaled = true,
+	TextColor3 = INK,
+	Visible = false,
+	ZIndex = 7,
+}, button)
+UiKit.round(keyCap, 5)
+new("UIStroke", { Color = WHITE, Thickness = 1.5, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, keyCap)
+new("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 2) }, keyCap)
+local stateWide, stateShort = UDim2.new(), UDim2.new() -- (beside the cap: shorter)
 local save = new("TextButton", {
 	Name = "Save",
 	AutoButtonColor = false,
@@ -195,6 +210,7 @@ local function layout()
 		save.Position = UDim2.new(0, 5, 1, -17)
 		save.TextSize = 8
 		ringStroke.Thickness = 3
+		keyCap.Visible = false
 		title.Position, title.Size = UDim2.fromOffset(6, 6), UDim2.new(1, -12, 0, 11)
 		state.Position, state.Size = UDim2.fromOffset(3, 17), UDim2.new(1, -6, 1, -36)
 		title.TextXAlignment, state.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
@@ -217,7 +233,12 @@ local function layout()
 	title.Position = UDim2.new(0, pad, 0.5, -textH / 2)
 	title.Size = UDim2.fromOffset(room - stateW - 4, textH)
 	state.Position = UDim2.new(0, pad + room - stateW, 0.5, -textH / 2)
-	state.Size = UDim2.fromOffset(stateW, textH)
+	local capH = math.max(12, size.Y - 6)
+	keyCap.Size = UDim2.fromOffset(capH, capH)
+	keyCap.Position = UDim2.new(0, pad + room - capH, 0.5, -capH / 2)
+	stateWide = UDim2.fromOffset(stateW, textH)
+	stateShort = UDim2.fromOffset(math.max(10, stateW - capH - 5), textH)
+	state.Size = stateWide
 	drawn = "" -- (its words change with its size)
 end
 
@@ -324,12 +345,17 @@ local function refresh()
 	drawn = look
 	fillGradient.Transparency = KaijuBeamHud.fillLevel(charge / 100)
 	ringStroke.Transparency = if ready or blasting then 0 else 0.15
-	-- Its words.
+	-- Its words (ready on a computer: READY! and its key, Z, in a cap).
+	local capped = ready and not apart and not compact and not touch()
+	keyCap.Visible = capped
+	if not apart then
+		state.Size = if capped then stateShort else stateWide
+	end
 	if blasting then
 		state.Text = "BLASTING!"
 		state.TextColor3 = READY_GOLD
 	elseif ready then
-		state.Text = if compact or touch() then "READY!" else "READY!  [ Z ]"
+		state.Text = "READY!"
 		state.TextColor3 = READY_GOLD
 	else
 		state.Text = if compact then string.format("%d%%", pct) else string.format("CHARGING  %d%%", pct)

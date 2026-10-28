@@ -42,7 +42,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 458)
+panel.Size = UDim2.fromOffset(300, 490)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -373,6 +373,29 @@ end
 paintLanguage()
 player:GetAttributeChangedSignal("Language"):Connect(function()
 	task.defer(paintLanguage)
+end)
+
+-- KAIJU ROLL: the starter roll as a test, rolled from every kind
+-- (Modules/KaijuRoll.preview): see it with all the kaiju in it. Nothing is
+-- claimed or saved; START just closes it.
+local rollCaption = versionCaption:Clone()
+rollCaption.Position = UDim2.fromOffset(6, 456)
+rollCaption.Text = "KAIJU ROLL"
+rollCaption.Parent = panel
+local rollButton = Instance.new("TextButton")
+rollButton.Name = "KaijuRollPreview"
+rollButton.Size = UDim2.fromOffset(190, 26)
+rollButton.Position = UDim2.fromOffset(104, 456)
+rollButton.BackgroundColor3 = Color3.fromRGB(30, 84, 64)
+rollButton.TextColor3 = Color3.fromRGB(150, 255, 200)
+rollButton.Font = Enum.Font.GothamBold
+rollButton.TextSize = 12
+rollButton.Text = "ROLL WITH ALL KAIJU"
+rollButton.Parent = panel
+corner(rollButton, 5)
+rollButton.Activated:Connect(function()
+	panel.Visible = false
+	task.spawn(require(script.Parent.Modules.KaijuRoll).preview)
 end)
 
 UserInputService.InputBegan:Connect(function(input, processed)

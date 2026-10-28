@@ -33,7 +33,7 @@
 local Matchmaking = {}
 
 -- Queues. `Kind` is the PvP rule each plays by (Shared.PvPRules): Casual is
--- unrated practice on even stats; Ranked is rated, even stats, rarity capped.
+-- unrated, on your current stats; Ranked is rated, on your current stats.
 Matchmaking.Modes = {
 	["1v1"] = { Name = "1v1 Ranked", Size = 1, Kind = "Ranked", Rounds = true },
 	["2v2"] = { Name = "2v2 Party Duel", Size = 2, Kind = "Ranked" },

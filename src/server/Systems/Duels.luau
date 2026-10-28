@@ -63,9 +63,9 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	runs out: the healthier side wins). Duel fighters only hurt their
 	opponents (Shared.Matchmaking.versus). Leaving the Arena, the session or
 	the game forfeits. Each match plays by a PvP rule (Shared.PvPRules):
-	Ranked queues are rated (Elo) on even stats with rarity capped; Casual is
-	unrated on even stats; a challenge plays the challenger's choice of full
-	progression or even stats. Fighters carry it as MatchStats /
+	Ranked queues are rated (Elo) and Casual is unrated, both on full
+	progression (your current stats); a challenge plays the challenger's
+	choice of full progression or even stats. Fighters carry it as MatchStats /
 	MatchRarityCap, which the combat kit and stats read.
 	1v1 Ranked plays rounds (Shared.Matchmaking.Rounds): first to two, three
 	at most. A lethal blow downs the loser of a round instead of killing them

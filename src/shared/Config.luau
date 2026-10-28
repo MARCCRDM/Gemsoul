@@ -66,9 +66,10 @@ local Config = {
 	StartingCoins = 300,
 	MaxGems = 300, -- inventory limit (room for a long session's Commons)
 	MaxGear = 80, -- pieces of gear a player can hold (worn included)
-	-- Daily reward: base coins, plus more per day of streak (up to a week).
-	DailyRewardBase = 75,
-	DailyRewardPerStreak = 25,
+	-- Daily reward: base coins, plus more per day of streak (up to a week):
+	-- 750 on day one up to 2,250 on day seven (10x the beta's, 2026-10-28).
+	DailyRewardBase = 750,
+	DailyRewardPerStreak = 250,
 	DailyStreakMax = 7,
 	-- The shop buys gems at this share of their value: a quick sale, but
 	-- trading with other players pays better.

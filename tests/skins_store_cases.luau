@@ -407,10 +407,16 @@ end
 check(Cosmetics.coinPrice(Cosmetics.get("TitleLunar")) == nil, "Titles must never have a coin price")
 check(Cosmetics.coinPrice(Cosmetics.get("SkinCrusader")) == nil, "Exclusives must never have a coin price")
 
--- Bundles, squad kits and The Vault -----------------------------------------------------------
+-- Bundles and The Vault -----------------------------------------------------------------------
 -- Every bundle holds real looks, costs less than its looks one by one, and
 -- never sells power (gems, crates).
-for _, key in { "Welcome", "Rustbucket", "Brainrot", "Circuit", "DeepSpace", "SolarForge", "Royal", "Vault", "StarterPack" } do
+local onSale = { "StarterPack" }
+for _, bundle in Store.Bundles do
+	if bundle.Section ~= "Retired" then
+		table.insert(onSale, bundle.Id)
+	end
+end
+for _, key in onSale do
 	local reward = Store.contents(key)
 	check(reward ~= nil, key .. " has no contents")
 	for _, id in reward.Cosmetics or {} do
@@ -427,6 +433,45 @@ for id, cosmetic in Cosmetics.List do
 	end
 end
 check(table.find(vault.Cosmetics, "TitleCollector") and not table.find(vault.Cosmetics, "SuitIgnition"), "The Vault's exclusives are wrong")
+-- Player bundles: one whole look each (a suit, a weapon skin, a helmet, a
+-- visor and a pickaxe, one of each), a product slot and a price, and a name
+-- no other product has (tools/create_dev_products.py finds products by name).
+local productNames = {}
+for key in Store.RobuxProducts do
+	local name = Store.productName(key)
+	productNames[name] = (productNames[name] or 0) + 1
+end
+local looks = 0
+for _, bundle in Store.Bundles do
+	if bundle.Section == "Look" then
+		looks += 1
+		local kinds = {}
+		for _, id in bundle.Contents.Cosmetics or {} do
+			local kind = Cosmetics.get(id).Kind
+			kinds[kind] = (kinds[kind] or 0) + 1
+		end
+		for _, kind in { "Suit", "Skin", "Helmet", "Visor", "Pick" } do
+			check(kinds[kind] == 1, bundle.Id .. " should hold exactly one " .. kind)
+		end
+		check(Store.RobuxProducts[bundle.Id] ~= nil and Store.RobuxPrices[bundle.Id], bundle.Id .. " has no product slot or price")
+		check(productNames[bundle.Name] == 1, bundle.Name .. " shares its name with another product")
+		check(Store.savings(bundle.Id) >= 40, bundle.Id .. " saves too little (" .. Store.savings(bundle.Id) .. "%)")
+		check(not Store.retired(bundle.Id), bundle.Id .. " reads as retired")
+	end
+end
+check(looks >= 6, "Too few player bundles")
+-- No longer sold: the launch collections and the squad kits. Never offered,
+-- never in a "save with a bundle" note, but a purchase still going through
+-- is granted.
+for _, key in { "Rustbucket", "Brainrot", "Circuit", "DeepSpace", "SolarForge", "KitProspector", "KitProspectorSkirmisherJuggernaut" } do
+	check(Store.retired(key) and Store.contents(key) ~= nil, key .. " isn't retired, or can't be granted")
+	check(not Store.canBuy(key, {}, 0), key .. " can still be bought")
+end
+for id in Cosmetics.List do
+	for _, key in Store.bundlesWith(id) do
+		check(not Store.retired(key), id .. "'s bundle deal is one no longer sold: " .. key)
+	end
+end
 -- Kits: every choice of one, two or three has a product and the ladder's price.
 local kitIds = {}
 for _, kit in Store.Kits do
@@ -461,8 +506,14 @@ check(not Store.canBuy("StarterPack", {}, T0), "The Starter Pack sold before it 
 check(Store.canBuy("StarterPack", { StarterOfferAt = T0 }, T0 + 60), "The Starter Pack can't be bought on offer")
 check(not Store.canBuy("Vault", { VaultBought = true }, T0), "The Vault sold twice")
 check(not Store.canBuy("SkinPlasma", { Cosmetics = { Owned = { SkinPlasma = true } } }, T0), "A look you own can be bought")
-check(Store.canBuy("Brainrot", { Cosmetics = { Owned = { SkinBonk = true } } }, T0), "A bundle you own part of can't be bought")
-check(not Store.canBuy("Brainrot", { Cosmetics = { Owned = { SkinBonk = true, SkinBanana = true } } }, T0), "A bundle you own all of can be bought")
+do
+	local all = {}
+	for _, id in Store.bundle("NeonRush").Contents.Cosmetics do
+		all[id] = true
+	end
+	check(Store.canBuy("NeonRush", { Cosmetics = { Owned = { SuitNeon = true } } }, T0), "A bundle you own part of can't be bought")
+	check(not Store.canBuy("NeonRush", { Cosmetics = { Owned = all } }, T0), "A bundle you own all of can be bought")
+end
 check(not Store.canBuy("SeasonPremium", { Season = { Premium = true } }, T0), "Season premium sold twice")
 -- Crates in old saves become coins.
 local old = { Coins = 5, Crates = { GeodeCrate = 2, MasterworkCrate = 1, Junk = 3 } }
@@ -497,8 +548,16 @@ check(
 stubs.MinerRoster.Count, stubs.MinerRoster.Enabled = 3, true
 -- A bundle with a look you own: that look becomes coins.
 freshProfile()
-profile.Cosmetics.Owned.SkinBonk = true
-check(buy("Brainrot") == Granted and profile.Coins == Store.DuplicateRefund and profile.Cosmetics.Owned.SkinBanana, "An owned look in a bundle wasn't refunded")
+profile.Cosmetics.Owned.SkinCircuit = true
+check(buy("NeonRush") == Granted and profile.Coins == Store.DuplicateRefund and profile.Cosmetics.Owned.SuitNeon, "An owned look in a bundle wasn't refunded")
+-- A player bundle puts the whole look on.
+for _, id in Store.bundle("NeonRush").Contents.Cosmetics do
+	local kind = Cosmetics.get(id).Kind
+	check(profile.Cosmetics[kind] == id, "A player bundle didn't put on its " .. kind)
+end
+-- A retired bundle still going through is granted.
+freshProfile()
+check(buy("Brainrot") == Granted and profile.Cosmetics.Owned.SkinBanana, "A retired bundle's purchase wasn't granted")
 -- The Vault: everything, once.
 freshProfile()
 check(buy("Vault") == Granted and profile.VaultBought and profile.Cosmetics.Owned.TitleCollector and profile.Coins >= 10000, "The Vault wasn't granted")
@@ -510,12 +569,13 @@ check(buy("Welcome") == Granted and profile.WelcomeBought and profile.Cosmetics.
 if Config.TestCosmeticPrice then
 	freshProfile()
 	profile.Coins = 1000
-	local r1 = handlers.BuyProduct(thePlayer, "DeepSpace")
+	local r1 = handlers.BuyProduct(thePlayer, "DeepSpaceExplorer")
 	check(r1.Ok and profile.Cosmetics.Owned.SuitNebula and profile.Coins == 1000 - Config.TestCosmeticPrice, "A bundle couldn't be test-bought for coins")
-	check(not handlers.BuyProduct(thePlayer, "DeepSpace").Ok, "A bundle you own all of was bought again")
+	check(not handlers.BuyProduct(thePlayer, "DeepSpaceExplorer").Ok, "A bundle you own all of was bought again")
+	check(not handlers.BuyProduct(thePlayer, "DeepSpace").Ok, "A retired bundle was test-bought")
 	check(not handlers.BuyProduct(thePlayer, "Nope").Ok and not handlers.BuyProduct(thePlayer, 42).Ok, "Junk was bought")
 	profile.Coins = 0
-	check(not handlers.BuyProduct(thePlayer, "Circuit").Ok, "A bundle was bought with no coins")
+	check(not handlers.BuyProduct(thePlayer, "StormCaller").Ok, "A bundle was bought with no coins")
 end
 -- The Starter Pack goes on offer once.
 freshProfile()

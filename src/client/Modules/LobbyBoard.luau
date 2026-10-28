@@ -168,41 +168,67 @@ end
 
 -- Daily streak ----------------------------------------------------------------------------------
 
+-- A day's coins, short enough for its tile: 750, 1K, 1.25K, 2.25K.
+local function shortCoins(n: number): string
+	if n < 1000 then
+		return tostring(n)
+	end
+	local text = string.format("%.2f", n / 1000):gsub("0+$", ""):gsub("%.$", "")
+	return text .. "K"
+end
+
+local function dayCoins(day: number): number
+	return Config.DailyRewardBase + Config.DailyRewardPerStreak * (math.min(day, Config.DailyStreakMax) - 1)
+end
+
+-- Open, the week as a reward track: a tile a day with its coins (collected
+-- ones ticked green, the next one lit gold), the last one wide and gold, the
+-- week's top prize. Four on the first row, the rest on the second.
+local TILE, TILE_GAP = 46, 4
 local function buildStreak()
 	local frame, note, heading, edge, chevron = card("Streak", 1, GOLD, "DAILY STREAK")
-	local dots = {}
+	local tiles = {}
 	for i = 1, Config.DailyStreakMax do
-		local dot = new("Frame", {
+		local last = i == Config.DailyStreakMax
+		local row, col = if i <= 4 then 0 else 1, if i <= 4 then i - 1 else i - 5
+		local tile = new("Frame", {
+			Name = "Day" .. i,
 			BackgroundColor3 = TRACK,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(14 + (i - 1) * 28, 38),
-			Size = UDim2.fromOffset(24, 20),
+			Position = UDim2.fromOffset(14 + col * (TILE + TILE_GAP), 38 + row * (TILE + TILE_GAP)),
+			Size = UDim2.fromOffset(if last then TILE * 2 + TILE_GAP else TILE, TILE),
 		}, frame)
-		UiKit.round(dot, 5)
-		local day = label(dot, tostring(i), 11, P.Dim, IronUi.Heading, Enum.TextXAlignment.Center)
-		day.Size = UDim2.fromScale(1, 1)
-		dots[i] = { Dot = dot, Label = day }
+		UiKit.round(tile, 7)
+		local rim = new("UIStroke", { Color = EDGE, Thickness = 1, Transparency = 0.6 }, tile)
+		local day = label(tile, if last then "DAY " .. i .. "+" else "DAY " .. i, 8, P.Dim, IronUi.Heading, Enum.TextXAlignment.Center)
+		day.Position, day.Size = UDim2.fromOffset(0, 4), UDim2.new(1, 0, 0, 10)
+		local amount = label(tile, "", if last then 15 else 13, P.Text, IronUi.Heading, Enum.TextXAlignment.Center)
+		amount.Position, amount.Size = UDim2.fromOffset(0, 15), UDim2.new(1, 0, 0, 16)
+		local coin = label(tile, "◆", 10, GOLD, IronUi.Heading, Enum.TextXAlignment.Center)
+		coin.Position, coin.Size = UDim2.fromOffset(0, 31), UDim2.new(1, 0, 0, 11)
+		tiles[i] = { Tile = tile, Rim = rim, Day = day, Amount = amount, Coin = coin, Last = last }
 	end
 	local footer = label(frame, "", 11, P.Dim, IronUi.Body)
 	footer.RichText = true
 	-- Folded: what tomorrow pays, over the week as a bar.
 	local week, weekFill = bar(frame, GOLD)
 	week.Position, week.Size = UDim2.fromOffset(14, 41), UDim2.new(1, -28, 0, 3)
+	local trackH = 2 * TILE + TILE_GAP
 	local function place()
 		local m = mode("Streak")
 		placeTop(m, heading, note, edge, chevron)
-		for _, entry in dots do
-			entry.Dot.Visible = m == "open"
+		for _, entry in tiles do
+			entry.Tile.Visible = m == "open"
 		end
 		week.Visible = m ~= "open"
-		footer.Position = UDim2.fromOffset(14, if m == "open" then 64 else 21)
+		footer.Position = UDim2.fromOffset(14, if m == "open" then 38 + trackH + 6 else 21)
 		footer.Size = UDim2.new(1, -28, 0, 16)
 	end
 	toggle(frame, "Streak")
 	cards.Streak = {
 		Frame = frame,
 		Height = function()
-			return if mode("Streak") == "open" then 88 else ROW
+			return if mode("Streak") == "open" then 38 + trackH + 30 else ROW
 		end,
 		Place = place,
 	}
@@ -210,19 +236,26 @@ local function buildStreak()
 		local streak = math.clamp((profile.Daily or {}).Streak or 0, 0, Config.DailyStreakMax)
 		setFill(weekFill, streak / Config.DailyStreakMax, false)
 		note.Text = if streak > 0 then "DAY " .. streak else ""
-		for i, entry in dots do
+		for i, entry in tiles do
 			local done = i <= streak
 			local nextDay = i == streak + 1
-			entry.Dot.BackgroundColor3 = if done
-				then Color3.fromRGB(44, 128, 82)
-				elseif nextDay then Color3.fromRGB(226, 156, 44)
+			entry.Tile.BackgroundColor3 = if done
+				then Color3.fromRGB(28, 70, 50)
+				elseif nextDay then Color3.fromRGB(92, 66, 22)
+				elseif entry.Last then Color3.fromRGB(60, 48, 26)
 				else TRACK
-			entry.Label.TextColor3 = if done or nextDay then Color3.new(1, 1, 1) else P.Dim
-			entry.Label.Text = if done then "✓" else tostring(i)
+			entry.Rim.Color = if done then DONE elseif nextDay or entry.Last then GOLD else EDGE
+			entry.Rim.Transparency = if nextDay then 0 elseif done then 0.4 else 0.6
+			entry.Rim.Thickness = if nextDay then 2 else 1
+			entry.Amount.Text = if done then "✓" else shortCoins(dayCoins(i))
+			entry.Amount.TextColor3 = if done then DONE elseif nextDay then GOLD else P.Text
+			entry.Day.TextColor3 = if nextDay then GOLD else P.Dim
+			entry.Coin.Visible = not done
 		end
-		local tomorrow = Config.DailyRewardBase
-			+ Config.DailyRewardPerStreak * (math.min(streak + 1, Config.DailyStreakMax) - 1)
-		footer.Text = string.format('Tomorrow  <font color="#FFCA5B"><b>+%d ◆</b></font>', tomorrow)
+		footer.Text = string.format(
+			'Tomorrow  <font color="#FFCA5B"><b>+%d ◆</b></font>',
+			dayCoins(streak + 1)
+		)
 		return true
 	end
 end

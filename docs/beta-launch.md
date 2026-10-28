@@ -80,8 +80,8 @@ one. With `MinerRoster = false`:
   you fall, and the squad's when everyone has.
 - **Menus.** The Inventory's miner buttons and roster cards, the Wardrobe's
   "MINER 2" line and the Store's "each kit dresses one of your three miners"
-  lines are gone. A squad kit dresses your miner; the other kits wait in the
-  Wardrobe.
+  lines are gone. The squad kits are no longer sold (2026-10-28): the store
+  has player bundles instead, one whole look each (docs/store.md).
 - **Old saves** that already hold three keep all three as they are. The
   active one is the one you play; the others come back, gear and progress
   intact, when the flag is turned on again.
@@ -203,7 +203,7 @@ Social, Feedback, Reports.
 - Skirmisher survivability.
 - All three styles and all four elements.
 - Stun chains and resource costs.
-- Ranked's even stats.
+- Ranked on current stats (full progression since 2026-10-28).
 
 **Real phones under load:** several players mining, rolling gems, driving
 and fighting at once. Check:

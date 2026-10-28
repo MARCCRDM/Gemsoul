@@ -4,7 +4,7 @@ Cosmetics are looks only, never stats. Some are sold for Robux, directly
 (never at random). Others are free, earned one way only, so wearing one shows
 how you got it.
 
-The store itself, with its bundles, squad kits and prices, is in
+The store itself, with its bundles (player bundles since 2026-10-28) and prices, is in
 `docs/store.md` (2026-10-15). It replaced the crates and the coin-priced trims
 and back pieces described in older notes.
 
@@ -243,8 +243,8 @@ Nothing sells for Robux until you create its product.
    `src/shared/Store.luau`. The key is the cosmetic's id (`SkinPlasma`,
    `SuitRoyal`, …), or `StarterPack` or `SeasonPremium`.
 3. Until an id is set, pressing Buy says it's coming soon (or, while
-   `Config.TestCosmeticPrice` is set, buys it for coins). Bundles and squad
-   kits need products too: see `docs/store.md`.
+   `Config.TestCosmeticPrice` is set, buys it for coins). Bundles need
+   products too: see `docs/store.md`.
 
 Purchases are safe to retry:
 

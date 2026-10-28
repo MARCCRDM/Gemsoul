@@ -748,7 +748,7 @@ local function drawArena(frame: Frame)
 		run("DuelQueue", "1v1")
 	end, rankedShort).LayoutOrder = 1
 	local casualWhy, casualShort = lockedWhy("Casual", "Casual 1v1")
-	modeButton(grid, "CASUAL 1v1", "Even stats · unrated", P.Teal, casualWhy, function()
+	modeButton(grid, "CASUAL 1v1", "Your stats · unrated", P.Teal, casualWhy, function()
 		run("DuelQueue", "casual")
 	end, casualShort).LayoutOrder = 2
 	modeButton(

@@ -432,7 +432,10 @@ local switchScale = new("UIScale", { Scale = 1 }, switch)
 local switchArmed: boolean? = nil
 local function refreshSwitch()
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local want = touch and Spar.partner(player) == nil and SparKit.available() and not Spar.isDown(player)
+	local can = Spar.partner(player) == nil and SparKit.available() and not Spar.isDown(player)
+	-- (On a computer the key strip's X chip is the switch: OutpostScene.)
+	OutpostScene.showKit(Spar.hunting(player), can)
+	local want = touch and can
 	switch.Visible = want
 	if not want then
 		return
@@ -702,6 +705,7 @@ function SparKit.start()
 	end, false, Enum.ContextActionPriority.High.Value + 20, KEY, OLD_KEY, Enum.KeyCode.DPadUp)
 	bar.Activated:Connect(SparKit.toggle)
 	switch.Activated:Connect(SparKit.toggle)
+	OutpostScene.toggleKit = SparKit.toggle
 	for _, name in { "Spar", "Hunt", "SparDown", "Outpost", "CombatSession", "MatchId", "ChatOpen", "MenuOpen" } do
 		player:GetAttributeChangedSignal(name):Connect(function()
 			refreshBar()

@@ -104,14 +104,14 @@ the server just paid (`PlayerData.claimDaily`, marked on the player as
   - Days already collected are ticked.
   - Today is lit and marked TODAY.
   - Tomorrow has a teal edge.
-- **What it pays**: day 1 pays 75 coins, and each day in a row adds 25.
-  - Day 7 pays 225, and so does every day after it while the streak lasts.
+- **What it pays** (10x the beta's, 2026-10-28): day 1 pays 750 coins, and each day in a row adds 250.
+  - Day 7 pays 2,250, and so does every day after it while the streak lasts.
     That's why its tile says "DAY 7+": it doesn't reset weekly.
   - Missing a day (UTC) starts the streak again at day 1.
 
 | Day | 1 | 2 | 3 | 4 | 5 | 6 | 7 and after |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Coins | 75 | 100 | 125 | 150 | 175 | 200 | 225 |
+| Coins | 750 | 1,000 | 1,250 | 1,500 | 1,750 | 2,000 | 2,250 |
 
 - **Below the track**: what tomorrow pays (from day 7 on, "every day from now
   on"), and the rule for a missed day.
@@ -312,3 +312,20 @@ It is off for now with `Config.Features.ChatBox = false`. Setting it to
 | `tests/run_lobby.py` | 34 board + 36 feed | The real board and feed against GUI doubles. Board: cards per screen; folded rows, tapping one open (one at a time) and closed; the phone's choice, each as one slim strip; challenge rows; the bonus; the streak; unlock; no redraws while the lobby is hidden; opening Tasks. Feed: rare finds only; "You"; escaped names; three lines; duels; arrivals; a hidden lobby; the welcome once, with every day's coins on its track; Tasks stepping aside; stepping aside for a phone's loot card (and not on a computer) |
 | `tests/run_duels.py` | 88 auto queue | The shared rules (who's free, the default, intro phases, the pick, the bonus); a lone Ranked queue pulls the closest-rated lobby player after `CallAfter`; a called loss costs no rating; a called win pays the bonus; busy lobby players are left alone; auto queue off gets one offer, accepting starts the match, cancelling withdraws it; two new players pair at once as a single FirstFight with hints; a lone new player gets a called veteran; nobody around brings the sparring rival |
 | `tests/run_duels.py` | MATCH READY | A pairing starts nothing until everyone joins; the window names the other side; one JOIN doesn't start it; DECLINE leaves the queue and the other side keeps searching, paired with the next one queued; no answer in `ReadySeconds` leaves the queue; cancelling while asked hands the other side back to the queue; a fill-in's waiting player is asked with the fill-in shown joined; two auto-queued players are asked before they're paired |
+
+## PLAY menu and the board, 2026-10-28
+
+- **PLAY menu**: 1v1 RANKED is the big card on the left (VS PLAYERS);
+  1v1 CASUAL and 1v1 PRACTICE are stacked on the right (MORE MODES); a
+  BOUNTY BOARD bar runs along the bottom and opens Brutus's board from
+  anywhere in the Outpost (RiftServer takes a bounty from anywhere now).
+- **Casual and Ranked play on your current stats** (Shared.PvPRules: full
+  progression, no rarity cap). A new player's First Fight is still even.
+- **DAILY STREAK card**, opened: the week as a track of tiles, each day's
+  coins on it (collected ones ticked, the next lit gold, day 7 wide).
+- **Tasks pay 5x** (Shared.TrainingRewards: 1,450 coins in all where it
+  was 290) and the daily challenges 5x (their all-three bonus 250).
+- **Desktop keys**: the strip along the bottom is bold key caps (CLICK
+  mine, X fight/mine, Z spar, G duel, F invite, E talk); X's chip is a
+  button too and says what it swaps to. The HYPERBEAM pill shows a gold Z
+  key cap when it's ready.
