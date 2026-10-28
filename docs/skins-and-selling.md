@@ -36,7 +36,7 @@ is only a few lines of data.
 | Obsidian Lava | suit | 399 |
 | Neon Runner | suit | 399 |
 | Royal Gold | suit | 799 |
-| Starter Pack | Ignition suit (only here), Molten Core, Bone Crusher, Ember Trim, 1,000 coins | 99, one time, for 48 h after your first win |
+| Starter Pack | Ignition suit (only here), Molten Core, Bone Crusher, Thermal Core visor (*2026-10-28*: was Ember Trim), 1,000 coins | 99, one time, for 48 h after your first win |
 | Season premium | a second reward track: Moonsteel skin, LUNAR VANGUARD title, Lunar Frontier suit, coins | 399 |
 
 Every skin, suit and pickaxe for sale, and the bundles, are listed in

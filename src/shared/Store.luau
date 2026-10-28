@@ -298,13 +298,13 @@ Store.SquadBonus = { Cosmetics = { "TitleSquad" } }
 Store.StarterPack = {
 	Id = "StarterPack",
 	Name = "Starter Pack",
-	Tagline = "Your first win deserves a look: a suit you can't get anywhere else, two more looks and coins.",
+	Tagline = "Your first win deserves a look: a suit you can't get anywhere else, a Thermal Core visor, two more looks and coins.",
 	Section = "Offer",
 	Color = Color3.fromRGB(255, 96, 64),
 	Hero = "SuitIgnition",
 	Hours = 48,
 	Contents = {
-		Cosmetics = { "SuitIgnition", "SkinMolten", "PickBone", "TrimEmber" },
+		Cosmetics = { "SuitIgnition", "SkinMolten", "PickBone", "VisorThermal" },
 		Coins = 1000,
 	},
 }

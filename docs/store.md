@@ -45,7 +45,7 @@ this honestly:
 | Bundle | For | Robux | Inside | Saves |
 | --- | --- | --- | --- | --- |
 | Welcome Kit | new players, once, within 24 h of joining | 49 | Camo suit + skin, War Banner, 1 h 2x XP | 75% |
-| Starter Pack | once, for 48 h after your first win | 99 | Ignition suit (only here), Molten Core, Bone Crusher, Ember Trim, 1,000 coins | 44% + exclusive |
+| Starter Pack | once, for 48 h after your first win | 99 | Ignition suit (only here), Molten Core, Bone Crusher, Thermal Core visor (*2026-10-28*: was Ember Trim), 1,000 coins | 68% + exclusive |
 | Royal Treasury | large | 1,499 | Royal Gold, Chrome Knight, Stealth Black, Galaxy, Stormbreaker, Prism Shard, Gilded Prospector, Ember Cape, 5,000 coins, 24 h 2x XP | 24% |
 | The Vault | largest, once per account | 4,999 | Every weapon skin, suit, helmet, visor and pickaxe in the store (63), every bundle extra, the COLLECTOR title, 10,000 coins, 24 h 2x XP | 53% |
 

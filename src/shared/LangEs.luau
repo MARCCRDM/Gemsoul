@@ -822,7 +822,7 @@ return {
 	["{1}-day login streak"] = "Racha de {1} días",
 	["SPECIAL OFFER"] = "OFERTA ESPECIAL",
 	["ONE-TIME OFFER  ·  ENDS IN {1}:{2}:{3}"] = "OFERTA ÚNICA  ·  TERMINA EN {1}:{2}:{3}",
-	["Your first win deserves a look: a suit you can't get anywhere else, two more looks and coins."] = "Tu primera victoria merece estilo: un traje que no encontrarás en otro lado, dos apariencias más y monedas.",
+	["Your first win deserves a look: a suit you can't get anywhere else, a Thermal Core visor, two more looks and coins."] = "Tu primera victoria merece estilo: un traje que no encontrarás en otro lado, un visor Thermal Core, dos apariencias más y monedas.",
 	["{1} looks · {2} extra · {3} coins"] = "{1} apariencias · {2} extra · {3} monedas",
 	["See everything inside"] = "Ver todo lo que incluye",
 	["BUNDLE PRICE"] = "PRECIO DEL PAQUETE",
