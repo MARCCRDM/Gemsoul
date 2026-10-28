@@ -395,7 +395,9 @@ F.Hillback = like("Carapace", {
 	Light = GORE,
 	-- Landslide: its front heaved up, then the hill comes down.
 	Heavy = { Wind = { Pitch = 0.3, Lift = 0.3 }, Hit = { Pitch = -0.15, Lift = -0.25, Push = 0.2 } },
-	Lunge = F.Ironhide.Heavy,
+	-- Boulder Roll: rocked back on its haunches, then rolled forward into it
+	-- (a hill doesn't go over on its side).
+	Lunge = { Wind = { Pitch = 0.15, Lift = 0.1, Push = -0.2 }, Hit = { Pitch = -0.3, Lift = -0.1, Push = 0.8 } },
 })
 F.Inkwrap = like("Carapace", {
 	Light = { Wind = { Yaw = 0.3, Lift = 0.1 }, Hit = { Yaw = -0.4, Push = 0.3 } },
@@ -477,12 +479,13 @@ F.Blackhorn = like("Bulwark", {
 	Lunge = F.Hulkshell.Lunge,
 	Cast = ROAR,
 })
+-- (Its jaw already hangs open over that belly: it gapes no wider than 0.7.)
 F.Gluttonjaw = like("Razorback", {
-	Light = F.Dreadmaw.Light,
+	Light = { Wind = { Pitch = 0.15, Push = -0.25, Jaw = 0.6 }, Hit = { Pitch = -0.2, Push = 0.5, Jaw = -0.1 } },
 	-- Pin and Chew: reared up, jaws wide, then down on it.
-	Heavy = { Wind = { Pitch = 0.35, Jaw = 1.1, Lift = 0.15 }, Hit = { Pitch = -0.4, Jaw = 0.1, Lift = -0.15, Push = 0.5 } },
-	Lunge = F.Dreadmaw.Lunge,
-	Cast = ROAR,
+	Heavy = { Wind = { Pitch = 0.35, Jaw = 0.7, Lift = 0.15 }, Hit = { Pitch = -0.4, Jaw = 0.05, Lift = -0.15, Push = 0.5 } },
+	Lunge = { Wind = { Pitch = 0.2, Lift = -0.15, Jaw = 0.65 }, Hit = { Pitch = -0.25, Push = 0.8, Jaw = 0 } },
+	Cast = { Wind = { Pitch = 0.35, Jaw = 0.6, Arm = 0.6 }, Hit = { Pitch = -0.1, Jaw = 0.7, Arm = 0.3 } },
 })
 F.Lashape = like("Bulwark", {
 	-- Whip: the tail drawn back and cracked across.
@@ -640,7 +643,7 @@ F.Capspore = like("Carapace", {
 F.Coinmaw = like("Carapace", {
 	Light = F.Dreadmaw.Light,
 	-- Coin Spit: the purse thrown open, then a coin spat out.
-	Heavy = { Wind = { Jaw = 0.9, Pitch = 0.2 }, Hit = { Jaw = 0.4, Pitch = -0.1, Push = -0.15 } },
+	Heavy = { Wind = { Jaw = 0.7, Pitch = 0.2 }, Hit = { Jaw = 0.35, Pitch = -0.1, Push = -0.15 } },
 	Lunge = HOP,
 })
 F.Silkling = like("Carapace", {
@@ -673,11 +676,12 @@ F.Twinsong = like("Bulwark", {
 })
 F.Lumeballoon = like("Razorback", {
 	Light = FLOAT,
-	-- Red Mist: squeezed small, then swelling out.
-	Heavy = { Wind = { Lift = -0.2, Jaw = 0.4 }, Hit = { Lift = 0.3, Jaw = 0.9 } },
+	-- Red Mist: drawn in, then swelling out (on its stilts: it barely sinks,
+	-- or its feet would go through the ground).
+	Heavy = { Wind = { Lift = -0.06, Pitch = 0.1, Jaw = 0.4 }, Hit = { Lift = 0.3, Jaw = 0.9 } },
 	Lunge = FLOAT,
-	Cast = F.Skyjelly.Cast,
-	Guard = F.Skyjelly.Guard,
+	Cast = { Wind = { Lift = -0.06, Jaw = 0.4 }, Hit = { Lift = 0.4, Jaw = 0.9 } },
+	Guard = { Lift = -0.05, Pitch = 0.1, Jaw = 0.2 },
 })
 
 -- (A counter swings as a quick blow; an E, aimed or round itself, is its cast.)

@@ -2192,6 +2192,12 @@ local function newWild(at: Vector3, level: number, guard: boolean, facing: Vecto
 					local point = enemy.Root.Position + direction * math.min(studs, 20 * Kaiju.size(scale))
 					return abilityStep(wilds[enemy], point, point + direction)
 				end,
+				-- A warrior's cry: harder, faster blows for a while (KaijuFighter
+				-- reads them off its Body), as a pet's are.
+				Rally = function(plan)
+					e.RallyUntil = os.clock() + (plan.Duration or 5)
+					e.RallyDamage, e.RallyHaste = plan.Damage or 1, plan.Haste or 1
+				end,
 				Foes = function(center: Vector3, radius: number)
 					local wild = wilds[enemy]
 					return if wild then foesOf(wild)(center, radius) else {}

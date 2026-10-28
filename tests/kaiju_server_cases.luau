@@ -732,6 +732,10 @@ for id, plan in Kaiju.AbilityPlans do
 		check(math.abs(humanoid.Health - (50 + 200 * plan.Heal)) < 1e-6, id .. " didn't heal its share")
 	elseif guards then
 		check(body.Defense == nil, id .. "'s shell outlasted it")
+		-- (One that Heals mends it as it goes up: Crestbull's dig-in.)
+		if plan.Heal then
+			check(math.abs(humanoid.Health - (50 + 200 * plan.Heal)) < 1e-6, id .. " didn't heal as it went up")
+		end
 	end
 	if plan.Cleanse then
 		check(#body.Dots == 0 and body.SlowUntil == 0 and body.BlindUntil == 0, id .. " didn't cleanse")
@@ -1668,6 +1672,43 @@ check(pet.Model:GetAttribute("ActionKind") == "Stagger" and fighter.Action == ni
 -- Reeling, it can't act.
 KaijuFighter.step(fighter, wildFoe, now + 0.2)
 check(fighter.Choice == "Stagger" and fighter.Action == nil, "It acted while reeling")
+
+-- Under a warrior's cry (a Rally, on its Body) its blows land harder and
+-- come quicker out in the field, as in the arena; the cry over, as before.
+do
+	now += 5
+	settle(fighter)
+	settle(wf)
+	local strike = fighter.Strike
+	local amount = nil
+	fighter.Strike = function(_, value)
+		amount = value
+		return "Hit"
+	end
+	fightRoll = 0.99 -- (no combo after it)
+	local function blow()
+		now += 1
+		fighter.Action, fighter.RecoverUntil, amount = { Kind = "Light", At = now, Hits = 1 }, 0, nil
+		KaijuFighter.step(fighter, wildFoe, now)
+		return amount, fighter.NextAttack - now
+	end
+	local plain, gap = blow()
+	pet.RallyUntil, pet.RallyDamage, pet.RallyHaste = now + 10, 1.3, 1.25
+	local hard, quick = blow()
+	check(plain and hard and math.abs(hard - plain * 1.3) < 1e-6, "A rally didn't strengthen its blows in the field")
+	check(math.abs(quick - gap / 1.25) < 1e-6, "A rally didn't quicken its blows in the field")
+	pet.RallyUntil = now - 1
+	local after = blow()
+	check(after and math.abs(after - plain) < 1e-6, "A rally outlasted its cry")
+	fighter.Strike = strike
+	pet.RallyUntil, pet.RallyDamage, pet.RallyHaste = nil, nil, nil
+	-- A wild kaiju's cry lifts its own blows the same way.
+	local rally = wf.Caster().Rally
+	check(rally ~= nil, "A wild kaiju has no cry")
+	rally({ Duration = 4, Damage = 1.2, Haste = 1.1 })
+	check(enemy.RallyUntil == now + 4 and enemy.RallyDamage == 1.2 and enemy.RallyHaste == 1.1, "A wild one's cry")
+	enemy.RallyUntil = nil
+end
 
 -- The same the other way: the wild one's light blow on your kaiju's fresh guard.
 now += 5

@@ -183,19 +183,19 @@ as Moonmoth and Skyjelly do.
 | Spitgill | R | Slick | A foe too close: it slides back, leaving a slick that trips (stuns) whoever followed. |
 | Duskbat | E | Dive Bite | Dives onto their weakest out of the dark: 180% damage, with its element's effect. |
 | Duskbat | Q | Blackout | A cloud of darkness on its foe for 2s: 80% damage in all to those inside, blinding them. |
-| Duskbat | R | Vanish Wing | Low on health: it wraps itself in its wings, can't be hurt for 1.5s, and strikes their weakest. |
+| Duskbat | R | Vanish Wing | Low on health: it wraps itself in its wings, can't be hurt for 1.5s, and strikes their weakest for 120% damage. |
 | Tendrilis | E | Spear Lunge | Leaps in head first and spears its foe: 180% damage, leaving it Vulnerable. |
 | Tendrilis | Q | Four Tendrils | Four quick stabs of its tendrils: 160% damage in all, the last with its element's effect, and it heals 5% of its health. |
 | Tendrilis | R | Absorb | Low on health: a shell of 25% of its health for 4s, and it heals 10% of its health. |
 | Snipclaw | E | Split | Leaves a decoy in its place (it can't be hurt for a moment) and appears behind their weakest: 160% damage, stunning it. |
 | Snipclaw | Q | Scissor Cut | Two snips of its scissor claws: 140% damage in all, leaving its foe Vulnerable. |
-| Snipclaw | R | Phase Out | Low on health: it phases out, can't be hurt for 1.5s, and reappears with a snip. |
+| Snipclaw | R | Phase Out | Low on health: it phases out, can't be hurt for 1.5s, and reappears with a snip: 80% damage. |
 | Needlewing | E | Hypersonic Pass | Flashes through the line onto their weakest: 170% damage, with its element's effect. |
 | Needlewing | Q | Siphon | Stings its foe with its tail and drinks: 130% damage, slowing it, and it heals 8% of its health. |
-| Needlewing | R | Afterimage | Low on health: it leaves an afterimage, can't be hurt for 1.5s, and strikes their weakest. |
+| Needlewing | R | Afterimage | Low on health: it leaves an afterimage, can't be hurt for 1.5s, and strikes their weakest for 90% damage. |
 | Hollowbone | E | Bone Spur | Leaps onto its foe spur first: 170% damage, stunning it. |
 | Hollowbone | Q | Gravity Beams | Beams from its shoulders at its foe and one more: 140% damage in all, slowing them. |
-| Hollowbone | R | Hollow Form | Low on health: it goes hollow, can't be hurt for 1.5s, and strikes as it comes back. |
+| Hollowbone | R | Hollow Form | Low on health: it goes hollow, can't be hurt for 1.5s, and strikes as it comes back: 60% damage. |
 | Ribbonarm | E | Ribbon Pierce | Darts in behind a ribbon's point: 160% damage, leaving its foe Vulnerable. |
 | Ribbonarm | Q | Unfurl | Unrolls both ribbons in a sweep round it: 130% damage to the foes near it, with its element's effect. |
 | Ribbonarm | R | Cocoon Fold | Low on health: its ribbons wrap round it, a shell of 30% of its health for 4s. |
@@ -270,22 +270,22 @@ as Moonmoth and Skyjelly do.
 | Pulsewing | R | Pulse Lift | A foe too close: it lifts off and wheels back, leaving a pulse that slows whoever followed. |
 | Dunemaw | E | Burrow Ambush | Goes under (it can't be hurt for a moment) and erupts beneath their weakest: 160% damage, stunning it. |
 | Dunemaw | Q | Swallow | Swallows its foe whole for a moment: 140% damage, stunning it. |
-| Dunemaw | R | Sink | Low on health: it sinks into the ground, can't be hurt for 2s, and surfaces with a bite. |
+| Dunemaw | R | Sink | Low on health: it sinks into the ground, can't be hurt for 2s, and surfaces with a bite: 60% damage. |
 | Lashlight | E | Twin Lash | Swings in on its whips onto their weakest: 160% damage, rooting it (stunned). |
 | Lashlight | Q | Whip Pierce | Drives a whip straight through a line: 130% damage to everyone in it, with its element's effect. |
-| Lashlight | R | Fold | Low on health: it folds into its light, can't be hurt for 1.5s, and lashes as it unfolds. |
+| Lashlight | R | Fold | Low on health: it folds into its light, can't be hurt for 1.5s, and lashes as it unfolds: 70% damage. |
 | Inkstalk | E | Cold Grip | Jets onto their weakest and grips it with cold arms: 150% damage, slowing it. |
 | Inkstalk | Q | Ink Jet | A cloud of ink on its foe for 3s: 90% damage in all to those inside, blinding them. |
-| Inkstalk | R | Slip Away | Low on health: it slips away in ink, can't be hurt for 1.5s, and strikes as it comes back. |
+| Inkstalk | R | Slip Away | Low on health: it slips away in ink, can't be hurt for 1.5s, and strikes as it comes back: 70% damage. |
 | Skyrazor | E | Dive Rake | Dives onto their weakest, talons first: 180% damage, poisoning it. |
 | Skyrazor | Q | Beak Snap | A snap of its hooked beak: 130% damage, stunning its foe. |
-| Skyrazor | R | Wheel Off | Low on health: it wheels off into the sky, can't be hurt for 1.5s, and dives on their weakest. |
+| Skyrazor | R | Wheel Off | Low on health: it wheels off into the sky, can't be hurt for 1.5s, and dives on their weakest for 80% damage. |
 | Thornlash | E | Tail Impale | Leaps in and drives both tails into its foe: 170% damage, leaving it Vulnerable. |
 | Thornlash | Q | Spine Volley | Both tails fire six spines at its foe and those near it: 130% damage in all, the last with its element's effect. |
 | Thornlash | R | Spined Guard | Low on health: its tails curl over it; it takes 30% less for 3s and its spines hurt foes close to it. |
 | Flickerstripe | E | Teleport Strike | Blinks out (it can't be hurt for a moment) and strikes from behind their weakest: 150% damage, leaving it Vulnerable. |
 | Flickerstripe | Q | Shrink Ray | A shrinking ray through everyone in a line: 120% damage, blinding them. |
-| Flickerstripe | R | Face Turn | Low on health: a face turns and it flickers away, can't be hurt for 1.5s, and chops as it returns. |
+| Flickerstripe | R | Face Turn | Low on health: a face turns and it flickers away, can't be hurt for 1.5s, and chops as it returns: 70% damage. |
 | Cleaverhead | E | Head Cleave | Brings its axe of a head down on its foe: 190% damage, leaving it Vulnerable. |
 | Cleaverhead | Q | Four-Fist | Four quick blows of its four fists: 160% damage in all. |
 | Cleaverhead | R | Brace Arms | Hard pressed or crowded: all four arms up, it takes 35% less for 3s. |
@@ -330,7 +330,7 @@ no combat code changed.
   `KaijuConceptShapes`, from blocks, wedges, corner wedges, balls and
   discs. Legs bend at a knee down to a foot and toes. Membranes are
   triangles of wedges. Prisma's crystal is a pyramid of corner wedges.
-- **Size.** 2.7 to 5.8 studs tall at scale 1, and 18 to 58 parts each,
+- **Size.** 2.7 to 5.8 studs tall at scale 1, and 18 to 78 parts each,
   under the budget of 90.
 - **A second look.** After rendering all 61 beside their concepts (below),
   the six furthest from theirs were rebuilt: Rubbleking (a hunched golem,
@@ -339,6 +339,21 @@ no combat code changed.
   Coinmaw (a rounded purse with the zipper right across it), Twinsong (a
   wide body, the two heads side by side), Steamhide (bulked up, steam in
   puffs) and Pipsqueak (a round body bristling with nubs).
+- **A third look.** Eight more were rebuilt after a second side-by-side:
+  - Snipclaw: a great box of a head split by a lit seam, crab claws held
+    out wide, each edged with a lit crescent.
+  - Duskbat: three fingers fanned from each wrist, the skin between them
+    lit.
+  - Magnetjaw: a hulking beetle under a domed shell, two lit horns
+    sparking.
+  - Capspore: a sloping dome of a cap over lit gills.
+  - Yetihide: ragged locks of fur flaring off every limb.
+  - Barnacrab: low and wide under a dome of scrap plates, short legs
+    splayed, one claw raised.
+  - Mossgiant: grey stone now, not bark, its arms hanging to its knees,
+    moss all over and a burst of light across its chest.
+  - Gluttonjaw: jaws agape and lit inside, teeth all round, a round pale
+    belly.
 - **Floaters.** Prisma floats 0.7 studs up, Shrieker 0.9, and Needlewing,
   Oculus and Lightbird 1.0 (`KaijuHover`).
 - **No legs.** Prisma (a crystal), Oculus (a saucer), Shadowsphere (a
@@ -376,6 +391,49 @@ body is nearest to. Some new shared blows:
 Others are their own. Tritail drives all three tails down, Lashape cracks
 its whip of a tail over its head, Kickjaw drop-kicks, Dunemaw dives under
 and bursts up, and Gulper's cannon arm recoils.
+
+Every kind's walk, idle, blows and guard were then rendered frame by frame
+and checked against what the first sheet's kinds do. Four were fixed:
+
+- **Hillback**'s Boulder Roll was Ironhide's, which rolls it onto its
+  side. It now rocks back on its haunches and rolls forward.
+- **Coinmaw**'s whole lower half was its jaw, so the bottom of the purse
+  came away when it bit. Now only the front lip opens, hinged at the
+  bottom, over a dark inside.
+- **Lumeballoon** sank its legs through the floor on its float blows. It
+  dips less now.
+- **Gluttonjaw**'s jaw hangs open over its belly, so it has bites of its
+  own that open it no further than 0.7. Dreadmaw's, which it used to
+  borrow, open to 1.1, which would drive the jaw into the belly.
+
+## Abilities checked
+
+All 183 moves were checked against their descriptions: the numbers, the
+statuses, the hit counts, who they land on, and when an R fires. These
+were fixed:
+
+- **Shells and wards that heal.** Crestbull's Dig In and Tendrilis's
+  Absorb say they heal 10% of its health, but a shell or a ward never
+  healed. `KaijuAbilities` now heals them as they go up.
+- **War cries out in the field.** A rally (harder, faster blows for a
+  while) only worked in Kaiju Arena battles. Out in the field your kaiju
+  fight through `KaijuFighter`, which ignored it, and a wild kaiju's cry
+  did nothing at all. The fighter now reads the rally off the kaiju, and
+  a wild kaiju's cry sets one. This covers Gashclaw's, Gluttonjaw's,
+  Kickjaw's, Lashape's and Rubbleking's R, the first sheet's Frenzy and
+  Alpha Roar, and the Warrior's War Cry.
+- **Icons.** Steamhide's Pressure Shell, Ashcrawler's Harden and
+  Dreadcrown's Crown Aegis named an icon that isn't on the icon sheet,
+  so they showed a plain glyph. They use Supernova's now.
+- **Descriptions.** The nine new low-health Vanish moves didn't say what
+  their return strike deals. They do now, in English and Spanish.
+
+The rest held up. In a Kaiju Arena battle every R's moment matches its
+role: a tank or a warden at half health, a warrior or a breaker crowded, a
+shooter with a foe too close, an assassin low. Out in the field an R goes
+up when its kaiju is down to 60% of its health or sees a heavy blow or a
+cast coming. Team heals and wards, auras, cleanses and picking the weakest
+all do what they say.
 
 ## Balance
 
@@ -421,10 +479,13 @@ keyed with `{1}`, `{2}`, as `Shared.Lang` reads them.
 | `src/shared/KaijuShapesMore.luau` (new) | Their hides and hovers, and the helpers both halves use |
 | `src/shared/KaijuShapesMoreA.luau`, `KaijuShapesMoreB.luau` (new) | Their models |
 | `src/shared/KaijuShapes.luau` | Merges them in |
-| `src/shared/CreatureMotion.luau` | Their fight poses |
+| `src/shared/CreatureMotion.luau` | Their fight poses; Hillback's roll, Coinmaw's and Lumeballoon's blows and Gluttonjaw's bites fixed |
+| `src/server/Systems/KaijuAbilities.luau` | A shell or a ward that heals, heals |
+| `src/server/Systems/KaijuFighter.luau`, `KaijuWilds.luau` | A rally strengthens and quickens blows out in the field, for your kaiju and wild ones |
 | `src/shared/Kaiju.luau` | All 61 in `Kaiju.WildRoster` |
 | `src/shared/LangEs.luau` | Spanish |
-| `tests/kaiju_cases.luau`, `kaiju_models_cases.luau`, `kaiju_roles_cases.luau` | 94 kinds, 270 moves; the legless kinds |
+| `tests/kaiju_cases.luau`, `kaiju_models_cases.luau`, `kaiju_roles_cases.luau` | 94 kinds, 270 moves; the legless kinds; every move's icon on the icon sheet |
+| `tests/kaiju_server_cases.luau` | Healing shells and wards; rallies out in the field |
 | `tests/run_lang.py`, `run_kaiju_taming.py` | Bundle `KaijuRosterMore` |
 
 ## Tests
@@ -433,8 +494,8 @@ keyed with `{1}`, `{2}`, as `Shared.Lang` reads them.
 | --- | --- |
 | `run_kaiju.py` (`kaiju_models_cases`) | All 94 kinds in all four elements. For each model: its feet on the ground (or hovering), its joints seated, its part budget, its element's plates and its own hide. Every kind's fight poses stay in bounds. |
 | `run_kaiju.py` (`kaiju_cases`) | 94 kinds, each with a stat line of its own; the role rules; the habitats and the wild list. |
-| `run_kaiju.py` (`kaiju_server_cases`) | All 270 moves cast, each hitting its foe and leaving its status. |
-| `run_kaiju_roles.py` | Each kind's kit keeps its role's rules. The balance. |
+| `run_kaiju.py` (`kaiju_server_cases`) | All 270 moves cast, each hitting its foe and leaving its status. A shell or a ward that heals, heals. A rally strengthens and quickens your kaiju's blows out in the field, and a wild kaiju's cry sets one. |
+| `run_kaiju_roles.py` | Each kind's kit keeps its role's rules, and every move's icon is on the icon sheet. The balance. |
 | `run_lang.py` | The Spanish. |
 
 ## Not tested here

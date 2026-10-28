@@ -279,6 +279,16 @@ local function toRange(f, now: number, dir: Vector3)
 	hopBack(f, now, dir)
 end
 
+-- Under its rally (a warrior's cry: KaijuAbilities' Rally, on its Body):
+-- its blows' share and their pace, else 1 and 1.
+local function rally(f, now: number): (number, number)
+	local body = f.Body
+	if body and now < (body.RallyUntil or 0) then
+		return body.RallyDamage or 1, body.RallyHaste or 1
+	end
+	return 1, 1
+end
+
 -- One spine of a volley, from its mouth at its foe: it lands at once if its
 -- foe's still within its reach (a hop aside dodges it).
 local function spine(f, foe, now: number, distance: number)
@@ -294,7 +304,7 @@ local function spine(f, foe, now: number, distance: number)
 	if now < (body.BlindUntil or 0) and KaijuFighter.random() < (body.Blind or 0.5) then
 		return
 	end
-	f.Strike(foe, f.Stats.Damage * ranged.Mult, nil :: any, ranged.Name)
+	f.Strike(foe, f.Stats.Damage * ranged.Mult * rally(f, now), nil :: any, ranged.Name)
 end
 
 local function reel(f, now: number, seconds: number)
@@ -370,7 +380,7 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 	if distance * Brain.Reach / f.Reach <= Brain.Reach + KaijuFight.HitRange then
 		local blinded = now < (body.BlindUntil or 0) and KaijuFighter.random() < (body.Blind or 0.5)
 		if not blinded then
-			local amount = f.Stats.Damage * KaijuFight.blow(f.Style, action.Kind, action.Hits)
+			local amount = f.Stats.Damage * KaijuFight.blow(f.Style, action.Kind, action.Hits) * rally(f, now)
 			local name = f.Style.Names[action.Kind] or action.Kind
 			if f.Strike(foe, amount, heavy, name) == "Parried" then
 				-- Turned aside just as its guard went up: it's left reeling.
@@ -409,7 +419,8 @@ local function land(f, action, foe, now: number, distance: number, dir: Vector3)
 		return
 	end
 	-- After a counter it presses straight on.
-	local pace = if action.Kind == "Punish" then 0.5 else 1
+	local _, haste = rally(f, now)
+	local pace = (if action.Kind == "Punish" then 0.5 else 1) / haste
 	f.NextAttack = now + f.Rate * pace * (0.8 + KaijuFighter.random() * 0.4)
 	-- A ranged fighter's combo done up close: back it hops to shoot.
 	local ranged = f.Style.Ranged

@@ -319,6 +319,10 @@ local function defend(caster, id: string, plan, damage: number): boolean
 	end
 	body.Defense = d
 	cleanse(if plan.Cleanse then body else nil)
+	-- (One that heals it as it goes up: Crestbull's Dig In, Tendrilis's Absorb.)
+	if plan.Heal and h then
+		h.Health = math.min(h.MaxHealth, h.Health + h.MaxHealth * plan.Heal)
+	end
 	local look = if plan.Aura and plan.Aura.Status == "Poison"
 		then "Mantle"
 		elseif shape == "Shell" then "Shield"

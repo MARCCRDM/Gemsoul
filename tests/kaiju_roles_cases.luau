@@ -93,6 +93,21 @@ local Brain = load("KaijuBattleBrain")
 
 -- The roles and kits ---------------------------------------------------------------------------------------
 
+-- Every move's icon is on the painted sheet the game shows (the client's
+-- AbilityIconAtlas; past the icons uploaded so far, SurgeIcons' Fallback
+-- stands in), or its socket shows a bare glyph.
+local Atlas = luau.load(fs.readFile(ROOT .. "/src/client/Modules/AbilityIconAtlas.luau"), { debugName = "AbilityIconAtlas" })()
+local surgeIcons = fs.readFile(ROOT .. "/src/client/Modules/SurgeIcons.luau")
+local uploaded = tonumber(string.match(surgeIcons, "Icons%.Uploaded = (%d+)"))
+local fallback = {}
+for id in string.gmatch(string.match(surgeIcons, "Icons%.Fallback = (%b{})"), "(%w+) =") do
+	fallback[id] = true
+end
+local function onSheet(icon): boolean
+	local at = Atlas.Index[icon]
+	return at ~= nil and (at < uploaded or fallback[icon] == true)
+end
+
 check(KaijuRoles.of("Carapace") == "Tank", "A Carapace isn't a tank")
 check(KaijuRoles.of("Bulwark") == "Warrior", "A Bulwark isn't a warrior")
 check(KaijuRoles.of("Razorback") == "Ranged", "A Razorback isn't ranged")
@@ -105,6 +120,7 @@ local function wholeKit(kit, owner: string, role: string)
 			move.Name and move.Description and move.IconSource and move.From,
 			id .. " is missing a name, words, an icon or what it's from"
 		)
+		check(onSheet(move.IconSource), id .. "'s icon (" .. tostring(move.IconSource) .. ") isn't on the icon sheet")
 		check(Kaiju.AbilityPlans[id] == move.Plan, id .. " can't be cast")
 		check(Kaiju.moveInfo(id) == move, id .. " isn't found by its id")
 	end

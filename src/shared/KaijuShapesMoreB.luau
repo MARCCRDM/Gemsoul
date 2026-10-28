@@ -75,34 +75,69 @@ function Half.install(h)
 		make(m, tip, "Tuft", V(0.24, 0.3, 0.24), CF(0, 1.5, 2.17), H2)
 	end
 
-	-- Yetihide: a shaggy snow-white yeti, long fur hanging in blocks, a
-	-- fringe hiding its face but for two lit eyes, a mark of its element's
-	-- light on its chest, huge hands.
+	-- Yetihide: a shaggy snow-white yeti hunched under its own fur, ragged
+	-- locks of it flaring off every limb, a fringe over its face but for
+	-- two lit slanted eyes, a crystal of its element's light set in its
+	-- chest, long arms and huge hands.
 	function B.Yetihide(m, pal, H, H2)
 		local r = root(m, V(1.8, 2.0, 1.6), 2.4)
 		local lean = CF(0, 3.0, 0.1) * A(rad(-8), 0, 0)
-		local torso = limb(m, r, "Torso", V(2.0, 2.2, 1.5), lean, V(0, 1.9, 0.15), "Body", 1, H)
-		for i, x in { -0.62, 0, 0.62 } do
-			make(m, torso, "Fur", V(0.5, 1.1, 0.2), CF(x, 1.95 + (i % 2) * 0.15, -0.72), H2)
+		local torso = limb(m, r, "Torso", V(2.1, 2.2, 1.5), lean, V(0, 1.9, 0.15), "Body", 1, H)
+		-- A lock of fur hanging off `p` from `at` (its top), `len` long,
+		-- flared out by `flare` (a turn at its root).
+		local function lock(p, at: CFrame, w, len, deep, i, flare: CFrame?)
+			make(m, p, "Fur", V(w, len, deep), at * (flare or CF()) * CF(0, -len / 2, 0), if i % 2 == 0 then H else H2)
+		end
+		local FORWARD, BACK = A(rad(12), 0, 0), A(rad(-12), 0, 0)
+		-- Its front: the chest crystal in its setting, fur round and under it.
+		glow(m, torso, "Crystal", V(0.36, 0.36, 0.12), lean * CF(0, 0.3, -0.79) * A(0, 0, rad(45)), pal)
+		for _, c in { { -1, 1 }, { 1, 1 }, { -1, -1 }, { 1, -1 } } do
+			plate(m, torso, "Setting", V(0.36, 0.07, 0.1), lean * CF(c[1] * 0.17, 0.3 + c[2] * 0.17, -0.8) * A(0, 0, rad(-c[1] * c[2] * 45)), pal)
+		end
+		for i, x in { -0.85, -0.52, 0.52, 0.85 } do
+			lock(torso, lean * CF(x, 1.08, -0.84), 0.3, 0.8 + (i % 2) * 0.3, 0.22, i, FORWARD * A(0, 0, rad(x * 10)))
+		end
+		for i, x in { -0.78, -0.4, 0, 0.4, 0.78 } do
+			lock(torso, lean * CF(x, -0.05, -0.84), 0.36, 1.0 + ((i + 1) % 3) * 0.22, 0.22, i, FORWARD * A(0, 0, rad(-x * 12)))
+		end
+		-- Its sides and back, flaring out.
+		for _, s in { -1, 1 } do
+			for i, z in { -0.42, 0.1, 0.55 } do
+				lock(torso, lean * CF(s * 1.1, 0.75 - i * 0.12, z), 0.22, 1.25 + (i % 2) * 0.4, 0.4, i, A(0, 0, rad(s * 14)))
+			end
+			-- A mane off its shoulder, over the top of its arm.
+			lock(torso, CF(s * 1.25, 4.3, 0.05), 0.6, 0.85, 0.95, 1, A(0, 0, rad(s * 22)))
+		end
+		for i, x in { -0.6, 0, 0.6 } do
+			lock(torso, lean * CF(x, 0.9, 0.82), 0.5, 1.5 + (i % 2) * 0.35, 0.2, i, BACK)
+		end
+		-- The head sunk between its shoulders, shaggy round its face.
+		local head = make(m, torso, "Head", V(1.2, 1.05, 1.05), CF(0, 4.35, -0.35), H)
+		make(m, head, "Crown", V(1.3, 0.35, 1.1), CF(0, 4.92, -0.3), H2)
+		for i, x in { -0.45, -0.15, 0.15, 0.45 } do
+			lock(head, CF(x, 4.85, -0.92), 0.28, 0.3 + (i % 2) * 0.14, 0.14, i, A(rad(8), 0, 0))
 		end
 		for _, s in { -1, 1 } do
-			make(m, torso, "Fur", V(0.22, 1.5, 1.2), CF(s * 1.08, 2.45, 0.1), H2)
-			plate(m, torso, "Frost", V(0.6, 0.25, 0.7), CF(s * 1.05, 3.95, 0.05) * A(0, 0, rad(-s * 12)), pal)
+			glow(m, head, "Eye", V(0.22, 0.09, 0.06), CF(s * 0.26, 4.38, -0.89) * A(0, 0, rad(s * 12)), pal)
+			lock(head, CF(s * 0.62, 4.75, -0.6), 0.2, 0.75, 0.5, 0, A(0, 0, rad(s * 10)))
 		end
-		make(m, torso, "Fur", V(1.6, 1.2, 0.22), CF(0, 2.6, 0.85), H2)
-		glow(m, torso, "Mark", V(0.5, 0.3, 0.08), lean * CF(0, 0.35, -0.8), pal)
-		plate(m, torso, "MarkFrame", V(0.66, 0.08, 0.1), lean * CF(0, 0.55, -0.79), pal)
-		local head = make(m, torso, "Head", V(1.1, 1.0, 1.0), CF(0, 4.45, -0.3), H)
-		make(m, head, "Fringe", V(1.2, 0.42, 0.32), CF(0, 4.72, -0.78), H2)
-		eyes(m, head, 0.24, 4.42, -0.82, V(0.18, 0.08, 0.06), pal)
-		limb(m, head, "Jaw", V(0.75, 0.25, 0.6), CF(0, 3.98, -0.55), V(0, 4.08, -0.2), "Jaw", 1, H2)
+		local jaw = limb(m, head, "Jaw", V(0.85, 0.28, 0.6), CF(0, 3.88, -0.55), V(0, 3.98, -0.2), "Jaw", 1, H2)
+		for i, x in { -0.28, 0, 0.28 } do
+			lock(jaw, CF(x, 3.85, -0.86), 0.24, 0.45 + (i % 2) * 0.18, 0.14, i, A(rad(10), 0, 0))
+		end
 		for _, s in { -1, 1 } do
-			local hand = V(s * 1.38, 1.85, -0.25)
-			local p = arm(m, torso, V(s * 1.25, 3.8, 0), V(s * 1.48, 2.8, 0), hand, 0.75, H, H)
-			make(m, p, "Hand", V(0.92, 0.75, 0.92), CF(hand + V(0, -0.35, -0.05)), H2)
-			plate(m, p, "Knuckles", V(0.92, 0.2, 0.25), CF(hand + V(0, -0.35, -0.5)), pal)
-			h.talons(m, p, hand + V(0, -0.7, -0.3), 3, 0.3, CLAW)
-			leg(m, torso, s * 0.6, 1.9, 0.2, 0.78, H, H2, 3, 0.15)
+			-- Long arms shaggy down their outsides, great hands.
+			local hand = V(s * 1.42, 1.6, -0.25)
+			local p = arm(m, torso, V(s * 1.28, 3.8, 0), V(s * 1.5, 2.75, 0), hand, 0.72, H, H)
+			for i, y in { 3.5, 2.55 } do
+				lock(p, CF(s * 1.86, y, 0), 0.2, 0.85, 0.45, i, A(0, 0, rad(s * 12)))
+				lock(p, CF(s * 1.5, y - 0.05, -0.4), 0.42, 0.7, 0.18, i + 1, FORWARD)
+			end
+			make(m, p, "Hand", V(0.9, 0.7, 0.9), CF(hand + V(0, -0.3, -0.05)), H2)
+			h.talons(m, p, hand + V(0, -0.62, -0.3), 3, 0.3, H2)
+			local l = leg(m, torso, s * 0.6, 1.9, 0.2, 0.8, H, H2, 3, 0.15)
+			lock(l, CF(s * 0.62, 1.7, -0.27), 0.62, 0.65, 0.18, 0, FORWARD)
+			lock(l, CF(s * 1.03, 1.7, 0.15), 0.18, 0.75, 0.5, 1, A(0, 0, rad(s * 10)))
 		end
 	end
 
@@ -139,39 +174,63 @@ function Half.install(h)
 		)
 	end
 
-	-- Barnacrab: a crab under a shanty of rusted plates, patched in its
-	-- element's colour, little windows lit, stalk eyes, one great claw and
-	-- one small, six legs.
+	-- Barnacrab: a rusted crab under a dome of overlapping scrap plates,
+	-- patched in places with bare steel and its element's colour, stalk
+	-- eyes lit on top, one great claw raised and one small, six short
+	-- chunky legs glowing at the joints.
 	function B.Barnacrab(m, pal, H, H2)
-		local r = root(m, V(2.0, 1.2, 1.8), 1.6)
-		local body = limb(m, r, "Body", V(2.2, 0.85, 1.8), CF(0, 1.72, 0), V(0, 1.5, 0), "Body", 1, H)
-		for _, p in { { -0.55, 2.35, -0.2, 1.0, 0.5, 1.0, 6 }, { 0.5, 2.3, 0.25, 0.9, 0.45, 1.1, -8 }, { -0.1, 2.75, 0.15, 0.8, 0.4, 0.8, 4 } } do
-			make(m, body, "Shanty", V(p[4], p[5], p[6]), CF(p[1], p[2], p[3]) * A(0, rad(p[7]), rad(p[7] * 0.6)), H2)
+		local STEEL = C(84, 94, 104)
+		local function lit(p, name, size, cf)
+			return make(m, p, name, size, cf, pal.Plate, Enum.Material.Neon)
 		end
-		for _, p in { { 0.65, 2.55, -0.4 }, { -0.75, 2.62, 0.45 }, { 0.2, 3.0, -0.1 }, { -0.35, 2.15, -0.92 } } do
-			plate(m, body, "Patch", V(0.36, 0.3, 0.06), CF(p[1], p[2], p[3] - 0.1) * A(0, rad(p[1] * 20), 0), pal)
+		local r = root(m, V(2.0, 0.9, 1.8), 1.1)
+		local body = limb(m, r, "Body", V(2.3, 0.8, 1.9), CF(0, 1.0, 0.05), V(0, 0.85, 0.05), "Body", 1, H2)
+		make(m, body, "Hull", V(2.0, 0.6, 1.65), CF(0, 1.55, 0.08), H2)
+		-- The dome: a ring of shingled plates, a smaller ring, a cap.
+		for i = 0, 5 do
+			local a = rad(i * 60 + 30)
+			local out = V(math.cos(a), 0, math.sin(a))
+			local at = V(0, 1.65, 0.08) + out * V(1.0, 0, 0.82)
+			make(m, body, "Plate", V(1.05, 0.22, 0.95), CFrame.lookAt(at, at + out) * A(rad(-22), 0, 0), if i % 3 == 1 then STEEL else H)
 		end
-		for _, w in { { -0.55, 2.4, -0.71 }, { 0.5, 2.35, -0.31 } } do
-			glow(m, body, "Window", V(0.16, 0.14, 0.06), CF(w[1], w[2], w[3]), pal)
+		for i = 0, 3 do
+			local a = rad(i * 90 + 15)
+			local out = V(math.cos(a), 0, math.sin(a))
+			local at = V(0, 1.98, 0.08) + out * V(0.5, 0, 0.42)
+			make(m, body, "Plate", V(0.95, 0.2, 0.85), CFrame.lookAt(at, at + out) * A(rad(-15), 0, 0), if i == 2 then STEEL else H)
 		end
-		make(m, body, "Chimney", V(0.2, 0.5, 0.2), CF(0.2, 3.2, 0.25), H)
-		limb(m, body, "Mouth", V(0.7, 0.3, 0.3), CF(0, 1.4, -0.98), V(0, 1.5, -0.85), "Jaw", 1, H2)
+		make(m, body, "Cap", V(0.95, 0.22, 0.85), CF(0.05, 2.2, 0.12) * A(0, rad(12), rad(4)), H)
+		for _, p in { { 0.75, 1.75, -0.55, 35 }, { -0.95, 1.7, 0.45, -50 }, { 0.35, 2.1, 0.55, 15 }, { -0.4, 2.06, -0.4, -20 } } do
+			plate(m, body, "Patch", V(0.34, 0.08, 0.3), CF(p[1], p[2] + 0.12, p[3]) * A(rad(-12), rad(p[4]), 0), pal)
+		end
+		-- Stalk eyes up off the front of the dome.
 		for _, s in { -1, 1 } do
-			local top = V(s * 0.45, 2.55, -0.95)
-			beam(m, body, "Stalk", V(s * 0.35, 1.95, -0.8), top, 0.1, 0.1, H2)
-			glow(m, body, "Eye", V(0.18, 0.18, 0.18), CF(top + V(0, 0.08, 0)), pal)
-			local big = s > 0
-			local w = if big then 0.42 else 0.28
-			local hand = V(s * 1.3, 1.35, -2.0)
-			local p = arm(m, body, V(s * 0.9, 1.6, -0.75), V(s * 1.55, 1.6, -1.3), hand, w, H, H2)
-			local size = if big then V(0.9, 0.65, 1.0) else V(0.5, 0.36, 0.7)
-			make(m, p, "Claw", size, CF(hand + V(0, 0, -0.3)), H)
-			make(m, p, "Pincer", V(size.X * 0.5, size.Y * 0.4, size.Z * 0.8), CF(hand + V(0, -size.Y * 0.35, -0.3 - size.Z * 0.6)), H2)
+			local top = V(s * 0.38, 2.65, -0.55)
+			beam(m, body, "Stalk", V(s * 0.3, 1.85, -0.55), top, 0.12, 0.12, H2)
+			lit(body, "Eye", V(0.2, 0.2, 0.2), CF(top + V(0, 0.08, 0)))
 		end
-		for i, z in { -0.5, 0.1, 0.7 } do
+		limb(m, body, "Mouth", V(0.8, 0.26, 0.3), CF(0, 0.85, -0.95), V(0, 0.95, -0.8), "Jaw", 1, H)
+		-- The claws: the great one raised, the small one low.
+		for _, s in { -1, 1 } do
+			local big = s > 0
+			local shoulder = V(s * 0.95, 1.1, -0.7)
+			local elbow = if big then V(s * 1.6, 1.55, -1.2) else V(s * 1.4, 0.88, -1.25)
+			local hand = if big then V(s * 1.55, 2.15, -1.6) else V(s * 1.3, 0.8, -1.75)
+			local p = arm(m, body, shoulder, elbow, hand, if big then 0.4 else 0.28, H, H)
+			lit(p, "Joint", V(0.3, 0.3, 0.3), CF(elbow))
+			local size = if big then V(0.95, 0.8, 1.0) else V(0.52, 0.44, 0.6)
+			local claw = CF(hand + V(0, 0, -size.Z * 0.35)) * A(if big then rad(25) else 0, 0, 0)
+			make(m, p, "Claw", size, claw, H)
+			make(m, p, "Pincer", V(size.X * 0.62, size.Y * 0.45, size.Z * 0.95), claw * CF(0, size.Y * 0.35, -size.Z * 0.85) * A(rad(-14), 0, 0), if big then STEEL else H)
+			make(m, p, "Pincer", V(size.X * 0.5, size.Y * 0.36, size.Z * 0.8), claw * CF(0, -size.Y * 0.32, -size.Z * 0.75) * A(rad(16), 0, 0), H2)
+		end
+		-- Six short, thick legs splayed out wide, a glow at each knee.
+		for i, z in { -0.55, 0.1, 0.75 } do
 			for _, s in { -1, 1 } do
 				local step = if i % 2 == 0 then s else -s
-				h.spindle(m, body, V(s * 1.0, 1.5, z), V(s * 1.85, 1.75, z * 1.3), V(s * 2.15, 0.05, z * 1.5), 0.18, H, H2, step)
+				local knee = V(s * 1.62, 1.35, z * 1.15)
+				local l = h.spindle(m, body, V(s * 1.0, 0.95, z), knee, V(s * 2.15, 0.05, z * 1.35), 0.36, H, H2, step)
+				lit(l, "Joint", V(0.32, 0.28, 0.32), CF(knee))
 			end
 		end
 	end
@@ -235,29 +294,75 @@ function Half.install(h)
 		tail(m, torso, { V(0, 2.1, 0.8), V(0, 1.8, 1.6), V(0, 1.5, 2.4), V(0, 1.3, 3.1) }, { 0.45, 0.34, 0.22 }, H)
 	end
 
-	-- Mossgiant: a huge bark-brown giant grown over with moss, a crack of
-	-- its element's light across its chest, lichen in its colour.
+	-- Mossgiant: a towering stone golem grown over with moss, a small head
+	-- on broad shoulders, a crack of its element's light bursting across its
+	-- chest, arms so long its hooked fingers hang to its knees, lichen in
+	-- its colour.
 	function B.Mossgiant(m, pal, H, H2)
-		local r = root(m, V(1.8, 2.0, 1.4), 2.5)
-		local torso = limb(m, r, "Torso", V(2.0, 2.2, 1.3), CF(0, 3.2, 0), V(0, 2.1, 0), "Body", 1, H)
-		for _, p in { { -0.55, 3.8, -0.62, 0.7, 0.6 }, { 0.6, 2.7, -0.62, 0.6, 0.8 }, { 0.3, 4.05, 0.62, 0.9, 0.5 }, { -0.5, 2.6, 0.62, 0.7, 0.7 } } do
-			make(m, torso, "Moss", V(p[4], p[5], 0.1), CF(p[1], p[2], p[3]), H2)
+		local DEEP = C(56, 86, 42)
+		local function lit(p, name, size, cf)
+			return make(m, p, name, size, cf, pal.Plate, Enum.Material.Neon)
 		end
-		for i, c in { { 0, 0, 0 }, { 0.18, 0.18, 40 }, { -0.2, 0.12, -35 }, { 0.05, -0.22, 75 } } do
-			glow(m, torso, "Crack", V(0.07, 0.5, 0.06), CF(c[1], 3.4 + c[2], -0.66) * A(0, 0, rad(c[3])), pal)
+		local r = root(m, V(1.8, 2.2, 1.4), 2.6)
+		local torso = limb(m, r, "Torso", V(2.2, 1.9, 1.35), CF(0, 3.65, 0.05), V(0, 2.6, 0.05), "Body", 1, H)
+		make(m, torso, "Waist", V(1.6, 0.8, 1.15), CF(0, 2.4, 0.05), H)
+		-- Moss over it: patches on every face, some deep, lichen in its colour.
+		local patches = {
+			{ -0.7, 4.3, -0.69, 0.6, 0.45 }, { 0.75, 3.15, -0.69, 0.45, 0.6 }, { -0.55, 2.55, -0.62, 0.55, 0.4 },
+			{ 0.3, 4.1, 0.73, 0.9, 0.6 }, { -0.5, 3.0, 0.73, 0.7, 0.8 }, { 0.6, 2.5, 0.62, 0.5, 0.45 },
+			{ -0.75, 3.35, -0.69, 0.35, 0.5 }, { 0.55, 4.4, -0.69, 0.55, 0.3 }, { 0.2, 2.25, -0.62, 0.4, 0.3 },
+			{ -0.3, 4.45, 0.73, 0.6, 0.3 },
+		}
+		for i, p in patches do
+			make(m, torso, "Moss", V(p[4], p[5], 0.08), CF(p[1], p[2], p[3]), if i % 2 == 0 then DEEP else H2)
 		end
-		local head = make(m, torso, "Head", V(0.92, 0.95, 0.9), CF(0, 4.78, -0.05), H)
-		make(m, head, "MossCap", V(0.96, 0.3, 0.94), CF(0, 5.3, -0.05), H2)
-		eyes(m, head, 0.2, 4.85, -0.51, V(0.16, 0.1, 0.06), pal)
-		limb(m, head, "Jaw", V(0.66, 0.22, 0.55), CF(0, 4.35, -0.2), V(0, 4.45, 0.05), "Jaw", 1, H2)
 		for _, s in { -1, 1 } do
-			make(m, torso, "Shoulder", V(0.7, 0.4, 0.9), CF(s * 1.15, 4.35, 0), H2)
-			plate(m, torso, "Lichen", V(0.36, 0.1, 0.36), CF(s * 1.15, 4.58, 0.1), pal)
-			local hand = V(s * 1.4, 1.95, -0.15)
-			local p = arm(m, torso, V(s * 1.25, 4.0, 0), V(s * 1.48, 3.0, 0), hand, 0.66, H, H)
-			make(m, p, "Fist", V(0.75, 0.7, 0.75), CF(hand + V(0, -0.3, -0.05)), H2)
-			local l = leg(m, torso, s * 0.55, 2.1, 0.05, 0.72, H, H2, 0, 0.12)
-			plate(m, l, "Lichen", V(0.3, 0.3, 0.1), CF(s * 0.58, 1.2, -0.25), pal)
+			make(m, torso, "Moss", V(0.08, 0.7, 0.8), CF(s * 1.12, 3.4, 0.1), H2)
+		end
+		-- The crack: lines of light out from a point on its chest.
+		local heart = V(0.12, 3.75, -0.7)
+		for i, spec in { { 20, 0.55 }, { 70, 0.45 }, { 125, 0.6 }, { 170, 0.4 }, { 215, 0.5 }, { 265, 0.55 }, { 310, 0.45 }, { 350, 0.35 } } do
+			local a = rad(spec[1])
+			local dir = V(math.cos(a), math.sin(a), 0)
+			lit(torso, "Crack", V(spec[2], 0.07, 0.05), CF(heart + dir * spec[2] / 2) * A(0, 0, a))
+			if i % 3 == 1 then
+				local b = a + rad(35)
+				local from = heart + dir * spec[2]
+				lit(torso, "Crack", V(0.25, 0.06, 0.05), CF(from + V(math.cos(b), math.sin(b), 0) * 0.12) * A(0, 0, b))
+			end
+		end
+		glow(m, torso, "CrackCore", V(0.18, 0.18, 0.05), CF(heart) * A(0, 0, rad(45)), pal)
+		-- A small head on its shoulders, mossed on top.
+		local head = make(m, torso, "Head", V(0.85, 0.9, 0.85), CF(0, 5.05, -0.05), H)
+		make(m, head, "MossCap", V(0.92, 0.22, 0.92), CF(0, 5.55, -0.05), H2)
+		make(m, head, "Moss", V(0.3, 0.35, 0.08), CF(0.25, 5.3, -0.48), H2)
+		make(m, head, "Brow", V(0.86, 0.16, 0.16), CF(0, 5.2, -0.48), H)
+		eyes(m, head, 0.2, 5.08, -0.49, V(0.14, 0.07, 0.05), pal)
+		limb(m, head, "Jaw", V(0.6, 0.2, 0.5), CF(0, 4.62, -0.2), V(0, 4.72, 0.05), "Jaw", 1, H)
+		for _, s in { -1, 1 } do
+			make(m, torso, "Shoulder", V(0.95, 0.75, 1.15), CF(s * 1.35, 4.35, 0.05), H)
+			make(m, torso, "Moss", V(0.85, 0.12, 0.95), CF(s * 1.36, 4.78, 0.05), H2)
+			plate(m, torso, "Lichen", V(0.3, 0.06, 0.3), CF(s * 1.25, 4.86, -0.15), pal)
+			-- An arm hanging to its knees, hooked fingers at the end.
+			local hand = V(s * 1.62, 1.25, -0.1)
+			local p = arm(m, torso, V(s * 1.45, 4.15, 0.05), V(s * 1.7, 2.65, 0.05), hand, 0.72, H, H)
+			make(m, p, "Moss", V(0.1, 0.9, 0.6), CF(s * 2.02, 3.45, 0.05), H2)
+			make(m, p, "Moss", V(0.5, 0.6, 0.1), CF(s * 1.58, 3.55, -0.35), DEEP)
+			make(m, p, "Moss", V(0.5, 0.5, 0.1), CF(s * 1.66, 2.1, -0.3), DEEP)
+			make(m, p, "Moss", V(0.1, 0.55, 0.5), CF(s * 2.0, 1.85, 0.0), H2)
+			make(m, p, "Moss", V(0.08, 0.35, 0.5), CF(s * 2.02, 1.05, -0.1), H2)
+			plate(m, p, "Lichen", V(0.08, 0.3, 0.3), CF(s * 2.08, 2.75, 0.1), pal)
+			make(m, p, "Hand", V(0.75, 0.5, 0.75), CF(hand + V(0, -0.2, 0)), H)
+			for _, z in { -0.22, 0.22 } do
+				local knuckle = hand + V(0, -0.4, z)
+				local tip = knuckle + V(0, -0.5, -0.05)
+				beam(m, p, "Finger", knuckle, tip, 0.2, 0.2, H)
+				beam(m, p, "Finger", tip, tip + V(-s * 0.25, -0.12, 0), 0.16, 0.16, H)
+			end
+			local l = leg(m, torso, s * 0.6, 2.4, 0.05, 0.82, H, H, 0, 0.1)
+			make(m, l, "Moss", V(0.6, 0.55, 0.08), CF(s * 0.63, 1.65, -0.42), if s > 0 then DEEP else H2)
+			make(m, l, "Moss", V(0.08, 0.6, 0.5), CF(s * 1.05, 1.95, 0.05), if s > 0 then H2 else DEEP)
+			plate(m, l, "Lichen", V(0.26, 0.24, 0.06), CF(s * 0.5, 0.75, -0.36), pal)
 		end
 	end
 
@@ -298,37 +403,56 @@ function Half.install(h)
 		)
 	end
 
-	-- Gluttonjaw: a hunched, pot-bellied reptile that is mostly jaw, its
-	-- maw lit inside with its element's light, spines in its colour down
-	-- its back and tail, short arms.
+	-- Gluttonjaw: a hunched, pot-bellied reptile that is mostly mouth, its
+	-- great jaws agape and lit inside with its element's colour, blocky
+	-- teeth all round them, a round pale belly, little arms, glowing spines
+	-- stepping down its back and tail.
 	function B.Gluttonjaw(m, pal, H, H2)
-		local r = root(m, V(1.8, 1.8, 1.8), 2.1)
-		local hunch = CF(0, 2.5, 0.3) * A(rad(-15), 0, 0)
-		local body = limb(m, r, "Body", V(1.8, 2.0, 1.7), hunch, V(0, 1.6, 0.5), "Body", 1, H)
-		make(m, body, "Belly", V(1.5, 1.5, 0.3), hunch * CF(0, -0.25, -0.85), H2)
-		for i = 0, 3 do
-			plate(m, body, "Spine", V(0.14, 0.4, 0.4), hunch * CF(0, 1.05, -0.4 + i * 0.4) * A(rad(45), 0, 0), pal)
+		local function lit(p, name, size, cf)
+			return make(m, p, name, size, cf, pal.Plate, Enum.Material.Neon)
 		end
-		local head = make(m, body, "Head", V(1.3, 0.75, 1.4), CF(0, 3.65, -0.95), H)
-		eyes(m, head, 0.5, 3.85, -1.45, V(0.1, 0.08, 0.1), pal)
-		glow(m, head, "Maw", V(1.12, 0.35, 1.15), CF(0, 3.18, -1.0), pal)
-		make(m, head, "Teeth", V(1.15, 0.12, 0.12), CF(0, 3.25, -1.62), CLAW)
-		local jaw = limb(m, head, "Jaw", V(1.25, 0.4, 1.4), CF(0, 2.86, -0.95), V(0, 3.05, -0.3), "Jaw", 1, H2)
-		make(m, jaw, "Teeth", V(1.1, 0.12, 0.12), CF(0, 3.1, -1.6), CLAW)
+		local r = root(m, V(1.8, 1.6, 1.8), 1.9)
+		local hunch = CF(0, 2.35, 0.4) * A(rad(-12), 0, 0)
+		local body = limb(m, r, "Body", V(1.9, 1.9, 1.8), hunch, V(0, 1.5, 0.45), "Body", 1, H)
+		h.ball(m, body, "Belly", 1.9, V(0, 1.7, -0.05), H2)
+		make(m, body, "Neck", V(1.45, 0.9, 1.2), CF(0, 3.2, -0.15), H)
+		-- The skull, tipped up: its upper jaw, lit along its underside, teeth
+		-- round the rim of it.
+		local skullAt = CF(0, 3.85, -0.95) * A(rad(16), 0, 0)
+		local head = make(m, body, "Skull", V(1.5, 0.75, 1.95), skullAt, H)
+		make(m, head, "Brow", V(1.55, 0.22, 0.5), skullAt * CF(0, 0.45, 0.25), H2)
 		for _, s in { -1, 1 } do
-			local hand = V(s * 0.85, 2.15, -1.1)
-			local p = arm(m, body, V(s * 0.85, 2.8, -0.6), V(s * 0.95, 2.4, -0.85), hand, 0.28, H, H2)
-			h.talons(m, p, hand, 2, 0.24, CLAW)
-			leg(m, body, s * 0.6, 1.6, 0.6, 0.72, H, H2, 3, 0.2)
+			glow(m, head, "Eye", V(0.14, 0.12, 0.14), skullAt * CF(s * 0.62, 0.42, 0.0), pal)
+		end
+		lit(head, "Maw", V(1.25, 0.08, 1.65), skullAt * CF(0, -0.38, -0.1))
+		for i, spot in { { -0.62, -0.75 }, { 0.62, -0.75 }, { -0.62, -0.2 }, { 0.62, -0.2 }, { -0.62, 0.35 }, { 0.62, 0.35 }, { -0.22, -0.92 }, { 0.22, -0.92 } } do
+			make(m, head, "Tooth", V(0.16, 0.22, 0.16), skullAt * CF(spot[1], -0.48, spot[2]), CLAW)
+		end
+		-- The lower jaw, dropped open, lit and toothed the same.
+		local jawAt = CF(0, 3.0, -1.3) * A(rad(-14), 0, 0)
+		local jaw = limb(m, head, "Jaw", V(1.45, 0.42, 1.75), jawAt, V(0, 3.2, -0.45), "Jaw", 1, H)
+		lit(jaw, "Maw", V(1.2, 0.08, 1.5), jawAt * CF(0, 0.22, -0.1))
+		for _, spot in { { -0.6, -0.7 }, { 0.6, -0.7 }, { -0.6, -0.1 }, { 0.6, -0.1 }, { -0.2, -0.85 }, { 0.2, -0.85 } } do
+			make(m, jaw, "Tooth", V(0.15, 0.2, 0.15), jawAt * CF(spot[1], 0.3, spot[2]), CLAW)
+		end
+		-- Spines of its light down its back.
+		for i = 0, 4 do
+			lit(body, "Spine", V(0.16, 0.36 - i * 0.03, 0.36 - i * 0.03), CF(0, 4.15 - i * 0.38, -0.25 + i * 0.42) * A(rad(45), 0, 0))
+		end
+		for _, s in { -1, 1 } do
+			local hand = V(s * 0.95, 2.35, -1.3)
+			local p = arm(m, body, V(s * 0.9, 2.95, -0.75), V(s * 1.05, 2.55, -1.0), hand, 0.26, H, H)
+			h.talons(m, p, hand, 2, 0.22, CLAW)
+			leg(m, body, s * 0.72, 1.5, 0.6, 0.78, H, H2, 3, 0.2)
 		end
 		tail(
 			m,
 			body,
-			{ V(0, 1.9, 1.3), V(0, 1.4, 2.1), V(0, 1.0, 2.8), V(0, 0.7, 3.4) },
-			{ 0.8, 0.6, 0.42 },
+			{ V(0, 1.85, 1.3), V(0, 1.45, 2.1), V(0, 1.05, 2.8), V(0, 0.72, 3.4) },
+			{ 0.85, 0.62, 0.42 },
 			H,
 			function(seg, i, at, w)
-				plate(m, seg, "Spine", V(0.12, 0.3, 0.3), CF(at + V(0, w * 0.55, 0)) * A(rad(45), 0, 0), pal)
+				lit(seg, "Spine", V(0.13, 0.3, 0.3), CF(at + V(0, w * 0.55, 0)) * A(rad(45), 0, 0))
 			end
 		)
 	end

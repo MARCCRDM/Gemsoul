@@ -1578,7 +1578,7 @@ Roster.Moves = {
 		Name = "Crown Aegis",
 		Key = "R",
 		From = "Ice Armor",
-		IconSource = "HeatShield",
+		IconSource = "Supernova",
 		Description = "Hard pressed or crowded: channels its crown into a ward, taking 35% less damage for 4s.",
 		Plan = { Shape = "Ward", Reduce = 0.35, Duration = 4, Power = 1 },
 		When = "Crowd",
