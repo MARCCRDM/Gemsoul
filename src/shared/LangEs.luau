@@ -283,6 +283,7 @@ return {
 	["1v1 PRACTICE"] = "PRÁCTICA 1v1",
 	["A rival miner with their own random kit. Coins on a win."] = "Un minero rival con su propio equipo al azar. Monedas si ganas.",
 	["MORE MODES"] = "MÁS MODOS",
+	["Pick a mode. Every win pays."] = "Elige un modo. Cada victoria paga.",
 	["BOUNTY BOARD"] = "TABLÓN DE RECOMPENSAS",
 	["RIFT BOSSES  ·  ALONE OR WITH YOUR PARTY"] = "JEFES DE LA GRIETA  ·  SOLO O CON TU GRUPO",
 	["OPEN  ›"] = "ABRIR  ›",

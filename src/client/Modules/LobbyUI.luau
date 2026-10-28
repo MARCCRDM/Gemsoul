@@ -48,13 +48,13 @@ LobbyUI.Unlocks = { Dungeon = 3, Casual = 3, Ranked = 10 }
 LobbyUI.DungeonsOpen = not (Config.Features and Config.Features.Dungeons == false)
 -- Key art for each card (assets/images/lobby/*.png, painted by
 -- tools/make_lobby_cards.py). 0 = not uploaded yet: the card shows its emblem.
--- Casual reuses the duel art (same fight, nothing on the line).
+-- Casual has none: it shows your own miner, in 3D, in the suit you wear
+-- (casualScene), so no two cards share a picture.
 LobbyUI.Art = {
 	Duel = 104755259743768,
 	Dungeon = 85958638729400,
 	Ranked = 108455735818338,
 }
-LobbyUI.Art.Casual = LobbyUI.Art.Duel
 
 local GREEN = Color3.fromRGB(62, 220, 120)
 local RED = Color3.fromRGB(232, 72, 72)
@@ -132,15 +132,22 @@ local function heading(value, color, x, align)
 	l.Position, l.Size, l.ZIndex = UDim2.fromOffset(x, 0), UDim2.fromOffset(420, 44), 21
 	return l
 end
-heading("VS PLAYERS", RED, 0, Enum.TextXAlignment.Left)
-heading("MORE MODES", P.Text, 700, Enum.TextXAlignment.Right)
+-- The title, plain, and a line under it: the cards say the rest.
+do
+	local title = heading("PLAY", P.Text, 0, Enum.TextXAlignment.Left)
+	title.TextSize, title.TextStrokeTransparency = 30, 1
+	title.Size = UDim2.fromOffset(420, 36)
+	local line = text(stage, "Pick a mode. Every win pays.", 13, P.Dim, IronUi.Body, Enum.TextXAlignment.Left)
+	line.Position, line.Size, line.ZIndex = UDim2.fromOffset(0, 34), UDim2.fromOffset(420, 18), 21
+	line.TextStrokeTransparency = 1
+end
 -- Auto queue (Shared.AutoQueue): on call for 1v1s while you're in the
 -- lobby, asked when a queue needs an opponent. The player's
 -- DuelAuto attribute says where it stands; the switch asks the server.
 local AutoQueue = require(game:GetService("ReplicatedStorage").Shared.AutoQueue)
 local autoButton = new("TextButton", {
-	Position = UDim2.fromOffset(440, 4),
-	Size = UDim2.fromOffset(240, 32),
+	Position = UDim2.fromOffset(1120 - 220, 2),
+	Size = UDim2.fromOffset(220, 30),
 	Text = "",
 	BackgroundColor3 = Color3.fromRGB(20, 25, 37),
 	AutoButtonColor = true,
@@ -148,11 +155,12 @@ local autoButton = new("TextButton", {
 }, stage)
 UiKit.round(autoButton, 16)
 local autoRim = new("UIStroke", { Color = GREEN, Thickness = 1.5 }, autoButton)
-local autoLabel = text(autoButton, "", 14, P.Text, IronUi.Heading)
+local autoLabel = text(autoButton, "", 13, P.Text, IronUi.Heading)
 autoLabel.Size, autoLabel.ZIndex = UDim2.fromScale(1, 1), 22
 autoLabel.TextStrokeTransparency = 1
-local autoSub = text(stage, "", 10, P.Dim, IronUi.Heading)
-autoSub.Position, autoSub.Size, autoSub.ZIndex = UDim2.fromOffset(400, 38), UDim2.fromOffset(320, 16), 21
+local autoSub = text(stage, "", 10, P.Dim, IronUi.Heading, Enum.TextXAlignment.Right)
+autoSub.Position, autoSub.Size, autoSub.ZIndex = UDim2.fromOffset(1120 - 340, 36), UDim2.fromOffset(340, 16), 21
+autoSub.TextStrokeTransparency = 1
 local function autoOn(): boolean
 	local value = player:GetAttribute("DuelAuto")
 	return if value == nil then AutoQueue.Default else value == true
@@ -171,15 +179,6 @@ autoButton.Activated:Connect(function()
 end)
 player:GetAttributeChangedSignal("DuelAuto"):Connect(refreshAuto)
 refreshAuto()
--- The divider between Ranked and the other modes.
-new("Frame", {
-	Position = UDim2.fromOffset(806, 60),
-	Size = UDim2.fromOffset(2, 440),
-	BackgroundColor3 = RED,
-	BackgroundTransparency = 0.6,
-	BorderSizePixel = 0,
-	ZIndex = 21,
-}, stage)
 
 local cards = {}
 local function card(spec)
@@ -198,16 +197,23 @@ local function card(spec)
 		Color = ColorSequence.new(spec.Color:Lerp(CARD, 0.62), CARD),
 	}, b)
 	local big = spec.H > 300
-	local artId = LobbyUI.Art[spec.Art] or 0
-	if artId ~= 0 then
-		local art = new("ImageLabel", {
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://" .. artId,
-			ScaleType = Enum.ScaleType.Crop,
-			ZIndex = 21,
-		}, b)
-		UiKit.round(art, 10)
+	local artId = spec.Art and LobbyUI.Art[spec.Art] or 0
+	-- (A scene is the card's art drawn in the game: Casual's miner.)
+	local hasArt = artId ~= 0 or spec.Scene ~= nil
+	if spec.Scene then
+		spec.Scene(b)
+	end
+	if hasArt then
+		if artId ~= 0 then
+			local art = new("ImageLabel", {
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+				Image = "rbxassetid://" .. artId,
+				ScaleType = Enum.ScaleType.Crop,
+				ZIndex = 21,
+			}, b)
+			UiKit.round(art, 10)
+		end
 		-- A dark wash where the words sit: the bottom of a tall card, the
 		-- left of a wide one.
 		local shade = new("Frame", {
@@ -232,16 +238,16 @@ local function card(spec)
 	end
 	local emblem, kicker, title
 	if big then
-		-- Tall card: the emblem up top, the words at the bottom, centred.
-		local center = Enum.TextXAlignment.Center
+		-- Tall card: the emblem up top, the words at the foot, from the left
+		-- (the queue's count has the bottom right).
+		local left = Enum.TextXAlignment.Left
 		emblem = IronUi.emblem(b, spec.Emblem, spec.Color, 120)
 		emblem.Position = UDim2.fromOffset((spec.W - 120) / 2, 80)
-		kicker = UiKit.fit(
-			place(text(b, spec.Kicker, 22, spec.Color, IronUi.Heading), 12, spec.H - 150, spec.W - 24, 26, center)
-		)
-		UiKit.fit(place(text(b, spec.Title, 40, P.Text, IronUi.Heading), 12, spec.H - 122, spec.W - 24, 50, center))
-		local sub = place(text(b, spec.Sub, 14, P.Dim, IronUi.Body), 20, spec.H - 66, spec.W - 40, 40, center)
+		kicker = UiKit.fit(place(text(b, spec.Kicker, 16, spec.Color, IronUi.Heading), 30, spec.H - 146, spec.W - 60, 22, left))
+		UiKit.fit(place(text(b, spec.Title, 44, P.Text, IronUi.Heading), 28, spec.H - 124, spec.W - 60, 52, left))
+		local sub = place(text(b, spec.Sub, 14, P.Dim, IronUi.Body), 30, spec.H - 66, spec.W - 250, 40, left)
 		sub.TextWrapped = true
+		sub.TextYAlignment = Enum.TextYAlignment.Top
 	else
 		-- Wide card: the emblem on the left, the words beside it.
 		local left = Enum.TextXAlignment.Left
@@ -258,8 +264,8 @@ local function card(spec)
 		end
 	end
 	-- The art says it already.
-	emblem.Visible = artId == 0
-	if artId ~= 0 and not big then
+	emblem.Visible = not hasArt
+	if hasArt and not big then
 		-- Words where the emblem was.
 		for _, child in b:GetChildren() do
 			if child:IsA("TextLabel") then
@@ -269,6 +275,14 @@ local function card(spec)
 		-- (The one-line words take the room too, so they keep their size.)
 		kicker.Size += UDim2.fromOffset(96, 0)
 		title.Size += UDim2.fromOffset(96, 0)
+		-- (A scene stands on the right: the words keep to its left.)
+		if spec.Scene then
+			for _, child in b:GetChildren() do
+				if child:IsA("TextLabel") then
+					child.Size = UDim2.fromOffset(math.min(child.Size.X.Offset, spec.W - 26 - 128), child.Size.Y.Offset)
+				end
+			end
+		end
 	end
 	-- What a win pays, in a corner; for the player queues, who's searching
 	-- right now (their DuelQueue attribute), bottom right.
@@ -370,9 +384,33 @@ if LobbyUI.DungeonsOpen then
 		end,
 	})
 end
+-- Casual's picture: your own miner, turning slowly in the suit you wear
+-- (CosmeticView), on the right of the card, a teal glow behind.
+local function casualScene(b: GuiObject)
+	local glow = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -80, 0.55, 0),
+		Size = UDim2.fromOffset(136, 136),
+		BackgroundColor3 = P.Teal,
+		BackgroundTransparency = 0.86,
+		ZIndex = 20,
+	}, b)
+	UiKit.round(glow, 999)
+	local holder = new("Frame", {
+		Name = "Miner",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -6, 0, 6),
+		Size = UDim2.new(0, 150, 1, -12),
+		BackgroundTransparency = 1,
+		ZIndex = 21,
+	}, b)
+	local profile = GemClient.Profile
+	local suit = profile and profile.Cosmetics and profile.Cosmetics.Suit or "SuitFrontier"
+	require(script.Parent.CosmeticView).attach(holder, suit, true)
+end
 card({
 	Title = "1v1 CASUAL",
-	Art = "Casual",
+	Scene = casualScene,
 	Kicker = "NO RATING",
 	Sub = "Real players, your current stats. Just for the fight.",
 	Emblem = "Equipment",
@@ -419,8 +457,17 @@ do
 		ZIndex = 21,
 	}, stage)
 	UiKit.round(bounty, 10)
-	new("UIGradient", { Rotation = 0, Color = ColorSequence.new(EMBER:Lerp(CARD, 0.55), CARD) }, bounty)
-	local rim = new("UIStroke", { Color = EMBER, Thickness = 2, Transparency = 0.3 }, bounty)
+	-- (dark, like the cards, with an ember edge on the left: not a slab of orange)
+	new("UIGradient", { Rotation = 0, Color = ColorSequence.new(EMBER:Lerp(CARD, 0.8), CARD) }, bounty)
+	local rim = new("UIStroke", { Color = EMBER, Thickness = 1.5, Transparency = 0.55 }, bounty)
+	local edge = new("Frame", {
+		Position = UDim2.fromOffset(0, 8),
+		Size = UDim2.new(0, 4, 1, -16),
+		BackgroundColor3 = EMBER,
+		BorderSizePixel = 0,
+		ZIndex = 22,
+	}, bounty)
+	UiKit.round(edge, 2)
 	local name = text(bounty, "BOUNTY BOARD", 20, P.Text, IronUi.Heading)
 	name.Position, name.Size, name.ZIndex = UDim2.fromOffset(20, 0), UDim2.fromOffset(220, 44), 22
 	name.TextXAlignment = Enum.TextXAlignment.Left
@@ -432,10 +479,10 @@ do
 	go.Position, go.Size, go.ZIndex = UDim2.new(1, -20, 0, 0), UDim2.fromOffset(120, 44), 22
 	go.TextXAlignment = Enum.TextXAlignment.Right
 	bounty.MouseEnter:Connect(function()
-		rim.Thickness, rim.Transparency = 3, 0
+		rim.Thickness, rim.Transparency = 2, 0.1
 	end)
 	bounty.MouseLeave:Connect(function()
-		rim.Thickness, rim.Transparency = 2, 0.3
+		rim.Thickness, rim.Transparency = 1.5, 0.55
 	end)
 	bounty.Activated:Connect(function()
 		LobbyUI.closePicker()
