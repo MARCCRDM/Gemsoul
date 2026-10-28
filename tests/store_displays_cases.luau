@@ -162,7 +162,7 @@ local solids = {}
 for _, d in shelter:GetDescendants() do
 	if d:IsA("BasePart") and d.CanCollide then
 		local low, high = box(d)
-		if high.Y > 1 and low.X < -50 and high.Z > -20 and low.Z < 34 then
+		if high.Y > 1 and low.X < -50 and high.Z > -20 and low.Z < 58 then
 			table.insert(solids, { d.Name, low, high })
 		end
 	end
@@ -170,7 +170,7 @@ end
 check(#solids >= 3, "The Store's counter and walls weren't found")
 
 -- What the Store sells, and what each stand shows.
-local kinds = { Helmet = 3, Skin = 3, Pick = 3, Suit = 2 }
+local kinds = { Helmet = 4, Skin = 4, Pick = 4, Suit = 6 }
 local count = {}
 for _, stand in Store.Stands do
 	count[stand.Kind] = (count[stand.Kind] or 0) + 1
@@ -284,7 +284,7 @@ for _, d in displays.Model:GetDescendants() do
 		check(quiet(d), d.Name .. " can be bumped, clicked or casts a shadow")
 	end
 end
-check(standParts <= 60, "The stands are too many parts: " .. standParts)
+check(standParts <= 110, "The stands are too many parts: " .. standParts)
 
 -- Every stand dressed: each thing on its stand, facing the hall, at its
 -- kind's size, out of the wall, the counter and the crew's way, at every
@@ -338,7 +338,11 @@ for i, shown in displays.Stands do
 			)
 		end
 		check(low.Y >= 0.86 - 0.05 and high.Y < 14.5, spec.Kind .. " goes through the floor or the booth's roof")
-		check(low.X > -84 and high.X < -56 and low.Z > -13 and high.Z < 25, spec.Kind .. " strays from the Store")
+		if spec.Group == "Market" then
+			check(low.X > -67 and high.X < -50 and low.Z > 24 and high.Z < 56, spec.Kind .. " strays from the Market")
+		else
+			check(low.X > -84 and high.X < -56 and low.Z > -13 and high.Z < 25, spec.Kind .. " strays from the Store")
+		end
 	end
 	-- Its size: the kind's height (a suit life size, never over 6.5).
 	Store.pose(displays, 0)
@@ -420,5 +424,5 @@ print(
 		.. checks
 		.. " Store display checks ("
 		.. standParts
-		.. " stand parts; 3 helmets, 3 weapon skins, 3 picks and 2 suits, every one on sale coming round)"
+		.. " stand parts; 4 helmets, 4 weapon skins, 4 picks and 6 suits, every one on sale coming round)"
 )

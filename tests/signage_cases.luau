@@ -143,9 +143,11 @@ for _, place in { { "the Outpost", site.Model }, { "the arena hall", pit } } do
 		check(count == 1 or not worded, "A sign with a line under its name: " .. entry.Text)
 	end
 end
--- The places that keep a word, each once (a bay's number, each bay).
+-- The places that keep a word, each once (a bay's number, each bay; the
+-- Store and the Market their lightbox and a blade sign at each end, read
+-- from both sides).
 for word, times in {
-	SHELTER = 1, QUARRY = 1, ARENA = 2, STORE = 1, MARKET = 1, INFO = 2,
+	SHELTER = 1, QUARRY = 1, ARENA = 2, STORE = 5, MARKET = 5, INFO = 2,
 } do
 	check(seen[word] == times, string.format("%s is on %d signs, not %d", word, seen[word] or 0, times))
 end

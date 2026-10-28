@@ -43,7 +43,37 @@ in them.
 - Three crates of gear by its south corner, near Tamsin, banded in the
   Market's green.
 
+## The makeover (2026-10-28)
+
+![Both, before and now](shopfronts/makeover-both.jpg)
+
+![The Store, before and now](shopfronts/makeover-store.jpg)
+
+![The Market, before and now](shopfronts/makeover-market.jpg)
+
+These renders do include the Store's stands. Their things are grey
+stand-ins (the test's previews); in the game each is the Shop's own
+dressed preview.
+
+- **A marquee of warm bulbs** round each lightbox, 15 along the top and
+  bottom and three down each side.
+- **Two blade signs** per shop, standing out from the fascia at each end
+  on a bracket, the shop's word on both faces in its colour, each with
+  its own light. You can read which is which walking along the wall.
+- **The mat** has lit edges in the shop's colour, and the column strips
+  are twice as wide.
+- **More on show** (`Client.StoreDisplays`): the back wall is four
+  helmets, four weapon skins and four picks wide (was three), and six
+  suits turn instead of two, four round the Store and two in front of the
+  Market. 18 cosmetics on show, up from 11, all still the Shop's own and
+  changing on the turn.
+
 Tested in `tests/signage_cases.luau`:
 
 - both lightboxes are lit in a colour of their own, with a white word;
-- no candle board (`PriceBoard`) on the Market's counter.
+- no candle board (`PriceBoard`) on the Market's counter;
+- STORE and MARKET each on five signs: the lightbox and both faces of
+  its two blade signs.
+
+And in `tests/store_displays_cases.luau`: four of each on the wall, six
+suits, the Market's two kept to the Market and clear of Tamsin and Borin.

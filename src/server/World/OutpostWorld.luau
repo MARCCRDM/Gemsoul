@@ -2064,7 +2064,7 @@ local function shelter(parent, at: CFrame, rules)
 			solid(part(m, at3(x - 0.4, 7.9, z + dz), Vector3.new(1.6, 15.8, 1.6), HULL_DARK, Enum.Material.Metal))
 			part(m, at3(x - 0.4, 1.3, z + dz), Vector3.new(2, 1, 2), ARMOR, Enum.Material.Metal)
 			-- (its colour lit down the column's face)
-			part(m, at3(x + 0.42, 8.4, z + dz), Vector3.new(0.06, 12, 0.32), look.Glow, Enum.Material.Neon)
+			part(m, at3(x + 0.42, 8.4, z + dz), Vector3.new(0.06, 12, 0.6), look.Glow, Enum.Material.Neon)
 		end
 		part(m, at3(x - 0.4, 17.6, z), Vector3.new(1.6, 4.8, 22.6), HULL_DARK, Enum.Material.Metal)
 		-- The lightbox, on the fascia's face, lighting the front in its colour.
@@ -2174,6 +2174,62 @@ local function shelter(parent, at: CFrame, rules)
 			local lamp = part(m, at3(-W + 10, 14.55, z + dz), Vector3.new(2, 0.12, 2), Color3.fromRGB(255, 240, 220), Enum.Material.Neon)
 			light(lamp, Color3.fromRGB(255, 236, 214), 18, 1.1, true)
 		end
+		-- The marquee: warm bulbs all round the lightbox, a showman's frame
+		-- that reads from across the hall.
+		local BULB = Color3.fromRGB(255, 226, 150)
+		for i = 0, 14 do
+			local dz = -10 + i * (20 / 14)
+			for _, y in { 15.35, 19.85 } do
+				part(m, at3(x + 0.72, y, z + dz), Vector3.new(0.42, 0.42, 0.42), BULB, Enum.Material.Neon, "Ball")
+			end
+		end
+		for _, dz in { -10.35, 10.35 } do
+			for k = 1, 3 do
+				part(m, at3(x + 0.72, 15.35 + k * 1.125, z + dz), Vector3.new(0.42, 0.42, 0.42), BULB, Enum.Material.Neon, "Ball")
+			end
+		end
+		-- Blade signs: one on each side, standing out into the hall from the
+		-- fascia's ends, the shop's word lit on both faces, so it reads from
+		-- along the wall as well as from in front.
+		for _, side in { -1, 1 } do
+			local blade = part(m, facing(x + 3.4, 11.6, z + side * 11.75, 0, 1), Vector3.new(5.4, 2.6, 0.3), HULL_DARK, Enum.Material.Metal)
+			blade.Name = word .. "Blade"
+			part(m, at3(x + 0.9, 13.4, z + side * 11.75), Vector3.new(1.4, 1, 0.5), HULL_DARK, Enum.Material.Metal) -- (its bracket)
+			for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+				local bladeGui = Instance.new("SurfaceGui")
+				bladeGui.Face = face
+				bladeGui.CanvasSize = Vector2.new(5.4 * 50, 2.6 * 50)
+				bladeGui.LightInfluence = 0
+				bladeGui.Brightness = 1.5
+				bladeGui.Parent = blade
+				local plate = Instance.new("Frame")
+				plate.Size = UDim2.fromScale(1, 1)
+				plate.BorderSizePixel = 0
+				plate.BackgroundColor3 = look.Face
+				plate.Parent = bladeGui
+				local rim = Instance.new("UIStroke")
+				rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+				rim.Color = look.Glow
+				rim.Thickness = 5
+				rim.Parent = plate
+				local bladeWord = Instance.new("TextLabel")
+				bladeWord.BackgroundTransparency = 1
+				bladeWord.Position = UDim2.fromScale(0.06, 0.14)
+				bladeWord.Size = UDim2.fromScale(0.88, 0.72)
+				bladeWord.Text = word
+				bladeWord.TextScaled = true
+				bladeWord.Font = Enum.Font.GothamBlack
+				bladeWord.TextColor3 = Color3.new(1, 1, 1)
+				bladeWord.Parent = plate
+			end
+			light(blade, look.Glow, 12, 0.8)
+		end
+		-- The mat lit round its edge in the shop's colour, a runway to the
+		-- counter.
+		for _, dz in { -7.75, 7.75 } do
+			part(m, at3(x + 5, 0.93, z + dz), Vector3.new(6.4, 0.04, 0.12), look.Glow, Enum.Material.Neon)
+		end
+		part(m, at3(x + 8.2, 0.93, z), Vector3.new(0.12, 0.04, 15.6), look.Glow, Enum.Material.Neon)
 		return counter, look
 	end
 	-- (Its stands of suits, helmets, picks and skins are the client's:

@@ -66,9 +66,14 @@ The three glowing orbs behind the counter are gone. In their place
 
 | Where | What |
 | --- | --- |
-| A lit back wall behind the counter | Three helmets on the top shelf, turned to show their shape. Three weapon skins hung on the slant under them. |
-| Plinths between the counter and the wall | Three pickaxes, turning, so you see the head in profile as they come round. |
-| Turntables either side of the counter | Two suits, life size, turning. |
+| A lit back wall behind the counter | Four helmets on the top shelf, turned to show their shape. Four weapon skins hung on the slant under them. |
+| Plinths between the counter and the wall | Four pickaxes, turning, so you see the head in profile as they come round. |
+| Turntables in front of the Store | Four suits, life size, turning: two either side of the counter. |
+| Turntables in front of the Market | Two more suits, one by each of its columns. |
+
+*2026-10-28:* the wall went from three to four of each, and the suits from
+two to six (four round the Store, two by the Market), so 18 things are on
+show instead of 11. See [shopfronts.md](shopfronts.md#the-makeover-2026-10-28).
 
 - **They're the real things.** Each stand shows the Shop's own 3D preview
   of the cosmetic: the same model the Shop shows, the way it looks when
@@ -141,7 +146,8 @@ clock, so everyone sees the same:
   while you're in the Outpost.
   - **The Store's stands:** 32 parts, plus whatever they show. That's
     about 900 parts with two suits up, since a suit is a whole dressed
-    mannequin.
+    mannequin; with the six suits of 2026-10-28, nearer 2,500. The
+    turntables move them all in one `BulkMoveTo` a frame.
     - They're drawn only within 200 studs of the Store, and turn only
       within 90.
     - They change one stand at a time.
@@ -155,7 +161,7 @@ clock, so everyone sees the same:
 
 | Suite | What it covers |
 | --- | --- |
-| `tests/run_store_displays.py` (new) | Three helmet, three skin, three pick and two suit stands. Only what's on sale, each coming round, never two alike at once, changing only on the turn. Each preview placed on its stand at its kind's size, facing the hall, wherever the server built it. Clear of the back wall, the counter, the Shelter's walls and the crew, at every turn of the turntables. Turntables never meet. Plates name and price it. Nothing clickable, solid or shadowed. |
+| `tests/run_store_displays.py` (new) | Four helmet, four skin, four pick and six suit stands (three, three, three and two before 2026-10-28; the Market's two kept to the Market). Only what's on sale, each coming round, never two alike at once, changing only on the turn. Each preview placed on its stand at its kind's size, facing the hall, wherever the server built it. Clear of the back wall, the counter, the Shelter's walls and the crew, at every turn of the turntables. Turntables never meet. Plates name and price it. Nothing clickable, solid or shadowed. |
 | `tests/run_quarry_life.py` (new) | Road lights on the server's roads, off the ramps and the ring crossing, in their bands' colours, pulsing outward. The lifter resting on the pad, hovering at the outpost, never jumping or spinning, clear of everything standing and high over the Shelter. Searchlights well up and sweeping. Meteors every shower, high and falling. Dust devils in the basin. Vents clear of rocks and roads, one at a time. Spires on the top bench, off the ramps. Ore on the conveyor. The part budget. |
 | `tests/run_outpost.py` | The five crew members built where the Shelter puts them: in the hall, on the floor, clear of the spawn, the Uplink's pad, the counters and each other. Every option a reply or an action the dialogue has. |
 | `tests/run_moon_quarry_scene.py` | The scenery budget (3,988 of 4,000) |

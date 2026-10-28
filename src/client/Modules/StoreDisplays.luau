@@ -5,12 +5,13 @@
 	(ReplicatedStorage.CosmeticPreviews, Server Equipment.cosmeticPreview),
 	so a stand looks just as the cosmetic does when worn.
 
-	  the wall     a lit back wall behind the counter: three helmets on the
-	               top shelf, three weapon skins hung under them
-	  the picks    three pickaxes turning on plinths between the counter and
+	  the wall     a lit back wall behind the counter: four helmets on the
+	               top shelf, four weapon skins hung under them
+	  the picks    four pickaxes turning on plinths between the counter and
 	               the wall
-	  the suits    two mannequins on turntables either side of the counter,
-	               each wearing a suit
+	  the suits    four mannequins on turntables out in the hall, two either
+	               side of the Store, and two more by the Market (Group
+	               "Market"), each wearing a suit
 
 	Every Every seconds (the suits every SuitEvery, turning faster too)
 	each stand moves on to the next of its kind that the Store sells (by the server's clock: everyone sees the same), so over
@@ -91,10 +92,21 @@ export type Stand = {
 	Every: number?,
 	Plate: CFrame,
 	PlateSize: Vector3,
+	Group: string, -- "Store", or "Market" (the suits by the Market)
 }
 StoreDisplays.Stands = {} :: { Stand }
 local WALL = -83.4 -- the face of the lit back wall
-local ROWS = { 0.5, 6, 11.5 } -- the wall's three columns, and the picks' plinths
+local ROWS = { -1.2, 3.6, 8.4, 13.2 } -- the wall's four columns, and the picks' plinths
+-- The suits' turntables: four round the Store, two by the Market (clear of
+-- the Market's mat, Tamsin and the Gem Gallery).
+StoreDisplays.SuitSpots = {
+	{ At = V(-62, 0, -10.5), Group = "Store" },
+	{ At = V(-62, 0, -4.5), Group = "Store" },
+	{ At = V(-62, 0, 16.5), Group = "Store" },
+	{ At = V(-62, 0, 22.5), Group = "Store" },
+	{ At = V(-62, 0, 29.5), Group = "Market" },
+	{ At = V(-62, 0, 48.5), Group = "Market" },
+}
 do
 	local hall = V(1, 0, 0)
 	local function add(spec)
@@ -111,6 +123,7 @@ do
 			Every = spec.Every,
 			Plate = facing(plate, plate + hall),
 			PlateSize = spec.PlateSize,
+			Group = spec.Group or "Store",
 		})
 	end
 	for k, z in ROWS do
@@ -119,7 +132,7 @@ do
 		add({
 			Kind = "Helmet",
 			Slot = k,
-			Slots = 3,
+			Slots = #ROWS,
 			Foot = V(WALL + 0.95, 11.32, z),
 			Height = 2.5,
 			Back = true,
@@ -130,7 +143,7 @@ do
 		add({
 			Kind = "Skin",
 			Slot = k,
-			Slots = 3,
+			Slots = #ROWS,
 			Foot = V(WALL + 0.12, 8.85, z),
 			Height = 4.2,
 			Back = true,
@@ -146,7 +159,7 @@ do
 		add({
 			Kind = "Pick",
 			Slot = k,
-			Slots = 3,
+			Slots = #ROWS,
 			Foot = V(-76, FLOOR + 2.6, z),
 			Height = 3.4,
 			Turn = 0.5,
@@ -157,17 +170,18 @@ do
 	-- The suits, life size on turntables either side of the counter, out
 	-- in the hall: the suit alone (no sword or shield: Server Equipment's
 	-- preview), turning briskly and changing often.
-	for k, z in { -8, 20 } do
+	for k, spot in StoreDisplays.SuitSpots do
 		add({
 			Kind = "Suit",
 			Slot = k,
-			Slots = 2,
-			Foot = V(-62, FLOOR + 0.7, z),
+			Slots = #StoreDisplays.SuitSpots,
+			Foot = V(spot.At.X, FLOOR + 0.7, spot.At.Z),
 			Height = nil,
 			Turn = 0.9,
 			Every = StoreDisplays.SuitEvery,
-			PlateAt = V(-58.6, FLOOR + 1.3, z),
+			PlateAt = V(spot.At.X + 3.4, FLOOR + 1.3, spot.At.Z),
 			PlateSize = V(2.8, 0.75, 0.1),
+			Group = spot.Group,
 		})
 	end
 end
@@ -315,16 +329,17 @@ function StoreDisplays.build(at: CFrame): Displays
 		)
 	end
 	-- The suits' turntables, a steel rim round each, lit warm.
-	for _, z in { -8, 20 } do
+	for _, spot in StoreDisplays.SuitSpots do
+		local sx, z = spot.At.X, spot.At.Z
 		put(
-			CFrame.new(-62, FLOOR + 0.35, z) * CFrame.Angles(0, 0, math.rad(90)),
+			CFrame.new(sx, FLOOR + 0.35, z) * CFrame.Angles(0, 0, math.rad(90)),
 			V(0.7, 4.6, 4.6),
 			DARK,
 			Enum.Material.Metal,
 			"Cylinder"
 		)
 		local rim = put(
-			CFrame.new(-62, FLOOR + 0.06, z) * CFrame.Angles(0, 0, math.rad(90)),
+			CFrame.new(sx, FLOOR + 0.06, z) * CFrame.Angles(0, 0, math.rad(90)),
 			V(0.12, 5, 5),
 			STEEL,
 			Enum.Material.Metal,
@@ -336,7 +351,7 @@ function StoreDisplays.build(at: CFrame): Displays
 		glow.Brightness = 0.6
 		glow.Parent = rim
 		-- (its plate on a short post in front)
-		put(CFrame.new(-58.6, FLOOR + 0.5, z), V(0.24, 1, 0.24), STEEL, Enum.Material.Metal)
+		put(CFrame.new(sx + 3.4, FLOOR + 0.5, z), V(0.24, 1, 0.24), STEEL, Enum.Material.Metal)
 	end
 	local stands = {}
 	for i, spec in StoreDisplays.Stands do
