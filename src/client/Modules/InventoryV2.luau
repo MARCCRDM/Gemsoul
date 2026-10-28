@@ -435,6 +435,7 @@ end
 
 -- Art --------------------------------------------------------------------------------------------------
 
+local previewAskedAt = -math.huge
 local function gearArt(holder: Instance, slot: string, id: string, worn: boolean, color: Color3)
 	clear(holder)
 	local view = new("ViewportFrame", {
@@ -444,9 +445,19 @@ local function gearArt(holder: Instance, slot: string, id: string, worn: boolean
 		LightColor = Color3.new(1, 1, 1),
 		LightDirection = Vector3.new(-0.4, -0.8, -0.6),
 	}, holder)
-	local ok, drawn = pcall(GearArt.draw, view, slot, id, worn)
+	-- Always the piece in its own look (the server's previews, built bare:
+	-- never the skin or suit worn over it), the worn ones too; a weapon put
+	-- away for the pick still has its picture. Not built yet: asked for,
+	-- and the drawn icon meanwhile.
+	local ok, drawn = pcall(GearArt.draw, view, slot, id, false)
 	if not (ok and drawn) then
 		view:Destroy()
+		if worn and os.clock() - previewAskedAt > 4 then
+			previewAskedAt = os.clock()
+			task.spawn(function()
+				pcall(GemClient.request, "GearPreviews")
+			end)
+		end
 		local gear = gearOf(loadoutNow(), slot, id)
 		if gear then
 			local okIcon, icon = pcall(GearArt.icon, holder, slot, gear, color)
@@ -4689,6 +4700,8 @@ local function watchStore(store: Instance)
 end
 local function watchPreviews(store: Instance)
 	store.ChildAdded:Connect(function()
+		-- (the worn slots redraw from it too)
+		gearChanged()
 		if state.Tab == "Pieces" then
 			gridKey = ""
 			draw()

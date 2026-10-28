@@ -3053,7 +3053,8 @@ function Equipment.showTitle(character: Model, title)
 end
 
 -- Item previews ----------------------------------------------------------------------------
--- Spare equipment is shown in the Armory as the real 3D item: each one is
+-- Equipment is shown in the Armory as the real 3D item (spare and worn, in
+-- its own look, without the skin or suit you wear over it): each one is
 -- built on a plain mannequin by the same code that dresses players, then its
 -- parts are stored (relative to the mannequin) in a hidden ScreenGui in the
 -- owner's PlayerGui, which only that player receives.
@@ -3354,15 +3355,24 @@ function Equipment.previews(player: Player): boolean
 	for _, slot in Slots.Order do
 		local kind = Slots.Definitions[slot].Kind
 		for id, quality in profile.Owned[kind] or {} do
-			if id ~= loadout[slot] and Classes.gear(loadout.Class, kind, id) then
+			if Classes.gear(loadout.Class, kind, id) then
+				-- (the worn piece too: the Inventory's slots show its own look,
+				-- never the skin or suit it's wearing, and a weapon put away
+				-- for the pick still has its picture)
+				local worn = id == loadout[slot]
 				local gems = loadout.ItemGems and loadout.ItemGems[slot]
+				local gem = if worn then loadout[slot .. "Gem"] else gems and gems[id]
+				local key = previewKey(loadout, slot, id, quality)
+				if worn then
+					key ..= "|worn:" .. (if gem then gem.Element .. tostring(gem.Id) else "-")
+				end
 				wanted[slot .. "|" .. id] = {
 					Slot = slot,
 					Id = id,
 					Quality = quality,
 					Roll = GearRolls.get(loadout, slot, id),
-					Gem = gems and gems[id],
-					Key = previewKey(loadout, slot, id, quality),
+					Gem = gem,
+					Key = key,
 				}
 			end
 		end
