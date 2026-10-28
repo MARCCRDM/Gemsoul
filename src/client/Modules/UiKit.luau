@@ -132,6 +132,55 @@ function UiKit.clearTopbar(screen: Vector2, size: Vector2): (number, UDim2)
 	return below, UDim2.new(0.5, 0, 0.5, (top - 8) / 2)
 end
 
+-- The screens that cover the play view (by their ScreenGui's name): the
+-- Inventory, the Store, the big windows. What sits over the play view steps
+-- aside while one is up: PartyUI's teammate bars, SocialUI's queue tab (on a
+-- phone it sat on the Store's coins and its close button).
+UiKit.Covers = {
+	Dashboard = true, Shop = true, Season = true, AugmentTree = true, SurgeArray = true,
+	Social = true, WelcomeBundle = true, Welcome = true, Intro = true, Tutorial = true,
+	MarketBoard = true, ChallengeChooser = true, Character = true, Party = true,
+	Referral = true, TopPlayers = true, EquipmentTrade = true, KaijuPanel = true,
+	Rift = true, Guide = true, GemPouch = true, KaijuRoll = true, KaijuPit = true,
+	KennelSale = true,
+}
+local coverWatch = nil -- { Up = { [ScreenGui]: true }, Listeners = { fn } }
+-- Calls `fn(covered)` now, and again each time one of them opens or closes.
+function UiKit.watchCovers(fn: (boolean) -> ())
+	if not coverWatch then
+		local watch = { Up = {}, Listeners = {} }
+		coverWatch = watch
+		local function tell()
+			local covered = next(watch.Up) ~= nil
+			for _, listener in watch.Listeners do
+				task.spawn(listener, covered)
+			end
+		end
+		local function follow(screen: Instance)
+			if not screen:IsA("ScreenGui") or not UiKit.Covers[screen.Name] then
+				return
+			end
+			local function update()
+				local up = if screen.Parent and screen.Enabled then true else nil
+				if watch.Up[screen] ~= up then
+					watch.Up[screen] = up
+					tell()
+				end
+			end
+			screen:GetPropertyChangedSignal("Enabled"):Connect(update)
+			screen.AncestryChanged:Connect(update)
+			update()
+		end
+		local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+		playerGui.ChildAdded:Connect(follow)
+		for _, screen in playerGui:GetChildren() do
+			follow(screen)
+		end
+	end
+	table.insert(coverWatch.Listeners, fn)
+	fn(next(coverWatch.Up) ~= nil)
+end
+
 function UiKit.gui(name: string, order: number?): ScreenGui
 	local gui = Instance.new("ScreenGui")
 	gui.Name = name

@@ -111,4 +111,21 @@ for _, piece in {
 	check(shop:find(piece, 1, true) ~= nil, "A size up missing on a phone: " .. piece)
 end
 
-print(string.format("PASS: %d phone layout checks (a phone either way up, never a tablet or a computer; the Store the whole screen on a phone, fitted whichever way up, its small print up)", checks))
+-- The queue tab (SocialUI) sits at the right end of Roblox's strip, where
+-- the Store on a phone has its coins and its close button: it steps aside
+-- while a screen covers the play view (UiKit.Covers, the Store among them),
+-- as the party bars do, so it never sits on a way out.
+do
+	local kit = fs.readFile(ROOT .. "/src/client/Modules/UiKit.luau")
+	check(kit:find("function UiKit.watchCovers", 1, true) ~= nil, "No shared watch on the covering screens")
+	for _, name in { "Shop", "Dashboard", "KaijuPanel", "Social" } do
+		check(kit:find("\n\t" .. name .. " = true", 1, true) ~= nil or kit:find(" " .. name .. " = true", 1, true) ~= nil, name .. " isn't a cover")
+	end
+	local social = fs.readFile(ROOT .. "/src/client/Modules/SocialUI.luau")
+	check(social:find("UiKit.watchCovers(", 1, true) ~= nil, "The queue tab doesn't watch the covering screens")
+	check(social:find('queued.Mode ~= "intro" and not covered', 1, true) ~= nil, "The queue tab still shows over the Store")
+	local party = fs.readFile(ROOT .. "/src/client/Modules/PartyUI.luau")
+	check(party:find("UiKit.watchCovers(", 1, true) ~= nil, "The party bars don't share the watch")
+end
+
+print(string.format("PASS: %d phone layout checks (a phone either way up, never a tablet or a computer; the Store the whole screen on a phone, fitted whichever way up, its small print up, nothing of the queue on it)", checks))

@@ -269,20 +269,13 @@ local phoneRows = false -- (the rows as drawn: slim, a phone's)
 -- (MobileLayout.party); MobileLayout hears how many are up, so your loot
 -- card goes under them.
 -- A screen over the world (the Inventory, the Store, a window like this
--- one) hides them too: they sat on top of it, over its own rows.
-local COVERS = {
-	Dashboard = true, Shop = true, Season = true, AugmentTree = true, SurgeArray = true,
-	Social = true, WelcomeBundle = true, Welcome = true, Intro = true, Tutorial = true,
-	MarketBoard = true, ChallengeChooser = true, Character = true, Party = true,
-	Referral = true, TopPlayers = true, EquipmentTrade = true, KaijuPanel = true,
-	Rift = true, Guide = true, GemPouch = true, KaijuRoll = true, KaijuPit = true,
-}
-local covering: { [ScreenGui]: boolean } = {}
+-- one: UiKit.Covers) hides them too: they sat on top of it, over its own rows.
+local covered = false
 local function fitPartyHud()
 	local phone = UiKit.short()
 	local hunting = phone and player:GetAttribute("Hunt") == true
 	hudGui.Enabled = player:GetAttribute("CombatSession") == nil and player:GetAttribute("MatchId") == nil and not hunting
-		and next(covering) == nil
+		and not covered
 	if phone then
 		local spot = MobileLayout.party(hudGui.AbsoluteSize, rowCount)
 		hudList.AnchorPoint = Vector2.zero
@@ -300,22 +293,10 @@ end
 player:GetAttributeChangedSignal("CombatSession"):Connect(fitPartyHud)
 player:GetAttributeChangedSignal("MatchId"):Connect(fitPartyHud)
 player:GetAttributeChangedSignal("Hunt"):Connect(fitPartyHud)
-local function watchCover(screen: Instance)
-	if not screen:IsA("ScreenGui") or not COVERS[screen.Name] then
-		return
-	end
-	local function update()
-		covering[screen] = if screen.Parent and screen.Enabled then true else nil
-		fitPartyHud()
-	end
-	screen:GetPropertyChangedSignal("Enabled"):Connect(update)
-	screen.AncestryChanged:Connect(update)
-	update()
-end
-player.PlayerGui.ChildAdded:Connect(watchCover)
-for _, screen in player.PlayerGui:GetChildren() do
-	watchCover(screen)
-end
+UiKit.watchCovers(function(now: boolean)
+	covered = now
+	fitPartyHud()
+end)
 hudGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 	if UiKit.short() ~= phoneRows then
 		PartyUI.redrawHud()

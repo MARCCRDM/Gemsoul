@@ -1886,6 +1886,13 @@ end
 placeTab()
 UiKit.onTopbar(placeTab)
 tabGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeTab)
+-- While a screen covers the play view (UiKit.Covers: the Store, the
+-- Inventory...) the tab steps aside: on a phone it sat right on the Store's
+-- coins and its close button. The search goes on; it's back on closing.
+local covered = false
+UiKit.watchCovers(function(now: boolean)
+	covered = now
+end)
 
 -- The duel overlay ----------------------------------------------------------------
 
@@ -2027,9 +2034,10 @@ game:GetService("RunService").RenderStepped:Connect(function()
 			else "⚔ " .. clock(match.Ends - now)
 	end
 	RoundPivot.tick(now)
-	-- (not over the Social window: its Arena section shows the search)
+	-- (not over the Social window: its Arena section shows the search; nor
+	-- over a screen that covers the play view)
 	-- (The intro queue has its own card: Lobby.client.)
-	banner.Visible = queued ~= nil and not gui.Enabled and queued.Mode ~= "intro"
+	banner.Visible = queued ~= nil and not gui.Enabled and queued.Mode ~= "intro" and not covered
 	if queued and searchLine and searchLine.Parent then
 		searchLine.Text = searchText()
 	end
