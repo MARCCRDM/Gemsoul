@@ -60,7 +60,8 @@
 	Nobody gets more critters than their band's cap or a fair share of the
 	Outpost's (Frontier.share); critters still on their way through count.
 	Nobody gets one in the core, in a fight elsewhere, in a spar, or down.
-	A critter's level comes from where it came through (Frontier.Levels).
+	A critter's level comes from where it came through (Frontier.Levels), and
+	rises with the kaiju its player has out (Frontier.teamScale).
 
 	Rifts are anchors in workspace.Rifts, drawn by each player's client
 	(RiftTear): an invisible part where the tear hangs, facing whoever drew
@@ -165,6 +166,20 @@ end
 -- step): critters come sooner, more of them, higher and harder.
 local function alone(player: Player): boolean
 	return player:GetAttribute("FrontierAlone") == true
+end
+
+-- The kaiju `player` has out, for critters that keep up with them
+-- (Frontier.teamScale): their average level and how many there are.
+local function teamOf(player: Player)
+	local pets = KaijuServer.team(player)
+	local sum = 0
+	for _, pet in pets do
+		sum += pet.Record and pet.Record.Level or 1
+	end
+	return { Average = if #pets > 0 then sum / #pets else 0, Count = #pets }
+end
+local function scaleFor(player: Player, band: string)
+	return Frontier.teamScale(band, teamOf(player))
 end
 
 -- In a fight with a wild kaiju, or taming one (FrontierEngaged, set each
@@ -312,7 +327,7 @@ end
 -- How many more critters may come for `player` out in `band` (more the
 -- more stirred up they have it, and more alone).
 local function roomFor(player: Player, band: string): number
-	local cap = Frontier.share(Frontier.capFor(band, stateOf(player).Stir, alone(player)), math.max(1, playersOut))
+	local cap = Frontier.share(Frontier.capFor(band, stateOf(player).Stir, alone(player)) + scaleFor(player, band).Extra, math.max(1, playersOut))
 	local mine = living(player) + (pending[player] or 0)
 	return math.max(0, math.min(cap - mine, Frontier.Caps.Server - total()))
 end
@@ -398,6 +413,7 @@ local function incursion(player: Player, band: string, count: number, raider: bo
 	local here = rootOf(player)
 	local wave = KaijuWilds.pickWave(count, rng, if here then homeAt(here.Position) else nil)
 	local n = waveNumber or 1
+	local up = scaleFor(player, band).Levels -- (critters that keep up with their team)
 	if n > 1 then
 		local kind = counterOf(player)
 		wave = Frontier.adapt(wave, n, kind, rng, Kaiju.isRanged)
@@ -462,7 +478,7 @@ local function incursion(player: Player, band: string, count: number, raider: bo
 						Prey = player,
 						Band = band,
 						Critter = critter,
-						Level = Frontier.critterLevel(band, rng, stateOf(player).Stir, alone(player)) + Frontier.adaptLevels(n),
+						Level = Frontier.critterLevel(band, rng, stateOf(player).Stir, alone(player)) + Frontier.adaptLevels(n) + up,
 						Facing = target.Position,
 						Hop = toward * (if Kaiju.isRanged(critter) then 10 else 24) + side + Vector3.new(0, 26, 0),
 						Raider = raider,
@@ -491,7 +507,9 @@ local function consider(player: Player, state, band: string)
 	-- (The next wave of their run, or a first again after a long quiet.)
 	state.Wave = if now - state.LastEncounter > Frontier.Adapt.Reset then 1 else state.Wave + 1
 	state.LastEncounter = now
-	local size = Frontier.incursion(band, rng:NextNumber(), state.Stir, alone(player)) + Frontier.adaptExtra(state.Wave)
+	local size = Frontier.incursion(band, rng:NextNumber(), state.Stir, alone(player))
+		+ Frontier.adaptExtra(state.Wave)
+		+ scaleFor(player, band).Extra
 	incursion(player, band, math.min(room, size), nil, state.Wave)
 end
 
@@ -858,7 +876,8 @@ local function wander(candidates: { any })
 	local band = Frontier.band(Frontier.distance(spot, center()))
 	local stir = stateOf(player).Stir
 	local lone = alone(player)
-	local count = math.min(free, roomFor(player, band), math.max(2, Frontier.incursion(band, rng:NextNumber(), stir, lone)))
+	local scale = scaleFor(player, band)
+	local count = math.min(free, roomFor(player, band), math.max(2, Frontier.incursion(band, rng:NextNumber(), stir, lone) + scale.Extra))
 	if count <= 0 then
 		return
 	end
@@ -897,7 +916,7 @@ local function wander(candidates: { any })
 				Prey = player,
 				Band = band,
 				Critter = critter,
-				Level = Frontier.critterLevel(band, rng, stir, lone),
+				Level = Frontier.critterLevel(band, rng, stir, lone) + scale.Levels,
 				Facing = floor + out * 10,
 				Hop = out * 14 + Vector3.new(0, 22, 0),
 				Wander = { Home = floor, Roam = Frontier.Wander.Roam, Notice = Frontier.Wander.Notice },

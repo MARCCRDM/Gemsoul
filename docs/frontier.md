@@ -466,6 +466,30 @@ send. A ranged one still comes last. On the second wave you're told:
 The run starts again from wave 1 when you're back in the core, when you're
 killed, or after two minutes without an encounter (`Adapt.Reset`).
 
+## Critters that keep up with your team (2026-10-28)
+
+Critters used to come at their band's level (fringe 1-4, edge 9-13) however
+far your team had grown, so a full team of high-level kaiju walked through
+them. Now every critter out of an encounter or a wandering rift comes up to
+meet the kaiju you have out (`Frontier.teamScale`, `Frontier.Team`):
+
+- **Levels**: Share of your kaiju's average level (fringe 65%, edge 100%),
+  less the middle of the band's range, never fewer than the band's own.
+- **More of them**: one more critter per 4 of those levels (at most 4),
+  times how full your team is (out of 3 and a support); the cap round you
+  rises by as much.
+
+| Your kaiju's average level | Fringe critters | Edge critters | Extra (full team) |
+|---|---|---|---|
+| 1-4 | 1-4 | 9-13 | 0 |
+| 12 | 6-9 | 10-14 | +1 fringe, +0 edge |
+| 20 | 12-15 | 18-22 | +2 fringe, +2 edge |
+| 30 | 18-21 | 28-32 | +4 fringe, +4 edge |
+
+The edge stays the harder band at every level. On top of this come the
+waves, the frontier stirring up and going out alone, as before. Their EXP
+rises with their level, as it always did.
+
 ## Performance
 
 The Outpost was already a big scene: about 8,600 parts, nearly 4,700 of

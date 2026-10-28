@@ -101,6 +101,8 @@
 	  Frontier.capFor(band, stir?, alone?) -> critters allowed round one player
 	  Frontier.share(cap, playersOut) -> critters at once round one player
 	  Frontier.critterLevel(band, rng, stir?, alone?) -> level
+	  Frontier.teamScale(band, team?) -> { Levels, Extra }   critters that keep up with
+	                                     your team ({ Average, Count } of the kaiju out)
 	  Frontier.critterExp(level, band, today) -> EXP for a kaiju that fought it
 	  Frontier.riftSpot(position, facing, center, rng, others?, past?, usable?) -> Vector3?   where a rift opens
 	  Frontier.trickle(count, rng?) -> { seconds }   when each of an encounter's tears opens
@@ -1007,6 +1009,29 @@ function Frontier.critterExp(level: number, band: string?, today: number?): numb
 		exp *= e.After
 	end
 	return math.max(1, math.floor(exp + 0.5))
+end
+
+-- Critters that keep up with your team ------------------------------------------------------
+-- A band's critters are for kaiju about its level (Frontier.Levels), but a
+-- team grows past them. Each critter comes Levels higher: Share[band] of
+-- the average level of the kaiju you have out, less the middle of the
+-- band's range (never fewer than the band's own). And a team well past
+-- the band draws a bigger swarm: one more critter for every LevelsPerExtra
+-- of those levels, at most MaxExtra, as much of that as the team is full
+-- (Count of Full: three and a support); the cap round you rises with it.
+Frontier.Team = { Share = { Fringe = 0.65, Edge = 1 }, LevelsPerExtra = 4, MaxExtra = 4, Full = 4 }
+
+function Frontier.teamScale(band: string, team): { Levels: number, Extra: number }
+	local range = Frontier.Levels[band]
+	local average = team and team.Average or 0
+	if not range or average <= 0 then
+		return { Levels = 0, Extra = 0 }
+	end
+	local t = Frontier.Team
+	local levels = math.max(0, math.floor(average * (t.Share[band] or 1) - (range[1] + range[2]) / 2 + 0.5))
+	local full = math.clamp((team.Count or 0) / t.Full, 0, 1)
+	local extra = math.min(t.MaxExtra, math.floor(levels / t.LevelsPerExtra * full + 1e-9))
+	return { Levels = levels, Extra = extra }
 end
 
 -- How many critters come through at once (`roll` in [0, 1)), more the

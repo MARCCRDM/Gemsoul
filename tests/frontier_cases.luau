@@ -1145,6 +1145,32 @@ do
 	check(select(2, server:gsub("Wave = 0", "")) >= 3, "A run of waves never starts again")
 end
 
+do -- Critters that keep up with your team (Frontier.teamScale)
+	local none = Frontier.teamScale("Fringe", nil)
+	check(none.Levels == 0 and none.Extra == 0, "No team out still scaled the critters")
+	local starter = Frontier.teamScale("Fringe", { Average = 2, Count = 4 })
+	check(starter.Levels == 0 and starter.Extra == 0, "A starter team's critters came up")
+	local mid = Frontier.teamScale("Fringe", { Average = 12, Count = 4 })
+	local high = Frontier.teamScale("Fringe", { Average = 25, Count = 4 })
+	check(mid.Levels > 0 and high.Levels > mid.Levels, "Critters don't rise with the team's level")
+	check(high.Extra > mid.Extra and high.Extra <= Frontier.Team.MaxExtra, "A stronger team doesn't draw a bigger swarm")
+	local lone = Frontier.teamScale("Fringe", { Average = 25, Count = 1 })
+	check(lone.Levels == high.Levels and lone.Extra < high.Extra, "A lone strong kaiju draws a full team's swarm")
+	local edge = Frontier.teamScale("Edge", { Average = 25, Count = 4 })
+	check(edge.Levels > 0, "The edge's critters don't keep up")
+	-- The edge stays the harder band, level for level.
+	for _, average in { 5, 12, 20, 30 } do
+		local team = { Average = average, Count = 4 }
+		local fringeTop = Frontier.Levels.Fringe[2] + Frontier.teamScale("Fringe", team).Levels
+		local edgeLow = Frontier.Levels.Edge[1] + Frontier.teamScale("Edge", team).Levels
+		check(edgeLow > fringeTop, "The fringe got tougher than the edge at average level " .. average)
+	end
+	local server = fs.readFile(ROOT .. "/src/server/Systems/FrontierServer.luau")
+	check(server:find("Frontier.adaptLevels(n) + up", 1, true) ~= nil, "Encounters don't keep up with the team")
+	check(server:find("+ scaleFor(player, band).Extra", 1, true) ~= nil, "A stronger team's encounters aren't bigger")
+	check(server:find("lone) + scale.Levels", 1, true) ~= nil, "Wandering rifts don't keep up with the team")
+end
+
 print(
 	string.format(
 		"PASS: %d frontier checks (bands, the biomes, their swaying borders and their ground, the spokes, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids, robbed while down)",
