@@ -72,10 +72,16 @@ local Kaiju = {}
 Kaiju.Elements = { "Fire", "Frost", "Shock", "Poison" }
 -- The first four: a new player's starter roll is of these (starterPicks).
 Kaiju.Starters = { "Bulwark", "Razorback", "Carapace", "Scythe" }
+-- Kinds sat out for now: kept (their data, models and moves, and any already
+-- caught stay as they are) but left out of Order, so nothing spawns, rolls,
+-- guards or sells them. Take one off to bring it back.
+Kaiju.Benched = { Starcrop = true }
 -- Every kind, the first four first, then the roster's (Shared.KaijuRoster).
 Kaiju.Order = table.clone(Kaiju.Starters)
 for _, id in KaijuRoster.Order do
-	table.insert(Kaiju.Order, id)
+	if not Kaiju.Benched[id] then
+		table.insert(Kaiju.Order, id)
+	end
 end
 
 -- Level 1 stats (at a Common Gemsoul). Guard: the share of each blow it shrugs off.
@@ -159,7 +165,7 @@ Kaiju.WildRoster = {
 }
 -- The rest of the roster (Shared.KaijuRosterMore) roams wild as well.
 for _, id in KaijuRosterMore.Order do
-	Kaiju.WildRoster[id] = true
+	Kaiju.WildRoster[id] = not Kaiju.Benched[id]
 end
 function Kaiju.wildKinds(band: string?): { string }
 	local out = {}

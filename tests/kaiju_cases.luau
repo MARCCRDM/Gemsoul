@@ -62,7 +62,18 @@ local GemTraits = shared("GemTraits")
 local ElementMatchup = shared("ElementMatchup")
 
 -- Species and stats ------------------------------------------------------------------------
-check(#Kaiju.Order == 90 and #Kaiju.Elements == 4, "Ninety species in four elements")
+local benched = 0
+for id in Kaiju.Benched do
+	benched += 1
+	check(Kaiju.Species[id] ~= nil and not table.find(Kaiju.Order, id), id .. " is benched but still in the order, or gone")
+	check(#Kaiju.wildKinds("Fringe") > 0 and not table.find(Kaiju.wildKinds("Vein"), id), id .. " is benched but still guards a vein")
+end
+check(#Kaiju.Order + benched == 90 and #Kaiju.Elements == 4, "Ninety species in four elements")
+-- A benched kind already caught stays as it is.
+do
+	local profile = { Kaiju = { List = { k1 = { Id = "k1", Species = "Starcrop", Element = "Fire", Level = 5 } }, Next = 2 } }
+	check(Kaiju.roster(profile).List.k1.Species == "Starcrop", "A benched kind already caught was changed")
+end
 -- A retired kind (Kaiju.Retired) already caught becomes its stand-in.
 do
 	local profile = { Kaiju = { List = { k1 = { Id = "k1", Species = "Drillmole", Element = "Fire", Level = 7 } }, Next = 2 } }

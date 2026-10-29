@@ -79,7 +79,7 @@ end
 local function rarest(): { string }
 	local kinds = {}
 	for _, id in KaijuRoster.Order do
-		if Kaiju.batch(id) == 1 and Kaiju.Species[id] then
+		if Kaiju.batch(id) == 1 and Kaiju.Species[id] and not Kaiju.Benched[id] then
 			table.insert(kinds, id)
 		end
 	end
