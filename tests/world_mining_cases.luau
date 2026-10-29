@@ -136,9 +136,15 @@ minerHead.Parent=nil; miner.Character=minerCharacter; step(.1)
 check(anchor.Position.Y==minerRoot.Position.Y+3.6,"Missing head did not fall back to character root")
 minerHead.Parent=minerCharacter
 miner.Character=minerCharacter
+local windows=#legendaries
 MiningRolls.publish(miner,at,reward("Legendary"))
 check(#live("MiningRollBox")==1 and #live("RollAnchor")==1,"Rapid mining stacked boxes over the same player")
+check(#legendaries==windows,"The Legendary window opened before the reel landed")
 step(Roll.Duration+.1)
+-- Someone else's Legendary: its window over them, their box stepping aside.
+local shown=legendaries[#legendaries]
+check(#legendaries==windows+1 and shown.Gem.Tier=="Legendary" and shown.Finder==miner.DisplayName and shown.Character==minerCharacter,"Someone else's Legendary opened no window over them")
+check(liveClass("BillboardGui")[1].Enabled==false,"Their box didn't step aside for the Legendary window")
 minerHead.Position=Vector3.new(30,5,8); step(.1)
 check(live("RollAnchor")[1].Position.X==30,"Result did not follow miner")
 check(live("MiningRollBox")[1].BackgroundTransparency<0.2 and live("GemReel")[1].ImageTransparency==0,"Box unexpectedly transparent before fade")

@@ -128,6 +128,9 @@ CombatSound.Ids = {
 	KaijuJump3 = 0, -- kaiju_jump_3.mp3
 	KaijuLand1 = 0, -- kaiju_land_1.mp3
 	KaijuLand2 = 0, -- kaiju_land_2.mp3
+	-- A Legendary mined: its window bursting open over the miner
+	-- (tools/make_legendary_sounds.py; LegendaryWindow).
+	LegendaryWindow = 0, -- legendary_window.mp3
 }
 
 -- 0 mutes combat, 1 is full.
@@ -173,6 +176,7 @@ local LEVEL = {
 	CoinCashIn = 0.9,
 	KaijuJump = 0.7,
 	KaijuLand = 0.75,
+	LegendaryWindow = 1,
 }
 
 -- Built-in stand-ins until a sound is uploaded: layers of { sound, speed,
@@ -304,6 +308,15 @@ local FALLBACK = {
 	-- a crunch coming down.
 	KaijuJump = { { S .. "action_jump.mp3", 1.25, 0.5 }, { S .. "swordlunge.wav", 1.6, 0.18 } },
 	KaijuLand = { { S .. "action_jump_land.mp3", 0.85, 0.65 }, { S .. "clickfast.wav", 0.6, 0.2 } },
+	-- A Legendary's window: a boom, a rising ping into a bright chord.
+	LegendaryWindow = {
+		{ S .. "action_jump_land.mp3", 0.5, 0.8 },
+		{ S .. "electronicpingshort.wav", 1, 0.3, 0.25 },
+		{ S .. "electronicpingshort.wav", 1.26, 0.28, 0.3 },
+		{ S .. "electronicpingshort.wav", 1.5, 0.28, 0.35 },
+		{ S .. "electronicpingshort.wav", 2, 0.3, 0.4 },
+		{ S .. "victory.wav", 1.2, 0.3, 0.3 },
+	},
 	Cackle = {
 		{ S .. "uuhhh.mp3", 1.7, 0.4 },
 		{ S .. "uuhhh.mp3", 2.1, 0.3, 0.2 },

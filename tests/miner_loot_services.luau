@@ -141,6 +141,12 @@ local GemArt = {
 	pose = function() return CFrame.new() end,
 }
 local LotterySound = { tick = function() ticks += 1 end, reveal = function(rank) table.insert(sounds, rank) end }
+-- A Legendary's window (its own tests: legendary_window), and task.delay on the clock.
+local legendaries, delays = {}, {}
+local LegendaryWindow = { play = function(character, gem, finder)
+	table.insert(legendaries, { Character = character, Gem = gem, Finder = finder, At = now })
+end }
+local task = { delay = function(seconds, fn) table.insert(delays, { now + seconds, fn }) end }
 -- Frames at 60 a second; tweens finish at the end of the frame they start in.
 local function step(seconds)
 	for _ = 1, math.ceil(seconds * 60) do
@@ -149,6 +155,11 @@ local function step(seconds)
 		local done = completions
 		completions = {}
 		for _, event in done do event:Fire() end
+		for i = #delays, 1, -1 do
+			if delays[i][1] <= now then
+				table.remove(delays, i)[2]()
+			end
+		end
 	end
 end
 local function live(name)

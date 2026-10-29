@@ -28,6 +28,39 @@ and party name are hidden locally; their name remains in the card header.
 Original display states return on expiry, replacement, streaming changes,
 leaving range, or entering combat.
 
+## A Legendary: its window over your head
+
+*2026-10-29:* mining a **Legendary** is a moment, for you and everyone near
+(`LegendaryWindow`):
+
+- a pillar of gold light shoots up out of you and fades, a shockwave ring
+  runs 60 studs across the ground, sparks and confetti fly;
+- a gold line draws across the air over your head and **snaps open into a
+  window** (with a little overshoot, a pop): YOU FOUND A (someone else's:
+  MARC FOUND A), **LEGENDARY!** bouncing in with a shine running through
+  its letters, the gem itself turning on the left, its name in its
+  element's colour and its worth;
+- behind it rays wheel slowly, diamond sparkles twinkle round it, a shine
+  sweeps across it and its gold frame pulses; a second shower of sparks
+  as it opens;
+- after about four seconds it folds back into the line and is gone (4.55 s
+  in all: `LegendaryWindow.at` is the timeline).
+
+It's a window in the world (a BillboardGui sized in studs, drawn over
+everything), so it's as big over the miner near or far, and anyone within
+220 studs sees it. Its sound is a deep boom, a rising "shwing" as it opens
+and a bright chord of bells ringing out under sparkles (CombatSound's
+`LegendaryWindow`, made by `tools/make_legendary_sounds.py`; built-in
+pings stand in till it's uploaded).
+
+Yours opens as your loot card lands (`MinerLoot.push`: at the card's
+`LandAt`, so it still comes when you mine on and the card folds early).
+Someone else's opens as the reel over their head lands
+(`MiningWorldReveal`), and that small box steps aside for it: the window
+says the same, bigger. A late onlooker doesn't get an old one replayed.
+
+![A Legendary's window (an offline render: in the game the gem turns on the left)](mining-loot/legendary-window.png)
+
 ## The card
 
 ![Rolling, landing, the stats filling](mining/loot-card.png)

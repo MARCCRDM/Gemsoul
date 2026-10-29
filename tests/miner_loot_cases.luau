@@ -277,6 +277,26 @@ check(1366 - corner.Right - desk.Size.X.Offset > 1366 / 2 + drive.W / 2, "The ca
 localPlayer:SetAttribute("MechPilot", nil)
 check(inCorner(), "The card moved after hopping out")
 
+-- A Legendary: its window over you as the card lands, not before; nothing
+-- for a lesser find.
+do
+	local before = #legendaries
+	Loot.push(gem("UltraRare", 5, 5, 5))
+	step(4)
+	check(#legendaries == before, "A lesser find opened the Legendary window")
+	local at = now
+	Loot.push(gem("Legendary", 8, 8, 8))
+	step(0.5)
+	check(#legendaries == before, "The Legendary window opened before the card landed")
+	-- Mined again at once: the card folds, the window still comes.
+	Loot.push(gem("Common", 2, 2, 2))
+	step(2)
+	local shown = legendaries[#legendaries]
+	check(#legendaries == before + 1 and shown.Gem.Tier == "Legendary" and shown.Finder == nil, "Your Legendary opened no window")
+	check(shown.At - at >= 1.4 and shown.At - at <= 2, "The window didn't come as the card landed: " .. (shown.At - at))
+	step(10)
+end
+
 -- A menu or a fight has the screen: hidden and silent, then back.
 Loot.setBlocked(true)
 check(gui.Enabled == false, "Card shown over a menu")

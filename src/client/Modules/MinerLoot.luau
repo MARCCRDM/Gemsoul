@@ -20,7 +20,9 @@
 -- screen, the RIFT CHARGED tag (FrontierHud) and a mech's HOP OUT; where a short
 -- window leaves no room above it, its row waits until it's gone.
 --
---   MinerLoot.push(loot)        the server's loot for a rock you mined
+--   MinerLoot.push(loot)        the server's loot for a rock you mined (a
+--                               Legendary also opens its window over you:
+--                               LegendaryWindow)
 --   MinerLoot.setBlocked(on)    a menu or a fight has the screen: hide
 --   MinerLoot.close()           leaving the Outpost: clear everything
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,6 +33,7 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local GemArt = require(script.Parent.GemArt)
 local IronUi = require(script.Parent.IronUi)
+local LegendaryWindow = require(script.Parent.LegendaryWindow)
 local LootStack = require(script.Parent.LootStack)
 local LotterySound = require(script.Parent.LotterySound)
 local MobileLayout = require(script.Parent.MobileLayout)
@@ -736,9 +739,17 @@ end
 
 function MinerLoot.push(loot)
 	ensureGui()
-	if LootStack.push(stack, loot, clock(), maxRows) then
+	local item = LootStack.push(stack, loot, clock(), maxRows)
+	if item then
 		sync()
 		step()
+		-- A Legendary: its window bursts open over you as the card lands
+		-- (even if another find folds the card first: LegendaryWindow).
+		if item.Loot.Gem and item.Loot.Gem.Tier == "Legendary" and item.LandAt then
+			task.delay(item.LandAt - item.At, function()
+				LegendaryWindow.play(game:GetService("Players").LocalPlayer.Character, item.Loot.Gem, nil)
+			end)
+		end
 	end
 end
 

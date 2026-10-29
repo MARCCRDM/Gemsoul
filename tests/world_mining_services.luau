@@ -97,6 +97,9 @@ function GemArt.setupViewport(viewport)
 	local camera=new("Camera"); camera.Parent=viewport; viewport.CurrentCamera=camera
 	return camera
 end
+-- A Legendary's window (its own tests: legendary_window).
+local legendaries={}
+local LegendaryWindow={play=function(character,gem,finder) table.insert(legendaries,{Character=character,Gem=gem,Finder=finder}) end}
 local function step(seconds)
 	now+=seconds
 	services.RunService.RenderStepped:Fire(seconds)

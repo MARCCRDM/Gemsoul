@@ -9,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local Roll = require(ReplicatedStorage.Shared.MiningRoll)
 local GemArt = require(script.Parent.GemArt)
+local LegendaryWindow = require(script.Parent.LegendaryWindow)
 
 local Reveal = {}
 local player = Players.LocalPlayer
@@ -220,7 +221,16 @@ local function showResult(entry, elapsed)
 	end
 	entry.Extras.Text = if gem then string.format("≈ %d ◆", math.floor(GemConfig.value(gem))) else ""
 	-- A delayed observer sees the result without replaying an old explosion.
-	if gem and elapsed - Roll.Duration < 0.7 then burst(entry) end
+	if gem and elapsed - Roll.Duration < 0.7 then
+		burst(entry)
+		-- A Legendary: its own window bursts open over them, and this box
+		-- steps aside for it (it says the same, bigger).
+		if gem.Tier == "Legendary" then
+			local miner = Players:GetPlayerByUserId(packet.MinerId)
+			LegendaryWindow.play(miner and miner.Character, gem, packet.MinerName)
+			entry.Board.Enabled = false
+		end
+	end
 end
 local function step()
 	if not canWatch() then Reveal.close(); return end
