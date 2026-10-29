@@ -33,6 +33,7 @@
 	  ShopUI.open(tab?)   ShopUI.close()   ShopUI.toggle()   ShopUI.refresh()
 	  ShopUI.showWelcome()   ShopUI.showStarter()
 ]]
+local TextService = game:GetService("TextService")
 local GroupService = game:GetService("GroupService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -44,6 +45,7 @@ local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local FreeRewards = require(ReplicatedStorage.Shared.FreeRewards)
 local Referrals = require(ReplicatedStorage.Shared.Referrals)
 local Store = require(ReplicatedStorage.Shared.Store)
+local Lang = require(ReplicatedStorage.Shared.Lang)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local CoinShop = require(script.Parent.CoinShop)
 local GemClient = require(script.Parent.GemClient)
@@ -608,6 +610,18 @@ local navList = UiKit.list(nav, if SHORT then MobileLayout.Store.TabGap else 10,
 if not SHORT then
 	navList.VerticalAlignment = Enum.VerticalAlignment.Center
 end
+-- How wide words are in a face (Roblox's measure; a fair guess without it).
+local function wordsWidth(words: string, size: number, font: Enum.Font): number
+	local ok, bounds = pcall(function()
+		return TextService:GetTextSize(words, size, font, Vector2.new(1000, 100))
+	end)
+	return if ok and typeof(bounds) == "Vector2" then bounds.X else #words * size * 0.66
+end
+-- A tab's width on a computer: its name (as the player reads it, maybe in
+-- Spanish) in the open tab's heavier face, with `pad` either side.
+local function tabWidth(name: string, size: number?, pad: number?): number
+	return math.ceil(wordsWidth(Lang.translate(name), size or 14, BLACK) + (pad or 9) * 2)
+end
 local navButtons = {}
 local navLabels = {} -- (the button itself, or on a phone the name in it)
 local dealTag: TextLabel? = nil -- (a phone: SALE on Featured while the offer's open)
@@ -618,8 +632,11 @@ for i, id in Store.Tabs do
 		AutoButtonColor = false,
 		BackgroundTransparency = 1,
 		BackgroundColor3 = C.Raised,
-		AutomaticSize = if SHORT then Enum.AutomaticSize.None else Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, HEAD),
+		-- (A computer: as wide as its name in the open tab's heavier face,
+		-- measured, not AutomaticSize: the open tab's full-width underline
+		-- made an automatic tab stretch across the whole bar.)
+		AutomaticSize = Enum.AutomaticSize.None,
+		Size = UDim2.fromOffset(if SHORT then 0 else tabWidth(Store.TabNames[id]), HEAD),
 		Font = BOLD,
 		TextSize = 14,
 		TextColor3 = C.Dim,
@@ -2516,6 +2533,36 @@ local DRAW = {
 	Free = drawFree,
 }
 
+-- A computer: the tabs fit between the name and the coins (and the offer's
+-- SALE clock while it shows): a little smaller and closer together when
+-- they must, never under them.
+local function fitTabs()
+	if SHORT then
+		return
+	end
+	local cornerW = 10 + 18 + 8 + wordsWidth(walletValue.Text, 15, BLACK) + 8 + 20 + 14
+	if deal.Visible then
+		cornerW += wordsWidth(deal.Text, 12, BLACK) + 24 + 10
+	end
+	local room = (W - 68 - cornerW - 16) - 184
+	for _, try in { { 14, 9, 10 }, { 13, 8, 6 }, { 12, 7, 4 }, { 11, 6, 2 } } do
+		local size, pad, gap = try[1], try[2], try[3]
+		local total = gap * (#Store.Tabs - 1)
+		for _, id in Store.Tabs do
+			total += tabWidth(Store.TabNames[id], size, pad)
+		end
+		if total <= room or size == 11 then
+			navList.Padding = UDim.new(0, gap)
+			for id, b in navButtons do
+				b.TextSize = size
+				b.Size = UDim2.fromOffset(tabWidth(Store.TabNames[id], size, pad), HEAD)
+			end
+			nav.Size = UDim2.fromOffset(math.max(room, total), HEAD)
+			return
+		end
+	end
+end
+
 local function drawHeader()
 	for id, b in navButtons do
 		local on = id == state.Tab
@@ -2541,6 +2588,7 @@ local function drawHeader()
 		local left = if key == "StarterPack" then starterLeft() else welcomeLeft()
 		deal.Text = dealWords(left)
 	end
+	fitTabs()
 end
 
 function refresh()
