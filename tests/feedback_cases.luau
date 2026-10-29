@@ -26,4 +26,14 @@ end
 local capped = Feedback.mergeErrors(nil, many, 10)
 fcheck(#capped == 10 and capped[1].Count == 30 and capped[10].Count == 21, "Error list not capped to the most frequent")
 
-print("PASS: " .. fchecks .. " feedback checks (report cleaning, error grouping, ranking and cap)")
+-- The DEV tools (and the reports) are Devvolver's alone: one listed UserId,
+-- no testers, nobody by Studio or by being the place's creator.
+fcheck(#Config.Playtest.Owners == 1 and Config.Playtest.Owners[1] == 11738957136, "The DEV tools have an owner besides Devvolver")
+fcheck(#(Config.Playtest.Testers or {}) == 0, "Someone else is listed for the test tools")
+fcheck(Config.Playtest.OpenAdmin == nil, "A switch could still open the DEV tools to everyone")
+fcheck(Feedback.isOwner({ UserId = 11738957136 }), "Devvolver isn't an owner")
+for _, id in { 11758049015, 1, 0, -1 } do
+	fcheck(not Feedback.isOwner({ UserId = id }), "UserId " .. id .. " got the DEV tools")
+end
+
+print("PASS: " .. fchecks .. " feedback checks (report cleaning, error grouping, ranking and cap, owner only)")

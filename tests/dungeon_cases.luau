@@ -204,6 +204,9 @@ local tester = squad(1)[1]
 check(not handlers.DungeonTest(tester, "Sahur").Ok, "Live server accepted test request")
 check(not handlers.PartyDungeon(tester, "Sahur").Ok, "Extra queue argument bypassed party minimum")
 studioMode = true
+-- Studio is no pass: only the owner's UserId runs tests, there too.
+check(not handlers.DungeonTest(tester, "Sahur").Ok, "Studio let a non-owner run a dungeon test")
+permittedTester = tester
 check(not handlers.DungeonTest(tester, "Bad").Ok, "Invalid test mode accepted")
 check(handlers.DungeonTest(tester, "Sahur").Ok, "Studio solo boss rejected")
 local testId = tester:GetAttribute("DungeonId")
@@ -214,10 +217,9 @@ check(tester:GetAttribute("DungeonId") == nil, "Solo test failed cleanup")
 check(tester:GetAttribute("DungeonTest") == nil, "Test flag leaked")
 check(profiles[tester].Coins == 0, "Studio test awarded coins")
 check(restoresGiven[#restoresGiven].Player ~= tester, "A Studio test restored swings")
-print("PASS: Studio test entry, live rejection, solo boss and cleanup")
+print("PASS: Studio test entry (owner only), live rejection, solo boss and cleanup")
 
 studioMode = false
-permittedTester = tester
 -- Dungeons closed for the players: the owners' tests still run.
 Config.Features.Dungeons = false
 check(handlers.DungeonTest(tester, "Sahur").Ok, "Authorized live tester rejected")

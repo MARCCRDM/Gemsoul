@@ -26,7 +26,7 @@ local Shop = require(script.Parent.Shop)
 local Feedback = require(script.Parent.Feedback)
 local Dungeon = {}
 local function canTest(player)
-	return Feedback.isOwner(player) or (game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId)
+	return Feedback.isOwner(player)
 end
 local runs, memberRun, slots = {}, {}, {}
 local finish

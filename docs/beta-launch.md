@@ -13,13 +13,18 @@ which sets the same).
 
 | Stage | Saves | DEV tools | Cosmetics for coins |
 | --- | --- | --- | --- |
-| `"Playtest"` | off: every join starts as a new player | everyone | 25 coins each, on top of the normal way |
-| `"Beta"` | load and save | Owners and Testers only | no |
-| `"Live"` | load and save | Owners and Testers only | no |
+| `"Playtest"` | off: every join starts as a new player | Devvolver only | 25 coins each, on top of the normal way |
+| `"Beta"` | load and save | Devvolver only | no |
+| `"Live"` | load and save | Devvolver only | no |
 
-- **Who has the DEV tools.** Owners and Testers are `Playtest.Owners` and
-  `Playtest.Testers`. They can still replay the first-time flow from the DEV
-  panel (New player, then Restore save).
+- **Who has the DEV tools.** Only the UserIds in `Playtest.Owners`, which is
+  Devvolver (11738957136) alone; `Playtest.Testers` is empty. That covers the
+  DEV button and panel, every test-admin action and the feedback and error
+  reports, and the server checks each request, so a client can't fake it.
+  Nobody else gets them: not everyone in Studio, not the place's creator,
+  and no stage or switch opens them to everyone. Devvolver can still replay
+  the first-time flow from the DEV panel (New player, then Restore save).
+  To give another account the tools, add its UserId to `Playtest.Owners`.
 - **The build label** (`Playtest.Build`) is `1.0 · 2026-10-28`. It appears
   on the dashboard and on every bug report. Give it a new name each time you
   publish.

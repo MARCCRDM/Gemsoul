@@ -3,10 +3,10 @@
 -- Where the game is in its life. This one switch sets every launch-sensitive
 -- setting together (STAGES, at the bottom):
 --   "Playtest"  friends-only test servers: every join starts brand new and
---               nothing is saved, everyone gets the DEV tools, cosmetics cost
---               25 test coins.
---   "Beta"      the public beta: saves load and save, only Owners and Testers
---               get the DEV tools, cosmetics are had the normal way.
+--               nothing is saved, cosmetics cost 25 test coins.
+--   "Beta"      the public beta: saves load and save, cosmetics are had the
+--               normal way.
+-- In every stage only the Owners below get the DEV tools.
 --   "Live"      launch: the same as Beta.
 local STAGE = "Live"
 
@@ -96,24 +96,25 @@ local Config = {
 	MarketBoardVersion = 3,
 	AutosaveSeconds = 120,
 
-	-- Testing on a published server (the stage sets OpenAdmin and FreshStart).
+	-- Testing on a published server (the stage sets FreshStart).
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
 		Build = "1.0 · 2026-10-28",
-		-- UserIds who can read feedback and error reports in game (Social >
-		-- Feedback > Reports). In Studio everyone can.
-		Owners = { 11738957136, 11758049015 }, -- Devvolver, VolverDev
-		-- UserIds who get the test-admin tools (e.g. regenerating gear).
-		Testers = { 11758049015 }, -- VolverDev
-		-- On: everyone gets the test-admin tools, not just Owners and Testers.
-		OpenAdmin = false,
+		-- The only UserIds with the DEV tools: the DEV button and panel, the
+		-- test-admin actions (regenerating gear, rerolls, replaying the fast
+		-- start, test caches, dungeon tests) and the feedback and error
+		-- reports (Social > Feedback > Reports). Nobody else gets them, not
+		-- in Studio, not the place's creator, in no stage.
+		Owners = { 11738957136 }, -- Devvolver
+		-- Extra UserIds with the test-admin actions (not the reports). Empty.
+		Testers = {},
 		-- On: every join starts as a brand-new player (zero coins, the fast
 		-- start: style, element, first fight) and nothing is loaded or saved,
 		-- so the first-time flow can be played again and again. Off (Beta and
 		-- Live): saves load and save like the live game, and the fast start
-		-- runs once per account. Owners and Testers can replay the fast start
-		-- from the DEV panel either way.
+		-- runs once per account. Owners can replay the fast start from the
+		-- DEV panel either way.
 		FreshStart = false,
 	},
 
@@ -128,14 +129,13 @@ local Config = {
 
 -- What each stage sets. Anything a stage leaves out keeps its value above.
 local STAGES = {
-	Playtest = { FreshStart = true, OpenAdmin = true, TestCosmeticPrice = 25 },
-	Beta = { FreshStart = false, OpenAdmin = false, TestCosmeticPrice = false },
-	Live = { FreshStart = false, OpenAdmin = false, TestCosmeticPrice = false },
+	Playtest = { FreshStart = true, TestCosmeticPrice = 25 },
+	Beta = { FreshStart = false, TestCosmeticPrice = false },
+	Live = { FreshStart = false, TestCosmeticPrice = false },
 }
 local preset = STAGES[STAGE]
 assert(preset, "Config: unknown stage " .. tostring(STAGE))
 Config.Playtest.FreshStart = preset.FreshStart
-Config.Playtest.OpenAdmin = preset.OpenAdmin
 -- false (no test price) is stored as nil, the way the price checks expect.
 Config.TestCosmeticPrice = preset.TestCosmeticPrice or nil
 

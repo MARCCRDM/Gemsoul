@@ -16,7 +16,6 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local ScriptContext = game:GetService("ScriptContext")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -41,9 +40,11 @@ local function build(): string
 	return Config.Playtest and Config.Playtest.Build or "dev"
 end
 
+-- The DEV tools' owners (Config.Playtest.Owners), by UserId alone: not
+-- everyone in Studio, not the place's creator.
 function Feedback.isOwner(player: Player): boolean
 	local owners = Config.Playtest and Config.Playtest.Owners or {}
-	return RunService:IsStudio() or table.find(owners, player.UserId) ~= nil
+	return table.find(owners, player.UserId) ~= nil
 end
 
 -- Pure: a cleaned report, or nil and why not.
