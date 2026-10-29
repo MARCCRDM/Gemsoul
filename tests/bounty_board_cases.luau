@@ -100,19 +100,25 @@ check(a1.Boss.Id == a2.Boss.Id and b1.Boss.Id == b2.Boss.Id, "Two players see di
 
 -- Where it stands ---------------------------------------------------------------------------
 -- (the Shelter's hall frame, as OutpostWorld lays it out: half 84 wide, 60
--- deep, the garage barrier at z -14; the inlay bands along x 28 and across
--- z 32; the Hall of Fame and the bounty office on the east wall, Brutus's
--- booth on the south wall; INFO-9 by its kiosk)
+-- deep, the garage barrier at z -14; the inlay bands along x -28 and 28
+-- and across z 0 and 32; the Hall of Fame and the bounty office on the
+-- east wall, Brutus's booth on the south wall; INFO-9 by its kiosk)
 local spot = Bounties.Board.Spot
-check(spot.X == 28 and spot.Z == 32, "The board isn't where the floor's bands cross")
-check(spot.X + 7 < 84 and spot.X - 7 > -84 and spot.Z - 4 > -14 and spot.Z + 4 < 60, "The board isn't inside the hall")
+check(spot.X == 46 and spot.Z == 10, "The board isn't on the way in from the garage")
+-- (its pad, its pylons' half span: the first board's, scaled)
+local client0 = fs.readFile(ROOT .. "/src/client/Modules/BountyBoard.luau")
+local scale = tonumber(client0:match("BountyBoard.Scale = ([%d%.]+)"))
+check(scale and scale > 1 and scale <= 1.6, "The board isn't a little bigger than the first one")
+local pad, span = 6 * scale, (5.6 + 1.2) * scale
+check(spot.X + span < 84 and spot.X - span > -84 and spot.Z - pad > -14 and spot.Z + pad < 60, "The board isn't inside the hall")
+check(spot.Z - pad > 1.2 and spot.Z + pad < 32 - 1.2 and math.abs(spot.X - 28) > span, "The board's pad sits on the floor's inlay bands")
 local function clear(x, z, room, what)
 	check((Vector3.new(x, 0, z) - Vector3.new(spot.X, 0, spot.Z)).Magnitude > room, "The board is in the way of " .. what)
 end
 clear(84, 10, 20, "the Hall of Fame")
 clear(84, 46, 20, "the bounty office")
 clear(52, 60, 18, "Brutus's booth")
-clear(84 - 11.5, 10, 14, "the Hall of Fame's rope")
+clear(84 - 11.5, 10, 18, "the Hall of Fame's rope")
 clear(15, 41, 10, "INFO-9")
 clear(0, 60, 16, "the main door")
 clear(Kennel.Pen.Middle.X, Kennel.Pen.Middle.Z, Kennel.Pen.Fence + 10, "the Kennel")

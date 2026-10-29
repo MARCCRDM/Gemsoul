@@ -1,11 +1,19 @@
 # The bounty board on the hall floor (2026-10-29)
 
-Out on the Shelter's floor, where the yellow inlay bands cross between the
-Hall of Fame and Brutus's booth, now stands a **double-sided bounty
-board**: a big screen on two lit pylons, a BOUNTIES lightbox and crossed
-blades on top, a glowing amber ring on the floor round its plinth.
+Out on the Shelter's floor, on the way in from the garage between the
+Kennel and the Hall of Fame, stands a **double-sided bounty board**: a big
+screen on two lit pylons, a lit visor over it with a BOUNTIES lightbox and
+crossed blades on top, a glowing amber pad on the floor round its plinth.
 
-![The board on the hall floor, the Hall of Fame behind](bounty-board/hall.jpg)
+*2026-10-29, moved and enlarged.* It used to stand where the inlay bands
+cross by INFO-9, off to the side of where players walk in; it's now right
+in front of you as you come through the garage barrier, a face to the
+garage and a face to the main door. It's 1.3 times the size it was
+(`BountyBoard.Scale`: the screen 12.5 studs wide, the boss on its ledge
+7 studs tall), on stepped pylon feet, with a visor over the screen lit
+along its lip and an amber mark at each corner of its pad.
+
+![The board from the garage side](bounty-board/hall.jpg)
 
 Each face shows **one bounty**, WANTED, and the boss is the point of it:
 
@@ -64,9 +72,10 @@ SurfaceGuis that ignore the hall's lighting (`LightInfluence = 0`), so
 they glow. The server builds every boss's portrait when it starts, so the
 first turn of the board doesn't wait on them.
 
-Its spot (28, 32 in the Shelter's frame) is clear of the Hall of Fame, the
-bounty office, Brutus's booth, the rope, INFO-9, the main door and the
-Kennel: `tests/bounty_board_cases.luau` checks that, and that the faces
-never match.
+Its spot (46, 10 in the Shelter's frame) is clear of the Hall of Fame, its
+rope, the bounty office, Brutus's booth, INFO-9, the main door and the
+Kennel, and its pad stays off the floor's inlay bands:
+`tests/bounty_board_cases.luau` checks that, that it's bigger than the
+first board, and that the faces never match.
 
 Spanish: "Recompensa", "Aceptar una recompensa", "SOLO O EN GRUPO".
