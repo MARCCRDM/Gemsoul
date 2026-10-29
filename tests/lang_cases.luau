@@ -237,6 +237,33 @@ do
 			spanish(kind.Fight.Ranged.Name)
 		end
 	end
+	-- The Tasks window's steps and chapters (Shared.TrainingRewards) and the
+	-- GUIDE's pages (Shared.GameGuide): every word in Spanish (a key's name,
+	-- like SPACE or Q E R, stays as it is, and so do the names below).
+	local named = { HYPERBEAM = true, KAIJU = true, Mechs = true }
+	local function guide(text: string)
+		if not named[text] then
+			spanish(text)
+		end
+	end
+	for _, o in Training.Objectives do
+		spanish(o.Name)
+		spanish(o.Hint)
+	end
+	for _, blurb in Training.Blurbs do
+		spanish(blurb)
+	end
+	for _, section in GameGuide.Sections do
+		guide(section.Title)
+		guide(section.Blurb)
+		for _, tip in section.Tips do
+			guide(tip.Title)
+			guide(tip.Text)
+			if type(tip.Phone) == "string" and tip.Phone ~= tip.Key and not tip.Phone:match("^[%d%-]+$") then
+				guide(tip.Phone)
+			end
+		end
+	end
 	check(#untranslated == 0, "Not in Spanish: " .. table.concat(untranslated, " | "))
 	same(Lang.translate("BREAKER"), "ROMPEDOR", "The breaker's role")
 	same(Lang.translate("WARDEN"), "GUARDIÁN", "The warden's role")

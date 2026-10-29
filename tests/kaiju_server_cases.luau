@@ -345,6 +345,7 @@ local PlayerData = {
 		profiles[player].Coins += coins
 	end,
 	milestone = function() end,
+	training = function() end,
 	count = function(player, name, n)
 		local profile = profiles[player]
 		profile.Stats = profile.Stats or {}

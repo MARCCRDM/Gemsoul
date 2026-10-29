@@ -111,7 +111,8 @@ phone game should be.
   mech's HOP OUT and the FIGHT / MINE switch beside it. **INVENTORY** is
   yellow, next along, and **RANKS isn't on a phone** any more (a computer
   keeps it). The row: PLAY, INVENTORY, SKINS (blue: the Store), TASKS, MARKET, SOCIAL,
-  INVITE.
+  INVITE. (*2026-10-29*: GUIDE has RANKS' old place, on a phone too; see
+  [guide-and-tasks.md](guide-and-tasks.md).)
 
 ![The phone dock: PLAY green and first, INVENTORY yellow, no RANKS. Offline render of the game's UI code, not a Roblox screenshot](mobile/dock-play-tile.png)
 - **FIGHT / MINE** (your kit or your pick, the X key on a keyboard) is a

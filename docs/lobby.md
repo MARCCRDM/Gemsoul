@@ -13,7 +13,7 @@ answer three questions at a glance:
 - **PLAY** shows how many miners are online and how many are searching for
   a 1v1. When you're alone it lists the modes instead. A band of light
   sweeps across it now and then.
-- **INVENTORY**, then **SKINS** (blue: opens the Store; the shop front in the Outpost is still signed STORE), TASKS, MARKET, RANKS, SOCIAL and INVITE.
+- **INVENTORY**, then **SKINS** (blue: opens the Store; the shop front in the Outpost is still signed STORE), TASKS, MARKET, GUIDE (how to play: [guide-and-tasks.md](guide-and-tasks.md)), SOCIAL and INVITE.
 - **Your card**:
   - your level badge, name and coins;
   - the XP still needed for the next level ("40 / 150 XP to level 6").
@@ -51,7 +51,7 @@ challenges' row shows the time left on today's three on its own; the "↻"
 it led with was a box too.
 
 On a phone the board isn't shown at all: the top right is kept clear for
-the game. The day's challenges are the Tasks window's **DAILY** page there
+the game. The day's challenges are the Tasks window's **TODAY** page there
 (and on a computer too), opened from the TASKS tile under PLAY.
 
 ## Daily challenges

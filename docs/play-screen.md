@@ -31,7 +31,8 @@ on the play screen:
 - Tapping it opens the Tasks window (`TrainingRewards.client`, through its
   `OpenTasks` event), on the page with something left to do.
 
-**Today's challenges are in the Tasks window too**, as its **DAILY** page.
+**Today's challenges are in the Tasks window too**, as its **DAILY** page
+(its **TODAY** page since the learning path: [guide-and-tasks.md](guide-and-tasks.md)).
 There are three cards, each with its progress, its coins and the time until
 new ones come. A fourth card, "All three today", pays the bonus. They show
 under "All" as well. The window sets an `Open` attribute with the count

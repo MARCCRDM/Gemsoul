@@ -584,6 +584,7 @@ local function finish(battle: Battle, winner: string, reason: string?)
 				PlayerData.count(player, if mixed then "MixedWins" else "KaijuWins")
 			end
 			KaijuServer.battleEnd(player)
+			PlayerData.training(player, "KaijuBattle")
 			local foe = foeOf(battle, player)
 			-- XP for you too, by the other player's level against yours
 			-- (Shared.Levelling: the same one beaten again soon, less).

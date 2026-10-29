@@ -158,7 +158,8 @@ function MobileLayout.dock(screen: Vector2, tiles: number)
 	-- Clear of Roblox's jump button at the bottom right (and as wide on the
 	-- left); no wider than it needs, so the ground in front of you shows.
 	local width = math.min(392, math.max(240, screen.X - 280))
-	local gap, tileHeight, playHeight = 6, 44, 38
+	-- (A tighter gap once there are eight tiles, so each stays big enough to tap.)
+	local gap, tileHeight, playHeight = if tiles >= 8 then 4 else 6, 44, 38
 	local height = playHeight + 6 + tileHeight
 	return {
 		X = (screen.X - width) / 2,

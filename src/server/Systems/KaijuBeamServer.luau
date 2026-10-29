@@ -367,6 +367,7 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 		Hovers = hovers,
 		Targets = roots,
 	})
+	PlayerData.training(player, "Hyperbeam")
 	return reply(true, "", { Start = start })
 end
 

@@ -1,62 +1,98 @@
 -- Pure account-persistent training objectives. No client supplies completion or payouts.
 local Training = {}
+-- The learning path: chapters (Category) in the order a new player meets
+-- them, the steps inside each in order. Step: what the card says to do,
+-- one short line; Hint: the how. Go: where its GO button takes you (the
+-- Tasks window: Mine, Inventory, Play, Market, Guide:<section>). Needs: a
+-- Config.Features switch it waits on (off: it's left out).
 Training.Objectives = {
- {Id="FirstRock",Category="Mining",Event="Mine",Goal=1,Coins=125,Name="First discovery",Hint="Break a rock in the Outpost. Click, tap or press E for each swing."},
- {Id="ThreeRocks",Category="Mining",Event="Mine",Goal=3,Coins=175,Name="Keep digging",Hint="Break three Outpost rocks. Every discovery can improve your build."},
- {Id="Enchant",Category="Equipment",Event="Enchant",Goal=1,Coins=125,Name="Power up your gear",Hint="Drag a gem onto an equipment socket in Inventory."},
- {Id="ThreeSlots",Category="Equipment",Event="Slot",Goal=3,Coins=250,Name="Build your loadout",Hint="Enchant three different equipment slots. Repeating one slot does not count."},
- {Id="EquipSurge",Category="Equipment",Event="EquipSurge",Goal=1,Coins=100,Name="Ready a Surge",Hint="In Inventory, move a gem into Q, E or R: its Surge is then yours to cast in fights."},
- {Id="Attack",Category="Combat",Event="Hit",Goal=1,Coins=100,Name="Make contact",Hint="Land a light or heavy weapon attack on an enemy."},
- {Id="Guard",Category="Combat",Event="Block",Goal=1,Coins=175,Name="Stand your ground",Hint="Face an enemy and hold Guard to absorb an incoming hit."},
- {Id="Cast",Category="Combat",Event="Surge",Goal=1,Coins=150,Name="Unleash your gem",Hint="Build Charge in a fight, then press Q, E or R (the gem buttons on a phone) to cast a Surge."},
- {Id="Rival",Category="Combat",Event="RivalWin",Goal=1,Coins=250,Name="First Rival victory",Hint="Defeat a Rival in practice or the Arena. No player opponent required."},
- {Id="GemFind",Category="Mining",Event="MineGem",Goal=1,Coins=125,Name="Something inside",Hint="Break a rock: every one holds a gem. Check its element and ability in Inventory."},
- {Id="RareFind",Category="Mining",Event="RareGem",Goal=1,Coins=300,Name="A rare discovery",Hint="Mine a Rare or better gem. Starter gifts and purchases do not count."},
- {Id="LegendFind",Category="Mining",Event="LegendGem",Goal=1,Coins=750,Name="Struck legendary",Hint="Discover a Legendary gem while mining. This is an optional long-term milestone."},
- {Id="TimedGuard",Category="Combat",Event="TimedBlock",Goal=1,Coins=200,Name="Perfect timing",Hint="Raise your shield just before a hit to perform a timed block."},
- {Id="PvPPlayed",Category="PvP",Event="PvPPlayed",Goal=1,Coins=200,Name="Enter the arena",Hint="Finish a player-versus-player 1v1 match. Winning is optional."},
- {Id="PvPWin",Category="PvP",Event="PvPWin",Goal=1,Coins=500,Name="First challenger defeated",Hint="Win a player-versus-player 1v1 match."},
- {Id="Boss",Category="PvE",Event="Boss",Goal=1,Coins=625,Name="Bring down a boss",Hint="Be alive with your party when a dungeon boss falls. Developer test runs do not count."},
- {Id="DungeonComplete",Category="PvE",Event="DungeonComplete",Goal=1,Coins=500,Name="Extraction complete",Hint="Finish a real dungeon run alive and collect your completion reward."},
- {Id="MarketBuy",Category="Market",Event="MarketBuy",Goal=1,Coins=175,Name="Find your upgrade",Hint="Complete a purchase from another player on the Market."},
- {Id="MarketSale",Category="Market",Event="MarketSale",Goal=1,Coins=375,Name="Open for business",Hint="Sell an item to another player. Earn this when the sale payment arrives."},
+ -- Basics: dig in.
+ {Id="FirstRock",Category="Basics",Event="Mine",Goal=1,Coins=125,Go="Mine",Name="Break your first rock",Hint="Walk up to a glowing rock in the Outpost and swing: click, tap or press E."},
+ {Id="GemFind",Category="Basics",Event="MineGem",Goal=1,Coins=125,Go="Mine",Name="Find a gem",Hint="Every rock holds a gem. It flies into your bag the moment the rock breaks."},
+ {Id="ThreeRocks",Category="Basics",Event="Mine",Goal=3,Coins=175,Go="Mine",Name="Keep digging",Hint="Break three rocks. More gems, more choices for your build."},
+ -- Gear: gems make you stronger.
+ {Id="Enchant",Category="Gear",Event="Enchant",Goal=1,Coins=125,Go="Inventory",Name="Socket a gem",Hint="Open Inventory and drag a gem onto a piece of your gear."},
+ {Id="EquipSurge",Category="Gear",Event="EquipSurge",Goal=1,Coins=100,Go="Inventory",Name="Ready a Surge",Hint="In Inventory, put a gem in Q, E or R. That's a power you can cast in fights."},
+ {Id="ThreeSlots",Category="Gear",Event="Slot",Goal=3,Coins=250,Go="Inventory",Name="Build your loadout",Hint="Socket gems into three different pieces of gear."},
+ -- Fight: the basics of a duel.
+ {Id="Attack",Category="Fight",Event="Hit",Goal=1,Coins=100,Go="Play",Name="Land a hit",Hint="Click or tap to swing your sword at an enemy. PLAY, then Practice, is a safe place to try."},
+ {Id="Guard",Category="Fight",Event="Block",Goal=1,Coins=175,Go="Play",Name="Block a hit",Hint="Hold right click (or the shield button) as a blow comes in."},
+ {Id="Cast",Category="Fight",Event="Surge",Goal=1,Coins=150,Go="Play",Name="Cast a Surge",Hint="Fighting fills your Charge. When it's ready, press Q, E or R (the gem buttons on a phone)."},
+ {Id="TimedGuard",Category="Fight",Event="TimedBlock",Goal=1,Coins=200,Go="Play",Name="Perfect block",Hint="Raise your shield just before the hit lands, not long before."},
+ {Id="Rival",Category="Fight",Event="RivalWin",Goal=1,Coins=250,Go="Play",Name="Beat a Rival",Hint="PLAY, then 1v1 Practice: win against a computer miner."},
+ -- Kaiju: your team.
+ {Id="KaijuCatch",Category="Kaiju",Event="KaijuCatch",Goal=1,Coins=300,Go="Guide:Kaiju",Needs="Kaiju",Name="Catch a kaiju",Hint="Wear a wild kaiju down until it glows gold and its plate says CATCH, then catch it."},
+ {Id="Hyperbeam",Category="Kaiju",Event="Hyperbeam",Goal=1,Coins=200,Go="Guide:Kaiju",Needs="Kaiju",Name="Fire a HYPERBEAM",Hint="Your kaiju charge it as they fight. When it's full, press Z (the beam button on a phone)."},
+ {Id="KaijuBattle",Category="Kaiju",Event="KaijuBattle",Goal=1,Coins=250,Go="Guide:Kaiju",Needs="Kaiju",Name="Kaiju Arena",Hint="Downstairs in the Shelter: step on a pad, place your kaiju, and watch them battle."},
+ -- Explore: the Outpost and beyond.
+ {Id="Mech",Category="Explore",Event="Mech",Goal=1,Coins=150,Go="Guide:Outpost",Needs="Mechs",Name="Pilot a mech",Hint="Find the garage in the Shelter and climb into a mech."},
+ {Id="RiftBoss",Category="Explore",Event="RiftBoss",Goal=1,Coins=500,Go="Guide:Rift",Needs="Kaiju",Name="Beat a Rift boss",Hint="Mine out to the Rift Vein, step through the gate and take down the boss at the end."},
+ -- PvP: real players.
+ {Id="PvPPlayed",Category="PvP",Event="PvPPlayed",Goal=1,Coins=200,Go="Play",Name="Enter the arena",Hint="Finish a 1v1 against a real player. Winning is optional."},
+ {Id="PvPWin",Category="PvP",Event="PvPWin",Goal=1,Coins=500,Go="Play",Name="First challenger defeated",Hint="Win a 1v1 against a real player."},
+ -- PvE: dungeons with a party.
+ {Id="Boss",Category="PvE",Event="Boss",Goal=1,Coins=625,Go="Play",Name="Bring down a boss",Hint="Be alive with your party when a dungeon boss falls. Developer test runs do not count."},
+ {Id="DungeonComplete",Category="PvE",Event="DungeonComplete",Goal=1,Coins=500,Go="Play",Name="Extraction complete",Hint="Finish a real dungeon run alive and collect your completion reward."},
+ -- Market: trade with players.
+ {Id="MarketBuy",Category="Market",Event="MarketBuy",Goal=1,Coins=175,Go="Market",Name="Find your upgrade",Hint="Buy something another player listed on the Market."},
+ {Id="MarketSale",Category="Market",Event="MarketSale",Goal=1,Coins=375,Go="Market",Name="Open for business",Hint="Sell an item to another player. It counts when the payment arrives."},
+ -- Discoveries: long-term, never in the way.
+ {Id="RareFind",Category="Discoveries",Event="RareGem",Goal=1,Coins=300,Go="Mine",Name="A rare discovery",Hint="Mine a Rare or better gem. Starter gifts and purchases do not count."},
+ {Id="LegendFind",Category="Discoveries",Event="LegendGem",Goal=1,Coins=750,Go="Mine",Name="Struck legendary",Hint="Discover a Legendary gem while mining. A long-term goal: no rush."},
 }
--- Sequential presentation only; valid gameplay still earns credit in any order.
-Training.Pages={"Mining","Equipment","Combat","PvP","PvE","Market","Discoveries"}
--- Pages for activities that are switched off (Config.Features), e.g.
--- Closed.PvE while dungeons are closed: they're left out of the list and the
--- count, and never the page the window opens on. Filled in from
--- Config.Features by closeFor.
+-- The chapters, in order (the window opens on the first with steps left).
+Training.Pages={"Basics","Gear","Fight","Kaiju","Explore","PvP","PvE","Market","Discoveries"}
+-- What each chapter teaches, one line (the Tasks window's chapter header).
+Training.Blurbs={
+ Basics="Mine rocks, find gems.",
+ Gear="Gems in your gear make you stronger.",
+ Fight="Swing, block and cast: the duel basics.",
+ Kaiju="Catch kaiju and fight as a team.",
+ Explore="Mechs, the Rift and its bosses.",
+ PvP="Test yourself against real players.",
+ PvE="Dungeons with a party.",
+ Market="Buy and sell with other players.",
+ Discoveries="Rare finds. Long-term goals, no rush.",
+}
+-- Chapters for activities that are switched off (Config.Features), e.g.
+-- Closed.PvE while dungeons are closed, and single steps waiting on a
+-- switch (Needs, Off): they're left out of the list and the count, and
+-- never the chapter the window opens on. Filled in from Config.Features
+-- by closeFor.
 Training.Closed={}
+Training.Off={}
 function Training.closeFor(features)
  Training.Closed.PvE=features.Dungeons==false
  Training.Closed.Market=features.Market==false
+ Training.Off.Kaiju=features.Kaiju==false
+ Training.Off.Mechs=features.Mechs==false
 end
 function Training.pageOf(objective)
  if objective.Id=="RareFind" or objective.Id=="LegendFind" then return "Discoveries" end
  return objective.Category
 end
 function Training.listed(objective)
- return not Training.Closed[Training.pageOf(objective)]
+ return not Training.Closed[Training.pageOf(objective)] and not (objective.Needs and Training.Off[objective.Needs])
 end
 function Training.currentPage(paid)
  for index,name in Training.Pages do
   if Training.Closed[name] then continue end
   local total,done=0,0
   for _,o in Training.Objectives do
-   if Training.pageOf(o)==name then total+=1;if paid[o.Id] then done+=1 end end
+   if Training.pageOf(o)==name and Training.listed(o) then total+=1;if paid[o.Id] then done+=1 end end
   end
   if done<total then return name,index,done,total end
  end
  return nil,#Training.Pages,0,0
 end
--- The one task to point a player at (the lobby's tracker): the first one
--- left on the current page, or nil when every listed task is done.
+-- The one task to point a player at (the lobby's tracker, the window's NEXT
+-- STEP): the first one left on the current chapter, or nil when every
+-- listed task is done.
 function Training.nextTask(paid)
  local page=Training.currentPage(paid)
  if not page then return nil end
  for _,o in Training.Objectives do
-  if Training.pageOf(o)==page and not paid[o.Id] then return o end
+  if Training.pageOf(o)==page and Training.listed(o) and not paid[o.Id] then return o end
  end
  return nil
 end

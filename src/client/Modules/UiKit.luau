@@ -165,7 +165,7 @@ UiKit.Covers = {
 	MarketBoard = true, ChallengeChooser = true, Character = true, Party = true,
 	Referral = true, TopPlayers = true, EquipmentTrade = true, KaijuPanel = true,
 	Rift = true, Guide = true, GemPouch = true, KaijuRoll = true, KaijuPit = true,
-	KennelSale = true,
+	KennelSale = true, TipGuide = true,
 }
 local coverWatch = nil -- { Up = { [ScreenGui]: true }, Listeners = { fn } }
 -- Calls `fn(covered)` now, and again each time one of them opens or closes.

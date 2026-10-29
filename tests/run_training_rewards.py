@@ -20,7 +20,7 @@ Training.record(p,"Slot","Weapon");Training.record(p,"Slot","Shield")
 check(p.Coins==775,"Distinct gear reward")
 for _,event in {"EquipSurge","Heavy","Block","Surge","RivalWin"} do Training.record(p,event) end
 check(p.Coins==1550,"Total reward budget must be 1450 (5x the beta's 290)")
-local extraEvents={"MineGem","RareGem","LegendGem","TimedBlock","PvPPlayed","PvPWin","Boss","DungeonComplete","MarketBuy","MarketSale"}
+local extraEvents={"MineGem","RareGem","LegendGem","TimedBlock","PvPPlayed","PvPWin","Boss","DungeonComplete","MarketBuy","MarketSale","KaijuCatch","Hyperbeam","KaijuBattle","Mech","RiftBoss"}
 for _,event in extraEvents do Training.record(p,event) end
 local total=100
 local ids={}
@@ -46,11 +46,11 @@ check(outOfOrder.Coins==250 and not outOfOrder.TrainingRewards.Paid.FirstRock,"O
 local _,changed=Training.record(outOfOrder,"RivalWin")
 check(not changed,"Completed action should not keep syncing")
 local paid={}
-check(Training.currentPage(paid)=="Mining","Mining must be first")
+check(Training.currentPage(paid)=="Basics","Basics must be first")
 paid.PvPWin=true
-check(Training.currentPage(paid)=="Mining","Later credit must not skip unfinished mining")
-for _,o in Training.Objectives do if Training.pageOf(o)=="Mining" then paid[o.Id]=true end end
-check(Training.currentPage(paid)=="Equipment","Completed mining must advance automatically")
+check(Training.currentPage(paid)=="Basics","Later credit must not skip unfinished basics")
+for _,o in Training.Objectives do if Training.pageOf(o)=="Basics" then paid[o.Id]=true end end
+check(Training.currentPage(paid)=="Gear","Completed basics must advance automatically")
 check(not paid.LegendFind and Training.pageOf({Id="LegendFind"})=="Discoveries","Legendary must not gate learning")
 for _,page in Training.Pages do
  for _,o in Training.Objectives do if Training.pageOf(o)==page then paid[o.Id]=true end end
@@ -65,18 +65,39 @@ end
 check(Training.currentPage(partway)=="PvE","Open PvE page should come next")
 Training.Closed.PvE=true
 check(Training.currentPage(partway)=="Market","A closed page held up the next one")
-check(not Training.listed({Id="Boss",Category="PvE"}) and Training.listed({Id="FirstRock",Category="Mining"}),"Closed tasks listed (or open ones hidden)")
+check(not Training.listed({Id="Boss",Category="PvE"}) and Training.listed({Id="FirstRock",Category="Basics"}),"Closed tasks listed (or open ones hidden)")
 Training.Closed.PvE=nil
 -- The lobby tracker's task: the first left on the current page.
 check(Training.nextTask({}).Id=="FirstRock","The tracker must start on the first rock")
-check(Training.nextTask({FirstRock=true,PvPWin=true}).Id=="ThreeRocks","The tracker skipped ahead")
+check(Training.nextTask({FirstRock=true,PvPWin=true}).Id=="GemFind","The tracker skipped ahead")
 local miningDone={}
-for _,o in Training.Objectives do if Training.pageOf(o)=="Mining" then miningDone[o.Id]=true end end
+for _,o in Training.Objectives do if Training.pageOf(o)=="Basics" then miningDone[o.Id]=true end end
 check(Training.nextTask(miningDone).Id=="Enchant","After mining the tracker must point at socketing")
 Training.Closed.PvE=true
 check(Training.nextTask(partway).Category=="Market","The tracker pointed at a closed task")
 Training.Closed.PvE=nil
 check(Training.nextTask(paid)==nil,"The tracker must go when every task is done")
+-- The learning path: every step has its chapter, a GO and words; the
+-- chapters are in order and each has its blurb.
+local seenPages={}
+for _,o in Training.Objectives do
+ check(table.find(Training.Pages,o.Category)~=nil,"A step outside the chapters: "..o.Id)
+ check(type(o.Go)=="string" and #o.Name>0 and #o.Hint>0,"A step without GO or words: "..o.Id)
+ local i=table.find(Training.Pages,o.Category)
+ for _,j in seenPages do check(j<=i,"Steps out of chapter order at "..o.Id) end
+ table.insert(seenPages,i)
+end
+for _,page in Training.Pages do check(type(Training.Blurbs[page])=="string","No blurb for "..page) end
+check(Training.Objectives[1].Id=="FirstRock" and Training.Pages[1]=="Basics","The path doesn't start at the first rock")
+-- A step waiting on a switched-off feature (Mechs off) is left out, and the
+-- chapter moves on without it.
+Training.closeFor({Mechs=false})
+check(not Training.listed({Id="Mech",Category="Explore",Needs="Mechs"}),"A step for a switched-off feature is listed")
+local allButMech={}
+for _,o in Training.Objectives do if o.Id~="Mech" and Training.pageOf(o)~="Explore" then allButMech[o.Id]=true end end
+allButMech.Mech=nil
+check(Training.nextTask(allButMech).Id=="RiftBoss","The tracker pointed at a switched-off step")
+Training.closeFor({})
 print("PASS: "..checks.." training reward checks: payouts, repeated actions, unique slots, persistence, replay and any-order progression")
 """
 with tempfile.TemporaryDirectory(prefix="gemsoul-rewards-") as d:

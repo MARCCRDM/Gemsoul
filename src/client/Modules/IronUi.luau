@@ -313,6 +313,15 @@ function IronUi.emblem(parent: Instance, kind: string, color: Color3, size: numb
 		bar(0.71 - 0.421, 0.44, 0.842, 0.065, 60)
 		bar(0.465, 0.36, 0.07, 0.24)
 		bar(0.465, 0.65, 0.07, 0.07)
+	elseif kind == "Guide" then
+		-- An open book: two pages from the spine, lines on them.
+		outline(0.1, 0.22, 0.38, 0.56, -4)
+		outline(0.52, 0.22, 0.38, 0.56, 4)
+		bar(0.485, 0.2, 0.03, 0.62)
+		for _, y in { 0.36, 0.48, 0.6 } do
+			bar(0.17, y, 0.24, 0.045, -4)
+			bar(0.59, y, 0.24, 0.045, 4)
+		end
 	elseif kind == "Tasks" then
 		-- A clipboard: its clip, a ticked line and two to do.
 		corner(outline(0.2, 0.16, 0.6, 0.72), UDim.new(0.12, 0))

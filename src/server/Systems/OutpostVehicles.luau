@@ -216,6 +216,12 @@ function OutpostVehicles.board(player: Player, machine: Machine): boolean
 	machine.Prompt.Enabled = false
 	machine.Model:SetAttribute("MechPilotId", player.UserId)
 	player:SetAttribute("MechPilot", machine.Id)
+	-- (A Tasks step: Pilot a mech. Required here: PlayerData isn't loaded
+	-- in the tests that drive the mechs alone.)
+	local ok, PlayerData = pcall(require, script.Parent.PlayerData)
+	if ok and PlayerData.training then
+		PlayerData.training(player, "Mech")
+	end
 	publish(machine)
 	print(string.format("[Mech] %s is piloting %s", player.Name, machine.Id))
 	return true

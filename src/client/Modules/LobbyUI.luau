@@ -8,7 +8,7 @@
 	unlock, a REPORT A BUG button at the top right, and the PLAY menu that
 	picks what to play. On a phone: a row of icon tiles at the bottom
 	centre, PLAY the first (a green tile; the big PLAY bar goes), INVENTORY
-	yellow after it, TASKS one of them, no RANKS; level and coins at the top
+	yellow after it, TASKS and GUIDE among them; level and coins at the top
 	left with your health under them, and nothing on the right: no board
 	(the challenges are the Tasks window's DAILY page) and no bug button
 	(SOCIAL has the form).
@@ -24,6 +24,8 @@
 
 	  LobbyUI.setVisible(on)  Lobby.client shows it while you're in the lobby
 	  LobbyUI.dashboardOpen() true while the dashboard is open over the lobby
+	  LobbyUI.openDashboard() / closeDashboard()   open or close it
+	  LobbyUI.openPicker()    the PLAY menu
 	  LobbyUI.Unlocks         duels needed for each mode
 ]]
 local Players = game:GetService("Players")
@@ -983,7 +985,7 @@ local inventoryLook -- (below: INVENTORY yellow on a phone)
 local function fitDock()
 	local size = gui.AbsoluteSize
 	local mobile = UiKit.handheld(size)
-	-- (On a phone: PLAY a green tile first, no RANKS; on a computer the
+	-- (On a phone: PLAY a green tile first; on a computer the
 	-- other way round.)
 	local buttons = {}
 	for _, button in tiles:GetChildren() do
@@ -1160,6 +1162,12 @@ function LobbyUI.closeDashboard()
 	showDashboard(false)
 end
 
+-- The Inventory (the dashboard over the lobby), as its tile opens it (a
+-- Tasks step's GO).
+function LobbyUI.openDashboard()
+	showDashboard(true)
+end
+
 local inventoryTile = tile("INVENTORY", "Pack", P.Gold, function()
 	showDashboard(true)
 end)
@@ -1238,9 +1246,11 @@ end)
 tile("MARKET", "Market", ICON, function()
 	require(script.Parent.MarketBoardUI).open()
 end)
-tile("RANKS", "Ranks", ICON, function()
-	require(script.Parent.TopPlayersUI).toggle()
-end):SetAttribute("DeskOnly", true) -- (not on a phone)
+-- How to play: the GUIDE (Modules/GuideUI), on a computer and on a phone.
+-- (The Hall of Fame stays on its board in the Shelter.)
+tile("GUIDE", "Guide", ICON, function()
+	require(script.Parent.GuideUI).toggle()
+end)
 tile("SOCIAL", "Social", ICON, function()
 	require(script.Parent.SocialUI).toggle()
 end)
