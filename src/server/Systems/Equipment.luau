@@ -3172,6 +3172,9 @@ local function buildPreviews(player: Player, store: Instance, loadout, wanted)
 				part.CFrame = origin:ToObjectSpace(part.CFrame)
 				part.Parent = preview
 			end
+			-- How many parts make it whole: the client draws it only once
+			-- they've all replicated (not the first few, a piece half there).
+			preview:SetAttribute("Parts", #preview:GetChildren())
 			preview.Parent = store
 		end
 		if ok and folder then

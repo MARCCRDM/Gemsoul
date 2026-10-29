@@ -435,7 +435,29 @@ end
 
 -- Art --------------------------------------------------------------------------------------------------
 
+-- The pieces' 3D art is built by the server on request. Asked until it says
+-- it's all built: one lost to its pacing ("Slow down!" when the Inventory's
+-- other requests go at the same moment) or made while a build was running
+-- used to leave the drawn icons up for good.
 local previewAskedAt = -math.huge
+local previewsAsking = false
+local function askPreviews()
+	if previewsAsking then
+		return
+	end
+	previewsAsking = true
+	previewAskedAt = os.clock()
+	task.spawn(function()
+		for attempt = 1, 6 do
+			local ok, result = pcall(GemClient.request, "GearPreviews")
+			if ok and typeof(result) == "table" and result.Ok and result.Done then
+				break
+			end
+			task.wait(0.4 * attempt)
+		end
+		previewsAsking = false
+	end)
+end
 local function gearArt(holder: Instance, slot: string, id: string, worn: boolean, color: Color3)
 	clear(holder)
 	local view = new("ViewportFrame", {
@@ -452,11 +474,8 @@ local function gearArt(holder: Instance, slot: string, id: string, worn: boolean
 	local ok, drawn = pcall(GearArt.draw, view, slot, id, false)
 	if not (ok and drawn) then
 		view:Destroy()
-		if worn and os.clock() - previewAskedAt > 4 then
-			previewAskedAt = os.clock()
-			task.spawn(function()
-				pcall(GemClient.request, "GearPreviews")
-			end)
+		if os.clock() - previewAskedAt > 4 then
+			askPreviews()
 		end
 		local gear = gearOf(loadoutNow(), slot, id)
 		if gear then
@@ -3854,9 +3873,7 @@ local function drawDetail(loadout)
 			local askKey = slot .. ":" .. #items
 			if #items > 0 and previewAsked ~= askKey then
 				previewAsked = askKey
-				task.spawn(function()
-					pcall(GemClient.request, "GearPreviews")
-				end)
+				askPreviews()
 			end
 			drawGrid(items, "No spare " .. string.lower(SLOT_NAME[slot]) .. " pieces. Mine and trade for more.")
 		end
@@ -4622,7 +4639,9 @@ function InventoryV2.setActive(on: boolean)
 	if root then
 		root.Visible = on
 	end
-	if not on then
+	if on then
+		askPreviews() -- (every piece's art up to date before it's looked at)
+	else
 		if ui.Intro then
 			ui.Intro.Visible = false
 		end
@@ -4699,13 +4718,22 @@ local function watchStore(store: Instance)
 	end)
 end
 local function watchPreviews(store: Instance)
-	store.ChildAdded:Connect(function()
-		-- (the worn slots redraw from it too)
-		gearChanged()
-		if state.Tab == "Pieces" then
-			gridKey = ""
-			draw()
+	-- A preview arrives, then its parts: once a moment after the last one
+	-- lands, everything showing art redraws (the worn slots too).
+	local due = false
+	store.DescendantAdded:Connect(function()
+		if due then
+			return
 		end
+		due = true
+		task.delay(0.25, function()
+			due = false
+			gearChanged()
+			if state.Tab == "Pieces" then
+				gridKey = ""
+				draw()
+			end
+		end)
 	end)
 end
 if playerGui:FindFirstChild("MinerPreviews") then
