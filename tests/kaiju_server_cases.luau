@@ -6860,12 +6860,13 @@ end)()
 	profiles[c] = { Gems = {}, Coins = 0, Milestones = {} }
 	check(not Kaiju.supportOwed(profiles[c]), "The support came before the roll")
 	-- (its element rolled with the roll: the card shows the one that comes)
+	-- (a new account always comes with a Skyjelly, its element one of the four)
+	check(Kaiju.StarterSupport.On, "New accounts don't come with a Skyjelly")
 	local shown = registered.KaijuRoll(c)
-	if Kaiju.StarterSupport.On then
-		check(shown.Support and table.find(Kaiju.Elements, shown.Support.Element) ~= nil, "The roll doesn't show the support's element")
-	else
-		check(shown.Support == nil, "The roll deals a support")
-	end
+	check(
+		shown.Support and shown.Support.Species == "Skyjelly" and table.find(Kaiju.Elements, shown.Support.Element) ~= nil,
+		"The roll doesn't show the Skyjelly and its element"
+	)
 	check(registered.KaijuRollClaim(c).Ok, "Couldn't claim the roll")
 	local roster = Kaiju.roster(profiles[c])
 	if not Kaiju.StarterSupport.On then

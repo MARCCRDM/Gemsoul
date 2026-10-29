@@ -1140,12 +1140,13 @@ do
 		check(Kaiju.supportGuard(fighter) == nil and Kaiju.gemMove(fighter) == Kaiju.recordSurge(fighter), "A fighter's gem move changed")
 	end
 	check(Kaiju.supportId({ List = {}, Next = 1 }) == nil, "A support out of nowhere")
-	-- Owed once, after the roll, unless you have the kind (while there's
-	-- a starter support at all: none now, Kaiju.StarterSupport.On).
+	-- Every new account comes with a Skyjelly (Kaiju.StarterSupport): owed
+	-- once, after the roll, unless you have the kind.
+	check(Kaiju.StarterSupport.On and Kaiju.StarterSupport.Species == "Skyjelly", "New accounts don't come with a Skyjelly")
 	local profile = { Kaiju = { List = {}, Next = 1 } }
 	check(not Kaiju.supportOwed(profile), "The support owed before the roll")
 	profile.KaijuRolled = Kaiju.RollVersion
-	check(Kaiju.supportOwed(profile) == Kaiju.StarterSupport.On, "The support owed or not after the roll, against StarterSupport.On")
+	check(Kaiju.supportOwed(profile), "The Skyjelly isn't owed after the roll")
 	profile.KaijuSupport = Kaiju.SupportVersion
 	check(not Kaiju.supportOwed(profile), "The support owed twice")
 	-- No roll deals a support kind, nor the Kaiju of the Day.
