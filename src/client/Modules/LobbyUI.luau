@@ -57,6 +57,14 @@ LobbyUI.Art = {
 	Dungeon = 85958638729400,
 	Ranked = 108455735818338,
 }
+do
+	-- (fetched now, so the PLAY menu's cards open with their art)
+	local ids = {}
+	for _, id in LobbyUI.Art do
+		table.insert(ids, id)
+	end
+	require(script.Parent.ImagePreload).add(ids)
+end
 
 local GREEN = Color3.fromRGB(62, 220, 120)
 local RED = Color3.fromRGB(232, 72, 72)

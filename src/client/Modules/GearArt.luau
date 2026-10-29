@@ -93,6 +93,13 @@ function GearArt.preview(slotName: string, id: string): Instance?
 	return store and store:FindFirstChild(slotName .. "|" .. id)
 end
 
+-- Whether all of a preview's parts have arrived (the server counts them in
+-- its "Parts"; a preview's children can come after the preview itself).
+function GearArt.complete(preview: Instance): boolean
+	local parts = preview:GetAttribute("Parts")
+	return typeof(parts) ~= "number" or #preview:GetChildren() >= parts
+end
+
 -- Lightweight drawn icons keep a large reserve bag cheap to render (no 3D).
 local BLACK, WHITE = Color3.new(0, 0, 0), Color3.new(1, 1, 1)
 -- The vector icons (tools/gear_icons/*.svg, baked by tools/make_gear_icons.js
@@ -220,6 +227,9 @@ function GearArt.draw(view: ViewportFrame, slotName: string, id: string, worn: b
 	local character = player.Character
 	local equipment = character and character:FindFirstChild("GemsoulGear")
 	local source = if worn then equipment and equipment:FindFirstChild(slotName) else GearArt.preview(slotName, id)
+	if source and not worn and not GearArt.complete(source) then
+		return false -- (still replicating: drawn once it's all here)
+	end
 	if source then
 		for _, part in source:GetDescendants() do
 			if part:IsA("BasePart") then

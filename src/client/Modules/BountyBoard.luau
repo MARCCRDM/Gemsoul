@@ -1,8 +1,8 @@
 --[[
-	The bounty board out on the hall floor (Shared.Bounties.Board), where
-	its inlay bands cross between the Hall of Fame and Brutus's booth: a
-	freestanding screen on two lit pylons with a BOUNTIES lightbox and
-	crossed blades on top, a glowing ring on the floor round it. Each face
+	The bounty board out on the hall floor (Shared.Bounties.Board), on the
+	way in from the garage between the Kennel and the Hall of Fame: a big
+	freestanding screen on two lit pylons, a lit visor over it with
+	a BOUNTIES lightbox and crossed blades on top, a glowing pad round it. Each face
 	shows one bounty, WANTED: the boss itself, a big figure of its body
 	(ReplicatedStorage.RiftPortraits) standing on a lit ledge out of the
 	screen's left half, in its element's light; beside it its name, element,
@@ -32,6 +32,8 @@ local RiftRun = require(Shared:WaitForChild("RiftRun"))
 
 local BountyBoard = {}
 BountyBoard.Reach = 260 -- studs from the board: past this it's put away
+BountyBoard.Scale = 1.3 -- how much bigger than the first board
+local K = BountyBoard.Scale
 
 -- The look: the hall's dark steel and bounty amber, WANTED in red.
 local DARK = Color3.fromRGB(34, 36, 44)
@@ -170,7 +172,7 @@ end
 -- screen's left half, turned a little to look out, a lamp over it. (A real
 -- figure, not a ViewportFrame: those don't draw on a board out in the
 -- world.) It may still be on its way from the server: put in when it comes.
-local STAGE = { X = 2.4, Y = -0.1, W = 4.2, H = 5.5 } -- (studs, on the face: the stage's middle and room)
+local STAGE = { X = 2.4 * K, Y = -0.1 * K, W = 4.2 * K, H = 5.5 * K } -- (studs, on the face: the stage's middle and room)
 local function bounds(model: Model, pivot: CFrame): (Vector3, Vector3)
 	local lo, hi = Vector3.one * math.huge, -Vector3.one * math.huge
 	for _, part in model:GetDescendants() do
@@ -236,12 +238,12 @@ local function portrait(face: Face, id: string, tint: Color3?)
 	local ledge = piece(body, foot * CFrame.new(0, -0.09, 0), Vector3.new(STAGE.W + 0.4, 0.18, size.Z + 0.6), DARK, Enum.Material.Metal)
 	ledge.Name = "Ledge"
 	piece(body, foot * CFrame.new(0, -0.09, -(size.Z + 0.6) / 2), Vector3.new(STAGE.W + 0.42, 0.2, 0.06), tint or AMBER, Enum.Material.Neon).Name = "LedgeEdge"
-	light(ledge, tint or AMBER, 7, 1.4)
+	light(ledge, tint or AMBER, 7 * K, 1.4)
 	-- (a lamp over it, so it reads from across the hall)
 	local lamp = piece(body, foot * CFrame.new(0, STAGE.H + 0.8, -0.4), Vector3.new(0.2, 0.2, 0.2), DARK, Enum.Material.Metal)
 	lamp.Name, lamp.Transparency = "Lamp", 1
 	local spot = Instance.new("SpotLight")
-	spot.Face, spot.Angle, spot.Range, spot.Brightness = Enum.NormalId.Bottom, 70, 10, 2.4
+	spot.Face, spot.Angle, spot.Range, spot.Brightness = Enum.NormalId.Bottom, 70, 10 * K, 2.4
 	spot.Color, spot.Shadows = Color3.fromRGB(255, 240, 220), false
 	spot.Parent = lamp
 	body.Name = "Figure"
@@ -283,62 +285,81 @@ local function draw(face: Face, entry, index: number, total: number)
 	TweenService:Create(flash, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
 end
 
--- The board, built once in the Shelter's frame.
+-- The board, built once in the Shelter's frame: laid out in the first
+-- board's units, K times bigger. A dark slate pad in an amber ring with a
+-- mark at each corner, the plinth; two pylons on stepped feet, an amber
+-- slit up each side, a red beacon on top; the screen in its housing,
+-- a visor over it lit along its lip; the BOUNTIES lightbox on the visor and
+-- the crossed blades over that.
 local function build(frame: CFrame): Folder
 	local made = Instance.new("Folder")
 	made.Name = "BountyBoard"
 	local b = frame * CFrame.new(Bounties.Board.Spot)
-	-- The ring on the floor round it, and the plinth.
-	disc(made, b * CFrame.new(0, 0.06, 0), 5.8, 0.04, AMBER, Enum.Material.Neon).Transparency = 0.15
-	disc(made, b * CFrame.new(0, 0.07, 0), 5.5, 0.05, Color3.fromRGB(30, 30, 38), Enum.Material.Slate)
-	disc(made, b * CFrame.new(0, 0.45, 0), 3.2, 0.9, DARK, Enum.Material.Metal, true)
-	disc(made, b * CFrame.new(0, 0.92, 0), 3.3, 0.08, AMBER, Enum.Material.Metal)
-	disc(made, b * CFrame.new(0, 0.97, 0), 2.9, 0.04, AMBER, Enum.Material.Neon).Transparency = 0.3
-	disc(made, b * CFrame.new(0, 0.98, 0), 2.55, 0.05, DARK, Enum.Material.Metal)
-	-- The pylons: dark steel, an amber slit up each side, a red cap.
+	local function at(x: number, y: number, z: number): CFrame
+		return b * CFrame.new(x * K, y * K, z * K)
+	end
+	local function size(x: number, y: number, z: number): Vector3
+		return Vector3.new(x, y, z) * K
+	end
+	-- The pad and the plinth.
+	disc(made, b * CFrame.new(0, 0.06, 0), 6 * K, 0.04, AMBER, Enum.Material.Neon).Transparency = 0.15
+	disc(made, b * CFrame.new(0, 0.07, 0), 6 * K - 0.3, 0.05, Color3.fromRGB(30, 30, 38), Enum.Material.Slate)
+	for i = 0, 3 do
+		local mark = b * CFrame.Angles(0, math.pi / 4 + i * math.pi / 2, 0) * CFrame.new(0, 0.11, -(6 * K - 1.3))
+		piece(made, mark, Vector3.new(0.4, 0.04, 1.8), AMBER, Enum.Material.Neon).Transparency = 0.2
+	end
+	disc(made, at(0, 0.45, 0), 3.2 * K, 0.9 * K, DARK, Enum.Material.Metal, true)
+	disc(made, at(0, 0.92, 0), 3.3 * K, 0.08 * K, AMBER, Enum.Material.Metal)
+	disc(made, at(0, 0.97, 0), 2.9 * K, 0.04 * K, AMBER, Enum.Material.Neon).Transparency = 0.3
+	disc(made, at(0, 0.98, 0), 2.55 * K, 0.05 * K, DARK, Enum.Material.Metal)
+	-- The pylons.
 	for _, s in { -1, 1 } do
-		local foot = b * CFrame.new(s * 5.6, 0, 0)
-		piece(made, foot * CFrame.new(0, 0.3, 0), Vector3.new(2, 0.6, 2), DARK, Enum.Material.Metal, true)
-		piece(made, foot * CFrame.new(0, 6.8, 0), Vector3.new(1.1, 13, 1.1), DARK, Enum.Material.Metal, true)
+		local x = s * 5.6
+		piece(made, at(x, 0.3, 0), size(2.4, 0.6, 2.4), DARK, Enum.Material.Metal, true)
+		piece(made, at(x, 0.75, 0), size(1.7, 0.3, 1.7), STEEL, Enum.Material.Metal, true)
+		piece(made, at(x, 6.8, 0), size(1.1, 13, 1.1), DARK, Enum.Material.Metal, true)
 		for _, side in { -1, 1 } do
-			piece(made, foot * CFrame.new(0, 6.8, side * 0.57), Vector3.new(0.28, 11, 0.06), AMBER, Enum.Material.Neon)
+			piece(made, at(x, 6.8, side * 0.57), size(0.28, 11, 0.06), AMBER, Enum.Material.Neon)
 		end
-		piece(made, foot * CFrame.new(s * 0.57, 6.8, 0), Vector3.new(0.06, 11, 0.28), AMBER, Enum.Material.Neon)
-		local cap = piece(made, foot * CFrame.new(0, 13.45, 0), Vector3.new(1.4, 0.3, 1.4), RED, Enum.Material.Neon)
-		light(cap, Color3.fromRGB(255, 120, 90), 8, 0.6)
-		piece(made, foot * CFrame.new(-s * 0.55, 7.6, 0), Vector3.new(0.8, 1.4, 0.7), STEEL, Enum.Material.Metal)
+		piece(made, at(x + s * 0.57, 6.8, 0), size(0.06, 11, 0.28), AMBER, Enum.Material.Neon)
+		local cap = piece(made, at(x, 13.45, 0), size(1.4, 0.3, 1.4), RED, Enum.Material.Neon)
+		light(cap, Color3.fromRGB(255, 120, 90), 8 * K, 0.6)
+		piece(made, at(x - s * 0.55, 7.6, 0), size(0.8, 1.4, 0.7), STEEL, Enum.Material.Metal)
 	end
 	-- The screen: a dark housing, amber edges, a face each way.
-	piece(made, b * CFrame.new(0, 7.6, 0), Vector3.new(10.2, 7.2, 1), DARK, Enum.Material.Metal, true)
+	piece(made, at(0, 7.6, 0), size(10.2, 7.2, 1), DARK, Enum.Material.Metal, true)
 	for _, y in { -3.62, 3.62 } do
-		piece(made, b * CFrame.new(0, 7.6 + y, 0), Vector3.new(10.4, 0.18, 1.08), AMBER, Enum.Material.Metal)
+		piece(made, at(0, 7.6 + y, 0), size(10.4, 0.18, 1.08), AMBER, Enum.Material.Metal)
 	end
 	for _, x in { -5.12, 5.12 } do
-		piece(made, b * CFrame.new(x, 7.6, 0), Vector3.new(0.18, 7.4, 1.08), AMBER, Enum.Material.Metal)
+		piece(made, at(x, 7.6, 0), size(0.18, 7.4, 1.08), AMBER, Enum.Material.Metal)
 	end
 	for i, side in { 1, -1 } do
 		-- (each face turned to look out its own side)
 		local carrier = piece(
 			made,
-			b * CFrame.new(0, 7.6, side * 0.53) * CFrame.Angles(0, if side > 0 then math.pi else 0, 0),
-			Vector3.new(9.6, 6.6, 0.05),
+			at(0, 7.6, side * 0.53) * CFrame.Angles(0, if side > 0 then math.pi else 0, 0),
+			size(9.6, 6.6, 0.05),
 			INK,
 			Enum.Material.SmoothPlastic
 		)
 		carrier.Name = if i == 1 then "FaceFront" else "FaceBack"
-		light(carrier, Color3.fromRGB(255, 214, 170), 14, 0.7)
+		light(carrier, Color3.fromRGB(255, 214, 170), 14 * K, 0.7)
 		faces[i] = layout(carrier)
 	end
-	-- The lightbox on top, BOUNTIES each way, the crossed blades over it.
-	piece(made, b * CFrame.new(0, 12.3, 0), Vector3.new(7.6, 1.9, 1), DARK, Enum.Material.Metal)
-	for _, x in { -2.8, 2.8 } do
-		piece(made, b * CFrame.new(x, 11.5, 0), Vector3.new(0.4, 0.6, 0.4), STEEL, Enum.Material.Metal)
+	-- The visor over the screen, out over each face, a lit strip under its lip.
+	piece(made, at(0, 11.45, 0), size(10.8, 0.3, 3.2), DARK, Enum.Material.Metal)
+	for _, side in { -1, 1 } do
+		piece(made, at(0, 11.6, side * 1.6), size(10.8, 0.1, 0.12), AMBER, Enum.Material.Metal)
+		piece(made, at(0, 11.27, side * 1.42), size(10.2, 0.05, 0.14), Color3.fromRGB(255, 226, 190), Enum.Material.Neon)
 	end
+	-- The lightbox on the visor, BOUNTIES each way, the crossed blades over it.
+	piece(made, at(0, 12.6, 0), size(7.6, 1.9, 1), DARK, Enum.Material.Metal)
 	for _, side in { 1, -1 } do
 		local lit = piece(
 			made,
-			b * CFrame.new(0, 12.3, side * 0.53) * CFrame.Angles(0, if side > 0 then math.pi else 0, 0),
-			Vector3.new(7, 1.4, 0.05),
+			at(0, 12.6, side * 0.53) * CFrame.Angles(0, if side > 0 then math.pi else 0, 0),
+			size(7, 1.4, 0.05),
 			IVORY,
 			Enum.Material.SmoothPlastic
 		)
@@ -348,22 +369,22 @@ local function build(frame: CFrame): Folder
 		word.ZIndex = 2
 		new("Frame", { Position = UDim2.fromOffset(0, 126), Size = UDim2.fromOffset(700, 14), BackgroundColor3 = RED, BorderSizePixel = 0, ZIndex = 2 }, gui)
 	end
-	local crest = b * CFrame.new(0, 14.6, 0)
-	local medal = piece(made, crest * CFrame.Angles(0, math.rad(90), 0), Vector3.new(0.3, 2, 2), AMBER, Enum.Material.Metal)
+	local crest = at(0, 14.9, 0)
+	local medal = piece(made, crest * CFrame.Angles(0, math.rad(90), 0), size(0.3, 2, 2), AMBER, Enum.Material.Metal)
 	medal.Shape = Enum.PartType.Cylinder
 	for _, s in { -1, 1 } do
-		piece(made, crest * CFrame.Angles(0, 0, math.rad(s * 38)), Vector3.new(0.32, 4.4, 0.16), STEEL, Enum.Material.Metal)
-		piece(made, crest * CFrame.new(s * 1.3, -1.6, 0) * CFrame.Angles(0, 0, math.rad(s * 38)), Vector3.new(0.9, 0.24, 0.2), DARK, Enum.Material.Metal)
+		piece(made, crest * CFrame.Angles(0, 0, math.rad(s * 38)), size(0.32, 4.4, 0.16), STEEL, Enum.Material.Metal)
+		piece(made, crest * CFrame.new(s * 1.3 * K, -1.6 * K, 0) * CFrame.Angles(0, 0, math.rad(s * 38)), size(0.9, 0.24, 0.2), DARK, Enum.Material.Metal)
 	end
 	-- Its prompt: the bounty board, from here.
-	local anchor = piece(made, b * CFrame.new(0, 2.6, 0), Vector3.new(1, 1, 1), DARK, Enum.Material.SmoothPlastic)
+	local anchor = piece(made, at(0, 2.6, 0), Vector3.new(1, 1, 1), DARK, Enum.Material.SmoothPlastic)
 	anchor.Transparency, anchor.Name = 1, "BountyPrompt"
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Take a bounty"
 	prompt.ObjectText = "Bounty Board"
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = 12
+	prompt.MaxActivationDistance = 14
 	prompt.RequiresLineOfSight = false
 	prompt.Triggered:Connect(function()
 		require(script.Parent.RiftClient).openGate("Bounty", anchor.Position)

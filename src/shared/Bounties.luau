@@ -47,11 +47,12 @@ function Bounties.list()
 	return list
 end
 
--- The board on the hall floor, where its inlay bands cross between the Hall
--- of Fame and Brutus's booth: one bounty on each face, both changing every
--- Period seconds, everyone's at the same time (the server's clock).
+-- The board on the hall floor, on the way in from the garage between the
+-- Kennel and the Hall of Fame, a face to the garage and a face to the main
+-- door: one bounty on each face, both changing every Period seconds,
+-- everyone's at the same time (the server's clock).
 Bounties.Board = {
-	Spot = Vector3.new(28, 0.86, 32),
+	Spot = Vector3.new(46, 0.86, 10),
 	Period = 12,
 }
 

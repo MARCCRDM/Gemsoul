@@ -435,7 +435,29 @@ end
 
 -- Art --------------------------------------------------------------------------------------------------
 
+-- The pieces' 3D art is built by the server on request. Asked until it says
+-- it's all built: one lost to its pacing ("Slow down!" when the Inventory's
+-- other requests go at the same moment) or made while a build was running
+-- used to leave the drawn icons up for good.
 local previewAskedAt = -math.huge
+local previewsAsking = false
+local function askPreviews()
+	if previewsAsking then
+		return
+	end
+	previewsAsking = true
+	previewAskedAt = os.clock()
+	task.spawn(function()
+		for attempt = 1, 6 do
+			local ok, result = pcall(GemClient.request, "GearPreviews")
+			if ok and typeof(result) == "table" and result.Ok and result.Done then
+				break
+			end
+			task.wait(0.4 * attempt)
+		end
+		previewsAsking = false
+	end)
+end
 local function gearArt(holder: Instance, slot: string, id: string, worn: boolean, color: Color3)
 	clear(holder)
 	local view = new("ViewportFrame", {
@@ -452,11 +474,8 @@ local function gearArt(holder: Instance, slot: string, id: string, worn: boolean
 	local ok, drawn = pcall(GearArt.draw, view, slot, id, false)
 	if not (ok and drawn) then
 		view:Destroy()
-		if worn and os.clock() - previewAskedAt > 4 then
-			previewAskedAt = os.clock()
-			task.spawn(function()
-				pcall(GemClient.request, "GearPreviews")
-			end)
+		if os.clock() - previewAskedAt > 4 then
+			askPreviews()
 		end
 		local gear = gearOf(loadoutNow(), slot, id)
 		if gear then
@@ -1031,15 +1050,22 @@ local function plainButton(parent: Instance, label: string, x: number, y: number
 		Text = label,
 		TextSize = if COMPACT then 12 else 12,
 		Font = HEAVY,
-		TextColor3 = if primary then Color3.fromRGB(26, 18, 6) else tint or C.Text,
+		TextColor3 = if primary then Color3.fromRGB(26, 18, 6) elseif tint then tint:Lerp(C.Text, 0.45) else C.Text,
 		AutoButtonColor = true,
-		BackgroundColor3 = if primary then C.Gold else C.Ink,
-		BackgroundTransparency = if primary then 0 else 0.25,
+		BackgroundColor3 = if primary then C.Gold else Color3.fromRGB(22, 24, 35),
+		BackgroundTransparency = 0,
 	}, parent)
 	place(b, x, y, w, h)
 	round(b, 9)
-	if not primary then
-		stroke(b, tint or C.Line, 1, if tint then 0.45 else 0.75)
+	if primary then
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(214, 200, 176)) }, b)
+	else
+		stroke(b, C.Line, 1, 0.86)
+		if tint then
+			-- (its colour: a short bar along the foot)
+			local bar = new("Frame", { BackgroundColor3 = tint, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -3), Size = UDim2.new(0.4, 0, 0, 2) }, b)
+			round(bar, 1)
+		end
 	end
 	UiKit.fit(b)
 	b:SetAttribute("UiSound", if primary then "Confirm" else "Click")
@@ -1606,7 +1632,9 @@ local function buildRow(parent: Instance, slot: string, x: number, y: number)
 	local rail = frame(row, C.Text)
 	place(rail, 12, 0, cw - 24, 3)
 	round(rail, 2)
-	local well = frame(row, Color3.fromRGB(255, 255, 255), 0.95)
+	local well = frame(row, C.Ink, 0)
+	local wellEdge = stroke(well, C.Line, 1, 0.8)
+	new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(0, 0.35) }, well)
 	if COMPACT then
 		place(well, 8, 8, 46, 46)
 	else
@@ -1668,7 +1696,7 @@ local function buildRow(parent: Instance, slot: string, x: number, y: number)
 	local socket = frame(socketRow, C.Ink, 0.4)
 	place(socket, 0, 0, 24, 24)
 	round(socket, 12)
-	local halo = frame(socket, C.Gold, 0.9)
+	local halo = frame(socket, C.Gold, 0.94)
 	halo.Name = "EmptySocketGlow"
 	halo.Position = UDim2.fromOffset(-4, -4)
 	halo.Size = UDim2.new(1, 8, 1, 8)
@@ -1679,7 +1707,7 @@ local function buildRow(parent: Instance, slot: string, x: number, y: number)
 	local plus = text(socket, "+", 14, C.Faint, HEADING)
 	plus.Size = UDim2.fromScale(1, 1)
 	plus.TextXAlignment = Enum.TextXAlignment.Center
-	local enchant = place(text(socketRow, "ADD A GEM", 10, C.Gold, HEADING), 30, 0, cw - (if COMPACT then 46 else 30), 24)
+	local enchant = place(text(socketRow, "ADD A GEM", 10, C.Gold:Lerp(C.Dim, 0.35), HEADING), 30, 0, cw - (if COMPACT then 46 else 30), 24)
 	enchant.Name, enchant.Visible = "EnchantHint", false
 	-- (the gem in it, and with the triad the move it gives this key)
 	local moveLine = place(text(socketRow, "", 10, C.Dim, HEADING), 30, 0, cw - (if COMPACT then 46 else 30), 24)
@@ -1693,7 +1721,7 @@ local function buildRow(parent: Instance, slot: string, x: number, y: number)
 	row:SetAttribute("UiSound", "Click")
 	row.Activated:Connect(open)
 	socketRow.Activated:Connect(open)
-	local entry = { Row = row, Tint = tint, Edge = edge, Rail = rail, Art = art, Name = name, Meta = meta, Ring = ring, Gem = gemHolder, Plus = plus, Halo = halo, Enchant = enchant }
+	local entry = { Row = row, Tint = tint, Edge = edge, Rail = rail, Well = well, WellEdge = wellEdge, Art = art, Name = name, Meta = meta, Ring = ring, Gem = gemHolder, Plus = plus, Halo = halo, Enchant = enchant }
 	entry.Key, entry.SurgeTile, entry.SurgeGlyph, entry.SurgeBadge, entry.SurgeLine, entry.SurgeEdge =
 		key, surgeTile, surgeGlyph, surgeBadge, surgeLine, surgeEdge
 	entry.MoveLine, entry.Socket = moveLine, socketRow
@@ -1805,11 +1833,12 @@ local function buildSurges(parent: Instance, x0: number, y0: number, totalW: num
 			Name = "Key" .. key,
 			Text = "",
 			AutoButtonColor = false,
-			BackgroundColor3 = KEY_COLORS[key]:Lerp(C.Ink, 0.86),
-			BackgroundTransparency = 0.05,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0,
 		}, parent)
 		place(card, x0 + (i - 1) * (cardW + gap), y0, cardW, cardH)
 		round(card, 10)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(25, 27, 39), Color3.fromRGB(14, 15, 23)) }, card)
 		local edge = stroke(card, C.Line, 1, 0.9)
 		local iconSize = if COMPACT then 30 else 34
 		local icon = frame(card, C.Ink, 0.3)
@@ -1877,20 +1906,21 @@ end
 local STAT_GLYPH = { Health = "+", Power = "⚡", Defense = "◆", Speed = "»" }
 local function statTile(parent: Instance, stat: string, x: number, y: number, w: number, h: number)
 	local color = STAT_COLOR[stat]
-	local tile = new("TextButton", { Name = "Tile" .. stat, Text = "", AutoButtonColor = false, BackgroundColor3 = color:Lerp(C.Ink, 0.88), BackgroundTransparency = 0.05 }, parent)
+	local tile = new("TextButton", { Name = "Tile" .. stat, Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0 }, parent)
 	place(tile, x, y, w, h)
 	round(tile, 10)
-	stroke(tile, color, 1, 0.6)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(25, 27, 39), Color3.fromRGB(14, 15, 23)) }, tile)
+	stroke(tile, C.Line, 1, 0.9)
 	local size = h - (if COMPACT then 12 else 24)
-	local ring = frame(tile, color:Lerp(C.Ink, 0.6), 0)
+	local ring = frame(tile, color:Lerp(C.Ink, 0.78), 0)
 	place(ring, 8, (h - size) / 2, size, size)
-	round(ring, size / 2)
-	stroke(ring, color, 1.5, 0.1)
+	round(ring, 8)
+	stroke(ring, color, 1, 0.55)
 	local glyph = text(ring, STAT_GLYPH[stat] or "•", math.floor(size * 0.5), color, HEAVY)
 	glyph.Size = UDim2.fromScale(1, 1)
 	glyph.TextXAlignment = Enum.TextXAlignment.Center
 	local tx = 8 + size + 10
-	local label = place(text(tile, string.upper(stat), 10, color, HEAVY), tx, if COMPACT then 4 else 10, w - tx - 8, 12)
+	local label = place(text(tile, string.upper(stat), 10, C.Dim, HEAVY), tx, if COMPACT then 4 else 10, w - tx - 8, 12)
 	label.Name = "Label"
 	local value = place(text(tile, "0", if COMPACT then 16 else 22, C.Text, HEAVY), tx, if COMPACT then 15 else 23, w - tx - 8, if COMPACT then 18 else 26)
 	local track = frame(tile, C.Line, 0.9)
@@ -1966,10 +1996,10 @@ local function buildSummary(canvas: Frame)
 			state.AutoMode = "Best"
 			request("AutoEquip", "Best")
 		end)
-		local all = plainButton(stats, "ALL STATS", 158, by, 146, 32, false, C.Teal)
+		local all = plainButton(stats, "ALL STATS", 158, by, 146, 32, false)
 		all.Name = "AllStats"
 		all.Activated:Connect(openStats)
-		local skins = plainButton(stats, "SKINS", 312, by, SIDE_W - 312, 32, false, Color3.fromRGB(255, 150, 205))
+		local skins = plainButton(stats, "SKINS", 312, by, SIDE_W - 312, 32, false)
 		skins.Name = "SkinsButton"
 		skins.Activated:Connect(function()
 			if ui.Popups then
@@ -3025,17 +3055,21 @@ function InventoryV2.paintRow(slot: string)
 	if not row then
 		return
 	end
-	-- A card in its piece's rarity: lit gold while its window is open, a
-	-- little lighter under the pointer, edged gold while its socket is empty.
+	-- Every card the same dark plate; the piece's rarity is its rail, its
+	-- words and the well its art sits in. Gold while its window is open, a
+	-- little lighter (edged in its rarity) under the pointer.
 	local picked = state.Detail == slot
 	local color = row.Color or C.Faint
 	row.Rail.BackgroundColor3 = if picked then C.Gold else color
-	row.Edge.Color = if picked or (row.EmptySocket and not row.Hovered) then C.Gold else color
-	row.Edge.Transparency = if picked then 0.1 elseif row.Hovered then 0.15 elseif row.EmptySocket then 0.5 else 0.55
+	row.Edge.Color = if picked then C.Gold elseif row.Hovered then color else C.Line
+	row.Edge.Transparency = if picked then 0.15 elseif row.Hovered then 0.35 else 0.9
 	row.Tint.Color = if picked
-		then ColorSequence.new(Color3.fromRGB(70, 54, 24), Color3.fromRGB(24, 18, 12))
-		elseif row.Hovered then ColorSequence.new(color:Lerp(C.Ink, 0.6), color:Lerp(C.Ink, 0.8))
-		else ColorSequence.new(color:Lerp(C.Ink, 0.74), color:Lerp(C.Ink, 0.9))
+		then ColorSequence.new(Color3.fromRGB(46, 38, 22), Color3.fromRGB(20, 16, 11))
+		elseif row.Hovered then ColorSequence.new(Color3.fromRGB(34, 37, 52), Color3.fromRGB(18, 20, 30))
+		else ColorSequence.new(Color3.fromRGB(25, 27, 39), Color3.fromRGB(13, 14, 22))
+	row.Well.BackgroundColor3 = color:Lerp(C.Ink, 0.7)
+	row.WellEdge.Color = color
+	row.WellEdge.Transparency = if row.Hovered or picked then 0.35 else 0.6
 end
 
 local function drawRows(loadout)
@@ -3128,7 +3162,7 @@ local function drawRows(loadout)
 			row.SurgeBadge.BackgroundTransparency = if surge then 0 else 0.35
 		end
 		row.Ring.Color = if gem then gemColor(gem) elseif row.EmptySocket then C.Gold else C.Faint
-		row.Ring.Transparency = if gem then 0.1 elseif row.EmptySocket then 0.25 else 0.5
+		row.Ring.Transparency = if gem then 0.1 elseif row.EmptySocket then 0.45 else 0.5
 	end
 end
 
@@ -3194,7 +3228,7 @@ local function drawKeys(loadout)
 		entry.Line.BackgroundColor3 = tint
 		entry.Line.BackgroundTransparency = if gem then 0.15 else 0.7
 		entry.Edge.Color = if picked or not gem then C.Gold else C.Line
-		entry.Edge.Transparency = if picked then 0.2 elseif not gem then 0.55 else 0.9
+		entry.Edge.Transparency = if picked then 0.2 elseif not gem then 0.7 else 0.9
 		local shown = if gem then gem.Id .. tostring(gem.Surge) else ""
 		if entry.Shown ~= shown then
 			entry.Shown = shown
@@ -3854,9 +3888,7 @@ local function drawDetail(loadout)
 			local askKey = slot .. ":" .. #items
 			if #items > 0 and previewAsked ~= askKey then
 				previewAsked = askKey
-				task.spawn(function()
-					pcall(GemClient.request, "GearPreviews")
-				end)
+				askPreviews()
 			end
 			drawGrid(items, "No spare " .. string.lower(SLOT_NAME[slot]) .. " pieces. Mine and trade for more.")
 		end
@@ -4622,7 +4654,9 @@ function InventoryV2.setActive(on: boolean)
 	if root then
 		root.Visible = on
 	end
-	if not on then
+	if on then
+		askPreviews() -- (every piece's art up to date before it's looked at)
+	else
 		if ui.Intro then
 			ui.Intro.Visible = false
 		end
@@ -4699,13 +4733,22 @@ local function watchStore(store: Instance)
 	end)
 end
 local function watchPreviews(store: Instance)
-	store.ChildAdded:Connect(function()
-		-- (the worn slots redraw from it too)
-		gearChanged()
-		if state.Tab == "Pieces" then
-			gridKey = ""
-			draw()
+	-- A preview arrives, then its parts: once a moment after the last one
+	-- lands, everything showing art redraws (the worn slots too).
+	local due = false
+	store.DescendantAdded:Connect(function()
+		if due then
+			return
 		end
+		due = true
+		task.delay(0.25, function()
+			due = false
+			gearChanged()
+			if state.Tab == "Pieces" then
+				gridKey = ""
+				draw()
+			end
+		end)
 	end)
 end
 if playerGui:FindFirstChild("MinerPreviews") then
