@@ -66,6 +66,16 @@ The new steps are counted on the server with `PlayerData.training`:
 Steps that wait on a switched-off feature (`Needs`) are left out of the list
 and of the count.
 
+The look (*2026-10-29, second pass*): the Outpost's work-order board, not a
+stack of glowing cards. Graphite panels, one amber accent, condensed Oswald
+capitals for names and numbers, steps as ruled lines with their number
+(01, 02…), done steps quiet (a faint tick, PAID) instead of green. The rule
+under TASKS is the whole path's progress. The NEXT STEP is a work order: an
+amber edge, notches for its count, the coins big at the right and a stamped
+GO plate. The lobby's DAILY STREAK and DAILY CHALLENGES cards
+(`LobbyBoard`) use the same graphite, amber and Oswald (no more violet or
+green).
+
 The window:
 - **TODAY** (the daily challenges and the bonus, with the time until new
   ones) and the chapters: a rail on a computer, chips on a phone. Each
