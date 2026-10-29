@@ -1716,6 +1716,13 @@ function RiftServer.start(outpost)
 	Shop.register("RiftChoice", choose)
 	Shop.register("RiftPeek", peek)
 	Shop.register("RiftMine", healMine)
+	-- (every bounty's portrait made up front: the bounty board on the hall
+	-- floor shows them all in turn, Client.BountyBoard)
+	task.defer(function()
+		for _, entry in Bounties.entries() do
+			portraitOf(entry.Boss)
+		end
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		if runOf[player] then
 			home(player, nil)

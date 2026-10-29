@@ -2798,6 +2798,10 @@ return {
 	-- RiftClient.openGate("Bounty"): every Rift boss, a tab per biome).
 	["Bounties"] = "Recompensas",
 	["Bounty Board"] = "Tablón de recompensas",
+	-- the bounty board on the hall floor (Client.BountyBoard)
+	["Bounty"] = "Recompensa",
+	["Take a bounty"] = "Aceptar una recompensa",
+	["SOLO OR PARTY"] = "SOLO O EN GRUPO",
 	["BOUNTY OFFICE"] = "OFICINA DE RECOMPENSAS",
 	["BRUTUS'S DUELS"] = "DUELOS DE BRUTUS",
 	["Find a duel"] = "Buscar un duelo",

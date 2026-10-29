@@ -15,6 +15,14 @@
 	  Bounties.Poster               a WANTED poster's canvas (pixels)
 	  Bounties.poster(gui, boss, element)   draws one on a SurfaceGui (Server.
 	                                OutpostServer, the booth's back wall)
+	  Bounties.Board                the board out on the hall floor (Client.
+	                                BountyBoard): Spot (in the Shelter's
+	                                frame) and Period (seconds a bounty's up)
+	  Bounties.entries() -> { { Boss, Element, Biome } }   every bounty, in
+	                                the board's order
+	  Bounties.boardAt(now) -> (front, back, share)   what its two faces show
+	                                at `now` (the server's clock), never the
+	                                same one, and how far through its turn
 ]]
 local BossLoot = require(script.Parent.BossLoot)
 local Frontier = require(script.Parent.Frontier)
@@ -37,6 +45,41 @@ function Bounties.list()
 		end
 	end
 	return list
+end
+
+-- The board on the hall floor, where its inlay bands cross between the Hall
+-- of Fame and Brutus's booth: one bounty on each face, both changing every
+-- Period seconds, everyone's at the same time (the server's clock).
+Bounties.Board = {
+	Spot = Vector3.new(28, 0.86, 32),
+	Period = 12,
+}
+
+-- Every bounty, each biome's ladder in turn: { Boss, Element, Biome }.
+function Bounties.entries()
+	local out = {}
+	for _, entry in Bounties.list() do
+		for _, boss in entry.Bosses do
+			table.insert(out, { Boss = boss, Element = entry.Element, Biome = entry.Biome })
+		end
+	end
+	return out
+end
+
+-- The bounties on the board's two faces at `now`, and how far through
+-- their turn (0 to 1). The back shows the one halfway round the list from
+-- the front's, so the two are never the same (with two or more).
+function Bounties.boardAt(now: number)
+	local list = Bounties.entries()
+	local n = #list
+	if n == 0 then
+		return nil, nil, 0
+	end
+	local period = Bounties.Board.Period
+	local turn = math.floor(now / period)
+	local front = list[turn % n + 1]
+	local back = list[(turn + math.max(1, n // 2)) % n + 1]
+	return front, back, (now % period) / period
 end
 
 -- The element whose ladder `bossId` is on (nil: no such bounty).
