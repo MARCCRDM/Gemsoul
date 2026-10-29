@@ -1771,8 +1771,8 @@ do
 	-- A sale's card, `w` by `h`: its picture in a well on the left (`fill`
 	-- draws it), a tag, its name and lines on the right, the price and the
 	-- buy button at the foot. `opts`: { Name, Key, Tint, Tag, TagColor,
-	-- Title, Sub, About?, Clock? (a label to tick), Fill, Short = { Tag,
-	-- Title, Sub } (the words for a narrow card) }.
+	-- Title, Sub, Rich? (Sub in rich text), About?, Clock? (a label to
+	-- tick), Fill, Short = { Tag, Title, Sub } (the words for a narrow card) }.
 	local function saleCard(parent: Instance, w: number, h: number, order: number, opts): Frame
 		local small = h < 240
 		local card = box(parent, Color3.new(1, 1, 1), 0, 0, w, h)
@@ -1799,6 +1799,7 @@ do
 		local y = 40 + nameSize + 8
 		local sub = text(card, words.Sub, 12 + UP, C.Dim, BOLD, x, y, tw, 16)
 		sub.TextTruncate = Enum.TextTruncate.AtEnd
+		sub.RichText = opts.Rich == true
 		y += 22
 		if opts.About and not small then
 			wrap(text(card, opts.About, 12 + UP, C.Faint, MEDIUM, x, y, tw, 50))
@@ -1879,13 +1880,25 @@ do
 	end
 
 	-- The premium trio: its three kaiju side by side in its well, one in
-	-- each element, turning.
+	-- each element, turning, each over a glow of its element's colour with
+	-- its element named at its feet (the three are one kind: the element
+	-- is what tells them apart).
 	function KaijuDeals.premium(parent: Instance, w: number, h: number, order: number): Frame
 		local sale = Kaiju.Sale.Premium
 		local kind = Kaiju.species(sale.Species)
 		local names = {}
 		for _, element in sale.Elements do
-			table.insert(names, GemConfig.elementName(element))
+			local tint = GemConfig.ElementColors[element] or C.Text
+			table.insert(
+				names,
+				string.format(
+					'<font color="#%02X%02X%02X">%s</font>',
+					math.floor(tint.R * 255 + 0.5),
+					math.floor(tint.G * 255 + 0.5),
+					math.floor(tint.B * 255 + 0.5),
+					GemConfig.elementName(element)
+				)
+			)
 		end
 		local gold = Color3.fromRGB(255, 196, 80)
 		return saleCard(parent, w, h, order, {
@@ -1895,7 +1908,8 @@ do
 			Tag = "PREMIUM  ·  ONCE ONLY",
 			TagColor = gold,
 			Title = sale.Name,
-			Sub = string.format("3 %ss  ·  %s  ·  Traits %d+", kind and kind.Name or sale.Species, table.concat(names, ", "), sale.TraitFloor),
+			Sub = string.format("%s  ·  Traits %d+", table.concat(names, "  "), sale.TraitFloor),
+			Rich = true,
 			About = string.format(
 				"Three %ss, one in each element. Each comes with an Ultra Rare Gemsoul holding its element's best moves: Q, E and R.",
 				kind and kind.Name or sale.Species
@@ -1907,12 +1921,47 @@ do
 					CellPadding = UDim2.fromOffset(0, 0),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}, row)
+				local small = h < 240
 				for i, element in sale.Elements do
+					local tint = GemConfig.ElementColors[element] or gold
 					local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i }, row)
-					view(cell, sale.Species, element, true)
+					-- its element's light rising from the floor behind it
+					local glow = new("Frame", {
+						Name = "Glow",
+						BackgroundColor3 = tint,
+						BorderSizePixel = 0,
+						Position = UDim2.fromOffset(2, 0),
+						Size = UDim2.new(1, -4, 1, 0),
+						ZIndex = 1,
+					}, cell)
+					new("UIGradient", {
+						Rotation = 90,
+						Transparency = NumberSequence.new({
+							NumberSequenceKeypoint.new(0, 1),
+							NumberSequenceKeypoint.new(0.45, 0.85),
+							NumberSequenceKeypoint.new(1, 0.45),
+						}),
+					}, glow)
+					view(cell, sale.Species, element, true).ZIndex = 2
+					-- its element, named, at its feet
+					local tag = new("TextLabel", {
+						Name = "Element",
+						AnchorPoint = Vector2.new(0.5, 1),
+						Position = UDim2.new(0.5, 0, 1, -5),
+						Size = UDim2.new(1, -8, 0, if small then 15 else 18),
+						BackgroundColor3 = tint:Lerp(Color3.new(0, 0, 0), 0.25),
+						Text = string.upper(GemConfig.elementName(element)),
+						Font = BLACK,
+						TextSize = if small then 9 else 11,
+						TextColor3 = Color3.new(1, 1, 1),
+						TextStrokeTransparency = 0.6,
+						ZIndex = 3,
+					}, cell)
+					round(tag, 5)
+					stroke(tag, tint:Lerp(Color3.new(1, 1, 1), 0.35), 1, 0.2)
 				end
 			end,
-			Short = { Tag = "PREMIUM", Title = sale.Name, Sub = "3 kaiju  ·  Ultra Rare Gemsouls" },
+			Short = { Tag = "PREMIUM", Title = sale.Name, Sub = table.concat(names, "  ") },
 		})
 	end
 
