@@ -2812,6 +2812,9 @@ return {
 	["BRING A PARTY"] = "TRAE UN GRUPO",
 	["REWARD: BOSS CACHE"] = "RECOMPENSA: COFRE DEL JEFE",
 	["LAST SEEN: {*}"] = "VISTO POR ÚLTIMA VEZ: {*}",
+	["REWARD"] = "RECOMPENSA",
+	["PARTY"] = "GRUPO",
+	["LAST SEEN"] = "VISTO POR ÚLTIMA VEZ",
 	-- The Shelter's Hall of Fame (Shared.HallOfFame, Server.TopPlayers).
 	["HALL OF FAME"] = "SALÓN DE LA FAMA",
 	["PVP HALL OF FAME"] = "SALÓN DE LA FAMA PVP",

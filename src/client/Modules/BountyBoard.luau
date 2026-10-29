@@ -3,10 +3,11 @@
 	its inlay bands cross between the Hall of Fame and Brutus's booth: a
 	freestanding screen on two lit pylons with a BOUNTIES lightbox and
 	crossed blades on top, a glowing ring on the floor round it. Each face
-	shows one bounty, WANTED: the boss itself, a figure of its body
+	shows one bounty, WANTED: the boss itself, a big figure of its body
 	(ReplicatedStorage.RiftPortraits) standing on a lit ledge out of the
-	screen, over its element's glow; its name, element, threat, what it pays
-	and where it was last seen; both change every Board.Period
+	screen's left half, in its element's light; beside it its name, element,
+	threat, what it pays, who to bring and where it was last seen, in a
+	plain column; both change every Board.Period
 	seconds, never to the same one (Bounties.boardAt), the same for
 	everyone (the server's clock). Its prompt opens the bounty board (Client.
 	RiftClient, "Bounty").
@@ -100,72 +101,64 @@ local function text(parent: Instance, value: string, x: number, y: number, w: nu
 	}, parent)
 end
 
--- A face's screen, laid out once (960 x 660): WANTED and the bounty's
--- number along the top, the boss on the left, its card on the right, and
--- along the bottom where it was last seen, the prompt and the time left.
+-- A face's screen, laid out once (960 x 660): the left half is the boss's
+-- stage (the figure stands in front of it, out of the screen, lit in its
+-- element's colour rising from the floor), the right half says who it is:
+-- its name, big; its element and threat; what it pays, whether to bring a
+-- party, where it was last seen; and how to take it. Plain words in a
+-- column, nothing more. A thin line along the foot runs down the time
+-- left on this bounty.
 local W, H = 960, 660
+local SPLIT = 480
 local function layout(carrier: BasePart): Face
 	local gui = new("SurfaceGui", {
 		Face = Enum.NormalId.Front,
 		SizingMode = Enum.SurfaceGuiSizingMode.FixedSize,
 		CanvasSize = Vector2.new(W, H),
 		LightInfluence = 0,
-		Brightness = 1.4,
+		Brightness = 1.3,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	}, carrier)
 	local parts: { [string]: Instance } = {}
-	local back = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = INK, BorderSizePixel = 0 }, gui)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(26, 22, 30), Color3.fromRGB(10, 11, 18)) }, back)
-	-- (its element's tint washed over the whole screen)
-	parts.Wash = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = AMBER, BackgroundTransparency = 0.88, BorderSizePixel = 0 }, back)
+	local back = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0 }, gui)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(20, 20, 28), Color3.fromRGB(8, 9, 14)) }, back)
+	-- The stage: its element's light rising from the floor behind the boss.
+	parts.Wash = new("Frame", { Size = UDim2.fromOffset(SPLIT, H), BackgroundColor3 = AMBER, BorderSizePixel = 0 }, back)
 	new("UIGradient", {
-		Rotation = 0,
-		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.6, 0.85), NumberSequenceKeypoint.new(1, 1) }),
-	}, parts.Wash)
-	-- The top: WANTED in red, the bounty's number in amber, an amber rule.
-	text(back, Lang.translate("WANTED"), 30, 10, 480, 72, 62, RED)
-	parts.Count = text(back, "", 520, 18, 410, 56, 30, AMBER, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
-	new("Frame", { Position = UDim2.fromOffset(30, 88), Size = UDim2.fromOffset(W - 60, 4), BackgroundColor3 = AMBER, BorderSizePixel = 0 }, back)
-	-- The boss, over its element's glow, in a frame.
-	local stage = new("Frame", { Position = UDim2.fromOffset(30, 110), Size = UDim2.fromOffset(380, 412), BackgroundColor3 = Color3.fromRGB(18, 18, 28), BorderSizePixel = 0 }, back)
-	parts.Rim = new("UIStroke", { Color = AMBER, Thickness = 4 }, stage)
-	parts.Glow = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.48),
-		Size = UDim2.fromOffset(330, 330),
-		BackgroundColor3 = AMBER,
-		BackgroundTransparency = 0.55,
-		BorderSizePixel = 0,
-	}, stage)
-	new("UICorner", { CornerRadius = UDim.new(1, 0) }, parts.Glow)
-	new("UIGradient", {
-		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0.6), NumberSequenceKeypoint.new(1, 1) }),
 		Rotation = 90,
-	}, parts.Glow)
-	-- Its card: name, element, threat, reward, party.
-	parts.Name = text(back, "", 440, 104, 490, 136, 58, IVORY)
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.45, 0.85), NumberSequenceKeypoint.new(1, 0.35) }),
+	}, parts.Wash)
+	text(back, Lang.translate("WANTED"), 34, 22, 300, 44, 34, RED)
+	parts.Count = text(back, "", W - 230, 22, 200, 44, 24, FADED, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+	parts.Count:SetAttribute("NoTranslate", true)
+	new("Frame", { Position = UDim2.fromOffset(SPLIT, 40), Size = UDim2.fromOffset(2, H - 80), BackgroundColor3 = IVORY, BackgroundTransparency = 0.88, BorderSizePixel = 0 }, back)
+	-- Who it is.
+	local x, cw = SPLIT + 36, W - SPLIT - 72
+	parts.Name = text(back, "", x, 70, cw, 170, 70, IVORY)
+	parts.Name.TextYAlignment = Enum.TextYAlignment.Bottom
+	parts.Name.TextScaled = true
+	new("UITextSizeConstraint", { MaxTextSize = 70, MinTextSize = 30 }, parts.Name)
 	parts.Name:SetAttribute("NoTranslate", true)
-	parts.Band = new("Frame", { Position = UDim2.fromOffset(440, 250), Size = UDim2.fromOffset(250, 52), BackgroundColor3 = AMBER, BorderSizePixel = 0 }, back)
-	parts.Element = text(parts.Band, "", 0, 0, 250, 52, 30, INK, nil, Enum.TextXAlignment.Center)
-	parts.Threat = text(back, "", 440, 318, 300, 48, 34, AMBER)
-	parts.Pips = new("Frame", { Position = UDim2.fromOffset(700, 326), Size = UDim2.fromOffset(230, 32), BackgroundTransparency = 1 }, back)
-	for i = 1, 5 do
-		new("Frame", {
-			Name = "Pip" .. i,
-			Position = UDim2.fromOffset((i - 1) * 46, 0),
-			Size = UDim2.fromOffset(38, 32),
-			BackgroundColor3 = Color3.fromRGB(46, 46, 58),
-			BorderSizePixel = 0,
-		}, parts.Pips)
+	parts.Kind = text(back, "", x, 250, cw, 40, 30, IVORY)
+	parts.Kind.RichText = true
+	parts.Kind:SetAttribute("NoTranslate", true)
+	parts.Accent = new("Frame", { Position = UDim2.fromOffset(x, 306), Size = UDim2.fromOffset(84, 6), BackgroundColor3 = AMBER, BorderSizePixel = 0 }, back)
+	-- What it pays, who to bring, where it was last seen: a label over each.
+	local function row(y: number, label: string): TextLabel
+		text(back, Lang.translate(label), x, y, cw, 26, 20, FADED, Enum.Font.GothamBold)
+		return text(back, "", x, y + 24, cw, 34, 28, IVORY)
 	end
-	parts.Reward = text(back, Lang.translate("REWARD: BOSS CACHE"), 440, 380, 490, 44, 30, IVORY, Enum.Font.GothamBold)
-	parts.Party = new("Frame", { Position = UDim2.fromOffset(440, 440), Size = UDim2.fromOffset(300, 50), BackgroundColor3 = RED, BorderSizePixel = 0 }, back)
-	parts.PartyText = text(parts.Party, "", 0, 0, 300, 50, 26, IVORY, nil, Enum.TextXAlignment.Center)
-	-- The bottom: where it was last seen and the prompt, then the time left.
-	local foot = new("Frame", { Position = UDim2.fromOffset(0, 540), Size = UDim2.fromOffset(W, H - 540), BackgroundColor3 = Color3.fromRGB(8, 9, 14), BorderSizePixel = 0 }, back)
-	parts.Seen = text(foot, "", 30, 10, 500, 50, 26, FADED, Enum.Font.GothamBold)
-	text(foot, string.upper(Lang.translate("Take a bounty")) .. "  [E]", 520, 10, 410, 50, 28, AMBER, Enum.Font.GothamBlack, Enum.TextXAlignment.Right)
-	local track = new("Frame", { Position = UDim2.fromOffset(30, 76), Size = UDim2.fromOffset(W - 60, 14), BackgroundColor3 = Color3.fromRGB(40, 40, 52), BorderSizePixel = 0 }, foot)
+	row(332, "REWARD").Text = Lang.translate("BOSS CACHE")
+	parts.Party = row(394, "PARTY")
+	parts.Seen = row(456, "LAST SEEN")
+	-- How to take it.
+	local key = new("Frame", { Position = UDim2.fromOffset(x, H - 126), Size = UDim2.fromOffset(52, 52), BackgroundTransparency = 1 }, back)
+	new("UIStroke", { Color = AMBER, Thickness = 3 }, key)
+	new("UICorner", { CornerRadius = UDim.new(0, 8) }, key)
+	text(key, "E", 0, 0, 52, 52, 30, AMBER, nil, Enum.TextXAlignment.Center):SetAttribute("NoTranslate", true)
+	text(back, string.upper(Lang.translate("Take a bounty")), x + 70, H - 126, cw - 70, 52, 30, AMBER)
+	-- The time left on this bounty, along the foot.
+	local track = new("Frame", { Position = UDim2.fromOffset(0, H - 8), Size = UDim2.fromOffset(W, 8), BackgroundColor3 = Color3.fromRGB(30, 30, 40), BorderSizePixel = 0 }, back)
 	parts.Fill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = AMBER, BorderSizePixel = 0 }, track)
 	-- (a flash over it all when its bounty changes)
 	parts.Flash = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = IVORY, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 10 }, gui)
@@ -173,11 +166,11 @@ local function layout(carrier: BasePart): Face
 end
 
 -- The boss on a face: a figure of its body (ReplicatedStorage.RiftPortraits,
--- Server.RiftServer's portraitOf) standing on a lit ledge out of the screen,
--- in front of the frame its glow is in, turned a little to look out. (A
--- real figure, not a ViewportFrame: those don't draw on a board out in the
+-- Server.RiftServer's portraitOf) standing big on a lit ledge out of the
+-- screen's left half, turned a little to look out, a lamp over it. (A real
+-- figure, not a ViewportFrame: those don't draw on a board out in the
 -- world.) It may still be on its way from the server: put in when it comes.
-local STAGE = { X = 2.6, Y = -0.14, W = 3.3, H = 3.75 } -- (studs, on the face: the frame's middle and room)
+local STAGE = { X = 2.4, Y = -0.1, W = 4.2, H = 5.5 } -- (studs, on the face: the stage's middle and room)
 local function bounds(model: Model, pivot: CFrame): (Vector3, Vector3)
 	local lo, hi = Vector3.one * math.huge, -Vector3.one * math.huge
 	for _, part in model:GetDescendants() do
@@ -192,6 +185,7 @@ local function bounds(model: Model, pivot: CFrame): (Vector3, Vector3)
 	end
 	return lo, hi
 end
+local warned: { [string]: boolean } = {}
 local function portrait(face: Face, id: string, tint: Color3?)
 	if face.Figure then
 		face.Figure:Destroy()
@@ -200,21 +194,30 @@ local function portrait(face: Face, id: string, tint: Color3?)
 	local folder = ReplicatedStorage:FindFirstChild("RiftPortraits")
 	local source = folder and folder:FindFirstChild(id)
 	if not (source and source:IsA("Model")) then
+		-- (said once, so a boss that never comes shows up in the output)
+		if not warned[id] then
+			warned[id] = true
+			warn("[BountyBoard] waiting for the portrait of", id)
+		end
+		face.Missing = id
+		return
+	end
+	local body = source:Clone() :: Model?
+	if not body then
 		face.Missing = id
 		return
 	end
 	face.Missing = nil
-	local body = source:Clone()
 	for _, d in body:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Anchored, d.CanCollide, d.CanQuery, d.CanTouch, d.CastShadow = true, false, false, false, false
-		elseif d:IsA("Script") or d:IsA("LocalScript") or d:IsA("Sound") then
+		elseif d:IsA("Script") or d:IsA("LocalScript") or d:IsA("Sound") or d:IsA("Humanoid") then
 			d:Destroy()
 		end
 	end
 	local lo, hi = bounds(body, body:GetPivot())
 	local size = hi - lo
-	if size.Y <= 0 then
+	if size.Y <= 0 or size.Y ~= size.Y then
 		body:Destroy()
 		return
 	end
@@ -223,20 +226,31 @@ local function portrait(face: Face, id: string, tint: Color3?)
 	lo, hi = lo * fit, hi * fit
 	size = hi - lo
 	-- On a ledge out of the face (its front is the carrier's -Z), its back
-	-- clear of the screen, its feet on the ledge at the frame's foot.
+	-- clear of the screen, its feet on the ledge at the stage's foot.
 	local carrier = face.Carrier
-	local depth = 0.25 + size.Z / 2
+	local depth = 0.3 + size.Z / 2
 	local foot = carrier.CFrame * CFrame.new(STAGE.X, STAGE.Y - STAGE.H / 2 - 0.1, -depth)
-	local look = carrier.CFrame.Rotation * CFrame.Angles(0, math.rad(-18), 0)
+	local look = carrier.CFrame.Rotation * CFrame.Angles(0, math.rad(-16), 0)
 	local center = Vector3.new((lo.X + hi.X) / 2, lo.Y, (lo.Z + hi.Z) / 2)
 	body:PivotTo(CFrame.new(foot.Position) * look * CFrame.new(-center))
-	local ledge = piece(body, foot * CFrame.new(0, -0.09, 0), Vector3.new(STAGE.W + 0.4, 0.18, size.Z + 0.5), DARK, Enum.Material.Metal)
+	local ledge = piece(body, foot * CFrame.new(0, -0.09, 0), Vector3.new(STAGE.W + 0.4, 0.18, size.Z + 0.6), DARK, Enum.Material.Metal)
 	ledge.Name = "Ledge"
-	piece(body, foot * CFrame.new(0, -0.09, -(size.Z + 0.5) / 2), Vector3.new(STAGE.W + 0.42, 0.2, 0.06), tint or AMBER, Enum.Material.Neon).Name = "LedgeEdge"
-	light(ledge, tint or AMBER, 7, 1.2)
+	piece(body, foot * CFrame.new(0, -0.09, -(size.Z + 0.6) / 2), Vector3.new(STAGE.W + 0.42, 0.2, 0.06), tint or AMBER, Enum.Material.Neon).Name = "LedgeEdge"
+	light(ledge, tint or AMBER, 7, 1.4)
+	-- (a lamp over it, so it reads from across the hall)
+	local lamp = piece(body, foot * CFrame.new(0, STAGE.H + 0.8, -0.4), Vector3.new(0.2, 0.2, 0.2), DARK, Enum.Material.Metal)
+	lamp.Name, lamp.Transparency = "Lamp", 1
+	local spot = Instance.new("SpotLight")
+	spot.Face, spot.Angle, spot.Range, spot.Brightness = Enum.NormalId.Bottom, 70, 10, 2.4
+	spot.Color, spot.Shadows = Color3.fromRGB(255, 240, 220), false
+	spot.Parent = lamp
 	body.Name = "Figure"
 	body.Parent = carrier.Parent
 	face.Figure = body
+end
+
+local function hex(c: Color3): string
+	return string.format("#%02X%02X%02X", math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
 end
 
 -- `entry` (a Bounties.entries() entry, number `index` of `total`) on `face`.
@@ -245,24 +259,23 @@ local function draw(face: Face, entry, index: number, total: number)
 	local boss = entry.Boss
 	local tint = GemConfig.ElementColors[entry.Element] or AMBER
 	local threat = BossLoot.threat(boss)
-	local group = threat >= RiftRun.GroupThreat;
-	(p.Count :: TextLabel).Text = string.format("%s  %d / %d", Lang.translate("BOUNTY"), index, total);
+	local group = threat >= RiftRun.GroupThreat
+	local color = THREAT_COLORS[math.clamp(threat - 1, 1, 3)] or AMBER;
+	(p.Count :: TextLabel).Text = string.format("%02d / %02d", index, total);
 	(p.Name :: TextLabel).Text = string.upper(boss.Name or "?");
 	(p.Wash :: Frame).BackgroundColor3 = tint;
-	(p.Glow :: Frame).BackgroundColor3 = tint;
-	(p.Rim :: UIStroke).Color = tint;
-	(p.Band :: Frame).BackgroundColor3 = tint;
-	(p.Element :: TextLabel).Text = Lang.translate(string.upper(GemConfig.elementName(entry.Element) or entry.Element or ""))
-	local color = THREAT_COLORS[math.clamp(threat - 1, 1, 3)] or AMBER;
-	(p.Threat :: TextLabel).Text = Lang.translate("THREAT " .. BossLoot.numeral(threat));
-	(p.Threat :: TextLabel).TextColor3 = color
-	for i = 1, 5 do
-		local pip = (p.Pips :: Frame):FindFirstChild("Pip" .. i) :: Frame
-		pip.BackgroundColor3 = if i <= threat then color else Color3.fromRGB(46, 46, 58)
-	end;
-	(p.Party :: Frame).BackgroundColor3 = if group then RED else Color3.fromRGB(46, 150, 90);
-	(p.PartyText :: TextLabel).Text = Lang.translate(if group then "BRING A PARTY" else "SOLO OR PARTY");
-	(p.Seen :: TextLabel).Text = Lang.translate("LAST SEEN: " .. string.upper(entry.Biome or ""))
+	(p.Accent :: Frame).BackgroundColor3 = tint;
+	(p.Fill :: Frame).BackgroundColor3 = tint;
+	(p.Kind :: TextLabel).Text = string.format(
+		'<font color="%s">%s</font>   <font color="%s">%s</font>',
+		hex(tint),
+		Lang.translate(string.upper(GemConfig.elementName(entry.Element) or entry.Element or "")),
+		hex(color),
+		Lang.translate("THREAT " .. BossLoot.numeral(threat))
+	);
+	(p.Party :: TextLabel).Text = Lang.translate(if group then "BRING A PARTY" else "SOLO OR PARTY");
+	(p.Party :: TextLabel).TextColor3 = if group then RED else Color3.fromRGB(110, 220, 140);
+	(p.Seen :: TextLabel).Text = string.upper(entry.Biome or "")
 	portrait(face, tostring(boss.Id), tint)
 	-- (the flash: a blink of light over the new one)
 	local flash = p.Flash :: Frame

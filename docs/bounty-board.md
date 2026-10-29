@@ -7,16 +7,29 @@ blades on top, a glowing amber ring on the floor round its plinth.
 
 ![The board on the hall floor, the Hall of Fame behind](bounty-board/hall.jpg)
 
-Each face shows **one bounty**, a WANTED poster:
+Each face shows **one bounty**, WANTED, and the boss is the point of it:
 
-- the boss itself: a 3D figure of its body standing on a lit ledge out of
-  the screen, over its element's glow (the same bodies as the bounty
-  office's portraits, `ReplicatedStorage.RiftPortraits`; a ViewportFrame
-  doesn't draw on a board out in the world, so it's a real figure),
-- its name and element, its threat (THREAT and a numeral, green to red),
-- what it pays (a boss cache), whether to bring a party, and where it was
-  last seen (its biome),
-- `TAKE A BOUNTY [E]` along the bottom.
+- *2026-10-29, rebuilt.* The left half is the boss's stage: a big 3D
+  figure of its body (5.5 studs) standing on a lit ledge out of the
+  screen, a lamp over it and its element's light rising from the floor
+  behind it. The same bodies as the bounty office's portraits
+  (`ReplicatedStorage.RiftPortraits`; a ViewportFrame doesn't draw on a
+  board out in the world, so it's a real figure). No placeholder orb:
+  until a body has come from the server the stage is just its light, and
+  the client says so once in the output (`[BountyBoard] waiting for the
+  portrait of ...`).
+- The right half says who it is, in one plain column: its name, big; its
+  element and threat (`THERMAL   THREAT III`); then REWARD, PARTY and LAST
+  SEEN, a small label over each value; and `[E] TAKE A BOUNTY`.
+- A thin line along the foot, in its element's colour, runs down the time
+  left on this bounty.
+
+The old face (a glow circle behind the boss, a filled element band, five
+threat pips, a red BRING A PARTY pill, a progress bar) is gone.
+
+*(Renders: the board as the client builds it, with stand-in bodies from
+the trailer's exports on its ledges; in the game each is that boss's own
+body.)*
 
 ![The front face up close](bounty-board/front.jpg)
 
