@@ -706,8 +706,10 @@ check(ids[1] == k3.Id and ids[2] == k2.Id and #ids == 3, "setTeam didn't keep it
 check(roster.Active == k3.Id and Kaiju.active(roster) == k3, "The lead isn't the first of the team")
 check(#roster.Team == 3, "setTeam didn't tidy the team it saved")
 roster.List[k3.Id] = nil
-check(Kaiju.teamIds(roster)[1] == k2.Id and #Kaiju.teamIds(roster) == 3, "A kaiju gone kept its place")
-check(#Kaiju.team(roster) == 3 and Kaiju.team(roster)[1] == k2, "Kaiju.team isn't the records in order")
+-- (A kaiju gone leaves its place empty: nobody slides over from another team.)
+check(Kaiju.teamIds(roster)[1] == k2.Id and #Kaiju.teamIds(roster) == 2, "A kaiju gone didn't leave its place empty")
+check(Kaiju.teamNumber(roster, k4.Id) == 2, "A kaiju slid from Team 2 into Team 1's empty place")
+check(#Kaiju.team(roster) == 2 and Kaiju.team(roster)[1] == k2, "Kaiju.team isn't the records in order")
 -- Four teams of three: twelve kaiju fill them in order; the team out is
 -- roster.Out (a team with nobody in it isn't one: Team 1); a support kind
 -- isn't in a team (its own slot); two swap places, and teams; setTeam puts
@@ -746,6 +748,76 @@ do
 	Kaiju.add(small, "Razorback", soulFor("Fire", "u1"))
 	small.Out = 2
 	check(Kaiju.outTeam(small) == 1 and #Kaiju.teamIds(small) == 1, "An empty team is out")
+end
+-- Real teams and a bench (Kaiju.teams, place, benchKaiju, autoFill): a team
+-- can have empty places and any team can be filled; a kaiju in no team is on
+-- the bench; an old save's line becomes its teams as they stood.
+do
+	local r = Kaiju.roster({})
+	local all = {}
+	for i = 1, 6 do
+		local record = Kaiju.add(r, if i % 2 == 0 then "Bulwark" else "Razorback", soulFor("Fire", "b" .. i), 20)
+		table.insert(all, record.Id) -- (level 20: three places a team)
+	end
+	check(Kaiju.slots(r) == 3, "Teams aren't three places")
+	check(#Kaiju.teamOf(r, 1) == 3 and #Kaiju.teamOf(r, 3) == 0 and #Kaiju.bench(r) == 0, "Caught kaiju didn't fill the first teams with room")
+	-- Bench one: its place is empty, it's on the bench, nobody moved.
+	check(Kaiju.benchKaiju(r, all[2]), "Couldn't bench a kaiju")
+	check(#Kaiju.teamOf(r, 1) == 2 and Kaiju.teamOf(r, 1)[2] == all[3] and Kaiju.bench(r)[1] == all[2], "Benching didn't leave an empty place")
+	check(Kaiju.teamNumber(r, all[2]) == nil and Kaiju.teamNumber(r, all[4]) == 2, "teamNumber is wrong for the bench")
+	check(not Kaiju.benchKaiju(r, all[2]), "Benched one already on the bench")
+	-- Team 4 with Team 3 empty: fine.
+	check(Kaiju.place(r, all[2], 4, 1) and Kaiju.teamOf(r, 4)[1] == all[2] and #Kaiju.teamOf(r, 3) == 0, "Couldn't fill Team 4 with Team 3 empty")
+	-- On an empty place: it moves there (its old place empties).
+	check(Kaiju.place(r, all[1], 4, 3) and Kaiju.teamOf(r, 4)[2] == all[1] and Kaiju.teamNumber(r, all[1]) == 4, "Placing on an empty place didn't move it")
+	-- On someone: they trade places; from the bench, the one there goes to the bench.
+	Kaiju.benchKaiju(r, all[3])
+	check(Kaiju.place(r, all[3], 2, 1) and Kaiju.teamOf(r, 2)[1] == all[3] and Kaiju.teamNumber(r, all[4]) == nil, "From the bench onto someone didn't bench them")
+	check(Kaiju.swap(r, all[4], all[5]) and Kaiju.teamNumber(r, all[4]) == 2 and Kaiju.teamNumber(r, all[5]) == nil, "A swap with the bench didn't trade")
+	check(not Kaiju.place(r, all[5], 1, 4) and not Kaiju.place(r, all[5], 5, 1) and not Kaiju.place(r, "nope", 1, 1), "Placed somewhere that isn't a place")
+	-- Auto fill: the bench's best into the empty places.
+	local bench = #Kaiju.bench(r)
+	local placed = Kaiju.autoFill(r)
+	check(placed == bench and #Kaiju.bench(r) == 0, "Auto fill didn't empty the bench into empty places")
+	-- Keep one in a team at least.
+	local lone = Kaiju.roster({})
+	local only = Kaiju.add(lone, "Razorback", soulFor("Fire", "lone"))
+	check(not Kaiju.benchKaiju(lone, only.Id) and Kaiju.teamNumber(lone, only.Id) == 1, "Benched the last kaiju in a team")
+	-- The team out with nobody: the first team with someone.
+	local r2 = Kaiju.roster({})
+	for i = 1, 4 do
+		Kaiju.add(r2, "Razorback", soulFor("Fire", "o" .. i), 20)
+	end
+	Kaiju.place(r2, Kaiju.teamOf(r2, 2)[1], 3, 1)
+	r2.Out = 2
+	check(Kaiju.outTeam(r2) == 1, "An empty team out isn't the first with someone")
+	-- Teams grow (a kaiju levels up past Kaiju.SlotLevels): the new places
+	-- fill from the bench, once (Kaiju.roster).
+	local slotLevels = Kaiju.SlotLevels
+	Kaiju.SlotLevels = { 1, 10, 20 } -- (as if teams grew with your best kaiju)
+	local grow = {}
+	local g = Kaiju.roster(grow)
+	for i = 1, 6 do
+		Kaiju.add(g, "Razorback", soulFor("Fire", "g" .. i), 1)
+	end
+	check(#Kaiju.teamOf(g, 1) == 1 and #Kaiju.bench(g) == 2, "Level 1 kaiju aren't teams of one and a bench")
+	Kaiju.roster(grow)
+	g.List[Kaiju.teamOf(g, 1)[1]].Level = 20
+	Kaiju.roster(grow)
+	check(#Kaiju.teamOf(g, 1) == 3 and #Kaiju.bench(g) == 0, "Bigger teams didn't fill from the bench")
+	Kaiju.SlotLevels = slotLevels
+	-- An old save's line (roster.Order) becomes its teams as they stood.
+	local old = Kaiju.roster({})
+	for i = 1, 5 do
+		Kaiju.add(old, "Razorback", soulFor("Fire", "l" .. i), 20)
+	end
+	local line = Kaiju.order(old)
+	old.Teams = nil
+	old.Order = { line[5], line[4], line[3], line[2], line[1] }
+	local teams = Kaiju.teams(old)
+	check(teams[1][1] == line[5] and teams[1][3] == line[3] and teams[2][1] == line[2] and teams[2][2] == line[1], "An old save's line didn't become its teams")
+	Kaiju.saveTeams(old, teams)
+	check(old.Order == nil and type(old.Teams) == "table" and Kaiju.teamOf(old, 2)[2] == line[1], "Saving the teams didn't keep them")
 end
 -- One out from before (Active, no Team) still leads.
 local before = { List = { k1 = { Id = "k1", Level = 9 }, k2 = { Id = "k2", Level = 2 } }, Active = "k2" }

@@ -1690,6 +1690,13 @@ function Kaiju.roster(profile)
 			end
 		end
 	end
+	-- (Teams just grew, a kaiju levelling up past Kaiju.SlotLevels: the new
+	-- places fill from the bench, once.)
+	local size = Kaiju.slots(roster)
+	if type(roster.Size) == "number" and size > roster.Size then
+		Kaiju.autoFill(roster)
+	end
+	roster.Size = size
 	return roster
 end
 
@@ -1709,7 +1716,7 @@ function Kaiju.add(roster, speciesId: string, soul, level: number?, over: (boole
 	if Kaiju.count(roster) >= Kaiju.MaxOwned + extra or not Kaiju.Species[speciesId] then
 		return nil
 	end
-	local before = Kaiju.order(roster)
+	local teams = Kaiju.teams(roster) -- (as they stand, before it joins)
 	local id = "k" .. roster.Next
 	roster.Next += 1
 	local record = Kaiju.new(id, speciesId, soul, level, traits)
@@ -1717,10 +1724,16 @@ function Kaiju.add(roster, speciesId: string, soul, level: number?, over: (boole
 	if not roster.Active or not roster.List[roster.Active] then
 		roster.Active = id
 	end
-	-- (a fighter joins the end of the line: the first team with room)
+	-- (a fighter joins the first team with room, else the bench)
 	if not Kaiju.isSupport(speciesId) then
-		table.insert(before, id)
-		roster.Order = before
+		local size = Kaiju.slots(roster)
+		for n = 1, Kaiju.Teams do
+			if #teams[n] < size then
+				table.insert(teams[n], id)
+				break
+			end
+		end
+		Kaiju.saveTeams(roster, teams)
 	end
 	return record
 end
@@ -1730,26 +1743,42 @@ local function idNumber(id: string): number
 	return tonumber(string.match(id, "%d+")) or 0
 end
 
--- Your teams: up to Kaiju.Teams of them, each as big as your slots, kept as
--- one line of your fighters (roster.Order; support kinds have their own
--- slot: supportId). Team n is places (n - 1) * size + 1 to n * size of the
--- line, so the teams fill in order: Team 2 only once Team 1 is full, then
--- Team 3, then Team 4. A kaiju caught joins the end of the line (Kaiju.add);
--- the TEAMS tab swaps two places (Kaiju.swap). One team is out at a time
--- (roster.Out; keys 1 to 4 pick it: KaijuServer's KaijuTeamOut).
+-- Your teams: up to Kaiju.Teams of them, each with up to Kaiju.slots places
+-- (more as your best kaiju levels up), kept as roster.Teams: a list of ids
+-- for each team, the first its lead. A team can have empty places, and any
+-- team can be filled, whatever the others hold. A fighter in no team sits on
+-- the bench (Kaiju.bench); support kinds have their own slot (supportId). A
+-- kaiju caught joins the first team with room, else the bench (Kaiju.add).
+-- The kaiju menu's TEAMS page places them (Kaiju.place, Kaiju.swap,
+-- Kaiju.benchKaiju, Kaiju.autoFill). One team is out at a time (roster.Out;
+-- keys 1 to 4 pick it: KaijuServer's KaijuTeamOut). An older save's one line
+-- of fighters (roster.Order: Team 1 its first places, Team 2 the next...)
+-- becomes its teams as they stood.
 Kaiju.Teams = 4
 
--- The line, tidied: kaiju you own, each once, no support kinds; the ones in
--- roster.Order first (a save from before teams: its team, roster.Team, and
--- its lead), then any not placed yet, on their feet first, highest level,
--- then oldest. One knocked out keeps its place (it's down, not out).
-function Kaiju.order(roster): { string }
-	local out, seen = {}, {}
-	if not roster or type(roster.List) ~= "table" then
-		return out
+-- A fighter of yours (owned, not a support kind).
+local function fighter(roster, id: any): boolean
+	return type(id) == "string" and roster.List[id] ~= nil and not Kaiju.isSupport(roster.List[id].Species)
+end
+
+-- On their feet first, highest level, then oldest.
+local function better(roster, a: string, b: string): boolean
+	local ra, rb = roster.List[a], roster.List[b]
+	if (ra.Down == true) ~= (rb.Down == true) then
+		return not ra.Down
 	end
+	if (ra.Level or 1) ~= (rb.Level or 1) then
+		return (ra.Level or 1) > (rb.Level or 1)
+	end
+	return idNumber(a) < idNumber(b)
+end
+
+-- An older save's line: roster.Order (or before that its team, roster.Team,
+-- and its lead), then any not placed, best first.
+local function oldLine(roster): { string }
+	local out, seen = {}, {}
 	local function take(id)
-		if type(id) == "string" and roster.List[id] and not seen[id] and not Kaiju.isSupport(roster.List[id].Species) then
+		if fighter(roster, id) and not seen[id] then
 			seen[id] = true
 			table.insert(out, id)
 		end
@@ -1770,15 +1799,8 @@ function Kaiju.order(roster): { string }
 			table.insert(rest, id)
 		end
 	end
-	table.sort(rest, function(a, b)
-		local ra, rb = roster.List[a], roster.List[b]
-		if (ra.Down == true) ~= (rb.Down == true) then
-			return not ra.Down -- (one knocked out fills a place last)
-		end
-		if (ra.Level or 1) ~= (rb.Level or 1) then
-			return (ra.Level or 1) > (rb.Level or 1)
-		end
-		return idNumber(a) < idNumber(b)
+	table.sort(rest, function(x, y)
+		return better(roster, x, y)
 	end)
 	for _, id in rest do
 		take(id)
@@ -1786,65 +1808,232 @@ function Kaiju.order(roster): { string }
 	return out
 end
 
--- How many teams have someone in them (at least 1, at most Kaiju.Teams).
-function Kaiju.teamCount(roster): number
+-- Your teams, tidied: Kaiju.Teams lists of ids (each a fighter you own, once,
+-- at most Kaiju.slots a team; a kaiju gone leaves its place empty).
+function Kaiju.teams(roster): { { string } }
+	local teams = {}
+	for n = 1, Kaiju.Teams do
+		teams[n] = {}
+	end
+	if not roster or type(roster.List) ~= "table" then
+		return teams
+	end
 	local size = Kaiju.slots(roster)
-	return math.clamp(math.ceil(#Kaiju.order(roster) / size), 1, Kaiju.Teams)
+	if type(roster.Teams) == "table" then
+		local seen = {}
+		for n = 1, Kaiju.Teams do
+			local saved = roster.Teams[n]
+			for _, id in (if type(saved) == "table" then saved else {}) do
+				if #teams[n] < size and fighter(roster, id) and not seen[id] then
+					seen[id] = true
+					table.insert(teams[n], id)
+				end
+			end
+		end
+	else
+		for i, id in oldLine(roster) do
+			local n = math.ceil(i / size)
+			if n <= Kaiju.Teams then
+				table.insert(teams[n], id)
+			end
+		end
+	end
+	return teams
 end
 
--- Team `n`'s ids in order (the first leads); empty for a team not filled yet.
-function Kaiju.teamOf(roster, n: number): { string }
+-- The bench: your fighters in no team, best first.
+function Kaiju.bench(roster): { string }
 	local out = {}
-	if type(n) ~= "number" or n < 1 or n > Kaiju.Teams then
+	if not roster or type(roster.List) ~= "table" then
 		return out
 	end
-	local order, size = Kaiju.order(roster), Kaiju.slots(roster)
-	for i = (n - 1) * size + 1, math.min(n * size, #order) do
-		table.insert(out, order[i])
+	local placed = {}
+	for _, team in Kaiju.teams(roster) do
+		for _, id in team do
+			placed[id] = true
+		end
 	end
+	for id in roster.List do
+		if fighter(roster, id) and not placed[id] then
+			table.insert(out, id)
+		end
+	end
+	table.sort(out, function(x, y)
+		return better(roster, x, y)
+	end)
 	return out
 end
 
--- The team out (or picked, while called back): 1 to Kaiju.Teams.
-function Kaiju.outTeam(roster): number
-	local n = roster and tonumber(roster.Out) or 1
-	n = math.clamp(math.floor(n), 1, Kaiju.Teams)
-	if #Kaiju.teamOf(roster, n) == 0 then
-		return 1
+-- Every fighter in one line: the teams in turn, then the bench.
+function Kaiju.order(roster): { string }
+	local out = {}
+	for _, team in Kaiju.teams(roster) do
+		table.move(team, 1, #team, #out + 1, out)
 	end
-	return n
+	local bench = Kaiju.bench(roster)
+	table.move(bench, 1, #bench, #out + 1, out)
+	return out
 end
 
--- Which team a kaiju is in (nil for one in none: a support kind).
-function Kaiju.teamNumber(roster, id: string): number?
-	local at = table.find(Kaiju.order(roster), id)
-	if not at then
-		return nil
-	end
-	local n = math.ceil(at / Kaiju.slots(roster))
-	return if n <= Kaiju.Teams then n else nil
-end
-
--- Keeps the line as it is now (and roster.Team, roster.Active: the team out
+-- Keeps `teams` as your teams (and roster.Team, roster.Active: the team out
 -- and its lead, for anything reading them).
-function Kaiju.saveOrder(roster, order: { string })
-	roster.Order = order
-	roster.Order = Kaiju.order(roster)
+function Kaiju.saveTeams(roster, teams: { { string } })
+	roster.Teams = teams
+	roster.Teams = Kaiju.teams(roster)
+	roster.Order = nil -- (the old line: the teams say it all now)
 	roster.Team = Kaiju.teamIds(roster)
 	roster.Active = roster.Team[1]
 end
 
--- Two of your kaiju swap places (and so teams). False if either isn't in
--- the line.
+-- How many teams have someone in them (at least 1).
+function Kaiju.teamCount(roster): number
+	local n = 0
+	for _, team in Kaiju.teams(roster) do
+		if #team > 0 then
+			n += 1
+		end
+	end
+	return math.max(1, n)
+end
+
+-- Team `n`'s ids in order (the first leads); empty for a team with nobody.
+function Kaiju.teamOf(roster, n: number): { string }
+	if type(n) ~= "number" or n < 1 or n > Kaiju.Teams or n ~= math.floor(n) then
+		return {}
+	end
+	return Kaiju.teams(roster)[n]
+end
+
+-- The team out (or picked, while called back): 1 to Kaiju.Teams; a team
+-- with nobody in it isn't one (the first with someone).
+function Kaiju.outTeam(roster): number
+	local n = roster and tonumber(roster.Out) or 1
+	n = math.clamp(math.floor(n), 1, Kaiju.Teams)
+	local teams = Kaiju.teams(roster)
+	if #teams[n] > 0 then
+		return n
+	end
+	for i = 1, Kaiju.Teams do
+		if #teams[i] > 0 then
+			return i
+		end
+	end
+	return 1
+end
+
+-- Where a kaiju is: its team and place, or nil (the bench, or a support kind).
+function Kaiju.placeOf(roster, id: string): (number?, number?)
+	for n, team in Kaiju.teams(roster) do
+		local at = table.find(team, id)
+		if at then
+			return n, at
+		end
+	end
+	return nil, nil
+end
+
+-- Which team a kaiju is in (nil: on the bench, or a support kind).
+function Kaiju.teamNumber(roster, id: string): number?
+	return (Kaiju.placeOf(roster, id))
+end
+
+-- Two of your fighters trade places: in two teams, a team and the bench
+-- (the benched one takes the place), or within a team. False if either
+-- isn't a fighter of yours.
 function Kaiju.swap(roster, a: string, b: string): boolean
-	local order = Kaiju.order(roster)
-	local i, j = table.find(order, a), table.find(order, b)
-	if not i or not j then
+	if not roster or type(roster.List) ~= "table" or not fighter(roster, a) or not fighter(roster, b) or a == b then
 		return false
 	end
-	order[i], order[j] = order[j], order[i]
-	Kaiju.saveOrder(roster, order)
+	local teams = Kaiju.teams(roster)
+	local na, ia, nb, ib
+	for n, team in teams do
+		ia = ia or table.find(team, a)
+		na = na or (if table.find(team, a) then n else nil)
+		ib = ib or table.find(team, b)
+		nb = nb or (if table.find(team, b) then n else nil)
+	end
+	if na then
+		teams[na][ia] = b
+	end
+	if nb then
+		teams[nb][ib] = a
+	end
+	Kaiju.saveTeams(roster, teams)
 	return true
+end
+
+-- Puts `id` (a fighter of yours) in team `n`, place `slot`: on an empty
+-- place it goes there (after the team's last); on someone it trades places
+-- with them (one from the bench sends them to the bench). False if it can't.
+function Kaiju.place(roster, id: string, n: number, slot: number): boolean
+	if not roster or type(roster.List) ~= "table" or not fighter(roster, id) then
+		return false
+	end
+	if type(n) ~= "number" or n < 1 or n > Kaiju.Teams or n ~= math.floor(n) then
+		return false
+	end
+	local size = Kaiju.slots(roster)
+	if type(slot) ~= "number" or slot < 1 or slot > size or slot ~= math.floor(slot) then
+		return false
+	end
+	local teams = Kaiju.teams(roster)
+	local team = teams[n]
+	local other = team[slot]
+	if other == id then
+		return true
+	end
+	if other then
+		return Kaiju.swap(roster, id, other)
+	end
+	local from, at = Kaiju.placeOf(roster, id)
+	if from then
+		table.remove(teams[from], at)
+	end
+	if #team >= size then
+		return false
+	end
+	table.insert(team, id)
+	Kaiju.saveTeams(roster, teams)
+	return true
+end
+
+-- Sends `id` from its team to the bench. False if it's not in a team, or it
+-- would leave every team empty (someone has to be ready to come out).
+function Kaiju.benchKaiju(roster, id: string): boolean
+	local n, at = Kaiju.placeOf(roster, id)
+	if not n then
+		return false
+	end
+	local teams = Kaiju.teams(roster)
+	local placed = 0
+	for _, team in teams do
+		placed += #team
+	end
+	if placed <= 1 then
+		return false
+	end
+	table.remove(teams[n :: number], at :: number)
+	Kaiju.saveTeams(roster, teams)
+	return true
+end
+
+-- Fills every team's empty places from the bench, best first (team `only`
+-- alone if given). Returns how many it placed.
+function Kaiju.autoFill(roster, only: number?): number
+	local teams, bench, size = Kaiju.teams(roster), Kaiju.bench(roster), Kaiju.slots(roster)
+	local placed = 0
+	for n = 1, Kaiju.Teams do
+		if only == nil or only == n then
+			while #teams[n] < size and #bench > 0 do
+				table.insert(teams[n], table.remove(bench, 1))
+				placed += 1
+			end
+		end
+	end
+	if placed > 0 then
+		Kaiju.saveTeams(roster, teams)
+	end
+	return placed
 end
 
 -- Your team out, as ids in order (the first is its lead): the team picked
@@ -1862,28 +2051,21 @@ function Kaiju.team(roster): { any }
 	return out
 end
 
--- Puts `ids` in the team out, in that order (the first leads): each swaps
--- places with the one there (a kaiju from another team takes its place in
--- the line, so every team stays as full as it was).
+-- Puts `ids` in the team out, in that order (the first leads): each takes
+-- its place there, the one in it trading places with it.
 function Kaiju.setTeam(roster, ids: { string })
-	local order = Kaiju.order(roster)
+	local n = Kaiju.outTeam(roster)
 	local size = Kaiju.slots(roster)
-	local base = (Kaiju.outTeam(roster) - 1) * size
 	local placed, seen = 0, {}
 	for _, id in ids do
-		local from = table.find(order, id)
-		-- (once each, and only one of yours in the line)
-		if from and not seen[id] then
+		if fighter(roster, id) and not seen[id] and placed < size then
 			seen[id] = true
 			placed += 1
-			local at = base + placed
-			if placed > size or at > #order then
-				break
-			end
-			order[from], order[at] = order[at], order[from]
+			local team = Kaiju.teamOf(roster, n)
+			Kaiju.place(roster, id, n, math.min(placed, #team + (if table.find(team, id) then 0 else 1)))
 		end
 	end
-	Kaiju.saveOrder(roster, order)
+	Kaiju.saveTeams(roster, Kaiju.teams(roster))
 end
 
 function Kaiju.inTeam(roster, id: string): boolean

@@ -392,22 +392,24 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 - **Recall.** The server can still call all of them back to you for 4
   seconds (`KaijuRecall`), but the strip no longer has a button for it:
   AUTO HEAL took the place of RECALL and HUNT.
-- **Teams 1 to 4, on the number keys.** Your kaiju fill four teams of
-  three, in order: Team 1 first, then Team 2, then 3, then 4 (12 kept at
-  most; the support has its own slot and is in no team). A new catch joins
-  the team that's filling. Press a team's number (or tap its chip on the
-  kaiju card) and:
+- **Teams 1 to 4, on the number keys.** You have four teams of three
+  places and a **bench** (the support has its own slot and is in no team).
+  Each team is yours to arrange: any team can have kaiju in it whatever the
+  others hold, a place can stay empty, and a kaiju can sit on the bench
+  (`roster.Teams`; `Kaiju.teams`, `bench`, `place`, `swap`, `benchKaiju`,
+  `autoFill`). A new catch takes the first team with an empty place, else
+  the bench. Press a team's number (or tap its chip on the kaiju card) and:
   - **the team out's own number** calls it back (they fold into light and
     fly to you), and the same number brings it out again, in a fight or out
     of one;
   - **another team's number** swaps that team in: the team out goes back
     and the other comes out where you are;
-  - **an empty team** says how they fill ("Team 3 is empty. Your kaiju fill
-    the teams in order: fill Team 2 first."), and a team all knocked out
-    says so and stays home.
+  - **an empty team** opens TEAMS with its first place picked, to fill it
+    ("Team 3 is empty: put kaiju in it on the TEAMS page."), and a team all
+    knocked out says so and stays home.
 
   This replaced CALL BACK / DEPLOY: there's no button for them now, the
-  number does both (`KaijuTeamOut`; `Kaiju.order`, `teamOf`, `outTeam`). The
+  number does both (`KaijuTeamOut`; `Kaiju.teams`, `teamOf`, `outTeam`). The
   pick or combat kit switch moved from 1 to **Y** to free the numbers (and
   then to **X**: see [friendly-sparring.md](friendly-sparring.md)).
 
@@ -434,12 +436,33 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   arriving they just stood there). Coming in, that's often under the
   loading screen, so once the screen's gone your own team plays it again
   where you can see it (`KaijuOutAt` on the model, `KaijuHud`).
-- **The TEAMS tab** (the kaiju panel's fourth): a row for each team, its
-  three places, OUT or CALLED BACK on the team out, LOCKED on a team past
-  the one filling ("Fill Team 2 first" in its places), and SEND OUT on the
-  others. Tap a kaiju, then another, in any team, and they swap places
-  (`KaijuSwap`); tap the one picked again to let it go. Not in the middle
-  of a fight.
+- **The TEAMS page** (the kaiju panel's first, and what it opens on from
+  an empty place or an empty team's key; the whole width, no list beside
+  it). *2026-10-29, remade:* it used to be the old line cut into threes, so
+  Teams 2 to 4 were LOCKED till the one before was full and moving one
+  kaiju shifted all the rest. Now:
+  - **four team cards side by side**, each with its three places (the first
+    LEADS; an empty one says "+ EMPTY"), what it's doing (OUT, CALLED BACK,
+    READY, EMPTY) and its button: CALL BACK / BRING OUT / SEND OUT with its
+    key, or FILL on an empty team;
+  - **the bench** underneath, every fighter in no team, and **the SUPPORT**
+    slot at its right (your other supports wait on the bench strip; tap one
+    to make it the support);
+  - **one way to move anything: tap a kaiju, then tap where it goes.** The
+    bar says what's picked ("MOVING THERMAL BULWARK · tap a place, a kaiju
+    to swap with, or the bench") and every target says what a tap there
+    does: PUT HERE on an empty place, SWAP on a kaiju, SEND TO BENCH on the
+    bench. Or tap an empty place first, then the kaiju to put in it. Drag
+    and drop does the same. CANCEL (or the one picked again) lets go;
+    DETAILS opens the one picked;
+  - **AUTO FILL** puts the bench's best into the empty places, Team 1 first.
+
+  Requests: `KaijuPlace` (to a team and place: an empty one takes it, a
+  full one swaps), `KaijuSwap` (any two of your fighters, the bench too),
+  `KaijuBench`, `KaijuAutoFill`, `KaijuSupport`. Not while that kaiju is in
+  a fight; the last kaiju in a team can't be benched ("Keep at least one
+  kaiju in a team."). An older save's line becomes its teams, three a team,
+  the first time it's read.
 
   *2026-10-27, fixed:* in the game the tab could show only Team 1's first
   place, the rest missing. Each redraw cleared the rows and destroyed the
@@ -451,6 +474,8 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   ![The TEAMS tab](kaiju/teams-tab.png)
 
   ![The TEAMS tab on a phone](kaiju/teams-tab-phone.png)
+
+  ![Moving a kaiju: every target says what a tap does](kaiju/teams-tab-moving.png)
 - **They jump with you, follow the leader.** Jump and your team jumps
   after you one by one, down your line: the one nearest you first (0.14 s
   after you), then each one behind it 0.26 s after the one before

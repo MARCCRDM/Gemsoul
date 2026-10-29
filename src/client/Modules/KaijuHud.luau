@@ -88,7 +88,8 @@
 
 	  KaijuHud.start()     once, from Lobby.client
 	  KaijuHud.open(id?, tab?)   the panel, on kaiju `id` (else your lead),
-	                       on "Details", "Heal" or "Enchant"
+	                       on "Teams", "Details", "Heal" or "Enchant"
+	                       (no id and no tab: TEAMS)
 ]]
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -450,10 +451,10 @@ local autoArt: string? = nil
 -- The team keys, tabs along the card's top (on a phone, above the move
 -- stick: see layout): four chips, 1 to 4 (Kaiju.Teams), the
 -- keys that bring each team out. The team out is gold; picked but called
--- back, a gold edge; a team with kaiju in it, plain; one all knocked out, red; one not
--- filled yet, faint (they fill in order: Kaiju.order). Tap one or press its
+-- back, a gold edge; a team with kaiju in it, plain; one all knocked out, red; an
+-- empty one, faint (you fill it on TEAMS: Kaiju.teams). Tap one or press its
 -- number: the team out's own calls it back or brings it out again, another
--- team's swaps it in (KaijuServer's KaijuTeamOut).
+-- team's swaps it in (KaijuServer's KaijuTeamOut), an empty one opens TEAMS.
 local teamPad = new("Frame", {
 	Name = "Teams",
 	BackgroundTransparency = 1,
@@ -936,7 +937,7 @@ local SHORT = UiKit.short()
 local W, H = if SHORT then 860 else 800, if SHORT then 340 else 512
 local window = IronUi.window("KaijuPanel", 11, W, H, "K", P.Gold)
 window.Title.Text = "YOUR KAIJU"
-window.Subtitle.Text = "Choose a kaiju to inspect, heal, enchant, or swap into your team."
+window.Subtitle.Text = "Arrange your teams, then look after each kaiju: details, healing, enchants."
 window.Close.Activated:Connect(function()
 	window.Gui.Enabled = false
 end)
@@ -1429,14 +1430,15 @@ function teamsUi.Drag.inside(f: GuiObject, point: Vector2): boolean
 	return point.X >= p.X and point.Y >= p.Y and point.X < p.X + size.X and point.Y < p.Y + size.Y
 end
 -- A kaiju's card or place to drop on: `clip`, if given, is what it scrolls
--- in (a drop only counts where it shows); `support` for the support card.
-function teamsUi.Drag.target(frame: GuiObject, id: string?, clip: GuiObject?, support: boolean?)
+-- in (a drop only counts where it shows); `support` for the support card,
+-- `place` ({Team=,Slot=}) for an empty place in TEAMS, `bench` for the bench.
+function teamsUi.Drag.target(frame: GuiObject, id: string?, clip: GuiObject?, support: boolean?, place: any?, bench: boolean?)
 	for i = #teamsUi.Drag.Targets, 1, -1 do
 		if not teamsUi.Drag.Targets[i].Frame.Parent then
 			table.remove(teamsUi.Drag.Targets, i)
 		end
 	end
-	table.insert(teamsUi.Drag.Targets, { Frame = frame, Id = id, Clip = clip, Support = support == true })
+	table.insert(teamsUi.Drag.Targets, { Frame = frame, Id = id, Clip = clip, Support = support == true, Place = place, Bench = bench == true })
 end
 function teamsUi.Drag.under(point: Vector2)
 	for _, t in teamsUi.Drag.Targets do
@@ -1490,6 +1492,7 @@ function teamsUi.Drag.begin(drag, point: Vector2)
 	drag.Started = true
 	teamsUi.Drag.SuppressUntil = math.huge -- (no taps till it's dropped)
 	listFrame.ScrollingEnabled = false
+	teamsUi.Pane.ScrollingEnabled = false
 	local color = elementColor(record.Element)
 	local ghost = new("Frame", {
 		Name = "KaijuDragGhost",
@@ -1517,6 +1520,7 @@ function teamsUi.Drag.finish(point: Vector2?)
 	local drag = teamsUi.Drag.Active
 	teamsUi.Drag.Active = nil
 	listFrame.ScrollingEnabled = true
+	teamsUi.Pane.ScrollingEnabled = true
 	teamsUi.Drag.paintHover(nil)
 	if not drag or not drag.Started then
 		return
@@ -1548,6 +1552,13 @@ function teamsUi.Drag.finish(point: Vector2?)
 		return
 	elseif b then
 		request, args = "KaijuSwap", { drag.Id, target.Id }
+	elseif target.Place then
+		request, args = "KaijuPlace", { drag.Id, target.Place.Team, target.Place.Slot }
+	elseif target.Bench then
+		if not Kaiju.teamNumber(data, drag.Id) then
+			return -- (it's on the bench already)
+		end
+		request, args = "KaijuBench", { drag.Id }
 	else
 		return
 	end
@@ -1556,6 +1567,7 @@ function teamsUi.Drag.finish(point: Vector2?)
 		if result and not result.Ok and result.Message and result.Message ~= "" then
 			UiKit.toast(result.Message, P.Bad)
 		end
+		teamsUi.Pick = nil
 		if window.Gui.Enabled and drawPanel then
 			drawPanel()
 		end
@@ -1595,155 +1607,492 @@ window.Gui:GetPropertyChangedSignal("Enabled"):Connect(function()
 	end
 end)
 
--- TEAMS: your four teams (Kaiju.Teams), a row each with its places
--- (Kaiju.slots). They fill in order (Kaiju.order): a team past the one
--- filling is LOCKED till that one's full. Tap a kaiju, then another in any
--- team, and they swap places (KaijuSwap); tap the one picked again to let
--- it go. SEND OUT brings a team out, as its number key does (pressTeam).
-teamsUi.Pane = new("Frame", {
+-- TEAMS (the panel's first page, the whole width): your four teams side by
+-- side (Kaiju.teams), each a card with its places (Kaiju.slots; the first
+-- LEADS, an empty one says so), its key and what it's doing (OUT, CALLED
+-- BACK, READY, EMPTY) and a button to bring it out or call it back
+-- (pressTeam, as its key does). Under them your BENCH (Kaiju.bench: in no
+-- team) and your SUPPORT (its own slot). To arrange them: tap a kaiju, then
+-- where it goes: an empty place (PUT HERE: KaijuPlace), another kaiju (SWAP:
+-- KaijuSwap, the bench's too) or the bench (SEND TO BENCH: KaijuBench). Or
+-- tap an empty place first, then who fills it. Dragging one onto a place,
+-- a kaiju or the bench does the same. AUTO FILL fills the empty places from
+-- the bench (KaijuAutoFill). The bar at the top says what's picked, with
+-- DETAILS (its page) and CANCEL.
+teamsUi.Pane = new("ScrollingFrame", {
 	Name = "Teams",
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(0, 38),
 	Size = UDim2.new(1, 0, 1, -38),
+	CanvasSize = UDim2.new(),
+	ScrollBarThickness = if SHORT then 3 else 0,
+	ScrollingDirection = Enum.ScrollingDirection.Y,
 	Visible = false,
 }, right)
+teamsUi.Gold = Color3.fromRGB(255, 202, 91)
+teamsUi.Card = Color3.fromRGB(18, 22, 36)
+teamsUi.Place = Color3.fromRGB(26, 31, 48)
+-- The bar: what to do now (or what's picked), and its buttons.
+teamsUi.Bar = new("Frame", { BackgroundColor3 = teamsUi.Card, Size = UDim2.new(1, 0, 0, if SHORT then 28 else 34) }, teamsUi.Pane)
+UiKit.round(teamsUi.Bar, 8)
+teamsUi.BarEdge = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.5 }, teamsUi.Bar)
+teamsUi.Hint = label(teamsUi.Bar, "", if SHORT then 11 else 13, P.Text, IronUi.Bold)
+teamsUi.Hint.RichText = true
+teamsUi.Hint.Position = UDim2.fromOffset(12, 0)
+teamsUi.Buttons = new("Frame", {
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -5, 0.5, 0),
+	Size = UDim2.new(0, 320, 1, -8),
+}, teamsUi.Bar)
 do
-	local hintH = if SHORT then 16 else 22
-	teamsUi.Hint = label(teamsUi.Pane, "", if SHORT then 10 else 11, P.Dim, IronUi.Body)
-	teamsUi.Hint.Size = UDim2.new(1, 0, 0, hintH - 4)
-	teamsUi.Rows = new("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, hintH),
-		Size = UDim2.new(1, 0, 1, -hintH),
-	}, teamsUi.Pane)
+	local list = UiKit.list(teamsUi.Buttons, 6, true)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	list.VerticalAlignment = Enum.VerticalAlignment.Center
 end
-teamsUi.Pick = nil :: string?
+function teamsUi.barButton(text: string, color: Color3, order: number, onClick: () -> ()): TextButton
+	local b = smallButton(teamsUi.Buttons, text, color)
+	b.LayoutOrder = order
+	b.Size = UDim2.new(0, if SHORT then 74 else 92, 1, 0)
+	b.TextSize = if SHORT then 10 else 11
+	b.Activated:Connect(onClick)
+	return b
+end
+teamsUi.Rows = new("Frame", { Name = "Cards", BackgroundTransparency = 1 }, teamsUi.Pane)
+teamsUi.BenchBox = new("Frame", { Name = "Bench", BackgroundColor3 = teamsUi.Card }, teamsUi.Pane)
+UiKit.round(teamsUi.BenchBox, 10)
+teamsUi.BenchEdge = new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.5 }, teamsUi.BenchBox)
+teamsUi.Pick = nil :: any -- { Id = id } or { Team = n, Slot = k } (an empty place)
+
+-- Doing it: the request, then the page again (a toast if it couldn't).
+function teamsUi.send(request: string, ...)
+	local args = table.pack(...)
+	teamsUi.Pick = nil
+	task.spawn(function()
+		local result = GemClient.request(request, table.unpack(args, 1, args.n))
+		if result and not result.Ok and result.Message and result.Message ~= "" then
+			UiKit.toast(result.Message, P.Bad)
+		end
+		if window.Gui.Enabled and tab == "Teams" then
+			teamsUi.draw(roster())
+		end
+	end)
+	teamsUi.draw(roster())
+end
+
+-- A tap on a kaiju (`id`), an empty place (`place`: { Team, Slot }) or the
+-- bench: picks it, or finishes the move picked.
+function teamsUi.tap(id: string?, place: any?, bench: boolean?)
+	if os.clock() < teamsUi.Drag.SuppressUntil then
+		return
+	end
+	local pick = teamsUi.Pick
+	local data = roster()
+	if not data then
+		return
+	end
+	if pick == nil then
+		if bench then
+			return
+		end
+		teamsUi.Pick = if id then { Id = id } else place
+	elseif pick.Id and id == pick.Id then
+		teamsUi.Pick = nil
+	elseif pick.Team and place and place.Team == pick.Team and place.Slot == pick.Slot then
+		teamsUi.Pick = nil
+	elseif pick.Id and id then
+		local a, b = data.List[pick.Id], data.List[id]
+		if a and b and (Kaiju.isSupport(a.Species) or Kaiju.isSupport(b.Species)) then
+			if Kaiju.isSupport(a.Species) and Kaiju.isSupport(b.Species) then
+				teamsUi.send("KaijuSupport", if Kaiju.supportId(data) == pick.Id then id else pick.Id)
+			else
+				UiKit.toast("A support goes in the support slot, not a team.", teamsUi.Gold)
+				teamsUi.Pick = nil
+			end
+			return
+		end
+		teamsUi.send("KaijuSwap", pick.Id, id)
+		return
+	elseif pick.Id and place then
+		teamsUi.send("KaijuPlace", pick.Id, place.Team, place.Slot)
+		return
+	elseif pick.Id and bench then
+		if Kaiju.teamNumber(data, pick.Id) then
+			teamsUi.send("KaijuBench", pick.Id)
+		else
+			teamsUi.Pick = nil
+		end
+		return
+	elseif pick.Team and id then
+		local record = data.List[id]
+		if record and Kaiju.isSupport(record.Species) then
+			UiKit.toast("A support goes in the support slot, not a team.", teamsUi.Gold)
+			return
+		end
+		teamsUi.send("KaijuPlace", id, pick.Team, pick.Slot)
+		return
+	else
+		teamsUi.Pick = if id then { Id = id } elseif place then place else nil
+	end
+	teamsUi.draw(data)
+end
+
+-- A kaiju's face, name, level and role, and its health (`w` by `h`, as a
+-- place in a team or a card on the bench).
+function teamsUi.face(parent: GuiObject, record, key: string, compact: boolean)
+	local color = elementColor(record.Element)
+	local h = parent.Size.Y.Offset
+	local face = h - 8
+	local view = viewport(parent, { Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(face, face) })
+	UiKit.round(view, 6)
+	portrait(view, modelFor(key, record))
+	local left = face + 10
+	local name = nameLabel(parent, Kaiju.nameOf(record), if compact then 11 else 13, color:Lerp(P.Text, 0.45), IronUi.Bold)
+	name.Position, name.Size = UDim2.fromOffset(left, if compact then 3 else 6), UDim2.new(1, -left - 6, 0, if compact then 13 else 16)
+	local spec = Kaiju.Species[record.Species]
+	local role = spec and spec.Role or ""
+	local line = label(parent, "", if compact then 9 else 10, P.Dim, IronUi.Bold)
+	line.RichText = true
+	line.Text = if record.Down
+		then '<font color="#F05C5C">DOWN</font>  ·  LV ' .. tostring(record.Level or 1)
+		else "LV " .. tostring(record.Level or 1) .. (if compact or role == "" then "" else '  ·  <font color="#' .. (ROLE_COLORS[role] or P.Dim):ToHex() .. '">' .. string.upper(role) .. "</font>")
+	line.Position, line.Size = UDim2.fromOffset(left, if compact then 16 else 23), UDim2.new(1, -left - 6, 0, 12)
+	if not compact then
+		local back, fill = bar(parent, HEALTH)
+		back.Position, back.Size = UDim2.new(0, left, 1, -10), UDim2.new(1, -left - 8, 0, 4)
+		fill.Size = UDim2.fromScale(healthShare(record, nil), 1)
+	end
+	return color
+end
+
+-- A badge on a place or card, a ribbon along its portrait's foot (clear of
+-- the name): what a tap does now (PUT HERE, SWAP, MOVING) or LEAD.
+function teamsUi.badge(parent: GuiObject, text: string, color: Color3, dark: boolean?)
+	local face = parent.Size.Y.Offset - 8
+	local b = label(parent, text, 8, if dark then INK else color, Enum.Font.GothamBlack)
+	b.AnchorPoint = Vector2.new(0, 1)
+	b.Position = UDim2.new(0, 4, 1, -4)
+	b.Size = UDim2.fromOffset(face, 13)
+	b.TextXAlignment = Enum.TextXAlignment.Center
+	b.BackgroundTransparency = if dark then 0 else 0.1
+	b.BackgroundColor3 = if dark then color else INK
+	b.ZIndex = 4
+	UiKit.round(b, 4)
+	return b
+end
+
 function teamsUi.draw(data)
 	keepModels("team:") -- (the portraits are kept for the next draw)
 	for _, child in teamsUi.Rows:GetChildren() do
 		child:Destroy()
 	end
-	local order, size = Kaiju.order(data), Kaiju.slots(data)
-	local filling = math.clamp(math.floor(#order / size) + 1, 1, Kaiju.Teams) -- (the team the next catch joins)
+	for _, child in teamsUi.BenchBox:GetChildren() do
+		if not child:IsA("UIComponent") then
+			child:Destroy()
+		end
+	end
+	for _, child in teamsUi.Buttons:GetChildren() do
+		if child:IsA("GuiButton") then
+			child:Destroy()
+		end
+	end
+	local teams, bench, size = Kaiju.teams(data), Kaiju.bench(data), Kaiju.slots(data)
 	local out, away = Kaiju.outTeam(data), Kaiju.away(data)
-	if teamsUi.Pick and not table.find(order, teamsUi.Pick) then
-		teamsUi.Pick = nil
+	local support = Kaiju.supportId(data)
+	-- (A pick that's gone, a kaiju sold or a team shrunk: let it go.)
+	local pick = teamsUi.Pick
+	if pick and pick.Id and not data.List[pick.Id] then
+		pick, teamsUi.Pick = nil, nil
 	end
-	teamsUi.Hint.Text = if teamsUi.Pick
-		then "Now tap the kaiju to swap it with (or tap it again to let go)."
-		else "Drag a kaiju onto another (or tap one, then another) to swap them. Press 1 to 4 to bring a team out."
-	teamsUi.Hint.TextColor3 = if teamsUi.Pick then P.Gold else P.Dim
-	local gap = 4
-	local rowH = if SHORT then 48 else 84
-	local nameW, buttonW = if SHORT then 74 else 66, if SHORT then 82 else 76
+	local picked = pick and pick.Id and data.List[pick.Id]
+	local pickedSupport = picked and Kaiju.isSupport(picked.Species)
+	local pickedPlaced = picked and Kaiju.teamNumber(data, pick.Id) ~= nil
+
+	-- The bar.
+	if picked then
+		teamsUi.Hint.Text = string.format(
+			'<font color="#FFCA5B">MOVING %s</font>  ·  %s',
+			string.upper(Kaiju.nameOf(picked)),
+			if pickedSupport
+				then "tap another support to make it your support"
+				elseif pickedPlaced then "tap a place, a kaiju to swap with, or the bench"
+				else "tap a place or a kaiju to put it in a team"
+		)
+		teamsUi.barButton("DETAILS", P.Edge, 1, function()
+			selected, tab, teamsUi.Pick = pick.Id, "Details", nil
+			drawPanel()
+		end)
+		teamsUi.barButton("CANCEL", P.Bad, 2, function()
+			teamsUi.Pick = nil
+			teamsUi.draw(roster())
+		end)
+	elseif pick and pick.Team then
+		teamsUi.Hint.Text = string.format('<font color="#FFCA5B">TEAM %d, PLACE %d</font>  ·  tap a kaiju to put it here', pick.Team, pick.Slot)
+		teamsUi.barButton("CANCEL", P.Bad, 2, function()
+			teamsUi.Pick = nil
+			teamsUi.draw(roster())
+		end)
+	else
+		teamsUi.Hint.Text = "Tap a kaiju, then tap where it should go."
+		if #bench > 0 then
+			teamsUi.barButton("AUTO FILL", teamsUi.Gold, 1, function()
+				teamsUi.send("KaijuAutoFill")
+			end)
+		end
+	end
+	teamsUi.Hint.Size = UDim2.new(1, -(if picked then (if SHORT then 170 else 206) elseif pick or #bench > 0 then 110 else 16), 1, 0)
+	teamsUi.BarEdge.Color = if pick then teamsUi.Gold else P.Edge
+	teamsUi.BarEdge.Transparency = if pick then 0.2 else 0.5
+
+	-- The four teams, side by side.
+	local width = teamsUi.Pane.AbsoluteSize.X
+	if width <= 0 then
+		width = if SHORT then 590 else 760
+	end
+	local gap = if SHORT then 6 else 10
+	local cardW = math.floor((width - 4 - gap * (Kaiju.Teams - 1)) / Kaiju.Teams)
+	local headH, placeH, placeGap, footH = if SHORT then 22 else 30, if SHORT then 34 else 56, if SHORT then 3 else 5, if SHORT then 24 else 30
+	local top = (if SHORT then 28 else 34) + (if SHORT then 6 else 10)
+	local benchGap, benchH = if SHORT then 6 else 10, if SHORT then 64 else 96
+	-- (Places as tall as fit: the teams and the bench on the page at once.)
+	local room = teamsUi.Pane.AbsoluteSize.Y
+	if room > 0 then
+		local fixed = top + headH + (size - 1) * placeGap + footH + (if SHORT then 10 else 16) + benchGap + benchH + 4
+		placeH = math.clamp(math.floor((room - fixed) / size), if SHORT then 30 else 40, placeH)
+	end
+	local cardH = headH + size * placeH + (size - 1) * placeGap + footH + (if SHORT then 10 else 16)
+	teamsUi.Rows.Position, teamsUi.Rows.Size = UDim2.fromOffset(0, top), UDim2.new(1, 0, 0, cardH)
 	for n = 1, Kaiju.Teams do
-		local isOut = n == out
-		local row = new("Frame", {
+		local team = teams[n]
+		local isOut = n == out and #team > 0
+		local card = new("Frame", {
 			Name = "Team" .. n,
-			BackgroundColor3 = if isOut and not away then P.Gold:Lerp(INK, 0.86) else P.Inset,
-			Position = UDim2.fromOffset(0, (n - 1) * (rowH + gap)),
-			Size = UDim2.new(1, 0, 0, rowH),
+			BackgroundColor3 = if isOut and not away then teamsUi.Gold:Lerp(teamsUi.Card, 0.88) else teamsUi.Card,
+			Position = UDim2.fromOffset((n - 1) * (cardW + gap), 0),
+			Size = UDim2.fromOffset(cardW, cardH),
 		}, teamsUi.Rows)
-		UiKit.round(row, 8)
-		new("UIStroke", { Color = if isOut then P.Gold else P.Edge, Thickness = 1, Transparency = if isOut then 0.2 else 0.6 }, row)
-		-- Its number (its key), and whether it's out.
-		local number = label(row, tostring(n), if SHORT then 18 else 24, if isOut then P.Gold else P.Text, Enum.Font.GothamBlack)
-		number:SetAttribute("NoTranslate", true)
-		number.Position, number.Size = UDim2.fromOffset(8, if SHORT then 2 else 10), UDim2.fromOffset(nameW - 10, if SHORT then 22 else 30)
-		local filled = #Kaiju.teamOf(data, n)
-		local stateText = if filled == 0 and n > filling then "LOCKED"
-			elseif filled == 0 then "EMPTY"
-			elseif isOut and away then "CALLED BACK"
-			elseif isOut then "OUT"
-			else "TEAM " .. n
-		local state = label(row, stateText, 9, if isOut then P.Gold else P.Dim, IronUi.Bold)
-		state.Position, state.Size = UDim2.fromOffset(8, if SHORT then 25 else 44), UDim2.fromOffset(nameW - 10, 14)
-		-- Its places.
-		local cellsW = row.AbsoluteSize.X > 0 and row.AbsoluteSize.X or (if SHORT then 608 else 490)
-		local cellW = math.floor((cellsW - nameW - buttonW - 12 - gap * (size - 1)) / size)
-		for i = 1, size do
-			local id = order[(n - 1) * size + i]
-			local record = id and data.List[id]
-			local x = nameW + (i - 1) * (cellW + gap)
-			local cell = new("TextButton", {
-				Name = "Place" .. i,
-				Text = "",
-				AutoButtonColor = record ~= nil,
-				BackgroundColor3 = if record and teamsUi.Pick == id then P.Gold:Lerp(INK, 0.55) else TILE_BACK,
-				BackgroundTransparency = if record then 0 else 0.4,
-				Position = UDim2.fromOffset(x, 4),
-				Size = UDim2.fromOffset(cellW, rowH - 8),
-			}, row)
-			UiKit.round(cell, 6)
-			if not record then
-				local note = label(cell, if n > filling then string.format("Fill Team %d first", n - 1) else "Open", 9, P.Dim, IronUi.Bold)
-				note.Size, note.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
-				continue
-			end
-			local color = elementColor(record.Element)
-			new("UIStroke", { Color = if teamsUi.Pick == id then P.Gold else color, Thickness = if teamsUi.Pick == id then 2 else 1, Transparency = if teamsUi.Pick == id then 0 else 0.5 }, cell)
-			-- (a phone: its face, then its name and level beside it; a
-			-- computer: its face over its name and level, so the name fits)
-			local face = if SHORT then rowH - 16 else 42
-			local view = viewport(cell, {
-				Position = if SHORT then UDim2.fromOffset(4, 4) else UDim2.new(0.5, -face / 2, 0, 3),
-				Size = UDim2.fromOffset(face, face),
-			})
-			UiKit.round(view, 6)
-			portrait(view, modelFor("team:" .. id, record))
-			local name = nameLabel(cell, Kaiju.nameOf(record), if SHORT then 10 else 11, color:Lerp(P.Text, 0.35), IronUi.Bold)
-			local level = label(cell, (if record.Down then "DOWN  ·  " else "") .. "LV " .. tostring(record.Level or 1), 9, if record.Down then P.Bad else P.Dim, IronUi.Bold)
-			if SHORT then
-				name.Position, name.Size = UDim2.fromOffset(face + 8, 4), UDim2.new(1, -(face + 12), 0, 14)
-				level.Position, level.Size = UDim2.fromOffset(face + 8, 20), UDim2.new(1, -(face + 12), 0, 12)
-			else
-				name.Position, name.Size = UDim2.fromOffset(4, face + 6), UDim2.new(1, -8, 0, 14)
-				level.Position, level.Size = UDim2.fromOffset(4, face + 21), UDim2.new(1, -8, 0, 12)
-				name.TextXAlignment, level.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
-			end
-			teamsUi.Drag.source(cell, id)
-			teamsUi.Drag.target(cell, id)
-			cell.Activated:Connect(function()
-				if os.clock() < teamsUi.Drag.SuppressUntil then
-					return
-				end
-				if teamsUi.Pick == nil then
-					teamsUi.Pick = id
-					teamsUi.draw(roster())
-				elseif teamsUi.Pick == id then
-					teamsUi.Pick = nil
-					teamsUi.draw(roster())
-				else
-					local a = teamsUi.Pick
-					teamsUi.Pick = nil
-					task.spawn(function()
-						local result = GemClient.request("KaijuSwap", a, id)
-						if not result.Ok and result.Message and result.Message ~= "" then
-							UiKit.toast(result.Message, P.Bad)
-						end
-						if window.Gui.Enabled and tab == "Teams" then
-							teamsUi.draw(roster())
-						end
-					end)
-					teamsUi.draw(roster())
-				end
-			end)
+		UiKit.round(card, 10)
+		new("UIStroke", { Color = if isOut then teamsUi.Gold else P.Edge, Thickness = if isOut then 1.5 else 1, Transparency = if isOut then 0.1 else 0.55 }, card)
+		-- Its name and key, and what it's doing.
+		local title = label(card, "TEAM " .. n, if SHORT then 12 else 15, if isOut then teamsUi.Gold else P.Text, Enum.Font.GothamBlack)
+		title.Position, title.Size = UDim2.fromOffset(if SHORT then 8 else 10, if SHORT then 3 else 6), UDim2.new(0.6, 0, 0, headH - 6)
+		local stateText, stateColor
+		if #team == 0 then
+			stateText, stateColor = "EMPTY", P.Dim
+		elseif isOut and away then
+			stateText, stateColor = "CALLED BACK", P.Dim
+		elseif isOut then
+			stateText, stateColor = "OUT", teamsUi.Gold
+		else
+			stateText, stateColor = "READY", P.Good
 		end
-		-- SEND OUT (as its key does), or where it stands.
-		if filled > 0 and not (isOut and not away) then
-			local send = smallButton(row, if isOut then "DEPLOY" else "SEND OUT", P.Gold)
-			send.AnchorPoint = Vector2.new(1, 0.5)
-			send.Position = UDim2.new(1, -6, 0.5, 0)
-			send.Size = UDim2.fromOffset(buttonW, if SHORT then 30 else 32)
-			send.TextSize = if SHORT then 10 else 11
-			send.Activated:Connect(function()
-				pressTeam(n)
+		local state = label(card, stateText, if SHORT then 8 else 10, stateColor, Enum.Font.GothamBlack)
+		state.AnchorPoint = Vector2.new(1, 0)
+		state.TextXAlignment = Enum.TextXAlignment.Right
+		state.Position, state.Size = UDim2.new(1, -8, 0, if SHORT then 4 else 8), UDim2.fromOffset(cardW * 0.5, headH - 8)
+		-- Its places.
+		for k = 1, size do
+			local id = team[k]
+			local record = id and data.List[id]
+			local y = headH + 4 + (k - 1) * (placeH + placeGap)
+			local isPicked = pick ~= nil and ((pick.Id ~= nil and pick.Id == id) or (pick.Team == n and pick.Slot == k and not id))
+			local cell = new("TextButton", {
+				Name = "Place" .. k,
+				Text = "",
+				AutoButtonColor = true,
+				BackgroundColor3 = if isPicked then teamsUi.Gold:Lerp(INK, 0.6) elseif record then teamsUi.Place else INK,
+				BackgroundTransparency = if record or isPicked then 0 else 0.35,
+				Position = UDim2.fromOffset(if SHORT then 4 else 6, y),
+				Size = UDim2.fromOffset(cardW - (if SHORT then 8 else 12), placeH),
+			}, card)
+			UiKit.round(cell, 7)
+			local canDrop = pick ~= nil and not isPicked and not pickedSupport and (picked ~= nil or record ~= nil)
+			new("UIStroke", {
+				Color = if isPicked or canDrop then teamsUi.Gold elseif record then elementColor(record.Element) else P.Edge,
+				Thickness = if isPicked then 2 else 1,
+				Transparency = if isPicked then 0 elseif canDrop then 0.35 elseif record then 0.55 else 0.6,
+			}, cell)
+			if record then
+				teamsUi.face(cell, record, "team:" .. id, SHORT)
+				if isPicked then
+					teamsUi.badge(cell, "MOVING", teamsUi.Gold, true)
+				elseif canDrop then
+					teamsUi.badge(cell, "SWAP", teamsUi.Gold)
+				elseif k == 1 and not SHORT then
+					teamsUi.badge(cell, "LEAD", teamsUi.Gold)
+				end
+				teamsUi.Drag.source(cell, id)
+				teamsUi.Drag.target(cell, id, teamsUi.Pane)
+				cell.Activated:Connect(function()
+					teamsUi.tap(id, nil, nil)
+				end)
+			else
+				local word = label(cell, if canDrop then "PUT HERE" elseif isPicked then "PICK A KAIJU" else "+  EMPTY", if SHORT then 10 else 12, if canDrop or isPicked then teamsUi.Gold else P.Dim, Enum.Font.GothamBlack)
+				word.Size, word.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+				local place = { Team = n, Slot = k }
+				teamsUi.Drag.target(cell, nil, teamsUi.Pane, nil, place)
+				cell.Activated:Connect(function()
+					teamsUi.tap(nil, place, nil)
+				end)
+			end
+		end
+		-- Bring it out (its key), or call it back.
+		local foot = smallButton(card, "", teamsUi.Gold)
+		foot.AnchorPoint = Vector2.new(0.5, 1)
+		foot.Position = UDim2.new(0.5, 0, 1, if SHORT then -4 else -7)
+		foot.Size = UDim2.new(1, if SHORT then -8 else -12, 0, footH)
+		foot.TextSize = if SHORT then 10 else 12
+		foot.Font = Enum.Font.GothamBlack
+		local keyHint = if SHORT then "" else "  [" .. n .. "]"
+		if #team == 0 then
+			-- (Its first place picked: tap a kaiju to put it in.)
+			foot.Text = "FILL"
+			foot.TextColor3, foot.BackgroundColor3 = teamsUi.Gold, INK
+		elseif isOut and not away then
+			foot.Text = "CALL BACK" .. keyHint
+			foot.BackgroundColor3 = P.Edge:Lerp(INK, 0.5)
+		else
+			foot.Text = (if isOut then "SEND OUT" else "BRING OUT") .. keyHint
+			foot.BackgroundColor3 = teamsUi.Gold
+			foot.TextColor3 = INK
+		end
+		foot:SetAttribute("NoTranslate", true)
+		foot.Activated:Connect(function()
+			pressTeam(n)
+		end)
+	end
+
+	-- The bench and the support.
+	local benchY = top + cardH + benchGap
+	teamsUi.BenchBox.Position, teamsUi.BenchBox.Size = UDim2.fromOffset(0, benchY), UDim2.new(1, -4, 0, benchH)
+	local benchDrop = picked ~= nil and pickedPlaced and not pickedSupport
+	teamsUi.BenchEdge.Color = if benchDrop then teamsUi.Gold else P.Edge
+	teamsUi.BenchEdge.Transparency = if benchDrop then 0.2 else 0.5
+	local supportW = if SHORT then 150 else 196
+	local head = label(teamsUi.BenchBox, "", if SHORT then 10 else 12, if benchDrop then teamsUi.Gold else P.Dim, Enum.Font.GothamBlack)
+	head.Text = if benchDrop then "SEND TO BENCH" else string.format("BENCH  ·  %d", #bench)
+	head.Position, head.Size = UDim2.fromOffset(10, 4), UDim2.new(1, -supportW - 30, 0, 16)
+	-- (the whole box is a place to drop one: the bench)
+	local benchHit = new("TextButton", {
+		Name = "BenchHit",
+		Text = "",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -supportW - 12, 1, 0),
+	}, teamsUi.BenchBox)
+	benchHit.Activated:Connect(function()
+		teamsUi.tap(nil, nil, true)
+	end)
+	teamsUi.Drag.target(benchHit, nil, teamsUi.Pane, nil, nil, true)
+	local strip = new("ScrollingFrame", {
+		Name = "Strip",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(8, if SHORT then 20 else 24),
+		Size = UDim2.new(1, -supportW - 28, 1, if SHORT then -24 else -30),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.X,
+		ScrollingDirection = Enum.ScrollingDirection.X,
+		ScrollBarThickness = 3,
+		ZIndex = 2,
+	}, teamsUi.BenchBox)
+	UiKit.list(strip, 6, true)
+	if #bench == 0 then
+		local none = label(strip, if benchDrop then "Tap here to bench it" else "Everyone's in a team.", if SHORT then 10 else 12, P.Dim, IronUi.Body)
+		none.Size = UDim2.new(1, 0, 1, 0)
+	end
+	local benchCardW = if SHORT then 132 else 168
+	for i, id in bench do
+		local record = data.List[id]
+		local isPicked = pick ~= nil and pick.Id == id
+		local canDrop = pick ~= nil and not isPicked and not pickedSupport
+		local cell = new("TextButton", {
+			Name = "Bench" .. i,
+			Text = "",
+			LayoutOrder = i,
+			AutoButtonColor = true,
+			BackgroundColor3 = if isPicked then teamsUi.Gold:Lerp(INK, 0.6) else teamsUi.Place,
+			Size = UDim2.new(0, benchCardW, 1, -6),
+			ZIndex = 3,
+		}, strip)
+		UiKit.round(cell, 7)
+		new("UIStroke", {
+			Color = if isPicked or canDrop then teamsUi.Gold else elementColor(record.Element),
+			Thickness = if isPicked then 2 else 1,
+			Transparency = if isPicked then 0 elseif canDrop then 0.35 else 0.55,
+		}, cell)
+		cell.Size = UDim2.fromOffset(benchCardW, benchH - (if SHORT then 28 else 36))
+		teamsUi.face(cell, record, "team:" .. id, true)
+		if isPicked then
+			teamsUi.badge(cell, "MOVING", teamsUi.Gold, true)
+		elseif canDrop and picked then
+			teamsUi.badge(cell, "SWAP", teamsUi.Gold)
+		elseif canDrop then
+			teamsUi.badge(cell, "PUT HERE", teamsUi.Gold)
+		end
+		teamsUi.Drag.source(cell, id)
+		teamsUi.Drag.target(cell, id, strip)
+		cell.Activated:Connect(function()
+			teamsUi.tap(id, nil, nil)
+		end)
+	end
+	-- SUPPORT: its own slot, at the bench's right (others of its kind beside it).
+	local supportBox = new("Frame", {
+		Name = "Support",
+		BackgroundColor3 = SUPPORT:Lerp(INK, 0.86),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -6, 0, 6),
+		Size = UDim2.new(0, supportW, 1, -12),
+		ZIndex = 2,
+	}, teamsUi.BenchBox)
+	UiKit.round(supportBox, 8)
+	new("UIStroke", { Color = SUPPORT, Thickness = 1, Transparency = 0.4 }, supportBox)
+	local supportWord = label(supportBox, "SUPPORT", if SHORT then 9 else 10, SUPPORT, Enum.Font.GothamBlack)
+	supportWord.Position, supportWord.Size = UDim2.fromOffset(8, 2), UDim2.new(1, -16, 0, 14)
+	supportWord.ZIndex = 3
+	local supportRecord = support and data.List[support]
+	if supportRecord then
+		local cell = new("TextButton", {
+			Name = "SupportKaiju",
+			Text = "",
+			BackgroundColor3 = if pick and pick.Id == support then teamsUi.Gold:Lerp(INK, 0.6) else teamsUi.Place,
+			Position = UDim2.fromOffset(4, if SHORT then 16 else 18),
+			Size = UDim2.fromOffset(supportW - 8, benchH - (if SHORT then 34 else 36)),
+			ZIndex = 3,
+		}, supportBox)
+		UiKit.round(cell, 7)
+		teamsUi.face(cell, supportRecord, "team:" .. support, true)
+		teamsUi.Drag.target(cell, support, nil, true)
+		cell.Activated:Connect(function()
+			teamsUi.tap(support, nil, nil)
+		end)
+	else
+		local none = label(supportBox, "Catch a support kind", if SHORT then 9 else 10, P.Dim, IronUi.Body)
+		none.Position, none.Size = UDim2.fromOffset(8, 18), UDim2.new(1, -16, 1, -22)
+		none.ZIndex = 3
+	end
+	-- Other supports of yours, to swap in: on the bench strip, after the fighters.
+	for id, record in data.List do
+		if Kaiju.isSupport(record.Species) and id ~= support then
+			local cell = new("TextButton", {
+				Name = "OtherSupport",
+				Text = "",
+				LayoutOrder = 1000,
+				BackgroundColor3 = SUPPORT:Lerp(INK, 0.8),
+				Size = UDim2.fromOffset(benchCardW, benchH - (if SHORT then 28 else 36)),
+				ZIndex = 3,
+			}, strip)
+			UiKit.round(cell, 7)
+			new("UIStroke", { Color = SUPPORT, Thickness = 1, Transparency = 0.5 }, cell)
+			teamsUi.face(cell, record, "team:" .. id, true)
+			teamsUi.Drag.source(cell, id)
+			cell.Activated:Connect(function()
+				teamsUi.send("KaijuSupport", id)
 			end)
 		end
 	end
+	teamsUi.Pane.CanvasSize = UDim2.fromOffset(0, benchY + benchH + 4)
 end
 
-for order, entry in { { "Details", "DETAILS" }, { "Heal", "HEAL" }, { "Soul", "ENCHANT" }, { "Teams", "TEAMS" } } do
+for order, entry in { { "Teams", "TEAMS" }, { "Details", "DETAILS" }, { "Heal", "HEAL" }, { "Soul", "ENCHANT" } } do
 	local b = smallButton(tabRow, entry[2], P.Gold)
 	b.LayoutOrder = order
 	b.Size = UDim2.fromOffset(if SHORT then 104 else 112, 28)
@@ -2964,6 +3313,11 @@ function drawPanel()
 	healPane.Visible = tab == "Heal" and record ~= nil
 	soulUi.soulPane.Visible = tab == "Soul" and record ~= nil
 	teamsUi.Pane.Visible = tab == "Teams" and data ~= nil
+	-- (TEAMS takes the panel's whole width: no list beside it.)
+	local wide = tab == "Teams" and data ~= nil
+	listFrame.Visible = not wide
+	right.Position = if wide then UDim2.new() else UDim2.fromOffset(LIST_W + 14, 0)
+	right.Size = if wide then UDim2.fromScale(1, 1) else UDim2.new(1, -(LIST_W + 14), 1, 0)
 	if tab == "Teams" and data then
 		teamsUi.draw(data)
 		if record then
@@ -3063,11 +3417,12 @@ function KaijuHud.open(id: string?, onTab: string?)
 	tab = if onTab == "Heal" or onTab == "Infuse"
 		then "Heal"
 		elseif onTab == "Soul" or onTab == "Enchant" then "Soul"
-		elseif onTab == "Teams" then "Teams"
+		elseif onTab == "Teams" or (onTab == nil and id == nil) then "Teams"
 		else "Details"
 	swapping = false
 	pickFresh = true
 	selected = id
+	teamsUi.Pick = nil
 	drawPanel()
 	window.Gui.Enabled = true
 end
@@ -3244,11 +3599,15 @@ function pressTeam(n: number)
 	if not data or busy or not n then
 		return
 	end
-	if #Kaiju.teamOf(data, n) == 0 then
-		UiKit.toast(
-			string.format("Team %d is empty. Your kaiju fill the teams in order: fill Team %d first.", n, Kaiju.teamCount(data)),
-			P.Gold
-		)
+	local members = Kaiju.teamOf(data, n)
+	if #members == 0 then
+		-- (An empty team's key: TEAMS, its first place picked to fill.)
+		if not (window.Gui.Enabled and tab == "Teams") then
+			UiKit.toast(string.format("Team %d is empty: put kaiju in it on the TEAMS page.", n), P.Gold)
+			KaijuHud.open(nil, "Teams")
+		end
+		teamsUi.Pick = { Team = n, Slot = #members + 1 }
+		drawPanel()
 		return
 	end
 	act(function()

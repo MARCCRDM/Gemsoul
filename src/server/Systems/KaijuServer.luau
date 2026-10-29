@@ -1982,7 +1982,7 @@ local function teamOut(player: Player, n: any)
 	end
 	local ids = Kaiju.teamOf(roster, n)
 	if #ids == 0 then
-		return reply(false, string.format("Team %d is empty: fill Team %d first, then catch more kaiju.", n, Kaiju.teamCount(roster)))
+		return reply(false, string.format("Team %d is empty: put kaiju in it on the TEAMS page.", n))
 	end
 	local current, away = Kaiju.outTeam(roster), Kaiju.away(roster)
 	if n == current then
@@ -2023,16 +2023,22 @@ local function teamOut(player: Player, n: any)
 	return reply(true, string.format("Team %d out.", n))
 end
 
--- Two of your kaiju swap places in your teams (the TEAMS tab): not during a
--- kaiju battle, nor taking one of the team out away mid-fight.
-local function swapKaiju(player: Player, a: any, b: any)
+-- A change to your teams (the TEAMS page): `change(roster)` makes it and
+-- says whether it could. Not during a kaiju battle, nor taking one of the
+-- team out away mid-fight (`touched`: the ids it moves).
+local function changeTeams(player: Player, touched: { string }, change: (any) -> (boolean, string?))
 	local profile = PlayerData.get(player)
 	local roster = profile and Kaiju.roster(profile)
-	if not roster or type(a) ~= "string" or type(b) ~= "string" or not roster.List[a] or not roster.List[b] or a == b then
-		return reply(false, "That kaiju isn't yours.")
+	if not roster then
+		return reply(false, "You have no kaiju.")
 	end
-	if not Kaiju.teamNumber(roster, a) or not Kaiju.teamNumber(roster, b) then
-		return reply(false, "A support kaiju has its own slot.")
+	for _, id in touched do
+		if type(id) ~= "string" or not roster.List[id] then
+			return reply(false, "That kaiju isn't yours.")
+		end
+		if Kaiju.isSupport(roster.List[id].Species) then
+			return reply(false, "A support kaiju has its own slot.")
+		end
 	end
 	if KaijuServer.battling(player) then
 		return reply(false, "Not during a kaiju battle.")
@@ -2041,14 +2047,70 @@ local function swapKaiju(player: Player, a: any, b: any)
 	local out = Kaiju.teamIds(roster)
 	for _, pet in petsOf(player) do
 		local id = pet.Record.Id
-		if (id == a or id == b) and now - pet.LastFight < 3 and table.find(out, id) then
+		if table.find(touched, id) and now - pet.LastFight < 3 and table.find(out, id) then
 			return reply(false, "Not in the middle of a fight.")
 		end
 	end
-	Kaiju.swap(roster, a, b)
+	local ok, message = change(roster)
+	if not ok then
+		return reply(false, message or "That can't go there.")
+	end
 	PlayerData.sync(player)
 	upkeep(player, now)
-	return reply(true, "")
+	return reply(true, message or "")
+end
+
+-- Two of your kaiju trade places: in two teams, a team and the bench, or
+-- within a team.
+local function swapKaiju(player: Player, a: any, b: any)
+	if a == b then
+		return reply(false, "That kaiju isn't yours.")
+	end
+	return changeTeams(player, { a, b }, function(roster)
+		return Kaiju.swap(roster, a, b)
+	end)
+end
+
+-- `id` into team `n`, place `slot` (an empty place, or trading places with
+-- the one there).
+local function placeKaiju(player: Player, id: any, n: any, slot: any)
+	return changeTeams(player, { id }, function(roster)
+		local other = type(n) == "number" and type(slot) == "number" and Kaiju.teamOf(roster, n)[slot]
+		if other then
+			-- (the one it trades places with mustn't be mid-fight either)
+			for _, pet in petsOf(player) do
+				if pet.Record.Id == other and os.clock() - pet.LastFight < 3 and table.find(Kaiju.teamIds(roster), other) then
+					return false, "Not in the middle of a fight."
+				end
+			end
+		end
+		return Kaiju.place(roster, id, n, slot)
+	end)
+end
+
+-- `id` out of its team, onto the bench.
+local function benchKaiju(player: Player, id: any)
+	return changeTeams(player, { id }, function(roster)
+		if not Kaiju.teamNumber(roster, id) then
+			return false, "It's on the bench already."
+		end
+		if not Kaiju.benchKaiju(roster, id) then
+			return false, "Keep at least one kaiju in a team."
+		end
+		return true
+	end)
+end
+
+-- Fills the empty places (of team `n`, or all of them) from the bench.
+local function autoFill(player: Player, n: any)
+	local only = if type(n) == "number" and n >= 1 and n <= Kaiju.Teams then math.floor(n) else nil
+	return changeTeams(player, {}, function(roster)
+		local placed = Kaiju.autoFill(roster, only)
+		if placed == 0 then
+			return false, if #Kaiju.bench(roster) == 0 then "Nobody's on the bench." else "No empty places."
+		end
+		return true, string.format("%d placed from the bench.", placed)
+	end)
 end
 
 -- Puts `ids` out as the team (the first leads): only your own, and not
@@ -2755,6 +2817,9 @@ function KaijuServer.start()
 	Shop.register("KaijuCallBack", callBack)
 	Shop.register("KaijuTeamOut", teamOut)
 	Shop.register("KaijuSwap", swapKaiju)
+	Shop.register("KaijuPlace", placeKaiju)
+	Shop.register("KaijuBench", benchKaiju)
+	Shop.register("KaijuAutoFill", autoFill)
 	Shop.register("KaijuRoll", rollRequest)
 	Shop.register("KaijuRollClaim", rollClaim)
 	Shop.register("KaijuSupport", setSupport)

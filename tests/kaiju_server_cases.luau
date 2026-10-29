@@ -3411,6 +3411,9 @@ minedWithIt()
 -- yours fed; and a roll left unclaimed given after a while in the Outpost.
 local function yourTeam()
 	Kaiju.SlotLevels = { 1, 1, 1 }
+	-- (Grown from one slot: regrouped three a team, as an old line is.)
+	roster.Order, roster.Teams = Kaiju.order(roster), nil
+	Kaiju.saveTeams(roster, Kaiju.teams(roster))
 	for _, key in { "CombatSession", "MatchId", "DungeonId", "Expedition", "Hunt", "Spar" } do
 		a:SetAttribute(key, nil)
 	end
@@ -3552,7 +3555,7 @@ local function yourTeam()
 		for _, record in extra do
 			roster.List[record.Id] = nil
 		end
-		Kaiju.saveOrder(roster, Kaiju.order(roster))
+		Kaiju.saveTeams(roster, Kaiju.teams(roster))
 		KaijuServer._upkeep(a, now)
 		squad = KaijuServer.team(a)
 	end
