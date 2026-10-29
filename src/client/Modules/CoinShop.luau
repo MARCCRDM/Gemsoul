@@ -1,9 +1,9 @@
 --[[
-	The coin packs, in the gilt look (Client GiltUi): coins for Robux
+	The coin packs, in the windows' look (Client GiltUi): coins for Robux
 	(Shared.Store.CoinPacks), in a window of their own, apart from the Store
 	and the Market. Four packs side by side, each its own treasure (a purse,
 	a satchel, a strongbox, a hoard spilling from an open chest) glinting on
-	crimson velvet in a burst of light, the bigger ones cheaper per coin:
+	deep blue in a burst of light, the bigger ones cheaper per coin:
 	each card shows its saving and the price at the first pack's rate struck
 	through.
 
@@ -337,7 +337,7 @@ local function treasure(well: Instance, tier: number, w: number, h: number)
 	local cx = math.floor(w / 2)
 	-- (the small ones drawn bigger, so every treasure fills its well)
 	local unit = math.floor(math.min(w, h * 1.5) * 0.17 * (({ 1.45, 1.22, 1, 1 })[tier] or 1))
-	-- (a soft shadow on the velvet)
+	-- (a soft shadow under it)
 	local shadow = shape(well, cx, floor + 3, math.floor(w * (0.46 + tier * 0.1)), 6, 2)
 	shadow.BackgroundColor3 = Color3.new(0, 0, 0)
 	shadow.BackgroundTransparency = 0.6
@@ -414,8 +414,8 @@ local function card(row: Instance, pack: Store.CoinPack, tier: number, x: number
 		Size = UDim2.fromOffset(w, h),
 		BackgroundColor3 = WHITE,
 	}, row)
-	UiKit.round(box, 4)
-	shade(box, Color3.fromRGB(48, 37, 27), Color3.fromRGB(15, 11, 9))
+	UiKit.round(box, 10)
+	shade(box, Color3.fromRGB(32, 41, 66), Color3.fromRGB(12, 15, 27))
 	local restEdge = if marked then Color3.fromRGB(150, 230, 120) elseif pack.Tag then Gilt.Gold else Gilt.Brass
 	local edge = new("UIStroke", {
 		Color = restEdge,
@@ -423,16 +423,7 @@ local function card(row: Instance, pack: Store.CoinPack, tier: number, x: number
 		Transparency = if marked or pack.Tag then 0 else 0.35,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, box)
-	-- (a gold hairline just inside, as on the window)
-	local inner = new("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(3, 3),
-		Size = UDim2.new(1, -6, 1, -6),
-	}, box)
-	UiKit.round(inner, 3)
-	new("UIStroke", { Color = Gilt.Gold, Thickness = 1, Transparency = 0.8, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, inner)
-
-	-- The treasure, on crimson velvet in a burst of light.
+	-- The treasure, on deep blue in a burst of light.
 	local wellH = if phone then 92 else 122
 	local well = new("Frame", {
 		Name = "Well",
@@ -441,9 +432,9 @@ local function card(row: Instance, pack: Store.CoinPack, tier: number, x: number
 		BackgroundColor3 = WHITE,
 		ClipsDescendants = true,
 	}, box)
-	UiKit.round(well, 3)
-	shade(well, Color3.fromRGB(96, 26, 22), Color3.fromRGB(26, 8, 8))
-	new("UIStroke", { Color = Color3.fromRGB(10, 4, 3), Thickness = 1, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, well)
+	UiKit.round(well, 8)
+	shade(well, Color3.fromRGB(58, 72, 150), Color3.fromRGB(14, 18, 42))
+	new("UIStroke", { Color = Color3.fromRGB(4, 6, 14), Thickness = 1, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, well)
 	burst(
 		well,
 		(w - 14) / 2,
@@ -453,7 +444,7 @@ local function card(row: Instance, pack: Store.CoinPack, tier: number, x: number
 		if best or marked then 9 else 3
 	)
 	treasure(well, tier, w - 14, wellH)
-	-- (velvet darkening to the edges)
+	-- (darkening to the edges)
 	local vignette = new("Frame", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(0, 0, 0),
@@ -485,16 +476,17 @@ local function card(row: Instance, pack: Store.CoinPack, tier: number, x: number
 			TextColor3 = Gilt.Bright,
 			ZIndex = 50,
 		}, box)
-		UiKit.round(ribbon, 3)
+		UiKit.round(ribbon, 12)
+		ribbon.Text = string.upper(ribbonText)
+		ribbon.Font = Gilt.Display
+		ribbon.TextSize = 11
 		shade(
 			ribbon,
-			if marked then Color3.fromRGB(72, 140, 52) elseif best then Color3.fromRGB(196, 140, 40) else Color3.fromRGB(168, 38, 24),
-			if marked then Color3.fromRGB(26, 62, 18) elseif best then Color3.fromRGB(110, 62, 12) else Color3.fromRGB(84, 14, 10)
+			if marked then Color3.fromRGB(110, 230, 120) elseif best then Color3.fromRGB(255, 214, 96) else Color3.fromRGB(255, 96, 110),
+			if marked then Color3.fromRGB(40, 160, 70) elseif best then Color3.fromRGB(244, 140, 30) else Color3.fromRGB(200, 40, 70)
 		)
-		ribbon.TextStrokeColor3, ribbon.TextStrokeTransparency = Color3.new(0, 0, 0), 0.5
-		new("UIStroke", { Color = Gilt.Bright, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, ribbon)
-		Gilt.stud(ribbon, 5, UDim2.fromScale(0, 0.5)).ZIndex = 51
-		Gilt.stud(ribbon, 5, UDim2.fromScale(1, 0.5)).ZIndex = 51
+		ribbon.TextColor3 = if best then Color3.fromRGB(34, 18, 2) else WHITE
+		new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1, Transparency = 0.6, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, ribbon)
 	end
 
 	-- How many: a coin, then the number in gold.
@@ -688,14 +680,14 @@ function CoinShop.open(short: number?)
 			LayoutOrder = 2,
 			BackgroundColor3 = WHITE,
 		}, body)
-		UiKit.round(note, 3)
-		shade(note, Color3.fromRGB(70, 22, 16), Color3.fromRGB(34, 10, 8))
-		new("UIStroke", { Color = Color3.fromRGB(196, 84, 60), Thickness = 1, Transparency = 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, note)
+		UiKit.round(note, 8)
+		shade(note, Color3.fromRGB(64, 24, 38), Color3.fromRGB(30, 12, 22))
+		new("UIStroke", { Color = Color3.fromRGB(255, 92, 110), Thickness = 1, Transparency = 0.35, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, note)
 		local mark = new("TextLabel", {
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, 12, 0.5, 0),
 			Size = UDim2.fromOffset(24, 24),
-			BackgroundColor3 = Color3.fromRGB(214, 92, 70),
+			BackgroundColor3 = Color3.fromRGB(255, 92, 110),
 			Text = "!",
 			TextSize = 16,
 			Font = Gilt.Serif,

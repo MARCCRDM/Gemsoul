@@ -1,15 +1,18 @@
 --[[
-	The Kennel's sales, in the gilt look (Client GiltUi): opened from the
+	The Kennel's sales, in the windows' look (Client GiltUi): opened from the
 	Daily Kaiju Sale's plinth (Client KennelLife) or from Wren, the kennel
 	keeper (Dialogue). Three offers, each for Robux (Shared.Store), as the
 	Store has them:
 
 	  Starter Rare Roll   one roll on the rarest kinds, once ever: played on
 	                      the roll screen (Client KaijuRoll) as soon as you
-	                      have room; four of them in its picture
+	                      have room; four of them together in its picture
 	                      (Kaiju.Sale.Showcase)
 	  Triskull Trinity    the premium trio, once ever: three Triskulls, one
-	                      in each element, turning side by side
+	                      in each element, side by side
+
+	Each picture is a lit stage (Client Showcase): the element's colour
+	behind them, a glow, a disc to stand on and a rim of light.
 	  Daily Kaiju Sale    today's Kaiju of the Day (Shared.KaijuKennel
 	                      .special), one each a day, turning in its view,
 	                      its kind, element, role and the time left
@@ -24,7 +27,6 @@
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Kaiju = require(Shared:WaitForChild("Kaiju"))
@@ -35,18 +37,16 @@ local Store = require(Shared:WaitForChild("Store"))
 local GemClient = require(script.Parent.GemClient)
 local Gilt = require(script.Parent.GiltUi)
 local IronUi = require(script.Parent.IronUi)
+local Showcase = require(script.Parent.Showcase)
 local UiKit = require(script.Parent.UiKit)
 
 local new = IronUi.new
 local player = Players.LocalPlayer
 
 local KennelSale = {}
-KennelSale.Width = 560
+KennelSale.Width = 640
 
 local gui: ScreenGui? = nil
-local spin: RBXScriptConnection? = nil
--- The kaiju turning in their views: { Model, Center, Rest }.
-local turning = {}
 
 local function screen(): ScreenGui
 	if not gui then
@@ -56,11 +56,6 @@ local function screen(): ScreenGui
 end
 
 function KennelSale.close()
-	if spin then
-		spin:Disconnect()
-		spin = nil
-	end
-	table.clear(turning)
 	if gui then
 		gui:ClearAllChildren()
 	end
@@ -91,51 +86,21 @@ local function untilMidnight(now: number): string
 	return if h > 0 then string.format("%dh %02dm", h, m) else string.format("%dm", math.max(1, m))
 end
 
--- A kaiju in a view filling `parent`, turning unless `still`.
-local function portrait(parent: Instance, species: string, element: string, still: boolean?): ViewportFrame
-	local model = KaijuModels.forPortrait(KaijuModels.build(species, element))
-	local cf, size = model:GetBoundingBox()
-	local reach = math.max(size.X, size.Y * 1.2, size.Z)
-	local view = new("ViewportFrame", {
-		Name = "KaijuView",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		Ambient = KaijuModels.Portrait.Ambient,
-		LightColor = KaijuModels.Portrait.LightColor,
-		LightDirection = KaijuModels.Portrait.LightDirection,
-	}, parent)
-	local camera = Instance.new("Camera")
-	camera.FieldOfView = 34
-	camera.CFrame = CFrame.lookAt(cf.Position + Vector3.new(reach * 0.55, reach * 0.35, -reach * 1.45), cf.Position)
-	camera.Parent = view
-	view.CurrentCamera = camera
-	model.Parent = view
-	if not still then
-		table.insert(turning, { Model = model, Center = CFrame.new(cf.Position), Rest = model:GetPivot() })
-		spin = spin
-			or RunService.RenderStepped:Connect(function()
-				local angle = (os.clock() * 0.5) % (math.pi * 2)
-				for _, turn in turning do
-					turn.Model:PivotTo(turn.Center * CFrame.Angles(0, angle, 0) * turn.Center:Inverse() * turn.Rest)
-				end
-			end)
-	end
-	return view
+-- A kaiju on a lit stage filling `parent`, in its element's colour, turning.
+local function portrait(parent: Instance, species: string, element: string)
+	local tint = GemConfig.ElementColors[element] or Gilt.Gold
+	local stage = Showcase.stage(parent, tint)
+	Showcase.model(stage, KaijuModels.forPortrait(KaijuModels.build(species, element)), { Tint = tint, Spin = true, Turn = 0.6, Aspect = 1.6 })
 end
 
--- Views laid out in a grid filling `parent`, `cols` across.
-local function gallery(parent: Instance, kaiju: { { Species: string, Element: string } }, cols: number, still: boolean?)
-	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, parent)
-	local rows = math.ceil(#kaiju / cols)
-	new("UIGridLayout", {
-		CellSize = UDim2.fromScale(1 / cols, 1 / rows),
-		CellPadding = UDim2.fromOffset(0, 0),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, grid)
-	for i, shown in kaiju do
-		local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i }, grid)
-		portrait(cell, shown.Species, shown.Element, still)
+-- Kaiju together on one lit stage filling `parent`, under a `tint`.
+local function gallery(parent: Instance, kaiju: { { Species: string, Element: string } }, tint: Color3)
+	local stage = Showcase.stage(parent, tint)
+	local models = {}
+	for _, shown in kaiju do
+		table.insert(models, KaijuModels.forPortrait(KaijuModels.build(shown.Species, shown.Element)))
 	end
+	Showcase.group(stage, models, { Tint = tint, Turn = 0.35, Fill = 0.92, Aspect = 1.6 })
 end
 
 -- Buys `key`: Roblox's prompt, or coins while testing, or not yet on sale.
@@ -188,6 +153,7 @@ local function offer(body: Instance, order: number, opts)
 		row.Size = UDim2.new(1, 0, 0, math.max(opts.Height, list.AbsoluteContentSize.Y))
 	end)
 	local name = Gilt.words(words, opts.Title, 22, Gilt.Ink)
+	name.Font = Gilt.Display
 	name.LayoutOrder = 1
 	local sub = Gilt.words(words, opts.Sub, 13, Gilt.Faded)
 	sub.LayoutOrder = 2
@@ -232,10 +198,11 @@ function KennelSale.open()
 
 	-- The heading: the Kennel's name and Wren's, a stud on a rule under it.
 	local head = new("Frame", { Name = "Head", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 52), LayoutOrder = 1 }, body)
-	local title = Gilt.words(head, "The Kennel", 26, Gilt.Gold)
+	local title = Gilt.words(head, "THE KENNEL", 26, Gilt.Ink)
+	title.Font = Gilt.Display
 	title.TextXAlignment = Enum.TextXAlignment.Center
 	title.Size = UDim2.new(1, 0, 0, 32)
-	local by = Gilt.words(head, "Wren's sales", 13, Gilt.Faded)
+	local by = Gilt.words(head, "Wren's sales", 13, Gilt.Gold)
 	by.TextXAlignment = Enum.TextXAlignment.Center
 	by.Font = IronUi.Body
 	by.Position, by.Size = UDim2.fromOffset(0, 30), UDim2.new(1, 0, 0, 16)
@@ -263,14 +230,16 @@ function KennelSale.open()
 
 	-- The Starter Rare Roll: four of the rarest kinds in its picture.
 	local rare = Kaiju.Sale.Rare
-	local tall = if phone then 112 else 132
+	local tall = if phone then 120 else 150
 	Gilt.heading(body, "Starter Rare Roll  ·  once only", 2, false)
 	offer(body, 3, {
 		Name = "Rare",
 		Height = tall,
+		WellWidth = math.floor(tall * 1.6),
+		Edge = Color3.fromRGB(176, 120, 255),
 		Key = rare.Product,
 		Art = function(well)
-			gallery(well, Kaiju.Sale.Showcase, 2, true)
+			gallery(well, Kaiju.Sale.Showcase, Color3.fromRGB(176, 120, 255))
 		end,
 		Title = "A roll on the rarest kinds",
 		Sub = string.format("%d kinds  ·  any element  ·  traits %d or better", #Kaiju.rareKinds(), rare.TraitFloor),
@@ -279,7 +248,7 @@ function KennelSale.open()
 		Owned = if profile[rare.Once] then "Claimed. Thank you for your support." else nil,
 	})
 
-	-- The premium trio, side by side, turning.
+	-- The premium trio, side by side.
 	local premium = Kaiju.Sale.Premium
 	local trio = {}
 	local elements = {}
@@ -291,11 +260,11 @@ function KennelSale.open()
 	offer(body, 5, {
 		Name = "Premium",
 		Height = tall,
-		WellWidth = math.floor(tall * 1.5),
+		WellWidth = math.floor(tall * 1.6),
 		Edge = Gilt.Gold,
 		Key = premium.Product,
 		Art = function(well)
-			gallery(well, trio, #trio)
+			gallery(well, trio, Color3.fromRGB(96, 124, 255))
 		end,
 		Title = premium.Name,
 		Sub = string.format("3 Triskulls  ·  %s  ·  traits %d or better", table.concat(elements, ", "), premium.TraitFloor),
@@ -314,6 +283,8 @@ function KennelSale.open()
 	offer(body, 7, {
 		Name = "Daily",
 		Height = tall,
+		WellWidth = math.floor(tall * 1.6),
+		Edge = GemConfig.ElementColors[special.Element],
 		Key = daily.Product,
 		Art = function(well)
 			portrait(well, special.Species, special.Element)

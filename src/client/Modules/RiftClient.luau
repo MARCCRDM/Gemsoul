@@ -83,6 +83,7 @@ local BOLD, BODY = IronUi.Bold, IronUi.Body
 -- The Bounty Board's look: Client GiltUi (a gilt frame on dark stone,
 -- serif headings in old gold).
 local Gilt = require(script.Parent.GiltUi)
+local Showcase = require(script.Parent.Showcase)
 
 local function serverNow(): number
 	return workspace:GetServerTimeNow()
@@ -278,7 +279,7 @@ end
 local function warning(parent: Instance, order: number, compact: boolean?, head: string?, body: string?)
 	local box = new("Frame", {
 		Name = "Warning",
-		BackgroundColor3 = Color3.fromRGB(64, 22, 14),
+		BackgroundColor3 = Color3.fromRGB(56, 22, 30),
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = order,
@@ -441,27 +442,18 @@ end
 -- Each threat's colour on the gate's cards (its pips).
 local THREAT_COLORS = { Color3.fromRGB(110, 220, 140), WARN, Color3.fromRGB(255, 92, 72) }
 
--- A boss's portrait in `view`: its body as the server built it
--- (ReplicatedStorage.RiftPortraits, Server.RiftServer's portraitOf), seen
--- from the front quarter. (It may still be on its way: it's put in when it
--- comes.)
-local function portraitInto(view: ViewportFrame, id: string)
+-- A boss's portrait on `stage` (Client Showcase: lit in its element's
+-- colour, a dark silhouette while `locked`): its body as the server built
+-- it (ReplicatedStorage.RiftPortraits, Server.RiftServer's portraitOf),
+-- seen from the front quarter. (It may still be on its way: it's put in
+-- when it comes.)
+local function portraitInto(stage: Frame, id: string, tint: Color3, locked: boolean)
 	local function place(source: Instance)
-		if not view.Parent or not source:IsA("Model") then
+		if not stage.Parent or not source:IsA("Model") then
 			return
 		end
-		local model = source:Clone()
-		model.Parent = view
-		local camera = Instance.new("Camera")
-		local cf, size = model:GetBoundingBox()
-		local reach = math.max(size.X, size.Y, size.Z)
-		camera.FieldOfView = 40
-		camera.CFrame = CFrame.lookAt(
-			cf.Position + Vector3.new(reach * 0.75, reach * 0.3, -reach * 1.45),
-			cf.Position + Vector3.new(0, size.Y * 0.04, 0)
-		)
-		camera.Parent = view
-		view.CurrentCamera = camera
+		local view = Showcase.model(stage, source:Clone(), { Tint = tint, Dark = locked, Aspect = 1.4, Fill = 0.86, Turn = 0.6 })
+		view.Name = "Portrait"
 	end
 	local folder = ReplicatedStorage:FindFirstChild("RiftPortraits")
 	local source = folder and folder:FindFirstChild(id)
@@ -493,7 +485,7 @@ local function bossCard(parent: Instance, entry, order: number, compact: boolean
 		ClipsDescendants = true,
 		LayoutOrder = order,
 	}, parent)
-	UiKit.round(card, 3)
+	UiKit.round(card, 10)
 	new("UIGradient", {
 		Rotation = 90,
 		Color = ColorSequence.new(accent:Lerp(Gilt.Deep, 0.78), Gilt.Deep),
@@ -504,37 +496,13 @@ local function bossCard(parent: Instance, entry, order: number, compact: boolean
 		card
 	)
 	local foot = if compact then 34 else 50
-	-- The stage: a glow behind it, then the boss.
-	local glow = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 0.5, -foot / 2 + 6),
-		Size = UDim2.fromScale(0.8, 0.8),
-		BackgroundColor3 = accent,
-		BackgroundTransparency = if entry.Unlocked then 0.86 else 0.95,
-	}, card)
-	new("UIAspectRatioConstraint", { AspectRatio = 1 }, glow)
-	UiKit.round(glow, 999)
-	new("UIGradient", {
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0),
-			NumberSequenceKeypoint.new(0.6, 0.55),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-		Rotation = 90,
-	}, glow)
-	local view = new("ViewportFrame", {
-		Name = "Portrait",
+	-- The stage: the boss lit in its element's colour (a silhouette locked).
+	local holder = new("Frame", {
+		Name = "Stage",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, if compact then 4 else 8),
-		Size = UDim2.new(1, 0, 1, -foot - (if compact then 4 else 8)),
-		Ambient = Color3.fromRGB(150, 140, 150),
-		LightColor = Color3.fromRGB(255, 236, 220),
-		LightDirection = Vector3.new(-0.5, -0.8, 0.6),
-		-- (Locked: a silhouette.)
-		ImageColor3 = if entry.Unlocked then Color3.new(1, 1, 1) else Color3.fromRGB(8, 6, 10),
-		ImageTransparency = if entry.Unlocked then 0 else 0.15,
+		Size = UDim2.new(1, 0, 1, -foot),
 	}, card)
-	portraitInto(view, tostring(entry.Id))
+	portraitInto(Showcase.stage(holder, accent), tostring(entry.Id), accent, not entry.Unlocked)
 	-- Its level, top right, coloured by how dangerous it is.
 	local level = Gilt.words(card, string.format("Level %d", entry.Level or 1), if compact then 10 else 12, if entry.Unlocked
 		then THREAT_COLORS[entry.Threat] or Gilt.Ink
@@ -747,7 +715,7 @@ local function partySlot(parent: Instance, slot, order: number, compact: boolean
 				AnchorPoint = Vector2.new(1, 1),
 				Position = UDim2.new(1, -inset, 1, -inset),
 				Size = UDim2.fromOffset(side, side),
-				BackgroundColor3 = Color3.fromRGB(52, 16, 12),
+				BackgroundColor3 = Color3.fromRGB(60, 22, 32),
 				Text = "",
 				AutoButtonColor = true,
 			}, card)
@@ -1047,7 +1015,7 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 					TextSize = if small then 11 else 14,
 					Font = Gilt.Serif,
 					TextColor3 = if on then Gilt.Gold else Gilt.Faded,
-					BackgroundColor3 = if on then Color3.fromRGB(44, 36, 28) else Gilt.Well,
+					BackgroundColor3 = if on then Color3.fromRGB(34, 44, 70) else Gilt.Well,
 					AutoButtonColor = false,
 					LayoutOrder = i,
 				}, biomeRow)
