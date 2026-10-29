@@ -4559,4 +4559,6 @@ return {
 	["Daily challenges"] = "Desafíos diarios",
 	["Three a day, and a bonus for finishing all three."] = "Tres al día, y un extra por terminar los tres.",
 	["A step-by-step path through the game. Every step pays coins, once."] = "Un camino paso a paso por el juego. Cada paso paga monedas, una vez.",
+	["FIELD LOG  ·  {1} / {2} COMPLETE"] = "REGISTRO  ·  {1} / {2} HECHAS",
+	["NEXT OBJECTIVE"] = "SIGUIENTE OBJETIVO",
 }

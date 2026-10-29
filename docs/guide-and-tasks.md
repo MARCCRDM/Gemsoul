@@ -66,13 +66,13 @@ The new steps are counted on the server with `PlayerData.training`:
 Steps that wait on a switched-off feature (`Needs`) are left out of the list
 and of the count.
 
-The look (*2026-10-29*): the game's own window style, the Store's (Client
-GiltUi): a navy sheen with an amber bar along the top, the amber diamond and
-TASKS lit from above, a steel rule under the header, the chapters in a
-recessed well (the open one with an amber edge), cards fading down in steel
-hairlines, the NEXT STEP warmed with amber, and GO as the Store's glossy
-amber buy button. Done steps get a green tick and PAID. The lobby's DAILY
-STREAK and DAILY CHALLENGES cards (`LobbyBoard`) use the same colours.
+The look (*2026-10-29*): the Rift terminal, a field log on dark glass.
+Cyan light on a double frame with corner brackets, TASKS in Michroma, names
+and numbers in Sarpanch, words in Titillium Web. The path's progress is a row
+of segments in the header. The open chapter is lit magenta. The NEXT OBJECTIVE
+sits on magenta glass with brackets, its count as glowing segments, the coins
+in gold and a cyan GO. Steps are ruled log lines, ticked in cyan when paid.
+It's all frames, gradients and strokes (no uploaded images).
 
 The window:
 - **TODAY** (the daily challenges and the bonus, with the time until new
