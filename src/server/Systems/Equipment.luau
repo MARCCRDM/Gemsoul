@@ -27,6 +27,7 @@ local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local PlayerData = require(script.Parent.PlayerData)
+local FighterRig = require(script.Parent.FighterRig)
 local Shop = require(script.Parent.Shop)
 
 local FOLDER_NAME = "GemsoulGear"
@@ -3064,12 +3065,11 @@ local building: { [Player]: boolean } = {}
 
 local function mannequin(): Model?
 	if not mannequinTemplate then
-		local ok, rig = pcall(function()
-			return Players:CreateHumanoidModelFromDescription(
-				Instance.new("HumanoidDescription"),
-				Enum.HumanoidRigType.R15
-			)
-		end)
+		-- The body every player wears (FighterRig), so a preview is the piece
+		-- exactly as it sits on you. (A Roblox avatar rig from a
+		-- HumanoidDescription loads its body over the network: it could
+		-- stall or fail on a live server, and then no preview was built.)
+		local ok, rig = pcall(FighterRig.build)
 		if not ok or not rig then
 			return nil
 		end
@@ -3494,15 +3494,44 @@ local function watch(player: Player)
 	end
 end
 
+-- The Inventory's 3D pieces are built ahead, not when the screen asks: as a
+-- profile loads and after every gear change (CharacterChanged fires for
+-- both, new spare pieces included), so the Inventory opens on the pieces
+-- themselves instead of drawn stand-ins while the server builds them. A
+-- pass that finds a build already running tries again a moment later.
+local previewsQueued: { [Player]: boolean } = {}
+local function queuePreviews(player: Player)
+	if previewsQueued[player] then
+		return
+	end
+	previewsQueued[player] = true
+	task.delay(1, function()
+		previewsQueued[player] = nil
+		for _ = 1, 8 do
+			if player.Parent == nil then
+				return
+			end
+			local ok, done = pcall(Equipment.previews, player)
+			if ok and done then
+				return
+			end
+			task.wait(2)
+		end
+	end)
+end
+
 function Equipment.start()
 	Players.PlayerAdded:Connect(watch)
 	for _, player in Players:GetPlayers() do
 		watch(player)
 		task.spawn(Equipment.apply, player)
+		queuePreviews(player)
 	end
 	PlayerData.CharacterChanged:Connect(Equipment.apply)
+	PlayerData.CharacterChanged:Connect(queuePreviews)
 	Players.PlayerRemoving:Connect(function(player)
 		building[player] = nil
+		previewsQueued[player] = nil
 	end)
 	-- The Shop asks for the skins and suits it's showing.
 	Shop.register("CosmeticPreviews", function(_player, ids)

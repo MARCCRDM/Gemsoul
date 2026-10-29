@@ -103,6 +103,22 @@ are handed to the animators by attribute (`SeamFx`, `PrismaticBase`,
 - A skin or suit painting over a Prismatic plate takes its `PrismaticBase` as well as its tag, so a copy doesn't shimmer where the worn gear doesn't.
 - Previews still can't show particles or lights: a ViewportFrame doesn't draw them.
 
+## The Inventory's pieces are ready before it opens
+
+Each piece in the Inventory (worn and spare) is a 3D preview the server builds
+on a mannequin and hands to its owner (`GearPreviews` in the PlayerGui).
+
+- **Before:** the previews were built only once the Inventory opened and asked,
+  on a Roblox avatar rig loaded from a `HumanoidDescription`. Every first open
+  showed the drawn stand-in icons while the server built them, and on a live
+  server that rig can stall or fail to load, leaving the stand-ins up for good.
+- **Now:** the mannequin is the body every player wears (`FighterRig`), built
+  in place with nothing to download, so a preview is the piece exactly as it
+  sits on you. The server builds them as a profile loads and again after every
+  gear change (`PlayerData.CharacterChanged`, new spare pieces included),
+  retrying while a build is already running, so the Inventory opens on the
+  pieces themselves. It still asks as it opens, in case one is missing.
+
 ## Tests
 
 `tests/gear_look_cases.luau` (`run_gear_look.py`) builds real kits with the real
@@ -118,6 +134,7 @@ are handed to the animators by attribute (`SeamFx`, `PrismaticBase`,
 - **Suits leave the rest alone:** under every suit, stones keep their colour, and an element doesn't recolour a suit's trims.
 - **Repeatable:** the same kit builds the same twice.
 - **The Armory:** its one-piece previews show their stones.
+- **The Inventory's previews:** with the avatar loader failing, a starter kit and a spare still get every piece, whole, and nothing is rebuilt when nothing changed.
 - **First person:** it can hold all 27 weapon skins, and a weapon with no straight piece.
 - **Stone lights:** each carries its pulse (`PulseBase`, `PulsePeriod`, `PulseDim`) and the `GemGlow` tag.
 - **Prismatic under a skin or suit:** no plate keeps `PrismaticBase` without its tag.

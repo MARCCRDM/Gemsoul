@@ -830,6 +830,57 @@ do
 	local only = Equipment._dress(rig, table.clone(KIT), { Owned = {}, Helmet = helmetIds[1] }, 7, "Helmet")
 	check(only and only.Helmet and only.Helmet:GetAttribute("HelmetSkin") ~= nil, "the one-helmet preview has no skin")
 end
+-- The Inventory's previews are built on the players' own body (FighterRig),
+-- never a Roblox avatar rig (that loads over the network and could fail on
+-- a live server, leaving every slot on its drawn stand-in): with the avatar
+-- loader failing, a starter kit still gets every piece, whole.
+do
+	services.Players.CreateHumanoidModelFromDescription = function()
+		error("no avatar rigs here")
+	end
+	local loadout = {
+		Class = "Warrior",
+		Weapon = "MatrixSwords1",
+		Helmet = "MatrixHelmets1",
+		Armor = "MatrixArmors1",
+		Gloves = "MatrixGloves1",
+		Boots = "MatrixBoots1",
+		Shield = "MatrixShields1",
+		GearRolls = {},
+		ItemGems = {},
+	}
+	local owned = { Weapons = { MatrixSwords1 = 1, MatrixSwords2 = 1 }, Helmets = { MatrixHelmets1 = 1 }, Armors = { MatrixArmors1 = 1 },
+		Gloves = { MatrixGloves1 = 1 }, Boots = { MatrixBoots1 = 1 }, Shields = { MatrixShields1 = 1 } }
+	stubData.get = function()
+		return { Owned = owned, Character = loadout }
+	end
+	stubData.character = function()
+		return loadout
+	end
+	local playerGui = Instance.new("PlayerGui")
+	local player = setmetatable({ UserId = 1, Name = "Previewer", Parent = game }, {
+		__index = function(_, key)
+			if key == "FindFirstChildOfClass" then
+				return function(_, class)
+					return if class == "PlayerGui" then playerGui else nil
+				end
+			end
+			return nil
+		end,
+	})
+	check(Equipment.previews(player) == true, "the Inventory's previews didn't build")
+	local store = playerGui:FindFirstChild("GearPreviews")
+	local built = 0
+	for _, name in { "Weapon|MatrixSwords1", "Weapon|MatrixSwords2", "Helmet|MatrixHelmets1", "Armor|MatrixArmors1", "Gloves|MatrixGloves1", "Boots|MatrixBoots1", "Shield|MatrixShields1" } do
+		local preview = store and store:FindFirstChild(name)
+		check(preview ~= nil, name .. ": no preview")
+		check(preview and #preview:GetChildren() > 0 and preview:GetAttribute("Parts") == #preview:GetChildren(), name .. ": its preview isn't whole")
+		built += 1
+	end
+	check(Equipment.previews(player) == true and #store:GetChildren() == built, "built again with nothing changed")
+	stubData.get, stubData.character = nil, nil
+end
+
 -- The Store's preview of each skin is the skin as worn, rounded parts and
 -- all: every egg and tube keeps its mesh (stripped, each showed as a box).
 services.Players.CreateHumanoidModelFromDescription = function()
