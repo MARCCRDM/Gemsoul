@@ -3200,6 +3200,7 @@ return {
 	["Nobody's on the bench."] = "No hay nadie en la banca.",
 	["No empty places."] = "No hay lugares libres.",
 	["{1} placed from the bench."] = "{1} puestos desde la banca.",
+	["That's today's {1} critter coins. Critters pay coins again tomorrow."] = "Ya tienes las {1} monedas de bichos de hoy. Los bichos vuelven a dar monedas mañana.",
 	["Team {1} out."] = "Equipo {1} fuera.",
 	["Teams"] = "Equipos",
 	["Team {1}"] = "Equipo {1}",

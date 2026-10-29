@@ -2846,6 +2846,14 @@ for _, fx in fxs do
 	if fx[1] == "CritterCoins" then after += 1 end
 end
 check(after == count, "A zero reward must not create collectible-looking coins")
+-- The cap reached is said, once a day.
+local told = 0
+for _, note in notes do
+	if note[1] == a and string.find(note[2], "today's " .. Kaiju.Bug.DailyCoins .. " critter coins", 1, true) then
+		told += 1
+	end
+end
+check(told == 1, "The day's coin cap wasn't said once: " .. told)
 end
 -- A critter your kaiju kills outright (its first blow the killing one):
 -- the kill's still yours, coins to you and EXP to the kaiju. (Its credit

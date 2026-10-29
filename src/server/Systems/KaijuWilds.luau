@@ -1971,6 +1971,15 @@ local function payCoins(player: Player, amount: number)
 		bugs.Coins += coins
 		PlayerData.addCoins(player, coins, "Critters")
 	end
+	-- (The day's cap reached: said once, so critters going quiet isn't a
+	-- mystery; the tally starts afresh tomorrow.)
+	if amount > 0 and Kaiju.bugCoins(bugs, bugs.Day) <= 0 and not bugs.Told then
+		bugs.Told = true
+		Remotes.Notify:FireClient(
+			player,
+			string.format("That's today's %d critter coins. Critters pay coins again tomorrow.", Kaiju.Bug.DailyCoins)
+		)
+	end
 	return coins
 end
 

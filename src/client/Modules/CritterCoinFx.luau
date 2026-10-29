@@ -4,10 +4,14 @@ local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 local TweenService = game:GetService("TweenService")
 local CritterFx = require(script.Parent.CritterFx)
+local CombatSound = require(script.Parent.CombatSound)
 
 local CoinFx = {}
 local active = 0
 local gold = Color3.fromRGB(255, 200, 55)
+-- Each coin that reaches you rings a step higher up a major scale (in
+-- semitones), so a handful climbs; the last adds the cash-in.
+local STEPS = { 0, 2, 4, 5, 7 }
 
 -- Each coin lands with sparks; the final coin adds a short expanding pulse.
 local function collect(at: Vector3, final: boolean)
@@ -106,6 +110,9 @@ function CoinFx.play(origin: Vector3, userId: number, amount: number)
 		glow.Parent = coin
 		table.insert(coins, { Part = coin, Landing = landing })
 	end
+	-- (Yours ring in your ears; someone else's at their feet.)
+	local mine = recipient == Players.LocalPlayer
+	CombatSound.play("CoinPop", origin)
 	active += 1
 	local began = os.clock()
 	local connection
@@ -128,6 +135,10 @@ function CoinFx.play(origin: Vector3, userId: number, amount: number)
 				local p = t / 0.4
 				position = origin:Lerp(entry.Landing, p) + Vector3.new(0, math.sin(p * math.pi) * 2.4, 0)
 			elseif t < 0.7 then
+				if not entry.Landed then
+					entry.Landed = true
+					CombatSound.play("CoinClink", entry.Landing, { Volume = 0.8 })
+				end
 				position = entry.Landing + Vector3.new(0, math.sin((t - 0.4) / 0.3 * math.pi) * 0.85, 0)
 			else
 				local p = math.clamp((t - 0.7) / 0.45, 0, 1)
@@ -138,6 +149,11 @@ function CoinFx.play(origin: Vector3, userId: number, amount: number)
 					local glow = entry.Part:FindFirstChildOfClass("PointLight")
 					if glow then glow.Enabled = false end
 					collect(target, i == count)
+					local at = if mine then nil else target
+					CombatSound.play("CoinCollect", at, { Pitch = 2 ^ (STEPS[i] / 12), Exact = true })
+					if i == count then
+						CombatSound.play("CoinCashIn", at)
+					end
 				end
 			end
 			entry.Part.CFrame = CFrame.new(position) * CFrame.Angles(0, t * 11 + i, math.rad(15))

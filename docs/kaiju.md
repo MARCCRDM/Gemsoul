@@ -484,6 +484,14 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   crouches, springs up nose-first with its legs tucked, tips forward and
   lands with a squash and a puff of dust (`CreatureMotion`'s `Motion.hop`,
   posed from the `KaijuHopAt` take-off time the server puts on its model).
+  *2026-10-29:* **heard too, every kaiju**: a springing whoosh as it leaves
+  the ground (a "bwip" out of its crouch, air rushing past, a short "hup"),
+  a thud, crunch and spatter of grit as it lands, sized to it (a knee-high
+  kaiju's higher and lighter, a big one's deeper). Before, only a big
+  kaiju's landing made a sound, and a small one jumped in silence
+  (`CreatureAnimation`; `KaijuJump` and `KaijuLand` in `CombatSound`, made
+  by `tools/make_kaiju_jump_sounds.py`; built-in sounds stand in till
+  they're uploaded).
   **Every jump, however fast you jump again**: your own client tells the
   server each time you jump (`KaijuJump.client.luau`, `Remotes.KaijuJump`),
   as well as the server watching you rise, so none is missed; a jump seen

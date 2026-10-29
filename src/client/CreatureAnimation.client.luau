@@ -20,6 +20,7 @@ local Motion = require(ReplicatedStorage.Shared.CreatureMotion)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local CombatSound = require(script.Parent.Modules.CombatSound)
 local KaijuMotionFx = require(script.Parent.Modules.KaijuMotionFx)
+local FxSize = require(script.Parent.Modules.FxSize)
 local HitFlash = require(script.Parent.Modules.HitFlash)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 -- Studs from the camera a creature's joints are animated out to: kaiju
@@ -205,15 +206,27 @@ RunService.PreSimulation:Connect(function(dt)
 			rig.Shown = shown
 			pose = Motion.gait(shown, rig.Phase, rig.Amount, now, turning(rig, step))
 			-- Jumping after its owner, in line (KaijuServer's hops): it
-			-- crouches, springs, tucks and lands with a thud and a puff of dust.
+			-- crouches, springs (a whoosh off its feet), tucks and lands with a
+			-- thud and a puff of dust, each sound sized to it (FxSize).
 			local hopAt = model:GetAttribute("KaijuHopAt")
 			if type(hopAt) == "number" then
 				local air = 2 * math.sqrt(2 * Kaiju.Hop.Height / math.max(workspace.Gravity, 1))
 				pose = Motion.hop(pose, now - hopAt, air)
+				local size = FxSize.ofModel(model)
+				local voice = { Pitch = math.clamp(size ^ -0.2, 0.85, 1.2) }
+				if rig.JumpedFrom ~= hopAt and now >= hopAt then
+					rig.JumpedFrom = hopAt
+					if now - hopAt < 0.25 then
+						FxSize.run(size, CombatSound.play, "KaijuJump", rig.Root.Position, voice)
+					end
+				end
 				if rig.LandedFrom ~= hopAt and now - hopAt >= air then
 					rig.LandedFrom = hopAt
-					if now - hopAt < air + 0.3 and (rig.Root.Position - camera.CFrame.Position).Magnitude < STEP_FAR then
-						KaijuMotionFx.footstep(model, rig.Root, rig.Humanoid, 0)
+					if now - hopAt < air + 0.3 then
+						FxSize.run(size, CombatSound.play, "KaijuLand", rig.Root.Position, voice)
+						if (rig.Root.Position - camera.CFrame.Position).Magnitude < STEP_FAR then
+							KaijuMotionFx.footstep(model, rig.Root, rig.Humanoid, 0)
+						end
 					end
 				end
 			end

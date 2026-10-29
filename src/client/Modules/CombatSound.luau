@@ -113,6 +113,21 @@ CombatSound.Ids = {
 	KaijuLevelUp = 0, -- kaiju_level_up.mp3
 	CallBack = 0, -- call_back.mp3
 	Deploy = 0, -- deploy.mp3
+	-- A critter's coins: bursting out, landing, each reaching you, the last
+	-- one in (tools/make_coin_sounds.py; CritterCoinFx).
+	CoinPop = 0, -- coin_pop.mp3
+	CoinClink1 = 0, -- coin_clink_1.mp3
+	CoinClink2 = 0, -- coin_clink_2.mp3
+	CoinClink3 = 0, -- coin_clink_3.mp3
+	CoinCollect = 0, -- coin_collect.mp3
+	CoinCashIn = 0, -- coin_cash_in.mp3
+	-- A kaiju jumping after you: its take-off and its landing
+	-- (tools/make_kaiju_jump_sounds.py; CreatureAnimation).
+	KaijuJump1 = 0, -- kaiju_jump_1.mp3
+	KaijuJump2 = 0, -- kaiju_jump_2.mp3
+	KaijuJump3 = 0, -- kaiju_jump_3.mp3
+	KaijuLand1 = 0, -- kaiju_land_1.mp3
+	KaijuLand2 = 0, -- kaiju_land_2.mp3
 }
 
 -- 0 mutes combat, 1 is full.
@@ -152,6 +167,12 @@ local LEVEL = {
 	HeavyContact = 1,
 	Deflect = 0.85,
 	Charge = 0.7,
+	CoinPop = 0.7,
+	CoinClink = 0.45,
+	CoinCollect = 0.8,
+	CoinCashIn = 0.9,
+	KaijuJump = 0.7,
+	KaijuLand = 0.75,
 }
 
 -- Built-in stand-ins until a sound is uploaded: layers of { sound, speed,
@@ -261,6 +282,28 @@ local FALLBACK = {
 	-- A kaiju into its Gemsoul (a falling ping), and out (a rising one).
 	CallBack = { { S .. "electronicpingshort.wav", 1.5, 0.3 }, { S .. "electronicpingshort.wav", 0.9, 0.25, 0.12 } },
 	Deploy = { { S .. "electronicpingshort.wav", 0.9, 0.3 }, { S .. "electronicpingshort.wav", 1.5, 0.3, 0.1 } },
+	-- A critter's coins: a pop and a spray of pings, a tick as each lands, a
+	-- bright two-note ping as each reaches you (played a step higher each),
+	-- and a run of them up for the last.
+	CoinPop = {
+		{ S .. "action_jump_land.mp3", 1.8, 0.35 },
+		{ S .. "electronicpingshort.wav", 2.6, 0.18, 0.03 },
+		{ S .. "electronicpingshort.wav", 2.9, 0.15, 0.07 },
+		{ S .. "electronicpingshort.wav", 2.4, 0.13, 0.11 },
+	},
+	CoinClink = { { S .. "clickfast.wav", 2.2, 0.3 }, { S .. "electronicpingshort.wav", 3.2, 0.1 } },
+	CoinCollect = { { S .. "electronicpingshort.wav", 2.0, 0.3 }, { S .. "electronicpingshort.wav", 2.67, 0.32, 0.055 } },
+	CoinCashIn = {
+		{ S .. "electronicpingshort.wav", 1.6, 0.3 },
+		{ S .. "electronicpingshort.wav", 2.0, 0.28, 0.04 },
+		{ S .. "electronicpingshort.wav", 2.4, 0.26, 0.08 },
+		{ S .. "electronicpingshort.wav", 3.2, 0.3, 0.12 },
+		{ S .. "victory.wav", 1.5, 0.15, 0.1 },
+	},
+	-- A kaiju jumping after you: a springing whoosh off its feet, a thud and
+	-- a crunch coming down.
+	KaijuJump = { { S .. "action_jump.mp3", 1.25, 0.5 }, { S .. "swordlunge.wav", 1.6, 0.18 } },
+	KaijuLand = { { S .. "action_jump_land.mp3", 0.85, 0.65 }, { S .. "clickfast.wav", 0.6, 0.2 } },
 	Cackle = {
 		{ S .. "uuhhh.mp3", 1.7, 0.4 },
 		{ S .. "uuhhh.mp3", 2.1, 0.3, 0.2 },
@@ -285,6 +328,10 @@ local MIN_GAP = {
 	Contact = 0.04,
 	Giggle = 0.35, -- (a swarm giggling at once is one giggle, not a din)
 	Cackle = 0.6,
+	CoinClink = 0.025,
+	CoinCollect = 0.03,
+	KaijuJump = 0.05,
+	KaijuLand = 0.05,
 }
 local DEFAULT_GAP = 0.03
 local MAX_VOICES = 28
@@ -404,8 +451,9 @@ local function emit(
 	Debris:AddItem(holder, 6 + (delay or 0))
 end
 
--- `options`: Volume (multiplier), Pitch (multiplier).
-function CombatSound.play(name: string, position: Vector3?, options: { Volume: number?, Pitch: number? }?)
+-- `options`: Volume (multiplier), Pitch (multiplier), Exact (no random
+-- detune: a run of notes stays in tune).
+function CombatSound.play(name: string, position: Vector3?, options: { Volume: number?, Pitch: number?, Exact: boolean? }?)
 	if CombatSound.Volume <= 0 then
 		return
 	end
@@ -421,7 +469,8 @@ function CombatSound.play(name: string, position: Vector3?, options: { Volume: n
 	lastPlayed[name] = now
 	local size = FxSize.get()
 	local volume = (LEVEL[name] or 0.85) * (options and options.Volume or 1) * math.min(1.2, 0.4 + 0.6 * size)
-	local pitch = (options and options.Pitch or 1) * (0.94 + math.random() * 0.12) * math.clamp(size ^ -0.15, 0.9, 1.2)
+	local detune = if options and options.Exact then 1 else 0.94 + math.random() * 0.12
+	local pitch = (options and options.Pitch or 1) * detune * math.clamp(size ^ -0.15, 0.9, 1.2)
 	local found = takes(name)
 	if #found > 0 then
 		-- A take at random, never the same one twice running.

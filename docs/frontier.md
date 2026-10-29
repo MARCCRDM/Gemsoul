@@ -340,6 +340,19 @@ What one pays:
   killing blow pays out inside it (`KaijuServer.strike`). With a team of
   three or four out, most critters die that way. Its credit now goes on
   first, so the coins and the kaiju's EXP come every time.
+  *2026-10-29*: **the day's cap is said.** Once your 300 for the day are in,
+  critters drop nothing till tomorrow (UTC), and that used to happen without
+  a word, so it looked as if critter coins had broken. Now the kill that
+  reaches the cap says so, once a day ("That's today's 300 critter coins.
+  Critters pay coins again tomorrow.": `KaijuWilds`' `payCoins`).
+  **And the coins are heard** (`CritterCoinFx`, `CombatSound`): a pop and a
+  spray of little coins ringing as the critter bursts, a clink as each one
+  lands, a bright two-note "bling" as each reaches you, a step higher up a
+  major scale each time so a handful climbs, and a "cha-ching" of bells
+  over a shake of coins on the last. Yours ring in your ears; another
+  player's at their feet. The files are made by `tools/make_coin_sounds.py`
+  (`assets/sounds/combat/coin_*.mp3`); built-in pings stand in till
+  `tools/upload_audio.py` uploads them.
 
 ### What you do about them
 
