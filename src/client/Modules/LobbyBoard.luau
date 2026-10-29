@@ -41,19 +41,20 @@ local new = IronUi.new
 local LobbyBoard = {}
 
 local WIDE = 224
--- The Tasks window's look: graphite, one amber, Oswald for names and
--- numbers; what's done goes quiet instead of lighting up green.
-local PANEL = Color3.fromRGB(17, 18, 21)
-local RAISED = Color3.fromRGB(27, 28, 33)
-local EDGE = Color3.fromRGB(42, 44, 50)
-local TRACK = Color3.fromRGB(42, 44, 50)
-local GOLD = Color3.fromRGB(255, 184, 64)
-local GOLD_WASH = Color3.fromRGB(46, 36, 18)
+-- The game's window colours (the Store's, Client GiltUi): navy cards fading
+-- down, steel hairlines, amber for what matters, green for what's done.
+local PANEL = Color3.fromRGB(22, 29, 47)
+local PANEL_LOW = Color3.fromRGB(13, 17, 30)
+local RAISED = Color3.fromRGB(36, 46, 72)
+local EDGE = Color3.fromRGB(62, 76, 108)
+local TRACK = Color3.fromRGB(11, 15, 27)
+local GOLD = Color3.fromRGB(255, 196, 64)
+local GOLD_WASH = Color3.fromRGB(64, 50, 26)
 local VIOLET = GOLD -- (one accent: the challenges are amber too)
-local TEXT = Color3.fromRGB(236, 232, 224)
-local MUTED = Color3.fromRGB(152, 149, 142)
-local DONE = Color3.fromRGB(98, 98, 102) -- (done: faint, not green)
-local DISPLAY = Enum.Font.Oswald
+local TEXT = Color3.fromRGB(240, 243, 250)
+local MUTED = Color3.fromRGB(152, 164, 190)
+local DONE = Color3.fromRGB(96, 226, 150)
+local DISPLAY = Enum.Font.GothamBlack
 
 local column: Frame
 local compact = false
@@ -84,7 +85,9 @@ end
 
 local function bar(parent: Instance, color: Color3)
 	local track = new("Frame", { BackgroundColor3 = TRACK, BorderSizePixel = 0 }, parent)
+	UiKit.round(track, 3)
 	local fill = new("Frame", { BackgroundColor3 = color, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, track)
+	UiKit.round(fill, 3)
 	return track, fill
 end
 
@@ -107,19 +110,21 @@ local function mode(key: string): string
 	return if expanded == key then "open" else "folded"
 end
 
--- A card: a graphite plate, an amber edge, a title and a note on the right.
+-- A card: navy fading down in a steel hairline, an amber edge, a title and a
+-- note on the right.
 local function card(name: string, order: number, accent: Color3, title: string)
 	local frame = new("TextButton", {
 		Name = name,
 		Text = "",
 		AutoButtonColor = false,
-		BackgroundColor3 = PANEL,
-		BackgroundTransparency = 0.06,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.04,
 		LayoutOrder = order,
 		Size = UDim2.fromOffset(WIDE, 60),
 	}, column)
-	UiKit.round(frame, 4)
-	new("UIStroke", { Color = EDGE, Thickness = 1 }, frame)
+	UiKit.round(frame, 10)
+	new("UIStroke", { Color = EDGE, Thickness = 1, Transparency = 0.45 }, frame)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(PANEL, PANEL_LOW) }, frame)
 	local edge = new("Frame", {
 		Name = "Edge",
 		BackgroundColor3 = accent,
@@ -127,10 +132,11 @@ local function card(name: string, order: number, accent: Color3, title: string)
 		Position = UDim2.fromOffset(0, 12),
 		Size = UDim2.new(0, 3, 0, 18),
 	}, frame)
-	local heading = label(frame, title, 15, TEXT, DISPLAY)
+	UiKit.round(edge, 2)
+	local heading = label(frame, title, 12, TEXT, IronUi.Heading)
 	heading.Name = "Title"
 	heading.Position, heading.Size = UDim2.fromOffset(14, 10), UDim2.new(1, -100, 0, 22)
-	local note = label(frame, "", 14, MUTED, DISPLAY, Enum.TextXAlignment.Right)
+	local note = label(frame, "", 11, MUTED, IronUi.Heading, Enum.TextXAlignment.Right)
 	note.Name = "Note"
 	note.AnchorPoint = Vector2.new(1, 0)
 	note.Position, note.Size = UDim2.new(1, -12, 0, 10), UDim2.fromOffset(78, 22)
@@ -180,9 +186,9 @@ local function dayCoins(day: number): number
 	return Config.DailyRewardBase + Config.DailyRewardPerStreak * (math.min(day, Config.DailyStreakMax) - 1)
 end
 
--- Open, the week as a reward track: a square plate a day with its coins
--- (collected ones go quiet with a tick, the next one has an amber rim), the
--- last one wide on an amber wash, the week's top prize. Four on the first row, the rest on the second.
+-- Open, the week as a reward track: a tile a day with its coins (collected
+-- ones ticked green, the next one rimmed in amber), the last one wide on an
+-- amber wash, the week's top prize. Four on the first row, the rest on the second.
 local TILE, TILE_GAP = 46, 4
 local function buildStreak()
 	local frame, note, heading, edge, chevron = card("Streak", 1, GOLD, "DAILY STREAK")
@@ -197,11 +203,11 @@ local function buildStreak()
 			Position = UDim2.fromOffset(14 + col * (TILE + TILE_GAP), 38 + row * (TILE + TILE_GAP)),
 			Size = UDim2.fromOffset(if last then TILE * 2 + TILE_GAP else TILE, TILE),
 		}, frame)
-		UiKit.round(tile, 3)
-		local rim = new("UIStroke", { Color = EDGE, Thickness = 1, Transparency = 1 }, tile)
+		UiKit.round(tile, 7)
+		local rim = new("UIStroke", { Color = EDGE, Thickness = 1, Transparency = 0.5 }, tile)
 		local day = label(tile, if last then "DAY " .. i .. "+" else "DAY " .. i, 8, MUTED, IronUi.Heading, Enum.TextXAlignment.Center)
 		day.Position, day.Size = UDim2.fromOffset(0, 4), UDim2.new(1, 0, 0, 10)
-		local amount = label(tile, "", if last then 19 else 16, TEXT, DISPLAY, Enum.TextXAlignment.Center)
+		local amount = label(tile, "", if last then 15 else 13, TEXT, DISPLAY, Enum.TextXAlignment.Center)
 		amount.Position, amount.Size = UDim2.fromOffset(0, 14), UDim2.new(1, 0, 0, 20)
 		local coin = label(tile, "◆", 8, GOLD, IronUi.Heading, Enum.TextXAlignment.Center)
 		coin.Position, coin.Size = UDim2.fromOffset(0, 33), UDim2.new(1, 0, 0, 9)
@@ -239,11 +245,11 @@ local function buildStreak()
 			local done = i <= streak
 			local nextDay = i == streak + 1
 			entry.Tile.BackgroundColor3 = if done
-				then PANEL
+				then TRACK
 				elseif entry.Last or nextDay then GOLD_WASH
 				else RAISED
-			entry.Rim.Color = GOLD
-			entry.Rim.Transparency = if nextDay then 0 else 1
+			entry.Rim.Color = if done then DONE elseif nextDay or entry.Last then GOLD else EDGE
+			entry.Rim.Transparency = if nextDay then 0 elseif done then 0.5 else 0.5
 			entry.Rim.Thickness = if nextDay then 1.5 else 1
 			entry.Amount.Text = if done then "✓" else shortCoins(dayCoins(i))
 			entry.Amount.TextColor3 = if done then DONE elseif nextDay or entry.Last then GOLD else TEXT
@@ -251,7 +257,7 @@ local function buildStreak()
 			entry.Coin.Visible = not done
 		end
 		footer.Text = string.format(
-			'Tomorrow  <font color="#FFB840"><b>+%d ◆</b></font>',
+			'Tomorrow  <font color="#FFC440"><b>+%d ◆</b></font>',
 			dayCoins(streak + 1)
 		)
 		return true
@@ -277,12 +283,12 @@ local function buildChallenges()
 			Position = UDim2.fromOffset(14, 1),
 			Size = UDim2.fromOffset(18, 18),
 		}, row)
-		UiKit.round(check, 3)
-		local tick = label(check, "", 11, MUTED, IronUi.Heading, Enum.TextXAlignment.Center)
+		UiKit.round(check, 9)
+		local tick = label(check, "", 11, Color3.fromRGB(10, 30, 20), IronUi.Heading, Enum.TextXAlignment.Center)
 		tick.Size = UDim2.fromScale(1, 1)
 		local name = label(row, "", 12, TEXT)
 		name.Position = UDim2.fromOffset(40, 0)
-		local reward = label(row, "", 14, GOLD, DISPLAY, Enum.TextXAlignment.Right)
+		local reward = label(row, "", 12, GOLD, DISPLAY, Enum.TextXAlignment.Right)
 		reward.AnchorPoint = Vector2.new(1, 0)
 		reward.Position, reward.Size = UDim2.new(1, -12, 0, 0), UDim2.fromOffset(56, 20)
 		local hint = label(row, "", 10, MUTED, IronUi.Body)
@@ -353,7 +359,7 @@ local function buildChallenges()
 		heading.Text = "DAILY CHALLENGES"
 		local allDone = view.BonusDone == true
 		-- (The time left on today's three; the ↻ it led with showed as a box.)
-		note.Text = if allDone then '<font color="#9A9890">ALL DONE ✓</font>' else untilReset()
+		note.Text = if allDone then '<font color="#60E296">ALL DONE ✓</font>' else untilReset()
 		local nextUp = nil
 		for _, item in view.List do
 			if item.Done ~= true then
@@ -365,7 +371,7 @@ local function buildChallenges()
 		if nextUp then
 			line.Text = nextUp.Name
 			figure.Text = string.format(
-				'%d/%d  <font color="#FFB840">+%d ◆</font>',
+				'%d/%d  <font color="#FFC440">+%d ◆</font>',
 				math.min(nextUp.Count, nextUp.Goal),
 				nextUp.Goal,
 				nextUp.Coins
@@ -387,9 +393,9 @@ local function buildChallenges()
 				entry.Reward.Text = if finished then "PAID" else "+" .. item.Coins .. " ◆"
 				entry.Reward.TextColor3 = if finished then DONE else GOLD
 				entry.Count.Text = math.min(item.Count, item.Goal) .. "/" .. item.Goal
-				entry.Check.BackgroundColor3 = TRACK
+				entry.Check.BackgroundColor3 = if finished then DONE else TRACK
 				entry.Tick.Text = if finished then "✓" else ""
-				entry.Fill.BackgroundColor3 = if finished then MUTED else VIOLET
+				entry.Fill.BackgroundColor3 = if finished then DONE else VIOLET
 				setFill(entry.Fill, item.Count / item.Goal, drawn)
 				-- Just finished: a flash of gold over the row.
 				local key = (view.Day or 0) .. ":" .. item.Id
@@ -401,7 +407,7 @@ local function buildChallenges()
 						Size = UDim2.new(1, -16, 1, 0),
 						Position = UDim2.fromOffset(8, 0),
 					}, if open then entry.Row else frame)
-					UiKit.round(flash, 3)
+					UiKit.round(flash, 6)
 					local fade = TweenService:Create(flash, TweenInfo.new(1.2), { BackgroundTransparency = 1 })
 					fade.Completed:Connect(function()
 						flash:Destroy()
@@ -412,8 +418,8 @@ local function buildChallenges()
 			end
 		end
 		bonus.Text = if allDone
-			then string.format('<font color="#9A9890">BONUS PAID  +%d ◆</font>', view.Bonus or Daily.Bonus)
-			else string.format('ALL THREE  <font color="#FFB840">+%d ◆ BONUS</font>', view.Bonus or Daily.Bonus)
+			then string.format('<font color="#60E296">BONUS PAID  +%d ◆</font>', view.Bonus or Daily.Bonus)
+			else string.format('ALL THREE  <font color="#FFC440">+%d ◆ BONUS</font>', view.Bonus or Daily.Bonus)
 		drawn = true
 		return true
 	end
