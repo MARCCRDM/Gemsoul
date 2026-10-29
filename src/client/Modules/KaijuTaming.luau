@@ -3,8 +3,9 @@
 	tame: KaijuWilds runs it, Shared.Kaiju.Tame has the rules).
 
 	  Ready     a wild kaiju near you worn down to half its health glows gold
-	            (a pulsing Highlight) with READY TO CATCH and the chance over
-	            it: it can be caught now. Not while someone's taming it.
+	            (a pulsing Highlight) and its own plate reads CATCH and the
+	            chance, gold, in its name's place (WildBars.setCatch): it can
+	            be caught now. Not while someone's taming it.
 	  The cast  while a tame is cast on one (its KaijuTameBy, till
 	            KaijuTameEnds), everyone sees a beam of gold light from its
 	            tamer to it and motes of light closing in round it as it
@@ -59,12 +60,14 @@ function KaijuTaming.ready(model: Model): boolean
 	return humanoid ~= nil and humanoid.Health > 0 and Kaiju.tameChance(humanoid.Health, humanoid.MaxHealth) > 0
 end
 
--- Ready: the glow and the words over it ----------------------------------------------------------------
+-- Ready: the glow, and its plate says so ---------------------------------------------------------------
 
-type Mark = { Highlight: Highlight, Board: BillboardGui, Text: TextLabel }
+-- (The words are on its own plate, WildBars.setCatch, not on a sign over
+-- it: a sign over each would stack over the fight.)
+type Mark = { Highlight: Highlight }
 local marks: { [Model]: Mark } = {}
 
-local function markOf(model: Model, root: BasePart): Mark
+local function markOf(model: Model): Mark
 	local mark = marks[model]
 	if mark then
 		return mark
@@ -78,31 +81,7 @@ local function markOf(model: Model, root: BasePart): Mark
 		OutlineTransparency = 0,
 		DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
 	}, model)
-	-- (In PlayerGui, so its words are translated: Translate. Just over its
-	-- plate, WildBars: the same spot, a plate's height and a bit higher.)
-	local height = model:GetExtentsSize().Y
-	local phone = WildBars.phone() -- (smaller on a phone, like the plate)
-	local board = new("BillboardGui", {
-		Name = "TameReadyBoard",
-		Adornee = root,
-		AlwaysOnTop = true,
-		LightInfluence = 0,
-		MaxDistance = SHOW,
-		Size = if phone then UDim2.fromOffset(180, 30) else UDim2.fromOffset(220, 34),
-		StudsOffsetWorldSpace = Vector3.new(0, height * 0.5 + 1.4, 0),
-		SizeOffset = Vector2.new(0, 1.3),
-	}, player:WaitForChild("PlayerGui"))
-	local text = new("TextLabel", {
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		Font = Enum.Font.GothamBlack,
-		TextSize = if phone then 14 else 16,
-		TextColor3 = GOLD,
-		TextStrokeColor3 = Color3.fromRGB(40, 26, 0),
-		TextStrokeTransparency = 0.2,
-		Text = "",
-	}, board)
-	mark = { Highlight = highlight, Board = board, Text = text }
+	mark = { Highlight = highlight }
 	marks[model] = mark
 	return mark
 end
@@ -112,7 +91,7 @@ local function unmark(model: Model)
 	if mark then
 		marks[model] = nil
 		mark.Highlight:Destroy()
-		mark.Board:Destroy()
+		WildBars.setCatch(model, nil)
 	end
 end
 
@@ -355,8 +334,8 @@ local function step()
 					if near and KaijuTaming.ready(model) then
 						local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
 						local chance = Kaiju.tameChance(humanoid.Health, humanoid.MaxHealth)
-						markOf(model, root).Text.Text =
-							string.format("READY TO CATCH · %d%%", math.floor(chance * 100 + 0.5))
+						markOf(model)
+						WildBars.setCatch(model, string.format("CATCH · %d%%", math.floor(chance * 100 + 0.5)))
 					else
 						unmark(model)
 					end

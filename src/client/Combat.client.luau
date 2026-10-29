@@ -1983,41 +1983,51 @@ local function floorUnder(position: Vector3): Vector3
 	return if hit then hit.Position + Vector3.new(0, 0.15, 0) else position
 end
 
-local numbers = 0
+-- (Everyone else's hits, a kaiju fight's blows most of all, come up
+-- small, fewer and wordless, their colour still telling WEAK from RESIST:
+-- so the fight under them can be watched.)
+local numbers, quiet = 0, 0
+local QUIET = 8 -- others' numbers on screen at once, at most
 local function damageNumber(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?, mine: boolean?)
-	if numbers >= 24 then
+	if numbers >= 24 or (not mine and quiet >= QUIET) then
 		return -- plenty on screen already
 	end
 	numbers += 1
+	if not mine then
+		quiet += 1
+	end
 	local anchor =
 		effectPart(Vector3.one * 0.1, CFrame.new(position + Vector3.new(math.random() - 0.5, 0, 0)), Color3.new())
 	anchor.Transparency = 1
 	local board = new("BillboardGui", {
-		Size = UDim2.fromOffset(140, 48),
+		Size = if mine then UDim2.fromOffset(140, 48) else UDim2.fromOffset(90, 30),
 		AlwaysOnTop = true,
-		MaxDistance = 120,
+		MaxDistance = if mine then 120 else 80,
 		StudsOffset = Vector3.zero,
 	}, anchor)
 	local label = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 		Font = Enum.Font.GothamBlack,
-		-- RESIST / WEAK!: the element against the target's armor (ElementMatchup).
+		-- RESIST / WEAK!: the element against the target's armor (ElementMatchup),
+		-- on your own hits (others' say it by their colour alone).
 		-- (In the world, so client/Translate doesn't see it: translated here.)
-		Text = Lang.translate(
-			(if crit then "CRIT " else "")
-				.. tostring(amount)
-				.. (if matchTag == "Weak" then " WEAK!" elseif matchTag == "Resist" then " RESIST" else "")
-		),
+		Text = if mine
+			then Lang.translate(
+				(if crit then "CRIT " else "")
+					.. tostring(amount)
+					.. (if matchTag == "Weak" then " WEAK!" elseif matchTag == "Resist" then " RESIST" else "")
+			)
+			else tostring(amount),
 		-- (Your own blade's numbers come up bigger: they're the ones you're watching.)
-		TextSize = (if crit then 32 else 24) * (if mine then 1.3 else 1),
+		TextSize = if mine then (if crit then 32 else 24) * 1.3 else (if crit then 20 else 15),
 		TextColor3 = if matchTag == "Resist"
 			then Color3.fromRGB(165, 168, 180)
 			elseif matchTag == "Weak" then Color3.fromRGB(255, 150, 60)
 			else color or Color3.new(1, 1, 1),
 		TextStrokeTransparency = 0.2,
 	}, board)
-	local punch = new("UIScale", { Scale = if mine then 1.8 else 1.35 }, label)
+	local punch = new("UIScale", { Scale = if mine then 1.8 else 1.15 }, label)
 	TweenService:Create(punch, TweenInfo.new(if mine then 0.18 else 0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
 		:Play()
 	TweenService:Create(board, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -2029,6 +2039,9 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 	}):Play()
 	task.delay(0.95, function()
 		numbers -= 1
+		if not mine then
+			quiet -= 1
+		end
 		anchor:Destroy()
 	end)
 end

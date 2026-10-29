@@ -1,5 +1,5 @@
--- KaijuTaming on screen: a weakened wild kaiju glows gold with READY TO CATCH
--- and its chance (not a healthy one, not a far one, not one being tamed);
+-- KaijuTaming on screen: a weakened wild kaiju glows gold and its plate reads
+-- CATCH and its chance (no sign of its own over the fight) (not a healthy one, not a far one, not one being tamed);
 -- a tame cast draws a beam and motes closing in; the tamer's bar fills and
 -- ends on the server's result, then goes.
 local checks = 0
@@ -15,10 +15,6 @@ local function boardFor(model)
 	end
 	return nil
 end
-local function textOf(board)
-	local label = board and board:FindFirstChildOfClass("TextLabel")
-	return label and label.Text
-end
 
 Taming.start()
 local healthy = wildKaiju("Wild Fire Bulwark", Vector3.new(20, 3, 0), 0.8)
@@ -31,9 +27,11 @@ local glow = weak:FindFirstChildOfClass("Highlight")
 check(glow ~= nil and glow.Adornee == weak, "A weakened kaiju near you doesn't glow")
 local chance = Kaiju.tameChance(90, 300)
 check(
-	textOf(boardFor(weak)) == string.format("READY TO CATCH · %d%%", math.floor(chance * 100 + 0.5)),
-	"The ready words are wrong: " .. tostring(textOf(boardFor(weak)))
+	catchText[weak] == string.format("CATCH · %d%%", math.floor(chance * 100 + 0.5)),
+	"The ready words are wrong: " .. tostring(catchText[weak])
 )
+check(boardFor(weak) == nil, "A sign of its own over a ready kaiju (it covers the fight)")
+check(catchText[healthy] == nil and catchText[far] == nil, "A plate that can't be caught says CATCH")
 check(far:FindFirstChildOfClass("Highlight") == nil, "A kaiju across the quarry glows")
 check(Taming.ready(weak) and not Taming.ready(healthy), "ready() is wrong")
 weak:SetAttribute("KaijuTries", Kaiju.TameTries)
@@ -57,6 +55,7 @@ weak:SetAttribute("KaijuTameEnds", serverClock + Kaiju.Tame.Cast)
 Taming.cast(weak, chance, Kaiju.Tame.Cast)
 frames(0.3)
 check(not Taming.ready(weak) and weak:FindFirstChildOfClass("Highlight") == nil, "Still glowing ready while held")
+check(catchText[weak] == nil, "Its plate still says CATCH while held")
 local hold = workspace:FindFirstChild("TameHold")
 check(hold ~= nil, "No tame beam drawn")
 local beams, motes = 0, {}
@@ -124,16 +123,15 @@ check(labels()["CATCH BROKEN"] and gui.Enabled, "A broken tame didn't show")
 -- A model gone takes its marks with it.
 weak.Parent = nil
 frames(0.3)
-check(boardFor(weak) == nil, "A gone kaiju's ready words stayed")
--- On a phone the ready words are smaller, like the plate under them.
+check(catchText[weak] == nil, "A gone kaiju's ready words stayed")
+-- On a phone, the same: its plate says so, no sign over it.
 phoneMode = true
 local phoneWeak = wildKaiju("Wild Ion Razorback", Vector3.new(-24, 3, 0), 0.3)
 frames(0.3)
-local small = boardFor(phoneWeak)
-check(small and small.Size.X.Offset == 180 and small.Size.Y.Offset == 30, "Mobile readiness should have a readable billboard")
-check(small:FindFirstChildOfClass("TextLabel").TextSize >= 14, "Mobile readiness text is too small")
+check(catchText[phoneWeak] ~= nil and boardFor(phoneWeak) == nil, "On a phone a ready kaiju's plate doesn't say CATCH")
 phoneWeak.Parent = nil
 frames(0.3)
+check(catchText[phoneWeak] == nil, "A gone kaiju's plate kept CATCH on a phone")
 phoneMode = false
 
 print(string.format("PASS: %d kaiju taming checks (ready glow and chance, not healthy/far/held, the beam and motes, the cast bar, results)", checks))

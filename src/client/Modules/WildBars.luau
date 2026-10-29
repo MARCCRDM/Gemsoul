@@ -10,8 +10,13 @@
 	caught (KaijuTameBy) has a gold edge.
 
 	The nearest Budget within Range of the camera show, never one knocked
-	out. They sit in PlayerGui (so they're in the player's language: "Lv"
-	reads "Nv" in Spanish), each adorning its kaiju's root.
+	out, one ready to catch first. They sit in PlayerGui (so they're in the
+	player's language: "Lv" reads "Nv" in Spanish), each adorning its
+	kaiju's root. So a fight can be watched, not read: the name drops its
+	"Wild ", a plate that would cover a nearer one shrinks to its level and
+	bar (Compact), and if even that would cover one it isn't shown; a kaiju
+	ready to catch says so in its own plate (CATCH · 51%, gold) rather than
+	in a sign of its own over it.
 
 	  WildBars.watch(model)   start drawing it (KaijuHud's scan hands it each
 	                          wild kaiju it finds)
@@ -22,8 +27,14 @@
 	                          on a phone (PhoneSize, everything inside in
 	                          proportion)
 	  WildBars.draw(plate, share, trail, guardian, catching)   fills it in
+	  WildBars.setCatch(model, text?)   the plate's name becomes `text`
+	                          (gold), e.g. "CATCH · 51%"; nil, its name again
+	  WildBars.compact(plate, on)   just the level and bar, or all of it
+	  WildBars.overlaps(a, b) -> boolean   two plates' screen boxes
+	                          ({ X, Y, W, H }, centred) overlap (pure)
 	  WildBars.choose(entries, budget, range) -> { [entry]: true }   which
-	                          show: entries are { Distance, Share } (pure)
+	                          show: entries are { Distance, Share,
+	                          Priority? } (pure; Priority first)
 	  WildBars.phone() -> boolean          a phone (touch, no keyboard; or a
 	                          short screen): the smaller plates
 	  WildBars.Budget, PhoneBudget, Range, Size, PhoneSize, Hold, Drain
@@ -32,12 +43,12 @@ local BodyHealth = require(script.Parent.BodyHealth)
 
 local WildBars = {}
 
-WildBars.Budget = 6 -- shown at once, at most
+WildBars.Budget = 3 -- shown at once, at most (a fight is to be watched)
 WildBars.Range = 140 -- studs from the camera: further, none
 WildBars.Size = Vector2.new(210, 36) -- the plate, in pixels
 -- On a phone: smaller, and fewer at once (they were a third of the screen).
 WildBars.PhoneSize = Vector2.new(124, 22)
-WildBars.PhoneBudget = 4
+WildBars.PhoneBudget = 2
 WildBars.Hold = 0.35 -- seconds the trail holds after a blow
 WildBars.Drain = 0.8 -- how much of the bar the trail drains a second
 WildBars.Every = 0.25 -- seconds between picks
@@ -65,6 +76,9 @@ function WildBars.choose(entries, budget: number, range: number): { [any]: boole
 		end
 	end
 	table.sort(want, function(a, b)
+		if (a.Priority == true) ~= (b.Priority == true) then
+			return a.Priority == true
+		end
 		return a.Distance < b.Distance
 	end)
 	local on = {}
@@ -72,6 +86,12 @@ function WildBars.choose(entries, budget: number, range: number): { [any]: boole
 		on[want[i]] = true
 	end
 	return on
+end
+
+-- Whether two plates' boxes on screen ({ X, Y, W, H }, X and Y their
+-- centres, in pixels) overlap.
+function WildBars.overlaps(a, b): boolean
+	return math.abs(a.X - b.X) * 2 < a.W + b.W and math.abs(a.Y - b.Y) * 2 < a.H + b.H
 end
 
 local function make(class: string, props, parent: Instance?)
@@ -130,8 +150,12 @@ function WildBars.plate(model: Model, phone: boolean?): BillboardGui
 		TextStrokeTransparency = 0.25,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		TextScaled = true,
-		Text = model.Name,
+		-- (no "Wild ": the plate's only ever over a wild one)
+		Text = (string.gsub(model.Name, "^Wild ", "")),
 	}, plate)
+	plate:SetAttribute("Name", name.Text)
+	plate:SetAttribute("Scale", k)
+	plate:SetAttribute("FullH", H)
 	-- (A long name, the guardian's, shrinks a little before it's cut short.)
 	make("UITextSizeConstraint", { MaxTextSize = px(14), MinTextSize = math.min(px(14), if phone then 8 else 10) }, name)
 	-- Its Grade (Shared Kaiju.grade), at the end of the name: a fine one is
@@ -200,8 +224,9 @@ function WildBars.plate(model: Model, phone: boolean?): BillboardGui
 end
 
 -- Fills `plate` in: `share` of its health (the trail at `trail`, never
--- under it), gold for the guardian, a gold edge while it's being caught.
-function WildBars.draw(plate: BillboardGui, share: number, trail: number, guardian: boolean?, catching: boolean?)
+-- under it), gold for the guardian, a gold edge while it's being caught,
+-- and `catch` (gold) in its name's place while it's ready to catch.
+function WildBars.draw(plate: BillboardGui, share: number, trail: number, guardian: boolean?, catching: boolean?, catch: string?)
 	local x = math.clamp(share, 0, 1)
 	local back = plate:FindFirstChild("Back") :: Frame
 	local fill = back:FindFirstChild("Fill") :: Frame
@@ -213,7 +238,33 @@ function WildBars.draw(plate: BillboardGui, share: number, trail: number, guardi
 	edge.Color = if guardian or catching then GOLD else EDGE
 	edge.Thickness = if catching then 2 else 1
 	local name = plate:FindFirstChild("Title") :: TextLabel
-	name.TextColor3 = if guardian then GOLD else NAME
+	name.Text = catch or plate:GetAttribute("Name") or name.Text
+	name.TextColor3 = if guardian or catch then GOLD else NAME
+end
+
+-- Just the level and the bar (the name's row folded away), or all of it.
+function WildBars.compact(plate: BillboardGui, on: boolean)
+	if (plate:GetAttribute("Compact") == true) == on then
+		return
+	end
+	plate:SetAttribute("Compact", on)
+	local k = plate:GetAttribute("Scale") or 1
+	local function px(n: number): number
+		return math.max(1, math.floor(n * k + 0.5))
+	end
+	local row = if on then px(19) else 0
+	local full = plate:GetAttribute("FullH") or plate.Size.Y.Offset
+	local title = plate:FindFirstChild("Title") :: TextLabel
+	title.Visible = not on
+	local grade = plate:FindFirstChild("Grade") :: TextLabel?
+	if grade then
+		grade.Visible = not on
+	end
+	local level = plate:FindFirstChild("Level") :: Frame
+	level.Position = UDim2.fromOffset(0, px(19) - row)
+	local back = plate:FindFirstChild("Back") :: Frame
+	back.Position = UDim2.fromOffset(px(42), px(21) - row)
+	plate.Size = UDim2.fromOffset(plate.Size.X.Offset, full - row)
 end
 
 type Entry = {
@@ -224,6 +275,7 @@ type Entry = {
 	Trail: number,
 	HitAt: number,
 	Shown: boolean,
+	Catch: string?,
 }
 local entries: { [Model]: Entry } = {}
 
@@ -252,8 +304,19 @@ local function redraw(entry: Entry)
 		entry.Share,
 		entry.Trail,
 		model:GetAttribute("KaijuGuardian") == true,
-		model:GetAttribute("KaijuTameBy") ~= nil
+		model:GetAttribute("KaijuTameBy") ~= nil,
+		entry.Catch
 	)
+end
+
+-- Ready to catch: its plate says so (gold, in its name's place) and is
+-- shown first. nil: its name again.
+function WildBars.setCatch(model: Model, text: string?)
+	local entry = entries[model]
+	if entry and entry.Catch ~= text then
+		entry.Catch = text
+		redraw(entry)
+	end
 end
 
 local function drop(model: Model)
@@ -352,9 +415,64 @@ function WildBars.start()
 				drop(model)
 			end
 		end
-		local on = WildBars.choose(list, if onPhone() then WildBars.PhoneBudget else WildBars.Budget, WildBars.Range)
 		for _, item in list do
-			local show = on[item] == true
+			item.Priority = item.Entry.Catch ~= nil
+		end
+		local on = WildBars.choose(list, if onPhone() then WildBars.PhoneBudget else WildBars.Budget, WildBars.Range)
+		-- Nearest (and ready to catch) first: one that would cover a plate
+		-- already placed folds to its level and bar, or isn't shown.
+		local chosen = {}
+		for _, item in list do
+			if on[item] then
+				table.insert(chosen, item)
+			end
+		end
+		table.sort(chosen, function(a, b)
+			if a.Priority ~= b.Priority then
+				return a.Priority
+			end
+			return a.Distance < b.Distance
+		end)
+		local placed, mode = {}, {}
+		for _, item in chosen do
+			local plate = item.Entry.Plate
+			local adornee = plate.Adornee :: BasePart?
+			local point, onScreen = Vector3.zero, false
+			if adornee then
+				point, onScreen = camera:WorldToViewportPoint(adornee.Position + plate.StudsOffsetWorldSpace)
+			end
+			if not onScreen then
+				mode[item] = "Full" -- (off screen: nothing to cover)
+				continue
+			end
+			local full = plate:GetAttribute("FullH") or plate.Size.Y.Offset
+			local k = plate:GetAttribute("Scale") or 1
+			local W = plate.Size.X.Offset
+			local boxes = {
+				{ "Full", { X = point.X, Y = point.Y, W = W, H = full } },
+				{ "Compact", { X = point.X, Y = point.Y, W = W, H = full - math.max(1, math.floor(19 * k + 0.5)) } },
+			}
+			for _, option in boxes do
+				local clear = true
+				for _, other in placed do
+					if WildBars.overlaps(option[2], other) then
+						clear = false
+						break
+					end
+				end
+				if clear then
+					mode[item] = option[1]
+					table.insert(placed, option[2])
+					break
+				end
+			end
+		end
+		for _, item in list do
+			local how = mode[item]
+			local show = how ~= nil
+			if show then
+				WildBars.compact(item.Entry.Plate, how == "Compact")
+			end
 			if item.Entry.Shown ~= show then
 				item.Entry.Shown = show
 				item.Entry.Plate.Enabled = show

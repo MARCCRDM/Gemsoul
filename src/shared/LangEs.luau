@@ -1937,7 +1937,7 @@ return {
 	["The catch broke."] = "La captura se interrumpió.",
 	["Too far away: the catch broke."] = "Demasiado lejos: la captura se interrumpió.",
 	["You were hit: the catch broke."] = "Te golpearon: la captura se interrumpió.",
-	["READY TO CATCH · {1}%"] = "LISTO PARA ATRAPAR · {1}%",
+	["CATCH · {1}%"] = "ATRAPAR · {1}%",
 	["CATCHING {*}"] = "ATRAPANDO {*}",
 	["Stay close and don't get hit."] = "Quédate cerca y que no te golpeen.",
 	["CAUGHT!"] = "¡ATRAPADO!",

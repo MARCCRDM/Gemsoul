@@ -77,6 +77,22 @@ and bar scaled to fit, and only the 4 nearest show (`PhoneBudget`). The
 gold READY TO CATCH words over it shrink the same way. Your kaiju and the rift's critters still show
 their health on their bodies only.
 
+*2026-10-29, watching a fight:* the plates, a READY TO CATCH sign over
+each catchable one and everyone's WEAK!/RESIST numbers stacked into a wall
+over the fight. Now:
+
+- At most 3 plates (2 on a phone), a ready-to-catch one first. The name
+  drops its "Wild ".
+- A plate that would cover one already placed (nearest first) folds to
+  just its level and bar (`WildBars.compact`); if even that would cover
+  one, it isn't shown (`WildBars.overlaps`, screen boxes).
+- No sign over a catchable kaiju: its own plate's name reads **CATCH ·
+  51%** in gold (`WildBars.setCatch`, from KaijuTaming), and the gold glow
+  stays.
+- Damage numbers that aren't your own hits are small (15, 20 for a crit),
+  wordless (WEAK!/RESIST by colour only), and at most 8 on screen. Your
+  own hits are unchanged.
+
 - `Client.WildBars`: `watch(model)` (KaijuHud's scan hands it each wild
   kaiju), `start()`, `plate(model, phone?)`, `phone()`, `draw(plate, share, trail, guardian,
   catching)`, `choose(entries, budget, range)`.

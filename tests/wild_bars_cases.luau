@@ -2,9 +2,11 @@
 -- A wild kaiju's plate over its head (client Modules/WildBars): its name,
 -- its level and a health bar in its outline's colours, the trail of the
 -- last blow behind it; gold for the vein guardian, a gold edge while it's
--- being caught; the nearest few within range shown, none knocked out. The
--- HUD hands it every wild kaiju, the catch words sit just over it, and
--- "Lv" is in Spanish. Run by tests/run_wild_bars.py.
+-- being caught; the nearest few within range shown, none knocked out, a
+-- ready-to-catch one first, and none over another (a plate that would cover
+-- one folds to its level and bar, or isn't shown): so a fight can be watched.
+-- A ready one says CATCH in its own plate. The HUD hands it every wild
+-- kaiju, and "Lv" is in Spanish. Run by tests/run_wild_bars.py.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -66,7 +68,21 @@ do
 	end
 	check(not on[list[5]] and not on[downed] and not on[far], "A far one, a fifth or a knocked-out one shown")
 	check(next(WildBars.choose({ far, downed }, 4, WildBars.Range)) == nil, "Shown out of range or knocked out")
+	-- One ready to catch is shown before nearer ones.
+	local ready = { Distance = 90, Share = 0.4, Priority = true }
+	table.insert(list, ready)
+	local first = WildBars.choose(list, 2, WildBars.Range)
+	check(first[ready] and first[list[1]] and not first[list[2]], "One ready to catch isn't shown first")
 end
+-- Two plates' boxes on screen: side by side they don't cover each other;
+-- one just over another's does.
+do
+	local a = { X = 500, Y = 300, W = 210, H = 36 }
+	check(not WildBars.overlaps(a, { X = 720, Y = 300, W = 210, H = 36 }), "Plates side by side cover each other")
+	check(not WildBars.overlaps(a, { X = 500, Y = 340, W = 210, H = 36 }), "A plate under another covers it")
+	check(WildBars.overlaps(a, { X = 560, Y = 320, W = 210, H = 36 }), "A plate over another doesn't cover it")
+end
+check(WildBars.Budget <= 4 and WildBars.PhoneBudget <= 2, "Too many plates over a fight")
 
 -- Its plate --------------------------------------------------------------------------------------------
 local function wildKaiju(name: string, level: number, guardian: boolean?)
@@ -94,7 +110,7 @@ check(plate.AlwaysOnTop and plate.LightInfluence == 0 and plate.MaxDistance == W
 check(plate.Enabled == false, "Shown before it's picked")
 check(plate.Size.X.Offset == WildBars.Size.X and plate.Size.Y.Offset == WildBars.Size.Y, "The plate's size")
 local name = plate:FindFirstChild("Title")
-check(name and name.Text == "Wild Frost Razorback", "No name on the plate")
+check(name and name.Text == "Frost Razorback", "The plate's name (no \"Wild \"): " .. tostring(name and name.Text))
 check(name.TextTruncate == roblox.Enum.TextTruncate.AtEnd, "A long name runs off the plate")
 local fit = name:FindFirstChildOfClass("UITextSizeConstraint")
 check(name.TextScaled and fit and fit.MaxTextSize == 14 and fit.MinTextSize >= 9, "A long name doesn't shrink to fit")
@@ -159,6 +175,24 @@ WildBars.draw(plate, 1, 1, false, true)
 check(not near(edge.Color, plainEdge) and edge.Thickness == 2, "Being caught, no gold edge")
 WildBars.draw(plate, 1, 1)
 check(near(edge.Color, plainEdge) and edge.Thickness == 1, "Still edged gold once it's let go")
+-- Ready to catch: its name's place says so, gold; then its name again.
+local plainName = name.TextColor3
+WildBars.draw(plate, 0.4, 0.4, false, false, "CATCH · 51%")
+check(name.Text == "CATCH · 51%" and not near(name.TextColor3, plainName), "A ready plate doesn't say CATCH, gold")
+WildBars.draw(plate, 0.4, 0.4)
+check(name.Text == "Frost Razorback" and near(name.TextColor3, plainName), "Its name didn't come back")
+-- Folded: just the level and the bar, shorter, everything still inside;
+-- unfolded, all of it again.
+WildBars.compact(plate, true)
+check(not name.Visible and level.Position.Y.Offset == 0 and plate.Size.Y.Offset < WildBars.Size.Y, "A folded plate isn't just its level and bar")
+for _, child in plate:GetChildren() do
+	if child:IsA("GuiObject") and child.Visible then
+		local bottom = child.Position.Y.Offset + child.Size.Y.Offset + child.Size.Y.Scale * plate.Size.Y.Offset
+		check(child.Position.Y.Offset >= 0 and bottom <= plate.Size.Y.Offset + 0.5, child.Name .. " spills off a folded plate")
+	end
+end
+WildBars.compact(plate, false)
+check(name.Visible and level.Position.Y.Offset == 19 and plate.Size.Y.Offset == WildBars.Size.Y, "A plate didn't unfold")
 local guard = WildBars.plate((wildKaiju("Vein Guardian Fire Bulwark", 18, true)))
 WildBars.draw(guard, 1, 1, true)
 local guardEdge = guard:FindFirstChild("Back"):FindFirstChild("Edge")
@@ -173,8 +207,10 @@ check(has(module, "entry.Plate.Parent = playerGui"), "The plate's not in PlayerG
 local foes = source("src/client/Modules/FoeBars.luau")
 check(has(foes, 'model:GetAttribute("KaijuWild") ~= nil'), "FoeBars draws its bar over a wild kaiju too")
 local taming = source("src/client/Modules/KaijuTaming.luau")
-check(has(taming, "SizeOffset = Vector2.new(0, 1.3)"), "The catch words sit on the plate")
+check(has(taming, 'WildBars.setCatch(model, string.format("CATCH · %d%%"') and not has(taming, "BillboardGui"), "The catch words aren't on its own plate")
+check(has(module, "WildBars.overlaps(option[2], other)"), "Plates aren't kept off each other")
 local es = source("src/shared/LangEs.luau")
 check(has(es, '["Lv {1}"] = "Nv {1}"'), "No Spanish for the level")
+check(has(es, '["CATCH · {1}%"] = "ATRAPAR · {1}%"'), "No Spanish for CATCH")
 
 print(string.format("PASS: %d wild kaiju plate checks (which show, the plate, its bar and trail, the guardian, being caught, wired in)", checks))
