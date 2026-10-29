@@ -46,6 +46,7 @@ local LoadingFlow = require(script.Parent.LoadingFlow)
 local LotterySound = require(script.Parent.LotterySound)
 local MobileLayout = require(script.Parent.MobileLayout)
 local MinerLoot = require(script.Parent.MinerLoot)
+local MineCue = require(script.Parent.MineCue)
 local MiningReveal = require(script.Parent.MiningWorldReveal)
 local PickImpacts = require(script.Parent.PickImpacts)
 local ProbeLayout = require(script.Parent.ProbeLayout)
@@ -422,7 +423,7 @@ local blockingScreens = {
 	Intro = true, Tutorial = true, MarketBoard = true,
 }
 local openScreens = {}
-local miningPrompts = {}
+local cueBlocked = true -- (the rocks' glow and label: Client MineCue)
 local function fitOutpostHud()
 	local size = hud.AbsoluteSize
 	local mobile = UiKit.handheld(size)
@@ -440,9 +441,7 @@ local function fitOutpostHud()
 	card.Visible = not blocked and expanded
 	local rock = swingBar.Adornee
 	swingBar.Enabled = not blocked and hud.Enabled and mining() and rock ~= nil and rock:IsDescendantOf(workspace)
-	for _, promptGui in miningPrompts do
-		promptGui.Enabled = not blocked and hud.Enabled
-	end
+	cueBlocked = blocked or not hud.Enabled
 	PlayerCard.setBlocked(blocked or not hud.Enabled)
 	MinerLoot.setBlocked(blocked or not hud.Enabled)
 	-- (Hidden in a mech: its HOP OUT button names the key.)
@@ -1763,36 +1762,9 @@ ProximityPromptService.PromptButtonHoldEnded:Connect(function(prompt)
 	end
 end)
 
--- A small, clickable instruction instead of Roblox's large E + rock-name
--- panel: only for your first stones (Rules.MineButton.Training). After that
--- there's no button: tap or click to swing, or walk into the rock.
-ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
-	if prompt:GetAttribute("PromptKind") ~= "Mine" then return end
-	local stats = GemClient.Profile and GemClient.Profile.Stats
-	if ((stats and tonumber(stats.GemsMined)) or 0) >= Rules.MineButton.Training then return end
-	if miningPrompts[prompt] then miningPrompts[prompt]:Destroy() end
-	local promptGui = new("BillboardGui", {
-		Name = "ClickToMine", Adornee = prompt.Parent, AlwaysOnTop = true, Active = true,
-		Size = UDim2.fromOffset(144, 36), StudsOffsetWorldSpace = Vector3.new(0, 1.6, 0),
-		Enabled = hud.Enabled and next(openScreens) == nil,
-	}, player.PlayerGui)
-	miningPrompts[prompt] = promptGui
-	local rock = prompt.Parent and prompt.Parent.Parent
-	local verb = if rock and rock:GetAttribute("HealRock") then "heal" else "mine"
-	local instruction = if inputType == Enum.ProximityPromptInputType.Touch then "Tap to " .. verb
-		elseif inputType == Enum.ProximityPromptInputType.Gamepad then "X to " .. verb
-		else "Click to " .. verb
-	local button = new("TextButton", {
-		Text = instruction, Font = IronUi.Bold, TextSize = 14, TextColor3 = Color3.fromRGB(230, 248, 255), Active = true,
-		Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(9, 25, 34), BackgroundTransparency = 0.12,
-	}, promptGui)
-	UiKit.round(button, 9)
-	new("UIStroke", { Color = Color3.fromRGB(118, 211, 230), Transparency = 0.45 }, button)
-	button.Activated:Connect(function() OutpostScene.swing(prompt:GetAttribute("NodeId")) end)
-end)
+-- (A rock's own prompt draws nothing: the rocks glow and the one in reach
+-- is labelled by Client MineCue, below, the same on foot and in a mech.)
 ProximityPromptService.PromptHidden:Connect(function(prompt)
-	local promptGui = miningPrompts[prompt]
-	if promptGui then promptGui:Destroy(); miningPrompts[prompt] = nil end
 	PlayerCard.hidden(prompt)
 end)
 
@@ -1904,7 +1876,12 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or not active or Spar.fighting(player) then
 		return
 	end
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+	-- (a pad's X: on foot the rock's prompt takes it; in a mech, this)
+	if
+		input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch
+		or (input.KeyCode == Enum.KeyCode.ButtonX and MechPilot.of(player) ~= nil)
+	then
 		OutpostScene.swing(nil)
 	end
 end)
@@ -1955,6 +1932,46 @@ RunService.Heartbeat:Connect(function()
 	if rock then
 		OutpostScene.swing(rock:GetAttribute("NodeId"), true)
 	end
+end)
+
+-- Pointing the way (Client MineCue, Outpost.MineCue): the rocks around you
+-- glow, the one in reach brightest, with its label over it: always in a
+-- mech, on foot for your first stones. Not over a screen or a fight, nor
+-- in a mech that can't mine.
+local cueAt = 0
+local function cue()
+	local mech = pilotedMech()
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not active or cueBlocked or mech == false or not root or Spar.fighting(player) then
+		MineCue.hide()
+		return
+	end
+	local spec = Rules.MineCue
+	local near = MineCue.near(
+		CollectionService:GetTagged(NODE_TAG),
+		root.Position,
+		mech ~= nil,
+		if mech then spec.MechGlow else spec.Glow,
+		spec.Max
+	)
+	local stats = GemClient.Profile and GemClient.Profile.Stats
+	local learning = ((stats and tonumber(stats.GemsMined)) or 0) < Rules.MineButton.Training
+	MineCue.show(nearestRock(), near, {
+		Label = mech ~= nil or learning,
+		Mech = mech ~= nil,
+		Input = UserInputService:GetLastInputType(),
+	})
+end
+OutpostScene._cue = cue
+RunService.Heartbeat:Connect(function()
+	local now = os.clock()
+	if now >= cueAt then
+		cueAt = now + Rules.MineCue.Every
+		cue()
+	end
+end)
+MineCue.onSwing(function(nodeId)
+	OutpostScene.swing(nodeId)
 end)
 
 -- Entering and leaving -------------------------------------------------------------------------------------

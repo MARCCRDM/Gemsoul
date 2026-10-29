@@ -94,6 +94,26 @@ in reach only shows while you're learning: your first 50 stones
 that there's no button, as in other mining games: tap or click anywhere to
 swing at the rock in reach, or walk into it (below).
 
+## The rocks glow: where to mine (on foot and in a mech)
+
+*2026-10-29.* The rocks around you glow so you always see where to go
+(`Client.MineCue`, `Outpost.MineCue`):
+
+- the 6 nearest within 42 studs on foot (70 in a mech, measured across the
+  ground) get a soft cyan outline;
+- the one in reach (the rock a swing would hit) glows **amber**, filled and
+  pulsing; a healing crystal glows green;
+- over that rock, its label says how: **Click to mine**, **Tap to mine** or
+  **X to mine** (to heal, for a crystal), and a click or tap on it swings.
+  On foot it shows for your first 50 stones (above); **in a mech it always
+  shows**, a size up, as the mech's camera sits further back.
+
+The old label only followed the rock's proximity prompt, which a pilot up
+in a mech's cockpit was usually too far from, so it never showed in a mech.
+The cue follows the same reach a swing uses instead (`Outpost.Reach` on
+foot, `Outpost.MechReach` flat from a mech). A pad's X swings from a mech
+too. Nothing glows over an open screen, in a fight or a spar.
+
 ## Walk into a rock to mine it
 
 Walking into a rock mines it, as a click or a tap on it does: on foot and
