@@ -54,19 +54,19 @@ SkyRift.HazeSteps = 11 -- slices along each band of its glow (more: smoother end
 
 -- One light, the rift's violet, from deep in the black to white-hot at the
 -- tear; its two torn sides a shade warmer and a shade cooler.
-local DEEP = Color3.fromRGB(34, 10, 70) -- the glow at its farthest
-local INSIDE = Color3.fromRGB(8, 4, 22) -- the other side's dark
-local VIOLET = Color3.fromRGB(122, 64, 230)
-local GLOW_EDGE = Color3.fromRGB(196, 168, 255) -- the glow nearest the tear, and the rays
+local DEEP = Color3.fromRGB(66, 24, 120) -- the glow at its farthest
+local INSIDE = Color3.fromRGB(16, 8, 42) -- the other side's dark
+local VIOLET = Color3.fromRGB(164, 102, 255)
+local GLOW_EDGE = Color3.fromRGB(220, 196, 255) -- the glow nearest the tear, and the rays
 local EDGE_WARM = Color3.fromRGB(236, 150, 255)
-local EDGE_COOL = Color3.fromRGB(150, 182, 255)
+local EDGE_COOL = Color3.fromRGB(158, 224, 255)
 local WHITE = Color3.fromRGB(244, 240, 255)
 local CRACK = Color3.fromRGB(226, 210, 255)
 local SHARD = Color3.fromRGB(10, 8, 20) -- a sliver of the black, breaking off
 -- The other side's stars: pink, green and gold.
 local ALIEN = { Color3.fromRGB(255, 120, 220), Color3.fromRGB(120, 255, 190), Color3.fromRGB(255, 214, 120), WHITE }
 -- The nebula inside, along the tear, top to bottom.
-local NEBULA = { Color3.fromRGB(96, 44, 186), Color3.fromRGB(44, 120, 176), Color3.fromRGB(156, 54, 168) }
+local NEBULA = { Color3.fromRGB(158, 84, 255), Color3.fromRGB(74, 204, 245), Color3.fromRGB(218, 100, 236) }
 
 local function frac(x: number): number
 	return x - math.floor(x)
@@ -238,9 +238,9 @@ function SkyRift.draw(parent: Instance)
 	-- strength and colour across), each fading out to both sides and, in
 	-- steps along it, to both ends: no hard edges.
 	local HAZE = {
-		{ 0.46, 0.98, 0.45, ColorSequence.new(DEEP, VIOLET:Lerp(DEEP, 0.35)) },
-		{ 0.26, 0.86, 0.6, ColorSequence.new(VIOLET:Lerp(DEEP, 0.25), VIOLET) },
-		{ 0.12, 0.74, 0.7, ColorSequence.new(VIOLET, GLOW_EDGE) },
+		{ 0.50, 0.98, 0.52, ColorSequence.new(DEEP, VIOLET:Lerp(DEEP, 0.35)) },
+		{ 0.30, 0.86, 0.72, ColorSequence.new(VIOLET:Lerp(DEEP, 0.25), VIOLET) },
+		{ 0.16, 0.74, 0.82, ColorSequence.new(VIOLET, GLOW_EDGE) },
 	}
 	local haze = {}
 	local holder = new("Frame", {
@@ -353,7 +353,7 @@ function SkyRift.draw(parent: Instance)
 			})
 		)
 		flow[i] = glow
-		local line = bar(canvas, mids[i], mids[i + 1], 3, 6)
+		local line = bar(canvas, mids[i], mids[i + 1], 3, 6, 0.005)
 		line.BackgroundColor3 = WHITE:Lerp(GLOW_EDGE, s * 0.6)
 		soft(line, 0, 90)
 		filament[i] = line
@@ -373,16 +373,18 @@ function SkyRift.draw(parent: Instance)
 		round(star)
 		stars[k] = star
 	end
+	-- Scale the luminous widths with the billboard so the silhouette reads
+	-- on phones as well as desktop; keep the same layer and particle counts.
 	-- The torn edges: a soft glow (warmer down one side, cooler down the
 	-- other, both the rift's violet) round a white-hot line.
 	local edges = {}
 	for side, points in { left, right } do
 		local tint = if side == 1 then EDGE_WARM else EDGE_COOL
 		for i = 1, n - 1 do
-			local glow = bar(canvas, points[i], points[i + 1], 14, 8)
+			local glow = bar(canvas, points[i], points[i + 1], 14, 8, 0.025)
 			glow.BackgroundColor3 = tint
 			soft(glow, 0, 90)
-			local core = bar(canvas, points[i], points[i + 1], 2, 9)
+			local core = bar(canvas, points[i], points[i + 1], 2, 9, 0.0035)
 			core.BackgroundColor3 = WHITE
 			core.BackgroundTransparency = 0.05
 			table.insert(edges, { Glow = glow, Core = core, Seed = i * 1.7 + side * 3.1 })
@@ -442,12 +444,12 @@ function SkyRift.draw(parent: Instance)
 				band.Frame.BackgroundTransparency = 1 - math.min(1, depth * band.Fade * (1 + 0.45 * surge) + glow)
 			end
 			for _, edge in edges do
-				edge.Glow.Size = UDim2.new(edge.Glow.Size.X.Scale, 2, 0, 14 + 10 * surge)
+				edge.Glow.Size = UDim2.new(edge.Glow.Size.X.Scale, 2, 0.025 + 0.012 * surge, 0)
 			end
 		end
 		for _, ray in rays do
 			ray.Frame.BackgroundTransparency =
-				math.clamp(0.72 + 0.22 * (0.5 + 0.5 * math.sin(t * 0.45 + ray.Seed * 2.3)) - 0.3 * surge, 0, 1)
+				math.clamp(0.58 + 0.20 * (0.5 + 0.5 * math.sin(t * 0.45 + ray.Seed * 2.3)) - 0.3 * surge, 0, 1)
 		end
 		for k, lines in cracks do
 			local lit = surge > 0.3 or SkyRift.crack(t, k)
@@ -456,17 +458,17 @@ function SkyRift.draw(parent: Instance)
 			end
 		end
 		for i, glow in flow do
-			glow.BackgroundTransparency = 0.15 + 0.35 * (0.5 + 0.5 * math.sin(t * 1.2 - i * 0.3)) - 0.15 * surge
+			glow.BackgroundTransparency = 0.08 + 0.22 * (0.5 + 0.5 * math.sin(t * 1.2 - i * 0.3)) - 0.08 * surge
 		end
 		for i, line in filament do
-			line.BackgroundTransparency = 0.2 + 0.3 * (0.5 + 0.5 * math.sin(t * 2.3 - i * 0.8)) - 0.2 * surge
+			line.BackgroundTransparency = 0.08 + 0.18 * (0.5 + 0.5 * math.sin(t * 2.3 - i * 0.8)) - 0.08 * surge
 		end
 		for k, star in stars do
 			star.BackgroundTransparency = 0.15 + 0.6 * (0.5 + 0.5 * math.sin(t * (1.5 + k % 3) + k))
 		end
 		for _, edge in edges do
 			local flicker = 0.5 + 0.5 * math.sin(t * 6.3 + edge.Seed * 2.1) * math.sin(t * 2.9 + edge.Seed)
-			edge.Glow.BackgroundTransparency = math.max(0, 0.15 + 0.3 * flicker - 0.15 * surge)
+			edge.Glow.BackgroundTransparency = math.max(0, 0.06 + 0.18 * flicker - 0.06 * surge)
 		end
 		for k, shard in shards do
 			local x, y, turn, size, fade = SkyRift.shard(t, k)
@@ -529,8 +531,8 @@ function SkyRift.mount(at: CFrame)
 	})
 	seep.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.12, 0.35),
-		NumberSequenceKeypoint.new(0.7, 0.55),
+		NumberSequenceKeypoint.new(0.12, 0.18),
+		NumberSequenceKeypoint.new(0.7, 0.4),
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	seep.Color = ColorSequence.new(VIOLET, EDGE_COOL)
