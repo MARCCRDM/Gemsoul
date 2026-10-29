@@ -28,6 +28,7 @@
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
@@ -122,7 +123,9 @@ local stageScale = new("UIScale", {}, stage)
 local function fitStage()
 	local screen = gui.AbsoluteSize
 	if screen.X > 0 then
-		stageScale.Scale = math.min(1, (screen.X - 32) / 1120, (screen.Y - 24) / 612)
+		-- (on a phone, clear of the capture buttons Roblox puts at the right edge)
+		local margin = if UserInputService.TouchEnabled then 150 else 32
+		stageScale.Scale = math.min(1, (screen.X - margin) / 1120, (screen.Y - 24) / 612)
 		stage.Position = UDim2.new(0.5, 0, 0.5, 26 * stageScale.Scale)
 	end
 end
@@ -199,7 +202,7 @@ local function card(spec)
 	}, b)
 	local big = spec.H > 300
 	local artId = spec.Art and LobbyUI.Art[spec.Art] or 0
-	-- (A scene is the card's art drawn in the game: Casual's miner.)
+	-- (A scene is the card's art drawn in the game: Casual's blades.)
 	local hasArt = artId ~= 0 or spec.Scene ~= nil
 	if spec.Scene then
 		spec.Scene(b)
@@ -385,29 +388,47 @@ if LobbyUI.DungeonsOpen then
 		end,
 	})
 end
--- Casual's picture: your own miner, turning slowly in the suit you wear
--- (CosmeticView), on the right of the card, a teal glow behind.
+-- Casual's picture: two blades crossed in a teal glow, drawn flat on the
+-- right of the card, clear of the words.
 local function casualScene(b: GuiObject)
 	local glow = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -80, 0.55, 0),
-		Size = UDim2.fromOffset(136, 136),
+		Position = UDim2.new(1, -72, 0.47, 0),
+		Size = UDim2.fromOffset(124, 124),
 		BackgroundColor3 = P.Teal,
-		BackgroundTransparency = 0.86,
+		BackgroundTransparency = 0.84,
 		ZIndex = 20,
 	}, b)
 	UiKit.round(glow, 999)
-	local holder = new("Frame", {
-		Name = "Miner",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -6, 0, 6),
-		Size = UDim2.new(0, 150, 1, -12),
-		BackgroundTransparency = 1,
-		ZIndex = 21,
-	}, b)
-	local profile = GemClient.Profile
-	local suit = profile and profile.Cosmetics and profile.Cosmetics.Suit or "SuitFrontier"
-	require(script.Parent.CosmeticView).attach(holder, suit, true)
+	new("UIStroke", { Color = P.Teal, Thickness = 1.5, Transparency = 0.55 }, glow)
+	local STEEL, GRIP = Color3.fromRGB(214, 226, 236), Color3.fromRGB(40, 48, 64)
+	for _, tilt in { -42, 42 } do
+		-- (a sword stood on its pommel, tip up, turned about its middle)
+		local sword = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(1, -72, 0.47, 0),
+			Size = UDim2.fromOffset(16, 118),
+			BackgroundTransparency = 1,
+			Rotation = tilt,
+			ZIndex = 21,
+		}, b)
+		local function piece(x, y, w, h, color, z)
+			return new("Frame", {
+				Position = UDim2.fromOffset(x, y),
+				Size = UDim2.fromOffset(w, h),
+				BackgroundColor3 = color,
+				BorderSizePixel = 0,
+				ZIndex = z or 21,
+			}, sword)
+		end
+		piece(5, 4, 6, 74, STEEL)
+		local tip = piece(5, 1, 6, 6, STEEL)
+		tip.Rotation = 45
+		piece(7, 8, 2, 64, P.Teal, 22)
+		UiKit.round(piece(-8, 76, 32, 6, P.Teal), 3)
+		piece(5, 82, 6, 26, GRIP)
+		UiKit.round(piece(3, 107, 10, 10, P.Teal), 999)
+	end
 end
 card({
 	Title = "1v1 CASUAL",
