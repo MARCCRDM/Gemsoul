@@ -19,6 +19,20 @@ Left: before. Right: after.
 
 ![The coin packs](ui-theme/coins.jpg)
 
+## The Store (`Client.ShopUI`)
+
+The Store keeps its layout and takes the same look: the navy sheen and amber
+bar, an amber STORE mark, the picked category lit from below, glossy amber
+Buy buttons, amber capitals for the section heads and page titles, and each
+card washed in its own colour (a look's rarity, a bundle's, a sale's) with a
+bar of that colour along its top. Every picture stands on the same lit stage
+as the kaiju, in its rarity's colour. The offer's clock in the header is
+short now (SALE · 23:59:59), so it never runs into the last category.
+
+![The Store's front page](ui-theme/store.jpg)
+
+![A Store catalog](ui-theme/store-skins.jpg)
+
 ## Kaiju and bosses on show (`Client.Showcase`)
 
 Every kaiju or boss shown in these windows stands on a lit stage: its
@@ -26,8 +40,8 @@ element's colour rising up the back and glowing behind it, a lit disc under
 its feet, a soft rim of that colour round its outline so it stands off the
 dark, and a 3/4 view from a little below that fills the stage. A group (the
 Starter Rare Roll's four, the Triskull Trinity) stands together in one shot,
-the middle one forward, instead of tiny separate boxes. The Daily Kaiju turns
-slowly. A locked boss on the Bounty Board is a dark silhouette on its stage.
+the middle one forward, instead of tiny separate boxes (in the Kennel and in
+the Store). The Daily Kaiju turns slowly. A locked boss on the Bounty Board is a dark silhouette on its stage.
 
 *(Renders from the game's own UI code; the kaiju are the game's models, lit
 as a ViewportFrame lights them. The Bounty Board's boss stages are empty in

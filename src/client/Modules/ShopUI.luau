@@ -50,6 +50,7 @@ local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
 local ShopArt = require(script.Parent.ShopArt)
+local Showcase = require(script.Parent.Showcase)
 local UiKit = require(script.Parent.UiKit)
 local UiSound = require(script.Parent.UiSound)
 
@@ -72,23 +73,40 @@ end)
 
 -- Look ---------------------------------------------------------------------------------------------------
 
+-- The windows' look (Client GiltUi): deep navy with a cool sheen down it,
+-- steel edges, an amber bar along the top, glossy amber for buying, and each
+-- look's rarity (or each kaiju's element) lighting its own stage.
 local C = {
-	Window = Color3.fromRGB(11, 14, 22),
-	WindowLow = Color3.fromRGB(7, 9, 15),
-	Surface = Color3.fromRGB(20, 25, 37),
-	Raised = Color3.fromRGB(27, 34, 50),
-	Well = Color3.fromRGB(14, 18, 28),
+	Window = Color3.fromRGB(26, 33, 54),
+	WindowMid = Color3.fromRGB(15, 20, 33),
+	WindowLow = Color3.fromRGB(7, 10, 18),
+	Surface = Color3.fromRGB(22, 29, 47),
+	SurfaceLow = Color3.fromRGB(13, 17, 30),
+	Raised = Color3.fromRGB(36, 46, 72),
+	Well = Color3.fromRGB(11, 15, 27),
 	Line = Color3.fromRGB(255, 255, 255),
-	Text = Color3.fromRGB(240, 243, 248),
-	Dim = Color3.fromRGB(150, 162, 184),
-	Faint = Color3.fromRGB(96, 108, 130),
-	Buy = Color3.fromRGB(0, 176, 106),
-	BuyHover = Color3.fromRGB(16, 200, 124),
-	Sale = Color3.fromRGB(255, 76, 92),
-	Gold = Color3.fromRGB(255, 200, 92),
-	Good = Color3.fromRGB(96, 214, 140),
+	Steel = Color3.fromRGB(62, 76, 108),
+	Text = Color3.fromRGB(240, 243, 250),
+	Dim = Color3.fromRGB(152, 164, 190),
+	Faint = Color3.fromRGB(100, 112, 140),
+	Buy = Color3.fromRGB(255, 184, 52),
+	BuyText = Color3.fromRGB(34, 18, 2),
+	Sale = Color3.fromRGB(255, 72, 104),
+	Gold = Color3.fromRGB(255, 196, 64),
+	Good = Color3.fromRGB(96, 226, 150),
 	Ink = Color3.fromRGB(8, 10, 16),
 }
+-- Glossy amber, at rest and under the mouse (a gradient over white).
+local AMBER = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 222, 110)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 184, 52)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(240, 130, 24)),
+})
+local AMBER_LIT = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 236, 150)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 202, 80)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(252, 148, 36)),
+})
 local BLACK, BOLD, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
 -- On a phone on its side (SHORT) the store is the whole screen instead of a
 -- window over the world (MobileLayout.store): drawn 844 wide and as tall as
@@ -229,16 +247,20 @@ local function pill(parent: Instance, value: string, color: Color3, filled: bool
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.fromOffset(0, (size or 10) + 10),
 		Text = value,
-		Font = BOLD,
+		Font = BLACK,
 		TextSize = size or 10,
-		TextColor3 = if filled == false then color:Lerp(C.Text, 0.25) else C.Ink,
+		TextColor3 = if filled == false then color:Lerp(C.Text, 0.3) else C.Ink,
 	}, parent)
-	round(tag, 6)
-	new("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, tag)
+	round(tag, 999)
+	if filled == false then
+		stroke(tag, color, 1, 0.55)
+	end
+	new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, tag)
 	return tag
 end
 
--- A button: "Primary" (buy), "Secondary" (outlined) or "Quiet" (text).
+-- A button: "Primary" (buy: glossy amber, dark words), "Secondary" (slate
+-- in a steel rim) or "Quiet" (words).
 local function button(
 	parent: Instance,
 	value: string,
@@ -250,35 +272,53 @@ local function button(
 	onClick: (() -> ())?
 ): TextButton
 	local primary, quiet = style == "Primary", style == "Quiet"
-	local base = if primary then C.Buy elseif quiet then C.Surface else C.Raised
+	local base = if primary then Color3.new(1, 1, 1) elseif quiet then C.Surface else C.Raised
+	local ink = if primary then C.BuyText elseif quiet then C.Dim else C.Text
 	local b = new("TextButton", {
 		Text = value,
 		AutoButtonColor = false,
-		Font = BOLD,
+		Font = if primary then BLACK else BOLD,
 		TextSize = if h >= 44 then 16 else 13,
-		TextColor3 = if primary then Color3.new(1, 1, 1) elseif quiet then C.Dim else C.Text,
+		TextColor3 = ink,
 		BackgroundColor3 = base,
 		BackgroundTransparency = if quiet then 1 else 0,
 		Position = UDim2.fromOffset(x, y),
 		Size = UDim2.fromOffset(w, h),
 	}, parent)
 	round(b, 10)
-	if not primary and not quiet then
-		stroke(b, C.Line, 1, 0.82)
+	-- (amber: a gradient over white, which only darkens its dark words)
+	local shade = if primary then new("UIGradient", { Rotation = 90, Color = AMBER }, b) else nil
+	local rim = if quiet
+		then nil
+		else stroke(b, if primary then Color3.fromRGB(255, 236, 170) else C.Steel, if primary then 1.5 else 1, if primary then 0.4 else 0.1)
+	if primary then
+		-- (light catching its top edge)
+		local shine = box(b, Color3.new(1, 1, 1), 8, 1, 0, 1, 0.45)
+		shine.Name = "Shine"
+		shine.Size = UDim2.new(1, -16, 0, 1)
 	end
 	b:SetAttribute("UiSound", if primary then "Confirm" else "Click")
 	b.MouseEnter:Connect(function()
-		if primary then
-			b.BackgroundColor3 = C.BuyHover
+		if shade then
+			shade.Color = AMBER_LIT
 		elseif quiet then
 			b.TextColor3 = C.Text
 		else
-			b.BackgroundColor3 = C.Raised:Lerp(C.Line, 0.06)
+			b.BackgroundColor3 = C.Raised:Lerp(C.Line, 0.08)
+		end
+		if rim then
+			rim.Transparency = 0
 		end
 	end)
 	b.MouseLeave:Connect(function()
+		if shade then
+			shade.Color = AMBER
+		end
 		b.BackgroundColor3 = base
-		b.TextColor3 = if primary then Color3.new(1, 1, 1) elseif quiet then C.Dim else C.Text
+		b.TextColor3 = ink
+		if rim then
+			rim.Transparency = if primary then 0.4 else 0.1
+		end
 	end)
 	if onClick then
 		b.Activated:Connect(onClick)
@@ -286,25 +326,21 @@ local function button(
 	return b
 end
 
--- A dark well for a product's picture, washed with its colour from below.
-local function well(parent: Instance, tint: Color3, x: number, y: number, w: number, h: number): Frame
-	local frame = box(parent, Color3.new(1, 1, 1), x, y, w, h)
+-- A product's picture on a lit stage (Client Showcase): its colour (the
+-- look's rarity, the bundle's, the kaiju's element) rising from the floor
+-- and glowing behind it, a lit disc under it, a thin rim of that colour.
+-- Returns the well (put the picture in it) and its stage (a kaiju's view
+-- goes on that: Showcase.model).
+local function well(parent: Instance, tint: Color3, x: number, y: number, w: number, h: number): (Frame, Frame)
+	local frame = box(parent, Color3.new(1, 1, 1), x, y, w, h, 1)
 	frame.ClipsDescendants = true
-	round(frame, 10)
-	new("UIGradient", {
-		Rotation = 90,
-		Color = ColorSequence.new(C.Well, C.Well:Lerp(tint, 0.22)),
-	}, frame)
-	local glow = new("Frame", {
-		BackgroundColor3 = tint,
-		BackgroundTransparency = 0.9,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.55),
-		Size = UDim2.fromScale(0.8, 0.8),
-		SizeConstraint = Enum.SizeConstraint.RelativeYY,
-	}, frame)
-	round(glow, 999)
-	return frame
+	local stage = Showcase.stage(frame, tint)
+	local corner = stage:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner.CornerRadius = UDim.new(0, 10)
+	end
+	stroke(stage, tint, 1, 0.7)
+	return frame, stage
 end
 
 -- A product's picture at `size`, centred at (cx, cy) in `parent`.
@@ -316,14 +352,41 @@ local function art(parent: Instance, kind: string, id: string?, size: number, cx
 	return icon
 end
 
--- Hover: a card lifts its edge.
+-- Hover: a card's edge lights up in its own colour.
 local function hoverEdge(card: GuiButton, edge: UIStroke, rest: Color3, restAlpha: number)
 	card.MouseEnter:Connect(function()
-		edge.Color, edge.Transparency = C.Line, 0.55
+		edge.Color, edge.Transparency = rest:Lerp(C.Line, 0.25), 0.05
 	end)
 	card.MouseLeave:Connect(function()
 		edge.Color, edge.Transparency = rest, restAlpha
 	end)
+end
+
+-- A card's face: navy with a sheen down it, `tint` washing in at the top
+-- (`amount`), in an edge of `edge` (returned).
+local function face(card: GuiObject, tint: Color3, amount: number, edge: Color3, edgeAlpha: number): UIStroke
+	card.BackgroundColor3 = Color3.new(1, 1, 1)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(C.Surface:Lerp(tint, amount), C.SurfaceLow),
+	}, card)
+	return stroke(card, edge, 1, edgeAlpha)
+end
+
+-- A short bar of colour along a card's top edge, brightest at its middle.
+local function topBar(card: GuiObject, tint: Color3, inset: number, thick: number?): Frame
+	local bar = box(card, tint, inset, 0, 0, thick or 2)
+	bar.Name = "TopBar"
+	bar.Size = UDim2.new(1, -inset * 2, 0, thick or 2)
+	round(bar, 2)
+	new("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, bar)
+	return bar
 end
 
 -- State ---------------------------------------------------------------------------------------------------------
@@ -479,9 +542,19 @@ local panel = new("Frame", {
 -- (a phone: the whole screen, square to its edges)
 if not SHORT then
 	round(panel, 16)
-	stroke(panel, C.Line, 1, 0.86)
+	stroke(panel, C.Steel, 1.5, 0)
 end
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(C.Window, C.WindowLow) }, panel)
+-- The windows' sheen (Client GiltUi), and on a computer its amber bar along
+-- the top.
+local SHEEN = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, C.Window),
+	ColorSequenceKeypoint.new(0.3, C.WindowMid),
+	ColorSequenceKeypoint.new(1, C.WindowLow),
+})
+new("UIGradient", { Rotation = 90, Color = SHEEN }, panel)
+if not SHORT then
+	topBar(panel, C.Gold, 24, 3).Name = "Rim"
+end
 local scale = new("UIScale", {}, panel)
 
 -- Header: the name, the categories, an offer while one's open, coins, close.
@@ -489,8 +562,16 @@ local scale = new("UIScale", {}, panel)
 -- the close button at its right end, and the categories run down a rail on
 -- the left, the picked one lit with a gold edge.)
 if not SHORT then
-	local brand = text(panel, "STORE", 20, C.Text, BLACK, 28, 14, 120, 26)
+	local mark = box(panel, C.Gold, 28, 22, 10, 10)
+	mark.Name = "Mark"
+	mark.Rotation = 45
+	local brand = text(panel, "STORE", 22, Color3.new(1, 1, 1), BLACK, 46, 13, 110, 26)
 	brand.Name = "Brand"
+	-- (amber words, lit from above)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(255, 232, 150), Color3.fromRGB(255, 172, 44)),
+	}, brand)
 	text(panel, "KAIJU  ·  LOOKS  ·  BUNDLES", 9, C.Faint, BOLD, 28, 40, 150, 12).Name = "Promise"
 end
 local band = if SHORT then box(panel, C.Ink, 0, 0, W, HEAD, 0.45) else nil
@@ -500,12 +581,12 @@ end
 local nav = new("Frame", {
 	Name = if SHORT then "Rail" else "Nav",
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(196, 0),
-	Size = UDim2.fromOffset(600, HEAD),
+	Position = UDim2.fromOffset(184, 0),
+	Size = UDim2.fromOffset(580, HEAD),
 }, panel)
 -- (Eight tabs: close together, so the offer's clock on the right never
 -- covers the last of them.)
-local navList = UiKit.list(nav, if SHORT then MobileLayout.Store.TabGap else 12, not SHORT)
+local navList = UiKit.list(nav, if SHORT then MobileLayout.Store.TabGap else 10, not SHORT)
 if not SHORT then
 	navList.VerticalAlignment = Enum.VerticalAlignment.Center
 end
@@ -548,6 +629,14 @@ for i, id in Store.Tabs do
 	else
 		underline = box(b, C.Gold, 0, HEAD - 4, 0, 3)
 		underline.Size = UDim2.new(1, 0, 0, 3)
+		-- (the picked tab lit from below: amber rising off its line)
+		local glow = box(underline, C.Gold, 0, -22, 0, 22)
+		glow.Name = "Glow"
+		glow.Size = UDim2.new(1, 0, 0, 22)
+		new("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new(1, 0.8),
+		}, glow)
 	end
 	underline.Name = "Underline"
 	round(underline, 2)
@@ -567,7 +656,7 @@ for i, id in Store.Tabs do
 	navButtons[id] = b
 	navLabels[id] = label
 end
-local headerRule = box(panel, C.Line, 0, HEAD, W, 1, 0.92)
+local headerRule = box(panel, C.Steel, 0, HEAD, W, 1, 0.35)
 headerRule.Name = "HeaderRule"
 
 local close = new("TextButton", {
@@ -581,6 +670,7 @@ local close = new("TextButton", {
 }, panel)
 IronUi.cross(close, if SHORT then 15 else 14, C.Dim)
 round(close, if SHORT then 20 else 18)
+stroke(close, C.Steel, 1, 0.2)
 close:SetAttribute("UiSound", "Back")
 -- Right of the categories: the offer (while one's open), then coins.
 local corner = new("Frame", {
@@ -604,6 +694,7 @@ local wallet = new("TextButton", {
 	LayoutOrder = 2,
 }, corner)
 round(wallet, 18)
+stroke(wallet, C.Steel, 1, 0.2)
 new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 14) }, wallet)
 UiKit.list(wallet, 8, true).VerticalAlignment = Enum.VerticalAlignment.Center
 local walletCoin =
@@ -617,7 +708,7 @@ local walletPlus = text(wallet, "+", 16, C.Ink, BLACK, 0, 0, 20, 20)
 walletPlus.Name = "TopUp"
 walletPlus.TextXAlignment = Enum.TextXAlignment.Center
 walletPlus.BackgroundTransparency = 0
-walletPlus.BackgroundColor3 = Color3.fromRGB(255, 202, 91)
+walletPlus.BackgroundColor3 = C.Gold
 walletPlus.LayoutOrder = 3
 round(walletPlus, 10)
 CoinShop.hook(wallet)
@@ -630,14 +721,20 @@ local deal = new("TextButton", {
 	LayoutOrder = 1,
 	Size = UDim2.fromOffset(0, 30),
 	AutomaticSize = Enum.AutomaticSize.X,
-	Font = BOLD,
+	Font = BLACK,
 	TextSize = 12,
 	TextColor3 = Color3.new(1, 1, 1),
 	Visible = false,
 }, corner)
 round(deal, 15)
+stroke(deal, Color3.fromRGB(255, 170, 186), 1, 0.4)
 new("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, deal)
 deal:SetAttribute("UiSound", "Tab")
+-- (short, so it never runs into the categories: the offer's name is on
+-- the banner it leads to)
+local function dealWords(left: number): string
+	return "SALE  ·  " .. clock(left)
+end
 
 local page = new("Frame", {
 	Name = "Page",
@@ -775,7 +872,10 @@ local function overlayCard(w: number, h: number): Frame
 		ZIndex = 21,
 	}, overlay)
 	round(card, 16)
-	stroke(card, C.Line, 1, 0.8)
+	stroke(card, C.Steel, 1.5, 0)
+	card.BackgroundColor3 = Color3.new(1, 1, 1)
+	new("UIGradient", { Rotation = 90, Color = SHEEN }, card)
+	topBar(card, C.Gold, 24, 3).ZIndex = 22
 	-- (never bigger than the store itself; a phone's, below Roblox's strip)
 	local room = H - (if SHORT then HEAD else 0)
 	new("UIScale", { Scale = math.min(1, (W - 16) / w, (room - 16) / h) }, card)
@@ -791,6 +891,7 @@ local function overlayCard(w: number, h: number): Frame
 	}, card)
 	IronUi.cross(x, 13, C.Dim)
 	round(x, 16)
+	stroke(x, C.Steel, 1, 0.2)
 	x.Activated:Connect(closeOverlay)
 	return card
 end
@@ -910,9 +1011,13 @@ local function contentRow(parent: Instance, item: Store.RewardItem, order: numbe
 	row.LayoutOrder = order
 	row.ZIndex = 22
 	round(row, 10)
+	local piece = item.Id and Cosmetics.get(item.Id)
+	local cosmeticTint = if piece then Cosmetics.rarityColor(piece) else nil
+	face(row, cosmeticTint or C.Steel, 0.08, C.Steel, 0.45)
 	local slot = box(row, C.Well, 8, 8, 40, 40)
 	slot.ZIndex = 22
 	round(slot, 8)
+	stroke(slot, cosmeticTint or C.Steel, 1, 0.55)
 	art(slot, item.Kind, item.Id, 36)
 	local cosmetic = item.Id and Cosmetics.get(item.Id)
 	local name = text(row, item.Text, 14, C.Text, BOLD, 60, 9, 250, 20)
@@ -1082,6 +1187,7 @@ function showReceipt(key: string)
 	local tick = box(card, C.Good, 252, 30, 56, 56)
 	tick.ZIndex = 22
 	round(tick, 28)
+	stroke(tick, C.Good:Lerp(C.Line, 0.5), 2, 0.3)
 	local mark = text(tick, "✓", 30, C.Ink, BLACK, 0, 0, 56, 56)
 	mark.TextXAlignment = Enum.TextXAlignment.Center
 	mark.ZIndex = 23
@@ -1108,6 +1214,7 @@ function showReceipt(key: string)
 		slot.LayoutOrder = i
 		slot.ZIndex = 22
 		round(slot, 10)
+		stroke(slot, C.Steel, 1, 0.2)
 		art(slot, item.Kind, item.Id, 60)
 	end
 	local note = text(
@@ -1188,15 +1295,19 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 		Name = id,
 		Text = "",
 		AutoButtonColor = false,
-		BackgroundColor3 = if picked then C.Raised else C.Surface,
 		LayoutOrder = order,
 	}, parent)
 	round(card, 12)
-	local edge = stroke(card, if picked then C.Gold else C.Line, if picked then 2 else 1, if picked then 0 else 0.9)
-	if not picked then
-		hoverEdge(card, edge, C.Line, 0.9)
+	-- (its rarity's colour: washed in at the top, its edge, a bar along the
+	-- top; the picked one ringed in amber)
+	local edge = face(card, color, if picked then 0.2 else 0.1, if picked then C.Gold else color, if picked then 0 else 0.68)
+	if picked then
+		edge.Thickness = 2
+	else
+		hoverEdge(card, edge, color, 0.68)
 	end
 	local pic = well(card, color, 6, 6, CARD_W - 12, CARD.Pic)
+	topBar(card, color, 18)
 	art(pic, "Cosmetic", id, CARD.Art)
 	local rarity = pill(card, string.upper(RARITY_NAMES[cosmetic.Rarity] or ""), color, false, 9 + UP)
 	rarity.Position = UDim2.fromOffset(12, 12)
@@ -1237,10 +1348,11 @@ end
 
 -- A segmented control: options side by side, one on.
 local function segmented(parent: Instance, order: number, options: { { string } }, on: string, pick)
-	local frame = box(parent, C.Surface, 0, 0, 0, 30)
+	local frame = box(parent, C.SurfaceLow, 0, 0, 0, 30)
 	frame.LayoutOrder = order
 	frame.AutomaticSize = Enum.AutomaticSize.X
-	round(frame, 9)
+	round(frame, 15)
+	stroke(frame, C.Steel, 1, 0.25)
 	new("UIPadding", { PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 3) }, frame)
 	UiKit.list(frame, 2, true).VerticalAlignment = Enum.VerticalAlignment.Center
 	for i, option in options do
@@ -1249,16 +1361,16 @@ local function segmented(parent: Instance, order: number, options: { { string } 
 			Name = option[1],
 			Text = option[2],
 			AutoButtonColor = false,
-			Font = BOLD,
+			Font = if active then BLACK else BOLD,
 			TextSize = 12 + UP,
-			TextColor3 = if active then C.Ink else C.Dim,
-			BackgroundColor3 = C.Text,
+			TextColor3 = if active then C.BuyText else C.Dim,
+			BackgroundColor3 = C.Gold,
 			BackgroundTransparency = if active then 0 else 1,
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.fromOffset(0, 24),
 			LayoutOrder = i,
 		}, frame)
-		round(b, 7)
+		round(b, 12)
 		new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, b)
 		b:SetAttribute("UiSound", "Tab")
 		b.Activated:Connect(function()
@@ -1276,6 +1388,8 @@ local function productPage(id: string, x: number)
 	local side = box(page, C.Surface, x, 0, w, PAGE_H)
 	side.Name = "ProductPage"
 	round(side, 14)
+	face(side, color, 0.12, C.Steel, 0.1)
+	topBar(side, color, 28, 3)
 	local inner = w - 36
 	-- Where each part sits, top to bottom. (A phone: from the bottom up, the
 	-- note, buy, the price, the words and the name, and the picture takes
@@ -1405,11 +1519,11 @@ local function productPage(id: string, x: number)
 	local deals = if cosmetic.Robux and not mine and Y.Offer then Store.bundlesWith(id) else {}
 	if #deals > 0 then
 		local key = deals[1]
-		local offer = box(side, C.Sale, 18, Y.Offer, inner, Y.OfferH, 0.88)
+		local offer = box(side, C.Sale, 18, Y.Offer, inner, Y.OfferH, 0.86)
 		offer.Name = "BundleDeal"
 		round(offer, 10)
-		stroke(offer, C.Sale, 1, 0.55)
-		text(offer, string.format("SAVE %d%% IN A BUNDLE", Store.savings(key)), 10, C.Sale, BOLD, 12, 9, inner - 90, 14)
+		stroke(offer, C.Sale, 1, 0.45)
+		text(offer, string.format("SAVE %d%% IN A BUNDLE", Store.savings(key)), 10, C.Sale:Lerp(C.Line, 0.2), BLACK, 12, 9, inner - 90, 14)
 		local about = text(
 			offer,
 			string.format(
@@ -1475,8 +1589,9 @@ local function drawCatalog(tab: string)
 	-- (a phone: the tab is the title, and the sorting sits on top of the grid)
 	local top = if SHORT then 38 else 54
 	if not SHORT then
-		text(page, Store.TabNames[tab], 22, C.Text, BLACK, 0, 0, 300, 28).Name = "PageTitle"
-		text(page, string.format("%d looks  ·  you own %d", #all, have), 12, C.Dim, MEDIUM, 0, 28, 300, 16)
+		round(box(page, C.Gold, 0, 5, 4, 20), 2)
+		text(page, string.upper(Store.TabNames[tab]), 22, C.Text, BLACK, 14, 0, 300, 28).Name = "PageTitle"
+		text(page, string.format("%d looks  ·  you own %d", #all, have), 12, C.Dim, MEDIUM, 14, 28, 300, 16)
 	end
 	-- (a phone: from the grid's left edge, short of the product page)
 	local controls = new("Frame", {
@@ -1518,7 +1633,7 @@ local function drawCatalog(tab: string)
 		if #ids == 0 then
 			return
 		end
-		local head = text(list, title, 11 + UP, C.Dim, BOLD, 0, 0, GRID_W, 16)
+		local head = text(list, title, 11 + UP, C.Dim, BLACK, 0, 0, GRID_W, 16)
 		head.LayoutOrder = order
 		local rows = math.ceil(#ids / COLS)
 		local grid = new("Frame", {
@@ -1553,8 +1668,9 @@ local function sectionHead(parent: Instance, order: number, title: string, blurb
 		Size = UDim2.fromOffset(PAGE_W - 12, 44),
 		LayoutOrder = order,
 	}, parent)
-	text(head, title, 18, C.Text, BLACK, 0, 0, PAGE_W, 24)
-	text(head, blurb, 12, C.Dim, MEDIUM, 0, 24, PAGE_W, 18)
+	round(box(head, C.Gold, 0, 4, 4, 18), 2)
+	text(head, string.upper(title), 18, C.Text, BLACK, 14, 0, PAGE_W, 24)
+	text(head, blurb, 12, C.Dim, MEDIUM, 14, 24, PAGE_W, 18)
 	return head
 end
 
@@ -1578,9 +1694,14 @@ local function offerBanner(parent: Instance, key: string, w: number, order: numb
 	round(banner, 14)
 	new("UIGradient", {
 		Rotation = 0,
-		Color = ColorSequence.new(C.Surface:Lerp(offer.Color, 0.28), C.Surface),
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, C.Surface:Lerp(offer.Color, 0.34)),
+			ColorSequenceKeypoint.new(0.55, C.Surface:Lerp(offer.Color, 0.1)),
+			ColorSequenceKeypoint.new(1, C.SurfaceLow),
+		}),
 	}, banner)
-	stroke(banner, offer.Color, 1, 0.55)
+	stroke(banner, offer.Color:Lerp(C.Line, 0.15), 1.5, 0.35)
+	topBar(banner, offer.Color:Lerp(C.Line, 0.3), 30, 3)
 	-- (a phone: a narrower picture and price box, the words between)
 	local picW, boxW = if SHORT then 196 else 290, if SHORT then 214 else 240
 	local x = picW + 32
@@ -1589,7 +1710,7 @@ local function offerBanner(parent: Instance, key: string, w: number, order: numb
 	art(pic, "Cosmetic", offer.Hero, if SHORT then 120 else 150, 0.4, 0.5)
 	thumbs(pic, reward.Cosmetics or {}, offer.Hero, if SHORT then 40 else 48, 3)
 	local left = if key == "StarterPack" then starterLeft else welcomeLeft
-	local kicker = wrap(text(banner, "", 11, C.Gold, BOLD, x, 22, if SHORT then tw else 420, if SHORT then 28 else 14))
+	local kicker = wrap(text(banner, "", 11, C.Gold, BLACK, x, 22, if SHORT then tw else 420, if SHORT then 28 else 14))
 	kicker.Name = "OfferClock"
 	timer(
 		kicker,
@@ -1597,7 +1718,7 @@ local function offerBanner(parent: Instance, key: string, w: number, order: numb
 		if key == "StarterPack" then "ONE-TIME OFFER  ·  ENDS IN " else "NEW MINERS ONLY  ·  ENDS IN "
 	)
 	local nameY = if SHORT then 52 else 40
-	text(banner, offer.Name, if SHORT then 22 else 30, C.Text, BLACK, x, nameY, if SHORT then tw else 420, if SHORT then 28 else 36)
+	text(banner, string.upper(offer.Name), if SHORT then 22 else 30, C.Text, BLACK, x, nameY, if SHORT then tw else 420, if SHORT then 28 else 36)
 	wrap(text(banner, offer.Tagline, if SHORT then 12 else 13, C.Dim, MEDIUM, x, nameY + (if SHORT then 30 else 40), tw, 40))
 	text(banner, counts(reward), 12, C.Text, BOLD, x, 132, if SHORT then tw else 420, 16).TextTruncate =
 		Enum.TextTruncate.AtEnd
@@ -1606,8 +1727,9 @@ local function offerBanner(parent: Instance, key: string, w: number, order: numb
 	end).TextXAlignment =
 		Enum.TextXAlignment.Left
 	-- The price box.
-	local priceBox = box(banner, C.Window, w - boxW - 14, 14, boxW, 168, 0.15)
+	local priceBox = box(banner, C.WindowLow, w - boxW - 14, 14, boxW, 168, 0.2)
 	round(priceBox, 12)
+	stroke(priceBox, C.Steel, 1, 0.2)
 	text(priceBox, "BUNDLE PRICE", 10, C.Dim, BOLD, 16, 14, 200, 14)
 	-- (the saving up beside the caption: price, old price and badge in one
 	-- row are wider than the box)
@@ -1645,8 +1767,9 @@ local function lookCard(parent: Instance, bundle: Store.Bundle, order: number, w
 		LayoutOrder = order,
 	}, parent)
 	round(card, 14)
-	local edge = stroke(card, C.Line, 1, 0.9)
-	hoverEdge(card, edge, C.Line, 0.9)
+	local edge = face(card, bundle.Color, 0.14, bundle.Color, 0.6)
+	hoverEdge(card, edge, bundle.Color, 0.6)
+	topBar(card, bundle.Color, 24)
 	local pic = well(card, bundle.Color, 6, 6, w - 12, 132)
 	art(pic, "Cosmetic", bundle.Hero, 104, 0.4, 0.52)
 	thumbs(pic, reward.Cosmetics or {}, bundle.Hero, 36, 3)
@@ -1681,10 +1804,15 @@ local function premiumCard(parent: Instance, bundle: Store.Bundle, order: number
 	round(card, 14)
 	new("UIGradient", {
 		Rotation = 0,
-		Color = ColorSequence.new(C.Surface:Lerp(bundle.Color, 0.16), C.Surface),
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, C.Surface:Lerp(bundle.Color, 0.26)),
+			ColorSequenceKeypoint.new(0.6, C.Surface:Lerp(bundle.Color, 0.06)),
+			ColorSequenceKeypoint.new(1, C.SurfaceLow),
+		}),
 	}, card)
-	local edge = stroke(card, bundle.Color, 1, 0.6)
-	hoverEdge(card, edge, bundle.Color, 0.6)
+	local edge = stroke(card, bundle.Color, 1.5, 0.45)
+	hoverEdge(card, edge, bundle.Color, 0.45)
+	topBar(card, bundle.Color:Lerp(C.Line, 0.2), 30, 3)
 	local pic = well(card, bundle.Color, 8, 8, 216, 216)
 	art(pic, "Cosmetic", bundle.Hero, 150, 0.42, 0.5)
 	thumbs(pic, reward.Cosmetics or {}, bundle.Hero, 44, 4)
@@ -1695,7 +1823,7 @@ local function premiumCard(parent: Instance, bundle: Store.Bundle, order: number
 	else
 		pill(card, "BEST FOR COLLECTORS", bundle.Color, false, 9).Position = UDim2.fromOffset(x, 16)
 	end
-	text(card, bundle.Name, 22, C.Text, BLACK, x, 40, tw, 28)
+	text(card, string.upper(bundle.Name), 22, C.Text, BLACK, x, 40, tw, 28)
 	wrap(text(card, bundle.Tagline, 12, C.Dim, MEDIUM, x, 72, tw, 46))
 	text(card, counts(reward), 11, C.Gold, BOLD, x, 124, tw, 16).TextTruncate = Enum.TextTruncate.AtEnd
 	priceRow(card, bundle.Id, x, 146, 22)
@@ -1712,8 +1840,8 @@ end
 -- Kaiju ----------------------------------------------------------------------------------------------------------
 -- The kaiju sales (Shared.Kaiju.Sale), here as well as at the Kennel
 -- (Client KennelSale): the Starter Rare Roll, once ever, then the premium
--- Triskull Trinity, once ever, then today's Kaiju of the Day, turning in its
--- view. The Kaiju page shows them big, with what each brings; Featured
+-- Triskull Trinity, once ever, then today's Kaiju of the Day, turning on its
+-- stage (Client Showcase). The Kaiju page shows them big, with what each brings; Featured
 -- leads with the first two, smaller. (A kaiju bought joins your reserves,
 -- or its roll plays on the roll screen: showReceipt closes the store for
 -- it. The team revive is sold from the kaiju panel, when one's down.)
@@ -1724,43 +1852,9 @@ do
 	local KaijuModels = require(ReplicatedStorage.Shared.KaijuModels)
 	local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 
-	-- Kaiju turning in their views: { Model, Center, Rest } (cleared with
-	-- the page).
-	local turning = {}
-	KaijuDeals.Turning = turning
-	RunService.RenderStepped:Connect(function()
-		if #turning == 0 or not gui.Enabled then
-			return
-		end
-		local angle = (os.clock() * 0.5) % (math.pi * 2)
-		for _, spin in turning do
-			spin.Model:PivotTo(spin.Center * CFrame.Angles(0, angle, 0) * spin.Center:Inverse() * spin.Rest)
-		end
-	end)
-
-	-- A kaiju in a view filling `parent`, turning if `turn`.
-	local function view(parent: Instance, species: string, element: string, turn: boolean?): ViewportFrame
-		local model = KaijuModels.forPortrait(KaijuModels.build(species, element))
-		local cf, size = model:GetBoundingBox()
-		local reach = math.max(size.X, size.Y * 1.2, size.Z)
-		local frame = new("ViewportFrame", {
-			Name = "KaijuView",
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 1),
-			Ambient = KaijuModels.Portrait.Ambient,
-			LightColor = KaijuModels.Portrait.LightColor,
-			LightDirection = KaijuModels.Portrait.LightDirection,
-		}, parent)
-		local camera = Instance.new("Camera")
-		camera.FieldOfView = 34
-		camera.CFrame = CFrame.lookAt(cf.Position + Vector3.new(reach * 0.55, reach * 0.35, -reach * 1.45), cf.Position)
-		camera.Parent = frame
-		frame.CurrentCamera = camera
-		model.Parent = frame
-		if turn then
-			table.insert(turning, { Model = model, Center = CFrame.new(cf.Position), Rest = model:GetPivot() })
-		end
-		return frame
+	-- A kaiju as it's shown, built for a view.
+	local function figure(species: string, element: string): Model
+		return KaijuModels.forPortrait(KaijuModels.build(species, element))
 	end
 
 	-- Seconds to the next Kaiju of the Day (midnight UTC: KaijuKennel.day).
@@ -1781,12 +1875,18 @@ do
 		round(card, 14)
 		new("UIGradient", {
 			Rotation = 0,
-			Color = ColorSequence.new(C.Surface:Lerp(opts.Tint, 0.2), C.Surface),
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, C.Surface:Lerp(opts.Tint, 0.26)),
+				ColorSequenceKeypoint.new(0.6, C.Surface:Lerp(opts.Tint, 0.07)),
+				ColorSequenceKeypoint.new(1, C.SurfaceLow),
+			}),
 		}, card)
-		stroke(card, opts.Tint, 1, 0.62)
+		stroke(card, opts.Tint, 1.5, 0.45)
+		topBar(card, opts.Tint:Lerp(C.Line, 0.2), 30, 3)
 		local side = math.min(h - 16, math.floor(w * 0.42))
-		local pic = well(card, opts.Tint, 8, 8, side, h - 16)
-		opts.Fill(pic)
+		-- (its stage: the sale's own colour, or the kaiju's)
+		local _, stage = well(card, opts.Stage or opts.Tint, 8, 8, side, h - 16)
+		opts.Fill(stage, side / (h - 16))
 		local x = side + 24
 		local tw = w - x - 16
 		local words = if tw < 200 and opts.Short then opts.Short else opts
@@ -1835,8 +1935,13 @@ do
 				sale.TraitFloor
 			),
 			Clock = untilNext,
-			Fill = function(pic)
-				view(pic, special.Species, special.Element, true)
+			Fill = function(stage, aspect)
+				Showcase.model(stage, figure(special.Species, special.Element), {
+					Tint = GemConfig.ElementColors[special.Element] or C.Gold,
+					Spin = true,
+					Turn = 0.6,
+					Aspect = aspect,
+				})
 			end,
 			Short = {
 				Tag = "DAILY SALE",
@@ -1863,26 +1968,28 @@ do
 				"One roll on the starter roll's reels, every rare kind as likely as the next (1 in %d). It comes with a Rare Gemsoul holding its element's best surge.",
 				#kinds
 			),
-			Fill = function(pic)
-				local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, pic)
-				new("UIGridLayout", {
-					CellSize = UDim2.fromScale(0.5, 0.5),
-					CellPadding = UDim2.fromOffset(0, 0),
-					SortOrder = Enum.SortOrder.LayoutOrder,
-				}, grid)
-				for i, shown in Kaiju.Sale.Showcase do
-					local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i }, grid)
-					view(cell, shown.Species, shown.Element)
+			-- (the four together on one stage, the middle ones a step forward)
+			Fill = function(stage, aspect)
+				local models = {}
+				for _, shown in Kaiju.Sale.Showcase do
+					table.insert(models, figure(shown.Species, shown.Element))
 				end
+				Showcase.group(stage, models, {
+					Tint = Color3.fromRGB(176, 120, 255),
+					Turn = 0.35,
+					Fill = 0.92,
+					Aspect = aspect,
+				})
 			end,
 			Short = { Tag = "ONCE ONLY", Title = "Starter Rare Roll", Sub = string.format("%d rarest kinds", #kinds) },
 		})
 	end
 
-	-- The premium trio: its three kaiju side by side in its well, one in
-	-- each element, turning, each over a glow of its element's colour with
-	-- its element named at its feet (the three are one kind: the element
-	-- is what tells them apart).
+	-- The premium trio: its three kaiju together on one stage, one in each
+	-- element, the middle one forward, their elements named along the
+	-- floor in the same order (the three are one kind: the element is what
+	-- tells them apart). The stage is blue: gold kaiju on gold would melt
+	-- into it.
 	function KaijuDeals.premium(parent: Instance, w: number, h: number, order: number): Frame
 		local sale = Kaiju.Sale.Premium
 		local kind = Kaiju.species(sale.Species)
@@ -1905,6 +2012,7 @@ do
 			Name = "KaijuPremium",
 			Key = sale.Product,
 			Tint = gold,
+			Stage = Color3.fromRGB(96, 124, 255),
 			Tag = "PREMIUM  ·  ONCE ONLY",
 			TagColor = gold,
 			Title = sale.Name,
@@ -1914,50 +2022,45 @@ do
 				"Three %ss, one in each element. Each comes with an Ultra Rare Gemsoul holding its element's best moves: Q, E and R.",
 				kind and kind.Name or sale.Species
 			),
-			Fill = function(pic)
-				local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, pic)
-				new("UIGridLayout", {
-					CellSize = UDim2.fromScale(1 / #sale.Elements, 1),
-					CellPadding = UDim2.fromOffset(0, 0),
-					SortOrder = Enum.SortOrder.LayoutOrder,
-				}, row)
+			Fill = function(stage, aspect)
+				local models = {}
+				for _, element in sale.Elements do
+					table.insert(models, figure(sale.Species, element))
+				end
+				Showcase.group(stage, models, {
+					Tint = Color3.fromRGB(150, 170, 255),
+					Turn = 0.3,
+					Fill = 0.9,
+					Aspect = aspect,
+				})
+				-- their elements, named along the floor, left to right
 				local small = h < 240
+				local names = new("Frame", {
+					Name = "Elements",
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(0.5, 1),
+					Position = UDim2.new(0.5, 0, 1, -6),
+					Size = UDim2.new(1, -10, 0, if small then 15 else 18),
+					ZIndex = stage.ZIndex + 3,
+				}, stage)
+				local list = UiKit.list(names, 4, true)
+				list.HorizontalAlignment = Enum.HorizontalAlignment.Center
 				for i, element in sale.Elements do
 					local tint = GemConfig.ElementColors[element] or gold
-					local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i }, row)
-					-- its element's light rising from the floor behind it
-					local glow = new("Frame", {
-						Name = "Glow",
-						BackgroundColor3 = tint,
-						BorderSizePixel = 0,
-						Position = UDim2.fromOffset(2, 0),
-						Size = UDim2.new(1, -4, 1, 0),
-						ZIndex = 1,
-					}, cell)
-					new("UIGradient", {
-						Rotation = 90,
-						Transparency = NumberSequence.new({
-							NumberSequenceKeypoint.new(0, 1),
-							NumberSequenceKeypoint.new(0.45, 0.85),
-							NumberSequenceKeypoint.new(1, 0.45),
-						}),
-					}, glow)
-					view(cell, sale.Species, element, true).ZIndex = 2
-					-- its element, named, at its feet
 					local tag = new("TextLabel", {
 						Name = "Element",
-						AnchorPoint = Vector2.new(0.5, 1),
-						Position = UDim2.new(0.5, 0, 1, -5),
-						Size = UDim2.new(1, -8, 0, if small then 15 else 18),
-						BackgroundColor3 = tint:Lerp(Color3.new(0, 0, 0), 0.25),
+						Size = UDim2.new(1 / #sale.Elements, -4, 1, 0),
+						BackgroundColor3 = tint:Lerp(Color3.new(0, 0, 0), 0.3),
+						BackgroundTransparency = 0.1,
 						Text = string.upper(GemConfig.elementName(element)),
 						Font = BLACK,
 						TextSize = if small then 9 else 11,
 						TextColor3 = Color3.new(1, 1, 1),
 						TextStrokeTransparency = 0.6,
-						ZIndex = 3,
-					}, cell)
-					round(tag, 5)
+						LayoutOrder = i,
+						ZIndex = stage.ZIndex + 3,
+					}, names)
+					round(tag, 999)
 					stroke(tag, tint:Lerp(Color3.new(1, 1, 1), 0.35), 1, 0.2)
 				end
 			end,
@@ -2155,8 +2258,8 @@ local function freeCard(
 ): Frame
 	local card = box(freeHost or page, C.Surface, x, y, w, h)
 	round(card, 14)
-	local rail = box(card, tint, 18, 0, w - 36, 3)
-	round(rail, 2)
+	face(card, tint, 0.12, tint, 0.65)
+	topBar(card, tint, 18, 3)
 	text(card, title, 18, C.Text, BLACK, 20, 18, w - 160, 24)
 	-- (`wide`: nothing beside it, the reward tiles are under it)
 	wrap(text(card, blurb, 12, C.Dim, MEDIUM, 20, 44, if wide then w - 40 else w - 170, 34))
@@ -2176,8 +2279,9 @@ local function rewardTile(card: Frame, id: string, have: boolean, x: number, y: 
 end
 
 local function drawFree()
-	text(page, "Free", 22, C.Text, BLACK, 0, 0, 300, 28).Name = "PageTitle"
-	text(page, "Looks you can't buy: earn them by growing the crew.", 12, C.Dim, MEDIUM, 0, 28, 500, 16)
+	round(box(page, C.Gold, 0, 5, 4, 20), 2)
+	text(page, "FREE", 22, C.Text, BLACK, 14, 0, 300, 28).Name = "PageTitle"
+	text(page, "Looks you can't buy: earn them by growing the crew.", 12, C.Dim, MEDIUM, 14, 28, 500, 16)
 	if not freeState then
 		text(page, "Checking your free rewards…", 14, C.Dim, MEDIUM, 0, 70, PAGE_W, 30)
 		fetchFree()
@@ -2345,7 +2449,7 @@ local function drawFree()
 		ClearTextOnFocus = false,
 	}, cCard)
 	round(entry, 10)
-	stroke(entry, C.Line, 1, 0.85)
+	stroke(entry, C.Steel, 1, 0.1)
 	button(cCard, "Redeem", "Primary", half - 20 - 130, 92, 130, 44, function()
 		if FreeRewards.normalizeCode(entry.Text) then
 			freeAction("RedeemCode", entry.Text)
@@ -2416,7 +2520,7 @@ local function drawHeader()
 	end
 	if key then
 		local left = if key == "StarterPack" then starterLeft() else welcomeLeft()
-		deal.Text = Store.productName(key) .. "  ·  " .. clock(left)
+		deal.Text = dealWords(left)
 	end
 end
 
@@ -2425,7 +2529,6 @@ function refresh()
 		return
 	end
 	table.clear(timers)
-	table.clear(KaijuDeals.Turning)
 	drawHeader()
 	IronUi.clear(page)
 	DRAW[state.Tab]()
@@ -2487,7 +2590,6 @@ function ShopUI.close()
 	closeOverlay()
 	IronUi.clear(page)
 	table.clear(timers)
-	table.clear(KaijuDeals.Turning)
 end
 
 function ShopUI.toggle()
@@ -2535,8 +2637,9 @@ local function offerPopup(name: string, key: string)
 		Active = true,
 	}, popup)
 	round(card, 16)
-	stroke(card, C.Line, 1, 0.82)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(C.Window, C.WindowLow) }, card)
+	stroke(card, C.Steel, 1.5, 0)
+	new("UIGradient", { Rotation = 90, Color = SHEEN }, card)
+	topBar(card, C.Gold, 24, 3).Name = "Rim"
 	local fitScale = new("UIScale", {}, card)
 	local function fitPopup()
 		local s = popup.AbsoluteSize
@@ -2550,7 +2653,7 @@ local function offerPopup(name: string, key: string)
 	popup:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPopup)
 	UiKit.onTopbar(fitPopup)
 	fitPopup()
-	text(card, "SPECIAL OFFER", 11, C.Gold, BOLD, 24, 20, 300, 14)
+	text(card, "SPECIAL OFFER", 11, C.Gold, BLACK, 24, 20, 300, 14)
 	local x = new("TextButton", {
 		Name = "Close",
 		Text = "",
@@ -2562,6 +2665,7 @@ local function offerPopup(name: string, key: string)
 	}, card)
 	IronUi.cross(x, 13, C.Dim)
 	round(x, 16)
+	stroke(x, C.Steel, 1, 0.2)
 	local body = new("Frame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(20, 50),
@@ -2592,6 +2696,7 @@ local function offerPopup(name: string, key: string)
 			local tile = box(strip, C.Surface, 0, 0, 132, 134)
 			tile.LayoutOrder = i
 			round(tile, 12)
+			stroke(tile, C.Steel, 1, 0.3)
 			local cosmetic = item.Id and Cosmetics.get(item.Id)
 			local pic = well(tile, if cosmetic then Cosmetics.rarityColor(cosmetic) or C.Dim else C.Gold, 6, 6, 120, 92)
 			art(pic, item.Kind, item.Id, 78)
@@ -2670,7 +2775,7 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		if key then
 			local left = if key == "StarterPack" then starterLeft() else welcomeLeft()
-			deal.Text = Store.productName(key) .. "  ·  " .. clock(left)
+			deal.Text = dealWords(left)
 		end
 	end
 	if welcomeGui.Enabled and welcomeLeft() <= 0 then
