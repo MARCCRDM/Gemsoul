@@ -19,11 +19,11 @@
 	                  team's swaps it in, at once (KaijuServer's
 	                  KaijuTeamOut). Tap a
 	                  tile for the panel on that kaiju. The team's HYPERBEAM
-	                  (KaijuBeamHud, in KaijuHud.beamSlot()): on a computer
-	                  the card's outline, its pill on the bottom edge; on a
-	                  phone a button of its own. Computer: bottom left, three
-	                  by two (the kaiju two by two, AUTO HEAL over the team
-	                  keys). Phone: small, at the top left in a fight too,
+	                  (KaijuBeamHud, in KaijuHud.beamSlot()): a tile, its rim
+	                  its meter; on a computer on the card, its key Z on it,
+	                  on a phone a button of its own. Computer: bottom left,
+	                  three by two (the kaiju two by two, AUTO HEAL over the
+	                  HYPERBEAM). Phone: small, at the top left in a fight too,
 	                  two rows (the kaiju in a row, AUTO HEAL a slim row
 	                  under them); the team keys off the card, two by two
 	                  just above the move stick, under your left thumb,
@@ -447,8 +447,8 @@ autoState.TextXAlignment = Enum.TextXAlignment.Center
 local autoWant: boolean? = nil -- (switched here, till the roster says so)
 local autoArt: string? = nil
 
--- The team keys, under AUTO HEAL (on a phone, above the move stick: see
--- layout): four chips, 1 to 4 (Kaiju.Teams), the
+-- The team keys, tabs along the card's top (on a phone, above the move
+-- stick: see layout): four chips, 1 to 4 (Kaiju.Teams), the
 -- keys that bring each team out. The team out is gold; picked but called
 -- back, a gold edge; a team with kaiju in it, plain; one all knocked out, red; one not
 -- filled yet, faint (they fill in order: Kaiju.order). Tap one or press its
@@ -567,14 +567,14 @@ function KaijuHud._tabs.shape()
 	end
 end
 
--- The team's HYPERBEAM: on a computer its pill, on the card's bottom edge
--- (KaijuBeamHud draws it in here, and its meter round the card:
--- KaijuHud.beamSlot()); on a phone off the card, a button of its own right
--- of the team keys (Apart: its meter round it instead).
+-- The team's HYPERBEAM, a tile with its meter round it (KaijuBeamHud draws
+-- it in here: KaijuHud.beamSlot()): on a computer on the card, under AUTO
+-- HEAL; on a phone off the card, a button of its own right of the team
+-- keys.
 local beamSlot = new("Frame", {
 	Name = "BeamSlot",
 	BackgroundTransparency = 1,
-	ZIndex = 10, -- (over the card's outline, the HYPERBEAM's meter)
+	ZIndex = 10, -- (over the card's own tiles)
 }, card)
 
 -- CATCH: beside the strip, when there's a wild kaiju to catch. A slim
@@ -642,9 +642,9 @@ local function layout()
 	local phone = UiKit.short()
 	local hunting = Spar.hunting(player)
 	-- One card (MobileLayout.kaiju, kaijuDesk, kaijuCells): on a computer
-	-- the kaiju two by two, AUTO HEAL over the team keys; on a phone small,
-	-- the kaiju in a row over AUTO HEAL, the team keys apart; the HYPERBEAM
-	-- round it.
+	-- the kaiju two by two, AUTO HEAL over the HYPERBEAM; on a phone small,
+	-- the kaiju in a row over AUTO HEAL, the team keys and the HYPERBEAM
+	-- apart.
 	local spot = if phone then MobileLayout.kaiju(screen, hunting) else MobileLayout.kaijuDesk(screen)
 	card.Position = UDim2.fromOffset(spot.X, spot.Y)
 	card.Size = UDim2.fromOffset(spot.W, spot.H)
@@ -675,12 +675,12 @@ local function layout()
 		end
 	end
 	-- The four team keys: on a computer tabs along the card's top edge, the
-	-- team out's merged into it (_tabs.shape), AUTO HEAL down the whole right
-	-- column; on a phone two by two off the card, just above the move
-	-- stick, under your left thumb (MobileLayout.keys).
+	-- team out's merged into it (_tabs.shape); on a phone two by two off the
+	-- card, just above the move stick, under your left thumb
+	-- (MobileLayout.keys).
 	KaijuHud._tabs.OnTop = not phone
+	place(autoButton, cells.Auto)
 	if phone then
-		place(autoButton, cells.Auto)
 		local keys = MobileLayout.keys(screen)
 		local gap, across, rect = keys.Gap, keys.Across, keys
 		teamPad.Parent = gui
@@ -695,18 +695,12 @@ local function layout()
 			chip.Number.TextSize = math.clamp(math.floor(math.min(w, h) * 0.55), 10, 18)
 		end
 	else
-		place(autoButton, {
-			X = cells.Auto.X,
-			Y = cells.Auto.Y,
-			W = cells.Auto.W,
-			H = cells.Teams.Y + cells.Teams.H - cells.Auto.Y,
-		})
 		teamPad.Parent = card
 		place(teamPad, { X = 0, Y = -KaijuHud._tabs.H, W = spot.W, H = KaijuHud._tabs.H })
 	end
 	KaijuHud._tabs.shape()
-	-- The HYPERBEAM: on a computer its pill on the card's bottom edge; on a
-	-- phone off the card, just right of the team keys (MobileLayout.beam).
+	-- The HYPERBEAM: on a computer on the card, under AUTO HEAL; on a phone
+	-- off the card, just right of the team keys (MobileLayout.beam).
 	if phone then
 		beamSlot.Parent = gui
 		place(beamSlot, MobileLayout.beam(screen))
@@ -714,7 +708,6 @@ local function layout()
 		beamSlot.Parent = card
 		place(beamSlot, cells.Beam)
 	end
-	beamSlot:SetAttribute("Apart", phone)
 	-- CATCH: a readable, non-modal prompt, under the card on touch, above
 	-- the combat HUD at center on a computer.
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled

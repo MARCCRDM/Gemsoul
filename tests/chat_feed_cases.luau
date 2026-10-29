@@ -359,13 +359,12 @@ check(gui.IgnoreGuiInset == false, "The feed ignores the top bar inset")
 -- Windowless: no background anywhere but the line you type in.
 check(w.holder().BackgroundTransparency == 1 and w.part("Lines").BackgroundTransparency == 1, "The feed has a window")
 check(w.part("Lines"):GetAttribute("NoTranslate") == true, "Players' words would be translated")
--- Bottom left, above the kaiju card (its team and buttons, 143 tall, its team
--- tabs 26 above it, with the
--- HYPERBEAM's pill hanging 12 below its edge), under the PLAY stack.
+-- Bottom left, above the kaiju card (its team, AUTO HEAL and the
+-- HYPERBEAM, 134 tall, its team tabs 26 above it), under the PLAY stack.
 local holder = w.holder()
 check(holder.AnchorPoint.X == 0 and holder.AnchorPoint.Y == 1, "Not anchored at its bottom left")
-check(holder.Position.X.Offset == 24 and holder.Position.Y.Scale == 1 and holder.Position.Y.Offset == -(24 + 12 + 143 + 12 + 26), "Not above the kaiju card")
-check(holder.Size.Y.Offset == 710 - (24 + 12 + 143 + 12 + 26) - 340, "Height doesn't fit between the kaiju card and the PLAY stack: " .. holder.Size.Y.Offset)
+check(holder.Position.X.Offset == 24 and holder.Position.Y.Scale == 1 and holder.Position.Y.Offset == -(24 + 134 + 12 + 26), "Not above the kaiju card")
+check(holder.Size.Y.Offset == 710 - (24 + 134 + 12 + 26) - 340, "Height doesn't fit between the kaiju card and the PLAY stack: " .. holder.Size.Y.Offset)
 w.resize(1920, 1080)
 check(holder.Size.Y.Offset == 230, "A tall screen didn't cap the height")
 w.resize(1024, 560)
@@ -467,7 +466,7 @@ w.resize(1100, 500, true)
 check(holder.Position.X.Offset == 12 and holder.Position.Y.Offset == -12, "A short screen didn't take the corner")
 check(holder.Size.Y.Offset == 200 and holder.Size.X.Offset >= 180 and holder.Size.X.Offset <= 420, "A short screen's size is off")
 w.resize(1366, 710)
-check(holder.Position.X.Offset == 24 and holder.Position.Y.Offset == -(24 + 12 + 143 + 12 + 26), "The computer fit didn't come back")
+check(holder.Position.X.Offset == 24 and holder.Position.Y.Offset == -(24 + 134 + 12 + 26), "The computer fit didn't come back")
 -- The game's own words in the feed go through the translator.
 local quiet = boot({ noChannels = true })
 quiet.step(0.3)

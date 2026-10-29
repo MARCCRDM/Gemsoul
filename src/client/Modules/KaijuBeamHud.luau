@@ -3,21 +3,18 @@
 	Shared.KaijuBeam; the show: KaijuBeamFx). Shown with the kaiju card
 	(KaijuHud's) while your team's out, in mining and in fights alike.
 
-	On a computer the card's own outline is its meter: it fills left to
-	right round the card in your team's colours (the team's charge, a meter
-	of its own: KaijuCharge), over the card's dim edge. Its button, a pill
-	on the card's bottom edge (KaijuHud.beamSlot(): its cell, the card its
-	parent), says how far along it is and holds SAVE. On a phone the slot
-	is apart from the card (its Apart attribute: just right of the team
-	keys and as tall, MobileLayout.beam), and the button fills it, a tile:
-	HYPERBEAM over its percent, SAVE along its bottom, its meter its own
-	rim, filling from the bottom up.
+	A tile (KaijuHud.beamSlot(): on a computer the card's bottom-right
+	cell, under AUTO HEAL; on a phone apart, just right of the team keys
+	and as tall, MobileLayout.beam): HYPERBEAM over its percent, SAVE along
+	its bottom, and on a computer its key, Z, in a cap before the title.
+	Its rim is its meter: it fills from the bottom up in your team's
+	colours (the team's charge, a meter of its own: KaijuCharge).
 
 	  Charging   HYPERBEAM and its percent.
-	  Ready      the outline full and bright, its colours flowing round it,
-	             a glow that breathes about the card, READY! on the pill
-	             (and its key on a computer: Z; on a pad, the d-pad's down).
-	             It pops and chimes the moment it's ready.
+	  Ready      the rim full and bright, its colours flowing round it, a
+	             glow that breathes about the tile, READY!, the Z cap gold
+	             (on a pad, the d-pad's down). It pops and chimes the moment
+	             it's ready.
 	  Blasting   BLASTING! while the blast is under way.
 	  SAVE       the switch at its end: on (green), your kaiju fight with
 	             blows alone and charge faster (the server's KaijuSaveCharge).
@@ -25,11 +22,11 @@
 	(Light to run: it redraws only when what it shows changes, and moves
 	only while it's ready.)
 
-	  KaijuBeamHud.start(slot)   once, from Lobby.client, with the pill's
-	                             cell on the card (KaijuHud.beamSlot())
-	  KaijuBeamHud.fillLevel(share) -> NumberSequence   the outline's
-	                             see-through along the card for a charge
-	                             `share` (0..1) of the way: lit up to it
+	  KaijuBeamHud.start(slot)   once, from Lobby.client, with the tile's
+	                             slot (KaijuHud.beamSlot())
+	  KaijuBeamHud.fillLevel(share) -> NumberSequence   the rim's
+	                             see-through along it for a charge `share`
+	                             (0..1) of the way: lit up to it
 	  KaijuBeamHud.aim() -> { X, Z }   where you're looking, flat (the
 	                                   camera's look, else your facing)
 ]]
@@ -59,7 +56,7 @@ local READY_GOLD = Color3.fromRGB(255, 226, 120)
 
 local shownNow = false -- (with the kaiju card, while your team's out)
 
--- The pill: a glow behind, its words and the SAVE switch.
+-- The tile: a glow behind, its words, its key and the SAVE switch.
 local button = new("TextButton", {
 	Name = "Hyperbeam",
 	AutoButtonColor = false,
@@ -68,7 +65,7 @@ local button = new("TextButton", {
 	BackgroundTransparency = 0.08,
 	ZIndex = 3,
 }, nil)
-UiKit.round(button, 999)
+UiKit.round(button, 10)
 local stroke = new("UIStroke", { Color = P.Edge, Thickness = 1.5, Transparency = 0.2 }, button)
 local scale = new("UIScale", { Scale = 1 }, button)
 local glow = new("Frame", {
@@ -80,16 +77,16 @@ local glow = new("Frame", {
 	BackgroundTransparency = 1,
 	ZIndex = 2,
 }, button)
-UiKit.round(glow, 999)
--- The meter: the card's outline (set round the card by start), and the
--- glow about it once it's ready.
+UiKit.round(glow, 16)
+-- The meter: the tile's rim (set round it by start), and the glow about
+-- it once it's ready.
 local ring = new("Frame", {
 	Name = "HyperbeamRing",
 	BackgroundTransparency = 1,
 	Size = UDim2.fromScale(1, 1),
-	ZIndex = 2, -- (under the pill)
+	ZIndex = 2, -- (under the tile)
 }, nil)
-UiKit.round(ring, 10)
+UiKit.round(ring, 12)
 local ringStroke = new("UIStroke", { Color = WHITE, Thickness = 3, Transparency = 0 }, ring)
 local fillGradient = new("UIGradient", {}, ringStroke)
 local halo = new("Frame", {
@@ -100,7 +97,7 @@ local halo = new("Frame", {
 	BackgroundTransparency = 1,
 	ZIndex = 1,
 }, nil)
-UiKit.round(halo, 13)
+UiKit.round(halo, 15)
 local haloStroke = new("UIStroke", { Color = READY_GOLD, Thickness = 4, Transparency = 1 }, halo)
 local flash = new("Frame", {
 	Name = "Flash",
@@ -109,7 +106,7 @@ local flash = new("Frame", {
 	BackgroundTransparency = 1,
 	ZIndex = 9,
 }, button)
-UiKit.round(flash, 999)
+UiKit.round(flash, 10)
 
 local function words(name: string, font: Enum.Font, align: Enum.TextXAlignment): TextLabel
 	local text = new("TextLabel", {
@@ -137,12 +134,14 @@ local titleGradient = new("UIGradient", {
 	Enabled = false,
 }, title)
 local state = words("State", IronUi.Bold, Enum.TextXAlignment.Right)
--- Ready on a computer: its key, a bold gold cap beside READY!
+-- On a computer its key, Z, in a cap before the title: gold once it's
+-- ready.
 local keyCap = new("TextLabel", {
 	Name = "KeyCap",
 	BackgroundColor3 = READY_GOLD,
 	Font = Enum.Font.GothamBlack,
 	Text = "Z",
+	TextXAlignment = Enum.TextXAlignment.Center,
 	TextScaled = true,
 	TextColor3 = INK,
 	Visible = false,
@@ -151,7 +150,6 @@ local keyCap = new("TextLabel", {
 UiKit.round(keyCap, 5)
 new("UIStroke", { Color = WHITE, Thickness = 1.5, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, keyCap)
 new("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 2) }, keyCap)
-local stateWide, stateShort = UDim2.new(), UDim2.new() -- (beside the cap: shorter)
 local save = new("TextButton", {
 	Name = "Save",
 	AutoButtonColor = false,
@@ -169,8 +167,6 @@ local shineClip = button:FindFirstChild("ShineClip") :: Frame?
 
 local busy = false
 local wasReady = false
-local compact = false -- (a phone's short row: shorter words)
-local apart = false -- (a phone's: a tile of its own, its meter its rim)
 local drawn = "" -- (what it shows now: redrawn only when that changes)
 local paletteKey = ""
 
@@ -201,44 +197,22 @@ local function layout()
 	if size.X <= 0 or size.Y <= 0 then
 		return
 	end
-	if apart then
-		-- A tile: HYPERBEAM across the top (well in from its sides, so it
-		-- never runs under the rim), its state big in the room under it,
-		-- SAVE a strip along the bottom.
-		compact = true
-		save.Size = UDim2.new(1, -10, 0, 13)
-		save.Position = UDim2.new(0, 5, 1, -17)
-		save.TextSize = 8
-		ringStroke.Thickness = 3
-		keyCap.Visible = false
-		title.Position, title.Size = UDim2.fromOffset(6, 6), UDim2.new(1, -12, 0, 11)
-		state.Position, state.Size = UDim2.fromOffset(3, 17), UDim2.new(1, -6, 1, -36)
-		title.TextXAlignment, state.TextXAlignment = Enum.TextXAlignment.Center, Enum.TextXAlignment.Center
-		drawn = ""
-		return
-	end
-	-- HYPERBEAM on the left, its state on the right, SAVE at the end.
-	title.TextXAlignment, state.TextXAlignment = Enum.TextXAlignment.Left, Enum.TextXAlignment.Right
-	compact = size.X < 170
-	local pad = if compact then 6 else 9
-	local saveH = math.max(12, size.Y - 6)
-	local saveW = if compact then 32 else 44
-	save.Size = UDim2.fromOffset(saveW, saveH)
-	save.Position = UDim2.new(1, -saveW - 3, 0.5, -saveH / 2)
-	save.TextSize = if compact then 8 else 9
-	ringStroke.Thickness = if compact then 2.5 else 3
-	local textH = math.min(size.Y - 6, if compact then 13 else 15)
-	local room = size.X - pad * 2 - saveW - 4
-	local stateW = math.floor(room * (if compact then 0.38 else 0.45))
-	title.Position = UDim2.new(0, pad, 0.5, -textH / 2)
-	title.Size = UDim2.fromOffset(room - stateW - 4, textH)
-	state.Position = UDim2.new(0, pad + room - stateW, 0.5, -textH / 2)
-	local capH = math.max(12, size.Y - 6)
-	keyCap.Size = UDim2.fromOffset(capH, capH)
-	keyCap.Position = UDim2.new(0, pad + room - capH, 0.5, -capH / 2)
-	stateWide = UDim2.fromOffset(stateW, textH)
-	stateShort = UDim2.fromOffset(math.max(10, stateW - capH - 5), textH)
-	state.Size = stateWide
+	-- HYPERBEAM across the top (on a computer after its key in a cap; well
+	-- in from the sides, so it never runs under the rim), its state big in
+	-- the room under it, SAVE a strip along the bottom.
+	local keyed = not touch()
+	local cap = 13
+	keyCap.Visible = keyed
+	keyCap.Size = UDim2.fromOffset(cap, cap)
+	keyCap.Position = UDim2.fromOffset(6, 5)
+	local left = if keyed then 6 + cap + 3 else 6
+	title.Position, title.Size = UDim2.fromOffset(left, 6), UDim2.new(1, -left - 6, 0, 11)
+	title.TextXAlignment = if keyed then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center
+	state.Position, state.Size = UDim2.fromOffset(3, 18), UDim2.new(1, -6, 1, -37)
+	state.TextXAlignment = Enum.TextXAlignment.Center
+	save.Size = UDim2.new(1, -10, 0, 13)
+	save.Position = UDim2.new(0, 5, 1, -17)
+	save.TextSize = 8
 	drawn = "" -- (its words change with its size)
 end
 
@@ -279,28 +253,14 @@ end
 
 local colors = { CHARGE }
 
--- Where its meter goes and the shapes: round the card (the slot's parent)
--- for the pill; round the tile itself, a little out from it, on a phone.
-local function corner(frame: GuiObject, radius: number)
-	local c = frame:FindFirstChildOfClass("UICorner")
-	if c then
-		c.CornerRadius = UDim.new(0, radius)
-	end
-end
+-- Its meter round the tile, a little out from it, filling from the bottom
+-- up.
 local function home(slot: GuiObject)
-	apart = slot:GetAttribute("Apart") == true
-	local holder = if apart then slot else slot.Parent
-	ring.Parent, halo.Parent = holder, holder
+	ring.Parent, halo.Parent = slot, slot
 	ring.AnchorPoint, ring.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
-	ring.Size = if apart then UDim2.new(1, 4, 1, 4) else UDim2.fromScale(1, 1)
-	halo.Size = if apart then UDim2.new(1, 10, 1, 10) else UDim2.new(1, 6, 1, 6)
-	-- (the tile's meter fills from the bottom up; the card's left to right)
-	fillGradient.Rotation = if apart then -90 else 0
-	corner(button, if apart then 10 else 999)
-	corner(flash, if apart then 10 else 999)
-	corner(glow, if apart then 16 else 999)
-	corner(ring, if apart then 12 else 10)
-	corner(halo, if apart then 15 else 13)
+	ring.Size = UDim2.new(1, 4, 1, 4)
+	halo.Size = UDim2.new(1, 10, 1, 10)
+	fillGradient.Rotation = -90
 	layout()
 end
 
@@ -338,19 +298,16 @@ local function refresh()
 	local ready = charge >= 100 and not blasting
 	local saving = player:GetAttribute("KaijuSave") == true
 	local pct = math.floor(charge)
-	local look = string.format("%d/%s/%s/%s/%s", pct, tostring(blasting), tostring(saving), tostring(compact), tostring(touch()))
+	local look = string.format("%d/%s/%s/%s", pct, tostring(blasting), tostring(saving), tostring(touch()))
 	if look == drawn then
 		return
 	end
 	drawn = look
 	fillGradient.Transparency = KaijuBeamHud.fillLevel(charge / 100)
 	ringStroke.Transparency = if ready or blasting then 0 else 0.15
-	-- Its words (ready on a computer: READY! and its key, Z, in a cap).
-	local capped = ready and not apart and not compact and not touch()
-	keyCap.Visible = capped
-	if not apart then
-		state.Size = if capped then stateShort else stateWide
-	end
+	-- Its words, and its key's cap: gold once it's ready.
+	keyCap.BackgroundColor3 = if ready then READY_GOLD else Color3.fromRGB(58, 64, 88)
+	keyCap.TextColor3 = if ready then INK else P.Text
 	if blasting then
 		state.Text = "BLASTING!"
 		state.TextColor3 = READY_GOLD
@@ -358,10 +315,10 @@ local function refresh()
 		state.Text = "READY!"
 		state.TextColor3 = READY_GOLD
 	else
-		state.Text = if compact then string.format("%d%%", pct) else string.format("CHARGING  %d%%", pct)
+		state.Text = string.format("%d%%", pct)
 		state.TextColor3 = if saving then P.Good else P.Text
 	end
-	save.Text = if saving and not compact then "SAVE ON" else "SAVE"
+	save.Text = "SAVE"
 	save.TextColor3 = if saving then INK else P.Dim
 	save.BackgroundColor3 = if saving then P.Good else Color3.fromRGB(28, 32, 50)
 	saveStroke.Color = if saving then P.Good else P.Edge
@@ -439,19 +396,11 @@ function KaijuBeamHud.start(slot: GuiObject)
 		return
 	end
 	started = true
-	-- The pill in its cell on the card's bottom edge, the meter round the
-	-- card itself (the cell's parent); on a phone the tile, the meter round
-	-- it (home).
+	-- The tile fills its slot, the meter round it (home).
 	button.Size = UDim2.fromScale(1, 1)
 	button.Position = UDim2.fromScale(0, 0)
 	button.Parent = slot
 	home(slot)
-	slot:GetAttributeChangedSignal("Apart"):Connect(function()
-		home(slot)
-	end)
-	slot:GetPropertyChangedSignal("Parent"):Connect(function()
-		home(slot)
-	end)
 	button:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 	button.Activated:Connect(fire)
 	save.Activated:Connect(toggleSave)
@@ -464,15 +413,14 @@ function KaijuBeamHud.start(slot: GuiObject)
 		end
 		return Enum.ContextActionResult.Sink
 	end, false, 3000, Enum.KeyCode.Z, Enum.KeyCode.DPadDown)
-	-- Ready: its colours flow round the outline, the glow about the card
-	-- and the pill breathes, the title shimmers (nothing moves while it
-	-- charges).
+	-- Ready: its colours flow round the rim, the glow about the tile
+	-- breathes, the title shimmers (nothing moves while it charges).
 	IronUi.animate(glow, function(now: number)
 		if not wasReady then
 			return
 		end
 		local flow = ((now * 0.35) % 2) - 1
-		fillGradient.Offset = if apart then Vector2.new(0, flow) else Vector2.new(flow, 0)
+		fillGradient.Offset = Vector2.new(0, flow)
 		local tint = colors[1 + math.floor(now * 1.5) % #colors]:Lerp(READY_GOLD, 0.35)
 		glow.BackgroundColor3 = tint
 		glow.BackgroundTransparency = 0.62 + 0.18 * math.sin(now * 5)

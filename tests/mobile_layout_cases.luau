@@ -303,11 +303,18 @@ for _, s in SCREENS do
 		check(not MobileLayout.overlaps(shown, r), label .. ": the foe list overlaps the " .. name)
 	end
 	-- (The computer's card keeps three by two: the kaiju two by two, AUTO
-	-- HEAL over the team keys.)
+	-- HEAL over the HYPERBEAM, both inside the card.)
 	local desk = MobileLayout.kaijuDesk(Vector2.new(1366, 710))
 	local dc = MobileLayout.kaijuCells(desk)
-	check(not dc.Grid and dc.Teams.X == dc.Auto.X and dc.Teams.Y > dc.Auto.Y and dc.Fighters[3].Y > dc.Fighters[1].Y,
+	check(not dc.Grid and dc.Beam.X == dc.Auto.X and dc.Beam.Y > dc.Auto.Y and dc.Fighters[3].Y > dc.Fighters[1].Y,
 		"The computer's kaiju card isn't three by two")
+	check(
+		dc.Auto.H == dc.Fighters[1].H
+			and dc.Beam.H == dc.Support.H
+			and dc.Beam.Y + dc.Beam.H <= desk.H
+			and dc.Beam.X + dc.Beam.W <= desk.W,
+		"AUTO HEAL and the HYPERBEAM don't sit in the card's right column, a cell each"
+	)
 	-- The kit switch (pick or combat kit): just left of PLAY and level with
 	-- it, big enough to tap, on the screen, clear of PLAY, the tiles under
 	-- it, Roblox's thumbstick, the fight's ring (ATTACK, the surges, GUARD,

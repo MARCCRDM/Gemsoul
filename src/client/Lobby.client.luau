@@ -50,7 +50,7 @@ require(script.Parent.Modules.EdgeDome).start()
 if Config.Features == nil or Config.Features.Kaiju ~= false then
 	local KaijuHud = require(script.Parent.Modules.KaijuHud)
 	KaijuHud.start()
-	-- The team's HYPERBEAM: its button along the kaiju card's bottom, and
+	-- The team's HYPERBEAM: its tile on the kaiju card (apart on a phone), and
 	-- the blast itself.
 	require(script.Parent.Modules.KaijuBeamHud).start(KaijuHud.beamSlot())
 	require(script.Parent.Modules.KaijuBeamFx).start()

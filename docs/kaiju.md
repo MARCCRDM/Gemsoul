@@ -678,9 +678,9 @@ above the combat HUD near the bottom center:
   - **The kaiju, two by two on the left:** your team's three (the lead
     first, edged in gold, then the second beside it and the third under
     it), and your support beside the third.
-  - **On the right:** AUTO HEAL over the team keys, four chips two by two:
-    the team out gold, one called back edged in gold, one all knocked out
-    red, one not filled yet faint.
+  - **On the right** (*2026-10-29*): AUTO HEAL, a tile the size of a
+    kaiju's (it used to run down the whole column), over the HYPERBEAM's
+    tile with its key, Z. The team keys are tabs along the card's top.
 
   On a phone, *2026-10-27*, **a small grid at the top left**, in a fight
   too: the team's three and the support a little apart in a row, and AUTO
@@ -797,31 +797,31 @@ blast together. It works the same in mining and in fights.
   (`KaijuSaveCharge`). While it's on, your fighters cast none of their Q, E
   or R moves (`KaijuFighter.hold`). They fight with blows alone and charge
   1.6 times as fast. The support's heals still go out.
-- **The meter and its button** (`KaijuBeamHud`). *2026-10-26:* the kaiju
-  card's own outline is the meter. It fills left to right round the card in
-  your team's colours, by the team's charge, over the card's dim edge
-  (`KaijuBeamHud.fillLevel`). Its button is a pill set on the middle of the
-  card's bottom edge, half over it (`KaijuHud.beamSlot`,
-  `MobileLayout.kaijuCells`' `Beam`), clear of every tile. It has HYPERBEAM
-  on the left, its state on the right and SAVE at the end (green while
-  it's on). It shows:
-  - **Charging:** the percentage (CHARGING 42% on a computer).
-  - **Ready:** the outline full and bright, its colours flowing round the
-    card, a glow breathing about the card and the pill, the HYPERBEAM title
-    shimmering; it pops with a sound. It reads **READY! [ Z ]** on a
-    computer and **READY!** on a phone.
+- **The meter and its button** (`KaijuBeamHud`). *2026-10-29:* a tile on
+  the kaiju card, in the bottom-right cell under AUTO HEAL
+  (`KaijuHud.beamSlot`, `MobileLayout.kaijuCells`' `Beam`). It used to be a
+  pill hanging off the card's bottom edge, with the card's outline as its
+  meter; the card is 9 points shorter without it. The tile has its key, Z,
+  in a cap before HYPERBEAM, its state big under that and SAVE along the
+  bottom (green while it's on). Its rim is the meter: it fills from the
+  bottom up in your team's colours, by the team's charge
+  (`KaijuBeamHud.fillLevel`). It shows:
+  - **Charging:** the percentage.
+  - **Ready:** the rim full and bright, its colours flowing round it, a
+    glow breathing about the tile, the HYPERBEAM title shimmering, the Z
+    cap gold, READY!; it pops with a sound.
   - **Blasting:** BLASTING!
 
-  On a phone it isn't on the card: it's a button of its own right of the
-  team keys and as tall as they are, its rim the meter, filling from the
-  bottom up (the slot's `Apart` attribute; see [Your team](#your-team)).
+  On a phone it isn't on the card: the same tile is a button of its own
+  right of the team keys and as tall as they are, with no Z (see
+  [Your team](#your-team)).
 
   It's light to run: it redraws only when what it shows changes, and moves
   only while it's ready.
 
   **Z**, the gamepad's d-pad down, or a tap fires it.
 
-  ![The kaiju card with its outline as the HYPERBEAM meter: charging, saving, ready and blasting, its pill on the bottom edge. Offline render of the game's UI code, not a Roblox screenshot](kaiju/hyperbeam-states.png)
+  ![The kaiju card on a computer: AUTO HEAL over the HYPERBEAM's tile with its Z key, charging at 24%, saving at 60% and ready. Offline render of the game's UI code, not a Roblox screenshot](kaiju/hyperbeam-card.png)
 
   ![On a phone: the team keys two by two and the HYPERBEAM's own button beside them, charging at 63% and ready. Offline render, not a Roblox screenshot](kaiju/hyperbeam-phone.png)
 - **The blast** (`KaijuBeamServer`, 6.1 seconds, `KaijuBeam.timeline`).
@@ -1354,9 +1354,9 @@ Proposed guardrails:
 | `SparServer` | `Hunt`: the kit out alone |
 | `Shared.KaijuBeam` | The HYPERBEAM's rules: its charge (`Charge`, `gain`, `ready`), its timeline and phases, the formation and the leaps into it (`Leap`, `leap`, `leapHeight`, `arc`), the beam's reach (`hits`), the aim assist (`aim`), what it takes and how it swings (`threat`, `order`, `sweep`, `direction`) and its damage |
 | `KaijuBeamServer` | The team's charge on your profile (`BeamCharge`; `KaijuCharge` and `KaijuSave` on you), SAVE CHARGE (`KaijuSaveCharge`), the blast (`KaijuBeam`): the formation, holding them still, the pulses, letting go |
-| `KaijuHud` (client) | The kaiju card (a computer's three by two: the team and the support two by two, AUTO HEAL over the team keys; a phone's two rows; on a computer the HYPERBEAM its outline, its pill on the bottom edge), the team keys 1 to 4, CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL and TEAMS tabs, and the roll in the Outpost for a player still owed one |
+| `KaijuHud` (client) | The kaiju card (a computer's three by two: the team and the support two by two, AUTO HEAL over the HYPERBEAM; a phone's two rows; on a computer AUTO HEAL over the HYPERBEAM's tile, its key Z on it), the team keys 1 to 4, CATCH, a wild kaiju's Challenge, the kaiju panel and its HEAL and TEAMS tabs, and the roll in the Outpost for a player still owed one |
 | `KaijuRoll` (client) | The starter roll's screen, on the intro gem roll's reels (`KaijuRoll.Frame` frames the kaiju in each window): in the intro after the move reveal (`Intro.client`), and in the Outpost (`KaijuHud`) |
-| `KaijuBeamHud` (client) | The HYPERBEAM: on a computer the card's outline as its meter, its pill on the card's bottom edge; on a phone a button of its own right of the team keys, its rim the meter (the charge, READY, SAVE), Z / tap |
+| `KaijuBeamHud` (client) | The HYPERBEAM: a tile, its rim the meter (the charge, READY, SAVE); on a computer on the kaiju card under AUTO HEAL, its key Z on it; on a phone a button of its own right of the team keys; Z / tap |
 | `KaijuBeamFx` (client) | The blast on screen: the rune circle, each leap carried along its arc and slammed down, the roar, the auras, the streams and orb, the beam turning onto its targets in turn; your flash, grade and bloom, no camera takeover (`flight`; `tools/vfx_sim.luau`'s Hyperbeam renders it from your eyes) |
 | `KaijuTaming` (client) | The gold glow and READY TO CATCH on a kaiju that can be caught, the tame's beam and motes (from `KaijuTameBy`, for everyone), the tamer's cast bar and its result (`TameResult`) |
 | `CritterFx` (client) | A gem raid's snatchers on screen: their giggles and cackles with "hee hee!" over them, and a dropped gem flying back ("GOT IT BACK!") |

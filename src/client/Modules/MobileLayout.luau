@@ -400,35 +400,28 @@ function MobileLayout.foes(screen: Vector2, viewY: number?)
 	return { X = wallet.X + wallet.W - w, Y = wallet.Y, W = w, Bottom = bottom }
 end
 
--- The same card on a computer: bottom left, a fixed size, the pill's
--- lower half clear above the screen's edge (ChatFeed keeps its bottom
--- clear above it).
+-- The same card on a computer: bottom left, a fixed size (ChatFeed keeps
+-- its bottom clear above it).
 -- (Tabs: the team keys' tabs along its top edge, above it: KaijuHud.)
-MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 58, 58 }, Notch = 24, Tabs = 26 }
--- The card's strip under its rows: the pill's upper half and a little air.
-function MobileLayout.under(notch: number): number
-	return math.floor(notch / 2) + 3
-end
+MobileLayout.KaijuDesk = { W = 276, Pad = 6, Gap = 6, Rows = { 58, 58 }, Tabs = 26 }
 function MobileLayout.kaijuDesk(screen: Vector2)
 	local spec = MobileLayout.KaijuDesk
-	local h = spec.Pad + spec.Gap + spec.Rows[1] + spec.Rows[2] + MobileLayout.under(spec.Notch)
+	local h = spec.Pad * 2 + spec.Gap + spec.Rows[1] + spec.Rows[2]
 	return {
 		X = 24,
-		Y = screen.Y - 24 - spec.Notch / 2 - h,
+		Y = screen.Y - 24 - h,
 		W = spec.W,
 		H = h,
 		Pad = spec.Pad,
 		Gap = spec.Gap,
 		Rows = table.clone(spec.Rows),
-		Notch = spec.Notch,
 	}
 end
 
 -- The card's cells, inside it (`card`: kaiju's or kaijuDesk's). A
 -- computer's: the kaiju two by two on the left (Fighters 1 and 2 on top,
--- Fighter 3 and Support under them), Auto (AUTO HEAL) over Teams (the team
--- keys) on the right, and Beam, the HYPERBEAM's pill, across the middle of
--- the card's bottom edge (half below it). A phone's (Grid): the team's
+-- Fighter 3 and Support under them), Auto (AUTO HEAL) over Beam (the
+-- HYPERBEAM's tile, with its key) on the right. A phone's (Grid): the team's
 -- three in a row and the support a little apart, Auto across the card
 -- under them, no Teams or Beam (they're keys(screen) and beam(screen)).
 function MobileLayout.kaijuCells(card)
@@ -445,9 +438,6 @@ function MobileLayout.kaijuCells(card)
 		local auto = { X = pad, Y = pad + t + gap, W = card.W - pad * 2, H = rows[2] }
 		return { Fighters = fighters, Support = support, Auto = auto, Grid = true }
 	end
-	local notch = card.Notch or 22
-	local beamW = math.floor(card.W * 0.78)
-	local beam = { X = math.floor((card.W - beamW) / 2), Y = card.H - math.floor(notch / 2), W = beamW, H = notch }
 	local cell = math.floor((card.W - pad * 2 - gap * 2) / 3)
 	local function at(column: number, y: number, h: number)
 		return { X = pad + (column - 1) * (cell + gap), Y = y, W = cell, H = h }
@@ -457,8 +447,7 @@ function MobileLayout.kaijuCells(card)
 		Fighters = { at(1, pad, rows[1]), at(2, pad, rows[1]), at(1, y2, rows[2]) },
 		Support = at(2, y2, rows[2]),
 		Auto = at(3, pad, rows[1]),
-		Teams = at(3, y2, rows[2]),
-		Beam = beam,
+		Beam = at(3, y2, rows[2]),
 		Grid = false,
 	}
 end
