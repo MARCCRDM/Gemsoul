@@ -444,13 +444,21 @@ local function incursion(player: Player, band: string, count: number, raider: bo
 			-- tears; nowhere like that, any open ground round about.)
 			local level = KaijuServer.ground(root.Position).Y
 			local look = root.CFrame.LookVector
-			local spot = Frontier.riftSpot(root.Position, look, center(), rng, openTears(), spots, function(at)
+			local function level3(at: Vector3): boolean
 				return math.abs(KaijuServer.ground(at).Y - level) <= 3
-			end)
+			end
+			-- (Round the base: close by, never in the Shelter; out there: the
+			-- frontier's tears.)
+			local spot = if band == "Core"
+				then Frontier.coreSpot(root.Position, look, center(), shelterBox(), rng, level3)
+				else Frontier.riftSpot(root.Position, look, center(), rng, openTears(), spots, level3)
 			local floor = if spot
 				then KaijuServer.ground(spot)
 				else openGround(root, function()
-					return Frontier.riftSpot(root.Position, look, center(), rng) :: Vector3
+					return if band == "Core"
+						then Frontier.coreSpot(root.Position, look, center(), shelterBox(), rng)
+							or root.Position + look * Frontier.CoreCritters.Near
+						else Frontier.riftSpot(root.Position, look, center(), rng) :: Vector3
 				end)
 			table.insert(spots, floor)
 			local _, life = FrontierServer.open(floor, root.Position, {
@@ -513,8 +521,38 @@ local function consider(player: Player, state, band: string)
 	incursion(player, band, math.min(room, size), nil, state.Wave)
 end
 
+-- A swing at the rocks round the base: now and then a light critter or two
+-- (Frontier.CoreCritters), more often for a newcomer, their first on their
+-- first few swings. Never from inside the Shelter.
+local function coreSwing(player: Player, swings: number)
+	if player:GetAttribute("AtBase") == true then
+		return
+	end
+	local state = stateOf(player)
+	local rules = Frontier.CoreCritters
+	state.CoreSwings = (state.CoreSwings or 0) + swings
+	local now = os.clock()
+	if now - (state.CoreAt or -math.huge) < rules.Gap or living(player) > 0 or total() >= Frontier.Caps.Server then
+		return
+	end
+	local profile = PlayerData.get(player)
+	local stats = profile and (profile :: any).Stats
+	local met = stats and tonumber(stats.CoreCritters) or 0
+	if rng:NextNumber() >= Frontier.coreChance(met, state.CoreSwings) then
+		return
+	end
+	state.CoreAt, state.CoreSwings = now, 0
+	PlayerData.count(player, "CoreCritters")
+	incursion(player, "Core", Frontier.coreSize(met, rng), nil, 1)
+	if met <= 0 then
+		Remotes.Notify:FireClient(player, "Critters! They come for miners. Swing back, or let your kaiju handle them.")
+	end
+end
+FrontierServer._coreSwing = coreSwing
+
 -- A swing (or a mech's strike of `swings` swings) by `player`: noise, out
 -- past the core, louder the more stirred up it is, and it stirs it up more.
+-- Round the base: the light critters (coreSwing).
 function FrontierServer.swing(player: Player, swings: number?)
 	local root = rootOf(player)
 	if not root or not eligible(player) then
@@ -522,6 +560,7 @@ function FrontierServer.swing(player: Player, swings: number?)
 	end
 	local band = Frontier.band(Frontier.distance(root.Position, center()))
 	if band == "Core" then
+		coreSwing(player, swings or 1)
 		return
 	end
 	local state = stateOf(player)

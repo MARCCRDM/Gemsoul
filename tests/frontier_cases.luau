@@ -1171,6 +1171,43 @@ do -- Critters that keep up with your team (Frontier.teamScale)
 	check(server:find("lone) + scale.Levels", 1, true) ~= nil, "Wandering rifts don't keep up with the team")
 end
 
+
+-- Light critters round the base (Frontier.CoreCritters): a newcomer's first
+-- comes on their FirstAt'th swing, alone; then more often while they're new,
+-- rarely after; weak and never stirred up; their tears never in the Shelter.
+do
+	local rules = Frontier.CoreCritters
+	check(Frontier.coreChance(0, rules.Newcomer.FirstAt) == 1, "A newcomer's first core critter isn't certain")
+	check(Frontier.coreChance(0, 1) == rules.Newcomer.Chance, "A newcomer's first swings near base aren't more likely")
+	check(Frontier.coreChance(rules.Newcomer.Encounters, 50) == rules.Chance, "Old hands meet core critters as often as newcomers")
+	check(rules.Chance < rules.Newcomer.Chance and rules.Chance > 0, "Core critters never come, or come more for old hands")
+	check(Frontier.coreSize(0, Random.new(1)) == 1, "A newcomer's first is more than one")
+	local rng = Random.new(7)
+	for _ = 1, 200 do
+		local n = Frontier.coreSize(2, rng)
+		check(n >= rules.Size[1] and n <= rules.Size[2], "Too many core critters: " .. n)
+	end
+	check(Frontier.critterLevel("Core", rng, 1, true) == Frontier.Levels.Core[1], "Core critters get stirred up or tougher alone")
+	check(Frontier.Boost.Core.Damage < 1 and Frontier.Boost.Core.Health < 1, "Core critters aren't light")
+	check(Frontier.teamScale("Core", { Average = 30, Count = 4 }).Levels == 0, "Core critters keep up with a strong team")
+	local box = Vector2.new(88, 64)
+	local center = Vector3.zero
+	for i = 1, 300 do
+		local at = Vector3.new(rng:NextNumber(-140, 140), 0, rng:NextNumber(-140, 140))
+		local spot = Frontier.coreSpot(at, Vector3.new(1, 0, 0), center, box, rng)
+		if spot then
+			check(not Frontier.atBase(spot - center, box), "A core critter's tear opened in the Shelter")
+			local d = (Vector3.new(spot.X, 0, spot.Z) - Vector3.new(at.X, 0, at.Z)).Magnitude
+			check(d >= rules.Near - 0.01 and d <= rules.Far + 0.01, "A core tear opened too near or far: " .. d)
+		end
+	end
+	local server = fs.readFile(ROOT .. "/src/server/Systems/FrontierServer.luau")
+	check(server:find("coreSwing(player, swings or 1)", 1, true) ~= nil, "Swings near the base don't bring core critters")
+	check(server:find('player:GetAttribute("AtBase") == true', 1, true) ~= nil, "Core critters come in the Shelter")
+	local wilds = fs.readFile(ROOT .. "/src/server/Systems/KaijuWilds.luau")
+	check(wilds:find('wild.Band == "Core" and player:GetAttribute("AtBase") ~= true', 1, true) ~= nil, "Core critters can't chase near the base, or chase into the Shelter")
+end
+
 print(
 	string.format(
 		"PASS: %d frontier checks (bands, the biomes, their swaying borders and their ground, the spokes, outcrops, veins, noise, stirring it up, shares, critters, rifts, tears, the HUD, gem raids, robbed while down)",

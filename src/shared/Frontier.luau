@@ -6,6 +6,8 @@
 	The quarry is three bands round its middle:
 	  Core    the outpost, the landing pad and the field round them (inside
 	          Core studs): safe, no rifts, the plainest rocks
+	  (Core: round the base, a light critter or two now and then as you
+	  mine, sooner for a newcomer: CoreCritters.)
 	  Fringe  out to EdgeFrom: rifts start tearing open round you, and the
 	          rocks run richer (Bands.Fringe.Luck on every gem they pay)
 	  Edge    out to the walls: rifts open often and more critters come
@@ -346,6 +348,23 @@ Frontier.Noise = {
 -- (each one weak: Shared.Kaiju.Bug), but each is a whole brainrot body:
 -- the Outpost's cap keeps them from lagging it.
 Frontier.Caps = { Fringe = 7, Edge = 9, Server = 28 }
+
+-- Light critters round the base (the core), so a newcomer meets them on
+-- their first rocks there: a swing at the core's rocks brings one or two
+-- weak ones (Levels.Core, Boost.Core) now and then (Chance a swing); for
+-- one who's met fewer than Newcomer.Encounters of them, more often
+-- (Newcomer.Chance), the very first always on their FirstAt'th swing. Gap
+-- seconds between them, none while some are still about. Their tears open
+-- Near to Far studs from you, never in the Shelter, and they chase you
+-- anywhere in the core but into the Shelter.
+Frontier.CoreCritters = {
+	Chance = 1 / 45,
+	Newcomer = { Encounters = 3, Chance = 1 / 8, FirstAt = 4 },
+	Size = { 1, 2 },
+	Gap = 45,
+	Near = 14,
+	Far = 24,
+}
 -- Out past the core with no kaiju of yours out you're alone, and the
 -- frontier knows it: your swings and your seconds out there make Noise
 -- times the noise, the next encounter can come Gap seconds after one (not
@@ -420,9 +439,13 @@ Frontier.Disturbance = {
 Frontier.Leave, Frontier.Life = 4, 90
 -- Its level by where it came through: the edge's are for a kaiju of about
 -- level 8 and up.
-Frontier.Levels = { Fringe = { 1, 4 }, Edge = { 9, 13 } }
+Frontier.Levels = { Core = { 1, 1 }, Fringe = { 1, 4 }, Edge = { 9, 13 } }
 -- Critters from the edge are tougher, and worth more.
-Frontier.Boost = { Fringe = { Health = 1, Damage = 1, Exp = 1 }, Edge = { Health = 1.25, Damage = 1.2, Exp = 1.5 } }
+Frontier.Boost = {
+	Core = { Health = 0.55, Damage = 0.4, Exp = 0.5 }, -- (the light ones round the base: CoreCritters)
+	Fringe = { Health = 1, Damage = 1, Exp = 1 },
+	Edge = { Health = 1.25, Damage = 1.2, Exp = 1.5 },
+}
 -- EXP for each kaiju that fought one: Base + PerLevel x its level (times
 -- its band's Boost.Exp); a quarter after Daily critters a day.
 Frontier.Exp = { Base = 1.6, PerLevel = 0.5, Daily = 150, After = 0.25 }
@@ -935,6 +958,56 @@ function Frontier.atBase(offset: Vector3, box: Vector2): boolean
 	return math.abs(offset.X) <= box.X and math.abs(offset.Z) <= box.Y
 end
 
+-- The chance a swing at the core's rocks brings light critters, for one
+-- who's met `met` of them and has swung `swings` times there since the last.
+function Frontier.coreChance(met: number, swings: number): number
+	local rules = Frontier.CoreCritters
+	if met <= 0 and swings >= rules.Newcomer.FirstAt then
+		return 1
+	end
+	return if met < rules.Newcomer.Encounters then rules.Newcomer.Chance else rules.Chance
+end
+
+-- How many come: one the very first time, else one or two.
+function Frontier.coreSize(met: number, rng): number
+	if met <= 0 then
+		return 1
+	end
+	local size = Frontier.CoreCritters.Size
+	return if rng then rng:NextInteger(size[1], size[2]) else size[1]
+end
+
+-- Where a core critter's tear opens: Near to Far studs from `position`,
+-- ahead of `facing` if it can, never inside the Shelter (`box`: its half
+-- sizes round `center`), and `usable` if given. nil: nowhere fits.
+function Frontier.coreSpot(
+	position: Vector3,
+	facing: Vector3,
+	center: Vector3,
+	box: Vector2,
+	rng,
+	usable: ((Vector3) -> boolean)?
+): Vector3?
+	local rules = Frontier.CoreCritters
+	local flat = Vector3.new(facing.X, 0, facing.Z)
+	local ahead = if flat.Magnitude > 0.01 then math.atan2(flat.Z, flat.X) else rng:NextNumber(0, math.pi * 2)
+	for try = 1, 16 do
+		local spread = if try <= 8 then 0.9 else math.pi
+		local angle = ahead + rng:NextNumber(-spread, spread)
+		local reach = rng:NextNumber(rules.Near, rules.Far)
+		local spot = position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach
+		local offset = spot - center
+		if
+			not Frontier.atBase(Vector3.new(offset.X, 0, offset.Z), box)
+			and Vector2.new(offset.X, offset.Z).Magnitude <= Frontier.Rim
+			and (usable == nil or usable(spot))
+		then
+			return spot
+		end
+	end
+	return nil
+end
+
 -- How stirred up the frontier is after `swings` more swings in `band` (the
 -- core stirs nothing).
 function Frontier.stir(stir: number, band: string, swings: number): number
@@ -995,6 +1068,9 @@ end
 function Frontier.critterLevel(band: string, rng, stir: number?, alone: boolean?): number
 	local range = Frontier.Levels[band] or Frontier.Levels.Fringe
 	local level = if rng then rng:NextInteger(range[1], range[2]) else range[1]
+	if band == "Core" then
+		return level -- (the light ones round the base: never stirred up)
+	end
 	level += math.floor(Frontier.Disturbance.Levels * math.clamp(stir or 0, 0, 1) + 1e-9)
 	return level + (if alone then Frontier.Alone.Levels else 0)
 end
@@ -1019,7 +1095,7 @@ end
 -- the band draws a bigger swarm: one more critter for every LevelsPerExtra
 -- of those levels, at most MaxExtra, as much of that as the team is full
 -- (Count of Full: three and a support); the cap round you rises with it.
-Frontier.Team = { Share = { Fringe = 0.65, Edge = 1 }, LevelsPerExtra = 4, MaxExtra = 4, Full = 4 }
+Frontier.Team = { Share = { Core = 0, Fringe = 0.65, Edge = 1 }, LevelsPerExtra = 4, MaxExtra = 4, Full = 4 }
 
 function Frontier.teamScale(band: string, team): { Levels: number, Extra: number }
 	local range = Frontier.Levels[band]

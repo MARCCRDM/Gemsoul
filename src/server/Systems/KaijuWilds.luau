@@ -290,9 +290,11 @@ KaijuWilds.hunter = hunter
 
 -- Prey for a rift's critter: a hunter anywhere, or anyone else in the
 -- Outpost on their feet (or in a mech's cockpit) out past the core, not in
--- a spar or a fight elsewhere. (A critter's blow that would finish a miner
+-- a spar or a fight elsewhere; for one of the light critters round the base
+-- (`wild` of Band "Core": Frontier.CoreCritters), anywhere in the core but
+-- inside the Shelter (AtBase). (A critter's blow that would finish a miner
 -- knocks them down instead: SparServer.)
-local function prey(player: Player): boolean
+local function prey(player: Player, wild: any?): boolean
 	if hunter(player) then
 		return true
 	end
@@ -314,7 +316,10 @@ local function prey(player: Player): boolean
 	if not humanoid or humanoid.Health <= 0 or humanoid.SeatPart ~= nil or not root then
 		return false
 	end
-	return Frontier.distance(root.Position, Outpost.Location.Position) >= Frontier.Core - Frontier.Safe
+	if Frontier.distance(root.Position, Outpost.Location.Position) >= Frontier.Core - Frontier.Safe then
+		return true
+	end
+	return wild ~= nil and wild.Band == "Core" and player:GetAttribute("AtBase") ~= true
 end
 KaijuWilds.prey = prey
 
@@ -394,7 +399,7 @@ local function foesNear(center: Vector3, radius: number, wide: boolean?, wild: a
 	end
 	for _, player in Players:GetPlayers() do
 		local root = rootOf(player)
-		local fair = if wide then prey(player) else (hunter(player) or (wild ~= nil and exposed(wild, player)))
+		local fair = if wide then prey(player, wild) else (hunter(player) or (wild ~= nil and exposed(wild, player)))
 		if root and fair and (root.Position - center).Magnitude <= radius then
 			table.insert(list, { Root = root, Player = player })
 		end
@@ -504,7 +509,7 @@ local function hitFoe(enemy, victim, amount: number, element: string?, status: s
 		player
 		and (
 			hunter(player)
-			or (wild ~= nil and (wild.Bug or territorial(wild)) and prey(player))
+			or (wild ~= nil and (wild.Bug or territorial(wild)) and prey(player, wild))
 			or (wild ~= nil and exposed(wild, player))
 		)
 	then
@@ -525,7 +530,7 @@ local function fairFor(enemy, wild: Wild, victim): boolean
 		return false
 	end
 	local wide = wild.Bug or territorial(wild)
-	if victim.Player and not (if wide then prey(victim.Player) else (hunter(victim.Player) or exposed(wild, victim.Player))) then
+	if victim.Player and not (if wide then prey(victim.Player, wild) else (hunter(victim.Player) or exposed(wild, victim.Player))) then
 		return false
 	end
 	if not wild.Bug and not engaged(wild, if victim.Pet then victim.Pet.Owner else victim.Player) then
@@ -777,7 +782,7 @@ local function lingers(wild: Wild): boolean
 	local player = wild.Prey
 	local root = player and player.Parent and rootOf(player)
 	return root ~= nil
-		and prey(player :: Player)
+		and prey(player :: Player, wild)
 		and flat(root.Position - wild.Enemy.Home).Magnitude <= Frontier.Wander.Seal * 1.4
 end
 

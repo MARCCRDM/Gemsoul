@@ -4561,4 +4561,5 @@ return {
 	["A step-by-step path through the game. Every step pays coins, once."] = "Un camino paso a paso por el juego. Cada paso paga monedas, una vez.",
 	["FIELD LOG  ·  {1} / {2} COMPLETE"] = "REGISTRO  ·  {1} / {2} HECHAS",
 	["NEXT OBJECTIVE"] = "SIGUIENTE OBJETIVO",
+	["Critters! They come for miners. Swing back, or let your kaiju handle them."] = "¡Bichos! Vienen por los mineros. Devuélveles los golpes, o deja que tus kaiju se encarguen.",
 }
