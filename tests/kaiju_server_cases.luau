@@ -543,6 +543,17 @@ local server = {
 	Shop = Shop,
 	Duelist = DuelistStub,
 	CombatServer = CombatServerStub,
+	-- (Server.Analytics: the events sent, kept.)
+	Analytics = (function()
+		local events = {}
+		return {
+			Events = events,
+			event = function(player, name, value, a, b, c)
+				table.insert(events, { Player = player, Name = name, Value = value, A = a, B = b, C = c })
+			end,
+			coins = function() end,
+		}
+	end)(),
 }
 local sharedEnv
 local function load(path: string, name: string, environment)
@@ -2143,6 +2154,8 @@ do
 	check(not KaijuServer._fair(a, target), "Your kaiju still fights one being tamed")
 	finishCast(target)
 	check(a:GetAttribute("TameResult") == "Tamed", "A lucky try at 10% health failed")
+	local caught = server.Analytics.Events[#server.Analytics.Events]
+	check(caught and caught.Name == "KaijuCaught" and caught.Player == a and caught.A ~= nil, "The catch wasn't sent to Analytics")
 	local tamedId
 	for id, entry in roster.List do
 		if not had[id] and entry.Species == wild2.Species and entry.Soul.Element == wild2.Element then

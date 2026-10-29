@@ -13,6 +13,7 @@ local Party = require(script.Parent.Party)
 local Raids = require(script.Parent.Raids)
 local Duelist = require(script.Parent.Duelist)
 local ArenaSessions = require(script.Parent.ArenaSessions)
+local Analytics = require(script.Parent.Analytics)
 local ArenaDrop = require(script.Parent.ArenaDrop)
 local ArenaStreaks = require(script.Parent.ArenaStreaks)
 local CombatServer = require(script.Parent.CombatServer)
@@ -112,7 +113,7 @@ finish = function(run, won, reason)
 				local swings, xp = 0, 0
 				if eligible then
                     PlayerData.training(p, "DungeonComplete")
-					PlayerData.addCoins(p, 300)
+					PlayerData.addCoins(p, 300, "Dungeon")
 					xp = Progress.won(p, "DungeonBoss", squadLevel, "SlayBrute")
 					swings = Restores.give(p, SwingRestore.Dungeon)
 				end
@@ -229,7 +230,12 @@ local function spawnRoom(run, index)
 					return
 				end
                 if room.Boss and not run.Test then
-                    for _, member in living(run) do PlayerData.training(member, "Boss") end
+                    local spec = Rules.specOf(room, kind)
+                    local here = living(run)
+                    for _, member in here do
+                        PlayerData.training(member, "Boss")
+                        Analytics.event(member, "BossDefeated", #here, spec and spec.Id or "Boss", "Dungeon")
+                    end
                 end
 				if run.OpenWorld then
 					if room.Boss then

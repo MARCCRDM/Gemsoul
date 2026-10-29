@@ -69,7 +69,7 @@ local function marketSell(player: Player, ids: any)
 		total += Crafting.marketPrice(gem)
 		PlayerData.removeGem(player, gem.Id)
 	end
-	PlayerData.addCoins(player, total)
+	PlayerData.addCoins(player, total, "GemSale")
 	PlayerData.milestone(player, "Sold")
 	Progress.addXP(player, "Sell")
 	return reply(true, string.format("Sold %d gem%s for %d coins.", #gems, if #gems == 1 then "" else "s", total))
@@ -98,7 +98,7 @@ local function sellSpare(player: Player, tier: any)
 		total += Crafting.marketPrice(gem)
 	end
 	local sold = PlayerData.removeGems(player, ids)
-	PlayerData.addCoins(player, total)
+	PlayerData.addCoins(player, total, "GemSale")
 	PlayerData.milestone(player, "Sold")
 	Progress.addXP(player, "Sell")
 	return reply(

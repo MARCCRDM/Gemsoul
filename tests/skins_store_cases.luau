@@ -236,7 +236,18 @@ local thePlayer = { UserId = 7 }
 local handlers = {}
 local saves = 0
 local failSave = false -- (a save that fails: the receipt waits for Roblox to ask again)
+-- (Analytics: the purchases and tagged coins sent.)
+local analyticsPurchases, analyticsCoins = {}, {}
 local stubs = {
+	Analytics = {
+		purchased = function(_, key)
+			table.insert(analyticsPurchases, key)
+		end,
+		coins = function(_, delta, reason)
+			table.insert(analyticsCoins, { Delta = delta, Reason = reason })
+		end,
+		event = function() end,
+	},
 	Cosmetics = Cosmetics,
 	MinerRoster = { Count = 3, Enabled = true },
 	ExpeditionEconomy = { legacyCredits = function() return 0 end },

@@ -538,7 +538,7 @@ local function take(player: Player, stake, gemId: string?)
 	if stake == nil then
 		return { Kind = "None" }
 	elseif stake.Kind == "Coins" then
-		return if PlayerData.spendCoins(player, stake.Coins) then { Kind = "Coins", Coins = stake.Coins } else nil
+		return if PlayerData.spendCoins(player, stake.Coins, "KaijuBet") then { Kind = "Coins", Coins = stake.Coins } else nil
 	end
 	local id = gemId or stake.Gem.Id
 	if not holdings(player).Gems[id] then
@@ -554,7 +554,7 @@ local function give(player: Player, held)
 		return
 	end
 	if held.Kind == "Coins" then
-		PlayerData.addCoins(player, held.Coins)
+		PlayerData.addCoins(player, held.Coins, "KaijuBet")
 	elseif held.Kind == "Gem" then
 		PlayerData.returnGem(player, held.Gem)
 	end

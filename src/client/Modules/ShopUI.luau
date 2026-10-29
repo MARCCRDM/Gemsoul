@@ -449,11 +449,29 @@ local function live(key: string): boolean
 	return (Store.RobuxProducts[key] or 0) ~= 0
 end
 
+-- The Store funnel's steps seen here (Systems/Analytics): the Store opened,
+-- then an item looked at (once a visit).
+local viewed = false
+local function funnel(step: string)
+	if step == "StoreViewed" then
+		if viewed then
+			return
+		end
+		viewed = true
+	end
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	local remote = remotes and remotes:FindFirstChild("Funnel")
+	if remote then
+		remote:FireServer(step)
+	end
+end
+
 -- Buys a product: Roblox's prompt for Robux, or coins while testing.
 local function buy(key: string)
 	if state.Busy then
 		return
 	end
+	funnel("StoreViewed")
 	local ok, why = Store.canBuy(key, profile(), now())
 	if not ok then
 		UiKit.toast(why or "That isn't for sale.", C.Dim)
@@ -1342,6 +1360,7 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 	card:SetAttribute("UiSound", "Click")
 	card.Activated:Connect(function()
 		state.Selected[tab] = id
+		funnel("StoreViewed")
 		refresh()
 	end)
 end
@@ -2556,6 +2575,10 @@ function ShopUI.open(which: string?)
 	freeState = nil
 	closeOverlay()
 	fit() -- (before it shows: a phone's first fit would draw the page twice)
+	if not gui.Enabled then
+		viewed = false
+		funnel("StoreOpened")
+	end
 	gui.Enabled = true
 	UiSound.play("Open")
 	-- (a computer's window grows in a touch; a phone's is the screen)

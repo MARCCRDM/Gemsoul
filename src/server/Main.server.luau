@@ -65,6 +65,11 @@ else
 end
 -- The onboarding funnel (analytics) listens for loads, so it starts first.
 require(script.Parent.Systems.Funnel).start()
+-- Coins, feature events and the Store funnel (Creator Dashboard > Analytics).
+require(script.Parent.Systems.Analytics).start(
+	require(script.Parent.Systems.Remotes).Funnel,
+	require(game:GetService("ReplicatedStorage").Shared.Store).productKey
+)
 PlayerData.start()
 Vip.start()
 Mining.start()

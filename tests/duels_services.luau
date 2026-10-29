@@ -128,6 +128,16 @@ local ReplicatedStorage = {
 	end,
 }
 local RunService = { Heartbeat = signal() }
+-- (Analytics: the duel results and coins sent.)
+local analyticsEvents, analyticsCoins = {}, {}
+local Analytics = {
+	event = function(player, name, value, a, b, c)
+		table.insert(analyticsEvents, { Player = player, Name = name, Value = value, A = a, B = b, C = c })
+	end,
+	coins = function(player, delta, reason)
+		table.insert(analyticsCoins, { Player = player, Delta = delta, Reason = reason })
+	end,
+}
 local Debris = { AddItem = function() end }
 local game = {
 	GetService = function(_, name)

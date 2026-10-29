@@ -156,6 +156,7 @@ local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local Squad = require(ReplicatedStorage.Shared.Squad)
+local Analytics = require(script.Parent.Analytics)
 local Enemies = require(script.Parent.Enemies)
 local Gems = require(script.Parent.Gems)
 local KaijuAbilities = require(script.Parent.KaijuAbilities)
@@ -1963,7 +1964,7 @@ local function payCoins(player: Player, amount: number)
 	local coins = math.min(amount, Kaiju.bugCoins(bugs, bugs.Day))
 	if coins > 0 then
 		bugs.Coins += coins
-		PlayerData.addCoins(player, coins)
+		PlayerData.addCoins(player, coins, "Critters")
 	end
 	return coins
 end
@@ -2627,6 +2628,7 @@ local function resolveTame(enemy, wild: Wild, player: Player, now: number)
 		Enemies.remove(enemy)
 		gone(wild)
 		PlayerData.milestone(player, "KaijuTamed")
+		Analytics.event(player, "KaijuCaught", wild.Tries + 1, wild.Species, wild.Element)
 		tell(player, string.format("Caught! The %s is yours, starting over at level %d.", title, record.Level))
 		tameResult(player, "Tamed")
 		return

@@ -53,6 +53,9 @@ local workspace={
 }
 CFrame.lookAt=function(position) return {Position=position} end
 local RaycastParams={new=function() return {} end}
+-- (Analytics: level-ups and the like, dropped. A global: this file is at
+-- Luau's 200-local limit.)
+Analytics={event=function() end,coins=function() end}
 local Remotes={
 	CombatInput={OnServerEvent=signal()},
 	CombatFx={FireAllClients=function(_,...) table.insert(messages,{...}) end,FireClient=function(_,player,...) table.insert(messages,{Player=player,...}) end},

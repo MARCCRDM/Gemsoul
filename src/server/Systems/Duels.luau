@@ -1,3 +1,4 @@
+local Analytics = require(script.Parent.Analytics)
 local ArenaDrop = require(script.Parent.ArenaDrop)
 --[[
 	Player duels in the Arena: queues, challenges and matches.
@@ -455,8 +456,16 @@ function finish(match, winner: number?, reason: string)
                     if won then PlayerData.training(member, "PvPWin") end
                 end
 				if coins > 0 then
-					PlayerData.addCoins(member, coins)
+					PlayerData.addCoins(member, coins, "Duel")
 				end
+				Analytics.event(
+					member,
+					"DuelFinished",
+					1,
+					if match.Intro then "Intro" elseif match.Ranked then "Ranked" else match.Rules.Kind or "Casual",
+					if winner == nil then "Draw" elseif won then "Win" else "Loss",
+					#match.Teams[1] .. "v" .. #match.Teams[2]
+				)
 				local result = if won then "DuelWin" else "DuelPlay"
 				Progress.won(member, result, levels[if t == 1 then 2 else 1], result, foe)
 				publish(member)
@@ -1287,7 +1296,7 @@ local function fillWith(entry, called: Player): (boolean, string?)
 		if newcomer then
 			-- Once per newcomer's first fight, including leave/requeue attempts.
 			newcomer.IntroHelpRewarded = true
-			if joinBonus > 0 then PlayerData.addCoins(called, joinBonus) end
+			if joinBonus > 0 then PlayerData.addCoins(called, joinBonus, "QueueBonus") end
 			PlayerData.sync(called)
 			PlayerData.sync(entry.Players[1])
 			Remotes.Notify:FireClient(called, string.format("Joined the first fight: +%d coins paid now. Thanks for helping!", joinBonus))

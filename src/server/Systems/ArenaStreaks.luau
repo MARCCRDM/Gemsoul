@@ -283,7 +283,7 @@ local function reward(player: Player, duel, profile, m)
 	end
 	paid[tostring(m.Wins)] = true
 	if m.Coins and m.Coins > 0 then
-		PlayerData.addCoins(player, m.Coins)
+		PlayerData.addCoins(player, m.Coins, "Streak")
 	end
 	local title = m.Title and Cosmetics.get(m.Title)
 	if title then

@@ -182,12 +182,21 @@ local Remotes = {
 		end,
 	},
 }
+-- (Analytics: the coins the Market tagged, by player.)
+local marketCoins = {}
+local Analytics = {
+	coins = function(p, delta, reason)
+		assert(reason == "Market", "Market coins tagged " .. tostring(reason))
+		marketCoins[p] = (marketCoins[p] or 0) + delta
+	end,
+}
 local MarketBoard = load("src/server/Systems/MarketBoard.luau", {
 	game = game,
 	script = {
 		Parent = {
 			PlayerData = PlayerData,
 			Remotes = Remotes,
+			Analytics = Analytics,
 			Shop = Shop,
 			Equipment = {
 				marketPreviews = function()
@@ -690,6 +699,7 @@ do
 			Parent = {
 				PlayerData = PlayerData,
 				Remotes = Remotes,
+				Analytics = Analytics,
 				Shop = Shop2,
 				Equipment = {
 					marketPreviews = function()

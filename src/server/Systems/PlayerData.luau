@@ -33,6 +33,7 @@ local FreeRewards = require(ReplicatedStorage.Shared.FreeRewards)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Store = require(ReplicatedStorage.Shared.Store)
 local Remotes = require(script.Parent.Remotes)
+local Analytics = require(script.Parent.Analytics)
 local SessionLock = require(script.Parent.SessionLock)
 
 -- This server, for session locks (Studio play sessions have no JobId).
@@ -90,6 +91,11 @@ type Profile = {
 local PlayerData = {}
 
 local profiles: { [Player]: Profile } = {}
+-- (Analytics counts untagged coin changes against the real balance.)
+Analytics.balanceOf = function(player: Player): number?
+	local profile = profiles[player]
+	return profile and profile.Coins
+end
 local canSave: { [Player]: boolean } = {}
 local saving, tradeLocks, tradeReady = {}, {}, {}
 
@@ -449,6 +455,7 @@ local function claimDaily(player: Player, profile: Profile)
 	daily.Day = day
 	local reward = Config.DailyRewardBase + Config.DailyRewardPerStreak * (daily.Streak - 1)
 	profile.Coins += reward
+	Analytics.coins(player, reward, "DailyLogin")
 	profile.Season.XP += Season.XP.Daily
 	Tree.addXP(profile, Season.XP.Daily)
 	-- The lobby's welcome banner shows it (Modules/LobbyFeed).
@@ -513,6 +520,7 @@ local function load(player: Player)
 		loaded = false
 	end
 	canSave[player] = loaded
+	Analytics.track(player, profiles[player].Coins)
 
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
@@ -592,6 +600,7 @@ function PlayerData.start()
 			task.wait(0.2)
 		end
 		save(player, true)
+		Analytics.forget(player)
 		profiles[player] = nil
 		canSave[player] = nil
 		tradeLocks[player] = nil
@@ -1029,7 +1038,10 @@ function PlayerData.training(player, event, detail)
 	if not profile then
 		return
 	end
+	local before = profile.Coins
 	local finished, bonus, moved = DailyChallenges.record(profile, player.UserId, event, today())
+	Analytics.coins(player, profile.Coins - before, "DailyChallenge")
+	before = profile.Coins
 	for _, challenge in finished do
 		Remotes.Notify:FireClient(player, "DAILY CHALLENGE: " .. challenge.Name .. "  +" .. challenge.Coins .. " coins")
 	end
@@ -1037,6 +1049,7 @@ function PlayerData.training(player, event, detail)
 		Remotes.Notify:FireClient(player, "ALL 3 DAILY CHALLENGES DONE!  +" .. bonus .. " bonus coins")
 	end
 	local earned, changed = TrainingRewards.record(profile, event, detail)
+	Analytics.coins(player, profile.Coins - before, "Tasks")
 	if changed then
 		trainedEvent:Fire(player, event)
 		for _, objective in earned do
@@ -1200,12 +1213,14 @@ function PlayerData.addMarks(player: Player, amount: number)
 	end
 end
 
-function PlayerData.spendCoins(player: Player, amount: number): boolean
+-- `reason`: what it's for, for Analytics (Analytics.Reasons).
+function PlayerData.spendCoins(player: Player, amount: number, reason: string?): boolean
 	local profile = profiles[player]
 	if not profile or profile.Coins < amount then
 		return false
 	end
 	profile.Coins -= amount
+	Analytics.coins(player, -amount, reason)
 	sync(player)
 	return true
 end
@@ -1220,10 +1235,11 @@ function PlayerData.count(player: Player, name: string, n: number?)
 	end
 end
 
-function PlayerData.addCoins(player: Player, amount: number)
+function PlayerData.addCoins(player: Player, amount: number, reason: string?)
 	local profile = profiles[player]
 	if profile then
 		profile.Coins += amount
+		Analytics.coins(player, amount, reason)
 		sync(player)
 	end
 end

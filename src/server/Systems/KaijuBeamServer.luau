@@ -52,6 +52,7 @@ local RunService = game:GetService("RunService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local KaijuBeam = require(ReplicatedStorage.Shared.KaijuBeam)
+local Analytics = require(script.Parent.Analytics)
 local KaijuServer = require(script.Parent.KaijuServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
@@ -348,6 +349,7 @@ function KaijuBeamServer._fire(player: Player, aim: any, now: number)
 	end
 	casts[player] = cast
 	setCharge(player, 0)
+	Analytics.event(player, "Hyperbeam", #team, #targets, if #targets > 0 and isBoss(targets[1]) then "Boss" else "Foes")
 	player:SetAttribute("KaijuBeamAt", start)
 	player:SetAttribute("KaijuCharge", 0)
 	Remotes.CombatFx:FireAllClients("KaijuBeam", {

@@ -41,6 +41,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
 local Equipment = require(script.Parent.Equipment)
+local Analytics = require(script.Parent.Analytics)
 
 local MarketBoard = {}
 
@@ -529,6 +530,7 @@ local function settle(player: Player)
 			Rules.give(profile, got, Config.MaxGems, true)
 		end
 		profile.Coins += coins
+		Analytics.coins(player, coins, "Market")
 		escrow[entryId] = nil
         if sold then PlayerData.training(player, "MarketSale") end
         if entry.Role == "Buy" and got and not home then PlayerData.training(player, "MarketBuy") end
@@ -557,6 +559,7 @@ local function settle(player: Player)
 						paid[listingId] = os.time()
 						local coins = math.max(0, math.floor(tonumber(note.Coins) or 0))
 						profile.Coins += coins
+						Analytics.coins(player, coins, "Market")
 						changed = true
 						table.insert(
 							notes,
@@ -801,10 +804,12 @@ function handlers.MarketBuy(player: Player, listingId)
 		return Shop.reply(false, "That purchase is already going through.")
 	end
 	profile.Coins -= row.Price
+	Analytics.coins(player, -row.Price, "Market")
 	escrow[entryId] = { Role = "Buy", Listing = listingId, Price = row.Price, At = os.time() }
 	local function refund(message)
 		escrow[entryId] = nil
 		profile.Coins += row.Price
+		Analytics.coins(player, row.Price, "Market")
 		finishChange(player)
 		invalidate()
 		return Shop.reply(false, message)

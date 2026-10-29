@@ -161,7 +161,7 @@ local function payForWall(player: Player): (boolean, string?)
 	if PlayerData.useFreeMine(player) then
 		return true
 	end
-	if PlayerData.spendCoins(player, Mine.WallPrice) then
+	if PlayerData.spendCoins(player, Mine.WallPrice, "MineEntry") then
 		return true
 	end
 	return false, string.format("No free mines left today. A new wall costs %d coins.", Mine.WallPrice)
@@ -196,7 +196,7 @@ local function recoverGear(player: Player, depth: number)
 	end
 	-- A full gear bag turns the find into coins instead.
 	if Slots.gearCount(profile) >= (Config.MaxGear or 80) then
-		PlayerData.addCoins(player, gear.RarityTier * 5)
+		PlayerData.addCoins(player, gear.RarityTier * 5, "MineWall")
 		return gear.Name .. " (bag full: salvaged)"
 	end
 	-- Every find is its own piece with its own roll, even a model you have
@@ -249,7 +249,7 @@ local function grant(player: Player, wall: Wall, tile: Tile)
 		if tile.Kind == "Lucky" then
 			local lo, hi = Mine.pouch(wall.Depth)
 			local coins = rng:NextInteger(lo, hi) * 2
-			PlayerData.addCoins(player, coins)
+			PlayerData.addCoins(player, coins, "MineWall")
 			loot.Coins = coins
 			if rng:NextNumber() < Mine.armorChance(wall.Depth) then
 				loot.Gear = recoverGear(player, wall.Depth)
@@ -259,7 +259,7 @@ local function grant(player: Player, wall: Wall, tile: Tile)
 	elseif tile.Kind == "Ore" then
 		local lo, hi = Mine.pouch(wall.Depth)
 		local coins = rng:NextInteger(lo, hi)
-		PlayerData.addCoins(player, coins)
+		PlayerData.addCoins(player, coins, "MineWall")
 		local gear = if rng:NextNumber() < math.min(0.35, 0.15 + wall.Depth * 0.005)
 			then recoverGear(player, wall.Depth)
 			else nil
@@ -267,13 +267,13 @@ local function grant(player: Player, wall: Wall, tile: Tile)
 	elseif tile.Kind == "Coins" then
 		local lo, hi = Mine.pouch(wall.Depth)
 		local coins = rng:NextInteger(lo, hi)
-		PlayerData.addCoins(player, coins)
+		PlayerData.addCoins(player, coins, "MineWall")
 		return { Kind = "Coins", Count = coins, Text = "Coin pouch" }
 	end
 	-- Plain stone: sometimes a coin or two in the rubble.
 	if rng:NextNumber() < 0.3 then
 		local coins = rng:NextInteger(1, 3)
-		PlayerData.addCoins(player, coins)
+		PlayerData.addCoins(player, coins, "MineWall")
 		return { Kind = "Coins", Count = coins, Text = "Loose coins" }
 	end
 	return { Kind = "Stone", Text = "Rubble" }

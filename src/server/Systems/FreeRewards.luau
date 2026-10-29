@@ -102,7 +102,7 @@ local function redeem(player: Player, text: any)
 	end
 	local rest = table.clone(entry.Reward)
 	rest.Cosmetics = nil
-	local lines = StoreServer.grant(player, rest)
+	local lines = StoreServer.grant(player, rest, "Code")
 	for _, id in entry.Reward.Cosmetics or {} do
 		table.insert(lines, 1, Cosmetics.get(id) and Cosmetics.get(id).Name or id)
 	end

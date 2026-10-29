@@ -565,7 +565,7 @@ local function reward(enemy: Enemy)
 		return
 	end
 	for _, player in Party.nearby(best, enemy.Root.Position, 90) do
-		PlayerData.addCoins(player, enemy.Kind.Coins)
+		PlayerData.addCoins(player, enemy.Kind.Coins, "Enemy")
 		PlayerData.milestone(player, "Slain")
 		local profile = PlayerData.get(player)
 		if profile then

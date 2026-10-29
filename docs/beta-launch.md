@@ -121,6 +121,9 @@ is logged once per account:
 - **The client.** It can only report step 2, and only by name.
 - **A failed send** prints a warning and doesn't stop the game.
 
+Coins, gameplay events and the Store funnel are tracked too. See
+[analytics.md](analytics.md).
+
 ## The lobby: next task and bug reports
 
 (The lobby has grown since: daily challenges, a live feed and a welcome-back

@@ -2180,7 +2180,7 @@ local function raidCleared(duel)
 	local bossLevel = (if count > 0 then sum / count else 1) + raid.Wave - 1
 	for _, member in raid.Members do
 		if member.Parent then
-			PlayerData.addCoins(member, coins)
+			PlayerData.addCoins(member, coins, "Raid")
 			local profile = PlayerData.get(member)
 			if profile then
 				profile.Stats.Kills += 1
@@ -2265,7 +2265,7 @@ local function onWin(enemy)
 		end)
 		return
 	end
-	PlayerData.addCoins(owner, WIN_COINS)
+	PlayerData.addCoins(owner, WIN_COINS, "Rival")
 	local profile = PlayerData.get(owner)
 	if profile then
 		profile.Stats.Kills += 1

@@ -1024,3 +1024,17 @@ do
 	check(last(d, "FillIn") == nil, "Asked before auto queuing after practice")
 	print("PASS: auto queue (dungeon blocking, back from a dungeon or practice, paired after MATCH READY), off means no search")
 end
+
+-- Analytics: every finished duel sends its mode, result and size.
+do
+	local finished = 0
+	for _, e in analyticsEvents do
+		if e.Name == "DuelFinished" then
+			finished += 1
+			assert(e.B == "Win" or e.B == "Loss" or e.B == "Draw", "DuelFinished sent result " .. tostring(e.B))
+			assert(type(e.A) == "string" and type(e.C) == "string", "DuelFinished without its mode or size")
+		end
+	end
+	assert(finished > 0, "No duel result was sent to Analytics")
+	print("PASS: duel results sent to Analytics (" .. finished .. ")")
+end

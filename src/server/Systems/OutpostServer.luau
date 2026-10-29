@@ -1014,7 +1014,7 @@ local function secret(player: Player, id: any)
 	if new then
 		coins = Rules.SecretReward
 		bonus = if found >= total then Rules.SecretBonus else 0
-		PlayerData.addCoins(player, coins + bonus)
+		PlayerData.addCoins(player, coins + bonus, "Secret")
 		ChatChannels.announce(
 			"System",
 			string.format("%s discovered a secret: %s! (%d/%d)", player.DisplayName, spec.Name, found, total)

@@ -99,7 +99,15 @@ local equipped = {}
 local nextGem = 0
 local handlers = {}
 local spawnAt = cf(100, 5, 100)
+-- (Analytics: the coins the tutorial tagged.)
+local tutorialCoins = {}
 local stubs = {
+	Analytics = {
+		coins = function(_, delta, reason)
+			table.insert(tutorialCoins, { Delta = delta, Reason = reason })
+		end,
+		event = function() end,
+	},
 	Classes = {
 		get = function()
 			return { Armors = { { Id = "Padded" } }, Weapons = {} }

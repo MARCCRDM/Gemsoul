@@ -23,6 +23,7 @@ local Tree = require(ReplicatedStorage.Shared.AugmentTree)
 local Levelling = require(ReplicatedStorage.Shared.Levelling)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
+local Analytics = require(script.Parent.Analytics)
 
 local Progress = {}
 
@@ -41,6 +42,7 @@ local function give(player: Player, profile, season: number, level: number)
 		-- Seen by everyone near (the light over you), with your banner and
 		-- what it brought (LevelUpFx).
 		local reached = Tree.level(profile.Augments.XP)
+		Analytics.event(player, "PlayerLevel", reached)
 		Remotes.CombatFx:FireAllClients(
 			"LevelUp",
 			player.Character or player,

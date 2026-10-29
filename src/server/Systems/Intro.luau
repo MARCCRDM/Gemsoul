@@ -7,6 +7,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemRoller = require(ReplicatedStorage.Shared.GemRoller)
 local GemGenerator = require(script.Parent.GemGenerator)
+local Analytics = require(script.Parent.Analytics)
 local Funnel = require(script.Parent.Funnel)
 local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
@@ -333,6 +334,7 @@ function Intro.tutorialBuy(player, listingId)
 				return reply(false, "Couldn't add that item.")
 			end
 			profile.Coins -= row.Price
+			Analytics.coins(player, -row.Price, "Tutorial")
 			Tutorial.state(profile).Purchased = true
 			Tutorial.advance(profile, "Buy")
 			PlayerData.sync(player)
@@ -351,7 +353,7 @@ function Intro.tutorialVictory(player)
 		return
 	end
 	state.Won = true
-	PlayerData.addCoins(player, 50)
+	PlayerData.addCoins(player, 50, "Tutorial")
 	PlayerData.setGearQuality(player, "Armors", "ArmorProspectorArmor1", 1)
 	Tutorial.advance(profile, "Fight")
 	PlayerData.sync(player)

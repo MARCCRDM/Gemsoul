@@ -131,6 +131,7 @@ local GemInventory = require(ReplicatedStorage.Shared.GemInventory)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local Store = require(ReplicatedStorage.Shared.Store)
 local RiftWorld = require(script.Parent.Parent.World.RiftWorld)
+local Analytics = require(script.Parent.Analytics)
 local ArenaStreaks = require(script.Parent.ArenaStreaks)
 local Duelist = require(script.Parent.Duelist)
 local Dungeons = require(script.Parent.Dungeons)
@@ -692,6 +693,7 @@ local function recordWin(run)
 		local beaten = beatenBy(player)
 		local first = (beaten[run.Boss.Id] or 0) == 0
 		beaten[run.Boss.Id] = (beaten[run.Boss.Id] or 0) + 1
+		Analytics.event(player, "BossDefeated", #run.Members, run.Boss.Id, "Rift", run.Element)
 		if first and nextUp then
 			notify(player, string.format("Unlocked: %s, next on this Rift's ladder.", nextUp.Name))
 		end
@@ -722,7 +724,7 @@ victory = function(run)
 			run.Fallen[player] = nil
 			standUp(player)
 		end
-		PlayerData.addCoins(player, coins)
+		PlayerData.addCoins(player, coins, "Rift")
 		KaijuServer.reward(player, RiftRun.Reward.Exp)
 		local xp = Progress.won(player, "RiftBoss", bossLevel, "SlayBrute")
 		local swings = Restores.give(player, SwingRestore.Dungeon)
@@ -1589,7 +1591,7 @@ local function choose(player: Player, choice: any)
 		end
 		local used = run.Restores[player] or 0
 		local cost = RiftRun.restoreCost(used)
-		if not PlayerData.spendCoins(player, cost) then
+		if not PlayerData.spendCoins(player, cost, "RiftRestore") then
 			return Shop.short(player, cost, string.format("Not enough coins: RESTORE costs %d.", cost))
 		end
 		run.Restores[player] = used + 1

@@ -12,6 +12,15 @@ local TrainingRewards = {
 	end,
 }
 local DailyChallenges = Daily
+-- (Analytics: the coins each reason tagged.)
+local tagged = {}
+local Analytics = {
+	coins = function(_, delta, reason)
+		if delta ~= 0 then
+			tagged[reason] = (tagged[reason] or 0) + delta
+		end
+	end,
+}
 local DAY = 20377
 local function today()
 	return DAY
@@ -81,6 +90,7 @@ check(
 	profiles[player].Coins == Daily.ById.Rocks.Coins + Daily.ById.Guard.Coins + Daily.ById.Hits.Coins + Daily.Bonus,
 	"Coins don't add up"
 )
+check(tagged.DailyChallenge == profiles[player].Coins and tagged.Tasks == nil, "Challenge coins weren't tagged for Analytics")
 -- A player who left before the push: nothing sent.
 local gone = { UserId = 7, Parent = nil }
 profiles[gone] =

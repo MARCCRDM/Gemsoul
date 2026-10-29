@@ -33,6 +33,7 @@ local Economy = require(ReplicatedStorage.Shared.ExpeditionEconomy)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Season = require(ReplicatedStorage.Shared.Season)
 local Store = require(ReplicatedStorage.Shared.Store)
+local Analytics = require(script.Parent.Analytics)
 local GemGenerator = require(script.Parent.GemGenerator)
 local Gems = require(script.Parent.Gems)
 local PlayerData = require(script.Parent.PlayerData)
@@ -59,8 +60,9 @@ local function cosmeticName(id: string): string
 	return if cosmetic then cosmetic.Name else id
 end
 
--- Gives a Store.Reward. Returns the lines to show the player.
-function StoreServer.grant(player: Player, reward: Store.Reward): { string }
+-- Gives a Store.Reward. Returns the lines to show the player. `reason`: where
+-- its coins came from, for Analytics (Analytics.Reasons).
+function StoreServer.grant(player: Player, reward: Store.Reward, reason: string?): { string }
 	local profile = PlayerData.get(player)
 	if not profile then
 		return {}
@@ -73,6 +75,7 @@ function StoreServer.grant(player: Player, reward: Store.Reward): { string }
 		if Cosmetics.get(id) then
 			if profile.Cosmetics.Owned[id] then
 				profile.Coins += Store.DuplicateRefund
+				Analytics.coins(player, Store.DuplicateRefund, reason)
 				add(string.format("%s (already owned: +%d coins)", cosmeticName(id), Store.DuplicateRefund))
 			else
 				profile.Cosmetics.Owned[id] = true
@@ -87,11 +90,13 @@ function StoreServer.grant(player: Player, reward: Store.Reward): { string }
 	end
 	if coins > 0 then
 		profile.Coins += coins
+		Analytics.coins(player, coins, reason)
 		add(string.format("%d coins", coins))
 	end
 	local legacy = Economy.legacyCredits(reward.Marks, reward.Materials)
 	if legacy > 0 then
 		profile.Coins += legacy
+		Analytics.coins(player, legacy, "Legacy")
 		add(string.format("%d legacy salvage credits", legacy))
 	end
 	if reward.XPBoostMinutes then
@@ -155,8 +160,9 @@ local function firstLook(ids: { string }): { string }
 end
 
 -- What a product grants (a Store.RobuxProducts key). Returns false for a
--- key it doesn't know, else true and the lines to show.
-function StoreServer.grantProduct(player: Player, key: string): (boolean, { string }?)
+-- key it doesn't know, else true and the lines to show. `reason`: how it was
+-- paid for, for Analytics ("Bundle" for Robux, "Store" for coins).
+function StoreServer.grantProduct(player: Player, key: string, reason: string?): (boolean, { string }?)
 	local profile = PlayerData.get(player) :: any
 	if not profile then
 		return false
@@ -198,7 +204,7 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 	-- A coin pack: its coins, nothing to put on.
 	local pack = Store.coinPack(key)
 	if pack then
-		return true, StoreServer.grant(player, { Coins = pack.Coins })
+		return true, StoreServer.grant(player, { Coins = pack.Coins }, "CoinPack")
 	end
 	local reward = Store.contents(key)
 	if not reward then
@@ -211,7 +217,7 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 		end
 		return StoreServer.kaijuSale(player, reward.KaijuSale)
 	end
-	local lines = StoreServer.grant(player, reward)
+	local lines = StoreServer.grant(player, reward, reason)
 	local bundle = Store.bundle(key)
 	if bundle and bundle.NewPlayersOnly then
 		profile.WelcomeBought = true
@@ -256,15 +262,16 @@ local function buyProduct(player: Player, key: any)
 	if not ok then
 		return reply(false, why or "That isn't for sale.")
 	end
-	if not PlayerData.spendCoins(player, price) then
+	if not PlayerData.spendCoins(player, price, "Store") then
 		return Shop.short(player, price, string.format("You need %d coins.", price))
 	end
-	local granted, lines = StoreServer.grantProduct(player, key)
+	local granted, lines = StoreServer.grantProduct(player, key, "Store")
 	if not granted then
 		-- (A refill with no Outpost to put its swings on: the coins come back.)
-		PlayerData.addCoins(player, price)
+		PlayerData.addCoins(player, price, "Store")
 		return reply(false, "That didn't go through. Try again in a moment.")
 	end
+	Analytics.event(player, "CoinPurchase", price, key)
 	return reply(true, Store.productName(key) .. " is yours!", { Key = key, Lines = lines or {} })
 end
 
@@ -313,7 +320,7 @@ local function claimSeason(player: Player, which: any)
 		local key = tostring(l)
 		if not season.Claimed[key] then
 			season.Claimed[key] = true
-			for _, line in StoreServer.grant(player, Season.reward(l)) do
+			for _, line in StoreServer.grant(player, Season.reward(l), "Season") do
 				table.insert(lines, line)
 			end
 		end
@@ -321,7 +328,7 @@ local function claimSeason(player: Player, which: any)
 		local premium = Season.premiumReward(l)
 		if season.Premium and premium and not season.PremiumClaimed[key] then
 			season.PremiumClaimed[key] = true
-			for _, line in StoreServer.grant(player, premium) do
+			for _, line in StoreServer.grant(player, premium, "Season") do
 				table.insert(lines, line)
 			end
 		end
@@ -384,9 +391,10 @@ local function processReceipt(receipt)
 			then Enum.ProductPurchaseDecision.PurchaseGranted
 			else Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	if not StoreServer.grantProduct(player, key) then
+	if not StoreServer.grantProduct(player, key, "Bundle") then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
+	Analytics.purchased(player, key)
 	table.insert(profile.Receipts, id)
 	while #profile.Receipts > 200 do
 		table.remove(profile.Receipts, 1)
