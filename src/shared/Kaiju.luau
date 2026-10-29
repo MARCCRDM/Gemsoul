@@ -443,12 +443,14 @@ end
 -- only (KaijuRoles' Warden role, called SUPPORT: Moonmoth, Skyjelly). It
 -- floats in the middle of the three, ahead of you, mends you and your team and wards them
 -- (KaijuServer's support pulse); a support kind never takes one of the
--- three fighting slots. Everyone got StarterSupport once (supportOwed): a
--- new player with the starter roll, everyone else on their next visit.
--- That's off (On): no roll deals a support kind now; they're caught.
+-- three fighting slots. Everyone gets StarterSupport once (supportOwed): a
+-- new player with the starter roll, its element rolled (any of the four,
+-- evenly: supportElement), everyone else on their next visit. It's the
+-- only support given: no roll's cards deal a support kind; the rest are
+-- caught.
 Kaiju.SupportRole = "Warden"
 Kaiju.SupportSlot = 4
-Kaiju.StarterSupport = { Species = "Skyjelly", On = false } -- (its element rolled with the roll: supportElement)
+Kaiju.StarterSupport = { Species = "Skyjelly", On = true } -- (its element rolled with the roll: supportElement)
 Kaiju.SupportVersion = 1
 -- Its pulse: only while you're in a fight (in danger: Kaiju.Danger; out of
 -- one it mends nobody, that's for gems), it reads the health of you and

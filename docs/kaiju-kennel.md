@@ -55,11 +55,10 @@ order:
   even past a full roster. Paid for twice in one day, the second becomes a
   rare roll, so nothing is lost.
 
-**No roll deals a support kind** (the starter roll, the rare roll, boss
-rolls, the Kaiju of the Day): `Kaiju.rareKinds`, the starters and
-`Kennel.special` leave the support kinds out, and the starter roll's
-Skyjelly is off (`Kaiju.StarterSupport.On = false`). Supports come from
-catching them for now.
+**No roll's cards deal a support kind** (the starter roll, the rare roll,
+boss rolls, the Kaiju of the Day): `Kaiju.rareKinds`, the starters and
+`Kennel.special` leave the support kinds out. The one support anyone is
+given is the starter Skyjelly (below); the rest are caught.
 
 Both are Roblox developer products (`Store.RobuxProducts`). Their ids are
 0 until the products are made: listed by `tools/dev_products_manifest.luau`,
@@ -106,10 +105,13 @@ By the gate, facing the door:
 
 ## The starter support
 
-Off for now (`Kaiju.StarterSupport.On = false`): the intro's roll deals the
-three starter kinds and no support. Switched back on, the fourth kaiju, the
-support, is a Skyjelly, its element rolled with the roll
-(`Kaiju.supportElement`), and the roll card shows it. Any support kind you
+On again since 2026-10-29 (`Kaiju.StarterSupport.On = true`). Every new
+account gets a Skyjelly with the intro's roll, automatically: its only roll
+is its element, any of the four, evenly (`Kaiju.supportElement`), and the
+roll card shows it under the three starter kinds. Accounts made while it
+was off (2026-10-28 to 29) get theirs, any element, on their next visit to
+the Outpost (`Kaiju.supportOwed`); a starter roll left unclaimed from then
+gets one added when it's shown. Any support kind you
 own (a Warden) can take the support slot (SET AS SUPPORT in the kaiju
 panel, or drag it onto the slot), and swap with the one there.
 
@@ -123,6 +125,6 @@ the pen (the client's) and its bed (the server's), Wren and her options,
 the hologram off, the animation hooks, the sale's rules and Store entries
 (R$ 200, R$ 500 and R$ 200; once ever, once ever, once a day), the made to
 order stones (Rare with the best E; Ultra Rare with the best Q, E and R),
-no support kind in any roll, every support kind in the slot, and the
-starter support's element. `tests/run_kaiju.py` (kaiju_server_cases)
+no support kind in any roll's cards, every support kind in the slot, and
+the starter support's element. `tests/run_kaiju.py` (kaiju_server_cases)
 grants all three sales and plays the rare roll.

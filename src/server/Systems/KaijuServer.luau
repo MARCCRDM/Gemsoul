@@ -580,6 +580,10 @@ local function prepareRoll(profile)
 		and roll.Version == Kaiju.RollVersion
 		and p.KaijuRolled ~= Kaiju.RollVersion
 	then
+		-- (one made while there was no starter support: it comes with it now)
+		if Kaiju.StarterSupport.On and not roll.Boss and type(roll.Support) ~= "table" then
+			roll.Support = { Species = Kaiju.StarterSupport.Species, Element = Kaiju.supportElement() }
+		end
 		return roll
 	end
 	-- (A boss roll made and not yet taken: the same one again.)
