@@ -1,5 +1,28 @@
 # The Inventory: your gems, your gear, AUTO EQUIP
 
+## 2026-10-29: the art loads, and a calmer look
+
+**The slots' 3D art loads.** The pieces' pictures are 3D previews the server
+builds on request. The Inventory used to ask once, and that request was
+often lost to the server's pacing (the screen's other requests go at the
+same moment) or made while a build was running, so the slots stayed on the
+drawn stand-in icons. Now it asks when the Inventory opens and keeps asking
+until the server says every preview is built; a preview is drawn only once
+all its parts have arrived (the server counts them, "Parts"), and the slots
+redraw a moment after the last part lands. The UI's uploaded images (the
+surge icon sheet, the PLAY menu's mode art) are fetched as the game starts
+(`Modules/ImagePreload`), so their screens don't open with blank squares.
+
+**The look, same layout.** One dark card for every slot, stat and key
+instead of a colour wash over each: a slot's rarity is its top rail, its
+words and its art's well; a stat's colour is its icon and its bar; Q, E and
+R keep their coloured badges. One gold button (EQUIP BEST); ALL STATS,
+SKINS and the rest are plain, and the element buttons carry a short bar in
+their colour instead of a neon outline each. The empty-socket cue is one
+quiet gold ring and "ADD A GEM".
+
+![Phone, before and after](inventory/phone-before-after.png)
+
 ## The paper doll (current layout)
 
 The Inventory is now laid out like the old CharacterUI panel, updated for
@@ -16,7 +39,8 @@ it, a summary column, and the two backpacks on the right.
   buttons (AUTO EQUIP); GEM VAULT and SKINS.
 - **Paper doll**: Helmet, Chest and Gloves on the left; Sword, Shield and
   Boots on the right; the miner in the middle (drag to turn). Each slot is a
-  card tinted by the piece's rarity, with its gem socket underneath ("ADD A
+  dark card with the piece's rarity in its top rail, its name and the well
+  its 3D art sits in, with its gem socket underneath ("ADD A
   GEM" when the socket is empty, otherwise the gem and the Q/E/R move it
   gives). The Sword, Chest and Shield cards show their Q / E / R surge tile.
 - **Summary**: your name, GEAR SCORE (no avatar picture), the set bonus, the Q / E / R SURGES
