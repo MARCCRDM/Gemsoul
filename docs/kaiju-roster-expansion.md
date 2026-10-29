@@ -441,7 +441,7 @@ its own. Stat lines sit in the same bands and are sim inputs, not final.
 - Q **Coin Spit**: a lob that bursts in 4 studs.
 - R **Zip Up**: a shell of 35%; while it stands, allies' Q cooldowns run 50% faster.
 
-**60. Silkling** (after the larva). A great caterpillar kaiju: a segmented body, a blunt head, blue eyes; it spits silk.
+**60. Silkling** (after the larva). Taken out of the game (2026-10-29); any already caught became Coinmaws (`Kaiju.Retired`).
 210 / 9 / 1.2 / 9 / 0.20. Combo: Headbutt x1. Heavy: Silk Spray 1.5x (roots). Guard: curls, takes 25%.
 - E **Silk Wrap**: a shell of 30% on its lowest ally; the ally heals 5% a second while it stands.
 - Q **Silk Spray**: a 7-stud cone that roots for 1s.
@@ -454,7 +454,7 @@ its own. Stat lines sit in the same bands and are sim inputs, not final.
 | 6 | Crestbull, Shrieker, Tuskmound, Duskbat, Capspore, Peelcroc |
 | 7 | Kickjaw, Tonguefrost, Steamhide, Snipclaw, Skyjelly, Frostmaw |
 | 8 | Rubbleking, Glidespine, Inkwrap, Needlewing, Coinmaw, Magnetjaw |
-| 9 | Ogretoad, Fathomweb, Hillback, Hollowbone, Silkling, Hivecrystal |
+| 9 | Ogretoad, Fathomweb, Hillback, Hollowbone, Hivecrystal |
 | 10 | Ashcrawler, Spitgill, Nullplate, Tendrilis, Ribbonarm, Tritail (boss-adjacent flagship, like Triskull) |
 
 Coinmaw should be an event or quest kaiju (it eats gems: a catch that costs you a Common to lure), not a wild roll.
@@ -634,13 +634,13 @@ pattern, three moves of its own. Sim inputs, not final.
 
 ### Wardens (4)
 
-**87. Pipsqueak** (after Pigmon). A small friendly kaiju: a round red-brown body covered in blocky warts, a wide mouth, bright eyes. The second mascot.
+**87. Pipsqueak** (after Pigmon). Taken out of the game (2026-10-29); any already caught became Twinsongs (`Kaiju.Retired`).
 180 / 8 / 1.2 / 14 / 0.15. Combo: Bonk x1. Heavy: Trip 1.4x. Guard: ducks, takes 35%.
 - E **Cheer**: its team gains 25 mana and heals 5%.
 - Q **Pebble Toss**: a lob.
 - R **Brave Stand**: a shell of 30% on its lowest ally and it taunts that ally's attacker 2s.
 
-**88. Shadowsphere** (after Leliel). A floating striped black-and-white sphere; its shadow on the ground is where it really is.
+**88. Shadowsphere** (after Leliel). Taken out of the game (2026-10-29); any already caught became Lumeballoons (`Kaiju.Retired`).
 190 / 10 / 1.3 / 10 / 0.20. Combo: Shadow Snap x1 (from the ground). Heavy: Swallow 1.6x. Guard: the sphere vanishes, takes 30%.
 - E **Dirac Shade**: hides its lowest ally in its shadow for 2s (untargetable), healing it 10%.
 - Q **Shadow Snap**: a bite from the ground under a foe.
@@ -662,13 +662,12 @@ pattern, three moves of its own. Sim inputs, not final.
 
 | Wave | Kinds |
 | --- | --- |
-| 11 | Gorebull, Gashclaw, Quillhorn, Skyrazor, Pipsqueak |
+| 11 | Gorebull, Gashclaw, Quillhorn, Skyrazor |
 | 12 | Yetihide, Mossgiant, Phasehorn, Inkstalk, Lumeballoon, Cleaverhead |
-| 13 | Barnacrab, Blackhorn, Pulsewing, Thornlash, Shadowsphere, Starcrop |
+| 13 | Barnacrab, Blackhorn, Pulsewing, Thornlash, Starcrop |
 | 14 | Longneck, Lashape, Lightbird, Flickerstripe, Twinsong, Gulper |
 | 15 | Tarrask, Rancorn, Gluttonjaw, Oculus, Dunemaw, Lashlight (deep Frontier and boss-adjacent) |
 
-Pipsqueak is a quest reward (the Outpost's friendly kaiju), not a wild roll, like Coinmaw.
 
 ## Balance notes for the sim
 

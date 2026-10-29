@@ -1658,7 +1658,7 @@ Kaiju.MaxOwned = 12 -- kaiju one player can keep
 -- Kinds taken out of the game, and what one already caught becomes (its
 -- level, traits, Gemsoul and name kept): the nearest kind in role and
 -- rarity.
-Kaiju.Retired = { Drillmole = "Gulper" }
+Kaiju.Retired = { Drillmole = "Gulper", Silkling = "Coinmaw", Pipsqueak = "Twinsong", Shadowsphere = "Lumeballoon" }
 
 -- A profile's roster, made if it has none: { List = { [id] = record },
 -- Order = { id } (your teams, one line: Kaiju.order), Out = the team out

@@ -640,28 +640,6 @@ F.Coinmaw = like("Carapace", {
 	Heavy = { Wind = { Jaw = 0.7, Pitch = 0.2 }, Hit = { Jaw = 0.35, Pitch = -0.1, Push = -0.15 } },
 	Lunge = HOP,
 })
-F.Silkling = like("Carapace", {
-	Light = GORE,
-	Heavy = BREATH,
-	-- Inch Forward: its front lifted, then set down further on.
-	Lunge = { Wind = { Pitch = 0.15, Lift = 0.1 }, Hit = { Pitch = -0.15, Push = 0.4 } },
-})
-F.Pipsqueak = like("Carapace", {
-	-- Bonk: up on its toes, then head first.
-	Light = { Wind = { Pitch = 0.25, Lift = 0.1 }, Hit = { Pitch = -0.3, Push = 0.35 } },
-	-- Trip: low, then rolled into its legs.
-	Heavy = { Wind = { Lift = -0.2, Roll = 0.2 }, Hit = { Lift = 0.1, Roll = -0.4, Push = 0.4 } },
-	Lunge = { Wind = { Lift = -0.15 }, Hit = { Lift = 0.2, Push = 0.6 } },
-	Cast = F.Skyjelly.Cast,
-})
-F.Shadowsphere = like("Razorback", {
-	-- Shadow Snap: the maw in its shadow snapping.
-	Light = { Wind = { Jaw = 0.6, Lift = 0.15 }, Hit = { Jaw = 1.0, Lift = -0.1, Push = 0.3 } },
-	Heavy = { Wind = { Lift = 0.35, Jaw = 0.4 }, Hit = { Lift = -0.3, Jaw = 1.0, Push = 0.3 } },
-	Lunge = FLOAT,
-	Cast = F.Skyjelly.Cast,
-	Guard = { Lift = 0.2 },
-})
 F.Twinsong = like("Bulwark", {
 	-- Twin Chop: both arms at once, both heads snapping.
 	Light = { Wind = { Arm = 1.2, Pitch = 0.1, Jaw = 0.3 }, Hit = { Arm = -0.3, Pitch = -0.15, Push = 0.3, Jaw = 0.5 } },

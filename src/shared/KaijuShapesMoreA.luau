@@ -1300,36 +1300,6 @@ function Half.install(h)
 		end
 	end
 
-	-- Silkling: a great grey caterpillar, its front reared up, pale bands
-	-- lit with its element's light, little legs down its length.
-	function B.Silkling(m, pal, H, H2)
-		local r = root(m, V(1.4, 1.0, 2.4), 1.0)
-		local body = limb(m, r, "Segment", V(1.1, 1.0, 0.8), CF(0, 0.6, 0.6), V(0, 0.6, 0.6), "Body", 1, H)
-		for i, z in { 1.38, 2.14, 2.86 } do
-			local w = 1.04 - i * 0.08
-			make(m, body, "Segment", V(w, w * 0.9, 0.72), CF(0, 0.54 - i * 0.03, z), if i % 2 == 0 then H else H2)
-			glow(m, body, "Band", V(w + 0.04, 0.08, 0.1), CF(0, 0.54 + w * 0.3, z + 0.34), pal)
-		end
-		plate(m, body, "Band", V(1.14, 0.1, 0.12), CF(0, 1.08, 0.95), pal)
-		for i, seg in { { 0, 1.15, 0.05, 1.0 }, { 0, 1.75, -0.35, 0.95 }, { 0, 2.35, -0.55, 0.9 } } do
-			make(m, body, "Neck", V(seg[4], seg[4] * 0.9, 0.7), CF(seg[1], seg[2], seg[3]) * A(rad(-30 - i * 12), 0, 0), if i % 2 == 1 then H2 else H)
-			plate(m, body, "Band", V(seg[4] + 0.04, 0.1, 0.12), CF(seg[1], seg[2] + 0.1, seg[3] + 0.32) * A(rad(-30 - i * 12), 0, 0), pal)
-		end
-		local head = limb(m, body, "Head", V(1.0, 0.9, 0.9), CF(0, 2.95, -0.8), V(0, 2.6, -0.6), "Head", 1, H)
-		for _, s in { -1, 1 } do
-			glow(m, head, "Eye", V(0.22, 0.18, 0.06), CF(s * 0.28, 3.05, -1.26), pal)
-		end
-		limb(m, head, "Jaw", V(0.5, 0.16, 0.3), CF(0, 2.55, -1.15), V(0, 2.62, -0.95), "Jaw", 1, H2)
-		for i, z in { 0.6, 1.4, 2.2 } do
-			for _, s in { -1, 1 } do
-				local step = if i % 2 == 0 then s else -s
-				local p = limb(m, body, "Leg", V(0.2, 0.36, 0.22), CF(s * 0.46, 0.18, z), V(s * 0.46, 0.32, z), "Stride", step, H2)
-				make(m, p, "Foot", V(0.24, 0.08, 0.26), CF(s * 0.46, 0.04, z - 0.02), H)
-			end
-		end
-		make(m, body, "Tail", V(0.5, 0.4, 0.4), CF(0, 0.4, 3.35), H)
-	end
-
 	return B
 end
 

@@ -11,7 +11,7 @@
 	  More.install(kit) -> { [kind] = function(model, palette, hide, hide2) }
 
 	The builders are in two halves, Shared.KaijuShapesMoreA (Prisma to
-	Silkling) and Shared.KaijuShapesMoreB (Tarrask to Lumeballoon); this
+	Coinmaw) and Shared.KaijuShapesMoreB (Tarrask to Lumeballoon); this
 	module hands both the helpers they share.
 ]]
 local More = {}
@@ -51,7 +51,6 @@ More.Hides = {
 	Magnetjaw = { C(48, 60, 96), C(68, 82, 120) },
 	Capspore = { C(214, 198, 174), C(54, 58, 46) },
 	Coinmaw = { C(96, 58, 42), C(126, 78, 56) },
-	Silkling = { C(80, 84, 92), C(198, 202, 208) },
 	Tarrask = { C(86, 68, 52), C(64, 52, 42) },
 	Gorebull = { C(98, 90, 80), C(74, 68, 60) },
 	Yetihide = { C(216, 222, 234), C(182, 192, 208) },
@@ -77,8 +76,6 @@ More.Hides = {
 	Cleaverhead = { C(126, 152, 180), C(100, 124, 152) },
 	Starcrop = { C(42, 78, 82), C(60, 100, 104) },
 	Gulper = { C(98, 118, 110), C(76, 94, 88) },
-	Pipsqueak = { C(152, 64, 46), C(120, 50, 38) },
-	Shadowsphere = { C(234, 234, 234), C(28, 28, 32) },
 	Twinsong = { C(48, 54, 74), C(72, 78, 100) },
 	Lumeballoon = { C(216, 206, 178), C(182, 172, 144) },
 }

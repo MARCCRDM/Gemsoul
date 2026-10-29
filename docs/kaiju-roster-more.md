@@ -5,8 +5,11 @@ That's the 61 left: Prisma and Clawtide from the first sheet, and kinds 31
 to 90 from the second and third (Skyjelly, 57, was already in as everyone's
 starter support). With the 33 before them (the first four, the first
 sheet's 28 and Skyjelly) the game had 94 kinds. Drillmole has since been
-taken out (any already caught became a Gulper, `Kaiju.Retired`), so it's
-**93 kinds** now, each in all four elements: 372 kaiju.
+taken out (any already caught became a Gulper, `Kaiju.Retired`), and on
+2026-10-29 three Wardens with it: Silkling (now a Coinmaw), Pipsqueak (now
+a Twinsong) and Shadowsphere (now a Lumeballoon). That's **90 kinds** now,
+each in all four elements: 360 kaiju. With Silkling gone Tarrask moved up
+a rarity batch (the batches are the roster's kinds in thirties).
 
 ![The 61 new kaiju](kaiju/roster-61.jpg)
 
@@ -49,16 +52,15 @@ roams is its Habitat, as for the first sheet:
 
 | Roams | Kinds |
 | --- | --- |
-| Fringe and Edge (anywhere past the core) | Tuskmound, Crestbull, Shrieker, Duskbat, Peelcroc, Capspore, Coinmaw, Gorebull, Gashclaw, Quillhorn, Skyrazor, Pipsqueak |
+| Fringe and Edge (anywhere past the core) | Tuskmound, Crestbull, Shrieker, Duskbat, Peelcroc, Capspore, Coinmaw, Gorebull, Gashclaw, Quillhorn, Skyrazor |
 | The Edge only | the 41 others not listed here |
 | The Rift Vein's guardian only | Prisma, Tritail, Tarrask, Gluttonjaw, Oculus, Dunemaw, Starcrop |
 
-Coinmaw and Pipsqueak, the two mascots, were proposed as quest rewards.
-There are no quests for them yet, so they roam the Fringe for now.
+Coinmaw, a mascot, was proposed as a quest reward. There are no quests
+for it yet, so it roams the Fringe for now.
 
-The eight new Wardens (Prisma, Capspore, Coinmaw, Silkling, Pipsqueak,
-Shadowsphere, Twinsong, Lumeballoon) go in the support slot when caught,
-as Moonmoth and Skyjelly do.
+The five new Wardens (Prisma, Capspore, Coinmaw, Twinsong, Lumeballoon) go
+in the support slot when caught, as Moonmoth and Skyjelly do.
 
 ## The kinds
 
@@ -94,7 +96,6 @@ as Moonmoth and Skyjelly do.
 | Magnetjaw | Breaker | the Edge | 275 / 18 / 1.4 / 11 / 0.20 | Magnet Field | Pincer Crush | Polarize |
 | Capspore | Warden | Fringe and Edge | 200 / 10 / 1.3 / 9 / 0.20 | Healing Spores | Spore Puff | Root Guard |
 | Coinmaw | Warden | Fringe and Edge | 190 / 9 / 1.2 / 12 / 0.15 | Share the Hoard | Coin Spit | Zip Up |
-| Silkling | Warden | the Edge | 210 / 9 / 1.2 / 9 / 0.20 | Silk Wrap | Silk Spray | Cocoon |
 | Tarrask | Tank | Vein guardian | 330 / 13 / 1.5 / 9 / 0.30 | Reflective Carapace | Gore | Regenerate |
 | Gorebull | Tank | Fringe and Edge | 310 / 15 / 1.4 / 12 / 0.20 | Hoof Stamp | Bull Rush | Stubborn |
 | Yetihide | Tank | the Edge | 300 / 14 / 1.4 / 10 / 0.25 | Blizzard Coat | Bear Hug | Snowdrift |
@@ -120,8 +121,6 @@ as Moonmoth and Skyjelly do.
 | Cleaverhead | Breaker | the Edge | 245 / 18 / 1.4 / 13 / 0.15 | Head Cleave | Four-Fist | Brace Arms |
 | Starcrop | Breaker | Vein guardian | 240 / 16 / 1.3 / 13 / 0.15 | Belly Beam | Devour Energy | Star Shell |
 | Gulper | Breaker | the Edge | 265 / 18 / 1.5 / 11 / 0.15 | Absorb | Shoulder Cannon | Regenerate |
-| Pipsqueak | Warden | Fringe and Edge | 180 / 8 / 1.2 / 14 / 0.15 | Cheer | Pebble Toss | Brave Stand |
-| Shadowsphere | Warden | the Edge | 190 / 10 / 1.3 / 10 / 0.20 | Dirac Shade | Shadow Snap | Sea of Shadow |
 | Twinsong | Warden | the Edge | 200 / 10 / 1.2 / 12 / 0.15 | Duet Ward | Harmony Beam | Rejoin |
 | Lumeballoon | Warden | the Edge | 185 / 9 / 1.3 / 11 / 0.15 | Lift Allies | Red Mist | Deflate |
 
@@ -217,9 +216,6 @@ as Moonmoth and Skyjelly do.
 | Coinmaw | E | Share the Hoard | Spills its hoard over its team: it, you and every ally near it heal 10% of their health over 2s. |
 | Coinmaw | Q | Coin Spit | Spits a fistful of coins at its foe; they burst after a beat: 120% damage round where they land, stunning. |
 | Coinmaw | R | Zip Up | At half health: it zips shut, a shell of 35% of its health for 5s. |
-| Silkling | E | Silk Wrap | Wraps its team in silk: it and every ally near it take 30% less for 4s. |
-| Silkling | Q | Silk Spray | Sprays sticky silk down a line: 100% damage to everyone in it, pinning them (stunned). |
-| Silkling | R | Cocoon | At half health: it spins a cocoon, healing it, you and every ally near it 20% of their health over 4s. |
 | Tarrask | E | Reflective Carapace | Its mirror plates flare: foes near it take 40% damage and turn on it for 3s, while it takes 45% less. |
 | Tarrask | Q | Gore | Charges horns first down a line: 120% damage to everyone in its path, stunning them. |
 | Tarrask | R | Regenerate | At half health: its wounds close, healing it 20% of its health over 4s and clearing its effects. |
@@ -295,12 +291,6 @@ as Moonmoth and Skyjelly do.
 | Gulper | E | Absorb | Its shoulder mouth bites down on its foe: 160% damage, leaving it Vulnerable, and it heals 10% of its health. |
 | Gulper | Q | Shoulder Cannon | Fires its cannon arm through a line: 140% damage to everyone in it, with its element's effect. |
 | Gulper | R | Regenerate | Hard pressed or crowded: its alien flesh knits, healing it 25% of its health over 4s. |
-| Pipsqueak | E | Cheer | Cheers its team on: it, you and every ally near it heal 12% of their health over 3s. |
-| Pipsqueak | Q | Pebble Toss | Tosses a pebble at its foe: 100% damage, stunning it. |
-| Pipsqueak | R | Brave Stand | At half health: it stands up bravely for its team; it and every ally near it take 30% less for 4s. |
-| Shadowsphere | E | Dirac Shade | Hides its team in its shadow: it and every ally near it take 40% less for 2s. |
-| Shadowsphere | Q | Shadow Snap | Its shadow bites up from the ground under its foe after a beat: 120% damage round it, slowing. |
-| Shadowsphere | R | Sea of Shadow | At half health: its shadow spreads under its team, healing it, you and every ally near it 20% of their health over 4s. |
 | Twinsong | E | Duet Ward | The twins split to shield their team: it and every ally near it take 30% less for 4s. |
 | Twinsong | Q | Harmony Beam | A beam in two voices through everyone in a line: 120% damage, with its element's effect. |
 | Twinsong | R | Rejoin | At half health: the twins snap back together in a chord, healing it, you and every ally near it 25% of their health over 3s and clearing their effects. |
