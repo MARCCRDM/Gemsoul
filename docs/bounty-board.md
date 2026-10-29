@@ -9,8 +9,10 @@ blades on top, a glowing amber ring on the floor round its plinth.
 
 Each face shows **one bounty**, a WANTED poster:
 
-- the boss itself, its model over its element's glow (the same portraits
-  as the bounty office, `ReplicatedStorage.RiftPortraits`),
+- the boss itself: a 3D figure of its body standing on a lit ledge out of
+  the screen, over its element's glow (the same bodies as the bounty
+  office's portraits, `ReplicatedStorage.RiftPortraits`; a ViewportFrame
+  doesn't draw on a board out in the world, so it's a real figure),
 - its name and element, its threat (THREAT and a numeral, green to red),
 - what it pays (a boss cache), whether to bring a party, and where it was
   last seen (its biome),

@@ -125,6 +125,10 @@ check(client:find("Bounties.boardAt(", 1, true) ~= nil, "The board doesn't show 
 check(client:find('openGate("Bounty"', 1, true) ~= nil, "The board's prompt doesn't open the bounty board")
 check(client:find("RiftPortraits", 1, true) ~= nil, "The board doesn't show the bosses")
 check(client:find("LightInfluence = 0", 1, true) ~= nil, "The board's screen isn't lit")
+-- (the boss a real figure on a ledge: a ViewportFrame doesn't draw on a board out in the world)
+check(client:find('new("ViewportFrame"', 1, true) == nil and client:find('Instance.new("ViewportFrame"', 1, true) == nil, "The board draws its boss in a ViewportFrame, which doesn't show out in the world")
+check(client:find(":ScaleTo(", 1, true) ~= nil and client:find('"Ledge"', 1, true) ~= nil, "The boss isn't a figure on a ledge")
+check(client:find("part.Transparency < 0.95", 1, true) ~= nil, "The figure's size counts parts no one sees")
 local scene = fs.readFile(ROOT .. "/src/client/Modules/OutpostScene.luau")
 for _, call in { "BountyBoard.mount(shelterFrame)", "BountyBoard.show(active)", "BountyBoard.step(dt)" } do
 	check(scene:find(call, 1, true) ~= nil, "The Outpost doesn't put the board up: " .. call)

@@ -3,9 +3,10 @@
 	its inlay bands cross between the Hall of Fame and Brutus's booth: a
 	freestanding screen on two lit pylons with a BOUNTIES lightbox and
 	crossed blades on top, a glowing ring on the floor round it. Each face
-	shows one bounty, WANTED: the boss itself (ReplicatedStorage.
-	RiftPortraits) over its element's glow, its name, element, threat, what
-	it pays and where it was last seen; both change every Board.Period
+	shows one bounty, WANTED: the boss itself, a figure of its body
+	(ReplicatedStorage.RiftPortraits) standing on a lit ledge out of the
+	screen, over its element's glow; its name, element, threat, what it pays
+	and where it was last seen; both change every Board.Period
 	seconds, never to the same one (Bounties.boardAt), the same for
 	everyone (the server's clock). Its prompt opens the bounty board (Client.
 	RiftClient, "Bounty").
@@ -45,7 +46,7 @@ local at: CFrame? = nil
 local model: Folder? = nil
 local wanted = false
 local clock = 0
-type Face = { Gui: SurfaceGui, Shown: string?, Parts: { [string]: Instance } }
+type Face = { Gui: SurfaceGui, Carrier: BasePart, Shown: string?, Figure: Model?, Missing: string?, Parts: { [string]: Instance } }
 local faces: { Face } = {}
 
 local function piece(parent: Instance, cframe: CFrame, size: Vector3, color: Color3, material: Enum.Material, solid: boolean?): Part
@@ -141,13 +142,6 @@ local function layout(carrier: BasePart): Face
 		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0.6), NumberSequenceKeypoint.new(1, 1) }),
 		Rotation = 90,
 	}, parts.Glow)
-	parts.View = new("ViewportFrame", {
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		Ambient = Color3.fromRGB(150, 140, 150),
-		LightColor = Color3.fromRGB(255, 236, 220),
-		LightDirection = Vector3.new(-0.5, -0.8, 0.6),
-	}, stage)
 	-- Its card: name, element, threat, reward, party.
 	parts.Name = text(back, "", 440, 104, 490, 136, 58, IVORY)
 	parts.Name:SetAttribute("NoTranslate", true)
@@ -175,30 +169,74 @@ local function layout(carrier: BasePart): Face
 	parts.Fill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = AMBER, BorderSizePixel = 0 }, track)
 	-- (a flash over it all when its bounty changes)
 	parts.Flash = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = IVORY, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 10 }, gui)
-	return { Gui = gui, Shown = nil, Parts = parts }
+	return { Gui = gui, Carrier = carrier, Shown = nil, Figure = nil, Missing = nil, Parts = parts }
 end
 
--- The boss's body in the face's view, framed from the front quarter (it may
--- still be on its way from the server: put in when it comes).
-local function portrait(face: Face, id: string)
-	local view = face.Parts.View :: ViewportFrame
-	view:ClearAllChildren()
+-- The boss on a face: a figure of its body (ReplicatedStorage.RiftPortraits,
+-- Server.RiftServer's portraitOf) standing on a lit ledge out of the screen,
+-- in front of the frame its glow is in, turned a little to look out. (A
+-- real figure, not a ViewportFrame: those don't draw on a board out in the
+-- world.) It may still be on its way from the server: put in when it comes.
+local STAGE = { X = 2.6, Y = -0.14, W = 3.3, H = 3.75 } -- (studs, on the face: the frame's middle and room)
+local function bounds(model: Model, pivot: CFrame): (Vector3, Vector3)
+	local lo, hi = Vector3.one * math.huge, -Vector3.one * math.huge
+	for _, part in model:GetDescendants() do
+		-- (only what's seen: a big see-through hitbox would shrink it to nothing)
+		if part:IsA("BasePart") and part.Transparency < 0.95 then
+			local half = part.Size / 2
+			for _, c in { Vector3.new(-1, -1, -1), Vector3.new(-1, -1, 1), Vector3.new(-1, 1, -1), Vector3.new(-1, 1, 1), Vector3.new(1, -1, -1), Vector3.new(1, -1, 1), Vector3.new(1, 1, -1), Vector3.new(1, 1, 1) } do
+				local p = pivot:PointToObjectSpace(part.CFrame:PointToWorldSpace(half * c))
+				lo, hi = lo:Min(p), hi:Max(p)
+			end
+		end
+	end
+	return lo, hi
+end
+local function portrait(face: Face, id: string, tint: Color3?)
+	if face.Figure then
+		face.Figure:Destroy()
+		face.Figure = nil
+	end
 	local folder = ReplicatedStorage:FindFirstChild("RiftPortraits")
 	local source = folder and folder:FindFirstChild(id)
 	if not (source and source:IsA("Model")) then
-		face.Parts.Missing = view
+		face.Missing = id
 		return
 	end
-	face.Parts.Missing = nil
+	face.Missing = nil
 	local body = source:Clone()
-	body.Parent = view
-	local camera = Instance.new("Camera")
-	local cf, size = body:GetBoundingBox()
-	local reach = math.max(size.X, size.Y, size.Z)
-	camera.FieldOfView = 40
-	camera.CFrame = CFrame.lookAt(cf.Position + Vector3.new(reach * 0.75, reach * 0.3, -reach * 1.45), cf.Position + Vector3.new(0, size.Y * 0.04, 0))
-	camera.Parent = view
-	view.CurrentCamera = camera
+	for _, d in body:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored, d.CanCollide, d.CanQuery, d.CanTouch, d.CastShadow = true, false, false, false, false
+		elseif d:IsA("Script") or d:IsA("LocalScript") or d:IsA("Sound") then
+			d:Destroy()
+		end
+	end
+	local lo, hi = bounds(body, body:GetPivot())
+	local size = hi - lo
+	if size.Y <= 0 then
+		body:Destroy()
+		return
+	end
+	local fit = math.min(STAGE.H / size.Y, STAGE.W / math.max(size.X, size.Z, 0.1))
+	body:ScaleTo(body:GetScale() * fit)
+	lo, hi = lo * fit, hi * fit
+	size = hi - lo
+	-- On a ledge out of the face (its front is the carrier's -Z), its back
+	-- clear of the screen, its feet on the ledge at the frame's foot.
+	local carrier = face.Carrier
+	local depth = 0.25 + size.Z / 2
+	local foot = carrier.CFrame * CFrame.new(STAGE.X, STAGE.Y - STAGE.H / 2 - 0.1, -depth)
+	local look = carrier.CFrame.Rotation * CFrame.Angles(0, math.rad(-18), 0)
+	local center = Vector3.new((lo.X + hi.X) / 2, lo.Y, (lo.Z + hi.Z) / 2)
+	body:PivotTo(CFrame.new(foot.Position) * look * CFrame.new(-center))
+	local ledge = piece(body, foot * CFrame.new(0, -0.09, 0), Vector3.new(STAGE.W + 0.4, 0.18, size.Z + 0.5), DARK, Enum.Material.Metal)
+	ledge.Name = "Ledge"
+	piece(body, foot * CFrame.new(0, -0.09, -(size.Z + 0.5) / 2), Vector3.new(STAGE.W + 0.42, 0.2, 0.06), tint or AMBER, Enum.Material.Neon).Name = "LedgeEdge"
+	light(ledge, tint or AMBER, 7, 1.2)
+	body.Name = "Figure"
+	body.Parent = carrier.Parent
+	face.Figure = body
 end
 
 -- `entry` (a Bounties.entries() entry, number `index` of `total`) on `face`.
@@ -225,7 +263,7 @@ local function draw(face: Face, entry, index: number, total: number)
 	(p.Party :: Frame).BackgroundColor3 = if group then RED else Color3.fromRGB(46, 150, 90);
 	(p.PartyText :: TextLabel).Text = Lang.translate(if group then "BRING A PARTY" else "SOLO OR PARTY");
 	(p.Seen :: TextLabel).Text = Lang.translate("LAST SEEN: " .. string.upper(entry.Biome or ""))
-	portrait(face, tostring(boss.Id))
+	portrait(face, tostring(boss.Id), tint)
 	-- (the flash: a blink of light over the new one)
 	local flash = p.Flash :: Frame
 	flash.BackgroundTransparency = 0.25
@@ -372,8 +410,8 @@ function BountyBoard.refresh(now: number)
 				end
 			end
 			draw(face, entry, index, #list)
-		elseif face.Parts.Missing then
-			portrait(face, id)
+		elseif face.Missing then
+			portrait(face, id, GemConfig.ElementColors[entry.Element])
 		end
 		local fill = face.Parts.Fill :: Frame
 		fill.Size = UDim2.fromScale(1 - share, 1)
