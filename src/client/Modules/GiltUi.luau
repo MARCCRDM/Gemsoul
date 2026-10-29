@@ -123,6 +123,9 @@ end
 
 -- A button: crimson in a gold rim for the one that matters (`primary`),
 -- dark stone in brass for the rest. The rim brightens under the mouse.
+-- Its colour is a face behind its words (a gradient on the button itself
+-- would tint the words too, dark on dark): the button keeps its own Text,
+-- TextColor3 and the rest to set, and its Words follow them.
 function Gilt.button(
 	parent: Instance,
 	label: string,
@@ -138,26 +141,33 @@ function Gilt.button(
 		TextSize = size or 16,
 		Font = Gilt.Serif,
 		TextColor3 = if primary then Gilt.Bright else Gilt.Ink,
+		TextTransparency = 1,
 		TextTruncate = Enum.TextTruncate.AtEnd,
-		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 1,
 		AutoButtonColor = false,
 		Size = UDim2.new(1, 0, 0, tall or 40),
 		LayoutOrder = order,
 	}, parent)
 	UiKit.round(b, 3)
+	local face = new("Frame", {
+		Name = "Face",
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 1,
+	}, b)
+	UiKit.round(face, 3)
 	new("UIGradient", {
 		Rotation = 90,
 		Color = if primary
 			then ColorSequence.new(Color3.fromRGB(158, 34, 22), Color3.fromRGB(82, 14, 10))
 			else ColorSequence.new(Color3.fromRGB(56, 46, 36), Color3.fromRGB(28, 22, 17)),
-	}, b)
+	}, face)
 	local rim = new("UIStroke", {
 		Color = if primary then Gilt.Gold else Gilt.Brass,
 		Thickness = if primary then 1.5 else 1,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, b)
-	-- (its words lifted off the face: a soft shadow, never a dark outline)
-	b.TextStrokeColor3, b.TextStrokeTransparency = Color3.new(0, 0, 0), 0.75
 	-- (light catching its top edge)
 	new("Frame", {
 		Name = "Shine",
@@ -166,7 +176,33 @@ function Gilt.button(
 		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(2, 1),
 		Size = UDim2.new(1, -4, 0, 1),
+		ZIndex = 2,
 	}, b)
+	-- (its words lifted off the face: a soft shadow, never a dark outline)
+	local words = new("TextLabel", {
+		Name = "Words",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		TextStrokeColor3 = Color3.new(0, 0, 0),
+		TextStrokeTransparency = 0.75,
+		ZIndex = 3,
+	}, b)
+	local function follow()
+		words.Text, words.TextSize, words.Font = b.Text, b.TextSize, b.Font
+		words.TextColor3, words.TextTruncate, words.RichText = b.TextColor3, b.TextTruncate, b.RichText
+		words.TextXAlignment, words.TextWrapped, words.TextScaled = b.TextXAlignment, b.TextWrapped, b.TextScaled
+	end
+	follow()
+	for _, property in { "Text", "TextSize", "Font", "TextColor3", "TextTruncate", "RichText", "TextXAlignment", "TextWrapped", "TextScaled" } do
+		b:GetPropertyChangedSignal(property):Connect(follow)
+	end
+	-- (a button's words faded is its Words faded: its own stay hidden)
+	b:GetPropertyChangedSignal("TextTransparency"):Connect(function()
+		if b.TextTransparency < 1 then
+			words.TextTransparency = b.TextTransparency
+			b.TextTransparency = 1
+		end
+	end)
 	local rest = rim.Color
 	b.MouseEnter:Connect(function()
 		rim.Color = Gilt.Bright

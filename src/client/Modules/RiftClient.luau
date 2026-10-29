@@ -58,6 +58,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
+local ElementMatchup = require(ReplicatedStorage.Shared.ElementMatchup)
 local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
 local RiftRealms = require(ReplicatedStorage.Shared.RiftRealms)
 local RiftLobby = require(ReplicatedStorage.Shared.RiftLobby)
@@ -1185,38 +1187,77 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 		local levelWords = if chosen.Level
 			then Gilt.words(readyCard, string.format("Level %d", chosen.Level), if small then 12 else 14, THREAT_COLORS[chosen.Threat or 1] or Gilt.Ink)
 			else nil
-		-- (On a phone the card picked above already names it: its level
-		-- goes on the next line instead.)
-		if not small then
-			line(1, 25, Gilt.words(readyCard, chosen.Name, 19, Gilt.Ink), levelWords)
-		end
-		local size = if small then 11 else 13
 		local who, whoColor
-		if small then
-			who, whoColor = nil, nil
-		elseif chosen.Starter then
+		if chosen.Starter then
 			who, whoColor = "First boss  ·  Solo", Gilt.Faded
 		elseif chosen.Group then
 			local alone = view and view.Size <= 1
 			who = string.format("%s  ·  %d-%d players", if alone then "Bring friends" else "Group", RiftRun.Party - 2, RiftRun.Party)
 			whoColor = if alone then WARN else Gilt.Faded
 		end
-		line(
-			2,
-			size + 5,
-			text(readyCard, string.format("Deals %s damage", GemConfig.elementName(chosen.Element or "")), size, tint),
-			if small then levelWords elseif who then text(readyCard, who, size, whoColor) else nil
-		)
-		if chosen.Weakness then
-			line(3, size + 5, text(readyCard, "Vulnerable to " .. GemConfig.elementName(chosen.Weakness), size, Gilt.Green))
+		-- (On a phone the card picked above already names it, its level and
+		-- who it's for: the tiles come first.)
+		if not small then
+			line(1, 25, Gilt.words(readyCard, chosen.Name, 19, Gilt.Ink), levelWords)
+			if who then
+				line(2, 16, text(readyCard, who, 12, whoColor))
+			end
+		elseif levelWords then
+			levelWords:Destroy()
 		end
-		-- How to beat it, and what it punishes (the computer's card).
-		if not small and chosen.Tips then
-			for i, tip in { chosen.Tips[3], chosen.Tips[4] } do
-				if tip then
-					local l = text(readyCard, tip, 12, Gilt.Faded)
-					l.LayoutOrder = 3 + i
-				end
+		-- Three tiles side by side: what it hits with, what it's weak to,
+		-- and the armor it punishes.
+		local tips = DungeonRules.elementTips(chosen)
+		local hitsName = GemConfig.elementName(chosen.Element or "")
+		local weakName = GemConfig.elementName(tips.Weakness or "")
+		local hurtsName = GemConfig.elementName(tips.Hurts or "")
+		local weakBonus = math.floor((ElementMatchup.Weak - 1) * 100 + 0.5)
+		local punish = math.floor((ElementMatchup.Weak * DungeonRules.BossWeak - 1) * 100 + 0.5)
+		local function an(name: string): string
+			return (if string.match(name, "^[AEIOUaeiou]") then "an " else "a ") .. name
+		end
+		local tiles = new("Frame", {
+			Name = "Tiles",
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, if small then 40 else 64),
+			LayoutOrder = 3,
+		}, readyCard)
+		new("UIGridLayout", {
+			CellSize = UDim2.new(1 / 3, if small then -4 else -6, 1, 0),
+			CellPadding = UDim2.fromOffset(if small then 6 else 9, 0),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}, tiles)
+		for i, spec in {
+			{ "HITS WITH", hitsName, tint, string.format("%s gems in armor resist it", hitsName) },
+			{ "WEAK TO", weakName, Gilt.Green, string.format("+%d%% with %s sword gem", weakBonus, an(weakName)) },
+			{ "PUNISHES", hurtsName .. " armor", Gilt.Red, string.format("its hits do +%d%% to it", punish) },
+		} do
+			local cell = new("Frame", {
+				Name = "Tile",
+				BackgroundColor3 = Color3.new(0, 0, 0),
+				BackgroundTransparency = 0.55,
+				LayoutOrder = i,
+			}, tiles)
+			UiKit.round(cell, 3)
+			new("UIStroke", { Color = spec[3], Thickness = 1, Transparency = 0.6, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, cell)
+			new("Frame", {
+				Name = "Edge",
+				BackgroundColor3 = spec[3],
+				BorderSizePixel = 0,
+				Size = UDim2.new(1, 0, 0, 2),
+			}, cell)
+			local pad = if small then 6 else 9
+			local head = text(cell, spec[1], if small then 9 else 10, Gilt.Faded)
+			head.AutomaticSize = Enum.AutomaticSize.None
+			head.Position, head.Size = UDim2.fromOffset(pad, if small then 4 else 7), UDim2.new(1, -pad * 2, 0, if small then 11 else 13)
+			local value = Gilt.words(cell, spec[2], if small then 13 else 16, spec[3])
+			value.Position, value.Size = UDim2.fromOffset(pad, if small then 15 else 20), UDim2.new(1, -pad * 2, 0, if small then 16 else 20)
+			if not small then
+				local foot = text(cell, spec[4], 10, Gilt.Faded)
+				foot.AutomaticSize = Enum.AutomaticSize.None
+				foot.TextWrapped = false
+				foot.TextTruncate = Enum.TextTruncate.AtEnd
+				foot.Position, foot.Size = UDim2.fromOffset(pad, 42), UDim2.new(1, -pad * 2, 0, 14)
 			end
 		end
 		-- Your armor against it: what it takes of its hits now, and after.
@@ -1498,16 +1539,34 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 			personRow(scroller, person, i, small, tab == "Outpost", onInvite)
 		end
 		if #rows == 0 then
-			local empty = text(
-				scroller,
-				if tab == "Outpost"
-					then "Nobody else is in the Outpost right now."
-					elseif not friendsKnown then "Looking for your friends..."
-					else "None of your friends are online. Invite some to the game.",
-				if small then 11 else 12,
-				Gilt.Faded
-			)
-			empty.LayoutOrder = 1
+			-- (an empty list says so in the middle of it, not in a corner)
+			local empty = new("Frame", {
+				Name = "Empty",
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, math.max(40, listTall - tabTall - inviteAllTall - (if small then 20 else 26))),
+				LayoutOrder = 1,
+			}, scroller)
+			local head, sub
+			if tab == "Outpost" then
+				head, sub = "Nobody else here yet", "Miners in the Outpost show up here to invite."
+			elseif not friendsKnown then
+				head, sub = "Looking for your friends...", nil
+			else
+				head, sub = "No friends online", "Invite some to the game with the button below."
+			end
+			local title = Gilt.words(empty, head, if small then 12 else 15, Gilt.Faded)
+			title.TextXAlignment = Enum.TextXAlignment.Center
+			title.AnchorPoint = Vector2.new(0.5, 0.5)
+			title.Position = UDim2.new(0.5, 0, 0.5, if sub then -9 else 0)
+			title.Size = UDim2.new(1, -16, 0, if small then 16 else 20)
+			if sub then
+				local line = text(empty, sub, if small then 10 else 11, Gilt.Dusk)
+				line.AutomaticSize = Enum.AutomaticSize.None
+				line.TextXAlignment = Enum.TextXAlignment.Center
+				line.AnchorPoint = Vector2.new(0.5, 0.5)
+				line.Position = UDim2.new(0.5, 0, 0.5, if small then 9 else 12)
+				line.Size = UDim2.new(1, -16, 0, if small then 13 else 15)
+			end
 		end
 		-- The buttons: on your own, leading a party, or in someone's.
 		local how = if info.Joining or view.Trip then "Join" elseif view.Size <= 1 then "Alone" elseif view.Lead then "Lead" else "Member"

@@ -745,15 +745,18 @@ drawn like a fantasy MMO's dialog window, not a stack of coloured pills:
   builds it; the backup and down cards keep the plain card.
 - **Words**: serif (Merriweather) headings in old gold over a gilt rule
   fading out (`Gilt.heading`), sentence case, no numbered steps.
-- **Colour means something**: the boss's element ("Deals Thermal damage"),
-  green for what beats it and for ready, the level in its danger's colour
-  (green, amber, red), red for what a locked boss needs.
-- **The boss picked** reads like a tooltip: name and level, what it hits
-  with, who it's for, what it's weak to, how to beat it, then your armor
-  against it and **Adjust Armor**.
+- **Colour means something**: the boss's element, green for what beats it
+  and for ready, red for the armor it punishes, the level in its danger's
+  colour (green, amber, red), red for what a locked boss needs.
+- **The boss picked**: name and level, who it's for, then three tiles side
+  by side (**Hits with** its element, **Weak to** the element that beats
+  it and what a sword gem of it adds, **Punishes** the armor its hits do
+  extra to), then your armor against it and **Adjust Armor**.
 - **Buttons** (`Gilt.button`): crimson in a gold rim for the one that
   matters (Enter, Go In Now), dark stone in brass for the rest; the rim
-  brightens under the mouse.
+  brightens under the mouse. The colour is a face behind the words (a
+  gradient on the button itself tints its words too, dark on dark).
+- **An empty people list** says so in the middle of it, with what to do.
 - **Party**: members in recessed wells, faces in gilt rings (gold for the
   leader), "Ready · Leader" in words; the people list has underlined tabs.
 
