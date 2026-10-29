@@ -298,7 +298,7 @@ for _, d in banner:GetDescendants() do
 end
 local all = table.concat(words, "|")
 check(
-	string.find(all, "DAY 3 STREAK", 1, true) and string.find(all, "+125 ◆", 1, true),
+	string.find(all, "Day 3 streak", 1, true) and string.find(all, "|+125|", 1, true),
 	"The banner is wrong: " .. all
 )
 local nextReward = Config.DailyRewardBase + Config.DailyRewardPerStreak * 3

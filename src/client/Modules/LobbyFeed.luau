@@ -193,23 +193,46 @@ function LobbyFeed.welcome()
 		Size = UDim2.fromScale(1, 1),
 		ZIndex = 40,
 	}, layer)
-	-- The week's track: every day's coins, today lit, the days behind ticked,
-	-- and day 7 holding (it pays the same every day after, while the streak
-	-- lasts). A missed day starts it again at day 1 (PlayerData.claimDaily).
-	local W, H, PAD = 500, 318, 22
+	-- The week's track: every day's coins, today lit gold, the days behind
+	-- ticked, a rail joining them filled as far as today; day 7 holding (it
+	-- pays the same every day after, while the streak lasts). A missed day
+	-- starts it again at day 1 (PlayerData.claimDaily). No fanfare: it
+	-- arrives quietly a little after you're in (LobbyUI.setVisible).
+	local W, H, PAD = 520, 336, 24
 	local banner = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(W, H),
-		BackgroundColor3 = Color3.fromRGB(14, 18, 30),
+		BackgroundColor3 = Color3.new(1, 1, 1),
 		ZIndex = 41,
 	}, shade)
-	UiKit.round(banner, 14)
-	new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.45 }, banner)
-	-- A thin gold light along the top edge.
+	UiKit.round(banner, 16)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(28, 32, 50), Color3.fromRGB(11, 13, 22)),
+	}, banner)
+	new("UIStroke", { Color = GOLD, Thickness = 1.5, Transparency = 0.55 }, banner)
+	-- A warm light over the heading.
+	local halo = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, -60),
+		Size = UDim2.fromOffset(380, 150),
+		BackgroundColor3 = GOLD,
+		BackgroundTransparency = 0.82,
+		ZIndex = 41,
+	}, banner)
+	UiKit.round(halo, 999)
+	new("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.55, 0.55),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, halo)
 	local accent = new("Frame", {
-		Position = UDim2.fromOffset(24, 0),
-		Size = UDim2.new(1, -48, 0, 2),
+		Position = UDim2.fromOffset(40, 0),
+		Size = UDim2.new(1, -80, 0, 2),
 		BackgroundColor3 = GOLD,
 		ZIndex = 42,
 	}, banner)
@@ -220,7 +243,7 @@ function LobbyFeed.welcome()
 			NumberSequenceKeypoint.new(1, 1),
 		}),
 	}, accent)
-	local scale = new("UIScale", { Scale = 0.8 }, banner)
+	local scale = new("UIScale", { Scale = 0.85 }, banner)
 	-- Fitted to the whole screen, and clear of Roblox's buttons and DEV up
 	-- in the top bar's strip (the layer draws over it).
 	local fit, open = 1, false
@@ -240,7 +263,9 @@ function LobbyFeed.welcome()
 	place()
 	layer:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
 	local stopTopbar = UiKit.onTopbar(place)
-	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = fit })
+	shade.BackgroundTransparency = 1
+	TweenService:Create(shade, TweenInfo.new(0.4), { BackgroundTransparency = 0.5 }):Play()
+	TweenService:Create(scale, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Scale = fit })
 		:Play()
 	open = true
 	local function line(
@@ -269,94 +294,135 @@ function LobbyFeed.welcome()
 			ZIndex = 43,
 		}, parent)
 	end
+	-- A coin, drawn: a gold disc, a darker rim inside it, a glint.
+	local DEEP = Color3.fromRGB(206, 142, 40)
+	local function coin(parent: Instance, cx: number, cy: number, d: number, faded: number?)
+		local fade = faded or 0
+		local disc = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(cx, cy),
+			Size = UDim2.fromOffset(d, d),
+			BackgroundColor3 = GOLD,
+			BackgroundTransparency = fade,
+			ZIndex = 44,
+		}, parent)
+		UiKit.round(disc, 999)
+		local inner = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.62, 0.62),
+			BackgroundColor3 = DEEP,
+			BackgroundTransparency = fade,
+			ZIndex = 45,
+		}, disc)
+		UiKit.round(inner, 999)
+		local glint = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.36, 0.34),
+			Size = UDim2.fromScale(0.22, 0.22),
+			BackgroundColor3 = Color3.fromRGB(255, 240, 190),
+			BackgroundTransparency = math.max(fade, 0.15),
+			ZIndex = 46,
+		}, disc)
+		UiKit.round(glint, 999)
+		return disc
+	end
 	local gold = "FFCA5B" -- (GOLD)
 	local maxDay = Config.DailyStreakMax
 	local day = math.clamp(streak, 1, maxDay)
 	local function coins(d: number): number
 		return Config.DailyRewardBase + Config.DailyRewardPerStreak * (math.min(d, maxDay) - 1)
 	end
-	-- Header: what this is and who it's for, the streak on the right.
+	-- Header: what this is, then who it's for and the streak, centred.
 	local first = streak <= 1
-	line(banner, "DAILY REWARD", 22, P.Text, IronUi.Heading, PAD, 18, 300, 26)
+	line(banner, "DAILY REWARD", 26, P.Text, IronUi.Heading, 0, 20, W, 30, Enum.TextXAlignment.Center)
 	line(
 		banner,
-		string.format(if first then "Welcome, %s" else "Welcome back, %s", escape(player.DisplayName)),
+		string.format(
+			'%s  ·  <font color="#%s"><b>%s</b></font>',
+			string.format(if first then "Welcome, %s" else "Welcome back, %s", escape(player.DisplayName)),
+			gold,
+			if first then "A new streak" else string.format("Day %d streak", streak)
+		),
 		13,
 		P.Dim,
 		IronUi.Body,
-		PAD,
-		44,
-		300,
-		18
+		0,
+		52,
+		W,
+		18,
+		Enum.TextXAlignment.Center
 	)
-	local pill = new("TextLabel", {
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -PAD, 0, 20),
-		Size = UDim2.fromOffset(128, 24),
-		BackgroundColor3 = GOLD,
-		BackgroundTransparency = 0.88,
-		Text = if streak <= 1 then "NEW STREAK" else string.format("DAY %d STREAK", streak),
-		TextSize = 11,
-		Font = IronUi.Heading,
-		TextColor3 = GOLD,
-		ZIndex = 43,
-	}, banner)
-	UiKit.round(pill, 12)
-	new(
-		"UIStroke",
-		{ Color = GOLD, Thickness = 1, Transparency = 0.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border },
-		pill
-	)
-	-- The track.
-	local TILE_W, LAST_W, TILE_H, GAP = 56, 72, 86, 6
+	-- The track, on a rail.
+	local TILE_W, LAST_W, TILE_H, GAP = 58, 76, 92, 8
 	local trackW = TILE_W * (maxDay - 1) + LAST_W + GAP * (maxDay - 1)
-	local x, y0 = math.floor((W - trackW) / 2), 80
+	local x0, y0 = math.floor((W - trackW) / 2), 92
+	local function centre(i: number): number
+		return x0 + (i - 1) * (TILE_W + GAP) + (if i == maxDay then LAST_W else TILE_W) / 2
+	end
+	local rail = new("Frame", {
+		Position = UDim2.fromOffset(centre(1), y0 + TILE_H / 2 - 2),
+		Size = UDim2.fromOffset(centre(maxDay) - centre(1), 4),
+		BackgroundColor3 = Color3.fromRGB(40, 46, 68),
+		BorderSizePixel = 0,
+		ZIndex = 41,
+	}, banner)
+	UiKit.round(rail, 2)
+	local filled = new("Frame", {
+		Size = UDim2.fromOffset(centre(day) - centre(1), 4),
+		BackgroundColor3 = GOLD,
+		BorderSizePixel = 0,
+		ZIndex = 41,
+	}, rail)
+	UiKit.round(filled, 2)
 	local todayTile: Frame? = nil
+	local x = x0
 	for i = 1, maxDay do
 		local last = i == maxDay
-		local claimed, today, nextDay = i < day, i == day, i == day + 1
+		local claimed, today = i < day, i == day
 		local w = if last then LAST_W else TILE_W
 		local tile = new("Frame", {
 			Name = "Day" .. i,
-			Position = UDim2.fromOffset(x, if today then y0 - 4 else y0),
+			Position = UDim2.fromOffset(x, y0),
 			Size = UDim2.fromOffset(w, TILE_H),
 			BackgroundColor3 = if today
-				then Color3.fromRGB(67, 58, 43) -- (gold, mostly the panel's navy)
-				elseif claimed then Color3.fromRGB(20, 34, 32)
-				elseif last then Color3.fromRGB(38, 36, 36)
-				else Color3.fromRGB(26, 31, 48),
+				then Color3.new(1, 1, 1)
+				elseif claimed then Color3.fromRGB(22, 40, 36)
+				elseif last then Color3.fromRGB(52, 42, 26)
+				else Color3.fromRGB(28, 33, 52),
 			ZIndex = 42,
 		}, banner)
-		UiKit.round(tile, 9)
+		UiKit.round(tile, 10)
+		if today then
+			-- (lit gold: a gradient on the tile itself, its words its children)
+			new("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new(Color3.fromRGB(255, 218, 128), Color3.fromRGB(214, 150, 46)),
+			}, tile)
+		end
 		new("UIStroke", {
-			Color = if today then GOLD elseif nextDay then P.Teal elseif last then GOLD else P.Edge,
+			Color = if today then Color3.fromRGB(255, 236, 180) elseif claimed then P.Good elseif last then GOLD else P.Edge,
 			Thickness = if today then 2 else 1,
-			Transparency = if today then 0 elseif nextDay then 0.45 elseif last then 0.6 else 0.75,
+			Transparency = if today then 0 elseif claimed then 0.6 elseif last then 0.45 else 0.7,
 		}, tile)
-		local labelColor = if today then GOLD elseif claimed then Color3.fromRGB(110, 150, 130) else P.Dim
-		line(
-			tile,
-			if last then string.format("DAY %d+", i) else string.format("DAY %d", i),
-			9,
-			labelColor,
-			IronUi.Heading,
-			0,
-			8,
-			w,
-			12,
-			Enum.TextXAlignment.Center
-		)
-		local coin =
-			line(tile, "◆", if last then 24 else 20, GOLD, IronUi.Heading, 0, 24, w, 28, Enum.TextXAlignment.Center)
-		coin.TextTransparency = if claimed then 0.6 elseif today or last then 0 else 0.3
+		local ink = if today then Color3.fromRGB(64, 38, 4) elseif claimed then Color3.fromRGB(120, 168, 146) else P.Dim
+		line(tile, if last then string.format("DAY %d+", i) else string.format("DAY %d", i), 10, ink, IronUi.Heading, 0, 8, w, 12, Enum.TextXAlignment.Center)
+		if last then
+			-- the week's last day a stack of them
+			coin(tile, w / 2 - 9, 46, 20, if claimed then 0.55 else 0)
+			coin(tile, w / 2 + 9, 46, 20, if claimed then 0.55 else 0)
+			coin(tile, w / 2, 37, 22, if claimed then 0.55 else 0)
+		else
+			coin(tile, w / 2, 42, if today then 26 else 22, if claimed then 0.6 elseif today then 0 else 0.15)
+		end
 		line(
 			tile,
 			tostring(coins(i)),
-			if today then 15 else 13,
-			if today then P.Text elseif claimed then Color3.fromRGB(110, 150, 130) else Color3.fromRGB(212, 222, 236),
+			if today then 16 else 13,
+			if today then Color3.fromRGB(44, 26, 0) elseif claimed then Color3.fromRGB(120, 168, 146) else Color3.fromRGB(218, 226, 240),
 			IronUi.Heading,
 			0,
-			56,
+			64,
 			w,
 			18,
 			Enum.TextXAlignment.Center
@@ -366,37 +432,53 @@ function LobbyFeed.welcome()
 			local tick = new("TextLabel", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.new(1, -6, 0, 6),
-				Size = UDim2.fromOffset(16, 16),
+				Size = UDim2.fromOffset(18, 18),
 				BackgroundColor3 = P.Good,
 				Text = "✓",
-				TextSize = 10,
+				TextSize = 11,
 				Font = IronUi.Heading,
 				TextColor3 = Color3.fromRGB(8, 30, 18),
-				ZIndex = 44,
+				ZIndex = 47,
 			}, tile)
-			UiKit.round(tick, 8)
+			UiKit.round(tick, 9)
 		end
 		if today then
 			todayTile = tile
+			-- its glow, breathing behind it
+			local glow = new("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(x + w / 2, y0 + TILE_H / 2),
+				Size = UDim2.fromOffset(w + 18, TILE_H + 18),
+				BackgroundColor3 = GOLD,
+				BackgroundTransparency = 0.8,
+				ZIndex = 41,
+			}, banner)
+			UiKit.round(glow, 16)
+			TweenService:Create(
+				glow,
+				TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+				{ BackgroundTransparency = 0.92, Size = UDim2.fromOffset(w + 10, TILE_H + 10) }
+			):Play()
 			local tag = new("TextLabel", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.new(0.5, 0, 1, 0),
-				Size = UDim2.fromOffset(52, 16),
-				BackgroundColor3 = GOLD,
+				Size = UDim2.fromOffset(54, 17),
+				BackgroundColor3 = Color3.fromRGB(44, 26, 0),
 				Text = "TODAY",
 				TextSize = 9,
 				Font = IronUi.Heading,
-				TextColor3 = Color3.fromRGB(40, 24, 0),
-				ZIndex = 44,
+				TextColor3 = GOLD,
+				ZIndex = 47,
 			}, tile)
 			UiKit.round(tag, 8)
+			new("UIStroke", { Color = GOLD, Thickness = 1, Transparency = 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, tag)
 		end
 		x += w + GAP
 	end
-	-- Today's tile pops as the banner lands.
+	-- Today's tile lands a beat after the banner.
 	if todayTile then
-		local pop = new("UIScale", { Scale = 1.15 }, todayTile)
-		TweenService:Create(pop, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 0.2), {
+		local pop = new("UIScale", { Scale = 1.12 }, todayTile)
+		TweenService:Create(pop, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0.25), {
 			Scale = 1,
 		}):Play()
 	end
@@ -405,77 +487,59 @@ function LobbyFeed.welcome()
 		banner,
 		if day >= maxDay
 			then string.format('Every day from now on: <font color="#%s"><b>+%d ◆</b></font>', gold, coins(maxDay))
-			else string.format(
-				'Come back tomorrow for <font color="#%s"><b>+%d ◆</b></font>',
-				gold,
-				coins(day + 1)
-			),
-		13,
+			else string.format('Come back tomorrow for <font color="#%s"><b>+%d ◆</b></font>', gold, coins(day + 1)),
+		14,
 		P.Text,
 		IronUi.Body,
 		0,
-		184,
+		y0 + TILE_H + 20,
 		W,
 		18,
 		Enum.TextXAlignment.Center
 	)
-	line(
-		banner,
-		"Miss a day and the streak starts again at day 1.",
-		11,
-		P.Dim,
-		IronUi.Body,
-		0,
-		203,
-		W,
-		14,
-		Enum.TextXAlignment.Center
-	)
-	new("Frame", {
-		Position = UDim2.fromOffset(PAD, 230),
-		Size = UDim2.new(1, -PAD * 2, 0, 1),
-		BackgroundColor3 = P.Edge,
-		BackgroundTransparency = 0.6,
+	line(banner, "Miss a day and the streak starts again at day 1.", 11, P.Dim, IronUi.Body, 0, y0 + TILE_H + 40, W, 14, Enum.TextXAlignment.Center)
+	-- What you got today, the season XP and challenges, and on we go: a
+	-- tray along the foot.
+	local tray = new("Frame", {
+		Position = UDim2.fromOffset(PAD, H - 84),
+		Size = UDim2.new(1, -PAD * 2, 0, 64),
+		BackgroundColor3 = Color3.fromRGB(8, 10, 18),
+		BackgroundTransparency = 0.25,
 		ZIndex = 42,
 	}, banner)
-	-- What you got today, the challenges waiting, and on we go.
-	local amount = line(banner, string.format("+%d ◆", reward), 26, GOLD, IronUi.Heading, PAD, 244, 116, 32)
+	UiKit.round(tray, 12)
+	new("UIStroke", { Color = P.Edge, Thickness = 1, Transparency = 0.65 }, tray)
+	coin(tray, 30, 32, 34)
+	local amount = line(tray, string.format("+%s", tostring(reward)), 28, GOLD, IronUi.Heading, 56, 6, 150, 32)
 	IronUi.outline(amount, 1.5, Color3.fromRGB(60, 34, 0))
-	local xp = new("TextLabel", {
-		Position = UDim2.fromOffset(PAD + 120, 249),
-		Size = UDim2.fromOffset(142, 22),
-		BackgroundColor3 = P.Teal,
-		BackgroundTransparency = 0.86,
-		Text = string.format("+%d SEASON XP", Season.XP.Daily),
-		TextSize = 11,
-		Font = IronUi.Heading,
-		TextColor3 = P.Teal,
-		ZIndex = 43,
-	}, banner)
-	UiKit.round(xp, 11)
 	line(
-		banner,
-		"3 new daily challenges are waiting",
+		tray,
+		string.format(
+			'<font color="%s">+%d Season XP</font>  ·  <font color="%s">3 new daily challenges</font>',
+			hex(P.Teal),
+			Season.XP.Daily,
+			hex(Color3.fromRGB(186, 140, 255))
+		),
 		11,
-		Color3.fromRGB(186, 140, 255),
+		P.Dim,
 		IronUi.Heading,
-		PAD,
-		282,
+		56,
+		38,
 		260,
 		16
 	)
 	local go = new("TextButton", {
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -PAD, 0, 250),
-		Size = UDim2.fromOffset(148, 42),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -10, 0.5, 0),
+		Size = UDim2.fromOffset(150, 44),
 		Text = "CONTINUE",
 		TextSize = 15,
 		Font = IronUi.Heading,
-		TextColor3 = Color3.fromRGB(30, 20, 4),
+		TextColor3 = Color3.fromRGB(36, 22, 2),
 		BackgroundColor3 = GOLD,
 		AutoButtonColor = false,
 		ZIndex = 43,
-	}, banner)
+	}, tray)
 	UiKit.round(go, 10)
 	IronUi.juice(go)
 	local closing = false
@@ -487,7 +551,7 @@ function LobbyFeed.welcome()
 		root:SetAttribute("WelcomeOpen", nil)
 		open = false
 		stopTopbar()
-		TweenService:Create(scale, TweenInfo.new(0.2), { Scale = fit * 0.9 }):Play()
+		TweenService:Create(scale, TweenInfo.new(0.2), { Scale = fit * 0.92 }):Play()
 		local fade = TweenService:Create(shade, TweenInfo.new(0.2), { BackgroundTransparency = 1 })
 		fade.Completed:Connect(function()
 			layer:Destroy()
@@ -497,10 +561,7 @@ function LobbyFeed.welcome()
 	end
 	go.Activated:Connect(close)
 	shade.Activated:Connect(close)
-	task.delay(8, close)
-	pcall(function()
-		require(script.Parent.UiSound).play("Reward")
-	end)
+	task.delay(12, close)
 end
 
 -- Setup ----------------------------------------------------------------------------------------------

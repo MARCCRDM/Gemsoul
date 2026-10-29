@@ -96,14 +96,18 @@ the lobby is on screen.
 
 ## Welcome back: the daily reward
 
-The first time the lobby shows in a session, a banner shows the daily reward
-the server just paid (`PlayerData.claimDaily`, marked on the player as
-`DailyReward` and `DailyStreak`):
+About six seconds after the lobby first shows in a session (so the player
+lands and looks around first), a window shows the daily reward the server
+just paid (`PlayerData.claimDaily`, marked on the player as `DailyReward`
+and `DailyStreak`). It opens quietly: no fanfare sound, just a short fade
+and scale-in (2026-10-29).
 
-- **The week's track**: seven tiles, each with its day and its coins.
+- **The header**: DAILY REWARD, then "Welcome back, *name* · Day *N* streak"
+  ("Welcome, *name* · A new streak" on day 1).
+- **The week's track**: seven tiles on a rail that fills gold up to today.
   - Days already collected are ticked.
-  - Today is lit and marked TODAY.
-  - Tomorrow has a teal edge.
+  - Today is gold, gently glowing, and tagged TODAY.
+  - Day 7 shows a stack of coins.
 - **What it pays** (10x the beta's, 2026-10-28): day 1 pays 750 coins, and each day in a row adds 250.
   - Day 7 pays 2,250, and so does every day after it while the streak lasts.
     That's why its tile says "DAY 7+": it doesn't reset weekly.
@@ -115,17 +119,14 @@ the server just paid (`PlayerData.claimDaily`, marked on the player as
 
 - **Below the track**: what tomorrow pays (from day 7 on, "every day from now
   on"), and the rule for a missed day.
-- **At the bottom**:
-  - today's coins and the +50 Season XP the claim also gives;
-  - a nudge towards today's challenges;
-  - CONTINUE.
-- **The header**: the player's name, and the streak (NEW STREAK on day 1).
+- **The tray at the bottom**: today's coins, the +50 Season XP the claim also
+  gives, a nudge towards today's challenges, and CONTINUE.
 
-It closes on CONTINUE, a tap outside or after 8 seconds. The amounts come
+It closes on CONTINUE, a tap outside or after 12 seconds. The amounts come
 from `Config.DailyRewardBase`, `DailyRewardPerStreak` and `DailyStreakMax`, so
 the track follows any change to them.
 
-![Welcome back: before, day 3, day 7 and in Spanish](lobby/welcome-back.png)
+![The daily reward window, day 4](lobby/daily-reward.png)
 
 ## The PLAY menu
 

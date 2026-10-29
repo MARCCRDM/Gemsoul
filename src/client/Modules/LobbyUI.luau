@@ -1306,8 +1306,8 @@ function LobbyUI.setVisible(on: boolean)
 	wanted = on
 	if on then
 		refreshCrowd()
-		-- The welcome banner, once the lobby has settled (Modules/LobbyFeed).
-		task.delay(1.5, function()
+		-- The welcome banner, a few seconds after the lobby has settled (Modules/LobbyFeed).
+		task.delay(6, function()
 			if wanted and not dashboardShown then
 				LobbyFeed.welcome()
 			end
