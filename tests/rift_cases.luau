@@ -417,6 +417,10 @@ check(RiftRun.robCount(0) == 0 and RiftRun.robCount(1) == 1, "Robbed of nothing,
 check(RiftRun.robCount(4) == 2 and RiftRun.robCount(3) == 2, "Robbed of the wrong share")
 check(RiftRun.restoreCost(0) == RiftRun.Restore.Coins, "RESTORE's first cost")
 check(RiftRun.restoreCost(1) == RiftRun.Restore.Coins * RiftRun.Restore.Grow, "RESTORE doesn't go up")
+-- For Robux: R$ 50 the first time down in a session, doubling, never past R$ 300.
+for downs, robux in { 50, 100, 200, 300, 300, 300 } do
+	check(RiftRun.restoreRobux(downs) == robux, string.format("RESTORE's Robux price the %dth time down", downs))
+end
 check(RiftRun.cacheLuck(RiftRun.Rooms) > RiftRun.cacheLuck(1), "The caches aren't luckier further in")
 check(RiftRun.Reward.Luck > RiftRun.cacheLuck(RiftRun.Rooms), "The boss's cache no luckier than a cave's")
 check(RiftRun.rewardCoins(RiftRun.Rooms) > RiftRun.Reward.Coins, "The caves pay nothing")

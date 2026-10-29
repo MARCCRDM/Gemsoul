@@ -34,7 +34,7 @@ or Wren's **Daily Kaiju Sale** option, opens the sale window
 (`src/client/Modules/GiltUi.luau`). It has three offers, shown in this
 order:
 
-- **Starter Rare Roll** (`KaijuRareRoll`, **R$ 200**): once per miner
+- **Starter Rare Roll** (`KaijuRareRoll`, **R$ 150**): once per miner
   (`profile.KaijuRareRollBought`). One roll on the starter roll's screen
   from the rarest batch only (`Kaiju.rareKinds`), with traits of 6 or
   better. Its Gemsoul is a **Rare** stone, made to order with its element's

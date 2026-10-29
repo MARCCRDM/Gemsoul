@@ -187,7 +187,7 @@ function StoreServer.grantProduct(player: Player, key: string): (boolean, { stri
 	-- A Rift RESTORE: back on your feet at the boss. Paid for once you're
 	-- no longer down (the time ran out while it went through): kept for the
 	-- next time you're down there, used by RESTORE without paying again.
-	if key == "RiftRestore" then
+	if Store.isRiftRestore(key) then
 		if StoreServer.riftRestore and StoreServer.riftRestore(player) then
 			return true, { "back on your feet, kaiju and all" }
 		end

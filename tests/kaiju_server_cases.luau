@@ -6359,18 +6359,24 @@ end)()
 	a:SetAttribute("SparDown", now + 3)
 	tick()
 	check(type(a:GetAttribute("RiftFallen")) == "number" and a:GetAttribute("RiftRestore") == RiftRun.restoreCost(0), "Not asked what now")
+	check(a:GetAttribute("RiftRestoreRobux") == RiftRun.RestoreRobux.First, "RESTORE's first time down this session isn't its cheapest")
 	check(a:GetAttribute("SparDown") > now + RiftRun.Fallen - 1, "Not kept down while they choose")
 	check(#profiles[a].Gems == RiftRun.Rooms, "Robbed at the boss")
 	-- Down, their kaiju are called back into their Gemsouls.
 	check(Kaiju.away(profiles[a].Kaiju) == true and #KaijuServer.team(a) == 0, "Down at the boss, the kaiju weren't called back")
 	check(noted(a, "called back while you're down"), "Not told the kaiju were called back")
-	-- (RESTORE is a Robux product: choosing it prompts the purchase, and
-	-- the receipt brings you up. Coins only with no product id.)
+	-- (RESTORE is a Robux product, one for each price: choosing it prompts
+	-- this time's, and the receipt brings you up. Coins only with no
+	-- product id for it.)
 	local Store = shared("Store")
-	local product = Store.RobuxProducts.RiftRestore
+	for _, key in Store.RiftRestores do
+		Store.RobuxProducts[key] = 1
+	end
 	local prompted = registered.RiftChoice(a, "Restore")
 	check(prompted.Ok and type(a:GetAttribute("RiftFallen")) == "number", "RESTORE for Robux got you up unpaid")
-	Store.RobuxProducts.RiftRestore = 0
+	for _, key in Store.RiftRestores do
+		Store.RobuxProducts[key] = 0
+	end
 	local poor = registered.RiftChoice(a, "Restore")
 	check(not poor.Ok and string.find(poor.Message, "Not enough coins", 1, true), "Restored for nothing")
 	profiles[a].Coins = 1000
@@ -6395,6 +6401,7 @@ end)()
 	a:SetAttribute("SparDown", now + 3)
 	tick()
 	check(a:GetAttribute("RiftRestore") == RiftRun.restoreCost(1) and RiftRun.restoreCost(1) > RiftRun.restoreCost(0), "RESTORE didn't go up")
+	check(a:GetAttribute("RiftRestoreRobux") == RiftRun.restoreRobux(2) and RiftRun.restoreRobux(2) > RiftRun.restoreRobux(1), "RESTORE's Robux price didn't go up, down again this session")
 	check(#KaijuServer.team(a) == 0, "Down again, the kaiju stayed out")
 	table.clear(notes)
 	rootB.CFrame = CFrame.new(gate.Position + Vector3.new(-4, 0, 0))
@@ -6413,6 +6420,7 @@ end)()
 	a:SetAttribute("SparDown", now + 3)
 	tick()
 	check(a:GetAttribute("RiftRestore") == RiftRun.restoreCost(1), "A free revive counted as a RESTORE")
+	check(a:GetAttribute("RiftRestoreRobux") == RiftRun.restoreRobux(3), "Down a third time this session, RESTORE's Robux price didn't go up again")
 	check(registered.RiftChoice(a, "Home").Ok and a:GetAttribute("RiftRun") == nil, "Not home when they chose it")
 	check(#profiles[a].Gems == RiftRun.Rooms and kit[a] == false, "Home from the boss, robbed or still in their kit")
 	-- The last one out: the trip's gone, its critters, fighters and boss with it.

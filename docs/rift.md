@@ -508,12 +508,17 @@ fighters leave you be while you're down; with everyone down, they wait.
   The card is two columns. On the left, what you can do for yourself; on
   the right, **CALL FOR BACKUP**: the gate's lobby again, down there.
 
-  - **RESTORE · R$ 100**: you and your kaiju, every one of them, back to
-    full health right there (`KaijuServer.restoreAll`). A developer product
-    (`Store.RobuxProducts.RiftRestore`): the server prompts it and
-    `RiftServer.restoreBought` brings you up when the receipt lands; bought
-    after you left, it's kept (`profile.RiftRestores`) for the next time.
-    (With no product id it falls back to coins: 150, doubling each time.);
+  - **RESTORE · R$ 50**: you and your kaiju, every one of them, back to
+    full health right there (`KaijuServer.restoreAll`). Its price doubles
+    each time you're down at a boss in the same session (R$ 50, 100, 200,
+    then R$ 300 for good: `RiftRun.restoreRobux`, the `RiftRestoreRobux`
+    attribute), back to R$ 50 when you rejoin. A developer product has one
+    price, so each is its own (`Store.RiftRestores`: `RiftRestore50`,
+    `RiftRestore`, `RiftRestore200`, `RiftRestore300`): the server prompts
+    this time's and `RiftServer.restoreBought` brings you up when the
+    receipt lands; bought after you left, it's kept
+    (`profile.RiftRestores`) for the next time. (A price with no product id
+    yet falls back to coins: 150, doubling each time in a trip.);
   - **BACK TO BASE**: home with the gems you found;
   - **Your kaiju are called back** the moment you go down (into their
     Gemsouls: `KaijuServer.recallTeam`), so they're not left fighting

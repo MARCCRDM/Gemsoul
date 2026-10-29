@@ -161,10 +161,19 @@ for _, id in Cosmetics.ofKind("Visor") do
 		check(table.find(vault.Contents.Cosmetics, id), id .. " is sold but not in The Vault")
 	end
 end
+-- A Rift RESTORE at each price it's asked at, its product at that price.
+do
+	local RiftRun = shared("RiftRun")
+	for downs = 1, 6 do
+		local robux = RiftRun.restoreRobux(downs)
+		local key = Store.RiftRestores[robux]
+		check(key and Store.RobuxProducts[key] ~= nil and Store.RobuxPrices[key] == robux, "No RESTORE product at R$ " .. robux)
+	end
+end
 -- Every product slot buys something real.
 for key in Store.RobuxProducts do
 	local real = Store.bundle(key) or Store.kitsOf(key) or (Cosmetics.get(key) and Cosmetics.get(key).Robux)
-		or key == "StarterPack" or key == "SeasonPremium" or Store.refill(key) or key == "KaijuRevive" or key == "RiftRestore"
+		or key == "StarterPack" or key == "SeasonPremium" or Store.refill(key) or key == "KaijuRevive" or Store.isRiftRestore(key)
 		or (Store.contents(key) or {}).KaijuSale ~= nil -- (the Kennel's: KaijuServer.saleGrant)
 		or Store.coinPack(key) ~= nil -- (a coin pack's coins: Client CoinShop)
 	check(real, key .. " is a product slot for nothing")

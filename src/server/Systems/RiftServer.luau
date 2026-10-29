@@ -226,6 +226,7 @@ local CLEAR = {
 	"RiftExitAt",
 	"RiftFallen",
 	"RiftRestore",
+	"RiftRestoreRobux",
 }
 
 -- The trip's over: what's left of it goes.
@@ -259,6 +260,7 @@ end
 local function standUp(player: Player)
 	player:SetAttribute("RiftFallen", nil)
 	player:SetAttribute("RiftRestore", nil)
+	player:SetAttribute("RiftRestoreRobux", nil)
 	player:SetAttribute("SparDown", nil)
 	local humanoid = humanoidOf(player)
 	if humanoid and humanoid.Health > 0 then
@@ -958,13 +960,17 @@ end
 
 -- Knocked out at the boss: down until they choose (or the time runs out).
 -- Their kaiju are called back meanwhile (KaijuServer.recallTeam): they
--- come out again with them, restored or with backup come through.
+-- come out again with them, restored or with backup come through. Each
+-- time this session makes RESTORE's Robux price dearer (RiftRun.restoreRobux).
+local downs: { [Player]: number } = {}
 local function fallAtBoss(run, player: Player)
 	run.Handled[player] = true
 	local deadline = serverNow() + RiftRun.Fallen
 	run.Fallen[player] = deadline
+	downs[player] = (downs[player] or 0) + 1
 	player:SetAttribute("RiftFallen", deadline)
 	player:SetAttribute("RiftRestore", RiftRun.restoreCost(run.Restores[player] or 0))
+	player:SetAttribute("RiftRestoreRobux", RiftRun.restoreRobux(downs[player]))
 	player:SetAttribute("SparDown", deadline + 1)
 	if KaijuServer.recallTeam(player) then
 		notify(player, "Your kaiju are called back while you're down.")
@@ -1571,9 +1577,10 @@ local function choose(player: Player, choice: any)
 			revive(run, player, "Restored: you and your kaiju are back on your feet.")
 			return reply(true, "")
 		end
-		-- (For Robux once its product is on: the purchase is prompted here,
-		-- and RiftServer.restoreBought brings you back up. Coins till then.)
-		local product = Store.RobuxProducts.RiftRestore or 0
+		-- (For Robux once this price's product is on: the purchase is
+		-- prompted here, and RiftServer.restoreBought brings you back up.
+		-- Coins till then.)
+		local product = Store.RobuxProducts[Store.RiftRestores[RiftRun.restoreRobux(downs[player] or 1)]] or 0
 		if product ~= 0 then
 			pcall(function()
 				game:GetService("MarketplaceService"):PromptProductPurchase(player, product)
@@ -1713,6 +1720,7 @@ function RiftServer.start(outpost)
 		if runOf[player] then
 			home(player, nil)
 		end
+		downs[player] = nil
 	end)
 	local timer = 0
 	RunService.Heartbeat:Connect(function(dt)

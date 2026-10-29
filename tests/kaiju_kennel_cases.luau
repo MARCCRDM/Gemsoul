@@ -240,7 +240,7 @@ for _, record in supports do
 end
 -- The Store's two (200 R$ each, the day counted as KaijuKennel counts it).
 local Store = shared("Store")
-check(Store.robuxPrice("KaijuDaily") == 200 and Store.robuxPrice("KaijuRareRoll") == 200, "The Kennel's sales aren't R$ 200")
+check(Store.robuxPrice("KaijuDaily") == 200 and Store.robuxPrice("KaijuRareRoll") == 150, "The Kennel's sales aren't R$ 200 and R$ 150")
 check(Store.RobuxProducts.KaijuDaily ~= nil and Store.RobuxProducts.KaijuRareRoll ~= nil, "No product slots for the Kennel's sales")
 check(Store.contents("KaijuDaily").KaijuSale == "Daily" and Store.contents("KaijuRareRoll").KaijuSale == "Rare", "What the sales give")
 local now = 86400 * 20000 + 3600

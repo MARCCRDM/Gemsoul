@@ -54,8 +54,11 @@
 	             base with a report of what they took (Shared.Frontier.Rob,
 	             Server.Robbery). Knocked out at the boss, you choose:
 	             invite a friend, RESTORE (your health and your kaiju's
-	             team, for Restore.Coins, Grow times more each time in a
-	             trip) or back to base with what you found. Nothing chosen
+	             team, for Robux: RestoreRobux.First the first time you're
+	             down at a boss in a session, Grow times more each time
+	             after, never past Max; for Restore.Coins, Grow times more
+	             each time in a trip, while a price's product isn't on) or
+	             back to base with what you found. Nothing chosen
 	             in Fallen seconds: back to base. (Through the floor
 	             somehow, Fall.Below studs under it: back in the last cave
 	             you reached.)
@@ -89,6 +92,7 @@ RiftRun.Reward = { Coins = 300, PerRoom = 40, Luck = 0.6, Exp = 120 }
 RiftRun.Rob = { Share = 0.5 }
 RiftRun.Heal = { PerCave = 2, Hp = 5, Swing = 0.07, Pop = 0.25, Kaiju = 0.35, Regrow = 40, Reach = 10, Inset = 15 }
 RiftRun.Restore = { Coins = 150, Grow = 2 }
+RiftRun.RestoreRobux = { First = 50, Grow = 2, Max = 300 }
 RiftRun.Fallen = 60
 RiftRun.Fall = { Below = 20 }
 RiftRun.Exit = 20
@@ -381,6 +385,14 @@ end
 -- What RESTORE costs after `used` restores this trip.
 function RiftRun.restoreCost(used: number): number
 	return math.floor(RiftRun.Restore.Coins * RiftRun.Restore.Grow ^ math.max(0, used) + 0.5)
+end
+
+-- RESTORE's Robux price the `downs`th time you're down at a boss this
+-- session (this one counted): each price is its own product
+-- (Store.RiftRestores).
+function RiftRun.restoreRobux(downs: number): number
+	local r = RiftRun.RestoreRobux
+	return math.min(r.Max, math.floor(r.First * r.Grow ^ math.max(0, downs - 1) + 0.5))
 end
 
 -- Going in alone (warned: it's built for a party; not for a starter

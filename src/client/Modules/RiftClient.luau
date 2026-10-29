@@ -1922,10 +1922,13 @@ function RiftClient.openBackup()
 	refreshBackups()
 end
 
--- RESTORE's price: Robux once its product is on, coins till then.
+-- RESTORE's price: Robux (dearer each time you're down this session) once
+-- that price's product is on, coins till then.
 local function restoreLabel(): string
-	if (Store.RobuxProducts.RiftRestore or 0) ~= 0 then
-		return string.format("RESTORE  ·  R$ %d", Store.RobuxPrices.RiftRestore)
+	local robux = player:GetAttribute("RiftRestoreRobux")
+	local key = robux and Store.RiftRestores[robux]
+	if key and (Store.RobuxProducts[key] or 0) ~= 0 then
+		return string.format("RESTORE  ·  R$ %d", robux)
 	end
 	return string.format("RESTORE  ·  %d COINS", player:GetAttribute("RiftRestore") or RiftRun.Restore.Coins)
 end
@@ -2092,6 +2095,7 @@ function RiftClient.start()
 			"RiftWon",
 			"RiftFallen",
 			"RiftRestore",
+			"RiftRestoreRobux",
 		}
 	do
 		player:GetAttributeChangedSignal(key):Connect(changed)

@@ -430,8 +430,13 @@ Store.RobuxProducts = {
 	SwingMega = 3723018515,
 	-- Your knocked-out kaiju back on their feet now (Shared.Kaiju.Revive)
 	KaijuRevive = 3723018189,
-	-- Down at a Rift boss: back on your feet there, kaiju and all (RiftServer)
+	-- Down at a Rift boss: back on your feet there, kaiju and all (RiftServer),
+	-- a product for each price (Store.RiftRestores: dearer each time you're
+	-- down in a session, Shared.RiftRun.restoreRobux)
+	RiftRestore50 = 0,
 	RiftRestore = 3723023347,
+	RiftRestore200 = 0,
+	RiftRestore300 = 0,
 	-- The Kennel's sales (Shared.Kaiju.Sale): the Kaiju of the Day, the
 	-- one-time Starter Rare Roll and the one-time premium trio
 	KaijuDaily = 0,
@@ -443,6 +448,17 @@ Store.RobuxProducts = {
 	Coins50k = 0,
 	Coins100k = 0,
 }
+-- A Rift RESTORE's product at each of its prices (a developer product has
+-- the one price).
+Store.RiftRestores = { [50] = "RiftRestore50", [100] = "RiftRestore", [200] = "RiftRestore200", [300] = "RiftRestore300" }
+function Store.isRiftRestore(key: string): boolean
+	for _, product in Store.RiftRestores do
+		if product == key then
+			return true
+		end
+	end
+	return false
+end
 -- The Robux price of each bundle and offer (a cosmetic's is its own Robux).
 Store.RobuxPrices = {
 	Welcome = 49,
@@ -465,9 +481,12 @@ Store.RobuxPrices = {
 	StarterPack = 99,
 	SeasonPremium = 399,
 	KaijuRevive = 25,
+	RiftRestore50 = 50,
 	RiftRestore = 100,
+	RiftRestore200 = 200,
+	RiftRestore300 = 300,
 	KaijuDaily = 200,
-	KaijuRareRoll = 200,
+	KaijuRareRoll = 150,
 	KaijuPremium = 500,
 }
 -- (A refill's price is its own: Outpost.Refills.)
