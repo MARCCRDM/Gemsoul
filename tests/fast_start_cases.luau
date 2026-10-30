@@ -169,5 +169,14 @@ local intro = fs.readFile(ROOT .. "/src/server/Systems/Intro.luau")
 check(string.find(intro, "style, element = FastStart.DefaultStyle, FastStart.rollElement()", 1, true) ~= nil, "The server doesn't roll the element itself")
 local client = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
 check(not string.find(client, "KaijuRoll", 1, true), "The intro still plays the kaiju roll")
+-- The kaiju roll plays in the lobby instead, after the first fight, with
+-- nothing over the screen (KaijuHud), and they deploy from there.
+local hud = fs.readFile(ROOT .. "/src/client/Modules/KaijuHud.luau")
+local rollAt = string.find(hud, "task.spawn(KaijuRoll.play)", 1, true)
+check(rollAt ~= nil, "The lobby doesn't play the starter kaiju roll")
+local guard = string.sub(hud, math.max(1, rollAt - 500), rollAt)
+for _, need in { "Kaiju.rollsOwed(profile) > 0", "inOutpost", "not LoadingFlow.active()", "IntroCover", "FirstFight" } do
+	check(string.find(guard, need, 1, true) ~= nil, "The lobby's kaiju roll doesn't wait for: " .. need)
+end
 
-print("PASS: " .. checks .. " fast start checks (who sees it, the kit, the first fight's hints, Thermal or Cryo rolled for them, no kaiju in the intro)")
+print("PASS: " .. checks .. " fast start checks (who sees it, the kit, the first fight's hints, Thermal or Cryo rolled for them, no kaiju in the intro: rolled in the lobby after the first fight)")

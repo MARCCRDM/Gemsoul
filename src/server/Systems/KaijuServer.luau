@@ -47,13 +47,14 @@
 	               your spare Commons heal your team by themselves, out of
 	               danger, never a gem wasted. Quiet, but for running out
 	               of Commons.
-	  The roll     everyone gets Kaiju.StarterTeam kaiju, rolled, from Wren
-	               at the Kennel (not the intro: its dialogue offers the
-	               free roll while it's owed, Kaiju.rollsOwed; one full roll
-	               for a player who took an older one: Kaiju.RollVersion):
+	  The roll     everyone gets Kaiju.StarterTeam kaiju, rolled on their
+	               screen once they're in the lobby after the intro's first
+	               fight (KaijuHud plays it; Wren at the Kennel offers it too
+	               while it's owed, Kaiju.rollsOwed; one full roll for a
+	               player who took an older one: Kaiju.RollVersion):
 	               prepared here and saved, so a retry never rerolls, then
-	               claimed, the ones rolled becoming the team. It waits for
-	               them: never handed out by itself.
+	               claimed, the ones rolled becoming the team, out at once.
+	               Never handed out without the roll showing.
 
 	Requests (Shop.register):
 	  "KaijuRecall"         the team back to you, out of the fight for Kaiju.RecallSeconds
@@ -708,7 +709,6 @@ local function claimRoll(player: Player): { any }
 	end
 	local p = profile :: any
 	p.KaijuRoll, p.KaijuRolled, p.KaijuStarter = nil, Kaiju.RollVersion, true
-	PlayerData.training(player, "KaijuStarter") -- (Tasks: Meet Wren)
 	-- The ones rolled are your team.
 	local ids = {}
 	for _, record in added do
@@ -781,7 +781,7 @@ local function upkeep(player: Player, now: number)
 		return
 	end
 	teamOneOnJoin(player, profile.Kaiju)
-	-- (A roll owed waits for Wren, at the Kennel: never given by itself.)
+	-- (A roll owed is played on their screen in the lobby: KaijuHud. Never given by itself.)
 	-- The starter support, for one who has none yet (an older save).
 	if player:GetAttribute("Outpost") == true and Kaiju.supportOwed(profile) then
 		giveSupport(player)

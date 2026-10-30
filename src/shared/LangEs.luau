@@ -4492,12 +4492,8 @@ return {
 	-- The GUIDE (Shared.GameGuide, Modules/GuideUI) ------------------------------------------------
 	["GUIDE"] = "GUÍA",
 	["FIELD MANUAL"] = "MANUAL DE CAMPO",
-	["Meet Wren"] = "Conoce a Wren",
-	["Talk to Wren at the Kaiju Kennel and roll your free team of kaiju."] = "Habla con Wren en la Perrera Kaiju y tira tu equipo gratis de kaiju.",
-	["Wren is at the Kaiju Kennel, by the pen's gate in the Outpost."] = "Wren está en la Perrera Kaiju, junto a la puerta del corral en el Puesto.",
 	["Roll my free kaiju"] = "Tirar mis kaiju gratis",
 	["New here? Every miner gets a team of kaiju to fight beside them, and yours are waiting. Let's roll them!"] = "¿Nuevo por aquí? Cada minero recibe un equipo de kaiju que pelea a su lado, y el tuyo te espera. ¡Vamos a tirarlo!",
-	["Free kaiju: see Wren at the Kaiju Kennel to roll your first team."] = "Kaiju gratis: ve con Wren a la Perrera Kaiju para tirar tu primer equipo.",
 	["Finding your first opponent"] = "Buscando a tu primer rival",
 	["ROLLING YOUR ELEMENT"] = "TIRANDO TU ELEMENTO",
 	["YOUR ELEMENT"] = "TU ELEMENTO",

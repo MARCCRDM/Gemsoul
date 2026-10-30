@@ -22,9 +22,11 @@ and nothing else. No picker, no kaiju:
    once**; on a busy one the intro queue pairs two new miners, then calls
    a lobby player after 4 s, then the bot at 10 s.
 
-**Kaiju come later, from Wren** at the Kennel ("Roll my free kaiju":
-`docs/kaiju-kennel.md`), pointed to by a word on arriving in the Outpost
-and by Tasks' **Meet Wren** step (+150 coins).
+**Kaiju come right after, in the lobby:** back from the first fight, once
+the loading screen's gone, the starter kaiju roll plays by itself
+(`KaijuHud` plays `KaijuRoll`), and the three rolled deploy round you
+straight away. (If it's closed unclaimed, Wren at the Kennel offers it:
+"Roll my free kaiju", `docs/kaiju-kennel.md`.)
 
 The old picker (a fighting style, then any of the four elements) is still
 there behind `FastStart.Pick` (off): its screens are `style-picker.png` and
@@ -40,7 +42,7 @@ there behind `FastStart.Pick` (off): its screens are `style-picker.png` and
 | `Client/Modules/LoadingFlow` | `hold(..., { Until })`: not ready till it says so (a full-screen view of its own still takes over; `Max` still ends it) |
 | `Client/Lobby.client` | `firstDuel`: no toast or search card behind the cover; `uncover` |
 | `Shared.AutoQueue`, `Systems/Duels` | `Intro.Populated`, `introSearches`: the bot at once on a quiet server |
-| `Client/KaijuHud`, `Systems/KaijuServer` | no starter roll by itself any more; a word about Wren |
+| `Client/KaijuHud`, `Systems/KaijuServer` | the starter roll plays in the lobby after the first fight (never handed out without it showing) |
 | `Shared.Vendors`, `Client/Dialogue` | Wren's "Roll my free kaiju" (`Only`) and her greeting for a new player |
 
 ## Tests
@@ -50,8 +52,7 @@ there behind `FastStart.Pick` (off): its screens are `style-picker.png` and
 | `run_lottery_ui` | the picker (Pick on) and the fast start as it is: no picker, Thermal or Cryo on the reel, RETRY, on by itself to the surge roll and the fight, no kaiju, the loading screen held till the fight (Cryo, Thermal after a failed roll, a saved kit) |
 | `run_fast_start` | only Thermal or Cryo, both turning up; the server rolls it; no kaiju roll in the intro |
 | `run_duels` | the bot at once on a quiet server; the search on a busy one |
-| `run_kaiju` | an owed roll waits for Wren, never handed out by itself |
+| `run_kaiju` | an owed roll is never handed out without the roll showing; claimed, it's the team |
 | `run_outpost` | Wren's options fit the dialogue's five rows either way |
-| `run_training_rewards` | Meet Wren pays |
 
 ![The element roll: Thermal or Cryo, landed (an offline render: the gems turn in the cards in the game)](intro/element-roll.png)

@@ -326,14 +326,14 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   (`bossPick`) and every wild kaiju, den and pack out in the Outpost
   (`pickKind` in `KaijuWilds`) pick by those weights; they used to pick
   every kind evenly. The starter roll is unchanged.
-- **The starter roll.** *2026-10-30: it's Wren's now, at the Kennel, not
-  the intro's* (the intro only teaches gems and fighting: `docs/intro.md`).
-  Wren's dialogue offers **Roll my free kaiju** while it's owed (and greets
-  a new player with it); the kaiju card's first visit to the Outpost says
-  where to go, and Tasks has **Meet Wren** first in its KAIJU chapter. It's
-  never handed out by itself any more (it used to be after 90 s in the
-  Outpost, `RollGrace`, gone). Everyone gets three kaiju, rolled on the
-  same reels as the intro's gem roll: three
+- **The starter roll.** *2026-10-30: not in the intro any more* (it only
+  teaches gems and fighting: `docs/intro.md`). It plays by itself when a
+  new player reaches the lobby after the intro's first fight, with nothing
+  over the screen (`KaijuHud`), and the three rolled deploy round them at
+  once. Closed unclaimed, Wren at the Kennel offers it (**Roll my free
+  kaiju**). It's never handed out without the roll showing (it used to be
+  after 90 s in the Outpost, `RollGrace`, gone). Everyone gets three kaiju,
+  rolled on the same reels as the intro's gem roll: three
   cards (each with a numbered keycap) spin a reel of kaiju, every one on
   a glow in its Gemsoul's rarity and named under the window as it passes,
   and land, one after another, on yours (a random kind in a random

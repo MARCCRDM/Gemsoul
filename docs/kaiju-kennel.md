@@ -99,7 +99,8 @@ By the gate, facing the door:
 
 - **Roll my free kaiju** (2026-10-30), while the starter roll is owed
   (`Kaiju.rollsOwed`): plays it (`KaijuRoll`), the three rolled becoming
-  your team. Wren greets a new player with it ("New here? Every miner gets
+  your team. (It plays by itself in the lobby after the intro's first
+  fight: this is for one closed unclaimed.) Wren greets a new player with it ("New here? Every miner gets
   a team of kaiju…") and it takes the tip's row (an option's `Only`:
   `KaijuRollOwed` / `KaijuRollDone`, so five rows at most).
 - **Daily Kaiju Sale** opens the sale window.

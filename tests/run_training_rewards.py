@@ -20,7 +20,7 @@ Training.record(p,"Slot","Weapon");Training.record(p,"Slot","Shield")
 check(p.Coins==775,"Distinct gear reward")
 for _,event in {"EquipSurge","Heavy","Block","Surge","RivalWin"} do Training.record(p,event) end
 check(p.Coins==1550,"Total reward budget must be 1450 (5x the beta's 290)")
-local extraEvents={"MineGem","RareGem","LegendGem","TimedBlock","PvPPlayed","PvPWin","Boss","DungeonComplete","MarketBuy","MarketSale","KaijuStarter","KaijuCatch","Hyperbeam","KaijuBattle","Mech","RiftBoss"}
+local extraEvents={"MineGem","RareGem","LegendGem","TimedBlock","PvPPlayed","PvPWin","Boss","DungeonComplete","MarketBuy","MarketSale","KaijuCatch","Hyperbeam","KaijuBattle","Mech","RiftBoss"}
 for _,event in extraEvents do Training.record(p,event) end
 local total=100
 local ids={}

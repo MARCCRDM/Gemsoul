@@ -724,8 +724,6 @@ local function goTo(where: string?)
 		require(script.Parent.Modules.MarketBoardUI).open()
 	elseif where == "Mine" then
 		UiKit.toast(Lang.translate("Find a rock nearby and swing at it."), CYAN)
-	elseif where == "Kennel" then
-		UiKit.toast(Lang.translate("Wren is at the Kaiju Kennel, by the pen's gate in the Outpost."), CYAN)
 	end
 end
 go.Activated:Connect(function()
