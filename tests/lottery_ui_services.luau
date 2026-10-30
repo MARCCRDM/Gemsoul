@@ -154,7 +154,7 @@ function GemClient.request(action,...)
   prepareArgs={...}
   if failPrepare then return {Ok=false,Message="Retry"} end
   prepareArgs={...}
-  if prepareArgs[1]==nil and not profile.Intro.Lottery then prepareArgs={"Skirmisher",autoElement} end
+  if prepareArgs[1]==nil and not profile.Intro.Lottery then prepareArgs={"Prospector",autoElement} end
   reward=Lottery.prepareChoice(profile,prepareArgs[1],prepareArgs[2],function(element) count+=1; return {Id="g"..count,Element=element,Tier="Common"} end)
   return {Ok=reward~=nil,Message="Retry",Lottery=reward}
  end

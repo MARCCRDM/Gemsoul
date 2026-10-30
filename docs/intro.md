@@ -7,7 +7,7 @@ and nothing else. No picker, no kaiju:
    elements, **Thermal** and **Cryo**, flicks between them and lands on
    the one the server rolled (`FastStart.rollElement`, Systems/Intro:
    whatever the client sends, a new kit gets a random one of the two, in
-   the default Skirmisher style). YOUR ELEMENT, its name and what its hits
+   Prospector armor, never shown: no style picker). YOUR ELEMENT, its name and what its hits
    do, then on by itself after a beat. A roll that fails says so and
    offers RETRY.
 2. **The surge roll** (unchanged): Q, E and R's gems spin and crack open,
@@ -55,4 +55,14 @@ there behind `FastStart.Pick` (off): its screens are `style-picker.png` and
 | `run_kaiju` | an owed roll is never handed out without the roll showing; claimed, it's the team |
 | `run_outpost` | Wren's options fit the dialogue's five rows either way |
 
-![The element roll: Thermal or Cryo, landed (an offline render: the gems turn in the cards in the game)](intro/element-roll.png)
+*2026-10-30, restyled:* the roll uses the picker's own element cards
+(the gem on its lit stage, what it does, BEATS / WEAK TO), side by side
+with OR between them. The lit one's edge runs with its element's energy
+(ElementCardFX) and the screen floods with its colour; it lands with a
+flash, a ring of light and the name big under the cards, the other card
+stepping back. Prospector armor is everyone's (`FastStart.DefaultStyle`),
+never shown.
+
+![The element roll, landed (an offline render: the gems turn in the cards in the game)](intro/element-roll.png)
+
+![On a phone](intro/element-roll-phone.png)

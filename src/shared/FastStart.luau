@@ -3,7 +3,8 @@
 
 	  1. Their element, rolled for them (no picker, Pick off): Thermal or
 	     Cryo at random (StarterElements), shown landing on a quick reel,
-	     in the default armor style (DefaultStyle). The server rolls it.
+	     in the Prospector armor (DefaultStyle: no style picker, never
+	     shown). The server rolls it.
 	  2. The kit goes on (Shared.StarterLottery, granted by Systems/Intro):
 	     one move rolled per key (Q / E / R), the surge roll, moving on by
 	     itself.
@@ -39,7 +40,7 @@ FastStart.Pick = false -- off: no style or element picker (rolled for them)
 FastStart.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
 FastStart.Elements = { "Fire", "Frost", "Shock", "Poison" }
 FastStart.StarterElements = { "Fire", "Frost" } -- Thermal or Cryo, at random
-FastStart.DefaultStyle = "Skirmisher" -- (sword and shield: the first fight's kit)
+FastStart.DefaultStyle = "Prospector" -- (never shown: everyone starts in it, with sword and shield)
 
 -- A new player's element (Pick off): one of StarterElements at random.
 function FastStart.rollElement(random: Random?): string

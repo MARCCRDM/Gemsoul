@@ -15,15 +15,21 @@ check(veil.Parent and veil.Size.X.Scale==1 and veil.Size.Y.Scale==1,"The element
 -- Only the two starter elements on the reel, never a picker card to tap.
 local cards={}
 for _,element in FastStart.StarterElements do
- local function under(o) for _,c in o.children do if not c.Destroyed and c.Name==element then return c end local f=under(c) if f then return f end end return nil end
- local card=under(veil)
+ local card=nil
+ for _,o in objects do if not o.Destroyed and o.Name==element and o.Parent==veil then card=o end end
  check(card~=nil,"No "..element.." on the reel")
  cards[element]=card
 end
+-- They're the picker's own element cards (gem, strengths, matchup), lit in turn.
+for _,element in FastStart.StarterElements do
+ check(cards[element].ClassName=="TextButton" and cards[element].Size.X.Offset>=150 and cards[element].Size.Y.Offset>=200,"The "..element.." card isn't laid out")
+end
+check(FastStart.DefaultStyle=="Prospector","The armor isn't Prospector by default")
 check(#FastStart.StarterElements==2 and FastStart.StarterElements[1]=="Fire" and FastStart.StarterElements[2]=="Frost","The starter elements aren't Thermal and Cryo")
 for _,other in {"Shock","Poison"} do
- local function under(o) for _,c in o.children do if not c.Destroyed and c.Name==other then return c end local f=under(c) if f then return f end end return nil end
- check(under(veil)==nil,"Ion or Corrosive on the starter reel")
+ local found=false
+ for _,o in objects do if not o.Destroyed and o.Name==other and o.Parent==veil then found=true end end
+ check(not found,"Ion or Corrosive on the starter reel")
 end
 local result=named("ElementResult")
 local retry=named("Retry")

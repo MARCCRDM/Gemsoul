@@ -2533,78 +2533,120 @@ listen(gui.Destroying, function()
 end)
 fit()
 
--- No picker (FastStart.Pick off): over the picker at once, so it never shows,
--- a quick reel of the two starter elements runs while the server rolls one
--- (Systems/Intro: Thermal or Cryo at random), lands on it, and on by itself
--- to the surge roll, then the first fight. A failed roll: RETRY.
+-- No picker (FastStart.Pick off): the element roll. Over the picker at once
+-- (it never shows): the two starter elements' own cards from the picker
+-- (Thermal and Cryo: their gem on its lit stage, what they do, what they
+-- beat), side by side with OR between them. While the server rolls one
+-- (Systems/Intro: Thermal or Cryo at random) the light flicks from card to
+-- card, quick then slowing: the lit one's edge runs with its element's
+-- energy (ElementCardFX), its gem turns faster, and the screen floods with
+-- its colour. It lands with a flash and a ring of light, the other card
+-- stepping back, the name big under them; then on by itself to the surge
+-- roll and the first fight. A failed roll: RETRY.
 if not FastStart.Pick then
 	do
 		local list = FastStart.StarterElements
 		local veil = new("TextButton", {
 			Name = "ElementRoll",
 			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = C.Ink,
+			BackgroundColor3 = Color3.new(1, 1, 1),
 			AutoButtonColor = false,
 			Text = "",
 			ZIndex = 30,
 		}, gui)
 		new("UIGradient", { Rotation = 115, Color = ColorSequence.new(C.Ink, Color3.fromRGB(16, 22, 42)) }, veil)
-		local function line(value, size, color, font, y, h)
+		-- The flood: the lit element's colour rising from the bottom.
+		local flood = frame(veil, {
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.fromScale(0.5, 1),
+			Size = UDim2.fromScale(1, 0.75),
+			BackgroundColor3 = GemConfig.ElementColors[list[1]] or C.Gold,
+			ZIndex = 30,
+		})
+		new("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.78) }),
+		}, flood)
+		for i = 1, 26 do
+			frame(veil, {
+				Position = UDim2.fromScale(((i * 37) % 97) / 96, ((i * 23) % 53) / 100),
+				Size = UDim2.fromOffset(if i % 4 == 0 then 2 else 1, if i % 4 == 0 then 2 else 1),
+				BackgroundColor3 = C.Text,
+				BackgroundTransparency = if i % 4 == 0 then 0.45 else 0.7,
+				ZIndex = 30,
+			})
+		end
+		local function line(value, size, color, font, h)
 			local l = label(veil, value, size, color, font)
-			l.ZIndex, l.TextXAlignment, l.AnchorPoint = 31, Enum.TextXAlignment.Center, Vector2.new(0.5, 0)
-			l.Position, l.Size = UDim2.new(0.5, 0, y, 0), UDim2.new(0.9, 0, 0, h)
+			l.ZIndex, l.TextXAlignment, l.AnchorPoint = 33, Enum.TextXAlignment.Center, Vector2.new(0.5, 0)
+			l.Size = UDim2.new(0.92, 0, 0, h)
 			return l
 		end
-		local kicker = line("ROLLING YOUR ELEMENT", 15, C.Dim, Enum.Font.GothamBold, 0.14, 20)
+		local kicker = line("ROLLING YOUR ELEMENT", 14, C.Gold, Enum.Font.GothamBlack, 18)
 		kicker.Name = "Kicker"
-		local row = frame(veil, {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.47),
-			Size = UDim2.fromOffset(440, 230),
-			BackgroundTransparency = 1,
-			ZIndex = 31,
-		})
+		local title = line("THERMAL  OR  CRYO", 38, C.Text, Enum.Font.GothamBlack, 44)
+		local sub = line("Your gems, and the Q, E and R moves they give you, take this element.", 14, C.Dim, Enum.Font.GothamMedium, 18)
+
+		-- The two cards: the picker's own, taken off it (it never lays them
+		-- out again), with a dimmer, a pop and their element's energy.
 		local cards = {}
 		for i, element in list do
-			local color = GemConfig.ElementColors[element] or C.Gold
-			local card = frame(row, {
-				Name = element,
-				Position = UDim2.fromScale((i - 1) * 0.53, 0),
-				Size = UDim2.fromScale(0.47, 1),
-				BackgroundColor3 = C.Card,
-				ZIndex = 31,
-			})
-			UiKit.round(card, 14)
-			local edge = stroke(card, C.Line, 0, 1)
-			local grow = new("UIScale", {}, card)
-			-- Its gem, turning.
-			local view = new("ViewportFrame", {
-				BackgroundTransparency = 1,
-				AnchorPoint = Vector2.new(0.5, 0),
-				Position = UDim2.new(0.5, 0, 0, 14),
-				Size = UDim2.fromOffset(120, 120),
-				ZIndex = 32,
-			}, card)
-			local gem = { Id = "starter-roll-" .. element, Element = element, Tier = "Rare", Size = 6, Clarity = 6, Cut = 6 }
-			local model, radius = GemArt.model(gem, false)
-			GemArt.setupViewport(view, GemArt.cardDistance(radius))
-			model.Parent = view
-			local name = label(card, string.upper(GemConfig.elementName(element)), 26, color, Enum.Font.GothamBlack)
-			name.ZIndex, name.TextXAlignment = 32, Enum.TextXAlignment.Center
-			name.Position, name.Size = UDim2.fromOffset(0, 142), UDim2.new(1, 0, 0, 30)
-			local blurb = label(card, ELEMENTS[element] and ELEMENTS[element].Blurb or "", 13, C.Dim, Enum.Font.GothamBold)
-			blurb.ZIndex, blurb.TextXAlignment = 32, Enum.TextXAlignment.Center
-			blurb.Position, blurb.Size = UDim2.fromOffset(0, 176), UDim2.new(1, 0, 0, 18)
-			cards[i] = { Card = card, Edge = edge, Grow = grow, Model = model, Gem = gem, Color = color, Element = element }
+			local entry = elementButtons[element]
+			if entry then
+				elementButtons[element] = nil
+				entry.Button.Parent = veil
+				entry.Button.ZIndex = 32
+				entry.Button.AnchorPoint = Vector2.new(0.5, 0.5)
+				entry.Check.Ring.Visible = false
+				local pop = new("UIScale", {}, entry.Button)
+				local dim = frame(entry.Button, {
+					Size = UDim2.fromScale(1, 1),
+					BackgroundColor3 = C.Ink,
+					BackgroundTransparency = 1,
+					ZIndex = 40,
+				})
+				UiKit.round(dim, 12)
+				local effect = CardFX.create(entry.Button, entry.Holder)
+				cards[i] = { Entry = entry, Pop = pop, Dim = dim, Effect = effect, Element = element, Turn = i * 1.7 }
+			end
 		end
-		local result = line("", 34, C.Text, Enum.Font.GothamBlack, 0.72, 40)
+		-- OR between them: a diamond.
+		local orBadge = frame(veil, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromOffset(46, 46),
+			Rotation = 45,
+			BackgroundColor3 = C.Panel,
+			ZIndex = 33,
+		})
+		UiKit.round(orBadge, 8)
+		stroke(orBadge, C.Edge, 0, 1.5)
+		local orWord = label(veil, "OR", 15, C.Dim, Enum.Font.GothamBlack)
+		orWord.ZIndex, orWord.TextXAlignment, orWord.AnchorPoint = 34, Enum.TextXAlignment.Center, Vector2.new(0.5, 0.5)
+		orWord.Size = UDim2.fromOffset(46, 46)
+		-- The ring of light a landing sends out.
+		local burstRing = frame(veil, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(10, 10),
+			ZIndex = 31,
+			Visible = false,
+		})
+		UiKit.round(burstRing, 999)
+		local burstEdge = stroke(burstRing, C.Gold, 0, 4)
+		local flash = frame(veil, {
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 1,
+			ZIndex = 45,
+		})
+		local result = line("", 54, C.Text, Enum.Font.GothamBlack, 60)
 		result.Name = "ElementResult"
-		local hit = line("", 15, C.Dim, Enum.Font.GothamBold, 0.72, 20)
-		hit.Position = UDim2.new(0.5, 0, 0.72, 46)
+		new("UIStroke", { Color = C.Ink, Thickness = 3, Transparency = 0.2 }, result)
+		local resultPop = new("UIScale", {}, result)
+		local hit = line("", 16, C.Text, Enum.Font.GothamBold, 22)
 		local retry = new("TextButton", {
 			Name = "Retry",
 			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.new(0.5, 0, 0.72, 0),
 			Size = UDim2.fromOffset(220, 46),
 			BackgroundColor3 = C.Gold,
 			TextColor3 = C.Ink,
@@ -2612,42 +2654,138 @@ if not FastStart.Pick then
 			Font = Enum.Font.GothamBlack,
 			TextSize = 16,
 			Visible = false,
-			ZIndex = 32,
+			ZIndex = 34,
 		}, veil)
 		UiKit.round(retry, 999)
 
-		-- One card lit (the reel's on it), or the one landed on.
-		local lit = 1
-		local function light(index, landed)
-			lit = index
-			for i, c in cards do
-				local on = i == index
-				c.Card.BackgroundColor3 = if on then c.Color:Lerp(C.Ink, if landed then 0.6 else 0.75) else C.Card
-				c.Edge.Color = if on then c.Color else C.Line
-				c.Edge.Thickness = if on then (if landed then 3 else 2) else 1
-				c.Grow.Scale = if on then (if landed then 1.08 else 1.03) else (if landed then 0.94 else 1)
+		-- Where it all goes, for this screen: the cards as big as fit
+		-- (layoutCard lays each one out inside), the words above and below.
+		local function layoutRoll()
+			local size = veil.AbsoluteSize
+			local w, h = size.X, size.Y
+			if w <= 0 or h <= 0 then
+				return
 			end
+			local short = h < 520
+			local gap = if w < 640 then 54 else 84
+			local cardW = math.clamp(math.floor((w - 32 - gap) / 2), 150, 290)
+			local cardH = math.clamp(math.floor(h * (if short then 0.56 else 0.5)), 200, 400)
+			cardW = math.min(cardW, math.floor(cardH * 1.05)) -- (tall: gem on top, the name under it)
+			local top = if short then 8 else math.floor(h * 0.08)
+			kicker.Position = UDim2.new(0.5, 0, 0, top)
+			title.TextSize = if short then 26 else 38
+			title.Position = UDim2.new(0.5, 0, 0, top + 20)
+			title.Size = UDim2.new(0.92, 0, 0, title.TextSize + 6)
+			sub.Visible = not short
+			sub.Position = UDim2.new(0.5, 0, 0, top + 20 + title.TextSize + 8)
+			local middle = top + (if short then 54 else 100) + math.floor(cardH / 2)
+			for i, card in cards do
+				local x = math.floor(w / 2) + (if i == 1 then -1 else 1) * math.floor((cardW + gap) / 2)
+				card.Entry.Button.Position = UDim2.fromOffset(x, middle)
+				card.Entry.Button.Size = UDim2.fromOffset(cardW, cardH)
+				layoutCard(card.Entry, cardW, cardH)
+			end
+			orBadge.Position = UDim2.fromOffset(math.floor(w / 2), middle)
+			orWord.Position = orBadge.Position
+			local below = middle + math.floor(cardH / 2) + (if short then 6 else 18)
+			result.TextSize = if short then 34 else 54
+			result.Position = UDim2.new(0.5, 0, 0, below)
+			result.Size = UDim2.new(0.92, 0, 0, result.TextSize + 6)
+			hit.Position = UDim2.new(0.5, 0, 0, below + result.TextSize + 6)
+			retry.Position = UDim2.new(0.5, 0, 0, below)
 		end
-		light(1)
+		layoutRoll()
+		listen(veil:GetPropertyChangedSignal("AbsoluteSize"), layoutRoll)
+
+		-- One card lit (the reel's on it, or the one it landed on), the
+		-- other stepping back (further once it's landed).
+		local lit, landedOn = 1, nil
+		local function paint()
+			for i, card in cards do
+				local entry = card.Entry
+				local on = i == lit
+				local back = not on
+				local gone = landedOn ~= nil and back
+				entry.Stroke.Color = if on then entry.Color else C.Line
+				entry.Stroke.Thickness = if on then (if landedOn then 3 else 2) else 1
+				entry.Button.BackgroundColor3 = if on then C.Card:Lerp(entry.Color, 0.16) else C.Card
+				entry.WashFade.Transparency = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, if on then 0.55 else 0.9),
+					NumberSequenceKeypoint.new(0.6, if on then 0.92 else 0.98),
+					NumberSequenceKeypoint.new(1, 1),
+				})
+				for _, glow in entry.Glow do
+					glow.Disc.BackgroundTransparency = if on then glow.Base - 0.03 else glow.Base + 0.015
+				end
+				entry.Ring.Transparency = if on then 0.15 else 0.85
+				entry.Spark.Visible = on
+				entry.Name.TextColor3 = if back then entry.Color:Lerp(C.Dim, 0.45) else entry.Color
+				entry.Blurb.TextColor3 = if back then C.Dim else C.Text
+				if entry.Art and entry.Art.View then
+					entry.Art.View.ImageTransparency = if back then 0.4 else 0
+				end
+				for _, pair in entry.Lines do
+					pair[2].TextColor3 = if on then C.Text else C.Faint
+				end
+				card.Dim.BackgroundTransparency = if gone then 0.45 elseif back then 0.78 else 1
+				card.Pop.Scale = if gone then 0.92 elseif on then 1.04 else 0.97
+			end
+			local color = GemConfig.ElementColors[list[lit]] or C.Gold
+			flood.BackgroundColor3 = color
+			orBadge.BackgroundColor3 = C.Panel:Lerp(color, 0.25)
+		end
+		paint()
 		local began = os.clock()
-		listen(RunService.RenderStepped, function()
+		listen(RunService.RenderStepped, function(dt)
 			if not veil.Parent then
 				return
 			end
 			local t = os.clock() - began
-			for i, c in cards do
-				c.Model:PivotTo(GemArt.pose(c.Gem, t * (if i == lit then 2.2 else 0.8)))
+			for i, card in cards do
+				local entry = card.Entry
+				local on = i == lit
+				card.Turn += dt * (if on then 2.2 else 0.5)
+				local model = entry.Art and entry.Art.Model
+				if model and model.Parent then
+					model:PivotTo(GemArt.pose(entry.Gem, card.Turn))
+				end
+				if on then
+					local angle = t * 1.6 - math.pi / 2
+					entry.Spark.Position = UDim2.fromScale(0.5 + 0.5 * math.cos(angle), 0.5 + 0.5 * math.sin(angle))
+				end
+				CardFX.update(card.Effect, if on then card.Element else nil, t)
 			end
 		end)
 
 		local rolling = false
 		local function landOn(kit)
-			local index = table.find(list, kit.Element) or lit
-			light(index, true)
+			landedOn = table.find(list, kit.Element) or lit
+			lit = landedOn
+			paint()
+			local winner = cards[landedOn]
+			local color = GemConfig.ElementColors[kit.Element] or C.Text
+			-- The landing: a flash, the card pops, a ring of light runs out.
+			flash.BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.5)
+			flash.BackgroundTransparency = 0.45
+			tween(flash, 0.5, { BackgroundTransparency = 1 })
+			if winner then
+				winner.Pop.Scale = 1.14
+				tween(winner.Pop, 0.45, { Scale = 1.06 }, Enum.EasingStyle.Back)
+				burstRing.Position = winner.Entry.Button.Position
+				burstRing.Size = UDim2.fromOffset(40, 40)
+				burstRing.Visible = true
+				burstEdge.Color, burstEdge.Transparency = color, 0
+				tween(burstRing, 0.7, { Size = UDim2.fromOffset(620, 620) })
+				tween(burstEdge, 0.7, { Transparency = 1 })
+			end
 			LotterySound.play("Lock")
+			LotterySound.reveal(4)
 			kicker.Text = "YOUR ELEMENT"
+			title.Visible, sub.Visible = false, false
 			result.Text = string.upper(GemConfig.elementName(kit.Element))
-			result.TextColor3 = GemConfig.ElementColors[kit.Element] or C.Text
+			result.TextColor3 = color
+			resultPop.Scale = 0.6
+			tween(resultPop, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
 			hit.Text = ELEMENTS[kit.Element] and ELEMENTS[kit.Element].Hit or ""
 			reward = kit
 			-- A beat to see it, then the surge roll, then the first fight.
@@ -2700,7 +2838,13 @@ if not FastStart.Pick then
 					UiKit.toast(failed or "Couldn't roll your element.")
 					return
 				end
-				light(lit % #list + 1)
+				lit = lit % #list + 1
+				paint()
+				local card = cards[lit]
+				if card then
+					card.Pop.Scale = 1.08
+					tween(card.Pop, 0.12, { Scale = 1.04 })
+				end
 				LotterySound.tick(math.min(1, ticks / 16))
 				task.delay(if ticks < 10 then 0.07 else math.min(0.32, 0.07 + (ticks - 9) * 0.05), tick)
 			end
