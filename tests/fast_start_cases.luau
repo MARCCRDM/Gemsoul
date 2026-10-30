@@ -154,4 +154,20 @@ for _, id in FastStart.Order do
 	check(#keys > 0 and #tap > 0 and #reason > 0, id .. " needs words for keys and touch")
 end
 
-print("PASS: " .. checks .. " fast start checks (who sees it, the kit, the first fight's hints)")
+-- No picker: the element's rolled for them, Thermal or Cryo only, both
+-- turning up; the server rolls it whatever the client sent (Systems/Intro).
+check(FastStart.Pick == false, "The starter picker is back on")
+local seen = {}
+local random = { NextInteger = function(_, a, b) return math.random(a, b) end }
+for _ = 1, 200 do
+	local element = FastStart.rollElement(random)
+	check(element == "Fire" or element == "Frost", "A starter element other than Thermal or Cryo: " .. tostring(element))
+	seen[element] = true
+end
+check(seen.Fire and seen.Frost, "One of Thermal or Cryo never comes up")
+local intro = fs.readFile(ROOT .. "/src/server/Systems/Intro.luau")
+check(string.find(intro, "style, element = FastStart.DefaultStyle, FastStart.rollElement()", 1, true) ~= nil, "The server doesn't roll the element itself")
+local client = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
+check(not string.find(client, "KaijuRoll", 1, true), "The intro still plays the kaiju roll")
+
+print("PASS: " .. checks .. " fast start checks (who sees it, the kit, the first fight's hints, Thermal or Cryo rolled for them, no kaiju in the intro)")

@@ -403,6 +403,27 @@ function actions.KaijuMarket()
 	require(script.Parent.Modules.MarketBoardUI).open("Browse", "Kaiju")
 end
 
+-- Whether an option with Only shows now (Shared.Vendors).
+local function starterRollOwed(): boolean
+	local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+	local GemClient = require(script.Parent.Modules.GemClient)
+	return Kaiju.rollsOwed(GemClient.Profile) > 0
+end
+local onlyWhen = {
+	KaijuRollOwed = starterRollOwed,
+	KaijuRollDone = function()
+		return not starterRollOwed()
+	end,
+}
+
+-- Wren's free roll: the starter kaiju (KaijuRoll), once.
+function actions.KaijuStarterRoll()
+	close()
+	if starterRollOwed() then
+		task.spawn(require(script.Parent.Modules.KaijuRoll).play)
+	end
+end
+
 -- The Kennel's sales: the Daily Kaiju Sale and the Starter Rare Roll.
 function actions.KennelSale()
 	close()
@@ -481,6 +502,10 @@ local function open(vendorId: string, part: BasePart)
 	local function menu(list: { any }, topic: boolean)
 		local items: { MenuItem } = {}
 		for _, option in list do
+			local only = option.Only and onlyWhen[option.Only]
+			if option.Only and not (only and only()) then
+				continue
+			end
 			table.insert(items, {
 				Text = option.Text,
 				Run = function()
@@ -510,7 +535,7 @@ local function open(vendorId: string, part: BasePart)
 	end
 	mainMenu()
 
-	say(vendor.Greeting)
+	say(if vendor.OwedGreeting and starterRollOwed() then vendor.OwedGreeting else vendor.Greeting)
 	gui.Enabled = true
 end
 

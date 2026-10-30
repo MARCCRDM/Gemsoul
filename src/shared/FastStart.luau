@@ -1,19 +1,28 @@
 --[[
 	The fast start: a new player's first minute.
 
-	  1. Pick a fighting style (Prospector, Skirmisher, Juggernaut): the
-	     armor set they start in (Shared.ArmorFamilies).
-	  2. Independently pick an element (Thermal, Cryo, Ion, Corrosive),
-	     with the two showcase moves each of Q / E / R can roll (GemTraits.Intro).
-	  3. The kit goes on (Shared.StarterLottery, granted by Systems/Intro):
-	     one move rolled per key, shown on a reveal card before the fight.
-	  4. A first fight: an easy sparring match (Systems/Duelist, FirstFight),
-	     with a hint popping up the first time each control is useful
-	     (Client FirstFight). Then the lobby.
+	  1. Their element, rolled for them (no picker, Pick off): Thermal or
+	     Cryo at random (StarterElements), shown landing on a quick reel,
+	     in the default armor style (DefaultStyle). The server rolls it.
+	  2. The kit goes on (Shared.StarterLottery, granted by Systems/Intro):
+	     one move rolled per key (Q / E / R), the surge roll, moving on by
+	     itself.
+	  3. A first fight, behind the loading screen till it starts (no
+	     inventory or lobby in between): the sparring rival at once, unless
+	     the server's busy enough to find another new miner
+	     (Shared.AutoQueue.Intro.Populated). A hint pops up the first time
+	     each control is useful (Client FirstFight). Then the lobby.
+	  Kaiju aren't in it: the starter kaiju roll is Wren's, at the Kennel
+	  (Shared.Vendors' KaijuKeeper), once they're in the Outpost.
+
+	(Pick on: the old picker, a fighting style then any of the four
+	elements.)
 
 	Pure, for the server, the client and tests.
 
 	  FastStart.Enabled                  off = no picker and no first fight
+	  FastStart.Pick                     the old picker (off: rolled for them)
+	  FastStart.rollElement(random?)     -> "Fire" | "Frost" (StarterElements)
 	  FastStart.Styles / Elements        in the order the screens show them
 	  FastStart.SaveVersion              saves older than this were made before
 	                                     the fast start (see migrate)
@@ -26,8 +35,17 @@
 local FastStart = {}
 
 FastStart.Enabled = true
+FastStart.Pick = false -- off: no style or element picker (rolled for them)
 FastStart.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
 FastStart.Elements = { "Fire", "Frost", "Shock", "Poison" }
+FastStart.StarterElements = { "Fire", "Frost" } -- Thermal or Cryo, at random
+FastStart.DefaultStyle = "Skirmisher" -- (sword and shield: the first fight's kit)
+
+-- A new player's element (Pick off): one of StarterElements at random.
+function FastStart.rollElement(random: Random?): string
+	local list = FastStart.StarterElements
+	return list[(random or Random.new()):NextInteger(1, #list)]
+end
 -- Each style's own gem (as its armor art shows it).
 
 -- Saves from before the fast start: anyone who has been playing without

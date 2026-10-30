@@ -169,8 +169,10 @@ local Shop = {
 	register = function(name, fn)
 		handlers[name] = fn
 	end,
-	reply = function(ok, message)
-		return { Ok = ok, Message = message }
+	reply = function(ok, message, extra)
+		local result = extra or {}
+		result.Ok, result.Message = ok, message
+		return result
 	end,
 }
 local profiles, xp, xpFoe, levelOf = {}, {}, {}, {}

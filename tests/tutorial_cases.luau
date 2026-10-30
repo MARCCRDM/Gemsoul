@@ -102,6 +102,8 @@ local spawnAt = cf(100, 5, 100)
 -- (Analytics: the coins the tutorial tagged.)
 local tutorialCoins = {}
 local stubs = {
+	-- (The picker's way: these checks send their own style and element.)
+	FastStart = { Pick = true, DefaultStyle = "Skirmisher", rollElement = function() return "Fire" end },
 	Analytics = {
 		coins = function(_, delta, reason)
 			table.insert(tutorialCoins, { Delta = delta, Reason = reason })

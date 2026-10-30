@@ -77,8 +77,10 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	after a few seconds. Free players on call (the default) are pulled in,
 	closest rating first, their rating safe from a loss and a bonus on a
 	win; players who turned it off are offered the match instead (FillIn).
-	A new player's first fight is the "intro" queue: two new players pair at
-	once; alone, a lobby player is called; still alone, the sparring rival.
+	A new player's first fight is the "intro" queue: on a quiet server
+	(AutoQueue.Intro.Populated) the sparring rival at once; on a busy one two
+	new players pair at once, alone a lobby player is called, still alone
+	the sparring rival.
 	Nobody is put in a queued duel without saying so: when the queue pairs
 	two entries, everyone in them gets MATCH READY (JOIN / DECLINE) for
 	Matchmaking.ReadySeconds, and the match starts once they've all joined.
@@ -1233,6 +1235,14 @@ local function introJoin(player: Player)
 	local reason = busy(player)
 	if reason then
 		return reply(false, subject(player, player, reason))
+	end
+	-- A quiet server: the sparring rival at once (no search, no waiting).
+	if not AutoQueue.introSearches(#Players:GetPlayers()) then
+		local result = ArenaSessions.enterTraining(player)
+		if result and result.Ok == false then
+			return result
+		end
+		return reply(true, "Your sparring partner is ready.", { Bot = true })
 	end
 	enqueue(AutoQueue.IntroMode, { player }, 1)
 	return reply(true, "Finding your first opponent…")

@@ -23,12 +23,14 @@
 	same queue is who you're then matched with, the card's bonus comes with
 	you (you're called in for it).
 
-	A new player's first fight is a queue of its own ("intro"):
+	A new player's first fight is a queue of its own ("intro"). On a quiet
+	server (fewer than Intro.Populated players) it's the sparring rival at
+	once, no search. On a busy one:
 
 	  two new players          paired at once, each in their first fight
 	                           (hints pop up as they go, Shared.FastStart)
 	  one, after Intro.CallAfter   eligible lobby players are invited
-	  one, after Intro.BotAfter    the sparring rival steps in (the old flow)
+	  one, after Intro.BotAfter    the sparring rival steps in
 
 	Pure: the server (Systems/Duels) applies it, the client shows it, tests
 	check it.
@@ -39,6 +41,8 @@
 	                                       attribute; `queued`: already searching)
 	  AutoQueue.setting(record)            the player's choice (true: on call)
 	  AutoQueue.introPhase(waited)         "Search" | "Call" | "Bot"
+	  AutoQueue.introSearches(players)     a first fight looks for real
+	                                       players (`players` in the server)?
 	  AutoQueue.pick(candidates, rating)   the closest in rating ({ Rating })
 	  AutoQueue.bonus(called, won)         the fill-in's extra coins
 	  AutoQueue.settled(arrivedAt, now)    past the moment after logging in?
@@ -53,8 +57,9 @@ AutoQueue.FillBonus = 20 -- first-fight join bonus; other fill-ins retain the wi
 AutoQueue.Settle = 20 -- seconds after you first reach the lobby before you're asked to join anything
 AutoQueue.CarryFor = 60 -- seconds a taken-down fill-in card's bonus waits for that same queue
 AutoQueue.Intro = {
-	CallAfter = 5, -- seconds alone before lobby invitations
-	BotAfter = 15, -- seconds alone before the sparring rival steps in
+	Populated = 6, -- players in the server before a first fight looks for real ones (fewer: the rival at once)
+	CallAfter = 4, -- seconds alone before lobby invitations
+	BotAfter = 10, -- seconds alone before the sparring rival steps in
 }
 AutoQueue.IntroMode = "intro"
 
@@ -112,6 +117,10 @@ function AutoQueue.holdUntil(arrivedAt: number?, now: number): number
 end
 
 -- Where an intro search is after `waited` seconds alone.
+function AutoQueue.introSearches(players: number): boolean
+	return players >= AutoQueue.Intro.Populated
+end
+
 function AutoQueue.introPhase(waited: number): string
 	if waited >= AutoQueue.Intro.BotAfter then
 		return "Bot"

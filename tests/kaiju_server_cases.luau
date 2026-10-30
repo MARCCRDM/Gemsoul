@@ -3634,13 +3634,18 @@ local function yourTeam()
 	check(registered.KaijuInfuse(a, { "t1" }, resting.Id).Ok, "Couldn't infuse one at home")
 	check(resting.Health > math.floor(restingMost / 2), "The one at home wasn't mended")
 	check(not registered.KaijuInfuse(a, { "t1" }, "nope").Ok, "Infused a kaiju they don't own")
-	-- A roll left unclaimed: given after a while in the Outpost.
+	-- A roll owed waits for Wren, at the Kennel: never handed out by itself,
+	-- however long they're in the Outpost; claimed, it's theirs.
 	table.clear(notes)
 	b:SetAttribute("Outpost", true)
 	KaijuServer._upkeep(b, now)
 	check(Kaiju.count(profiles[b].Kaiju) == 0 and Kaiju.rollsOwed(profiles[b]) == 3, "Given the roll at once")
-	KaijuServer._upkeep(b, now + Kaiju.RollGrace + 1)
-	check(Kaiju.count(profiles[b].Kaiju) == 3 and profiles[b].KaijuRolled, "An unclaimed roll was never given")
+	KaijuServer._upkeep(b, now + 600)
+	check(Kaiju.count(profiles[b].Kaiju) == 0 and Kaiju.rollsOwed(profiles[b]) == 3, "An owed roll was handed out without Wren")
+	local rolled = registered.KaijuRoll(b)
+	check(rolled.Ok and #rolled.Rolls == 3, "Wren's roll didn't come up")
+	check(registered.KaijuRollClaim(b).Ok, "Wren's roll couldn't be claimed")
+	check(Kaiju.count(profiles[b].Kaiju) == 3 and profiles[b].KaijuRolled, "The claimed roll isn't theirs")
 	check(noted(b, "Your kaiju: "), "Not told about the kaiju given")
 	-- Always three: one who took an older roll (a short top-up, left saved
 	-- unclaimed here) gets a full new roll of three, once, and the three

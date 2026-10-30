@@ -904,7 +904,26 @@ do
 	advance(Matchmaking.EndPause)
 	respawn(ivy, kim)
 
-	-- The intro queue: two new players pair at once ---------------------------------
+	-- A quiet server (fewer than Intro.Populated): the sparring rival at once,
+	-- no search.
+	do
+		local populated = AutoQueue.Intro.Populated
+		AutoQueue.Intro.Populated = 1000
+		local alone = makePlayer(49, "Rue")
+		local before = #trainingEntered
+		local answer = handlers.IntroQueue(alone)
+		check(answer.Ok and answer.Bot, "A quiet server's first fight didn't go to the rival")
+		check(#trainingEntered == before + 1 and trainingEntered[#trainingEntered] == alone, "The rival didn't step in at once")
+		check(alone:GetAttribute("DuelQueue") == nil, "A quiet server's first fight still searched")
+		alone:SetAttribute("CombatSession", nil)
+		AutoQueue.Intro.Populated = populated
+	end
+	check(AutoQueue.introSearches(AutoQueue.Intro.Populated) and not AutoQueue.introSearches(AutoQueue.Intro.Populated - 1), "introSearches")
+	-- (What follows is a busy server: first fights look for real players.)
+	local populatedWas = AutoQueue.Intro.Populated
+	AutoQueue.Intro.Populated = 1
+
+	-- The intro queue (a busy server): two new players pair at once -------------------
 	local new1, new2 = makePlayer(41, "Nia"), makePlayer(42, "Oli")
 	check(not handlers.DuelQueue(new1, "intro").Ok, "The PLAY menu could queue the intro")
 	check(not handlers.IntroQueue(kim).Ok, "A veteran joined the intro queue")
@@ -970,15 +989,17 @@ do
 	-- Alone with nobody around: the sparring rival after Intro.BotAfter --------------
 	local new4 = makePlayer(44, "Quin")
 	lobby(kim)
+	local rivalsBefore = #trainingEntered
 	check(handlers.IntroQueue(new4).Ok, "Quin isn't in the intro queue")
 	advance(AutoQueue.Intro.BotAfter - 1)
-	check(new4:GetAttribute("DuelQueue") == "intro" and #trainingEntered == 0, "The rival came too soon")
+	check(new4:GetAttribute("DuelQueue") == "intro" and #trainingEntered == rivalsBefore, "The rival came too soon")
 	check(Duels.matchOf(kim) == nil, "Ignoring invitation pulled the lobby player")
 	advance(1.5)
-	check(#trainingEntered == 1 and trainingEntered[1] == new4, "The sparring rival didn't step in")
+	check(#trainingEntered == rivalsBefore + 1 and trainingEntered[#trainingEntered] == new4, "The sparring rival didn't step in")
 	check(new4:GetAttribute("DuelQueue") == nil and Duels.matchOf(new4) == nil, "Quin is still queued")
 	check(string.find(last(new4, "Notify")[2], "sparring partner", 1, true), "Quin wasn't told about the rival")
 	new4:SetAttribute("CombatSession", nil)
+	AutoQueue.Intro.Populated = populatedWas
 
 	-- Nobody is called while the Arena's lanes are full: the entry waits.
 	print("PASS: " .. (checks - before) .. " lobby invitation checks (explicit consent, muted invites, expiry, decline, forged requests, a moment after logging in, one card at a time, the bonus carried over, upfront intro bonus, no duplicate payment, normal PvP rewards unchanged, bot fallback)")

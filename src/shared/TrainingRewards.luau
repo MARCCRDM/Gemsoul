@@ -3,7 +3,7 @@ local Training = {}
 -- The learning path: chapters (Category) in the order a new player meets
 -- them, the steps inside each in order. Step: what the card says to do,
 -- one short line; Hint: the how. Go: where its GO button takes you (the
--- Tasks window: Mine, Inventory, Play, Market, Guide:<section>). Needs: a
+-- Tasks window: Mine, Inventory, Play, Market, Kennel, Guide:<section>). Needs: a
 -- Config.Features switch it waits on (off: it's left out).
 Training.Objectives = {
  -- Basics: dig in.
@@ -20,7 +20,8 @@ Training.Objectives = {
  {Id="Cast",Category="Fight",Event="Surge",Goal=1,Coins=150,Go="Play",Name="Cast a Surge",Hint="Fighting fills your Charge. When it's ready, press Q, E or R (the gem buttons on a phone)."},
  {Id="TimedGuard",Category="Fight",Event="TimedBlock",Goal=1,Coins=200,Go="Play",Name="Perfect block",Hint="Raise your shield just before the hit lands, not long before."},
  {Id="Rival",Category="Fight",Event="RivalWin",Goal=1,Coins=250,Go="Play",Name="Beat a Rival",Hint="PLAY, then 1v1 Practice: win against a computer miner."},
- -- Kaiju: your team.
+ -- Kaiju: your team (the first from Wren, at the Kennel: not in the intro).
+ {Id="KaijuStarter",Category="Kaiju",Event="KaijuStarter",Goal=1,Coins=150,Go="Kennel",Needs="Kaiju",Name="Meet Wren",Hint="Talk to Wren at the Kaiju Kennel and roll your free team of kaiju."},
  {Id="KaijuCatch",Category="Kaiju",Event="KaijuCatch",Goal=1,Coins=300,Go="Guide:Kaiju",Needs="Kaiju",Name="Catch a kaiju",Hint="Wear a wild kaiju down until it glows gold and its plate says CATCH, then catch it."},
  {Id="Hyperbeam",Category="Kaiju",Event="Hyperbeam",Goal=1,Coins=200,Go="Guide:Kaiju",Needs="Kaiju",Name="Fire a HYPERBEAM",Hint="Your kaiju charge it as they fight. When it's full, press Z (the beam button on a phone)."},
  {Id="KaijuBattle",Category="Kaiju",Event="KaijuBattle",Goal=1,Coins=250,Go="Guide:Kaiju",Needs="Kaiju",Name="Kaiju Arena",Hint="Downstairs in the Shelter: step on a pad, place your kaiju, and watch them battle."},

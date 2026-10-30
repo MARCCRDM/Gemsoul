@@ -47,13 +47,13 @@
 	               your spare Commons heal your team by themselves, out of
 	               danger, never a gem wasted. Quiet, but for running out
 	               of Commons.
-	  The roll     everyone starts with Kaiju.StarterTeam kaiju, rolled (the
-	               intro's roll, or one full roll in the Outpost for a
-	               player who took an older one: Kaiju.RollVersion):
+	  The roll     everyone gets Kaiju.StarterTeam kaiju, rolled, from Wren
+	               at the Kennel (not the intro: its dialogue offers the
+	               free roll while it's owed, Kaiju.rollsOwed; one full roll
+	               for a player who took an older one: Kaiju.RollVersion):
 	               prepared here and saved, so a retry never rerolls, then
-	               claimed, the ones rolled becoming the team; a roll left
-	               unclaimed is given after Kaiju.RollGrace seconds in the
-	               Outpost.
+	               claimed, the ones rolled becoming the team. It waits for
+	               them: never handed out by itself.
 
 	Requests (Shop.register):
 	  "KaijuRecall"         the team back to you, out of the fight for Kaiju.RecallSeconds
@@ -222,8 +222,6 @@ KaijuServer.battling = function(_player: Player): boolean
 	return false
 end
 local rng = Random.new()
--- When a player owing a starter roll was first seen in the Outpost.
-local owedSince: { [Player]: number } = {}
 -- Each of a player's kaiju's waits as it went back in its Gemsoul (its
 -- fighter's NextQ, NextR, NextSurge, NextGem and LastFight, its pulses,
 -- and the HUD's *At), by record id, so one swapped out and straight back
@@ -710,13 +708,13 @@ local function claimRoll(player: Player): { any }
 	end
 	local p = profile :: any
 	p.KaijuRoll, p.KaijuRolled, p.KaijuStarter = nil, Kaiju.RollVersion, true
+	PlayerData.training(player, "KaijuStarter") -- (Tasks: Meet Wren)
 	-- The ones rolled are your team.
 	local ids = {}
 	for _, record in added do
 		table.insert(ids, record.Id)
 	end
 	Kaiju.setTeam(roster, if #ids > 0 then ids else Kaiju.teamIds(roster))
-	owedSince[player] = nil
 	PlayerData.sync(player)
 	-- (And the support, the fourth, comes with them.)
 	giveSupport(player, roll.Support and roll.Support.Element)
@@ -783,13 +781,7 @@ local function upkeep(player: Player, now: number)
 		return
 	end
 	teamOneOnJoin(player, profile.Kaiju)
-	-- A roll left unclaimed: given after a while in the Outpost.
-	if player:GetAttribute("Outpost") == true and Kaiju.rollsOwed(profile) > 0 then
-		owedSince[player] = owedSince[player] or now
-		if now - owedSince[player] >= Kaiju.RollGrace then
-			claimRoll(player)
-		end
-	end
+	-- (A roll owed waits for Wren, at the Kennel: never given by itself.)
 	-- The starter support, for one who has none yet (an older save).
 	if player:GetAttribute("Outpost") == true and Kaiju.supportOwed(profile) then
 		giveSupport(player)
@@ -2797,7 +2789,7 @@ end
 
 local function left(player: Player)
 	despawn(player)
-	teams[player], waits[player], owedSince[player], rising[player] = nil, nil, nil, nil
+	teams[player], waits[player], rising[player] = nil, nil, nil
 	saidJump[player], lastJump[player], views[player] = nil, nil, nil
 	healAt[player], toldEmpty[player] = nil, nil
 	joined[player] = nil

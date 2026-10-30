@@ -97,6 +97,11 @@ the wild kaiju's (`KaijuMood`).
 
 By the gate, facing the door:
 
+- **Roll my free kaiju** (2026-10-30), while the starter roll is owed
+  (`Kaiju.rollsOwed`): plays it (`KaijuRoll`), the three rolled becoming
+  your team. Wren greets a new player with it ("New here? Every miner gets
+  a team of kaiju…") and it takes the tip's row (an option's `Only`:
+  `KaijuRollOwed` / `KaijuRollDone`, so five rows at most).
 - **Daily Kaiju Sale** opens the sale window.
 - **Buy and sell kaiju** opens the Market on kaiju.
 - **Kaiju and their kinds**: why these are rare, how to get one, what the

@@ -1,4 +1,11 @@
 -- Launch ceremony: server-owned outcomes, simultaneous reels, a spotlight for every reward.
+--
+-- The fast start (Shared.FastStart; Pick off): no picker. Their element is
+-- rolled by the server, Thermal or Cryo, and lands on a quick reel of the
+-- two; then the surge roll (revealMoves), moving on by itself; then the
+-- loading screen, up till their first fight starts (Lobby.client finds it
+-- and lets the cover go: the player attribute IntroCover). No kaiju here:
+-- the starter roll is Wren's, at the Kennel.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -26,7 +33,6 @@ local LotterySound = require(script.Parent.Modules.LotterySound)
 local Icons = require(script.Parent.Modules.SurgeIcons)
 local CardFX = require(script.Parent.Modules.ElementCardFX)
 local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
-local KaijuRoll = require(script.Parent.Modules.KaijuRoll)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -1652,11 +1658,24 @@ local function close()
 	for _, connection in connections do
 		connection:Disconnect()
 	end
-	-- The loading screen takes over at once (LoadingFlow): the inventory and
-	-- the world behind the intro aren't for seeing, only where it goes next
-	-- (your first fight's drop, or the Outpost).
+	-- The loading screen takes over at once (LoadingFlow) and stays up till
+	-- the first fight starts (Lobby.client clears IntroCover then, or when
+	-- there's no fight to wait for): the inventory, the lobby and the search
+	-- behind it aren't for seeing, only the fight's drop.
 	gui:SetAttribute("Closing", true)
-	LoadingFlow.hold("Intro", { Instant = true, Destination = LoadingFlow.home })
+	local me = game:GetService("Players").LocalPlayer
+	pcall(function()
+		me:SetAttribute("IntroCover", true)
+	end)
+	LoadingFlow.hold("Intro", {
+		Instant = true,
+		Destination = LoadingFlow.home,
+		Status = "Finding your first opponent",
+		Max = 60,
+		Until = function()
+			return me:GetAttribute("IntroCover") ~= true
+		end,
+	})
 	gui:Destroy()
 end
 -- The roll: a full-screen reveal of the kit. Each key is a tall card, and
@@ -1718,7 +1737,7 @@ local function rarityGlow(cell, tier)
 		UiKit.round(disc, 999)
 	end
 end
--- Seconds the locked-in kit stays up before it goes on to your kaiju by itself.
+-- Seconds the locked-in kit stays up before it goes on to your first fight by itself.
 local AUTO_NEXT = 2 -- seconds to see the rolled kit before it moves on by itself
 local function revealMoves(kit, after)
 	local moves = Lottery.starterMoves(kit.Element, kit)
@@ -2100,9 +2119,9 @@ local function revealMoves(kit, after)
 	end
 
 	-- Once every gem has given up its surge: what's next, and a bar filling
-	-- under it till your kaiju roll. It isn't a button: the intro's one
-	-- button is START, on the kaiju roll (KaijuRoll).
-	local nextUp = label(board, "NEXT  ·  YOUR KAIJU", 15, C.Gold, Enum.Font.GothamBlack)
+	-- under it till your first fight. It isn't a button: it goes on by itself
+	-- (or on a click).
+	local nextUp = label(board, "NEXT  ·  YOUR FIRST FIGHT", 15, C.Gold, Enum.Font.GothamBlack)
 	nextUp.Name, nextUp.TextXAlignment, nextUp.ZIndex = "NextUp", Enum.TextXAlignment.Center, 44
 	nextUp.Position, nextUp.Size, nextUp.Visible = UDim2.fromOffset(0, 540), UDim2.new(1, 0, 0, 20), false
 	local track = frame(nextUp, {
@@ -2214,8 +2233,8 @@ local function revealMoves(kit, after)
 		end
 	end)
 
-	-- On to your kaiju: on its own a few seconds after the last gem, or at
-	-- once on a click.
+	-- On to your first fight: on its own a few seconds after the last gem, or
+	-- at once on a click.
 	local done = false
 	local function proceed()
 		if done then
@@ -2453,11 +2472,9 @@ local function advance()
 		if reward and reward.Element then
 			busy = true
 			revealMoves(reward, function()
-				-- Then your kaiju: the starter roll (KaijuRoll), and on.
-				KaijuRoll.play(function()
-					busy = false
-					finish()
-				end)
+				-- Then your first fight (the kaiju come later, from Wren).
+				busy = false
+				finish()
 			end)
 		else
 			finish()
@@ -2515,3 +2532,181 @@ listen(gui.Destroying, function()
 	end
 end)
 fit()
+
+-- No picker (FastStart.Pick off): over the picker at once, so it never shows,
+-- a quick reel of the two starter elements runs while the server rolls one
+-- (Systems/Intro: Thermal or Cryo at random), lands on it, and on by itself
+-- to the surge roll, then the first fight. A failed roll: RETRY.
+if not FastStart.Pick then
+	do
+		local list = FastStart.StarterElements
+		local veil = new("TextButton", {
+			Name = "ElementRoll",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = C.Ink,
+			AutoButtonColor = false,
+			Text = "",
+			ZIndex = 30,
+		}, gui)
+		new("UIGradient", { Rotation = 115, Color = ColorSequence.new(C.Ink, Color3.fromRGB(16, 22, 42)) }, veil)
+		local function line(value, size, color, font, y, h)
+			local l = label(veil, value, size, color, font)
+			l.ZIndex, l.TextXAlignment, l.AnchorPoint = 31, Enum.TextXAlignment.Center, Vector2.new(0.5, 0)
+			l.Position, l.Size = UDim2.new(0.5, 0, y, 0), UDim2.new(0.9, 0, 0, h)
+			return l
+		end
+		local kicker = line("ROLLING YOUR ELEMENT", 15, C.Dim, Enum.Font.GothamBold, 0.14, 20)
+		kicker.Name = "Kicker"
+		local row = frame(veil, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.47),
+			Size = UDim2.fromOffset(440, 230),
+			BackgroundTransparency = 1,
+			ZIndex = 31,
+		})
+		local cards = {}
+		for i, element in list do
+			local color = GemConfig.ElementColors[element] or C.Gold
+			local card = frame(row, {
+				Name = element,
+				Position = UDim2.fromScale((i - 1) * 0.53, 0),
+				Size = UDim2.fromScale(0.47, 1),
+				BackgroundColor3 = C.Card,
+				ZIndex = 31,
+			})
+			UiKit.round(card, 14)
+			local edge = stroke(card, C.Line, 0, 1)
+			local grow = new("UIScale", {}, card)
+			-- Its gem, turning.
+			local view = new("ViewportFrame", {
+				BackgroundTransparency = 1,
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.new(0.5, 0, 0, 14),
+				Size = UDim2.fromOffset(120, 120),
+				ZIndex = 32,
+			}, card)
+			local gem = { Id = "starter-roll-" .. element, Element = element, Tier = "Rare", Size = 6, Clarity = 6, Cut = 6 }
+			local model, radius = GemArt.model(gem, false)
+			GemArt.setupViewport(view, GemArt.cardDistance(radius))
+			model.Parent = view
+			local name = label(card, string.upper(GemConfig.elementName(element)), 26, color, Enum.Font.GothamBlack)
+			name.ZIndex, name.TextXAlignment = 32, Enum.TextXAlignment.Center
+			name.Position, name.Size = UDim2.fromOffset(0, 142), UDim2.new(1, 0, 0, 30)
+			local blurb = label(card, ELEMENTS[element] and ELEMENTS[element].Blurb or "", 13, C.Dim, Enum.Font.GothamBold)
+			blurb.ZIndex, blurb.TextXAlignment = 32, Enum.TextXAlignment.Center
+			blurb.Position, blurb.Size = UDim2.fromOffset(0, 176), UDim2.new(1, 0, 0, 18)
+			cards[i] = { Card = card, Edge = edge, Grow = grow, Model = model, Gem = gem, Color = color, Element = element }
+		end
+		local result = line("", 34, C.Text, Enum.Font.GothamBlack, 0.72, 40)
+		result.Name = "ElementResult"
+		local hit = line("", 15, C.Dim, Enum.Font.GothamBold, 0.72, 20)
+		hit.Position = UDim2.new(0.5, 0, 0.72, 46)
+		local retry = new("TextButton", {
+			Name = "Retry",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0.72, 0),
+			Size = UDim2.fromOffset(220, 46),
+			BackgroundColor3 = C.Gold,
+			TextColor3 = C.Ink,
+			Text = "RETRY",
+			Font = Enum.Font.GothamBlack,
+			TextSize = 16,
+			Visible = false,
+			ZIndex = 32,
+		}, veil)
+		UiKit.round(retry, 999)
+
+		-- One card lit (the reel's on it), or the one landed on.
+		local lit = 1
+		local function light(index, landed)
+			lit = index
+			for i, c in cards do
+				local on = i == index
+				c.Card.BackgroundColor3 = if on then c.Color:Lerp(C.Ink, if landed then 0.6 else 0.75) else C.Card
+				c.Edge.Color = if on then c.Color else C.Line
+				c.Edge.Thickness = if on then (if landed then 3 else 2) else 1
+				c.Grow.Scale = if on then (if landed then 1.08 else 1.03) else (if landed then 0.94 else 1)
+			end
+		end
+		light(1)
+		local began = os.clock()
+		listen(RunService.RenderStepped, function()
+			if not veil.Parent then
+				return
+			end
+			local t = os.clock() - began
+			for i, c in cards do
+				c.Model:PivotTo(GemArt.pose(c.Gem, t * (if i == lit then 2.2 else 0.8)))
+			end
+		end)
+
+		local rolling = false
+		local function landOn(kit)
+			local index = table.find(list, kit.Element) or lit
+			light(index, true)
+			LotterySound.play("Lock")
+			kicker.Text = "YOUR ELEMENT"
+			result.Text = string.upper(GemConfig.elementName(kit.Element))
+			result.TextColor3 = GemConfig.ElementColors[kit.Element] or C.Text
+			hit.Text = ELEMENTS[kit.Element] and ELEMENTS[kit.Element].Hit or ""
+			reward = kit
+			-- A beat to see it, then the surge roll, then the first fight.
+			task.delay(1.3, function()
+				if closed or not veil.Parent then
+					return
+				end
+				revealMoves(kit, function()
+					busy = false
+					finish()
+				end)
+				task.delay(0.4, function()
+					veil:Destroy()
+				end)
+			end)
+		end
+		local function roll()
+			if rolling or closed then
+				return
+			end
+			rolling, busy = true, true
+			retry.Visible, result.Text, hit.Text = false, "", ""
+			kicker.Text = "ROLLING YOUR ELEMENT"
+			local kit, failed = nil, nil
+			task.spawn(function()
+				local answer = GemClient.request("PrepareStarterLottery")
+				if answer and answer.Ok and answer.Lottery and answer.Lottery.Element then
+					kit = answer.Lottery
+				else
+					failed = answer and answer.Message or "Couldn't roll your element."
+				end
+			end)
+			-- The reel: quick, then slowing, landing on the server's roll once
+			-- it's in (or RETRY if it never comes).
+			local ticks = 0
+			local function tick()
+				if closed or not veil.Parent then
+					return
+				end
+				ticks += 1
+				if kit and ticks >= 14 and list[lit] == kit.Element then
+					rolling = false
+					landOn(kit)
+					return
+				end
+				if failed or ticks > 60 then
+					rolling, busy = false, false
+					kicker.Text = "COULDN'T ROLL YOUR ELEMENT"
+					retry.Visible = true
+					UiKit.toast(failed or "Couldn't roll your element.")
+					return
+				end
+				light(lit % #list + 1)
+				LotterySound.tick(math.min(1, ticks / 16))
+				task.delay(if ticks < 10 then 0.07 else math.min(0.32, 0.07 + (ticks - 9) * 0.05), tick)
+			end
+			tick()
+		end
+		listen(retry.Activated, roll)
+		roll()
+	end
+end

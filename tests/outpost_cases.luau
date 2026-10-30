@@ -753,7 +753,18 @@ do
 				end
 			end
 		end
-		check(#info.Options <= 4, built.Id .. " offers too many options for the dialogue's five rows")
+		-- (Options with Only show while it holds: "KaijuRollOwed" and
+		-- "KaijuRollDone" never together.)
+		for _, owed in { true, false } do
+			local shown = 0
+			for _, option in info.Options do
+				if option.Only == nil or (option.Only == "KaijuRollOwed") == owed then
+					shown += 1
+				end
+				check(option.Only == nil or option.Only == "KaijuRollOwed" or option.Only == "KaijuRollDone", built.Id .. "'s option shows on an unknown condition: " .. option.Text)
+			end
+			check(shown <= 4, built.Id .. " offers too many options for the dialogue's five rows")
+		end
 		walk(info.Options, false)
 	end
 	local Lang = load("src/shared/Lang.luau", "Lang", {})

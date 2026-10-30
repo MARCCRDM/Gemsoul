@@ -77,8 +77,8 @@
 	                  for one more of it, - for one less; CLEAR, AUTO PICK.
 	                  Not while your team out is in a fight (the server's
 	                  KaijuDanger: Shared.Kaiju.Danger): IN A FIGHT then.
-	  The roll        a player still owed starter kaiju (from before the
-	                  roll, say) gets the roll here, once (KaijuRoll).
+	  The roll        the starter kaiju are Wren's, at the Kennel (Dialogue
+	                  plays KaijuRoll): owed, a word about it once a visit.
 	  No nameplates  nothing over a creature's head (yours, others', moon
 	                  bugs): its body shows its health, an outline in its
 	                  health's colour, a wild kaiju's always and through
@@ -3491,7 +3491,6 @@ end
 
 local tameModel: Model? = nil
 local wantShown = false
-local rollTried = false
 
 local function refresh()
 	local profile = GemClient.Profile
@@ -3504,12 +3503,14 @@ local function refresh()
 		or player:GetAttribute("MatchId") ~= nil
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
 	local menu = dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled or player:GetAttribute("MenuOpen") == true
-	-- The starter roll, once, for a player still owed it.
-	if not rollTried and inOutpost and not blocked and not menu and Kaiju.rollsOwed(profile) > 0 then
-		if not LoadingFlow.active() then
-			rollTried = true
-			task.spawn(KaijuRoll.play)
-		end
+	-- The starter roll is Wren's, at the Kennel (Dialogue: the free roll):
+	-- a word about it once a visit, once they're in the Outpost and free.
+	if not heroUi.WrenTold and inOutpost and not blocked and not menu and Kaiju.rollsOwed(profile) > 0
+		and not LoadingFlow.active() and player:GetAttribute("IntroCover") ~= true then
+		heroUi.WrenTold = true
+		task.delay(4, function()
+			UiKit.toast("Free kaiju: see Wren at the Kaiju Kennel to roll your first team.", Color3.fromRGB(124, 214, 98))
+		end)
 	end
 	-- A boss roll (one kaiju for each boss beaten: Kaiju.bossRollsOwed),
 	-- each in turn, once you're back in the Outpost with nothing over it.

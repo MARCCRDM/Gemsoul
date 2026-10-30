@@ -1000,12 +1000,11 @@ Kaiju.Danger = { Calm = 4, Radius = 45 }
 -- Gemsoul rolled like a mined gem, never the same kind and element twice (or
 -- as one already yours); the ones rolled become your team. A player who
 -- took an older roll (RollVersion: one that only topped up kaiju from
--- before) is owed one full roll of StarterTeam, once, in the Outpost. A
--- roll left unclaimed is given anyway after RollGrace seconds there.
+-- before) is owed one full roll of StarterTeam, once. The roll is Wren's,
+-- at the Kennel (Shared.Vendors' KaijuKeeper): it waits for them there.
 Kaiju.StarterLevel = 1
 Kaiju.StarterTeam = 3
 Kaiju.RollVersion = 2
-Kaiju.RollGrace = 90
 
 -- The 1v1 kaiju arena (phase 2): every match is for keeps.
 Kaiju.Arena = {

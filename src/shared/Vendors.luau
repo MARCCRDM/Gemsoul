@@ -9,7 +9,10 @@
 -- (COACH-4's next one, from Vendors.ArenaTips) - or Options of its own: a
 -- topic, its questions shown in place of the menu (with a way back).
 
-export type Option = { Text: string, Reply: string?, Action: string?, Options: { Option }? }
+-- An option with Only shows just while that holds (the client checks it:
+-- "KaijuRollOwed", the starter kaiju roll still owed, Kaiju.rollsOwed;
+-- "KaijuRollDone", it isn't).
+export type Option = { Text: string, Reply: string?, Action: string?, Options: { Option }?, Only: string? }
 export type Vendor = {
 	Name: string,
 	Role: string,
@@ -18,6 +21,7 @@ export type Vendor = {
 	Face: string,
 	Visor: boolean?, -- a visor slit in its colour on its screen, in place of a Face
 	Greeting: string,
+	OwedGreeting: string?, -- in place of Greeting while the starter kaiju roll is owed
 	Options: { Option },
 	Tips: { string }?, -- its own tips about its station, one at a time ("RoleTip")
 }
@@ -287,7 +291,10 @@ Vendors.KaijuKeeper = {
 	Face = "",
 	Visor = true,
 	Greeting = "Wren, kennel keeper. The rarest kinds on the moon live in this pen, a different few every day. Look all you like: they don't bite through the fence.",
+	-- (The starter kaiju roll is Wren's to give: it isn't in the intro.)
+	OwedGreeting = "New here? Every miner gets a team of kaiju to fight beside them, and yours are waiting. Let's roll them!",
 	Options = {
+		{ Text = "Roll my free kaiju", Action = "KaijuStarterRoll", Only = "KaijuRollOwed" },
 		{ Text = "Daily Kaiju Sale", Action = "KennelSale" },
 		{ Text = "Buy and sell kaiju", Action = "KaijuMarket" },
 		{
@@ -308,7 +315,8 @@ Vendors.KaijuKeeper = {
 				{ Text = "Who's in the pen today?", Action = "KennelToday" },
 			},
 		},
-		TIP,
+		-- (While the free roll's owed it takes the tip's row: five at most.)
+		{ Text = TIP.Text, Action = TIP.Action, Only = "KaijuRollDone" },
 	},
 	Tips = {
 		"The kaiju in the pen change at midnight, server time. Come back tomorrow for a new few.",

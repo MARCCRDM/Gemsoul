@@ -28,6 +28,7 @@ local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
 local Tutorial = require(ReplicatedStorage.Shared.Tutorial)
+local FastStart = require(ReplicatedStorage.Shared.FastStart)
 
 local function newGem(source: string, luck: number?): GemConfig.Gem
 	return GemGenerator.generate(Gems.random(), source, {
@@ -116,6 +117,11 @@ local function prepareLottery(player: Player, style, element)
 	local profile = PlayerData.get(player)
 	if not profile or profile.Intro.Done then
 		return reply(false, "Your starter kit is already claimed.")
+	end
+	-- No picker (FastStart.Pick off): the server rolls it, Thermal or Cryo,
+	-- in the default style, whatever was sent. (A kit already rolled stays.)
+	if not FastStart.Pick and not profile.Intro.Lottery then
+		style, element = FastStart.DefaultStyle, FastStart.rollElement()
 	end
 	if not profile.Intro.Lottery and not Lottery.validChoice(style, element) then
 		return reply(false, "Choose an armor style and starter element first.")

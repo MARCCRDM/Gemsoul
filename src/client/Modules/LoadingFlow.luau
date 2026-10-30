@@ -24,7 +24,10 @@
 
 	  LoadingFlow.hold(reason, options) -> hold   cover until ready
 	      options: Instant, FadeIn, Min, Max, Status, Force (cover even if a
-	      full-screen view is up), Destination (() -> Vector3?)
+	      full-screen view is up), Destination (() -> Vector3?), Until
+	      (() -> boolean: not ready till it says so, e.g. the intro's cover
+	      till the first fight starts; a full-screen view of its own still
+	      takes over, and Max still ends it)
 	      hold.cancel()   drop it now (a request that failed)
 	  LoadingFlow.waitCovered(timeout?)   until the screen is fully up
 	  LoadingFlow.waitClear(timeout?)     until it's gone
@@ -269,6 +272,7 @@ type Hold = {
 	Min: number,
 	Max: number,
 	Destination: (() -> Vector3?)?,
+	Until: (() -> boolean)?,
 	ReadyAt: number?,
 	Done: boolean,
 	cancel: () -> (),
@@ -299,6 +303,12 @@ function LoadingFlow.step(now: number, look: ((Hold, number) -> Snapshot)?)
 			continue
 		end
 		local ok, say = LoadingFlow.ready(s)
+		if ok and not s.Owned and hold.Until then
+			local fine, done = pcall(hold.Until)
+			if fine and not done then
+				ok = false
+			end
+		end
 		if ok and not s.Owned then
 			hold.ReadyAt = hold.ReadyAt or now
 			if s.Queue > 0 and now - hold.ReadyAt < LoadingFlow.AssetWait then
@@ -341,6 +351,7 @@ function LoadingFlow.hold(reason: string, options: { [string]: any }?): Hold
 		Min = o.Min or LoadingFlow.Min,
 		Max = o.Max or LoadingFlow.Max,
 		Destination = o.Destination,
+		Until = o.Until,
 		ReadyAt = nil,
 		Done = false,
 	} :: any

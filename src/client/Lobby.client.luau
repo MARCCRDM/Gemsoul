@@ -162,24 +162,37 @@ local function searchCard(): ((string) -> (), () -> ())
 end
 
 -- The intro duel: one match, then the lobby. The intro queue (Shared.AutoQueue)
--- pairs two new players at once; alone, a lobby player is called in; still
--- alone, the sparring rival steps in (the server sends it all).
+-- is the sparring rival at once on a quiet server; on a busy one it pairs two
+-- new players, then calls a lobby player, then the rival (the server sends
+-- it all). The intro's loading screen stays up through the search
+-- (IntroCover, set by Intro.client): it comes down once the fight's on, or
+-- when there's no fight to wait for (uncover).
 local FastStart = require(game:GetService("ReplicatedStorage").Shared.FastStart)
 local AutoQueue = require(game:GetService("ReplicatedStorage").Shared.AutoQueue)
+local function uncover()
+	player:SetAttribute("IntroCover", nil)
+end
 local function firstDuel()
-	UiKit.toast(
-		if FastStart.Enabled
-			then "Your first fight: another new miner if one's here, else an easy sparring partner. Tips pop up as you go."
-			else "Combat training: learn the basics, then spar.",
-		GOLD
-	)
+	local covered = player:GetAttribute("IntroCover") == true
+	if not covered then
+		UiKit.toast(
+			if FastStart.Enabled
+				then "Your first fight: an easy sparring partner, or another new miner if one's here. Tips pop up as you go."
+				else "Combat training: learn the basics, then spar.",
+			GOLD
+		)
+	end
 	local result = GemClient.request("IntroQueue")
 	if not (result and result.Ok) then
 		-- (A save that has fought before, or the Arena isn't ready: the old
 		-- way in, straight to a sparring partner.)
 		ArenaScene.enter(false)
 	else
-		local setLine, close = searchCard()
+		-- (Behind the loading screen it says it itself: no card.)
+		local setLine, close = function(_: string) end, function() end
+		if not covered then
+			setLine, close = searchCard()
+		end
 		local started = os.clock()
 		local deadline = started + AutoQueue.Intro.BotAfter + 20
 		while player:GetAttribute("CombatSession") == nil and os.clock() < deadline do
@@ -201,9 +214,11 @@ local function firstDuel()
 		end
 		close()
 	end
-	if not waitFor(function()
+	local fighting = waitFor(function()
 		return player:GetAttribute("CombatSession") ~= nil
-	end, 12) then
+	end, 12)
+	uncover() -- (the fight's own drop screen has it now, or the lobby does)
+	if not fighting then
 		return -- the Arena wasn't ready: straight to the lobby
 	end
 	-- Finished (won or lost), or left early.
@@ -262,6 +277,7 @@ task.spawn(function()
 	elseif FastStart.Enabled and fresh and not (intro and intro.Skipped) then
 		firstDuel()
 	end
+	uncover() -- (no first fight to wait for: the intro's cover can go)
 	for _ = 1, 5 do
 		if OutpostScene.isActive() then
 			break

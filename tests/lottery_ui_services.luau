@@ -30,7 +30,7 @@ local TweenInfo={new=function() return {} end}
 -- task.delay keeps its calls: they run only when a test runs them, in time
 -- order, up to a time (runDelayed).
 local delayed={}
-local task={delay=function(seconds,fn,...) table.insert(delayed,{At=now+seconds,Fn=fn,Args={...}}) end}
+local task={delay=function(seconds,fn,...) table.insert(delayed,{At=now+seconds,Fn=fn,Args={...}}) end,spawn=function(fn,...) fn(...) end}
 local function runDelayed(upTo)
  while true do
   local first,at=nil,nil
@@ -65,7 +65,9 @@ local run={RenderStepped=signal()}
 local input={InputBegan=signal()}
 local tween={Create=function(_,obj,_,props) return {Play=function() for k,v in props do obj[k]=v end end} end}
 -- No splash intro in the test: the launch intro starts straight away.
-local players={LocalPlayer={PlayerGui={FindFirstChild=function() return nil end}}}
+local players={LocalPlayer={PlayerGui={FindFirstChild=function() return nil end},Attributes={}}}
+function players.LocalPlayer:SetAttribute(key,value) self.Attributes[key]=value end
+function players.LocalPlayer:GetAttribute(key) return self.Attributes[key] end
 -- The onboarding funnel's remote: the steps the picker reports.
 local funnelSteps={}
 local funnelRemote={FireServer=function(_,step) table.insert(funnelSteps,step) end}
@@ -100,8 +102,8 @@ local CardFX={Themes={},create=function() return {} end,update=function() end}
 -- The kaiju starter roll after the gem roll (KaijuRoll): straight on here.
 local KaijuRoll={play=function(after) if after then after() end end}
 -- The loading screen the intro hands over to when it closes (LoadingFlow).
-local held={}
-local LoadingFlow={home="Outpost",hold=function(name) table.insert(held,name) end}
+local held,heldOptions={},{}
+local LoadingFlow={home="Outpost",hold=function(name,options) table.insert(held,name); table.insert(heldOptions,options or {}) end}
 -- The starter reel's 3D gems (GemArt): a model, its view's camera, its pose.
 local reelModels=0
 local GemArt={
@@ -142,13 +144,17 @@ local reward=nil
 local requests,prepareArgs={},nil
 local failPrepare,failFinish=false,false
 local GemClient={Profile=profile,Changed=signal()}
--- The real server keeps the first choice; a retry never rerolls it.
+-- The real server keeps the first choice; a retry never rerolls it. Sent
+-- nothing (no picker), it rolls the element itself, Thermal or Cryo
+-- (autoElement here), in the default style.
+local autoElement="Frost"
 function GemClient.request(action,...)
  table.insert(requests,action)
  if action=="PrepareStarterLottery" then
   prepareArgs={...}
   if failPrepare then return {Ok=false,Message="Retry"} end
   prepareArgs={...}
+  if prepareArgs[1]==nil and not profile.Intro.Lottery then prepareArgs={"Skirmisher",autoElement} end
   reward=Lottery.prepareChoice(profile,prepareArgs[1],prepareArgs[2],function(element) count+=1; return {Id="g"..count,Element=element,Tier="Common"} end)
   return {Ok=reward~=nil,Message="Retry",Lottery=reward}
  end
