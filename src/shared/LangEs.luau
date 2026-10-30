@@ -4489,6 +4489,8 @@ return {
 	["Find a rock nearby and swing at it."] = "Busca una roca cerca y golpéala.",
 	-- The GUIDE (Shared.GameGuide, Modules/GuideUI) ------------------------------------------------
 	["GUIDE"] = "GUÍA",
+	["FIELD MANUAL"] = "MANUAL DE CAMPO",
+	["SECTION {1}"] = "SECCIÓN {1}",
 	["Guide"] = "Guía",
 	["How to play Saga Miners"] = "Cómo jugar Saga Miners",
 	["OPEN TASKS"] = "ABRIR TAREAS",

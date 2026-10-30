@@ -3,11 +3,17 @@
 	opens from the lobby's GUIDE tile (on a computer and on a phone), and
 	from a step's GO in the Tasks window, on that step's page.
 
-	On a computer: the pages down the left, the page on the right, its tips
-	two to a row, each with the key it's about. On a phone: the pages as a
-	row of chips along the top, the same tips under them, the phone's own
-	buttons in place of the keys. PREV and NEXT page through it like a
+	It's the Tasks window's Rift terminal, as a field manual: dark glass,
+	cyan light along its edges and corner brackets, a double frame, Michroma
+	for its name, Sarpanch for names and numbers, Titillium for the words.
+	On a computer: the pages down the left, numbered 01 to 08, the open one
+	lit magenta; the page on the right, SECTION 04 over its name and line,
+	then its tips as manual entries two to a row, each with the key it's
+	about on a terminal key cap (or its number). On a phone: the pages as a
+	row of tabs along the top, the same entries one to a row, the phone's
+	own buttons in place of the keys. PREV and NEXT page through it like a
 	booklet; OPEN TASKS at the bottom goes to the step-by-step path.
+	Everything is frames, gradients and strokes (no images).
 
 	ScreenGui "TipGuide" (one of UiKit.Covers: what sits over the play view
 	steps aside while it's up).
@@ -25,16 +31,21 @@ local Lang = require(ReplicatedStorage.Shared.Lang)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 
-local new = IronUi.new
-local GOLD = Color3.fromRGB(255, 207, 103)
-local TEXT = Color3.fromRGB(240, 246, 255)
-local MUTED = Color3.fromRGB(169, 188, 207)
-local PANEL = Color3.fromRGB(12, 19, 30)
-local RAIL = Color3.fromRGB(16, 25, 38)
-local CARD = Color3.fromRGB(21, 32, 46)
-local CHIP = Color3.fromRGB(27, 41, 56)
-local KEY = Color3.fromRGB(36, 30, 18)
-local INK = Color3.fromRGB(15, 23, 34)
+-- The terminal's light (as Tasks): cyan for the frame and the keys, magenta
+-- for the page you're on, on dark glass.
+local GLASS_TOP = Color3.fromRGB(16, 36, 46)
+local GLASS_BOTTOM = Color3.fromRGB(5, 12, 19)
+local CYAN = Color3.fromRGB(54, 241, 205)
+local CYAN_LIT = Color3.fromRGB(150, 255, 236)
+local PINK = Color3.fromRGB(255, 79, 216)
+local TEXT = Color3.fromRGB(232, 246, 250)
+local DIM = Color3.fromRGB(127, 179, 196)
+local FAINT = Color3.fromRGB(79, 132, 150)
+local LINE = Color3.fromRGB(29, 67, 82)
+local INK = Color3.fromRGB(4, 14, 20)
+local TITLE = Enum.Font.Michroma -- (the window's name)
+local HEAD = Enum.Font.Sarpanch -- (names, numbers and keys)
+local BODY = Enum.Font.TitilliumWeb -- (the words)
 
 GameGuide.closeFor(Config.Features or {})
 
@@ -43,20 +54,59 @@ local GuideUI = {}
 local gui = UiKit.gui("TipGuide", 26)
 gui.Enabled = false
 
+local function new(kind: string, props, parent: Instance?)
+	local o = Instance.new(kind)
+	if o:IsA("GuiObject") then
+		o.BorderSizePixel = 0
+	end
+	for k, v in props do
+		(o :: any)[k] = v
+	end
+	o.Parent = parent
+	return o
+end
 local function label(parent: Instance, text: string, size: number, color: Color3?, font: Enum.Font?): TextLabel
 	return new("TextLabel", {
 		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
 		Text = text,
 		TextSize = size,
-		TextColor3 = color or MUTED,
-		Font = font or Enum.Font.Gotham,
+		TextColor3 = color or DIM,
+		Font = font or BODY,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Center,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 	}, parent)
 end
-local function stroke(parent: Instance, color: Color3, transparency: number?)
-	return new("UIStroke", { Color = color, Thickness = 1, Transparency = transparency or 0 }, parent)
+local function stroke(parent: Instance, color: Color3, transparency: number?, thickness: number?)
+	return new("UIStroke", {
+		Color = color,
+		Thickness = thickness or 1,
+		Transparency = transparency or 0,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, parent)
+end
+-- Light along a line: bright at one end, gone by the other.
+local function fade(object: GuiObject, from: number, to: number, rotation: number?)
+	return new("UIGradient", { Rotation = rotation or 0, Transparency = NumberSequence.new(from, to) }, object)
+end
+-- A corner bracket: two bars meeting at `corner` ("TL", "TR", "BL", "BR"),
+-- with a soft glow (a wider, fainter copy under them).
+local function bracket(parent: GuiObject, corner: string, color: Color3, length: number, thick: number)
+	local x = if corner == "TL" or corner == "BL" then 0 else 1
+	local y = if corner == "TL" or corner == "TR" then 0 else 1
+	for _, glow in { true, false } do
+		local t = if glow then thick + 4 else thick
+		local inset = if glow then -2 else 0
+		local common = {
+			AnchorPoint = Vector2.new(x, y),
+			Position = UDim2.new(x, if x == 0 then inset else -inset, y, if y == 0 then inset else -inset),
+			BackgroundColor3 = color,
+			BackgroundTransparency = if glow then 0.82 else 0,
+			ZIndex = 4,
+		}
+		new("Frame", common, parent).Size = UDim2.fromOffset(length, t)
+		new("Frame", common, parent).Size = UDim2.fromOffset(t, math.floor(length * 0.62))
+	end
 end
 -- How wide some words are as the player reads them (maybe in Spanish).
 local function textWidth(text: string, size: number, font: Enum.Font): number
@@ -66,91 +116,162 @@ local function textWidth(text: string, size: number, font: Enum.Font): number
 	end)
 	return if ok and typeof(bounds) == "Vector2" then bounds.X else #text * size * 0.7
 end
+-- How tall some wrapped words are at `width` (Roblox's own measure; a fair
+-- guess without it).
+local function textHeight(text: string, size: number, font: Enum.Font, width: number): number
+	text = Lang.translate(text)
+	local ok, bounds = pcall(function()
+		return TextService:GetTextSize(text, size, font, Vector2.new(width, 1000))
+	end)
+	if ok and typeof(bounds) == "Vector2" then
+		return bounds.Y
+	end
+	return math.ceil(#text * size * 0.5 / math.max(width, 1)) * size * 1.25
+end
+local function two(n: number): string
+	return string.format("%02d", n)
+end
 
 -- The window, over a shade that closes it when tapped.
 local shade = new("TextButton", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundColor3 = Color3.new(),
-	BackgroundTransparency = 0.3,
-	BorderSizePixel = 0,
+	BackgroundTransparency = 0.25,
 	Text = "",
 	AutoButtonColor = false,
 }, gui)
 local panel = new("TextButton", { -- (a button, so taps inside don't reach the shade)
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundColor3 = PANEL,
-	BorderSizePixel = 0,
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BackgroundTransparency = 0.03,
 	Text = "",
 	AutoButtonColor = false,
 }, shade)
-UiKit.round(panel, 14)
-stroke(panel, Color3.fromRGB(94, 132, 162), 0.5)
+UiKit.round(panel, 4)
+new("UIGradient", { Rotation = 100, Color = ColorSequence.new(GLASS_TOP, GLASS_BOTTOM) }, panel)
+stroke(panel, CYAN, 0.78)
 local scale = new("UIScale", {}, panel)
-local topLine = new(
-	"Frame",
-	{ Position = UDim2.fromOffset(20, 0), Size = UDim2.new(1, -40, 0, 2), BackgroundColor3 = GOLD, BorderSizePixel = 0 },
-	panel
-)
-new("UIGradient", {
-	Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.3, 0),
-		NumberSequenceKeypoint.new(1, 1),
-	}),
-}, topLine)
+-- The double frame: a second hairline just inside the first.
+local inner = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(6, 6), Size = UDim2.new(1, -12, 1, -12) }, panel)
+UiKit.round(inner, 2)
+stroke(inner, LINE, 0.1)
+-- Light falling from the top of the glass.
+local sheen = new("Frame", { BackgroundColor3 = CYAN, Size = UDim2.new(1, 0, 0, 66) }, panel)
+UiKit.round(sheen, 4)
+fade(sheen, 0.93, 1, 90)
+for _, corner in { "TL", "TR", "BL", "BR" } do
+	bracket(panel, corner, CYAN, 54, 2)
+end
 
--- The pages: a rail down the left (computer) or a row of chips (phone).
-local rail = new("Frame", { BackgroundColor3 = RAIL, BorderSizePixel = 0 }, panel)
-UiKit.round(rail, 12)
-local railTitle = label(rail, "GUIDE", 22, GOLD, Enum.Font.GothamBlack)
-local railSub = label(rail, "How to play Saga Miners", 11, MUTED)
+-- GUIDE (lit cyan) and FIELD MANUAL; the rule between the pages and the page.
+local heading = label(panel, "GUIDE", 24, CYAN, TITLE)
+heading.TextTruncate = Enum.TextTruncate.None
+new("UIStroke", { Color = CYAN, Transparency = 0.8, Thickness = 2 }, heading)
+local manual = label(panel, "FIELD MANUAL", 12, FAINT, HEAD)
+local divider = new("Frame", { BackgroundColor3 = LINE }, panel)
+local close = new("TextButton", {
+	AnchorPoint = Vector2.new(1, 0),
+	BackgroundColor3 = INK,
+	BackgroundTransparency = 0.3,
+	Text = "",
+	AutoButtonColor = false,
+}, panel)
+UiKit.round(close, 2)
+local closeRim = stroke(close, CYAN, 0.35, 1.5)
+local closeBars = IronUi.cross(close, 14, CYAN)
+close:SetAttribute("UiSound", "Back")
+close.MouseEnter:Connect(function()
+	closeRim.Transparency = 0
+	for _, b in closeBars do
+		b.BackgroundColor3 = CYAN_LIT
+	end
+end)
+close.MouseLeave:Connect(function()
+	closeRim.Transparency = 0.35
+	for _, b in closeBars do
+		b.BackgroundColor3 = CYAN
+	end
+end)
+
+-- The pages: down the left (computer) or a row of tabs (phone).
 local pages = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
 	CanvasSize = UDim2.new(),
 	ScrollBarThickness = 0,
 }, panel)
-local pagesList = new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }, pages)
+local pagesList = new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) }, pages)
 
--- The page: its title, its line, its tips.
-local title = label(panel, "", 26, TEXT, Enum.Font.GothamBlack)
-local blurb = label(panel, "", 13, MUTED)
-blurb.TextWrapped = true
+-- The page: SECTION 04, its name and where it is in the book, its line, a
+-- rule with a lit end and a diamond, then its entries.
+local sectionTag = label(panel, "", 12, PINK, HEAD)
+local title = label(panel, "", 26, TEXT, HEAD)
+local pageCount = label(panel, "", 14, FAINT, HEAD)
+pageCount.TextXAlignment = Enum.TextXAlignment.Right
+pageCount:SetAttribute("NoTranslate", true)
+local blurb = label(panel, "", 15, DIM, BODY)
+local rule = new("Frame", { BackgroundColor3 = LINE }, panel)
+local ruleLit = new("Frame", { BackgroundColor3 = CYAN, Size = UDim2.fromOffset(110, 1) }, rule)
+fade(ruleLit, 0, 1)
+new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0, 0, 0.5, 0),
+	Size = UDim2.fromOffset(7, 7),
+	Rotation = 45,
+	BackgroundColor3 = CYAN,
+}, rule)
 local tips = new("ScrollingFrame", {
 	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
 	CanvasSize = UDim2.new(),
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	ScrollingDirection = Enum.ScrollingDirection.Y,
-	ScrollBarThickness = 4,
-	ScrollBarImageColor3 = GOLD,
+	ScrollBarThickness = 3,
+	ScrollBarImageColor3 = CYAN,
 }, panel)
-local grid =
-	new("UIGridLayout", { SortOrder = Enum.SortOrder.LayoutOrder, CellPadding = UDim2.fromOffset(10, 10) }, tips)
+local grid = new("UIGridLayout", { SortOrder = Enum.SortOrder.LayoutOrder, CellPadding = UDim2.fromOffset(14, 10) }, tips)
 
-local close = new(
-	"TextButton",
-	{ AnchorPoint = Vector2.new(1, 0), BackgroundColor3 = CHIP, BorderSizePixel = 0, Text = "" },
-	panel
-)
-IronUi.cross(close, 13, TEXT)
-UiKit.round(close, 999)
-stroke(close, MUTED, 0.8)
-
--- Along the bottom: OPEN TASKS, then PREV and NEXT.
-local function footButton(text: string, primary: boolean): TextButton
+-- Along the bottom, over a hairline: OPEN TASKS, then PREV, the page and NEXT.
+local footRule = new("Frame", { BackgroundColor3 = LINE }, panel)
+-- A ghost button (cyan rim, cyan words), or NEXT: lit cyan glass, dark words.
+local function footButton(text: string, lit: boolean): TextButton
 	local b = new("TextButton", {
-		BackgroundColor3 = if primary then GOLD else CHIP,
-		BorderSizePixel = 0,
+		BackgroundColor3 = if lit then Color3.new(1, 1, 1) else INK,
+		BackgroundTransparency = if lit then 0 else 0.35,
 		Text = text,
-		TextSize = 13,
-		Font = Enum.Font.GothamBold,
-		TextColor3 = if primary then INK else TEXT,
-		AutoButtonColor = true,
+		TextSize = 16,
+		Font = HEAD,
+		TextColor3 = if lit then INK else CYAN,
+		AutoButtonColor = false,
 	}, panel)
-	UiKit.round(b, 999)
-	if not primary then
-		stroke(b, Color3.fromRGB(60, 84, 104), 0.3)
+	UiKit.round(b, 2)
+	if lit then
+		local shine = new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.fromRGB(96, 244, 214), Color3.fromRGB(14, 150, 132)),
+		}, b)
+		local glow = stroke(b, CYAN, 0.55, 3)
+		new("Frame", {
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.35,
+			Position = UDim2.fromOffset(4, 1),
+			Size = UDim2.new(1, -8, 0, 1),
+		}, b)
+		b:SetAttribute("UiSound", "Confirm")
+		b.MouseEnter:Connect(function()
+			shine.Color = ColorSequence.new(Color3.fromRGB(150, 255, 234), Color3.fromRGB(30, 190, 166))
+			glow.Transparency = 0.25
+		end)
+		b.MouseLeave:Connect(function()
+			shine.Color = ColorSequence.new(Color3.fromRGB(96, 244, 214), Color3.fromRGB(14, 150, 132))
+			glow.Transparency = 0.55
+		end)
+	else
+		local rim = stroke(b, CYAN, 0.55, 1)
+		b.MouseEnter:Connect(function()
+			rim.Transparency, b.TextColor3 = 0.1, CYAN_LIT
+		end)
+		b.MouseLeave:Connect(function()
+			rim.Transparency, b.TextColor3 = 0.55, CYAN
+		end)
 	end
 	IronUi.juice(b, 1.03, 0.97)
 	return b
@@ -158,81 +279,110 @@ end
 local tasksButton = footButton("OPEN TASKS", false)
 local prev = footButton("‹  PREV", false)
 local nextButton = footButton("NEXT  ›", true)
-local pageCount = label(panel, "", 12, MUTED, Enum.Font.GothamBold)
-pageCount.TextXAlignment = Enum.TextXAlignment.Center
+local footCount = label(panel, "", 14, FAINT, HEAD)
+footCount.TextXAlignment = Enum.TextXAlignment.Center
+footCount:SetAttribute("NoTranslate", true)
 
 local current = 1
 local phone = false
+local columns, cellW = 2, 300 -- (the entries' grid, as laid out)
 local pageButtons = {}
 local render -- (below)
 
 for i, section in GameGuide.Sections do
 	local b = new("TextButton", {
-		BackgroundColor3 = CHIP,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
+		BackgroundColor3 = CYAN,
 		Text = "",
 		LayoutOrder = i,
 		AutoButtonColor = false,
 	}, pages)
-	UiKit.round(b, 10)
-	local number = label(b, tostring(i), 12, GOLD, Enum.Font.GothamBlack)
+	b:SetAttribute("UiSound", "Tab")
+	local wash = fade(b, 0.9, 1)
+	local edge = new("Frame", { Name = "Edge", BackgroundColor3 = LINE }, b)
+	-- Open: a magenta edge (at the left, or under a tab) with its glow.
+	local mark = new("Frame", { Name = "Mark", BackgroundColor3 = PINK, Visible = false }, b)
+	local markGlow = new("Frame", { Name = "MarkGlow", BackgroundColor3 = PINK, BackgroundTransparency = 0.75, Visible = false }, b)
+	local number = label(b, two(i), 13, FAINT, HEAD)
 	number.Name = "Number"
-	number.TextXAlignment = Enum.TextXAlignment.Center
-	number.BackgroundTransparency, number.BackgroundColor3 = 0, KEY
-	UiKit.round(number, 999)
-	local name = label(b, section.Title, 13, TEXT, Enum.Font.GothamBold)
+	number:SetAttribute("NoTranslate", true)
+	local name = label(b, section.Title, 15, DIM, HEAD)
 	name.Name = "Name"
-	name.TextTruncate = Enum.TextTruncate.AtEnd
+	b.MouseEnter:Connect(function()
+		name.TextColor3 = TEXT
+	end)
+	b.MouseLeave:Connect(function()
+		name.TextColor3 = if i == current then TEXT else DIM
+	end)
 	b.Activated:Connect(function()
 		current = i
 		render()
 		tips.CanvasPosition = Vector2.zero
 	end)
-	pageButtons[i] = b
+	pageButtons[i] = { Button = b, Wash = wash, Edge = edge, Mark = mark, MarkGlow = markGlow, Number = number, Name = name }
 end
 
--- One tip: its key (or a number), its title and its words.
-local function tipCard(i: number, tip)
-	local card = new("Frame", { BackgroundColor3 = CARD, BorderSizePixel = 0, LayoutOrder = i }, tips)
-	UiKit.round(card, 12)
-	stroke(card, Color3.fromRGB(52, 72, 92), 0.45)
+-- The key a tip shows on this screen (a phone's button, else the key), or nil.
+local function keyOf(tip): string?
 	local keyText = if phone then tip.Phone else tip.Key
 	if keyText == nil and tip.Key ~= nil and phone then
 		keyText = tip.Key
 	end
-	local badgeW = if keyText then math.max(46, textWidth(keyText, 13, Enum.Font.GothamBlack) + 22) else 40
-	local badge = new("Frame", {
-		Position = UDim2.fromOffset(14, 14),
-		Size = UDim2.fromOffset(badgeW, if keyText then 34 else 40),
-		BackgroundColor3 = KEY,
-		BorderSizePixel = 0,
+	return if keyText == false then nil else keyText
+end
+local function capHeight(): number
+	return if phone then 30 else 34
+end
+-- How wide a key's cap is.
+local function capWidth(keyText: string?): number
+	local h = capHeight()
+	return if keyText then math.max(h + 6, math.ceil(textWidth(keyText, 15, HEAD)) + 20) else h
+end
+
+-- One entry: its key on a terminal cap (or its number), its name and words,
+-- over a hairline with a lit end. `column`: the page's widest cap, so every
+-- entry's words start in line.
+local function tipCard(i: number, tip, column: number)
+	local card = new("Frame", {
+		BackgroundColor3 = CYAN,
+		BackgroundTransparency = 0,
+		LayoutOrder = i,
+	}, tips)
+	fade(card, 0.955, 1, 0)
+	local top = new("Frame", { BackgroundColor3 = LINE, Size = UDim2.new(1, 0, 0, 1) }, card)
+	local lit = new("Frame", { BackgroundColor3 = CYAN, Size = UDim2.fromOffset(36, 1) }, top)
+	fade(lit, 0.2, 1)
+	local keyText = keyOf(tip)
+	local capH, capW = capHeight(), capWidth(keyText)
+	local cap = new("Frame", {
+		Name = "Key",
+		Position = UDim2.fromOffset(10, 12),
+		Size = UDim2.fromOffset(capW, capH),
+		BackgroundColor3 = INK,
+		BackgroundTransparency = if keyText then 0.1 else 0.5,
 	}, card)
-	UiKit.round(badge, if keyText then 8 else 999)
-	stroke(badge, GOLD, 0.35)
-	-- (A key cap: a lighter lip along its bottom.)
+	UiKit.round(cap, 2)
+	stroke(cap, if keyText then CYAN else LINE, if keyText then 0.35 else 0)
 	if keyText then
+		-- (A key cap: a lit lip along its bottom.)
 		new("Frame", {
 			AnchorPoint = Vector2.new(0, 1),
 			Position = UDim2.new(0, 3, 1, -2),
-			Size = UDim2.new(1, -6, 0, 3),
-			BackgroundColor3 = GOLD,
-			BackgroundTransparency = 0.7,
-			BorderSizePixel = 0,
-		}, badge)
+			Size = UDim2.new(1, -6, 0, 2),
+			BackgroundColor3 = CYAN,
+			BackgroundTransparency = 0.55,
+		}, cap)
 	end
-	local cap = label(badge, keyText or tostring(i), if keyText then 13 else 16, GOLD, Enum.Font.GothamBlack)
-	cap.Size, cap.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
-	if keyText and not phone then
-		cap:SetAttribute("NoTranslate", true) -- (a key's name; a phone's button names are words)
+	local capText = label(cap, keyText or two(i), 15, if keyText then CYAN else FAINT, HEAD)
+	capText.Size, capText.TextXAlignment, capText.TextTruncate = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center, Enum.TextTruncate.None
+	if not keyText or not phone then
+		capText:SetAttribute("NoTranslate", true) -- (a key's name, or a number; a phone's buttons are words)
 	end
-	local left = 14 + badgeW + 12
-	local head = label(card, tip.Title, 15, TEXT, Enum.Font.GothamBold)
-	head.Position, head.Size = UDim2.fromOffset(left, 12), UDim2.new(1, -left - 12, 0, 20)
-	head.TextTruncate = Enum.TextTruncate.AtEnd
-	local words = label(card, tip.Text, 12, MUTED)
-	words.TextWrapped, words.TextYAlignment = true, Enum.TextYAlignment.Top
-	words.Position, words.Size = UDim2.fromOffset(left, 36), UDim2.new(1, -left - 12, 1, -42)
+	local left = 10 + column + 12
+	local head = label(card, tip.Title, 17, TEXT, HEAD)
+	head.Position, head.Size = UDim2.fromOffset(left, 9), UDim2.new(1, -left - 10, 0, 22)
+	local words = label(card, tip.Text, 14, DIM, BODY)
+	words.TextWrapped, words.TextTruncate, words.TextYAlignment = true, Enum.TextTruncate.None, Enum.TextYAlignment.Top
+	words.Position, words.Size = UDim2.fromOffset(left, 32), UDim2.new(1, -left - 10, 1, -36)
 	return card
 end
 
@@ -246,131 +396,155 @@ local function layout()
 	laidOut = screen
 	phone = UiKit.handheld(screen)
 	local short = phone or screen.Y < 560
-	local width = math.min(if short then 900 else 920, screen.X - (if short then 20 else 60))
+	local width = math.min(if short then 900 else 940, screen.X - (if short then 20 else 60))
 	local height = math.min(if short then 620 else 600, screen.Y - (if short then 16 else 60))
 	panel.Size = UDim2.fromOffset(width, height)
 	local room, at = UiKit.clearTopbar(screen, Vector2.new(width, height))
 	scale.Scale, panel.Position = room, at
-	local pad = if short then 12 else 18
-	local closeSize = if short then 34 else 40
+	local pad = if short then 14 else 22
+	local closeSize = if short then 32 else 36
 	close.Size = UDim2.fromOffset(closeSize, closeSize)
-	close.Position = UDim2.new(1, -pad + 4, 0, pad - 4)
+	close.Position = UDim2.new(1, -pad + 4, 0, pad - 6)
 	local footH = if short then 34 else 40
 	local contentX, contentY
 	if short then
-		-- A phone: the pages a row of chips along the top, after GUIDE.
-		rail.Visible = true
-		rail.Position, rail.Size = UDim2.fromOffset(pad, pad), UDim2.fromOffset(92, 36)
-		railTitle.Position, railTitle.Size = UDim2.fromOffset(12, 0), UDim2.new(1, -12, 1, 0)
-		railTitle.TextSize = 18
-		railSub.Visible = false
-		pages.Position = UDim2.fromOffset(pad + 100, pad)
-		pages.Size = UDim2.new(1, -pad * 2 - 100 - closeSize - 8, 0, 36)
+		-- A phone: GUIDE, then the pages as a row of tabs along the top.
+		heading.TextSize = 18
+		heading.Position, heading.Size = UDim2.fromOffset(pad, pad - 2), UDim2.fromOffset(96, 30)
+		manual.Visible = false
+		local tabsX = pad + 104
+		pages.Position = UDim2.fromOffset(tabsX, pad - 2)
+		pages.Size = UDim2.new(1, -tabsX - pad - closeSize - 8, 0, 32)
 		pages.ScrollingDirection = Enum.ScrollingDirection.X
 		pages.AutomaticCanvasSize = Enum.AutomaticSize.X
 		pagesList.FillDirection = Enum.FillDirection.Horizontal
 		pagesList.VerticalAlignment = Enum.VerticalAlignment.Center
-		for i, b in pageButtons do
-			local name = b:FindFirstChild("Name") :: TextLabel
-			local number = b:FindFirstChild("Number") :: TextLabel
-			local w = math.ceil(textWidth(GameGuide.Sections[i].Title, 12, Enum.Font.GothamBold)) + 44
-			b.Size = UDim2.fromOffset(w, 32)
-			number.Position, number.Size = UDim2.fromOffset(6, 6), UDim2.fromOffset(20, 20)
-			number.TextSize = 11
-			name.Position, name.Size = UDim2.fromOffset(32, 0), UDim2.new(1, -36, 1, 0)
-			name.TextSize = 12
+		for i, p in pageButtons do
+			local w = math.ceil(textWidth(GameGuide.Sections[i].Title, 13, HEAD)) + 42
+			p.Button.Size = UDim2.fromOffset(w, 30)
+			p.Wash.Rotation = 90
+			p.Edge.Position, p.Edge.Size = UDim2.new(0, 0, 1, -1), UDim2.new(1, 0, 0, 1)
+			p.Mark.Position, p.Mark.Size = UDim2.new(0, 0, 1, -2), UDim2.new(1, 0, 0, 2)
+			p.MarkGlow.Position, p.MarkGlow.Size = UDim2.new(0, 0, 1, -5), UDim2.new(1, 0, 0, 5)
+			p.Number.Position, p.Number.Size, p.Number.TextSize = UDim2.fromOffset(6, 0), UDim2.new(0, 20, 1, 0), 11
+			p.Name.Position, p.Name.Size, p.Name.TextSize = UDim2.fromOffset(28, 0), UDim2.new(1, -30, 1, 0), 13
 		end
+		divider.Position, divider.Size = UDim2.fromOffset(pad, pad + 36), UDim2.new(1, -pad * 2, 0, 1)
 		contentX, contentY = pad, pad + 44
 	else
-		-- A computer: the pages down a rail on the left.
-		local railW = 220
-		rail.Visible = true
-		rail.Position, rail.Size = UDim2.fromOffset(pad, pad), UDim2.new(0, railW, 1, -pad * 2)
-		railTitle.Position, railTitle.Size = UDim2.fromOffset(16, 12), UDim2.new(1, -24, 0, 30)
-		railTitle.TextSize = 24
-		railSub.Visible = true
-		railSub.Position, railSub.Size = UDim2.fromOffset(16, 42), UDim2.new(1, -24, 0, 16)
-		pages.Position = UDim2.fromOffset(pad + 8, pad + 70)
-		pages.Size = UDim2.new(0, railW - 16, 1, -pad * 2 - 80)
+		-- A computer: GUIDE and FIELD MANUAL over the pages down the left.
+		local railW = 214
+		heading.TextSize = 24
+		heading.Position, heading.Size = UDim2.fromOffset(pad + 4, pad + 2), UDim2.fromOffset(railW, 32)
+		manual.Visible = true
+		manual.Position, manual.Size = UDim2.fromOffset(pad + 6, pad + 34), UDim2.fromOffset(railW, 16)
+		pages.Position = UDim2.fromOffset(pad, pad + 66)
+		pages.Size = UDim2.new(0, railW, 1, -pad * 2 - 66)
 		pages.ScrollingDirection = Enum.ScrollingDirection.Y
 		pages.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		pagesList.FillDirection = Enum.FillDirection.Vertical
 		pagesList.VerticalAlignment = Enum.VerticalAlignment.Top
-		for _, b in pageButtons do
-			local name = b:FindFirstChild("Name") :: TextLabel
-			local number = b:FindFirstChild("Number") :: TextLabel
-			b.Size = UDim2.new(1, 0, 0, 40)
-			number.Position, number.Size = UDim2.fromOffset(8, 8), UDim2.fromOffset(24, 24)
-			number.TextSize = 12
-			name.Position, name.Size = UDim2.fromOffset(42, 0), UDim2.new(1, -48, 1, 0)
-			name.TextSize = 13
+		for _, p in pageButtons do
+			p.Button.Size = UDim2.new(1, 0, 0, 38)
+			p.Wash.Rotation = 0
+			p.Edge.Position, p.Edge.Size = UDim2.new(), UDim2.new(0, 2, 1, 0)
+			p.Mark.Position, p.Mark.Size = UDim2.new(), UDim2.new(0, 3, 1, 0)
+			p.MarkGlow.Position, p.MarkGlow.Size = UDim2.new(), UDim2.new(0, 8, 1, 0)
+			p.Number.Position, p.Number.Size, p.Number.TextSize = UDim2.fromOffset(14, 0), UDim2.new(0, 26, 1, 0), 13
+			p.Name.Position, p.Name.Size, p.Name.TextSize = UDim2.fromOffset(44, 0), UDim2.new(1, -48, 1, 0), 15
 		end
-		contentX, contentY = pad + railW + 18, pad + 4
+		divider.Position, divider.Size = UDim2.fromOffset(pad + railW + 16, pad), UDim2.new(0, 1, 1, -pad * 2)
+		contentX, contentY = pad + railW + 34, pad + 2
 	end
-	-- The page: title and line, then the tips, then the bottom row.
+	-- The page: SECTION, its name and the count, its line, the rule, the entries.
+	local right = pad + (if short then 0 else closeSize + 10)
+	sectionTag.Visible = not short
+	sectionTag.Position, sectionTag.Size = UDim2.fromOffset(contentX, contentY), UDim2.new(0, 160, 0, 16)
+	local titleY = contentY + (if short then 0 else 16)
 	title.TextSize = if short then 20 else 28
-	title.Position = UDim2.fromOffset(contentX, contentY)
-	title.Size = UDim2.new(1, -contentX - pad - (if short then 0 else closeSize + 8), 0, if short then 24 else 34)
-	blurb.TextSize = if short then 12 else 13
-	blurb.Position = UDim2.fromOffset(contentX, contentY + (if short then 24 else 36))
-	blurb.Size = UDim2.new(1, -contentX - pad, 0, 18)
-	local tipsY = contentY + (if short then 48 else 64)
+	title.Position = UDim2.fromOffset(contentX, titleY)
+	title.Size = UDim2.new(1, -contentX - right - 70, 0, if short then 24 else 32)
+	pageCount.Visible = not short
+	pageCount.Position = UDim2.new(1, -right - 64, 0, titleY)
+	pageCount.Size = UDim2.fromOffset(60, 32)
+	local blurbY = titleY + (if short then 24 else 34)
+	blurb.TextSize = if short then 13 else 15
+	blurb.Position, blurb.Size = UDim2.fromOffset(contentX, blurbY), UDim2.new(1, -contentX - pad, 0, 20)
+	local ruleY = blurbY + (if short then 24 else 30)
+	rule.Position, rule.Size = UDim2.fromOffset(contentX + 4, ruleY), UDim2.new(1, -contentX - pad - 4, 0, 1)
+	local tipsY = ruleY + (if short then 10 else 14)
 	tips.Position = UDim2.fromOffset(contentX, tipsY)
-	tips.Size = UDim2.new(1, -contentX - pad + 6, 1, -tipsY - pad - footH - 10)
+	tips.Size = UDim2.new(1, -contentX - pad + 6, 1, -tipsY - pad - footH - 18)
 	local listW = width - contentX - pad
-	local columns = if listW >= 520 then 2 else 1
-	grid.CellSize = UDim2.new(1 / columns, -(10 * (columns - 1)) / columns - 6, 0, if short then 86 else 96)
-	-- Bottom row: OPEN TASKS at the left, PREV / page / NEXT at the right.
-	local footY = UDim2.new(0, 0, 1, -pad - footH)
-	tasksButton.Position = UDim2.new(0, contentX, 1, -pad - footH)
-	tasksButton.Size = UDim2.fromOffset(math.ceil(textWidth("OPEN TASKS", 13, Enum.Font.GothamBold)) + 34, footH)
-	local buttonW = if short then 96 else 116
-	nextButton.Position = UDim2.new(1, -pad - buttonW, footY.Y.Scale, footY.Y.Offset)
+	columns = if listW >= 520 then 2 else 1
+	cellW = math.floor((listW - 14 * (columns - 1)) / columns) - 6
+	grid.CellPadding = UDim2.fromOffset(14, if short then 6 else 8)
+	-- Bottom row, over its hairline: OPEN TASKS at the left, PREV / page / NEXT at the right.
+	local footY = -pad - footH
+	footRule.Position, footRule.Size = UDim2.new(0, contentX, 1, footY - 10), UDim2.new(1, -contentX - pad, 0, 1)
+	tasksButton.Position = UDim2.new(0, contentX, 1, footY)
+	tasksButton.Size = UDim2.fromOffset(math.ceil(textWidth("OPEN TASKS", 16, HEAD)) + 34, footH)
+	local buttonW = if short then 96 else 120
+	nextButton.Position = UDim2.new(1, -pad - buttonW, 1, footY)
 	nextButton.Size = UDim2.fromOffset(buttonW, footH)
-	pageCount.Position = UDim2.new(1, -pad - buttonW - 64, footY.Y.Scale, footY.Y.Offset)
-	pageCount.Size = UDim2.fromOffset(60, footH)
-	prev.Position = UDim2.new(1, -pad - buttonW * 2 - 72, footY.Y.Scale, footY.Y.Offset)
+	footCount.Position = UDim2.new(1, -pad - buttonW - 66, 1, footY)
+	footCount.Size = UDim2.fromOffset(62, footH)
+	prev.Position = UDim2.new(1, -pad - buttonW * 2 - 74, 1, footY)
 	prev.Size = UDim2.fromOffset(buttonW, footH)
 end
 
--- The words and cards, for the page we're on.
+-- The words and entries, for the page we're on.
 render = function()
 	local section = GameGuide.Sections[current]
 	if not section then
 		return
 	end
+	sectionTag.Text = "SECTION " .. two(current)
 	title.Text = section.Title
 	blurb.Text = section.Blurb
+	local count = two(current) .. " / " .. two(#GameGuide.Sections)
+	pageCount.Text, footCount.Text = count, count
 	for _, child in tips:GetChildren() do
 		if child:IsA("Frame") then
 			child:Destroy()
 		end
 	end
-	local shown = 0
+	local listed = {}
 	for _, tip in section.Tips do
 		if phone and tip.Phone == false then
 			continue -- (a computer's key with nothing like it on a phone)
 		end
-		shown += 1
-		tipCard(shown, tip)
+		table.insert(listed, tip)
 	end
-	for i, b in pageButtons do
+	local column = 0
+	for _, tip in listed do
+		column = math.max(column, capWidth(keyOf(tip)))
+	end
+	-- Every entry as tall as the page's longest words need (two lines: 70).
+	local tall = 70
+	for _, tip in listed do
+		local words = textHeight(tip.Text, 14, BODY, cellW - (10 + column + 12) - 10)
+		tall = math.max(tall, math.ceil(32 + words + 8))
+	end
+	grid.CellSize = UDim2.new(1 / columns, -(14 * (columns - 1)) / columns - 6, 0, math.min(tall, 110))
+	for i, tip in listed do
+		tipCard(i, tip, column)
+	end
+	for i, p in pageButtons do
 		local on = i == current
-		b.BackgroundTransparency = if on then 0 else (if phone then 0 else 1)
-		b.BackgroundColor3 = if on then GOLD else CHIP
-		local name = b:FindFirstChild("Name") :: TextLabel
-		local number = b:FindFirstChild("Number") :: TextLabel
-		name.TextColor3 = if on then INK else TEXT
-		number.BackgroundColor3 = if on then INK else KEY
+		p.Button.BackgroundTransparency = if on then 0 else 1
+		p.Mark.Visible, p.MarkGlow.Visible = on, on
+		p.Edge.Visible = not on
+		p.Name.TextColor3 = if on then TEXT else DIM
+		p.Number.TextColor3 = if on then PINK else FAINT
 	end
-	pageCount.Text = string.format("%d / %d", current, #GameGuide.Sections)
 	prev.Visible = current > 1
 	nextButton.Text = if current < #GameGuide.Sections then "NEXT  ›" else "DONE"
-	-- (The page's chip kept in view on a phone.)
+	-- (The page's tab kept in view on a phone.)
 	if phone then
-		local b = pageButtons[current]
-		if b then
-			local x = b.AbsolutePosition.X - pages.AbsolutePosition.X + pages.CanvasPosition.X
+		local p = pageButtons[current]
+		if p then
+			local x = p.Button.AbsolutePosition.X - pages.AbsolutePosition.X + pages.CanvasPosition.X
 			pages.CanvasPosition = Vector2.new(math.max(0, x - 40), 0)
 		end
 	end

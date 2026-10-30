@@ -7,6 +7,25 @@ path. Every step says what to do, how, and has a button that takes you there.
 
 ## GUIDE (`Modules/GuideUI`, words in `Shared/GameGuide`)
 
+*2026-10-30, restyled:* the GUIDE is the Tasks window's Rift terminal now,
+as a field manual, so the two read as one game's: dark cyan glass, a double
+hairline frame and corner brackets, GUIDE in Michroma over FIELD MANUAL,
+Sarpanch for names, numbers and keys, Titillium for the words. The pages
+are numbered 01 to 08, the open one lit magenta; the page has SECTION 04
+over its name and 04 / 08, a rule with a lit end; the tips are manual
+entries (a hairline with a lit end over each, no rounded cards or number
+circles), each key on a terminal key cap with a lit lip, the words starting
+in line on a page, every entry as tall as the page's longest words; OPEN
+TASKS and PREV are cyan-rimmed, NEXT lit cyan like Tasks' GO. It used to be
+gold pills, round number badges and rounded cards, which looked like any
+other game's.
+
+![Before](guide-and-tasks/guide-before.png)
+
+![Now](guide-and-tasks/guide.png)
+
+![On a phone](guide-and-tasks/guide-phone.png)
+
 - Opens from the **GUIDE** tile (an open-book icon). On a phone it's in the
   dock too, which now has eight tiles: PLAY, INVENTORY, SKINS, TASKS, MARKET,
   GUIDE, SOCIAL, INVITE. With eight tiles the gap between them is 4 points
@@ -26,7 +45,7 @@ path. Every step says what to do, how, and has a button that takes you there.
   | 1V1 & REWARDS | Practice, Ranked, daily challenges, Tasks |
 
 - **On a computer**: the pages down a rail on the left, the tips two to a
-  row. **On a phone**: the pages as a row of chips along the top, the tips one
+  row. **On a phone**: the pages as a row of tabs along the top, the tips one
   or two to a row (two once the list is 520 points wide). Phone cards show the on-screen button's name (ATTACK, GUARD, DODGE,
   GEMS, FIGHT, BEAM, CATCH) instead of the key, and tips that only apply to a
   keyboard (TAB) are left out.
