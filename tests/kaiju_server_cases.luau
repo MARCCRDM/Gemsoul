@@ -495,6 +495,14 @@ local DuelistStub = {
 -- Loading -------------------------------------------------------------------------------------------------
 
 local RunService = { Heartbeat = signal() }
+promptHandlers = {}
+-- Holds a prompt of `kind` as `player` (as Roblox does, within its reach).
+function holdPrompt(kind, player)
+	local prompt = { GetAttribute = function(_, key) return if key == "PromptKind" then kind else nil end }
+	for _, fn in promptHandlers do
+		fn(prompt, player)
+	end
+end
 local services = {
 	Players = Players,
 	RunService = RunService,
@@ -518,6 +526,15 @@ local services = {
 	},
 	Debris = { AddItem = function() end },
 	CollectionService = { AddTag = function() end },
+	-- Prompts held (the Kaiju Arena's door: GO UPSTAIRS), fired by hand.
+	ProximityPromptService = {
+		Handlers = {},
+		PromptTriggered = {
+			Connect = function(self, fn)
+				return table.insert(promptHandlers, fn)
+			end,
+		},
+	},
 }
 local loaded = {}
 local env
@@ -5041,11 +5058,22 @@ end
 	check((rootA.Position - pit.Arrive.Position).Magnitude < 1, "Not on the balcony")
 	check(told(a, "KaijuPitCross") and told(a, "KaijuPitCross")[3] == "Down", "No cover going down")
 	check(KaijuPit.inHall(pit.Origin, rootA.Position), "The balcony isn't in the hall")
+	-- Backing into the door does nothing (it's solid, and players walked out
+	-- by accident): it takes holding its prompt, GO UPSTAIRS.
 	rootA.CFrame = pit.Origin * CFrame.new(KaijuPit.Leave.Center)
-	step(0.5)
-	check(a:GetAttribute("KaijuPit") == true, "Back up the moment you arrived")
 	step(3)
-	check(a:GetAttribute("KaijuPit") == nil and (rootA.Position - top.Position).Magnitude < 1, "The doorway didn't take you up")
+	check(a:GetAttribute("KaijuPit") == true, "Walking into the doorway took you up")
+	local wayUp
+	for _, d in (pit.Folder and pit.Folder:GetDescendants()) or {} do
+		if d.Name == "WayUp" then
+			wayUp = d
+		end
+	end
+	check(wayUp and wayUp.CanCollide and wayUp:FindFirstChild("Leave"), "The door isn't solid with its prompt")
+	local upPrompt = wayUp:FindFirstChild("Leave")
+	check(upPrompt:GetAttribute("PromptKind") == "KaijuPitExit" and upPrompt.HoldDuration > 0, "The door's prompt isn't held")
+	holdPrompt("KaijuPitExit", a)
+	check(a:GetAttribute("KaijuPit") == nil and (rootA.Position - top.Position).Magnitude < 1, "The door's prompt didn't take you up")
 	-- Both down again.
 	for _, r in { rootA, rootB } do
 		r.CFrame = landing
@@ -5338,11 +5366,16 @@ end
 	check(#profiles[a].Gems == 0 and #profiles[b].Gems == 1, "The gems weren't put in")
 	battle = KaijuBattles.of(a)
 	check(battle and battle.Court == court, "No gem battle on the court")
+	-- Mid-battle the door won't take you (walking into it never does):
+	-- LEAVE in the battle forfeits it.
 	rootB.CFrame = pit.Origin * CFrame.new(KaijuPit.Leave.Center)
 	step(3)
-	check(b:GetAttribute("KaijuPit") == nil, "Couldn't walk up mid-battle")
+	check(b:GetAttribute("KaijuPit") == true, "Walked out of the arena mid-battle")
+	holdPrompt("KaijuPitExit", b)
+	check(b:GetAttribute("KaijuPit") == true and noted(b, "finish it first"), "The door let you out mid-battle")
+	registered.KaijuBattleLeave(b)
 	KaijuBattles.step(battle, now)
-	check(battle.Phase == "Over" and battle.Result[a] == "Win", "Walking up the stairs didn't forfeit")
+	check(battle.Phase == "Over" and battle.Result[a] == "Win", "LEAVE didn't forfeit")
 	local ids = {}
 	for _, gem in profiles[a].Gems do
 		ids[gem.Id] = true

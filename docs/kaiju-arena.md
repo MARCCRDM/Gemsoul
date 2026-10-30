@@ -60,9 +60,16 @@ model.
   - Your kaiju come with you.
   - You can't take a mech down: "Hop out of the mech first: it won't fit
     down the stairs."
-- **Coming back up.** The lit doorway behind the balcony (**EXIT** painted
-  over it) takes you back to the top of the stairs.
-  - Walking up mid-battle forfeits it.
+- **Coming back up.** The lit door behind the balcony (**EXIT** painted
+  over it): hold its prompt, **Go upstairs**, and you're back at the top
+  of the stairs.
+  - *2026-10-30:* walking into the doorway used to take you up, and it's
+    only a few steps behind where you arrive, so players backed into it by
+    accident, mid-battle too (a loss). Now the door is solid and only its
+    prompt (`KaijuPitExit`, held 0.8 s: Server.KaijuPitServer) takes you
+    up.
+  - Not mid-battle: "You're in a kaiju battle: finish it first." LEAVE in
+    the battle still forfeits it.
 - **Where it is.** The hall is 150 studs under the Shelter, inside the Core.
   The frontier (critters, rifts, raids) leaves it alone, and so does the
   Outpost's "stranded" check.

@@ -624,7 +624,7 @@ Vendors.ArenaGuide = {
 				},
 				{
 					Text = "Who gets the stake?",
-					Reply = "The winner takes both stakes. In a draw, each gets their own back. Going back up the stairs mid-battle counts as a loss. Only loose gems can be staked, never the gems in your gear.",
+					Reply = "The winner takes both stakes. In a draw, each gets their own back. Leaving a battle (LEAVE) counts as a loss. Only loose gems can be staked, never the gems in your gear.",
 				},
 				{
 					Text = "What do I get for a battle?",
@@ -649,7 +649,7 @@ Vendors.ArenaTips = {
 	"Both press REMATCH in the 12 seconds after a battle to go again on the same court, for the same stake.",
 	"During a battle, drag to look around the court, and scroll or pinch to zoom.",
 	"Every kaiju of yours earns experience from a battle: 40 for a win, 24 for a draw, 14 for a loss.",
-	"Going back up the stairs mid-battle counts as a loss, and your stake goes to your foe.",
+	"Leaving a battle counts as a loss, and your stake goes to your foe. The door upstairs stays shut till it's over.",
 	"A kaiju's Q wakes at level 5 and its R at level 10. Higher-level kaiju bring more moves to a battle.",
 	"Each kaiju casts its E when its mana is full. Mana fills as it hits and as it's hit, so a tank roars sooner the harder it's pushed.",
 	"One foe down, a kaiju goes straight for the next one near it. Ranged kaiju pick off the weakest one in range.",

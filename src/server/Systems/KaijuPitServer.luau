@@ -434,15 +434,12 @@ local function step(now: number)
 		if root and player:GetAttribute("Outpost") == true then
 			local rested = now - (crossedAt[player] or -math.huge) >= 2
 			if below[player] then
+				-- (Back up only by the door's prompt: exitPrompt. Walking
+				-- into the doorway did it, and players backed into it by
+				-- accident, mid-battle too.)
 				if not KaijuPit.inHall(pit.Origin, root.Position) then
 					-- (Somewhere else now: a respawn, the Rift.)
 					settle(player, false)
-				elseif rested then
-					-- (Mid-battle too: up the stairs is walking off, a loss.)
-					local leave = KaijuPit.Leave
-					if inBox(pit.Origin * CFrame.new(leave.Center), leave.Half * 2, root.Position) then
-						KaijuPitServer.up(player)
-					end
 				end
 			elseif rested and stairs and inBox(stairs.Landing, stairs.Size, root.Position) then
 				KaijuPitServer.down(player)
@@ -769,6 +766,18 @@ function KaijuPitServer.start(site, world)
 	KaijuBattles.inPit = function(player: Player): boolean
 		return below[player] == true
 	end
+	-- The way up: the door's prompt (GO UPSTAIRS), held on purpose. Not in
+	-- the middle of a kaiju battle: finish it (or its own forfeit) first.
+	game:GetService("ProximityPromptService").PromptTriggered:Connect(function(prompt, player)
+		if prompt:GetAttribute("PromptKind") ~= "KaijuPitExit" or not below[player] then
+			return
+		end
+		if player:GetAttribute("KaijuBattle") ~= nil then
+			Remotes.Notify:FireClient(player, "You're in a kaiju battle: finish it first.")
+			return
+		end
+		KaijuPitServer.up(player)
+	end)
 	Shop.register("KaijuPitStake", setStake)
 	Shop.register("KaijuPitFight", fight)
 	Shop.register("KaijuPitMode", setMode)

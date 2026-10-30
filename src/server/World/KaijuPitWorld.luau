@@ -390,16 +390,28 @@ function KaijuPitWorld.build(origin: CFrame, parent: Instance)
 		)
 		rail.Name = "Handrail"
 	end
-	-- The way back up: a lit doorway in the north wall, behind where you arrive.
+	-- The way back up: a lit door in the north wall, behind where you arrive.
+	-- Closed and solid: you leave by holding its prompt (GO UPSTAIRS,
+	-- PromptKind "KaijuPitExit": Server.KaijuPitServer), never by backing
+	-- into it by accident.
 	local leave = KaijuPit.Leave
-	part(
+	local wayUp = solid(part(
 		shell,
 		at(leave.Center.X, leave.Center.Y + 5, -Z + 0.1),
 		Vector3.new(leave.Half.X * 2, 10, 0.2),
 		Color3.fromRGB(230, 236, 244),
 		Enum.Material.Neon
-	).Name =
-		"WayUp"
+	))
+	wayUp.Name = "WayUp"
+	local upPrompt = Instance.new("ProximityPrompt")
+	upPrompt.Name = "Leave"
+	upPrompt.ActionText = "Go upstairs"
+	upPrompt.ObjectText = "EXIT"
+	upPrompt.HoldDuration = 0.8
+	upPrompt.MaxActivationDistance = 9
+	upPrompt.RequiresLineOfSight = false
+	upPrompt:SetAttribute("PromptKind", "KaijuPitExit")
+	upPrompt.Parent = wayUp
 	for _, s in { -1, 1 } do
 		part(
 			shell,
