@@ -64,7 +64,7 @@ for root,position in savedPositions do root.Position=position end
 print("PASS: "..checks.." live restored Surge casts, rarity, barriers, duplicate rejection and Ranked normalization")
 
 do
- check(Tech.Resources.Charge.Start==0 and Tech.Resources.Charge.Regen==0,"Charge must start empty and not regenerate freely")
+ check(Tech.Resources.Charge.StartShare==0.5 and Tech.chargeStart(100)==50 and Tech.Resources.Charge.Regen==0,"Charge must start half full and not regenerate freely")
  check(Tech.Resources.Charge.OnHit==5 and Tech.Resources.Charge.OnHeavy==10,"Weapon hit rewards")
  for rarity,band in Tech.ChargeBands do
   for _,id in GemRoller.Pools.Fire do

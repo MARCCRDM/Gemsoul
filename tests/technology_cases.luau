@@ -246,7 +246,8 @@ check(not cast("Q") and st.Resources.Charge == 100, "Empty surge slot consumed C
 -- The Charge economy: a fight starts part-full; surges can't follow each other
 -- faster than the lockout, however short their own recovery.
 CombatServer.reset(source)
-check(CombatServer._state(source).Resources.Charge == Tech.Resources.Charge.Start, "A fight starts at Charge.Start")
+local fullBar = CombatServer._state(source).Resources.Charge
+check(Tech.Resources.Charge.StartShare == 0.5 and fullBar == Tech.chargeStart(source:GetAttribute("MaxCharge")), "A fight doesn't start with half its Charge: " .. tostring(fullBar))
 st = reset()
 surgeGem("Shock", 1, 3, { Clarity = 10 })
 check(cast("Q") and st.NextTech - now >= Tech.SurgeLockout - 1e-6, "Surge lockout floor")

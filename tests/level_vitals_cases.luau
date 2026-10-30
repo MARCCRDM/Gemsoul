@@ -21,7 +21,7 @@ Players.PlayerAdded.Fire(player)
 CombatServer.reset(player)
 check(player:GetAttribute("Stamina") == 118 and player:GetAttribute("MaxCharge") == 118, "Reset publishes leveled maxima")
 local st = CombatServer._state(player)
-check(st.Resources.Stamina == 118 and st.Resources.Charge == 0, "Spawn starts stamina full and charge empty")
+check(st.Resources.Stamina == 118 and st.Resources.Charge == 59 and player:GetAttribute("Charge") == 59, "Spawn starts stamina full and charge half full (of the levelled 118)")
 CombatServer.tutorialCharge(player)
 check(st.Resources.Charge == 118, "Tutorial fills new Charge capacity")
 st.Resources.Stamina = 110

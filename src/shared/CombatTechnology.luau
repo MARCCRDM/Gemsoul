@@ -7,9 +7,15 @@ Tech.Traits = GemTraits
 Tech.ManeuversEnabled = false -- archived data is retained; controls and player casts are retired.
 Tech.Resources = {
 	Stamina = { Max = 100, Start = 100, Regen = 12, Color = Color3.fromRGB(65, 195, 112) },
-	-- Charge is earned by landed weapon hits; no free idle regeneration.
-	Charge = { Max = 100, Start = 0, Regen = 0, OnHit = 5, OnHeavy = 10, Color = Color3.fromRGB(70, 130, 255) },
+	-- Charge is earned by landed weapon hits; no free idle regeneration. A
+	-- fight starts with StartShare of it (half: a Surge or two ready early;
+	-- Start is that of the base Max).
+	Charge = { Max = 100, Start = 50, StartShare = 0.5, Regen = 0, OnHit = 5, OnHeavy = 10, Color = Color3.fromRGB(70, 130, 255) },
 }
+-- The Charge a fight starts with, for a Charge bar of `maximum`.
+function Tech.chargeStart(maximum: number?): number
+	return math.floor((maximum or Tech.Resources.Charge.Max) * Tech.Resources.Charge.StartShare + 0.5)
+end
 -- After any surge, no other surge (or swing) for at least this long, however
 -- much Rank and Clarity shorten its recovery: no back-to-back casting.
 Tech.SurgeLockout = 0.9

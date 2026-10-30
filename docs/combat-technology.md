@@ -14,6 +14,8 @@ The capacities and regeneration rates are initial tuning; the brief specifies co
 
 LMB attacks, Q/E choose swing sides, RMB guards, and Space dodges. **Z cycles Rig Maneuvers; R triggers the selected maneuver. X cycles Gem Surges; F triggers the selected surge.** Hold F for Cryo Stream and release to stop. Touch has matching trigger and cycle buttons. Tab frees the desktop cursor. K opens the Augment Tree. The fight screen has no tree or guide buttons; the dashboard has a visible AUGMENT TREE button.
 
+*2026-10-30:* **every fight starts with half your Charge** (`Tech.Resources.Charge.StartShare` = 0.5, `Tech.chargeStart`): 50 of a base 100, more as your miner levels and the bar grows (59 of 118 at level 10). On spawn, at a fight's start and on a reset; the AI rival too, by the same rule. It used to start empty, so a Surge took a stretch of hitting first. Landed hits still fill the rest; there's still no idle regeneration.
+
 The stored **Charge resource** is distinct from the **attack wind-up timing indicator**. Holding a normal weapon attack does not spend Charge.
 
 ## Rig Maneuvers

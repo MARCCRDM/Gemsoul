@@ -2518,7 +2518,7 @@ function spawnRival(owner: Player, raid, encounter)
 		Rate = if sparring then rules.BasicCooldown * 1.35 else rules.BasicCooldown,
 		-- Its own Stamina and Charge, by the same rules as yours.
 		Stamina = Tech.Resources.Stamina.Max,
-		Charge = Tech.Resources.Charge.Start,
+		Charge = Tech.chargeStart(Tech.Resources.Charge.Max),
 		ResourceAt = os.clock(),
 		StaminaRestUntil = 0,
 		Action = nil,

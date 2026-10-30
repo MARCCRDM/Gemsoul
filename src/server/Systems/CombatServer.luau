@@ -145,7 +145,7 @@ end
 local function state(player)
 	if not states[player] then
 		states[player] = {
-			Resources = { Stamina = resourceMax(player, "Stamina"), Charge = Tech.Resources.Charge.Start },
+			Resources = { Stamina = resourceMax(player, "Stamina"), Charge = Tech.chargeStart(resourceMax(player, "Charge")) },
 			ResourceAt = os.clock(),
 			TechCooldowns = {},
 			NextTech = 0,
@@ -2758,7 +2758,7 @@ function CombatServer.reset(player)
 	player:SetAttribute("Stamina", resourceMax(player, "Stamina"))
 	player:SetAttribute("MaxStamina", resourceMax(player, "Stamina"))
 	player:SetAttribute("MaxCharge", resourceMax(player, "Charge"))
-	player:SetAttribute("Charge", Tech.Resources.Charge.Start)
+	player:SetAttribute("Charge", Tech.chargeStart(resourceMax(player, "Charge")))
 end
 function CombatServer.start()
 	Enemies.hitPlayer = function(player, amount, element, enemy, heavy, crit, swordHit)
