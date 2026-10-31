@@ -216,7 +216,8 @@ end
 
 -- Roblox's own invite prompt. (Roblox doesn't send invites from a Studio
 -- playtest: it says so instead of failing quietly.)
-function ReferralUI.invite()
+-- (`message`: what the prompt says, e.g. the swing refill's; else Kindred Edge.)
+function ReferralUI.invite(message: string?)
 	if RunService:IsStudio() then
 		UiKit.toast("Invites open in the live game. Studio playtests can't send them.", P.Gold)
 		return
@@ -229,7 +230,7 @@ function ReferralUI.invite()
 	local options = nil
 	pcall(function()
 		local made = Instance.new("ExperienceInviteOptions")
-		made.PromptMessage = "Bring a friend: when they join, you get Kindred Edge!"
+		made.PromptMessage = message or "Bring a friend: when they join, you get Kindred Edge!"
 		options = made
 	end)
 	local shown = pcall(function()

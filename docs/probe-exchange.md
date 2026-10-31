@@ -60,6 +60,14 @@ selling gems: mining pays mostly Commons, and `SELL COMMONS` in the GEMS
 window sells every spare one at once, at the shop's rate (a quarter of
 their worth).
 
+**Free swings for an invite.** Under the market is a second strip, FREE
+SWINGS: INVITE opens Roblox's invite, and every friend who joins on it gives
+you a Swing Restore coupon (`Shared.Coupons`: half your pick's swings back).
+Holding one, the strip says how many and its button reads USE ONE: the
+refill, right there (the server's `UseCoupon`). On a computer the two strips
+sit one under the other; on a phone on its side, side by side, so the window
+stays as short (`ProbeLayout.strip`).
+
 ### Picks from before
 
 The Probe used to sell the Titan Pick and the Plasma Drill. A save that still

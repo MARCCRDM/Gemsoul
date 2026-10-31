@@ -1120,8 +1120,9 @@ end
 	The SWING REFILLS window: your pick (the free Survey Pick in 3D, its
 	charge live), then the refills Garrick sells for Robux (Shared.Outpost.Refills:
 	swings on top of that charge, about how many rocks that is, what you'll
-	have after, and BUY for its Robux), your coins in the corner, and the
-	player market below.
+	have after, and BUY for its Robux), your coins in the corner, the
+	player market below, and under it FREE SWINGS: invite a friend (each who
+	joins: a Swing Restore coupon), or use a coupon you have.
 
 	On a short screen (a phone on its side) the window is as wide as the
 	screen and the cards are shorter, so the words stay full size. Where
@@ -1624,50 +1625,50 @@ local function refillCard(L, index: number, id: string)
 	)
 end
 
--- The player market, under the picks.
-local function marketBanner(L)
+-- A strip across the window under the picks (its `row`: 1 the first):
+-- a round icon, a title and a line, and its button on the right; a press
+-- anywhere on it does what the button does.
+local function stripBanner(L, row: number, spec)
 	local phone = L.Phone
-	local w, h = L.W - L.Side * 2, L.MarketH
+	local at = ProbeLayout.strip(L, row)
+	local w, h = at.W, at.H
+	local color = spec.Color
 	local banner = new("TextButton", {
-		Name = "Market",
+		Name = spec.Name,
 		Text = "",
 		AutoButtonColor = false,
-		Position = UDim2.fromOffset(0, L.CardH + L.Gap),
+		Position = UDim2.fromOffset(at.X, at.Y),
 		Size = UDim2.fromOffset(w, h),
 		BackgroundColor3 = Color3.new(1, 1, 1),
 	}, probeBody)
 	UiKit.round(banner, 12)
 	new("UIGradient", {
-		Color = ColorSequence.new(P.Gold:Lerp(CARD_TOP, 0.8), CARD_TOP),
+		Color = ColorSequence.new(color:Lerp(CARD_TOP, 0.8), CARD_TOP),
 	}, banner)
-	new("UIStroke", { Color = P.Gold, Transparency = 0.55, Thickness = 1 }, banner)
+	new("UIStroke", { Color = color, Transparency = 0.55, Thickness = 1 }, banner)
 	IronUi.highlight(banner)
-	local open = function()
-		probe.Gui.Enabled = false
-		require(script.Parent.MarketBoardUI).open()
-	end
-	banner.Activated:Connect(open)
+	banner.Activated:Connect(spec.OnPress)
 	local chip = if phone then 28 else 38
 	local icon = new("Frame", {
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 10, 0.5, 0),
 		Size = UDim2.fromOffset(chip, chip),
-		BackgroundColor3 = P.Gold:Lerp(CARD_TOP, 0.65),
+		BackgroundColor3 = color:Lerp(CARD_TOP, 0.65),
 		ZIndex = 2,
 	}, banner)
 	UiKit.round(icon, chip)
-	new("UIStroke", { Color = P.Gold, Transparency = 0.4, Thickness = 1 }, icon)
+	new("UIStroke", { Color = color, Transparency = 0.4, Thickness = 1 }, icon)
 	local glyph =
-		text(icon, "🤝", if phone then 14 else 19, P.Text, IronUi.Body, 0, 0, chip, chip, Enum.TextXAlignment.Center)
+		text(icon, spec.Glyph, if phone then 14 else 19, P.Text, IronUi.Body, 0, 0, chip, chip, Enum.TextXAlignment.Center)
 	glyph.ZIndex = 3
-	local buttonW, buttonH = if phone then 112 else 156, if phone then 30 else 38
+	local buttonW, buttonH = if phone then 96 else 156, if phone then 30 else 38
 	local left = 10 + chip + 10
 	local room = w - left - buttonW - 20
 	local title = text(
 		banner,
-		"PLAYER MARKET",
+		if phone and spec.Short then spec.Short else spec.Title,
 		if phone then 13 else 15,
-		P.Gold,
+		color,
 		Enum.Font.GothamBlack,
 		left,
 		if phone then 4 else 9,
@@ -1675,30 +1676,78 @@ local function marketBanner(L)
 		if phone then 16 else 20
 	)
 	title.ZIndex = 2
-	local sub = text(
-		banner,
-		"Buy, sell and trade gems and gear with other miners.",
-		if phone then 11 else 12,
-		P.Dim,
-		IronUi.Body,
-		left,
-		if phone then 21 else 30,
-		room,
-		15
-	)
+	local sub = text(banner, spec.Line, if phone then 11 else 12, P.Dim, IronUi.Body, left, if phone then 21 else 30, room, 15)
 	sub.ZIndex = 2
-	probeButton(
+	return probeButton(
 		banner,
-		"OPEN MARKET",
-		P.Gold,
+		spec.Button,
+		color,
 		true,
 		w - buttonW - 10,
 		math.floor((h - buttonH) / 2),
 		buttonW,
 		buttonH,
 		if phone then 12 else 15,
-		open
+		spec.OnPress
 	)
+end
+
+-- The player market, under the picks.
+local function marketBanner(L)
+	stripBanner(L, 1, {
+		Name = "Market",
+		Color = P.Gold,
+		Glyph = "🤝",
+		Title = "PLAYER MARKET",
+		Line = if L.Phone then "Trade gems and gear." else "Buy, sell and trade gems and gear with other miners.",
+		Button = if L.Phone then "MARKET" else "OPEN MARKET",
+		OnPress = function()
+			probe.Gui.Enabled = false
+			require(script.Parent.MarketBoardUI).open()
+		end,
+	})
+end
+
+-- Free swings, under the market: invite a friend (Roblox's invite); each
+-- friend who joins gives you a Swing Restore coupon (Shared.Coupons: half
+-- your pick's swings back). Holding one, its button uses it right here.
+local INVITE = Color3.fromRGB(96, 214, 196)
+local usingCoupon = false
+local function inviteBanner(L)
+	local Coupons = require(ReplicatedStorage.Shared.Coupons)
+	local have = Coupons.count(GemClient.Profile, "Swings")
+	stripBanner(L, 2, {
+		Name = "InviteForSwings",
+		Color = INVITE,
+		Glyph = "✉",
+		Title = if have > 0 then string.format("FREE SWINGS  ·  %d COUPON%s", have, if have == 1 then "" else "S") else "FREE SWINGS  ·  INVITE A FRIEND",
+		Short = if have > 0 then string.format("FREE SWINGS ×%d", have) else "FREE SWINGS",
+		Line = if have > 0
+			then (if L.Phone then "Half your swings back." else "A Swing Restore: half your pick's swings back, now.")
+			elseif L.Phone then "Invite a friend: half back."
+			else "Each friend who joins on your invite: half your pick's swings back.",
+		Button = if have > 0 then "USE ONE" else "INVITE",
+		OnPress = function()
+			if Coupons.count(GemClient.Profile, "Swings") <= 0 then
+				require(script.Parent.ReferralUI).invite("Join me in Saga Miners: when you do, I get a free swing refill!")
+				return
+			end
+			if usingCoupon then
+				return
+			end
+			usingCoupon = true
+			task.spawn(function()
+				local result = GemClient.request("UseCoupon", "Swings")
+				usingCoupon = false
+				if result.Message and result.Message ~= "" then
+					UiKit.toast(result.Message, if result.Ok then P.Good else P.Bad)
+				end
+				if probe.Gui.Enabled then
+					drawProbe()
+				end
+			end)
+		end,
+	})
 end
 
 function drawProbe()
@@ -1722,6 +1771,7 @@ function drawProbe()
 		refillCard(L, i + 1, id)
 	end
 	marketBanner(L)
+	inviteBanner(L)
 	refreshCharge()
 end
 -- Coins changed while it's open (a sale, a payout): redraw what you can afford.

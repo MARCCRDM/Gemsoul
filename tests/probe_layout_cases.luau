@@ -40,6 +40,18 @@ do
 	-- Three cards side by side, the market under them, all inside the window.
 	check(L.CardW * 3 + L.Gap * 2 <= L.W - L.Side * 2, name .. ": the cards run past the window")
 	check(L.Top + L.CardH + L.Gap + L.MarketH <= L.H - 6, name .. ": the market runs past the window")
+	-- The two strips under the cards (the market, then free swings for an
+	-- invite): inside the body, under the cards, never on each other; on a
+	-- phone side by side (so the window stays as short), else one under another.
+	local market, invite = Layout.strip(L, 1), Layout.strip(L, 2)
+	for n, r in { market, invite } do
+		check(r.X >= 0 and r.X + r.W <= L.W - L.Side * 2 and r.Y >= L.CardH + L.Gap, name .. ": strip " .. n .. " leaves the body")
+		check(L.Top + r.Y + r.H <= L.H - 6, name .. ": strip " .. n .. " runs past the window")
+		check(r.W >= (if L.Phone then 250 else 600), name .. ": strip " .. n .. " too narrow: " .. r.W)
+	end
+	local apart = market.X + market.W <= invite.X or invite.Y >= market.Y + market.H
+	check(apart, name .. ": the invite strip covers the market")
+	check((invite.Y == market.Y) == L.Phone, name .. ": strips side by side on a phone, stacked on a computer")
 	-- Down a card: art, name, stats, then the footer's line, bar and button.
 	check(L.NameY >= L.ArtH and L.StatsY > L.NameY + 18, name .. ": the name sits on the art or the stats")
 	check(L.FootY >= L.StatsY + L.Row * 3, name .. ": the footer sits on the stats")
