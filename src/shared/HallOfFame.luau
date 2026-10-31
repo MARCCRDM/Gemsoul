@@ -6,7 +6,9 @@
 	  PLAYER VS PLAYER   1V1 DUELS (Arena 1v1 wins: Duels' Solo),
 	                     1V1 + KAIJU (wins in the Kaiju Arena's mixed
 	                     match, only while Config.Features.KaijuDuel is on),
-	                     KAIJU BATTLES (Kaiju Arena battle wins)
+	                     GEAR SCORE (the best-geared: GearRolls.gearScore,
+	                     every rolled stat on the six worn pieces; in place
+	                     of KAIJU BATTLES since 2026-10-31)
 	  PLAYER VS ENVIRONMENT  BOUNTY HUNTERS (Rift bosses slain: the bounties
 	                     Brutus posts), TOP MINERS (gems mined)
 
@@ -41,7 +43,7 @@ local STRIPE = Color3.fromRGB(26, 26, 29)
 
 HallOfFame.Boards = {
 	{ Id = "Duel", Group = "PvP", Title = "1V1 DUELS", Unit = "WINS", Color = Color3.fromRGB(255, 96, 80) },
-	{ Id = "Kaiju", Group = "PvP", Title = "KAIJU BATTLES", Unit = "WINS", Color = Color3.fromRGB(196, 110, 255) },
+	{ Id = "Gear", Group = "PvP", Title = "GEAR SCORE", Unit = "SCORE", Color = Color3.fromRGB(196, 110, 255) },
 	{ Id = "Bosses", Group = "PvE", Title = "BOUNTY HUNTERS", Unit = "BOSSES", Color = Color3.fromRGB(90, 220, 150) },
 	{ Id = "Mined", Group = "PvE", Title = "TOP MINERS", Unit = "GEMS", Color = Color3.fromRGB(96, 196, 255) },
 }

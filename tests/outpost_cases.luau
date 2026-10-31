@@ -646,9 +646,11 @@ do
 		distinct += 1
 	end
 	check(corners == 0 and distinct <= 3, "The Hall of Fame isn't a plain board (" .. corners .. " rounded corners, " .. distinct .. " text colours)")
-	for _, title in { "1V1 DUELS", "KAIJU BATTLES", "BOUNTY HUNTERS", "TOP MINERS" } do
+	for _, title in { "1V1 DUELS", "GEAR SCORE", "BOUNTY HUNTERS", "TOP MINERS" } do
 		check(texts[title] == 1, "No " .. title .. " column")
 	end
+	check(texts["KAIJU BATTLES"] == nil, "KAIJU BATTLES still on the board (GEAR SCORE took its place)")
+	check(texts["210"] == 1, "The GEAR SCORE column doesn't show the gear score")
 	check(texts["1V1 + KAIJU"] == nil, "A 1V1 + KAIJU column while that mode's off")
 	check(texts.Ana == 4 and texts.UNCLAIMED == nil, "Each column's champion isn't the board's first")
 	local children = #gui:GetDescendants()
