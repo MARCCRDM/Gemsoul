@@ -196,10 +196,11 @@ for n=60,2,-1 do
  end
 end
 check(reelModels>=3 and reelModels<=45,"Reel gem models not reused: "..reelModels)
--- The gem roll has no button of its own. Once the gems are out it says
--- what's next (the first fight: no kaiju roll in the intro, that's Wren's)
--- and goes on by itself, or at once on a click (not the click that landed
--- them), closing the intro behind the loading screen.
+-- The gem roll has no button of its own, and a click can't hurry it: every
+-- reel plays out. Once the gems are out it says what's next (the first
+-- fight: no kaiju roll in the intro, that's Wren's) and goes on by itself,
+-- or at once on a click (not one still coming as they land), closing the
+-- intro behind the loading screen.
 local nextUp
 for _,obj in objects do if not obj.Destroyed and obj.Name=="NextUp" then nextUp=obj end end
 check(nextUp and nextUp.ClassName=="TextLabel" and not nextUp.Visible,"The gem roll has no next line waiting")
@@ -215,12 +216,17 @@ local function buttons(o,list)
 end
 check(shade and #buttons(shade,{})==0,"The gem roll has a button: "..table.concat(shade and buttons(shade,{}) or {},", "))
 local function finished() return table.find(requests,"FinishStarterLottery")~=nil end
-table.clear(delayed)
+for _=1,5 do shade.Activated.Fire() end
+check(not nextUp.Visible and not finished(),"A click mid-spin landed the gems")
+for _=1,300 do
+ if nextUp.Visible then break end
+ step(0.05)
+ runDelayed(now)
+end
+check(nextUp.Visible and not finished(),"The gems out by themselves: no next line, or it went on at once")
 local landed=now
 shade.Activated.Fire()
-check(nextUp.Visible and not finished(),"The gems out: no next line, or it went on at once")
-shade.Activated.Fire()
-check(not finished(),"The click that landed the gems went straight past them")
+check(not finished(),"A click as the gems landed went straight past them")
 if resuming then
  runDelayed(landed+1.9)
  check(not finished(),"It went on to the fight too soon")

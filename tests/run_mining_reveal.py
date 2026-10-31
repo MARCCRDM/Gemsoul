@@ -1,4 +1,4 @@
-"""Drive the actual mining reel: awarded outcomes, queue, skip, resize and cleanup."""
+"""Drive the actual mining reel: awarded outcomes, queue, no skipping, resize and cleanup."""
 from pathlib import Path
 import re
 import subprocess

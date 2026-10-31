@@ -205,7 +205,8 @@ local function show(loot, token)
 	local heading = label(card, "ROLLING YOUR GEM", INFO, 22, 200, 18, 13, DIM)
 	local action = new("TextButton", {
 		Name = "RevealOrContinue",
-		Text = "REVEAL  ›",
+		Text = "CONTINUE  ›",
+		Visible = false, -- (no skipping the reel: it shows once the gem's down)
 		Font = IronUi.Bold,
 		TextSize = 13,
 		TextColor3 = WHITE,
@@ -216,12 +217,11 @@ local function show(loot, token)
 	}, card)
 	UiKit.round(action, 8)
 	local actionEdge = new("UIStroke", { Color = DIM, Thickness = 1.5, Transparency = 0.3 }, action)
-	local skip, dismiss, landed = false, false, false
+	local dismiss, landed = false, false
+	local continueFrom = math.huge
 	action.Activated:Connect(function()
-		if landed then
+		if landed and os.clock() >= continueFrom then
 			dismiss = true
-		else
-			skip = true
 		end
 	end)
 	current = {
@@ -373,7 +373,7 @@ local function show(loot, token)
 	end
 	local duration = 2.15 + rank * 0.12
 	local started = os.clock()
-	while live() and not skip do
+	while live() do
 		local p = math.clamp((os.clock() - started) / duration, 0, 1)
 		render(2 + (target - 2) * (1 - (1 - p) ^ 3), p)
 		fill.Size = UDim2.new(p, 0, 1, 0)
@@ -419,6 +419,8 @@ local function show(loot, token)
 	footer.Text = table.concat(extras, "  ·  ")
 	footer.TextTruncate = Enum.TextTruncate.AtEnd
 	action.Text = "CONTINUE  ›"
+	action.Visible = true
+	continueFrom = os.clock() + 0.4 -- (not a click from before)
 	LotterySound.reveal(rank)
 	burst(effects, rank, winningColor)
 	-- Landed: the light behind it swells, and a few glints twinkle on it.

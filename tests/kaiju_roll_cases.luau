@@ -523,7 +523,8 @@ fire(go, "Activated")
 check(after == 1 and not KaijuRoll.showing(), "TRY AGAIN didn't claim them and go on")
 check(requests[#requests] == "KaijuRollClaim", "TRY AGAIN didn't claim the roll")
 
--- A click mid-spin lands them all at once ------------------------------------------------------------
+-- A click mid-spin changes nothing: every reel plays out (a fight's last
+-- clicks never skip a roll), then it goes on by itself ----------------------------------------------
 table.clear(frames)
 table.clear(delayed)
 table.clear(tweens)
@@ -532,16 +533,34 @@ KaijuRoll2.play(function() end)
 gui = root:FindFirstChild("KaijuRoll")
 cards = cardsOf(gui)
 step(0.7)
-fire(gui:FindFirstChild("Shade"), "Activated")
+for _ = 1, 5 do
+	fire(gui:FindFirstChild("Shade"), "Activated")
+end
 step(0.05)
 for i, card in cards do
-	check(landed(card) and #views(card) == 1, "Card " .. i .. " didn't land at the click")
+	check(not landed(card), "Card " .. i .. " landed at a click mid-spin")
 end
-check(not find(gui, "Start")[1].Visible, "A START button after the click")
 local deskHeight = cards[1].Size.Y.Offset
--- Left alone, it starts on its own, in a couple of seconds.
 local claimsBefore = #requests
-step(3)
+local allDown = false
+for _ = 1, 120 do
+	step(0.05)
+	local down = 0
+	for _, card in cards do
+		if landed(card) then
+			down += 1
+		end
+	end
+	if down == #cards then
+		allDown = true
+		break
+	end
+end
+check(allDown, "The reels didn't all land by themselves")
+check(#requests == claimsBefore and KaijuRoll2.showing(), "It went on before the last kaiju was seen")
+check(not find(gui, "Start")[1].Visible, "A START button once they're down")
+-- Left alone, it starts on its own, in a couple of seconds.
+step(3.5)
 check(#requests == claimsBefore + 1 and not KaijuRoll2.showing(), "It didn't start on its own")
 
 -- A phone: shorter cards, without what each kaiju is like ----------------------------------------------
@@ -561,6 +580,20 @@ check(
 	"A phone's card still says what it's like"
 )
 check(landed(cards[1]) and landed(cards[3]), "A phone's kaiju didn't land")
+
+-- A boss's kaiju roll waits: for the boss's fall to play out, then for its
+-- cache's gear roll (never under it, nor before it opens), then straight on.
+do
+	local hud = fs.readFile(ROOT .. "/src/client/Modules/KaijuHud.luau")
+	local caches = fs.readFile(ROOT .. "/src/client/Modules/StreakRewards.luau")
+	check(hud:find("os.clock() + heroUi.BossHold", 1, true) ~= nil and hud:find("BossHold = 3.5", 1, true) ~= nil,
+		"A boss's kaiju roll doesn't wait for its fall")
+	check(hud:find("and not caches.isOpen() and not caches.pending()", 1, true) ~= nil,
+		"A boss's kaiju roll doesn't wait for its cache's roll")
+	check(caches:find("pendingUntil = os.clock() + wait + 10", 1, true) ~= nil and caches:find("function StreakRewards.pending()", 1, true) ~= nil,
+		"A boss cache on its way isn't marked")
+	check(caches:find("skip = true", 1, true) == nil, "A tap still skips the cache's roll")
+end
 
 print(
 	string.format(

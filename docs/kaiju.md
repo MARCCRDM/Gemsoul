@@ -346,7 +346,7 @@ third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
   its gem surge, its Gemsoul's E, marked GEM).
   Until then the card holds blank slots where they go. There's no button:
   once all three are down it reads YOUR KAIJU ARE LOCKED IN and moves on by
-  itself 2.5 seconds later (a click while they spin lands them all at once),
+  itself 2.5 seconds later (clicks while they spin don't hurry them: every reel plays out, so a fight's last clicks never skip a roll; a boss's kaiju roll waits for the boss's fall and then its cache's gear roll, and comes straight after),
   and **the three rolled are your team**. Only a claim that fails puts a
   button up, TRY AGAIN. The server makes the roll once and keeps it till
   it's claimed, so leaving doesn't reroll it; a roll left unclaimed is given

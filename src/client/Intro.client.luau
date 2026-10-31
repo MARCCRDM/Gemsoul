@@ -2304,20 +2304,13 @@ local function revealMoves(kit, after)
 			end
 		end)
 	end
-	-- Click during the roll: every gem cracks at once. Once they're out, a
-	-- click goes straight on to your kaiju (not the same double-click).
+	-- A click during the roll does nothing (every reel plays out). Once
+	-- they're out, a click goes straight on to your kaiju (not one still
+	-- landing from before).
 	listen(shade.Activated, function()
-		if finished then
-			if os.clock() - outAt > 0.6 then
-				proceed()
-			end
-			return
+		if finished and os.clock() - outAt > 0.6 then
+			proceed()
 		end
-		for _, entry in cards do
-			entry.surge(true)
-		end
-		LotterySound.play("Lock")
-		allOut()
 	end)
 end
 local function finish()

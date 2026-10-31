@@ -1012,7 +1012,7 @@ local info = new("Frame", {
 local heroName = nameLabel(info, "", 20, P.Text, Enum.Font.GothamBlack)
 heroName.Size = UDim2.new(1, -96, 0, 24)
 UiKit.fit(heroName)
-local heroUi: { [string]: any } = { Editing = false }
+local heroUi: { [string]: any } = { Editing = false, BossHold = 3.5 } -- (BossHold: seconds after a boss falls before its kaiju roll)
 heroUi.Rename = smallButton(info, "RENAME", P.Teal)
 heroUi.Rename.Name = "Rename"
 heroUi.Rename.AnchorPoint = Vector2.new(1, 0)
@@ -3515,9 +3515,19 @@ local function refresh()
 		task.spawn(KaijuRoll.play)
 	end
 	-- A boss roll (one kaiju for each boss beaten: Kaiju.bossRollsOwed),
-	-- each in turn, once you're back in the Outpost with nothing over it.
-	if not heroUi.BossRolling and inOutpost and not blocked and not menu and Kaiju.bossRollsOwed(profile) > 0
-		and not LoadingFlow.active() and os.clock() >= (heroUi.BossRollAt or 0) then
+	-- each in turn, once you're back in the Outpost with nothing over it:
+	-- never before the boss's fall has played out (BossHold after a new one's
+	-- owed), nor under its cache's roll or before it (StreakRewards: the
+	-- gear first, then straight on to the kaiju).
+	local owed = Kaiju.bossRollsOwed(profile)
+	if owed > (heroUi.BossOwedSeen or 0) then
+		heroUi.BossRollAt = math.max(heroUi.BossRollAt or 0, os.clock() + heroUi.BossHold)
+	end
+	heroUi.BossOwedSeen = owed
+	local caches = require(script.Parent.StreakRewards)
+	if not heroUi.BossRolling and inOutpost and not blocked and not menu and owed > 0
+		and not LoadingFlow.active() and os.clock() >= (heroUi.BossRollAt or 0)
+		and not caches.isOpen() and not caches.pending() then
 		heroUi.BossRolling = true
 		heroUi.BossRollAt = os.clock() + 4 -- (a beat between two, and no hammering if it fails)
 		task.spawn(KaijuRoll.play, function()

@@ -9,7 +9,7 @@
 	spot, then its E move rises out of it, ready. Under it go its name, its
 	kind, its health, damage and speed, what it's like, and its three moves
 	with their icons (E now, Q at level 5, R at level 10). The first stops,
-	then the next, then the last; click to land them all at once. Once
+	then the next, then the last; clicks don't hurry it. Once
 	they're all down, the starter support (Shared.Kaiju.StarterSupport,
 	the fourth, given with them) is named under the cards. START claims
 	them; the server keeps the roll till then, so leaving doesn't reroll it.
@@ -1074,20 +1074,8 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 			end
 		end)
 	end
-	-- Click during the roll: they all land at once.
-	table.insert(
-		connections,
-		shade.Activated:Connect(function()
-			if finished then
-				return
-			end
-			for _, item in cards do
-				item.reveal(true)
-			end
-			LotterySound.play("Lock")
-			allOut()
-		end)
-	)
+	-- (A click during the roll does nothing: every reel plays out, a fight's
+	-- last clicks never skip it. It moves on by itself once they're down.)
 	table.insert(
 		connections,
 		go.Activated:Connect(function()

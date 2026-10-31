@@ -17,13 +17,15 @@
 	The first time a cache opens, its lottery plays first (CacheLottery,
 	the mining find's round reel): each free gem rolls through gems and
 	lands, then each piece of gear rolls through the cache's armor and
-	weapons and lands, its stats filling in beside it. SKIP ALL goes
-	straight to the picks.
+	weapons and lands, its stats filling in beside it. Taps don't hurry it
+	(a fight's last clicks never skip it): the picks open once it's down.
 
 	  StreakRewards.start()   StreakRewards.open()   StreakRewards.refresh()
 	  StreakRewards.show(result)   open a cache list the server just sent
 	                               (the DEV panel's test caches)
 	  StreakRewards.isOpen() -> bool   (Combat frees the cursor for it)
+	  StreakRewards.pending() -> bool  a boss cache on its way (its kaiju
+	                                   roll waits for it, KaijuHud)
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -117,6 +119,13 @@ end
 
 function StreakRewards.isOpen(): boolean
 	return screen ~= nil
+end
+
+-- A boss cache on its way: from the boss's fall till its screen opens (or
+-- it couldn't be fetched). Its kaiju roll waits for it (KaijuHud).
+local pendingUntil = 0
+function StreakRewards.pending(): boolean
+	return os.clock() < pendingUntil
 end
 
 -- Where a boss cache's boss fell (its kicker).
@@ -518,7 +527,7 @@ function StreakRewards.open(id: string?)
 	-- Two rows on one board, scaled to fit the screen (phones included): the
 	-- free gems (all yours), then the gear to choose from. The first time a
 	-- cache opens, every card's reel rolls at once and lands in turn, the
-	-- gems first (CacheLottery); a tap lands them all.
+	-- gems first (CacheLottery); taps wait for it.
 	do
 		local gemEntries, gearEntries = {}, {}
 		for _, entry in cache.Items do
@@ -692,14 +701,14 @@ function StreakRewards.open(id: string?)
 		gearRow = row(gearTop, gearH)
 
 		local claim
-		local skip = false
+		local pickFrom = 0 -- (picks and CLAIM from then: just after the roll's down)
 		local function redraw()
 			for id, c in cards do
 				c.Mark(chosen[id] == true)
 			end
 			local n = #order
 			claim.Text = if rolling
-				then "ROLLING  ·  TAP TO REVEAL"
+				then "ROLLING…"
 				elseif n == picks and picks == 1 then "CLAIM IT"
 				elseif n == picks then "CLAIM THESE " .. picks
 				elseif picks == 1 then "PICK ONE"
@@ -707,9 +716,8 @@ function StreakRewards.open(id: string?)
 			claim.BackgroundColor3 = if n == picks and not rolling then GOLD else Color3.fromRGB(70, 74, 90)
 		end
 		local function toggle(id)
-			if rolling then
-				skip = true -- (a tap lands the whole roll)
-				return
+			if rolling or os.clock() < pickFrom then
+				return -- (no picks till it's down, nor a click still coming from before)
 			end
 			if chosen[id] then
 				chosen[id] = nil
@@ -733,10 +741,7 @@ function StreakRewards.open(id: string?)
 			else nil
 		for _, entry in gemEntries do
 			cards[entry.OfferId] = card(gemRow, entry, function()
-				-- (free: nothing to pick; a tap only lands the roll)
-				if rolling then
-					skip = true
-				end
+				-- (free: nothing to pick)
 			end, cache.Id, lot)
 			table.insert(drawn, cards[entry.OfferId])
 		end
@@ -762,8 +767,7 @@ function StreakRewards.open(id: string?)
 		UiKit.round(claim, 10)
 		claim:SetAttribute("UiSound", "Confirm")
 		claim.Activated:Connect(function()
-			if rolling then
-				skip = true
+			if rolling or os.clock() < pickFrom then
 				return
 			end
 			if busy or #order ~= picks then
@@ -802,7 +806,7 @@ function StreakRewards.open(id: string?)
 				local ok, err = pcall(lot.run, function()
 					return screen == shown
 				end, function()
-					return skip
+					return false -- (never skipped: it always plays out)
 				end)
 				if not ok then
 					warn("[StreakRewards] the cache's roll failed: " .. tostring(err))
@@ -810,6 +814,7 @@ function StreakRewards.open(id: string?)
 				lot.destroy()
 				if screen == shown then
 					rolling = false
+					pickFrom = os.clock() + 0.6
 					redraw()
 					if previewsIn then
 						for _, c in drawn do
@@ -860,11 +865,20 @@ function StreakRewards.start()
 			-- Fetch the new cache, then show it (after the match result, or
 			-- the boss's fall).
 			-- (a win's reward once the match's result card has gone: MatchResult)
-			task.delay(if kind == "BossCache" then 3 elseif kind == "WinReward" then Matchmaking.EndPause + 0.7 else 2.5, function()
+			-- (A boss's cache: once its fall has played out; till then, and
+			-- while it's fetched, its kaiju roll holds: pending.)
+			local wait = if kind == "BossCache" then 3 elseif kind == "WinReward" then Matchmaking.EndPause + 0.7 else 2.5
+			if kind == "BossCache" then
+				pendingUntil = os.clock() + wait + 10
+			end
+			task.delay(wait, function()
 				local result = GemClient.request("StreakCaches")
 				if result.Ok then
 					state = result
 					StreakRewards.open(if type(a) == "table" then a.Id else nil)
+				end
+				if kind == "BossCache" then
+					pendingUntil = 0
 				end
 			end)
 		elseif kind == "MatchEnd" then
