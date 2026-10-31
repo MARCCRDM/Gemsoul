@@ -1521,9 +1521,11 @@ RunService.RenderStepped:Connect(function(dt)
 	FirstPerson.start()
 	-- (a cache's board, a boss's in the Rift, needs the cursor too, and so
 	-- does the screen between a 1v1's rounds: free while it's up, and back
-	-- in the fight by itself when the next round starts, no TAB)
+	-- in the fight by itself when the next round starts, no TAB; and any
+	-- window: the kaiju panel, your character, a party: IronUi.anyOpen)
 	local guideOpen = CombatGuide.isOpen()
 		or AugmentTreeUI.isOpen()
+		or IronUi.anyOpen()
 		or require(script.Parent.Modules.StreakRewards).isOpen()
 		or require(script.Parent.Modules.RoundPivot).visible()
 	if guideOpen ~= guideWasOpen then
@@ -1986,15 +1988,16 @@ end
 -- (Everyone else's hits, a kaiju fight's blows most of all, come up
 -- small, fewer and wordless, their colour still telling WEAK from RESIST:
 -- so the fight under them can be watched.)
-local numbers, quiet = 0, 0
-local QUIET = 8 -- others' numbers on screen at once, at most
+-- (Up at once: All, and Others of them; Quiet, the most of others' at once.
+-- One table: this script is at Luau's 200 locals.)
+local onScreen = { All = 0, Others = 0, Quiet = 8 }
 local function damageNumber(position: Vector3, amount: number, crit: boolean, color: Color3?, matchTag: string?, mine: boolean?)
-	if numbers >= 24 or (not mine and quiet >= QUIET) then
+	if onScreen.All >= 24 or (not mine and onScreen.Others >= onScreen.Quiet) then
 		return -- plenty on screen already
 	end
-	numbers += 1
+	onScreen.All += 1
 	if not mine then
-		quiet += 1
+		onScreen.Others += 1
 	end
 	local anchor =
 		effectPart(Vector3.one * 0.1, CFrame.new(position + Vector3.new(math.random() - 0.5, 0, 0)), Color3.new())
@@ -2038,9 +2041,9 @@ local function damageNumber(position: Vector3, amount: number, crit: boolean, co
 		TextStrokeTransparency = 1,
 	}):Play()
 	task.delay(0.95, function()
-		numbers -= 1
+		onScreen.All -= 1
 		if not mine then
-			quiet -= 1
+			onScreen.Others -= 1
 		end
 		anchor:Destroy()
 	end)

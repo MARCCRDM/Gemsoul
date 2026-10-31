@@ -737,6 +737,7 @@ export type Window = {
 	chunky outlined title, an icon badge popping out of the corner and a red
 	close button. It pops open whenever it's enabled.
 ]]
+local windows: { ScreenGui } = {}
 function IronUi.window(
 	name: string,
 	order: number,
@@ -749,6 +750,7 @@ function IronUi.window(
 	local gui = UiKit.gui(name, order)
 	gui.Enabled = false
 	gui.IgnoreGuiInset = true
+	table.insert(windows, gui)
 	local shade = new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
@@ -934,6 +936,17 @@ function IronUi.window(
 		Dock = dock,
 		Resize = resize,
 	}
+end
+
+-- Whether any of these windows is open (Client.Combat frees the cursor in a
+-- fight while one is: the kaiju panel, your character, a party...).
+function IronUi.anyOpen(): boolean
+	for _, gui in windows do
+		if gui.Enabled and gui.Parent then
+			return true
+		end
+	end
+	return false
 end
 
 return IronUi
