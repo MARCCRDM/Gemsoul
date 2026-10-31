@@ -5,8 +5,7 @@
 	  MeteorGolemServer.swing(player)     a swing at a rock landed (Main chains
 	                                      it on OutpostServer.onSwing): the
 	                                      first one, eligible, starts the clock
-	  MeteorGolemServer.send(player)      the meteor now (the DEV panel's, and
-	                                      the clock's)
+	  MeteorGolemServer.send(player)      the meteor now (once the clock's up)
 
 	Its fall, for everyone near: the meteor (Client.MeteorGolemFx draws it
 	and, for whoever it's for, the cinematic: Remotes.MeteorGolem "Fall",
