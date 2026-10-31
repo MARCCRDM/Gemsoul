@@ -1950,8 +1950,7 @@ local function shelter(parent, at: CFrame, rules)
 	part(m, at3(0, gate.Top + 1.3, D + 3 + gate.Out / 2) * CFrame.Angles(0, math.pi, 0), Vector3.new((SHELTER.Door + gate.Pier) * 2 + 1, 2.6, gate.Out + 2),
 		HULL_DARK, Enum.Material.Metal, "Wedge")
 	part(m, at3(0, SHELTER.DoorHeight + 0.2, D + 2 + gate.Out + 0.1), Vector3.new(SHELTER.Door * 2, 0.4, 0.4), RED, Enum.Material.Neon)
-	local name = painted(m, facing(0, 31.3, D + 2.5, 0, 1), Vector3.new(30, 4.6, 0.4), "SHELTER")
-	light(name, Color3.fromRGB(255, 232, 200), 24, 0.8)
+	-- (No SHELTER over the door: taken down 2026-10-31.)
 	painted(m, facing(0, 25, D - 0.2, 0, -1), Vector3.new(16, 2.8, 0.4), "QUARRY")
 
 	-- The ramps: a wide one from the main door down to the quarry, and one
