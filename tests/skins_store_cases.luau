@@ -709,6 +709,12 @@ do
 		check(profile.Cosmetics.Owned[id], "/gift reaper didn't give " .. id)
 	end
 	check(#notified == 1 and notified[1][1] == thePlayer, "They weren't told about their gift")
+	-- Typed in Roblox's own chat: the server hears it and answers in a notice.
+	stubs.ChatRules = luau.load(fs.readFile(ROOT .. "/src/shared/ChatRules.luau"), { debugName = "ChatRules", environment = setmetatable({ Color3 = roblox.Color3 }, { __index = _G }) })()
+	StoreServer.giftCommand(owner, "/gift")
+	check(notified[#notified][1] == owner and string.find(notified[#notified][2], "Gift who", 1, true) ~= nil, "/gift alone didn't explain itself")
+	StoreServer.giftCommand(owner, "/gift nobodyhere reaper")
+	check(notified[#notified][1] == owner and string.find(notified[#notified][2], "No miner", 1, true) ~= nil, "/gift to nobody didn't say so")
 end
 -- The group: off with no id set.
 check(not handlers.CheckGroup(thePlayer).Ok, "The group reward paid out with no group set")

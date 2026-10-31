@@ -332,10 +332,12 @@ end
 -- Where place puts it (its pivot), not moving it (the team's hyperbeam
 -- sends its landing to clients ahead).
 function KaijuServer.spot(model: Model, point: Vector3, look: Vector3?, lift: number?): CFrame
-	local root = model.PrimaryPart :: BasePart
+	-- (A body whose PrimaryPart is gone, mid-respawn or torn down: its root
+	-- by name, else a body-sized guess, never an error mid-HYPERBEAM.)
+	local root = (model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")) :: BasePart?
 	local floor = KaijuServer.ground(point)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	local up = (if humanoid then humanoid.HipHeight else 1) + root.Size.Y / 2 + (lift or 0)
+	local up = (if humanoid then humanoid.HipHeight else 1) + (if root then root.Size.Y / 2 else 1) + (lift or 0)
 	local at = floor + Vector3.new(0, up, 0)
 	local facing = if look and flat(look - at).Magnitude > 0.1
 		then Vector3.new(look.X, at.Y, look.Z)

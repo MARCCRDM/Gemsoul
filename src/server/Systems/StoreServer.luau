@@ -430,8 +430,39 @@ local function giftBundle(player: Player, userId: any, words: any)
 	return reply(true, string.format("Gave %s the %s bundle: %s", target.DisplayName or target.Name or "them", bundle.Name, table.concat(lines or {}, ", ")))
 end
 
+-- /gift typed in Roblox's own chat (TextChatService: a command the server
+-- hears, Triggered by its text): the same gift, its answer a notice to you.
+function StoreServer.giftCommand(player: Player, line: string)
+	local ChatRules = require(ReplicatedStorage.Shared.ChatRules)
+	local notify = require(script.Parent.Remotes).Notify
+	local command = ChatRules.parse(line or "", nil)
+	if not command or command.Kind ~= "Gift" then
+		notify:FireClient(player, if command and command.Message then command.Message else "Try /gift name reaper")
+		return
+	end
+	local target, problem = ChatRules.findPlayer(command.Target, Players:GetPlayers())
+	if not target then
+		notify:FireClient(player, problem or "Nobody by that name.")
+		return
+	end
+	local result = giftBundle(player, target.UserId, command.Bundle)
+	notify:FireClient(player, result.Message or "")
+end
+
 function StoreServer.start()
 	Shop.register("GiftBundle", giftBundle)
+	pcall(function()
+		local command = Instance.new("TextChatCommand")
+		command.Name = "GiftCommand"
+		command.PrimaryAlias = "/gift"
+		command.Triggered:Connect(function(source: TextSource, text: string)
+			local player = Players:GetPlayerByUserId(source.UserId)
+			if player then
+				StoreServer.giftCommand(player, text)
+			end
+		end)
+		command.Parent = game:GetService("TextChatService")
+	end)
 	Shop.register("BuyProduct", buyProduct)
 	Shop.register("BuyCosmetic", buyCosmetic)
 	Shop.register("EquipCosmetic", equipCosmetic)
