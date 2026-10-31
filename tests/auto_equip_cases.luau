@@ -514,7 +514,7 @@ end
 -- The server: Forge's "AutoEquip" request -----------------------------------------------------
 do
 	local profile = gemProfile()
-	local calls, handlers = {}, {}
+	local calls, handlers, trained = {}, {}, {}
 	local state = { build = true, enchant = true }
 	local stubs = {
 		TestAdmin = {},
@@ -555,6 +555,10 @@ do
 				apply(profile, { Gear = {}, Gems = { { Slot = slot, Gem = gemId } } })
 				return true
 			end,
+			training = function(_, event, detail)
+				table.insert(trained, event .. (if detail then ":" .. detail else ""))
+			end,
+			milestone = function() end,
 		},
 	}
 	local serverEnv = setmetatable({
@@ -592,6 +596,19 @@ do
 		seenGem = seenGem or string.sub(call, 1, 4) == "gem:"
 	end
 	check(string.find(result.Message, "BEST build on", 1, true) ~= nil, "Says what it did: " .. tostring(result.Message))
+	-- Each gem it socketed counts as one dragged in: the Tasks steps and the
+	-- onboarding funnel's Socketed / Surge ready.
+	do
+		local gearGems, surgeGems, enchants, surges = 0, 0, 0, 0
+		for _, step in plan.Gems do
+			if Slots.SurgeDefinitions[step.Slot] then surgeGems += 1 else gearGems += 1 end
+		end
+		for _, event in trained do
+			if event == "Enchant" then enchants += 1 elseif event == "EquipSurge" then surges += 1 end
+		end
+		check(#plan.Gems > 0, "The test plan socketed no gems")
+		check(enchants == gearGems and surges == surgeGems, string.format("Auto-socketed gems not counted: %d/%d gear, %d/%d surge", enchants, gearGems, surges, surgeGems))
+	end
 	check(math.abs(result.Rating - plan.Rating) < 1e-6, "The rating it reports isn't the plan's")
 	local again = handler({}, "Best")
 	check(again.Ok and again.Pieces == 0 and string.find(again.Message, "nothing to change", 1, true), "Twice changed more")
@@ -613,8 +630,10 @@ do
 	state.enchant, state.build = true, false
 	check(not upgrade({}).Ok and #calls == 0, "Upgraded surges during combat")
 	state.build = true
+	table.clear(trained)
 	local upgraded = upgrade({}, { Gem = "unowned-client-id" })
 	check(upgraded.Ok and upgraded.Gems == 1 and #calls == 1, "Server did not apply its own surge plan")
+	check(#trained >= 1 and (trained[1] == "EquipSurge" or trained[1] == "Enchant"), "An upgraded surge didn't count: " .. table.concat(trained, ","))
 	check(profile.Character.WeaponGem.Id == "upgrade", "Wrong gem equipped")
 	check(upgrade({}).Gems == 0, "Repeated surge action changed the build again")
 	profile = nil

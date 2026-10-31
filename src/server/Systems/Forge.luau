@@ -28,6 +28,21 @@ local reply = Shop.reply
 local Forge = {}
 local Combat = require(game:GetService("ReplicatedStorage").Shared.Combat)
 
+-- A gem the server just socketed for you (AUTO EQUIP, EQUIP BEST, UPGRADE
+-- SURGES) counts the way one you dragged in does (Server.Enchanting): the
+-- Tasks steps (Socket a gem, Ready a Surge, Build your loadout) and with them
+-- the onboarding funnel's Socketed and Surge ready.
+local function counted(player: Player, slot: string)
+	if Slots.SurgeDefinitions[slot] then
+		PlayerData.training(player, "EquipSurge")
+	else
+		PlayerData.training(player, "Enchant")
+		PlayerData.training(player, "Slot", slot)
+	end
+	PlayerData.milestone(player, "Enchanted")
+end
+Forge.counted = counted -- (tests)
+
 -- Checks a list of gem ids from the client: all distinct and all yours.
 local function pickGems(player: Player, ids: any): { any }?
 	if typeof(ids) ~= "table" or #ids == 0 or #ids > Config.MaxGems then
@@ -151,6 +166,7 @@ local function autoEquip(player: Player, mode: any)
 		for _, step in plan.Gems do
 			if PlayerData.socketGem(player, step.Gem, step.Slot) then
 				gems += 1
+				counted(player, step.Slot)
 			end
 		end
 	end
@@ -197,7 +213,10 @@ local function upgradeSurges(player: Player)
 	local plan = UpgradeRecommendations.surges(profile)
 	local count = 0
 	for _, step in plan.Gems do
-		if PlayerData.socketGem(player, step.Gem, step.Slot) then count += 1 end
+		if PlayerData.socketGem(player, step.Gem, step.Slot) then
+			count += 1
+			counted(player, step.Slot)
+		end
 	end
 	if plan.Changes > 0 and count == 0 then
 		return reply(false, "Couldn't upgrade your surges. Try again.")
