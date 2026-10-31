@@ -337,7 +337,7 @@ local function build(): ScreenGui
 	-- off it), scaled the same as the stage.
 	local foot = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -24),
+		Position = UDim2.new(0.5, 0, 1, -48),
 		Size = UDim2.fromOffset(900, 44),
 		BackgroundTransparency = 1,
 		ZIndex = 3,
@@ -355,6 +355,23 @@ local function build(): ScreenGui
 		ZIndex = 10,
 	}, foot)
 	fades(tip :: TextLabel, "TextTransparency", 0)
+	-- Roblox supplies the running server's published build number. Keep this
+	-- outside the scaled stage so it stays readable on small phone screens.
+	local version = new("TextLabel", {
+		Name = "GameVersion",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -16),
+		Size = UDim2.new(1, -32, 0, 20),
+		BackgroundTransparency = 1,
+		Text = if RunService:IsStudio()
+			then "BETA · Studio preview"
+			else "BETA · Build " .. tostring(game.PlaceVersion),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 14,
+		TextColor3 = DIM,
+		ZIndex = 10,
+	}, back)
+	fades(version, "TextTransparency", 0)
 	fit()
 	screen.Parent = playerGui
 	return screen

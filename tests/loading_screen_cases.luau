@@ -46,6 +46,7 @@ local function signal()
 end
 local renderStepped = signal()
 local RunService = {
+	IsStudio = function() return false end,
 	RenderStepped = renderStepped,
 	BindToRenderStep = function(_, name, _, fn)
 		bound[name] = fn
@@ -159,7 +160,14 @@ local env = {
 	Enum = roblox.Enum,
 	Color3 = roblox.Color3,
 	UDim = roblox.UDim,
-	UDim2 = roblox.UDim2,
+	-- Lune requires integer offsets; Roblox accepts the animated fractional pixels.
+	UDim2 = {
+		new = roblox.UDim2.new,
+		fromScale = roblox.UDim2.fromScale,
+		fromOffset = function(x, y)
+			return roblox.UDim2.fromOffset(math.round(x), math.round(y))
+		end,
+	},
 	Vector2 = roblox.Vector2,
 	Vector3 = roblox.Vector3,
 	ColorSequence = roblox.ColorSequence,
@@ -205,6 +213,7 @@ local function load(path, extra)
 	end
 	environment = setmetatable(environment, { __index = _G })
 	environment.game = {
+		PlaceVersion = 123,
 		GetService = function(_, name)
 			return services[name]
 		end,
@@ -231,6 +240,7 @@ local gui = playerGui:FindFirstChild("LoadingScreen")
 check(gui ~= nil and gui.Enabled == true, "the loading screen isn't shown")
 check(LoadingScreen.covered(), "an instant cover isn't opaque at once")
 local backdrop = gui:FindFirstChild("Backdrop")
+check(backdrop:FindFirstChild("GameVersion").Text == "BETA · Build 123", "loading version must use the published place version")
 check(backdrop.BackgroundTransparency == 0 and backdrop.Active == true, "the backdrop doesn't cover and take clicks")
 frame(1 / 60)
 local statusLabel
