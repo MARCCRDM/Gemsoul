@@ -786,7 +786,8 @@ above the combat HUD near the bottom center:
 - **CATCH**, under the kaiju card on a phone, when a wild kaiju near you
   is down to half its
   health: the chance right now and the tries left. It starts the catch
-  (see [Catching](#catching)), and hides while it's under way.
+  (see [Catching](#catching)), and hides while it's under way. Tapping the
+  gold **CATCH · %** on the wild kaiju's own plate does the same.
 - **The kaiju panel:** on the left every kaiju you have: YOUR TEAM (numbered,
   1 leads; health, EXP, and DOWN: REVIVE IT on one knocked out) and AT HOME
   (their health too: it doesn't come back at home either). Pick one for it
@@ -1103,7 +1104,12 @@ ready to be caught, it **glows gold** (a pulsing outline you can see
 through rocks) with **READY TO CATCH** and the chance over it. Anyone within
 140 studs sees that.
 
-Press **C** on desktop or tap the **CATCH** pill on mobile. It's a slim
+Press **C** on desktop or tap the **CATCH** pill on mobile, or tap (or
+click) the gold **CATCH · %** on the kaiju's own plate over its head: it
+catches that one. In a fight on a phone that's where your eye is; the pill
+is up under the kaiju card. (The plate takes taps only while it says CATCH,
+so it never blocks the camera otherwise; too far away, the server says
+"Get closer to catch it.") It's a slim
 dark pill with a gold rim (210 x 42 on a computer, 176 x 38 on a phone): a
 gold disc (the C key, or a target on a touch screen), CATCH and the chance
 on top, the kaiju's name and the tries left under them. It shows only when

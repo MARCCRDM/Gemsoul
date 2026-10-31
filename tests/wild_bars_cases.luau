@@ -179,8 +179,16 @@ check(near(edge.Color, plainEdge) and edge.Thickness == 1, "Still edged gold onc
 local plainName = name.TextColor3
 WildBars.draw(plate, 0.4, 0.4, false, false, "CATCH · 51%")
 check(name.Text == "CATCH · 51%" and not near(name.TextColor3, plainName), "A ready plate doesn't say CATCH, gold")
+-- (and while it says so it's a button: a tap on it catches it, on a phone
+-- the gold words read as one; any other time it takes no taps at all)
+local tap = plate:FindFirstChild("Tap")
+check(tap ~= nil and tap:IsA("TextButton") and tap.Visible and plate.Active, "A plate saying CATCH can't be tapped")
+check(tap.Size.X.Scale == 1 and tap.Size.Y.Scale == 1, "The tap doesn't cover the plate")
+WildBars.draw(plate, 0.4, 0.4, false, true, "CATCH · 51%")
+check(not tap.Visible and not plate.Active, "A plate being caught can still be tapped")
 WildBars.draw(plate, 0.4, 0.4)
 check(name.Text == "Frost Razorback" and near(name.TextColor3, plainName), "Its name didn't come back")
+check(not tap.Visible and not plate.Active, "A plate not ready to catch takes taps")
 -- Folded: just the level and the bar, shorter, everything still inside;
 -- unfolded, all of it again.
 WildBars.compact(plate, true)
@@ -201,6 +209,8 @@ check(not near(guard:FindFirstChild("Title").TextColor3, name.TextColor3) and no
 -- Wired in ---------------------------------------------------------------------------------------------
 local hud = source("src/client/Modules/KaijuHud.luau")
 check(has(hud, "WildBars.watch(model)") and has(hud, "WildBars.start()"), "The HUD doesn't hand it the wild kaiju")
+check(has(hud, "WildBars.onCatch(catchReady)"), "A tap on a plate saying CATCH doesn't catch")
+check(has(source("src/client/Modules/WildBars.luau"), "catchTapped(model)"), "A plate's tap isn't wired to the catch")
 local module = source("src/client/Modules/WildBars.luau")
 check(has(module, 'model:GetAttribute("KaijuWild") == nil then\n\t\treturn'), "A plate over something not wild")
 check(has(module, "entry.Plate.Parent = playerGui"), "The plate's not in PlayerGui (no Spanish)")

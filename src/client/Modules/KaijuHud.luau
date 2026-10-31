@@ -3628,13 +3628,21 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 		say(GemClient.request("KaijuChallenge", model))
 	end)
 end)
-local function catchReady()
-	if not gui.Enabled or not tame.Visible or busy or KaijuTaming.casting() then
+-- CATCH (its button, C), or a tap on a wild kaiju's plate saying CATCH
+-- (`chosen`: that one; the server says if it's too far or not ready).
+local function catchReady(chosen: Model?)
+	if busy or KaijuTaming.casting() then
 		return
 	end
-	local target = tameTarget()
-	if not target or target ~= tameModel then
-		return
+	local target = chosen
+	if not target then
+		if not gui.Enabled or not tame.Visible then
+			return
+		end
+		target = tameTarget()
+		if not target or target ~= tameModel then
+			return
+		end
 	end
 	act(function()
 		local result = GemClient.request("KaijuTame", target)
@@ -3648,7 +3656,10 @@ local function catchReady()
 		end
 	end)
 end
-tame.Activated:Connect(catchReady)
+tame.Activated:Connect(function()
+	catchReady()
+end)
+WildBars.onCatch(catchReady)
 
 local started = false
 -- Where the team's HYPERBEAM goes (KaijuBeamHud): on a computer its pill on

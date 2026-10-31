@@ -28,7 +28,9 @@
 	                          proportion)
 	  WildBars.draw(plate, share, trail, guardian, catching)   fills it in
 	  WildBars.setCatch(model, text?)   the plate's name becomes `text`
-	                          (gold), e.g. "CATCH · 51%"; nil, its name again
+	                          (gold), e.g. "CATCH · 51%"; nil, its name again;
+	                          while it says so, a tap on it catches it
+	  WildBars.onCatch(fn)    what that tap does: fn(model) (KaijuHud)
 	  WildBars.compact(plate, on)   just the level and bar, or all of it
 	  WildBars.overlaps(a, b) -> boolean   two plates' screen boxes
 	                          ({ X, Y, W, H }, centred) overlap (pure)
@@ -117,6 +119,12 @@ local function lift(model: Model, root: BasePart): number
 end
 
 -- Its plate: the name over a level chip and the bar.
+-- What a tap on a plate saying CATCH does (KaijuHud: catch that one).
+local catchTapped: ((Model) -> ())? = nil
+function WildBars.onCatch(fn: (Model) -> ())
+	catchTapped = fn
+end
+
 function WildBars.plate(model: Model, phone: boolean?): BillboardGui
 	local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
 	local size = if phone then WildBars.PhoneSize else WildBars.Size
@@ -220,6 +228,17 @@ function WildBars.plate(model: Model, phone: boolean?): BillboardGui
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 	}, back)
+	-- (Over it all, unseen: a tap on the plate while it says CATCH catches
+	-- it, the gold words reading as a button on a touch screen: WildBars.onCatch,
+	-- wired up as it's watched.)
+	make("TextButton", {
+		Name = "Tap",
+		BackgroundTransparency = 1,
+		Text = "",
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 5,
+		Visible = false,
+	}, plate)
 	return plate
 end
 
@@ -240,6 +259,12 @@ function WildBars.draw(plate: BillboardGui, share: number, trail: number, guardi
 	local name = plate:FindFirstChild("Title") :: TextLabel
 	name.Text = catch or plate:GetAttribute("Name") or name.Text
 	name.TextColor3 = if guardian or catch then GOLD else NAME
+	local tap = plate:FindFirstChild("Tap") :: GuiButton?
+	if tap then
+		-- (and the plate takes taps only then: never a drag of the camera otherwise)
+		tap.Visible = catch ~= nil and not catching
+		plate.Active = tap.Visible
+	end
 end
 
 -- Just the level and the bar (the name's row folded away), or all of it.
@@ -354,6 +379,11 @@ function WildBars.watch(model: Model)
 	entries[model] = entry
 	redraw(entry)
 	entry.Plate.Parent = playerGui
+	;(entry.Plate:FindFirstChild("Tap") :: GuiButton).Activated:Connect(function()
+		if catchTapped then
+			catchTapped(model)
+		end
+	end)
 	humanoid.HealthChanged:Connect(function()
 		local now = shareOf(humanoid)
 		if now < entry.Share then
