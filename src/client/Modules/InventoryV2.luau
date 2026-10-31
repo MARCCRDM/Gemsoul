@@ -25,7 +25,9 @@
 	stats card as a sheet over the screen; a piece's card lists every stat
 	on it, since there's no hovering. GEMS is a tab: your loose gems in the
 	rows' place, a tab per element, ‹ GEAR to go back; drag one onto a key,
-	or start dragging and the rows come back to drop it on a piece.)
+	or start dragging and the rows come back to drop it on a piece. A quick
+	swipe up or down over a list scrolls it; a gem is picked up by holding
+	it a moment or moving it sideways: InventoryV2.touchScrolls.)
 
 	Drag a gem from the grid onto any row or Q / E / R card to socket it.
 	The server checks every move (the same requests as the first Inventory).
@@ -2623,7 +2625,14 @@ end
 local function startDrag(item: Item, input: InputObject)
 	if drag or not state.Active or not gui or not gui.Enabled then return end
 	local touch = input.UserInputType == Enum.UserInputType.Touch
-	drag = { Item = item, Start = pointOf(input, touch), Active = false, Touch = touch, Input = input } :: any
+	drag = { Item = item, Start = pointOf(input, touch), Active = false, Touch = touch, Input = input, At = os.clock() } :: any
+end
+-- On a phone a finger moving straight up or down over a list scrolls it;
+-- a gem (or a piece) is picked up by holding it a moment (DragHold) or by
+-- moving it sideways first (pure).
+InventoryV2.DragHold = 0.3
+function InventoryV2.touchScrolls(moved: Vector2, held: number): boolean
+	return held < InventoryV2.DragHold and math.abs(moved.Y) >= math.abs(moved.X)
 end
 function InventoryV2.beginGemDrag(gem, input: InputObject)
 	if gem.Cut ~= nil and GemInventory.find(profileNow(), gem.Id) then
@@ -2643,6 +2652,10 @@ UserInputService.InputChanged:Connect(function(input)
 	local point = pointOf(input, current.Touch)
 	if not current.Active then
 		if (point - current.Start).Magnitude < 8 then
+			return
+		end
+		if current.Touch and InventoryV2.touchScrolls(point - current.Start, os.clock() - (current.At or 0)) then
+			drag = nil -- (a swipe: the list scrolls, nothing's picked up)
 			return
 		end
 		current.Active = true

@@ -170,9 +170,29 @@ InventoryV2.beginGemDrag(loose,touch)
 local otherTouch={UserInputType=Enum.UserInputType.Touch,Position=Vector2.new(120,120)}
 UserInputService.InputChanged:Fire(otherTouch); UserInputService.InputEnded:Fire(otherTouch)
 check(drag~=nil and not drag.Active,"Second finger stole drag")
+now+=0.4 -- (held a moment: picked up)
 touch.Position=Vector2.new(120,120)
 UserInputService.InputChanged:Fire(touch); UserInputService.InputEnded:Fire(touch)
 check(#requests==before+1,"Touch drag did not socket")
+-- On a phone a quick swipe up or down over the list scrolls it; nothing's
+-- picked up (so you can scroll down to the gem you want to enchant with).
+local swipe={UserInputType=Enum.UserInputType.Touch,Position=Vector2.new(120,400)}
+InventoryV2.beginGemDrag(loose,swipe)
+swipe.Position=Vector2.new(124,300)
+UserInputService.InputChanged:Fire(swipe)
+check(drag==nil and ui.Grid.ScrollingEnabled,"A swipe up the list picked a gem up instead of scrolling")
+UserInputService.InputEnded:Fire(swipe)
+check(#requests==before+1,"A swipe socketed a gem")
+-- Moved sideways first, it's a drag at once.
+local side={UserInputType=Enum.UserInputType.Touch,Position=Vector2.new(10,120)}
+InventoryV2.beginGemDrag(loose,side)
+side.Position=Vector2.new(120,125)
+UserInputService.InputChanged:Fire(side)
+check(drag~=nil and drag.Active and not ui.Grid.ScrollingEnabled,"A sideways drag didn't pick the gem up")
+UserInputService.InputEnded:Fire(side)
+check(#requests==before+2,"A sideways touch drag did not socket")
+check(InventoryV2.touchScrolls(Vector2.new(2,-40),0.1) and not InventoryV2.touchScrolls(Vector2.new(2,-40),0.5) and not InventoryV2.touchScrolls(Vector2.new(40,5),0.1),"touchScrolls: swipe, hold, sideways")
+before=#requests
 -- A successful socket disappears; removing it makes it available again.
 GemVault.open(canvas)
 profile.Character.WeaponGem=loose
