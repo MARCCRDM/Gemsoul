@@ -652,7 +652,13 @@ local clock = 1000
 serverEnv.os = setmetatable({ clock = function() return clock end, time = os.time }, { __index = os })
 local Free = luau.load(fs.readFile(ROOT .. "/src/server/Systems/FreeRewards.luau"), { debugName = "FreeRewards.server", environment = serverEnv })()
 Free.start()
-local code = next(stubs.Codes.List)
+local code
+for name, entry in stubs.Codes.List do
+	if not entry.For then
+		code = name
+		break
+	end
+end
 local result = handlers.RedeemCode(thePlayer, string.lower(code) .. " ")
 check(result.Ok, "A real code (typed loosely) didn't redeem: " .. tostring(result.Message))
 clock += 3
@@ -667,6 +673,22 @@ clock += 3
 local launch = handlers.RedeemCode(thePlayer, "LAUNCH")
 check(launch.Ok == (code ~= "LAUNCH") or code == "LAUNCH", "LAUNCH didn't redeem")
 check(profile.Cosmetics.Owned.TitleFounder and profile.Cosmetics.Title == "TitleFounder", "A code's title wasn't given and worn")
+-- A gift: only for the players it names (by username, any case, or UserId).
+clock += 3
+check(not handlers.RedeemCode(thePlayer, "REAPERGIFT113").Ok, "A gift code redeemed for someone it isn't for")
+check(not profile.Cosmetics.Owned.HelmetGrimReaper, "A gift's cosmetics went to someone else")
+thePlayer.Name = "KinGreen113"
+clock += 3
+local gift = handlers.RedeemCode(thePlayer, "reapergift113")
+check(gift.Ok, "The gift didn't redeem for kingreen113: " .. tostring(gift.Message))
+for _, id in { "SuitStealth", "SkinVoid", "HelmetGrimReaper", "VisorTwilight", "PickVoid" } do
+	check(profile.Cosmetics.Owned[id], "The Reaper gift didn't give " .. id)
+end
+check(profile.Cosmetics.Helmet == "HelmetGrimReaper", "The Reaper gift's hood wasn't put on")
+thePlayer.Name = nil
+check(stubs.Codes.allowed({ For = { 42 } }, { UserId = 42 }) and not stubs.Codes.allowed({ For = { 42 } }, { UserId = 7 }), "A gift by UserId")
+local Bundle = Store.bundle("ReaperHarvest")
+check(Bundle and table.concat(Bundle.Contents.Cosmetics, ",") == table.concat(stubs.Codes.List.REAPERGIFT113.Reward.Cosmetics, ","), "The Reaper gift isn't the whole Reaper's Harvest bundle")
 -- The group: off with no id set.
 check(not handlers.CheckGroup(thePlayer).Ok, "The group reward paid out with no group set")
 local state = handlers.FreeRewards(thePlayer)

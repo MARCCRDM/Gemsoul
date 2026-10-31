@@ -83,7 +83,7 @@ local function redeem(player: Player, text: any)
 	end
 	lastTry[player] = now
 	local code = Rules.normalizeCode(text)
-	local entry, why = Codes.find(code, os.time())
+	local entry, why = Codes.find(code, os.time(), player)
 	if not entry then
 		return reply(false, why or "That code doesn't exist.")
 	end
