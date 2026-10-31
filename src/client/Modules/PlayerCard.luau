@@ -1,5 +1,6 @@
 -- Another miner near you: one small card beside them with DUEL, SPAR,
--- PARTY and KAIJU (a kaiju battle), in place of Roblox's prompt panels
+-- PARTY and KAIJU (a kaiju battle), and GEAR by their name (what they wear,
+-- to look at: GearInspect), in place of Roblox's prompt panels
 -- stacked up over their head (hard to read, and on a phone they covered the
 -- middle of the screen).
 --
@@ -83,9 +84,29 @@ local function build(root: BasePart, target: number, inputType: Enum.ProximityPr
 
 	local other = Players:GetPlayerByUserId(target)
 	local name = line(panel, if other then other.DisplayName else "Miner", 13, P.Text, IronUi.Bold)
-	name.Position, name.Size = UDim2.fromOffset(edge + 2, edge - 1), UDim2.fromOffset(width - edge * 2 - 4, nameH)
+	local gearW = if touch then 84 else 70
+	name.Position, name.Size = UDim2.fromOffset(edge + 2, edge - 1), UDim2.fromOffset(width - edge * 2 - 4 - gearW - 6, nameH)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 	name:SetAttribute("NoTranslate", true)
+	-- GEAR: what they wear, to look at (GearInspect), beside their name.
+	local gear = new("TextButton", {
+		Name = "Gear",
+		Text = "",
+		AutoButtonColor = true,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -edge, 0, edge - 3),
+		Size = UDim2.fromOffset(gearW, nameH + 4),
+		BackgroundColor3 = P.Teal:Lerp(Color3.fromRGB(14, 18, 28), 0.74),
+	}, panel)
+	UiKit.round(gear, 6)
+	new("UIStroke", { Color = P.Teal, Transparency = 0.45, Thickness = 1 }, gear)
+	gear:SetAttribute("UiSound", "Click")
+	local gearLabel = line(gear, "GEAR ›", 11, P.Teal, IronUi.Heading)
+	gearLabel.Size = UDim2.fromScale(1, 1)
+	gearLabel.TextXAlignment, gearLabel.TextYAlignment = Enum.TextXAlignment.Center, Enum.TextYAlignment.Center
+	gear.Activated:Connect(function()
+		require(script.Parent.GearInspect).open(target)
+	end)
 
 	local fills = {}
 	for i, action in PlayerCard.Actions do

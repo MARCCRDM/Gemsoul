@@ -94,6 +94,8 @@ require(script.Parent.Systems.Referrals).start()
 local CouponServer = require(script.Parent.Systems.CouponServer)
 CouponServer.start()
 require(script.Parent.Systems.FreeRewards).start()
+-- Another player's gear, to look at (GEAR on the card beside them).
+require(script.Parent.Systems.GearInspect).start()
 TopPlayers.start()
 Equipment.start()
 -- One health-recovery rule for players and computer fighters alike.
