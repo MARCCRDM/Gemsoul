@@ -1612,6 +1612,10 @@ end
 --   SlopeHalf } }: each ramp and its landing, on the quarry floor, Half
 --   their half sizes, x and z, SlopeHalf the slope's half width), Feet
 --   ({ Vector3 }: where its legs stand) }
+-- The Kaiju Daycare out on the quarry floor (Shared.Daycare.Pen: its
+-- middle, x and z, and how far round it is kept clear: no rocks, no wild
+-- kaiju, flat ground). Each player's client builds the pen itself.
+local DAYCARE = { X = -70, Z = 102, Clear = 32 }
 local SHELTER = {
 	HalfWidth = 84, -- x, inside
 	HalfDepth = 60, -- z, inside
@@ -2512,7 +2516,6 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	for _, c in
 		{
 			{ 130, 40, 11 },
-			{ -70, 100, 15 },
 			{ 95, -20, 8 },
 			{ -110, -40, 7 },
 			{ 48, 150, 12 },
@@ -2532,6 +2535,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		crater(ground, at * CFrame.new(c[1], 0, c[2]), c[3])
 		table.insert(standing, { (at * CFrame.new(c[1], 0, c[2])).Position, c[3] + 4 })
 	end
+	-- (The Kaiju Daycare's pen, its barn and its desk: flat ground. Each
+	-- player's client builds it there: Shared.Daycare.Pen, Client.DaycarePen.)
+	table.insert(standing, { (at * CFrame.new(DAYCARE.X, 0, DAYCARE.Z)).Position, DAYCARE.Clear })
 	local benchRamps = benches(ground, at)
 	craterRim(ground, at)
 	-- (The edge, for now: Shared.Outpost.Edge. Each player's client draws
@@ -2902,6 +2908,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 
 	-- Where rocks can grow: across the basin, clear of the buildings.
 	local keepOut = {
+		{ (at * CFrame.new(DAYCARE.X, 0, DAYCARE.Z)).Position, DAYCARE.Clear }, -- the Kaiju Daycare
 		{ (north).Position, 60 },
 		{ (north * CFrame.new(-70, 0, -18)).Position, 18 },
 		{ (north * CFrame.new(72, 0, -14)).Position, 18 },

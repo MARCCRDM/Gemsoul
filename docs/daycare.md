@@ -1,11 +1,37 @@
 # The Kaiju Daycare
 
-A pen in the Shelter's hall, east of the Kennel's stage, where you board kaiju
-you aren't using. Its kaiju wander the pen for everyone in the server to see.
-Each has a plate over it: its name and level, its owner, and **TRAINING** or
-**STORED**.
+A pen out in the quarry where you board kaiju you aren't using. Its kaiju
+wander the pen for everyone in the server to see. Each has a plate over it:
+its name and level, its owner, and **TRAINING** or **STORED**.
 
-To open it, use the keeper's desk in front of the pen (prompt: **Kaiju Daycare**).
+To open it, use the keeper's desk in front of the gate (prompt: **Kaiju Daycare**).
+
+## Where
+
+Walk out of the Shelter's main door, down the ramp, and turn right (west).
+The pen is in the quarry's frame at (-70, 102), about 20 studs past the
+ramp's edge. That spot is:
+
+- inside the core, so no rifts
+- between the Shelter's legs and the pumpkin patch
+- off the roads and the landing pad
+
+The server keeps 32 studs round it clear of rocks and wild kaiju, with the
+ground flat (`DAYCARE` in `OutpostWorld`, which must match `Daycare.Pen`; the
+crater that was there is gone). The tests check it against the ramp, the
+Shelter's feet, the roads, the pad and the patch.
+
+The pen itself, 32 studs across:
+
+- a stone-edged lawn with a sand path ring
+- a white rail fence
+- a shade tree, flower beds, a water trough and hay
+- the **KAIJU DAYCARE** arch over the gate (east, to the ramp), strung with lights
+- a red barn behind it
+- four lamp posts
+- the keeper's desk under a striped awning, with a price board
+
+Kaiju in it are full size (`Daycare.Scale` 1).
 
 ## Boarding
 
@@ -47,7 +73,7 @@ full health, at the end of your line, with a new id.
 |---|---|---|
 | The rules | `Shared.Daycare` | Fees, training and the pen's place. Nothing ticks: everything is worked out from when the kaiju came in (`Daycare.result`). |
 | The server | `Server.DaycareServer` | Handles `DaycareState`, `DaycareBoard` and `DaycareCollect`. A boarded kaiju leaves the roster through `Market.take` and waits in `profile.Daycare.Entries`. It comes back through `Market.give`. The fee is coins spent as `"Daycare"` (Analytics: Shop). |
-| The pen | `Client.DaycarePen` | Built on each player's screen, and mounted, shown and stepped by `KennelLife`. The server keeps who's in it in `ReplicatedStorage.DaycarePen`, the boarded kaiju of the players in this server, at most 12 drawn. They wander like the Kennel's (`KaijuKennel.state` with `Daycare.Pen`). |
+| The pen | `Client.DaycarePen` | Built on each player's screen, and mounted, shown and stepped by `OutpostScene` in the quarry's frame. The server keeps who's in it in `ReplicatedStorage.DaycarePen`, the boarded kaiju of the players in this server, at most 12 drawn. They wander like the Kennel's (`KaijuKennel.state` with `Daycare.Pen`). |
 | The window | `Client.DaycareUI` | Boarding, the price shown up front, and collecting. |
 
 ## Next: offers

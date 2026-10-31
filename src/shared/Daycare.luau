@@ -1,6 +1,6 @@
 --[[
-	The Kaiju Daycare: a pen in the Shelter's hall beside the Kennel where
-	you board kaiju you aren't using (Server.DaycareServer; its pen, where
+	The Kaiju Daycare: a pen out in the quarry by the Shelter's main door
+	where you board kaiju you aren't using (Server.DaycareServer; its pen, where
 	everyone in the server sees them, and its desk: Client.DaycarePen; its
 	window: Client.DaycareUI).
 
@@ -35,10 +35,25 @@ Daycare.Stays = { 1, 4, 12, 24 } -- hours of training to pick from
 Daycare.Store = { PerHour = 25, Max = 3000 }
 Daycare.Train = { PerHour = 60, PerLevel = 12, Share = 0.15, Cap = 20 }
 Daycare.Modes = { Store = true, Train = true }
--- The pen, in the Shelter's frame: on the hall floor east of the Kennel's
--- stage (the stage reaches x 14), laid out like Shared.KaijuKennel's Pen so
--- its residents wander the same way (Kennel.state with this pen).
-Daycare.Pen = { Middle = Vector3.new(34, 0.86, 18), Inner = 3.2, Outer = 7.4, Fence = 10, Desk = Vector3.new(34, 0.86, 5.5) }
+-- The pen, in the quarry's frame (Shared.Outpost.Location): out on the
+-- floor south-west of the Shelter's main door, between its legs and the
+-- pumpkin patch, inside the core (no rifts), clear of the ramp, the roads
+-- and the landing pad (Server.OutpostWorld keeps rocks and wild kaiju out
+-- of Clear studs round it, and the land flat). Laid out like the Kennel's
+-- Pen (Shared.KaijuKennel) so its residents wander the same way. Its gate
+-- faces east (+X, Gate), to the door's ramp; the keeper's desk in front of
+-- it (Desk), the barn behind it (Barn).
+Daycare.Pen = {
+	Middle = Vector3.new(-70, 0, 102),
+	Inner = 4.5,
+	Outer = 11,
+	Fence = 16,
+	Gate = 0,
+	Desk = Vector3.new(-47, 0, 102),
+	Barn = Vector3.new(-93, 0, 102),
+	Clear = 32,
+}
+Daycare.Scale = 1 -- its kaiju's size (the Kennel's are 0.75)
 Daycare.Shown = 12 -- kaiju drawn in it at most
 
 -- Coins an hour of training a kaiju of `level`.

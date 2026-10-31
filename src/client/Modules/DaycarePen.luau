@@ -1,9 +1,8 @@
 --[[
-	The Kaiju Daycare's pen, on the hall floor east of the Kennel's stage
-	(Shared.Daycare.Pen): a low fence round a bed of grass, a DAYCARE arch
-	over its gate, and the keeper's desk in front with its prompt (opens
-	Client.DaycareUI). Built on each player's own screen, like the Kennel's
-	pen (Client.KennelLife mounts, shows and steps it with its own).
+	The Kaiju Daycare's pen, out on the quarry floor by the Shelter's main
+	door (Shared.Daycare.Pen; Server.OutpostWorld keeps the ground there
+	clear and flat). Built on each player's own screen (Client.OutpostScene
+	mounts, shows and steps it, in the quarry's frame).
 
 	In it, every kaiju boarded by a player in this server
 	(ReplicatedStorage.DaycarePen, kept by Server.DaycareServer), wandering
@@ -23,7 +22,7 @@ local KaijuModels = require(Shared:WaitForChild("KaijuModels"))
 local GemConfig = require(Shared:WaitForChild("GemConfig"))
 
 local DaycarePen = {}
-DaycarePen.Reach = 220 -- studs from the pen: past this it's put away
+DaycarePen.Reach = 320 -- studs from the pen: past this it's put away
 
 local WOOD = Color3.fromRGB(124, 88, 58)
 local WOOD_DARK = Color3.fromRGB(88, 62, 42)
@@ -76,73 +75,155 @@ local function words(carrier: BasePart, text: string, color: Color3, font: Enum.
 	return l
 end
 
--- The pen: a bed of grass, a ring of fence posts with two rails, a water
--- trough, the DAYCARE arch over the gate (facing -Z, the way into the hall)
--- and the keeper's desk in front of it with a board of the prices.
+-- The pen, out on the quarry floor (Shared.Daycare.Pen): a stone border
+-- round a lawn, a white rail fence with its gate to the east (Gate), a
+-- sand path inside it, flower beds, a shade tree, a water trough and hay;
+-- the KAIJU DAYCARE arch over the gate, strung with lights; a red barn
+-- behind it (Barn); lamp posts round it; and the keeper's desk in front of
+-- the gate (Desk) under a striped awning, the prices on its board and its
+-- prompt (opens Client.DaycareUI).
+local RED = Color3.fromRGB(168, 58, 48)
+local WHITE = Color3.fromRGB(236, 232, 222)
+local STONE = Color3.fromRGB(128, 124, 118)
+local SAND = Color3.fromRGB(206, 182, 134)
+local LEAF = Color3.fromRGB(78, 150, 72)
+local BULB = Color3.fromRGB(255, 214, 140)
+local LAWN = 0.33 -- the lawn's top over the quarry floor
+
+local function disc(parent: Instance, cframe: CFrame, radius: number, height: number, color: Color3, material: Enum.Material): Part
+	local p = piece(parent, cframe * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(height, radius * 2, radius * 2), color, material)
+	p.Shape = Enum.PartType.Cylinder
+	p.CastShadow = false
+	return p
+end
+
+local function lamp(parent: Instance, base: CFrame)
+	piece(parent, base * CFrame.new(0, 3, 0), Vector3.new(0.45, 6, 0.45), WOOD_DARK, Enum.Material.Metal)
+	local head = piece(parent, base * CFrame.new(0, 6.3, 0), Vector3.new(1.1, 0.9, 1.1), BULB, Enum.Material.Neon)
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness = BULB, 18, 0.9
+	light.Parent = head
+end
+
 local function buildPen(frame: CFrame): Folder
 	local made = Instance.new("Folder")
 	made.Name = "DaycarePenBuilt"
 	local spec = Daycare.Pen
-	local middle = frame * CFrame.new(spec.Middle)
-	local bed = piece(made, middle * CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(0.1, spec.Fence * 2, spec.Fence * 2), GRASS, Enum.Material.Grass)
-	bed.Shape = Enum.PartType.Cylinder
-	bed.CastShadow = false
-	local posts = 24
-	local gate = math.rad(270) -- (the gap in the fence, at -Z)
+	-- (its middle, turned so +X is toward the gate)
+	local middle = frame * CFrame.new(spec.Middle) * CFrame.Angles(0, -spec.Gate, 0)
+	local R = spec.Fence
+	-- The ground: a stone border, the lawn, the path ring.
+	disc(made, middle * CFrame.new(0, 0.1, 0), R + 1.6, 0.2, STONE, Enum.Material.Cobblestone)
+	disc(made, middle * CFrame.new(0, 0.22, 0), R + 0.4, 0.2, GRASS, Enum.Material.Grass)
+	disc(made, middle * CFrame.new(0, 0.3, 0), spec.Outer + 1.4, 0.06, SAND, Enum.Material.Sand)
+	disc(made, middle * CFrame.new(0, 0.33, 0), spec.Inner - 0.6, 0.06, GRASS, Enum.Material.Grass)
+	-- The fence: dark posts, white rails, a gap for the gate at +X.
+	local posts = 44
+	local gateHalf = math.rad(9)
 	for i = 0, posts - 1 do
-		local a = math.rad(i * 360 / posts)
-		local b = math.rad((i + 1) * 360 / posts)
-		local pa = middle * CFrame.new(math.cos(a) * spec.Fence, 0, math.sin(a) * spec.Fence)
-		local pb = middle * CFrame.new(math.cos(b) * spec.Fence, 0, math.sin(b) * spec.Fence)
-		piece(made, pa * CFrame.new(0, 1.2, 0), Vector3.new(0.4, 2.4, 0.4), WOOD_DARK, Enum.Material.Wood, true)
+		local a = i / posts * math.pi * 2
+		local b = (i + 1) / posts * math.pi * 2
+		local pa = middle * CFrame.new(math.cos(a) * R, 0, math.sin(a) * R)
+		local pb = middle * CFrame.new(math.cos(b) * R, 0, math.sin(b) * R)
 		local mid = (a + b) / 2
-		local inGate = math.abs(((mid - gate + math.pi) % (math.pi * 2)) - math.pi) < math.rad(14)
+		local d = math.abs(((mid + math.pi) % (math.pi * 2)) - math.pi)
+		local inGate = d < gateHalf
+		if not (math.abs(((a + math.pi) % (math.pi * 2)) - math.pi) < gateHalf * 0.6) then
+			piece(made, pa * CFrame.new(0, 1.6, 0), Vector3.new(0.5, 3.2, 0.5), WOOD_DARK, Enum.Material.Wood, true)
+			piece(made, pa * CFrame.new(0, 3.28, 0), Vector3.new(0.7, 0.18, 0.7), WHITE, Enum.Material.SmoothPlastic)
+		end
 		if not inGate then
 			local centre = (pa.Position + pb.Position) / 2
 			local span = (pb.Position - pa.Position).Magnitude
-			for _, h in { 0.8, 1.9 } do
-				piece(made, CFrame.lookAt(centre, pb.Position) * CFrame.new(0, h, 0), Vector3.new(0.16, 0.24, span), WOOD, Enum.Material.Wood, true)
+			for _, h in { 1.1, 2.5 } do
+				piece(made, CFrame.lookAt(centre, pb.Position) * CFrame.new(0, h, 0), Vector3.new(0.18, 0.3, span), WHITE, Enum.Material.SmoothPlastic, true)
 			end
 		end
 	end
-	-- A trough and a little hay at the back.
-	local back = middle * CFrame.new(0, 0, spec.Fence - 2.2)
-	piece(made, back * CFrame.new(0, 0.35, 0), Vector3.new(3.2, 0.7, 1), WOOD_DARK, Enum.Material.Wood)
-	piece(made, back * CFrame.new(0, 0.66, 0), Vector3.new(2.8, 0.05, 0.7), Color3.fromRGB(80, 140, 170), Enum.Material.Glass)
-	piece(made, middle * CFrame.new(-6, 0.5, 4) * CFrame.Angles(0, 0.4, 0), Vector3.new(2, 1, 1.4), Color3.fromRGB(214, 180, 96), Enum.Material.Fabric)
-	-- The arch over the gate.
-	local front = middle * CFrame.new(0, 0, -spec.Fence)
-	local out = CFrame.lookAt(front.Position, front.Position + (front.Position - middle.Position) * Vector3.new(1, 0, 1))
-	for _, side in { -2.6, 2.6 } do
-		piece(made, out * CFrame.new(side, 2.4, 0), Vector3.new(0.6, 4.8, 0.6), WOOD_DARK, Enum.Material.Wood, true)
+	-- Inside: a shade tree, flower beds, a trough and hay, by the fence
+	-- (past where they walk: Outer).
+	local ring = (spec.Outer + R) / 2 + 0.6
+	local function at(angle: number): CFrame
+		return middle * CFrame.new(math.cos(angle) * ring, 0, math.sin(angle) * ring)
 	end
-	local sign = piece(made, out * CFrame.new(0, 5, 0), Vector3.new(7, 1.4, 0.35), SIGN, Enum.Material.Wood)
+	local tree = at(math.rad(140))
+	piece(made, tree * CFrame.new(0, 3, 0), Vector3.new(1.4, 6, 1.4), WOOD_DARK, Enum.Material.Wood)
+	for _, blob in { { 0, 7.4, 0, 6 }, { 1.6, 6.6, 1, 4.2 }, { -1.5, 6.8, -0.8, 4.4 } } do
+		local leaves = piece(made, tree * CFrame.new(blob[1], blob[2], blob[3]), Vector3.one * blob[4], LEAF, Enum.Material.Grass)
+		leaves.Shape = Enum.PartType.Ball
+	end
+	for k, angle in { 40, 220, 300 } do
+		local bed = at(math.rad(angle))
+		disc(made, bed * CFrame.new(0, 0.4, 0), 1.6, 0.25, Color3.fromRGB(96, 64, 42), Enum.Material.Ground)
+		for f = 0, 5 do
+			local fa = f / 6 * math.pi * 2
+			local bloom = piece(made, bed * CFrame.new(math.cos(fa) * 0.9, 0.75, math.sin(fa) * 0.9), Vector3.one * 0.5, ({ Color3.fromRGB(240, 90, 120), Color3.fromRGB(250, 210, 80), Color3.fromRGB(150, 110, 240) })[k], Enum.Material.SmoothPlastic)
+			bloom.Shape = Enum.PartType.Ball
+		end
+	end
+	local trough = at(math.rad(250)) * CFrame.Angles(0, math.rad(-250 - 90), 0)
+	piece(made, trough * CFrame.new(0, 0.6, 0), Vector3.new(4, 1, 1.4), WOOD_DARK, Enum.Material.Wood)
+	piece(made, trough * CFrame.new(0, 1.05, 0), Vector3.new(3.6, 0.06, 1.0), Color3.fromRGB(80, 150, 190), Enum.Material.Glass)
+	for _, h in { { 110, 0 }, { 115, 1.2 } } do
+		piece(made, at(math.rad(h[1])) * CFrame.new(0, 0.7 + h[2], 0) * CFrame.Angles(0, math.rad(h[1]), 0), Vector3.new(2.4, 1.2, 1.6), Color3.fromRGB(214, 180, 96), Enum.Material.Fabric)
+	end
+	-- The arch over the gate, strung with lights.
+	local gate = middle * CFrame.new(R, 0, 0)
+	local out = CFrame.lookAt(gate.Position, gate.Position + (gate.Position - middle.Position) * Vector3.new(1, 0, 1))
+	for _, side in { -3.6, 3.6 } do
+		piece(made, out * CFrame.new(side, 3.6, 0), Vector3.new(0.9, 7.2, 0.9), WOOD_DARK, Enum.Material.Wood, true)
+		piece(made, out * CFrame.new(side, 7.4, 0), Vector3.new(1.2, 0.4, 1.2), WHITE, Enum.Material.SmoothPlastic)
+	end
+	local sign = piece(made, out * CFrame.new(0, 7.9, 0), Vector3.new(10, 2, 0.45), SIGN, Enum.Material.Wood)
 	sign.Name = "DaycareSign"
-	words(sign, "KAIJU DAYCARE", CREAM, Enum.Font.GothamBlack, 46)
+	words(sign, "KAIJU DAYCARE", CREAM, Enum.Font.GothamBlack, 64)
+	piece(made, out * CFrame.new(0, 9.05, 0), Vector3.new(10.6, 0.3, 0.7), RED, Enum.Material.SmoothPlastic)
+	for k = -4, 4 do
+		piece(made, out * CFrame.new(k * 1.15, 6.75, -0.3), Vector3.one * 0.32, BULB, Enum.Material.Neon)
+	end
 	local glow = Instance.new("PointLight")
-	glow.Color, glow.Range, glow.Brightness = Color3.fromRGB(255, 220, 160), 12, 0.6
+	glow.Color, glow.Range, glow.Brightness = BULB, 18, 0.8
 	glow.Parent = sign
-	-- The desk, in front of the gate, and its board of prices.
-	local deskAt = frame * CFrame.new(Daycare.Pen.Desk)
-	local desk = CFrame.lookAt(deskAt.Position, deskAt.Position - (middle.Position - deskAt.Position) * Vector3.new(1, 0, 1))
-	piece(made, desk * CFrame.new(0, 0.6, 0), Vector3.new(4.4, 1.2, 1.4), WOOD, Enum.Material.Wood, true)
-	piece(made, desk * CFrame.new(0, 1.24, 0), Vector3.new(4.6, 0.1, 1.6), WOOD_DARK, Enum.Material.Wood)
-	local board = piece(made, desk * CFrame.new(0, 2.7, 0.55) * CFrame.Angles(0, math.rad(180), 0), Vector3.new(4.2, 2.2, 0.15), SIGN, Enum.Material.Wood)
+	-- The barn behind the pen (Barn), its doors to the pen.
+	local barnAt = frame * CFrame.new(spec.Barn)
+	local barn = CFrame.lookAt(barnAt.Position, (frame * CFrame.new(spec.Middle)).Position * Vector3.new(1, 0, 1) + Vector3.new(0, barnAt.Position.Y, 0))
+	piece(made, barn * CFrame.new(0, 3.5, 0), Vector3.new(11, 7, 8), RED, Enum.Material.WoodPlanks, true)
+	for _, side in { -1, 1 } do
+		piece(made, barn * CFrame.new(side * 2.9, 9.1, 0) * CFrame.Angles(0, 0, math.rad(side * -38)), Vector3.new(7.4, 0.5, 8.8), Color3.fromRGB(60, 46, 40), Enum.Material.Slate, true)
+	end
+	piece(made, barn * CFrame.new(0, 7.6, 0), Vector3.new(10.4, 1.4, 7.6), RED, Enum.Material.WoodPlanks)
+	piece(made, barn * CFrame.new(0, 2.6, -4.05), Vector3.new(4.4, 5.2, 0.2), Color3.fromRGB(40, 30, 26), Enum.Material.Wood)
+	for _, side in { -1, 1 } do
+		piece(made, barn * CFrame.new(side * 1.1, 2.6, -4.18) * CFrame.Angles(0, 0, math.rad(side * 50)), Vector3.new(0.25, 6.4, 0.1), WHITE, Enum.Material.SmoothPlastic)
+	end
+	piece(made, barn * CFrame.new(0, 6.2, -4.05), Vector3.new(1.6, 1.6, 0.2), WHITE, Enum.Material.SmoothPlastic)
+	-- Lamp posts round it.
+	for _, angle in { 45, 135, 225, 315 } do
+		local a = math.rad(angle)
+		lamp(made, middle * CFrame.new(math.cos(a) * (R + 3), 0, math.sin(a) * (R + 3)))
+	end
+	-- The keeper's desk in front of the gate, under a striped awning, its
+	-- board of prices to the side.
+	local deskAt = frame * CFrame.new(spec.Desk)
+	local desk = CFrame.lookAt(deskAt.Position, deskAt.Position + (deskAt.Position - gate.Position) * Vector3.new(1, 0, 1))
+	piece(made, desk * CFrame.new(0, 0.8, 0), Vector3.new(6, 1.6, 1.8), WOOD, Enum.Material.Wood, true)
+	piece(made, desk * CFrame.new(0, 1.66, 0), Vector3.new(6.4, 0.14, 2.1), WOOD_DARK, Enum.Material.Wood)
+	for _, side in { -3, 3 } do
+		piece(made, desk * CFrame.new(side, 2.6, 1.5), Vector3.new(0.35, 5.2, 0.35), WOOD_DARK, Enum.Material.Wood)
+	end
+	for k = 0, 5 do
+		piece(made, desk * CFrame.new(-2.75 + k * 1.1, 5.3, 0.4) * CFrame.Angles(math.rad(18), 0, 0), Vector3.new(1.1, 0.12, 3), if k % 2 == 0 then RED else WHITE, Enum.Material.Fabric)
+	end
+	local board = piece(made, desk * CFrame.new(5.2, 2.2, 0.4) * CFrame.Angles(0, math.rad(-20), 0), Vector3.new(3.4, 3, 0.2), SIGN, Enum.Material.Wood, true)
 	board.Name = "DaycareBoard"
-	words(
-		board,
-		string.format("STORE  %d/h\nTRAIN  from %d/h", Daycare.Store.PerHour, Daycare.trainRate(1)),
-		CREAM,
-		Enum.Font.GothamBold,
-		34
-	)
-	local anchor = piece(made, desk * CFrame.new(0, 1.8, 0), Vector3.new(1, 1, 1), SIGN, Enum.Material.SmoothPlastic)
+	words(board, string.format("STORE\n%d coins / h\n\nTRAIN\nfrom %d coins / h", Daycare.Store.PerHour, Daycare.trainRate(1)), CREAM, Enum.Font.GothamBold, 26)
+	local anchor = piece(made, desk * CFrame.new(0, 2.4, 0), Vector3.new(1, 1, 1), SIGN, Enum.Material.SmoothPlastic)
 	anchor.Transparency, anchor.Name = 1, "DaycarePrompt"
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Open"
 	prompt.ObjectText = "Kaiju Daycare"
 	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = 10
+	prompt.MaxActivationDistance = 12
 	prompt.RequiresLineOfSight = false
 	prompt.Triggered:Connect(function()
 		require(script.Parent.DaycareUI).open()
@@ -156,10 +237,10 @@ local function plate(entry: Configuration, root: BasePart): BillboardGui
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "DaycarePlate"
 	gui.Size = UDim2.fromOffset(140, 46)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, 3.2, 0)
+	gui.StudsOffsetWorldSpace = Vector3.new(0, 4, 0)
 	gui.AlwaysOnTop = true
 	gui.LightInfluence = 0
-	gui.MaxDistance = 70
+	gui.MaxDistance = 90
 	gui.Adornee = root
 	local training = entry:GetAttribute("Mode") == "Train"
 	local function text(value: string, y: number, h: number, size: number, color: Color3, font: Enum.Font)
@@ -216,7 +297,7 @@ local function stock()
 		local c = entries[i]
 		local ok, model = pcall(KaijuModels.build, c:GetAttribute("Species"), c:GetAttribute("Element"))
 		if ok and model then
-			KaijuModels.scale(model, Kennel.Scale)
+			KaijuModels.scale(model, Daycare.Scale)
 			model.Name = "Daycare" .. tostring(c:GetAttribute("Species"))
 			for _, p in model:GetDescendants() do
 				if p:IsA("BasePart") then
@@ -257,7 +338,8 @@ local function pose(now: number)
 		-- (its own spells, apart from the Kennel's: index from 101)
 		local s = Kennel.state(100 + i, #residents, now, Daycare.Pen)
 		table.insert(parts, r.Root)
-		table.insert(cframes, at * CFrame.new(s.Position + Vector3.new(0, r.Lift, 0)) * CFrame.Angles(0, s.Yaw, 0))
+		-- (on the lawn: LAWN over the quarry floor)
+		table.insert(cframes, at * CFrame.new(s.Position + Vector3.new(0, r.Lift + LAWN, 0)) * CFrame.Angles(0, s.Yaw, 0))
 		if r.Model:GetAttribute("PacedSpeed") ~= s.Speed then
 			r.Model:SetAttribute("PacedSpeed", s.Speed)
 		end
@@ -309,14 +391,20 @@ function DaycarePen.show(on: boolean)
 	end
 end
 
-function DaycarePen.step(now: number)
+local clock = 0
+function DaycarePen.step(dt: number)
 	if not (folder and wanted) then
 		return
 	end
+	clock += dt
+	if clock < 1 / 30 then
+		return
+	end
+	clock = 0
 	DaycarePen.show(wanted)
 	if folder.Parent then
 		stock()
-		pose(now)
+		pose(workspace:GetServerTimeNow())
 	end
 end
 

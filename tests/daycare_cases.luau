@@ -115,7 +115,27 @@ for i = 1, 6 do
 		check(st.Position.Y == Daycare.Pen.Middle.Y, "A Daycare kaiju off its floor")
 	end
 end
-check((Daycare.Pen.Middle - Kennel.Pen.Middle).Magnitude > Kennel.Pen.Fence + Daycare.Pen.Fence + 2, "The Daycare's pen overlaps the Kennel's")
+-- Out in the quarry, by the main door, clear of everything: the server keeps
+-- its ground clear (rocks, wild kaiju) and flat where the client builds it.
+local world = fs.readFile(ROOT .. "/src/server/World/OutpostWorld.luau")
+local dx, dz, clear = world:match("local DAYCARE = { X = (%-?%d+), Z = (%-?%d+), Clear = (%d+) }")
+check(tonumber(dx) == Daycare.Pen.Middle.X and tonumber(dz) == Daycare.Pen.Middle.Z and tonumber(clear) == Daycare.Pen.Clear, "The server keeps clear somewhere else than the pen")
+check(select(2, world:gsub("DAYCARE.Clear", "")) >= 2, "The pen's ground isn't kept clear of rocks and flat")
+check(world:find("{ -70, 100, 15 }", 1, true) == nil, "A crater still sits where the pen is")
+local flat = Vector3.new(1, 0, 1)
+local function apart(x, z, r)
+	return ((Daycare.Pen.Middle - Vector3.new(x, 0, z)) * flat).Magnitude - Daycare.Pen.Fence - 3 - r
+end
+check(Daycare.Pen.Middle.Magnitude < 150 - Daycare.Pen.Fence, "The pen's past the core (rifts out there)")
+check(apart(72, 118, 20) > 0, "The pen's on the landing pad")
+check(apart(-81, 153, 11) > 0, "The pen's in the pumpkin patch")
+check(apart(-56, 75, 4.4) > 0 and apart(-95, 71, 4.4) > 0, "The pen's on one of the Shelter's feet")
+check(math.abs(Daycare.Pen.Middle.X) - Daycare.Pen.Fence - 3 > 27 and Daycare.Pen.Middle.Z - Daycare.Pen.Fence - 3 > 64, "The pen's on the main door's ramp, or under the Shelter")
+check(math.abs(Daycare.Pen.Desk.X) > 27 + 4, "The keeper's desk is on the ramp")
+-- (the roads: the south spoke runs down x = 0, the west one along z = 0)
+check(math.abs(Daycare.Pen.Middle.X) - Daycare.Pen.Clear > 14 and math.abs(Daycare.Pen.Middle.Z) - Daycare.Pen.Clear > 14, "The pen's on a road")
+local scene = fs.readFile(ROOT .. "/src/client/Modules/OutpostScene.luau")
+check(scene:find("DaycarePen.mount(Rules.Location)", 1, true) ~= nil and scene:find("DaycarePen.step(dt)", 1, true) ~= nil, "The pen isn't built out in the quarry")
 -- (the Kennel's own pen unchanged)
 local k = Kennel.state(1, 6, 12345)
 check((k.Position - Kennel.Pen.Middle).Magnitude < Kennel.Pen.Fence, "The Kennel's pen moved")
@@ -272,6 +292,5 @@ local lvl, fee = UI.project(5, 12)
 check(lvl == t12.Level and fee == t12.Fee, "The window's quote isn't what the server charges")
 -- Wired in.
 check(fs.readFile(ROOT .. "/src/server/Main.server.luau"):find("Systems.DaycareServer).start()", 1, true) ~= nil, "The server doesn't start the Daycare")
-check(fs.readFile(ROOT .. "/src/client/Modules/KennelLife.luau"):find("DaycarePen.mount(frame)", 1, true) ~= nil, "The pen isn't built by the Kennel")
 check(fs.readFile(ROOT .. "/src/client/CreatureAnimation.client.luau"):find('"KaijuDaycare"', 1, true) ~= nil, "The Daycare's kaiju don't move")
 print(string.format("PASS: %d daycare checks (STORE and TRAIN, the fee, the cap, the pen, slots, boarding and collecting, the window's quote)", checks))
