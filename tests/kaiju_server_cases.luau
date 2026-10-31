@@ -1422,6 +1422,34 @@ do
 	now = before
 end
 
+-- LET GO (KaijuRelease): one not out with you nor your support, released;
+-- its enchant gem back in the pouch; never the team out, nor your last one.
+do
+	assert(registered.KaijuRelease, "No KaijuRelease request")
+	check(Kaiju.MaxOwned >= 24, "Room for only " .. Kaiju.MaxOwned .. " kaiju")
+	local roster = profiles[a].Kaiju
+	local extra = KaijuServer.adopt(a, "Razorback", { Id = "relSoul", Tier = "Rare", Element = "Fire", Cut = "Round" }, 3)
+	check(extra ~= nil, "Couldn't adopt one to let go")
+	local outTeam = Kaiju.teamIds(roster)
+	if table.find(outTeam, extra.Id) then
+		-- (it joined the team out: put it on the bench first)
+		roster.Order = { table.unpack(outTeam) }
+		table.remove(roster.Order, table.find(roster.Order, extra.Id))
+	end
+	check(not registered.KaijuRelease(a, second.Id).Ok and roster.List[second.Id] ~= nil, "Let go of one out with you")
+	check(not registered.KaijuRelease(b, extra.Id).Ok and roster.List[extra.Id] ~= nil, "Let go of someone else's kaiju")
+	local count = Kaiju.count(roster)
+	local gone = registered.KaijuRelease(a, extra.Id)
+	check(gone.Ok and roster.List[extra.Id] == nil and Kaiju.count(roster) == count - 1, "Couldn't let one go: " .. tostring(gone.Message))
+	local back = false
+	for _, gem in profiles[a].Gems do
+		back = back or gem.Id == "relSoul"
+	end
+	check(back, "Its enchant gem didn't come back to the pouch")
+	check(not registered.KaijuRelease(a, extra.Id).Ok, "Let the same one go twice")
+	PlayerData.removeGem(a, "relSoul")
+end
+
 -- Wild kaiju --------------------------------------------------------------------------------------------------
 
 flush()

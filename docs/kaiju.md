@@ -300,8 +300,13 @@ studs). Your own moves and other players' are unchanged.
 ## Your team
 
 Three kaiju fight beside you at once, and a fourth, your support, heals
-you (see [Your support](#your-support-the-fourth-kaiju)). You can keep 12;
-the others wait at home. (The plan is a second slot when one of yours reaches level 10 and a
+you (see [Your support](#your-support-the-fourth-kaiju)). You can keep 24
+(12 until 2026-10-31); the others wait at home, your kaiju inventory. Full?
+**LET GO** one (in its panel, on one at home or a support not in its slot,
+tapped twice to be sure: `KaijuServer.release`) or sell it on the Market
+to make room for a better one. It goes back to the wild; its enchant gem
+comes back to your pouch. Never the team that's out, your support or your
+last one, and not mid kaiju battle. (The plan is a second slot when one of yours reaches level 10 and a
 third at 20; the beta opens all three from the start: `Kaiju.SlotLevels`.)
 
 ![The starter roll: three reels spinning, then your three locked in](kaiju/roll.png)

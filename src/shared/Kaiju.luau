@@ -1661,7 +1661,10 @@ end
 
 -- The kaiju you own --------------------------------------------------------------------------
 
-Kaiju.MaxOwned = 12 -- kaiju one player can keep
+-- Kaiju one player can keep: the teams, the support and the rest at home
+-- (their inventory). Full, LET GO one (KaijuServer.release) or sell one on
+-- the Market to make room. (12 until 2026-10-31.)
+Kaiju.MaxOwned = 24
 
 -- Kinds taken out of the game, and what one already caught becomes (its
 -- level, traits, Gemsoul and name kept): the nearest kind in role and

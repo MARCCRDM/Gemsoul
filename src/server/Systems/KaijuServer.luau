@@ -2572,6 +2572,46 @@ Players.PlayerRemoving:Connect(function(player)
 	lastNamed[player] = nil
 end)
 
+-- LET GO: one of yours released back to the wild, to make room for a
+-- better one (Kaiju.MaxOwned). Not the team that's out or your support
+-- (swap it out first: the same rule as selling one, Shared.Market), never
+-- your last one, not mid kaiju battle. Its enchant gem comes back to your
+-- pouch.
+function KaijuServer.release(player: Player, id: any)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	if player:GetAttribute("KaijuBattle") ~= nil then
+		return reply(false, "Not in the middle of a kaiju battle.")
+	end
+	local Market = require(ReplicatedStorage.Shared.Market)
+	local why = Market.whyNot(profile, "Kaiju", nil, id)
+	if why then
+		return reply(false, why)
+	end
+	local roster = Kaiju.roster(profile)
+	local record = roster.List[id]
+	local name = Kaiju.nameOf(record)
+	despawn(player, id)
+	Market.take(profile, "Kaiju", nil, id)
+	local soul = record.Soul
+	if type(soul) == "table" then
+		if type(soul.Id) ~= "string" or soul.Id == "wild" then
+			soul.Id = PlayerData.newGemId()
+		end
+		PlayerData.returnGem(player, soul)
+	end
+	PlayerData.sync(player)
+	return reply(
+		true,
+		if type(soul) == "table"
+			then string.format("You let %s go. Its enchant gem is back in your pouch.", name)
+			else string.format("You let %s go.", name),
+		{ Released = id }
+	)
+end
+
 -- Whether any of `player`'s kaiju is out in the world right now (not
 -- called back, not left at home with nothing out).
 function KaijuServer.deployed(player: Player): boolean
@@ -2825,6 +2865,7 @@ function KaijuServer.start()
 	Shop.register("KaijuInfuse", infuse)
 	Shop.register("KaijuSocket", socketSoul)
 	Shop.register("KaijuName", nameKaiju)
+	Shop.register("KaijuRelease", KaijuServer.release)
 	Shop.register("KaijuAutoHeal", setAutoHeal)
 	Shop.register("KaijuCallBack", callBack)
 	Shop.register("KaijuTeamOut", teamOut)

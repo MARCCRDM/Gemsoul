@@ -1420,12 +1420,27 @@ local drawPanel
 -- stays a tap (pick it / tap-to-swap, as before).
 local teamsUi = {} -- (one table: this file is at Luau's 200 locals)
 teamsUi.Drag = { Slop = 8, Targets = {}, Active = nil :: any, SuppressUntil = 0 }
--- On a phone a finger moving straight up or down over the list scrolls it
--- (to the kaiju you want to enchant, heal...); one's picked up to drag by
--- holding it a moment (Hold) or moving it sideways first (pure).
+-- On a phone a finger moving along a list scrolls it (up or down the
+-- kaiju list, to the one you want to enchant or heal; sideways along the
+-- bench, `across`); one's picked up to drag by holding it a moment (Hold)
+-- or moving it the other way first (pure).
 teamsUi.Drag.Hold = 0.3
-function teamsUi.Drag.scrolls(moved: Vector2, held: number): boolean
-	return held < teamsUi.Drag.Hold and math.abs(moved.Y) >= math.abs(moved.X)
+function teamsUi.Drag.scrolls(moved: Vector2, held: number, across: boolean?): boolean
+	if held >= teamsUi.Drag.Hold then
+		return false
+	end
+	if across then
+		return math.abs(moved.X) >= math.abs(moved.Y)
+	end
+	return math.abs(moved.Y) >= math.abs(moved.X)
+end
+-- Whether what `frame` sits in scrolls sideways (the bench).
+function teamsUi.Drag.across(frame: GuiObject?): boolean
+	local up = frame and frame.Parent
+	while up and not up:IsA("ScrollingFrame") do
+		up = up.Parent
+	end
+	return up ~= nil and (up :: ScrollingFrame).ScrollingDirection == Enum.ScrollingDirection.X
 end
 function teamsUi.Drag.point(input: InputObject): Vector2
 	if input.UserInputType == Enum.UserInputType.Touch then
@@ -1478,7 +1493,7 @@ function teamsUi.Drag.source(frame: GuiObject, id: string)
 		if teamsUi.Drag.Active then
 			return
 		end
-		teamsUi.Drag.Active = { Id = id, Input = input, From = teamsUi.Drag.point(input), Started = false, At = os.clock() }
+		teamsUi.Drag.Active = { Id = id, Input = input, From = teamsUi.Drag.point(input), Started = false, At = os.clock(), Frame = frame }
 	end)
 end
 function teamsUi.Drag.paintHover(target)
@@ -1593,7 +1608,7 @@ UserInputService.InputChanged:Connect(function(input)
 	local point = teamsUi.Drag.point(input)
 	if not drag.Started then
 		if (point - drag.From).Magnitude >= teamsUi.Drag.Slop then
-			if kind == Enum.UserInputType.Touch and teamsUi.Drag.scrolls(point - drag.From, os.clock() - (drag.At or 0)) then
+			if kind == Enum.UserInputType.Touch and teamsUi.Drag.scrolls(point - drag.From, os.clock() - (drag.At or 0), teamsUi.Drag.across(drag.Frame)) then
 				teamsUi.Drag.Active = nil -- (a swipe: the list scrolls, nothing's picked up)
 				return
 			end
@@ -2520,6 +2535,40 @@ local function actionButton(order: number, text: string, color: Color3, width: n
 	return b
 end
 
+-- LET GO (one not out with you, nor your support): released, to make
+-- room for a better one (KaijuServer.release). A second tap within
+-- LetGoWindow seconds does it; its enchant gem comes back to your pouch.
+teamsUi.LetGoWindow = 3
+teamsUi.LetGoArmed = nil :: { Id: string, Until: number }?
+function teamsUi.letGo(record)
+	actionText.Size = UDim2.new(1, -330, 1, 0)
+	local armed = teamsUi.LetGoArmed
+	local sure = armed ~= nil and armed.Id == record.Id and os.clock() < armed.Until
+	local b = actionButton(3, if sure then "SURE? TAP" else "LET GO", P.Bad, 84, function()
+		local now = teamsUi.LetGoArmed
+		if now and now.Id == record.Id and os.clock() < now.Until then
+			teamsUi.LetGoArmed = nil
+			act(function()
+				say(GemClient.request("KaijuRelease", record.Id))
+				selected = nil
+			end)
+			return
+		end
+		teamsUi.LetGoArmed = { Id = record.Id, Until = os.clock() + teamsUi.LetGoWindow }
+		UiKit.toast(string.format("Tap LET GO again to release %s for good.", Kaiju.nameOf(record)), P.Bad)
+		drawPanel()
+		task.delay(teamsUi.LetGoWindow + 0.05, function()
+			local still = teamsUi.LetGoArmed
+			if still and still.Id == record.Id and os.clock() >= still.Until and window.Gui.Enabled and drawPanel then
+				teamsUi.LetGoArmed = nil
+				drawPanel()
+			end
+		end)
+	end)
+	b.Name = "LetGo"
+	b.TextSize = 12
+end
+
 local function drawActions(data, record, team: { string })
 	for _, child in actionButtons:GetChildren() do
 		if child:IsA("GuiObject") then
@@ -2583,6 +2632,7 @@ local function drawActions(data, record, team: { string })
 				say(GemClient.request("KaijuSupport", record.Id))
 			end)
 		end)
+		teamsUi.letGo(record)
 	else
 		actionText.Text = "In reserve. Choose exactly who it replaces."
 		actionButton(1, "SWAP IN", P.Teal, 100, function()
@@ -2590,6 +2640,7 @@ local function drawActions(data, record, team: { string })
 			listFrame.CanvasPosition = Vector2.zero
 			drawPanel()
 		end)
+		teamsUi.letGo(record)
 	end
 	if record.Down then
 		actionText.Text = string.format("Knocked out: back by itself in %s, or revive it now.", reviveClock(record))

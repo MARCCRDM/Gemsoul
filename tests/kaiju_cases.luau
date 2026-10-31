@@ -1555,8 +1555,10 @@ do
 	check(hud:find("Kaiju.traits(record)", 1, true) ~= nil and hud:find("TraitChips", 1, true) ~= nil, "The kaiju panel doesn't show its traits")
 	-- On a phone a swipe up or down scrolls the kaiju list; holding one or
 	-- moving it sideways drags it.
-	check(hud:find("teamsUi.Drag.scrolls(point - drag.From, os.clock() - (drag.At or 0))", 1, true) ~= nil, "A swipe on the kaiju list picks a kaiju up instead of scrolling")
-	check(hud:find("return held < teamsUi.Drag.Hold and math.abs(moved.Y) >= math.abs(moved.X)", 1, true) ~= nil, "The kaiju list's swipe rule changed")
+	check(hud:find("teamsUi.Drag.scrolls(point - drag.From, os.clock() - (drag.At or 0), teamsUi.Drag.across(drag.Frame))", 1, true) ~= nil, "A swipe on the kaiju list picks a kaiju up instead of scrolling")
+	check(hud:find("return math.abs(moved.X) >= math.abs(moved.Y)", 1, true) ~= nil and hud:find("ScrollingDirection == Enum.ScrollingDirection.X", 1, true) ~= nil, "A swipe along the bench picks a kaiju up instead of scrolling it")
+	-- LET GO: on one at home (or a support not in its slot), a second tap to be sure.
+	check(hud:find('GemClient.request("KaijuRelease", record.Id)', 1, true) ~= nil and hud:find('"SURE? TAP"', 1, true) ~= nil, "No LET GO, or it lets go on one tap")
 	local market = fs.readFile(ROOT .. "/src/client/Modules/MarketBoardUI.luau")
 	check(market:find("Grade %s", 1, true) ~= nil, "The Market doesn't show a kaiju's Grade")
 	local roll = fs.readFile(ROOT .. "/src/client/Modules/KaijuRoll.luau")
