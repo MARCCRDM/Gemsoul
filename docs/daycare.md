@@ -33,6 +33,26 @@ The pen itself, 32 studs across:
 
 Kaiju in it are full size (`Daycare.Scale` 1).
 
+**The ground.** The quarry floor there is terrain, a little above the
+quarry's frame, and it streams in. So the client builds the pen only once
+there's ground under it: it raycasts down at its middle, round its fence and
+at its desk, takes the middle height, and stands everything on that. Before
+this, it was built at the frame's height and sat half sunk.
+
+**The look (2026-10-31, second pass):**
+
+- **Lawn:** a lawn with a sand path ring for them to walk, and a straw
+  target on a stump in the middle.
+- **Fence:** lanterns on every other post, bushes outside.
+- **Inside:** two trees, a pond ringed with stones, flower beds, a trough,
+  hay, and straw beds by the barn.
+- **Way in:** stepping stones from the gate to the desk, and the desk's
+  striped awning over its counter.
+- **Plates:** dark rounded plates with the kaiju's element colour round
+  them, a TRAINING or STORED chip under each.
+- **Moods:** those training are livelier (a roar where the Kennel's would
+  nap), and those stored nap more.
+
 ## Boarding
 
 Pick one of your kaiju at home. It can't be the team that's out or your

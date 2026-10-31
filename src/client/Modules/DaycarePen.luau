@@ -31,8 +31,13 @@ local SIGN = Color3.fromRGB(40, 34, 28)
 local CREAM = Color3.fromRGB(246, 232, 200)
 local TRAIN = Color3.fromRGB(120, 230, 140)
 local STORE = Color3.fromRGB(120, 190, 255)
+local GOLD_TEXT = Color3.fromRGB(250, 208, 110)
 
-type Resident = { Key: string, Model: Model, Root: BasePart, Lift: number, Plate: BillboardGui, Mood: string?, MoodAt: number? }
+type Resident = { Key: string, Model: Model, Root: BasePart, Lift: number, Plate: BillboardGui, Training: boolean, Mood: string?, MoodAt: number? }
+-- How the Kennel's moods (Shared.KaijuKennel.Moods) come out here: the ones
+-- training livelier (no naps: a roar), the ones stored lazier (a nap).
+local TRAINING_MOOD = { Sleep = "Roar", Rest = "Look" }
+local STORED_MOOD = { Roar = "Sleep", Look = "Rest" }
 
 local at: CFrame? = nil
 local folder: Folder? = nil -- the residents (CreatureAnimation looks in "KaijuDaycare")
@@ -115,8 +120,11 @@ local function buildPen(frame: CFrame): Folder
 	-- The ground: a stone border, the lawn, the path ring.
 	disc(made, middle * CFrame.new(0, 0.1, 0), R + 1.6, 0.2, STONE, Enum.Material.Cobblestone)
 	disc(made, middle * CFrame.new(0, 0.22, 0), R + 0.4, 0.2, GRASS, Enum.Material.Grass)
-	disc(made, middle * CFrame.new(0, 0.3, 0), spec.Outer + 1.4, 0.06, SAND, Enum.Material.Sand)
-	disc(made, middle * CFrame.new(0, 0.33, 0), spec.Inner - 0.6, 0.06, GRASS, Enum.Material.Grass)
+	-- (a sand path ring, the lawn either side of it, and a sand patch
+	-- round the training post)
+	disc(made, middle * CFrame.new(0, 0.3, 0), spec.Outer + 1.3, 0.06, SAND, Enum.Material.Sand)
+	disc(made, middle * CFrame.new(0, 0.33, 0), spec.Outer - 1.1, 0.06, GRASS, Enum.Material.Grass)
+	disc(made, middle * CFrame.new(0, 0.36, 0), 2.6, 0.06, SAND, Enum.Material.Sand)
 	-- The fence: dark posts, white rails, a gap for the gate at +X.
 	local posts = 44
 	local gateHalf = math.rad(9)
@@ -130,7 +138,18 @@ local function buildPen(frame: CFrame): Folder
 		local inGate = d < gateHalf
 		if not (math.abs(((a + math.pi) % (math.pi * 2)) - math.pi) < gateHalf * 0.6) then
 			piece(made, pa * CFrame.new(0, 1.6, 0), Vector3.new(0.5, 3.2, 0.5), WOOD_DARK, Enum.Material.Wood, true)
-			piece(made, pa * CFrame.new(0, 3.28, 0), Vector3.new(0.7, 0.18, 0.7), WHITE, Enum.Material.SmoothPlastic)
+			if i % 2 == 0 then
+				-- (a little lantern on every other post: the fence lit at night)
+				piece(made, pa * CFrame.new(0, 3.3, 0), Vector3.new(0.7, 0.16, 0.7), WOOD_DARK, Enum.Material.Wood)
+				piece(made, pa * CFrame.new(0, 3.62, 0), Vector3.new(0.42, 0.5, 0.42), BULB, Enum.Material.Neon)
+			else
+				piece(made, pa * CFrame.new(0, 3.28, 0), Vector3.new(0.7, 0.18, 0.7), WHITE, Enum.Material.SmoothPlastic)
+			end
+			if i % 4 == 1 then
+				-- (a bush outside the fence)
+				local bush = piece(made, middle * CFrame.new(math.cos(a) * (R + 1.3), 0.9, math.sin(a) * (R + 1.3)), Vector3.new(2.2, 1.9, 2.2), Color3.fromRGB(64, 128, 60), Enum.Material.Grass)
+				bush.Shape = Enum.PartType.Ball
+			end
 		end
 		if not inGate then
 			local centre = (pa.Position + pb.Position) / 2
@@ -146,13 +165,26 @@ local function buildPen(frame: CFrame): Folder
 	local function at(angle: number): CFrame
 		return middle * CFrame.new(math.cos(angle) * ring, 0, math.sin(angle) * ring)
 	end
-	local tree = at(math.rad(140))
+	local tree = at(math.rad(135))
 	piece(made, tree * CFrame.new(0, 3, 0), Vector3.new(1.4, 6, 1.4), WOOD_DARK, Enum.Material.Wood)
 	for _, blob in { { 0, 7.4, 0, 6 }, { 1.6, 6.6, 1, 4.2 }, { -1.5, 6.8, -0.8, 4.4 } } do
 		local leaves = piece(made, tree * CFrame.new(blob[1], blob[2], blob[3]), Vector3.one * blob[4], LEAF, Enum.Material.Grass)
 		leaves.Shape = Enum.PartType.Ball
 	end
-	for k, angle in { 40, 220, 300 } do
+	-- A second, smaller tree across from the first.
+	local tree2 = at(math.rad(55))
+	piece(made, tree2 * CFrame.new(0, 2.2, 0), Vector3.new(1, 4.4, 1), WOOD_DARK, Enum.Material.Wood)
+	for _, blob in { { 0, 5.4, 0, 4.2 }, { 1, 4.8, 0.6, 3 } } do
+		local leaves = piece(made, tree2 * CFrame.new(blob[1], blob[2], blob[3]), Vector3.one * blob[4], Color3.fromRGB(96, 168, 80), Enum.Material.Grass)
+		leaves.Shape = Enum.PartType.Ball
+	end
+	-- Straw beds by the barn, where the stored ones nap.
+	for _, angle in { 168, 182 } do
+		local bed = at(math.rad(angle))
+		disc(made, bed * CFrame.new(0, 0.42, 0), 1.3, 0.18, Color3.fromRGB(222, 190, 110), Enum.Material.Fabric)
+		disc(made, bed * CFrame.new(0, 0.5, 0), 1.0, 0.1, Color3.fromRGB(236, 206, 128), Enum.Material.Fabric)
+	end
+	for k, angle in { 25, 300, 335 } do
 		local bed = at(math.rad(angle))
 		disc(made, bed * CFrame.new(0, 0.4, 0), 1.6, 0.25, Color3.fromRGB(96, 64, 42), Enum.Material.Ground)
 		for f = 0, 5 do
@@ -161,11 +193,33 @@ local function buildPen(frame: CFrame): Folder
 			bloom.Shape = Enum.PartType.Ball
 		end
 	end
-	local trough = at(math.rad(250)) * CFrame.Angles(0, math.rad(-250 - 90), 0)
+	local trough = at(math.rad(255)) * CFrame.Angles(0, math.rad(-255 - 90), 0)
 	piece(made, trough * CFrame.new(0, 0.6, 0), Vector3.new(4, 1, 1.4), WOOD_DARK, Enum.Material.Wood)
 	piece(made, trough * CFrame.new(0, 1.05, 0), Vector3.new(3.6, 0.06, 1.0), Color3.fromRGB(80, 150, 190), Enum.Material.Glass)
-	for _, h in { { 110, 0 }, { 115, 1.2 } } do
+	for _, h in { { 98, 0 }, { 104, 0 }, { 101, 1.2 } } do
 		piece(made, at(math.rad(h[1])) * CFrame.new(0, 0.7 + h[2], 0) * CFrame.Angles(0, math.rad(h[1]), 0), Vector3.new(2.4, 1.2, 1.6), Color3.fromRGB(214, 180, 96), Enum.Material.Fabric)
+	end
+	-- A pond, its stones round it.
+	local pond = at(math.rad(195))
+	disc(made, pond * CFrame.new(0, 0.36, 0), 2.6, 0.12, STONE, Enum.Material.Slate)
+	local water = disc(made, pond * CFrame.new(0, 0.44, 0), 2.1, 0.08, Color3.fromRGB(70, 150, 200), Enum.Material.Glass)
+	water.Transparency = 0.15
+	for k = 0, 7 do
+		local sa = k / 8 * math.pi * 2
+		local stone = piece(made, pond * CFrame.new(math.cos(sa) * 2.5, 0.5, math.sin(sa) * 2.5), Vector3.new(0.9, 0.5, 0.7), STONE, Enum.Material.Slate)
+		stone.Shape = Enum.PartType.Ball
+	end
+	-- The training post in the middle: a stump with a straw target, the
+	-- ones training circle it.
+	piece(made, middle * CFrame.new(0, 1.2, 0), Vector3.new(1.3, 2.4, 1.3), WOOD_DARK, Enum.Material.Wood, true)
+	for k, size in { 2.2, 1.5, 0.8 } do
+		-- (standing up on the stump, facing the gate: the disc turned back on its side)
+		disc(made, middle * CFrame.new(0.66 + k * 0.04, 3.5, 0) * CFrame.Angles(0, 0, math.rad(90)), size / 2, 0.08, if k % 2 == 1 then Color3.fromRGB(214, 180, 96) else RED, Enum.Material.Fabric)
+	end
+	-- Stepping stones from the gate out to the desk.
+	for k = 0, 4 do
+		local stone = disc(made, middle * CFrame.new(R + 1.2 + k * 1.5, 0.15, (k % 2) * 0.6 - 0.3), 0.85, 0.12, STONE, Enum.Material.Slate)
+		stone.Name = "Step"
 	end
 	-- The arch over the gate, strung with lights.
 	local gate = middle * CFrame.new(R, 0, 0)
@@ -208,12 +262,15 @@ local function buildPen(frame: CFrame): Folder
 	local desk = CFrame.lookAt(deskAt.Position, deskAt.Position + (deskAt.Position - gate.Position) * Vector3.new(1, 0, 1))
 	piece(made, desk * CFrame.new(0, 0.8, 0), Vector3.new(6, 1.6, 1.8), WOOD, Enum.Material.Wood, true)
 	piece(made, desk * CFrame.new(0, 1.66, 0), Vector3.new(6.4, 0.14, 2.1), WOOD_DARK, Enum.Material.Wood)
-	for _, side in { -3, 3 } do
-		piece(made, desk * CFrame.new(side, 2.6, 1.5), Vector3.new(0.35, 5.2, 0.35), WOOD_DARK, Enum.Material.Wood)
+	-- (the awning over the counter, on two posts behind it, sloping down
+	-- to the front, a scalloped red trim along its edge)
+	for _, side in { -3.1, 3.1 } do
+		piece(made, desk * CFrame.new(side, 2.7, 1.1), Vector3.new(0.35, 5.4, 0.35), WOOD_DARK, Enum.Material.Wood)
 	end
 	for k = 0, 5 do
-		piece(made, desk * CFrame.new(-2.75 + k * 1.1, 5.3, 0.4) * CFrame.Angles(math.rad(18), 0, 0), Vector3.new(1.1, 0.12, 3), if k % 2 == 0 then RED else WHITE, Enum.Material.Fabric)
+		piece(made, desk * CFrame.new(-2.75 + k * 1.1, 5.2, -0.2) * CFrame.Angles(math.rad(-14), 0, 0), Vector3.new(1.1, 0.12, 3.2), if k % 2 == 0 then RED else WHITE, Enum.Material.Fabric)
 	end
+	piece(made, desk * CFrame.new(0, 4.62, -1.8), Vector3.new(6.6, 0.4, 0.1), RED, Enum.Material.Fabric)
 	local board = piece(made, desk * CFrame.new(5.2, 2.2, 0.4) * CFrame.Angles(0, math.rad(-20), 0), Vector3.new(3.4, 3, 0.2), SIGN, Enum.Material.Wood, true)
 	board.Name = "DaycareBoard"
 	words(board, string.format("STORE\n%d coins / h\n\nTRAIN\nfrom %d coins / h", Daycare.Store.PerHour, Daycare.trainRate(1)), CREAM, Enum.Font.GothamBold, 26)
@@ -236,27 +293,49 @@ end
 local function plate(entry: Configuration, root: BasePart): BillboardGui
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "DaycarePlate"
-	gui.Size = UDim2.fromOffset(140, 46)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, 4, 0)
+	gui.Size = UDim2.fromOffset(150, 50)
+	gui.StudsOffsetWorldSpace = Vector3.new(0, 4.2, 0)
 	gui.AlwaysOnTop = true
 	gui.LightInfluence = 0
-	gui.MaxDistance = 90
+	gui.MaxDistance = 80
 	gui.Adornee = root
 	local training = entry:GetAttribute("Mode") == "Train"
-	local function text(value: string, y: number, h: number, size: number, color: Color3, font: Enum.Font)
+	local element = GemConfig.ElementColors[entry:GetAttribute("Element")] or CREAM
+	local back = Instance.new("Frame")
+	back.BackgroundColor3 = Color3.fromRGB(14, 16, 22)
+	back.BackgroundTransparency = 0.2
+	back.Size = UDim2.new(1, 0, 0, 34)
+	back.Parent = gui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = back
+	local edge = Instance.new("UIStroke")
+	edge.Color, edge.Thickness, edge.Transparency = element, 1.5, 0.3
+	edge.Parent = back
+	local function text(parent: Instance, value: string, x: number, y: number, w: number, h: number, size: number, color: Color3, font: Enum.Font, align: Enum.TextXAlignment?)
 		local l = Instance.new("TextLabel")
 		l.BackgroundTransparency = 1
-		l.Position, l.Size = UDim2.fromOffset(0, y), UDim2.new(1, 0, 0, h)
+		l.Position, l.Size = UDim2.fromOffset(x, y), UDim2.new(0, w, 0, h)
 		l.Font, l.Text, l.TextSize, l.TextColor3 = font, value, size, color
-		l.TextStrokeTransparency, l.TextStrokeColor3 = 0.3, Color3.new(0, 0, 0)
+		l.TextXAlignment = align or Enum.TextXAlignment.Center
+		l.TextTruncate = Enum.TextTruncate.AtEnd
 		l:SetAttribute("NoTranslate", true)
-		l.Parent = gui
+		l.Parent = parent
 		return l
 	end
-	local element = GemConfig.ElementColors[entry:GetAttribute("Element")] or CREAM
-	text(string.format("%s  ·  Lv %d", tostring(entry:GetAttribute("Name") or "Kaiju"), entry:GetAttribute("Level") or 1), 0, 16, 14, element:Lerp(CREAM, 0.35), Enum.Font.GothamBold)
-	text(tostring(entry:GetAttribute("Owner") or ""), 16, 13, 11, CREAM, Enum.Font.Gotham)
-	local tag = text(if training then "TRAINING" else "STORED", 30, 14, 11, if training then TRAIN else STORE, Enum.Font.GothamBlack)
+	text(back, tostring(entry:GetAttribute("Name") or "Kaiju"), 8, 3, 104, 16, 14, element:Lerp(CREAM, 0.25), Enum.Font.GothamBold, Enum.TextXAlignment.Left)
+	text(back, "Lv " .. tostring(entry:GetAttribute("Level") or 1), 108, 3, 36, 16, 12, GOLD_TEXT, Enum.Font.GothamBlack, Enum.TextXAlignment.Right)
+	text(back, tostring(entry:GetAttribute("Owner") or ""), 8, 18, 134, 13, 11, Color3.fromRGB(200, 196, 186), Enum.Font.Gotham, Enum.TextXAlignment.Left)
+	-- TRAINING or STORED, a chip under it.
+	local chip = Instance.new("Frame")
+	chip.AnchorPoint = Vector2.new(0.5, 0)
+	chip.Position, chip.Size = UDim2.new(0.5, 0, 0, 36), UDim2.fromOffset(78, 14)
+	chip.BackgroundColor3 = if training then TRAIN else STORE
+	chip.Parent = gui
+	local chipCorner = Instance.new("UICorner")
+	chipCorner.CornerRadius = UDim.new(1, 0)
+	chipCorner.Parent = chip
+	local tag = text(chip, if training then "TRAINING" else "STORED", 0, 0, 78, 14, 10, Color3.fromRGB(14, 16, 22), Enum.Font.GothamBlack)
 	tag:SetAttribute("NoTranslate", nil)
 	return gui
 end
@@ -320,6 +399,7 @@ local function stock()
 			tag.Parent = playerGui
 			table.insert(residents, {
 				Key = c.Name,
+				Training = c:GetAttribute("Mode") == "Train",
 				Model = model,
 				Root = root,
 				Lift = (model:GetAttribute("KaijuHipHeight") or 1) + root.Size.Y / 2,
@@ -343,9 +423,10 @@ local function pose(now: number)
 		if r.Model:GetAttribute("PacedSpeed") ~= s.Speed then
 			r.Model:SetAttribute("PacedSpeed", s.Speed)
 		end
-		if s.Mood ~= r.Mood or s.MoodAt ~= r.MoodAt then
-			r.Mood, r.MoodAt = s.Mood, s.MoodAt
-			r.Model:SetAttribute("KaijuMood", s.Mood)
+		local mood = s.Mood and ((if r.Training then TRAINING_MOOD else STORED_MOOD)[s.Mood] or s.Mood)
+		if mood ~= r.Mood or s.MoodAt ~= r.MoodAt then
+			r.Mood, r.MoodAt = mood, s.MoodAt
+			r.Model:SetAttribute("KaijuMood", mood)
 			r.Model:SetAttribute("KaijuMoodAt", s.MoodAt)
 		end
 	end
@@ -354,23 +435,86 @@ local function pose(now: number)
 	end
 end
 
+-- The ground under the pen: the quarry floor there is terrain, a little
+-- over the quarry's frame (and only there once it's streamed in). The
+-- middle of what's under its middle, its fence and its desk, as a lift over
+-- `base` (nil till there's ground under it).
+local function groundLift(base: CFrame): number?
+	local spec = Daycare.Pen
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local skip: { Instance } = { folder :: Instance }
+	for _, p in game:GetService("Players"):GetPlayers() do
+		if p.Character then
+			table.insert(skip, p.Character)
+		end
+	end
+	for _, name in { "Kaiju", "Enemies", "MeteorGolems", "KaijuKennel" } do
+		local f = workspace:FindFirstChild(name)
+		if f then
+			table.insert(skip, f)
+		end
+	end
+	if workspace.CurrentCamera then
+		table.insert(skip, workspace.CurrentCamera)
+	end
+	params.FilterDescendantsInstances = skip
+	local points = { spec.Middle, spec.Desk }
+	for k = 0, 7 do
+		local a = k / 8 * math.pi * 2
+		table.insert(points, spec.Middle + Vector3.new(math.cos(a), 0, math.sin(a)) * (spec.Fence - 1))
+	end
+	local heights = {}
+	for _, p in points do
+		local top = (base * CFrame.new(p + Vector3.new(0, 60, 0))).Position
+		local hit = workspace:Raycast(top, Vector3.new(0, -140, 0), params)
+		if hit then
+			table.insert(heights, hit.Position.Y - (base * CFrame.new(p)).Position.Y)
+		end
+	end
+	if #heights < 4 then
+		return nil
+	end
+	table.sort(heights)
+	return heights[(#heights + 1) // 2]
+end
+
+local base: CFrame? = nil
+local groundTry = 0
 function DaycarePen.mount(frame: CFrame)
-	if at then
+	if base then
 		return
 	end
-	at = frame
+	base = frame
 	local made = Instance.new("Folder")
 	made.Name = "KaijuDaycare" -- (CreatureAnimation looks in here)
 	folder = made
-	pen = buildPen(frame)
+end
+
+-- Built once there's ground under it to stand on (tried once a second).
+local function build(): boolean
+	if pen then
+		return true
+	end
+	if not base or os.clock() < groundTry then
+		return false
+	end
+	groundTry = os.clock() + 1
+	local lift = groundLift(base)
+	if not lift then
+		return false
+	end
+	at = base + Vector3.new(0, lift, 0)
+	pen = buildPen(at :: CFrame)
+	return true
 end
 
 local function near(): boolean
 	local camera = workspace.CurrentCamera
-	if not (at and camera) then
+	if not (base and camera) then
 		return false
 	end
-	local middle = at * CFrame.new(Daycare.Pen.Middle)
+	local middle = base * CFrame.new(Daycare.Pen.Middle)
 	return (camera.CFrame.Position - middle.Position).Magnitude < DaycarePen.Reach
 end
 
@@ -401,6 +545,9 @@ function DaycarePen.step(dt: number)
 		return
 	end
 	clock = 0
+	if not build() then
+		return
+	end
 	DaycarePen.show(wanted)
 	if folder.Parent then
 		stock()
@@ -408,4 +555,5 @@ function DaycarePen.step(dt: number)
 	end
 end
 
+DaycarePen._buildPen = buildPen -- (tests and previews: the pen at a frame)
 return DaycarePen
