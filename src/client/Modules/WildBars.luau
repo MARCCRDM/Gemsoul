@@ -118,13 +118,13 @@ local function lift(model: Model, root: BasePart): number
 	return root.Size.Y / 2 + 4
 end
 
--- Its plate: the name over a level chip and the bar.
 -- What a tap on a plate saying CATCH does (KaijuHud: catch that one).
 local catchTapped: ((Model) -> ())? = nil
 function WildBars.onCatch(fn: (Model) -> ())
 	catchTapped = fn
 end
 
+-- Its plate: the name over a level chip and the bar.
 function WildBars.plate(model: Model, phone: boolean?): BillboardGui
 	local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
 	local size = if phone then WildBars.PhoneSize else WildBars.Size
@@ -379,7 +379,8 @@ function WildBars.watch(model: Model)
 	entries[model] = entry
 	redraw(entry)
 	entry.Plate.Parent = playerGui
-	;(entry.Plate:FindFirstChild("Tap") :: GuiButton).Activated:Connect(function()
+	local tap = entry.Plate:FindFirstChild("Tap") :: GuiButton
+	tap.Activated:Connect(function()
 		if catchTapped then
 			catchTapped(model)
 		end
