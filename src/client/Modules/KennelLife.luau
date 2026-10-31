@@ -31,6 +31,7 @@ local KaijuModels = require(Shared:WaitForChild("KaijuModels"))
 local GemConfig = require(Shared:WaitForChild("GemConfig"))
 local Store = require(Shared:WaitForChild("Store"))
 local KennelSale = require(script.Parent.KennelSale)
+local DaycarePen = require(script.Parent.DaycarePen) -- (the Daycare beside it: mounted, shown and stepped with it)
 
 local KennelLife = {}
 KennelLife.Reach = 260 -- studs from the pen: past this they're put away
@@ -320,6 +321,7 @@ function KennelLife.mount(frame: CFrame)
 	made.Name = "KaijuKennel" -- (CreatureAnimation looks in here too)
 	folder = made
 	pen = buildPen(frame)
+	DaycarePen.mount(frame)
 end
 
 local function near(): boolean
@@ -343,6 +345,7 @@ function KennelLife.show(on: boolean)
 	if pen and pen.Parent ~= parent then
 		pen.Parent = parent
 	end
+	DaycarePen.show(on)
 end
 
 function KennelLife.step(dt: number)
@@ -360,6 +363,7 @@ function KennelLife.step(dt: number)
 		stock(now)
 		KennelLife.pose(now)
 		turnDisplay(now)
+		DaycarePen.step(now)
 	end
 end
 

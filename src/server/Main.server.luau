@@ -96,6 +96,8 @@ CouponServer.start()
 require(script.Parent.Systems.FreeRewards).start()
 -- Another player's gear, to look at (GEAR on the card beside them).
 require(script.Parent.Systems.GearInspect).start()
+-- The Kaiju Daycare: kaiju boarded (stored or trained), in a pen by the Kennel.
+require(script.Parent.Systems.DaycareServer).start()
 TopPlayers.start()
 Equipment.start()
 -- One health-recovery rule for players and computer fighters alike.

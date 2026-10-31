@@ -47,6 +47,7 @@ Analytics.Reasons = {
 	MineWall = "Gameplay", -- coins dug out of the Moon Mine wall
 	KaijuBet = "Gameplay", -- a kaiju battle stake, paid or won
 	GemSale = "Shop", -- gems sold for coins
+	Daycare = "Shop", -- a kaiju collected from the Daycare: its stay's fee
 	-- Timed and first-time rewards
 	DailyLogin = "TimedReward",
 	DailyChallenge = "TimedReward",

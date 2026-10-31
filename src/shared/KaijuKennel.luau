@@ -128,8 +128,8 @@ end
 
 -- Resident `index`'s spot `n`, somewhere in its own wedge of the pen:
 -- in turn nearer the middle and nearer the fence, so each walk crosses it.
-local function spot(index: number, count: number, n: number): Vector3
-	local pen = Kennel.Pen
+local function spot(index: number, count: number, n: number, pen): Vector3
+	pen = pen or Kennel.Pen
 	local wedge = math.pi * 2 / count
 	local a = (index - 1 + 0.15 + hash(index, n, "a") * 0.7) * wedge
 	local half = (pen.Outer - pen.Inner) / 2
@@ -154,12 +154,14 @@ end
 
 -- Where it stood at the end of spell `n`, and the way it last walked
 -- (from where it stood before that walk).
-local function rest(index: number, count: number, n: number): (Vector3, Vector3)
+local function rest(index: number, count: number, n: number, pen): (Vector3, Vector3)
 	local k = lastWalk(index, n)
-	local to = spot(index, count, k)
-	local from = spot(index, count, lastWalk(index, k - 1))
+	local to = spot(index, count, k, pen)
+	local from = spot(index, count, lastWalk(index, k - 1), pen)
 	local way = (to - from) * Vector3.new(1, 0, 1)
-	return to, if way.Magnitude > 0.01 then way.Unit else (Kennel.Pen.Middle - to).Unit
+	local middle = (pen or Kennel.Pen).Middle
+	local inward = (middle - to) * Vector3.new(1, 0, 1)
+	return to, if way.Magnitude > 0.01 then way.Unit elseif inward.Magnitude > 0.01 then inward.Unit else Vector3.new(0, 0, -1)
 end
 
 local function yawOf(look: Vector3): number
@@ -181,7 +183,8 @@ local function mood(index: number, n: number): string
 	return "Look"
 end
 
-function Kennel.state(index: number, count: number, now: number)
+-- (`pen`: another pen laid out like Kennel.Pen, the Daycare's; else this one.)
+function Kennel.state(index: number, count: number, now: number, pen: any?)
 	local spell = Kennel.Spell
 	-- (Each resident's spells start at its own moment, so they don't all
 	-- set off at once.)
@@ -189,9 +192,9 @@ function Kennel.state(index: number, count: number, now: number)
 	local n = math.floor(t / spell)
 	local into = t - n * spell
 	local start = now - into
-	local from, look = rest(index, count, n - 1)
+	local from, look = rest(index, count, n - 1, pen)
 	if walks(index, n) then
-		local to = spot(index, count, n)
+		local to = spot(index, count, n, pen)
 		local way = (to - from) * Vector3.new(1, 0, 1)
 		local length = way.Magnitude
 		local speed = math.max(Kennel.Speed, length / (spell - 1))

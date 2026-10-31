@@ -79,8 +79,9 @@ RunService.PreSimulation:Connect(function(dt)
 		scanAt = now + 0.5
 		local found = {}
 		-- (creatures and wild kaiju; kaiju out with their players; the
-		-- Kaiju Kennel's, drawn by this client alone: Client.KennelLife)
-		for _, name in { "Enemies", "Kaiju", "KaijuKennel" } do
+		-- Kaiju Kennel's and the Daycare's, drawn by this client alone:
+		-- Client.KennelLife, Client.DaycarePen)
+		for _, name in { "Enemies", "Kaiju", "KaijuKennel", "KaijuDaycare" } do
 			local folder = workspace:FindFirstChild(name)
 			for _, model in if folder then folder:GetChildren() else {} do
 				table.insert(found, model)
