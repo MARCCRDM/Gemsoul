@@ -677,7 +677,7 @@ check(profile.Cosmetics.Owned.TitleFounder and profile.Cosmetics.Title == "Title
 clock += 3
 check(not handlers.RedeemCode(thePlayer, "REAPERGIFT113").Ok, "A gift code redeemed for someone it isn't for")
 check(not profile.Cosmetics.Owned.HelmetGrimReaper, "A gift's cosmetics went to someone else")
-thePlayer.Name = "KinGreen113"
+thePlayer.Name, thePlayer.DisplayName = "someone_else", "KinGreen113" -- (chat shows the display name)
 clock += 3
 local gift = handlers.RedeemCode(thePlayer, "reapergift113")
 check(gift.Ok, "The gift didn't redeem for kingreen113: " .. tostring(gift.Message))
@@ -685,7 +685,8 @@ for _, id in { "SuitStealth", "SkinVoid", "HelmetGrimReaper", "VisorTwilight", "
 	check(profile.Cosmetics.Owned[id], "The Reaper gift didn't give " .. id)
 end
 check(profile.Cosmetics.Helmet == "HelmetGrimReaper", "The Reaper gift's hood wasn't put on")
-thePlayer.Name = nil
+thePlayer.Name, thePlayer.DisplayName = nil, nil
+check(stubs.Codes.allowed({ For = { "kingreen113" } }, { Name = "KINGREEN113", DisplayName = "x" }), "A gift by username")
 check(stubs.Codes.allowed({ For = { 42 } }, { UserId = 42 }) and not stubs.Codes.allowed({ For = { 42 } }, { UserId = 7 }), "A gift by UserId")
 local Bundle = Store.bundle("ReaperHarvest")
 check(Bundle and table.concat(Bundle.Contents.Cosmetics, ",") == table.concat(stubs.Codes.List.REAPERGIFT113.Reward.Cosmetics, ","), "The Reaper gift isn't the whole Reaper's Harvest bundle")

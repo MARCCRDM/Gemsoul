@@ -10,9 +10,10 @@
 	           Cosmetics = { "TitleFounder" }, XPBoostMinutes, ...
 	  Expires  optional: os.time() after which it stops working
 	           (os.time({ year = 2026, month = 12, day = 1 }))
-	  For      optional: a gift for certain players only, by username or
-	           UserId ({ "kingreen113" } or { 123456 }); to anyone else it's
-	           a code that doesn't exist
+	  For      optional: a gift for certain players only, by username,
+	           display name (the name chat shows) or UserId
+	           ({ "kingreen113" } or { 123456 }); to anyone else it's a code
+	           that doesn't exist
 	  Note     for you: where it was posted
 ]]
 local Codes = {}
@@ -39,7 +40,8 @@ Codes.List = {
 	},
 }
 
--- Whether `player` may redeem `entry` (a gift's For list, by username or UserId).
+-- Whether `player` may redeem `entry` (a gift's For list, by username,
+-- display name or UserId).
 function Codes.allowed(entry, player): boolean
 	if not entry.For then
 		return true
@@ -48,8 +50,12 @@ function Codes.allowed(entry, player): boolean
 		return false
 	end
 	local name = string.lower(tostring(player.Name or ""))
+	local shown = string.lower(tostring(player.DisplayName or ""))
 	for _, who in entry.For do
-		if (type(who) == "number" and who == player.UserId) or (type(who) == "string" and string.lower(who) == name) then
+		if type(who) == "number" and who == player.UserId then
+			return true
+		end
+		if type(who) == "string" and (string.lower(who) == name or string.lower(who) == shown) then
 			return true
 		end
 	end
