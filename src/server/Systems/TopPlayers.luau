@@ -31,10 +31,36 @@ end
 
 local TopPlayers = {}
 
+-- Never on a board: the game's own accounts (Config.Playtest's Owners and
+-- Testers, and these usernames, any case). Their scores aren't written,
+-- what's already there is taken off the next time they're in a server, and
+-- rows of theirs are skipped when the boards are read.
+TopPlayers.HiddenNames = { "Devvolver", "VolverDev" }
+
+-- Whether `userId` (`name`: a username or display name) is kept off the boards.
+function TopPlayers.hidden(userId: number?, name: string?): boolean
+	local playtest = Config.Playtest or {}
+	if userId and (table.find(playtest.Owners or {}, userId) or table.find(playtest.Testers or {}, userId)) then
+		return true
+	end
+	local lower = string.lower(name or "")
+	for _, hidden in TopPlayers.HiddenNames do
+		if string.lower(hidden) == lower then
+			return true
+		end
+	end
+	return false
+end
+
+local function hiddenPlayer(player: Player): boolean
+	return TopPlayers.hidden(player.UserId, player.Name) or TopPlayers.hidden(nil, player.DisplayName)
+end
+
 local stores: { [string]: OrderedDataStore } = {}
 local cache: { [string]: { { Name: string, Value: number } } } = {}
 local global = false
 local names: { [number]: string } = {}
+local removed: { [number]: boolean } = {} -- hidden accounts already taken off, this server
 
 -- A player's score on each board.
 local function scores(player: Player): { [string]: number }?
@@ -88,7 +114,7 @@ local function localBoards()
 	for _, board in BOARDS do
 		local rows = {}
 		for _, player in Players:GetPlayers() do
-			local s = scores(player)
+			local s = not hiddenPlayer(player) and scores(player)
 			if s then
 				table.insert(rows, { Name = player.DisplayName, Value = s[board], UserId = player.UserId })
 			end
@@ -105,8 +131,17 @@ local function refresh()
 		localBoards()
 		return
 	end
-	-- Write everyone's scores, then read the top ten.
+	-- Write everyone's scores (the hidden ones' taken off), then read the top ten.
 	for _, player in Players:GetPlayers() do
+		if hiddenPlayer(player) then
+			if not removed[player.UserId] then
+				removed[player.UserId] = true
+				for _, board in BOARDS do
+					pcall(stores[board].RemoveAsync, stores[board], tostring(player.UserId))
+				end
+			end
+			continue
+		end
 		local s = scores(player)
 		if s then
 			for _, board in BOARDS do
@@ -116,13 +151,16 @@ local function refresh()
 	end
 	local anyRead = false
 	for _, board in BOARDS do
-		local ok, pages = pcall(stores[board].GetSortedAsync, stores[board], false, 10)
+		local ok, pages = pcall(stores[board].GetSortedAsync, stores[board], false, 10 + #TopPlayers.HiddenNames + 2)
 		if ok and pages then
 			anyRead = true
 			local rows = {}
 			for _, entry in pages:GetCurrentPage() do
 				local userId = tonumber(entry.key) or 0
-				table.insert(rows, { Name = nameOf(userId), Value = entry.value, UserId = userId })
+				local name = nameOf(userId)
+				if #rows < 10 and not TopPlayers.hidden(userId, name) then
+					table.insert(rows, { Name = name, Value = entry.value, UserId = userId })
+				end
 			end
 			cache[board] = rows
 		end
