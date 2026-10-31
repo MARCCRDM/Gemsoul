@@ -1420,6 +1420,13 @@ local drawPanel
 -- stays a tap (pick it / tap-to-swap, as before).
 local teamsUi = {} -- (one table: this file is at Luau's 200 locals)
 teamsUi.Drag = { Slop = 8, Targets = {}, Active = nil :: any, SuppressUntil = 0 }
+-- On a phone a finger moving straight up or down over the list scrolls it
+-- (to the kaiju you want to enchant, heal...); one's picked up to drag by
+-- holding it a moment (Hold) or moving it sideways first (pure).
+teamsUi.Drag.Hold = 0.3
+function teamsUi.Drag.scrolls(moved: Vector2, held: number): boolean
+	return held < teamsUi.Drag.Hold and math.abs(moved.Y) >= math.abs(moved.X)
+end
 function teamsUi.Drag.point(input: InputObject): Vector2
 	if input.UserInputType == Enum.UserInputType.Touch then
 		return Vector2.new(input.Position.X, input.Position.Y) + game:GetService("GuiService"):GetGuiInset()
@@ -1471,7 +1478,7 @@ function teamsUi.Drag.source(frame: GuiObject, id: string)
 		if teamsUi.Drag.Active then
 			return
 		end
-		teamsUi.Drag.Active = { Id = id, Input = input, From = teamsUi.Drag.point(input), Started = false }
+		teamsUi.Drag.Active = { Id = id, Input = input, From = teamsUi.Drag.point(input), Started = false, At = os.clock() }
 	end)
 end
 function teamsUi.Drag.paintHover(target)
@@ -1586,6 +1593,10 @@ UserInputService.InputChanged:Connect(function(input)
 	local point = teamsUi.Drag.point(input)
 	if not drag.Started then
 		if (point - drag.From).Magnitude >= teamsUi.Drag.Slop then
+			if kind == Enum.UserInputType.Touch and teamsUi.Drag.scrolls(point - drag.From, os.clock() - (drag.At or 0)) then
+				teamsUi.Drag.Active = nil -- (a swipe: the list scrolls, nothing's picked up)
+				return
+			end
 			teamsUi.Drag.begin(drag, point)
 		end
 		return

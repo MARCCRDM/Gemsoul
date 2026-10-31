@@ -1553,6 +1553,10 @@ do
 	check(wilds:find('"KaijuGrade"', 1, true) ~= nil and wilds:find("stats.Guard)", 1, true) ~= nil, "A wild kaiju's traits don't show or count")
 	local hud = fs.readFile(ROOT .. "/src/client/Modules/KaijuHud.luau")
 	check(hud:find("Kaiju.traits(record)", 1, true) ~= nil and hud:find("TraitChips", 1, true) ~= nil, "The kaiju panel doesn't show its traits")
+	-- On a phone a swipe up or down scrolls the kaiju list; holding one or
+	-- moving it sideways drags it.
+	check(hud:find("teamsUi.Drag.scrolls(point - drag.From, os.clock() - (drag.At or 0))", 1, true) ~= nil, "A swipe on the kaiju list picks a kaiju up instead of scrolling")
+	check(hud:find("return held < teamsUi.Drag.Hold and math.abs(moved.Y) >= math.abs(moved.X)", 1, true) ~= nil, "The kaiju list's swipe rule changed")
 	local market = fs.readFile(ROOT .. "/src/client/Modules/MarketBoardUI.luau")
 	check(market:find("Grade %s", 1, true) ~= nil, "The Market doesn't show a kaiju's Grade")
 	local roll = fs.readFile(ROOT .. "/src/client/Modules/KaijuRoll.luau")
