@@ -433,3 +433,7 @@ ContextActionService:BindAction(
 	Enum.KeyCode.C,
 	Enum.KeyCode.V
 )
+
+-- Other players: their name and level over them, and their health once
+-- they're hit (PlayerPlates).
+require(script.Parent.Modules.PlayerPlates).start()
