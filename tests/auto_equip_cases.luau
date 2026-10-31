@@ -639,6 +639,12 @@ do
 	})
 	check(#worn == 0, "Read the account's skin, not the miner's wardrobe")
 	check(#AutoEquip.looks({ Character = {} }) == 0, "No cosmetics: nothing to plan")
+	-- Nothing on your back stays that way; a back piece you wear is swapped
+	-- for a rarer one.
+	check(#AutoEquip.looks({ Character = {}, Cosmetics = { Owned = { BackGeode = true } } }) == 0,
+		"Auto equip put a back piece on an empty back")
+	local back = AutoEquip.looks({ Character = {}, Cosmetics = { Owned = { BackGeode = true, BackWings = true }, Back = "BackGeode" } })
+	check(#back == 1 and back[1].Kind == "Back" and back[1].Id == "BackWings", "A worn back piece wasn't swapped for a rarer one (Crystal Wings over the Geode Shell)")
 end
 
 print(string.format("PASS: %d auto equip checks (Best, Balanced, the elements, two hands, other miners, gems, Q/E/R by their moves' power, the server)", checks))

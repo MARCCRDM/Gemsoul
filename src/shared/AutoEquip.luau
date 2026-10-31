@@ -315,8 +315,11 @@ function AutoEquip.rating(loadout): number
 	return total(statsOf(ratingsOf(loadout or {})))
 end
 
--- Looks: the rarest you own of each kind, over what you wear.
+-- Looks: the rarest you own of each kind, over what you wear. A back piece
+-- only over one you wear already: nothing on your back stays that way (it
+-- put a Geode Shell on players who'd never chosen one).
 AutoEquip.LookKinds = { "Suit", "Skin", "Shield", "Helmet", "Visor", "Pick", "Trim", "Back" }
+AutoEquip.OnlyOverWorn = { Back = true }
 local LOOK_RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 -- (the catalogue, loaded on first use: planning gear never needs it)
 local Cosmetics = nil
@@ -357,6 +360,9 @@ function AutoEquip.looks(profile)
 		local id = best[kind]
 		local now = worn[kind]
 		local wearing = now and owned[now] and lookRank(now) or 0
+		if AutoEquip.OnlyOverWorn[kind] and not (now and owned[now]) then
+			continue
+		end
 		if id and id ~= now and lookRank(id) > wearing then
 			table.insert(steps, { Kind = kind, Id = id })
 		end
