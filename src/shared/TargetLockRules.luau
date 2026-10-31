@@ -9,10 +9,15 @@
 --     rival wherever it is
 --   * with a target, it moves to any enemy that gets nearer than it by
 --     SwitchMargin studs, as long as that one is in sight or attacking you
---   * the target holds through turning, mouse and touch look, and up to
---     HiddenGrace seconds of cover; it lets go when the target dies, leaves
---     RetainRange or stays hidden. Your rival is never let go for distance
---     or cover, only when it dies or becomes ineligible
+--   * the target holds through mouse and touch look while it's still in
+--     front of you, and up to HiddenGrace seconds of cover; it lets go when
+--     the target dies, leaves RetainRange or stays hidden, or when you turn
+--     the camera yourself more than LookAway off it (to run, or to go for
+--     the minions round a boss). One you looked away from is let alone:
+--     never picked up again by itself (not even attacking you, not even a
+--     leader) unless it's right ahead of you again (AimDot). Your rival is
+--     never let go for distance, cover or looking away, only when it dies
+--     or becomes ineligible
 --   * with several targets within SwitchRange, Rules.switch cycles through
 --     them left to right; a target you switched to is kept until it's lost
 --   * Rules.pick locks a target chosen directly (the target list), pinned
@@ -31,6 +36,7 @@ local Rules = {
 	SwitchRange = 10, -- studs: the targets around you that switching cycles through
 	SwitchMargin = 2, -- studs: how much nearer another enemy must be to take the lock
 	AimDot = math.cos(math.rad(25)), -- how near the middle of the view T looks for a target to lock
+	LookAway = math.cos(math.rad(60)), -- turned this far off a target yourself, the lock lets it go
 	-- The 1v1s that keep the automatic lock on desktop (the player's CombatSession).
 	AutoSessions = { PvP = true, Training = true, Duel = true },
 }
@@ -40,7 +46,49 @@ function Rules.auto(session: any, desktop: boolean): boolean
 	return not desktop or Rules.AutoSessions[session] == true
 end
 function Rules.new()
-	return { Target = nil, HiddenSince = nil, Priority = false, Pinned = false }
+	return {
+		Target = nil,
+		HiddenSince = nil,
+		Priority = false,
+		Pinned = false,
+		Dropped = setmetatable({}, { __mode = "k" }), -- [target] = true: you looked away from it
+	}
+end
+-- You turned the camera yourself (`turning`) more than LookAway off the
+-- target: it's let go, and let alone after (Dropped). Never your rival.
+local function lookedAway(state, candidates, turning): boolean
+	if not turning or not state.Target then
+		return false
+	end
+	for _, candidate in candidates do
+		if candidate.Target == state.Target then
+			if candidate.Priority or candidate.Facing >= Rules.LookAway then
+				return false
+			end
+			state.Dropped[state.Target] = true
+			state.Target, state.HiddenSince, state.Pinned = nil, nil, false
+			return true
+		end
+	end
+	return false
+end
+-- The candidates the lock may pick up by itself: one you looked away from
+-- only once it's right ahead of you again (and then it's forgiven).
+local function pickable(state, candidates)
+	local dropped = state.Dropped
+	if not dropped or next(dropped) == nil then
+		return candidates
+	end
+	local list = {}
+	for _, candidate in candidates do
+		if not dropped[candidate.Target] then
+			table.insert(list, candidate)
+		elseif candidate.Visible and candidate.Facing >= Rules.AimDot then
+			dropped[candidate.Target] = nil
+			table.insert(list, candidate)
+		end
+	end
+	return list
 end
 -- Can this candidate be picked up as a new target?
 function Rules.valid(candidate, threshold)
@@ -102,6 +150,9 @@ function Rules.switch(state, candidates)
 	end
 	local pick = nearby[index % #nearby + 1]
 	state.Target, state.HiddenSince, state.Pinned = pick.Target, nil, true
+	if state.Dropped then
+		state.Dropped[pick.Target] = nil -- (chosen again: forgiven)
+	end
 	return state.Target
 end
 -- Locks a chosen target (tapped in the target list); it stays there
@@ -110,6 +161,9 @@ function Rules.pick(state, candidates, model)
 	for _, candidate in candidates do
 		if candidate.Target == model and holdable(candidate) then
 			state.Target, state.HiddenSince, state.Pinned = model, nil, true
+			if state.Dropped then
+				state.Dropped[model] = nil -- (chosen again: forgiven)
+			end
 			return model
 		end
 	end
@@ -154,7 +208,8 @@ end
 
 -- Without the automatic lock: a target you chose (T, the target list) is
 -- held as Rules.update holds it; nothing is picked for you.
-function Rules.hold(state, candidates, now)
+function Rules.hold(state, candidates, now, turning)
+	lookedAway(state, candidates, turning)
 	if state.Pinned and state.Target and keep(state, candidates, now) then
 		return state.Target
 	end
@@ -198,8 +253,11 @@ function Rules.toggle(state, candidates)
 	return state.Target
 end
 
--- `_turning` is kept for callers; turning never breaks the lock.
-function Rules.update(state, candidates, now, _turning)
+-- `turning`: you're turning the camera yourself (Rules.LookAway).
+function Rules.update(state, candidates, now, turning)
+	state.Dropped = state.Dropped or setmetatable({}, { __mode = "k" })
+	lookedAway(state, candidates, turning)
+	candidates = pickable(state, candidates)
 	-- A target you switched to holds until it's lost.
 	if state.Pinned then
 		if state.Target and keep(state, candidates, now) then

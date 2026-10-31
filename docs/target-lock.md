@@ -33,10 +33,17 @@ around. So outside a 1v1, desktop players aim themselves and lock on with T.
 
 **How long it holds.**
 
-- A target holds through turning, mouse look and touch look, and through up to
-  4 seconds of cover.
+- A target holds while you look around a little (mouse, touch drag, right
+  stick), and through up to 4 seconds of cover.
 - It lets go when the target dies, goes past 140 studs or stays hidden.
-- Your rival is only let go when it dies or can't be fought.
+- It also lets go when you turn the camera yourself more than 60° off it, to
+  run away or to go for the minions around a boss.
+- After you look away from a target, the lock leaves it alone. It isn't
+  picked up again by itself, even while it's attacking you or it's a pack
+  leader, until it's right ahead of you again (within 25°). Choosing it with
+  T or the target list also brings it back.
+- Your rival is only let go when it dies or can't be fought. Looking away
+  doesn't drop it.
 
 **Switching.**
 
@@ -46,8 +53,9 @@ around. So outside a 1v1, desktop players aim themselves and lock on with T.
 
 **The camera.**
 
-- It pulls hard toward the target's head, and a little softer while you look
-  around yourself.
+- It pulls hard toward the target's head.
+- While you look around yourself, it doesn't pull at all, so you can look
+  away. Your Arena rival is the exception: it gets a softer pull instead.
 - The pull pauses while the guide or the Augment Tree is open, without
   losing the target.
 - Moves only aim at the target while it's in sight: no aim assist through

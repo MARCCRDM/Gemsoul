@@ -1,6 +1,7 @@
 -- A strong, sticky lock (see TargetLockRules): your Arena rival is always
 -- the target, and the camera keeps pulling toward its head (gentler while
--- you're looking around yourself). Selection is local; hits remain
+-- you're looking around yourself). Anything else, the pull stops while you
+-- look around yourself, and turned well off it, you're let go. Selection is local; hits remain
 -- server-validated. On desktop it only picks targets by itself in a 1v1
 -- (Lock.auto); elsewhere a mouse player aims freely and T locks on.
 local Players = game:GetService("Players")
@@ -292,15 +293,21 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 			end
 		end
 	end
+	-- Looking around yourself (dragging, the right stick, the mouse): the
+	-- lock lets go once you've turned well off it (TargetLockRules.LookAway).
+	local looking = now < manualUntil
 	local target = if Lock.auto()
-		then Rules.update(state, records, now, now < manualUntil)
-		else Rules.hold(state, records, now)
+		then Rules.update(state, records, now, looking)
+		else Rules.hold(state, records, now, looking)
 	outline.Adornee, outline.Enabled = target, target ~= nil
-	if target and not paused then
-		-- A hard pull; a little softer (never released) while you look around.
+	-- (No pull at all while you look around, so you can look away and it
+	-- lets go; only your Arena rival keeps a softer pull through it.)
+	local rival = target ~= nil and Matchmaking.ownsRival(target, player)
+	if target and not paused and (rival or not looking) then
+		-- A hard pull, softer on your rival while you look around.
 		local point = pointOf(target)
 		if point then
-			local rate = if now < manualUntil then 9 else 16
+			local rate = if looking then 9 else 16
 			camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, point), 1 - math.exp(-dt * rate))
 		end
 	end

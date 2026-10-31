@@ -19,7 +19,8 @@ check(Rules.update(s, { c("far", 20), c("near", 8) }, 0, false) == "near", "Near
 check(Rules.update(s, { c("far", 2), c("near", 8) }, 0.1, false) == "far", "A nearer enemy did not take the lock")
 check(Rules.update(s, { c("far", 2), c("near", 3) }, 0.15, false) == "far", "Lock flickered to an enemy barely nearer")
 check(Rules.update(s, { c("near", 8, 0.8) }, 0.2, false) == "near", "Normal tracking lost retained target")
-check(Rules.update(s, { c("near", 8, -0.9) }, 0.3, true) == "near", "Turning away broke the lock")
+check(Rules.update(s, { c("near", 8, -0.9) }, 0.3, false) == "near", "A target getting behind you (you not turning) broke the lock")
+check(Rules.update(s, { c("near", 8, 0.8) }, 0.31, true) == "near", "Looking round a little broke the lock")
 check(Rules.update(s, { c("near", 8, 1, false) }, 0.4, false) == "near", "Brief cover broke the lock")
 check(Rules.update(s, { c("near", 8, 1, false) }, 3.5, false) == "near", "Lock dropped inside the cover grace")
 check(
@@ -226,6 +227,27 @@ do
 		Rules.hold(h, { b("ahead", 20, 0.999, 0, false) }, 1 + Rules.HiddenGrace + 0.1) == nil,
 		"A chosen lock held a hidden target too long"
 	)
+end
+-- Looking away (on a phone, a drag): turned well off a target yourself, the
+-- lock lets it go, and leaves it alone (attacking you, a leader) until it's
+-- right ahead of you again; the minions you turned to get the lock instead.
+do
+	local function boss(facing, engaged) local x = c("boss", 6, facing, true, true, false, engaged); x.Leader = true; return x end
+	local t = Rules.new()
+	check(Rules.update(t, { boss(1) }, 0, false) == "boss", "The boss wasn't locked")
+	check(Rules.update(t, { boss(0.2, true) }, 0.1, true) == nil, "Looking away from the boss didn't let go")
+	check(Rules.update(t, { boss(-0.9, true) }, 0.2, false) == nil, "The boss behind you, attacking, took the lock straight back")
+	check(Rules.update(t, { boss(-0.9, true), c("minion", 9, 0.95) }, 0.3, false) == "minion", "The minion you turned to wasn't locked")
+	check(Rules.update(t, { boss(0.5, true), c("minion", 9, 0.95) }, 0.4, false) == "minion", "The boss off to the side took the lock off the minion")
+	check(Rules.update(t, { boss(0.97) }, 0.5, false) == "boss", "Facing the boss again, it wasn't locked")
+	local r = Rules.new()
+	check(Rules.update(r, { c("rival", 30, 1, true, true, true) }, 0, false) == "rival", "The rival wasn't locked")
+	check(Rules.update(r, { c("rival", 30, -0.9, true, true, true) }, 0.1, true) == "rival", "Looking away let go of your Arena rival")
+	-- Without the automatic lock, a target you chose is let go the same way.
+	local h = Rules.new()
+	check(Rules.pick(h, { c("boss", 6) }, "boss") == "boss", "Couldn't pick the boss")
+	check(Rules.hold(h, { c("boss", 6, 0.1) }, 0, true) == nil, "Looking away didn't let go of a chosen target")
+	check(Rules.pick(h, { c("boss", 6, 0.1) }, "boss") == "boss" and not h.Dropped.boss, "Choosing it again didn't forgive it")
 end
 print(
 	"PASS: "
