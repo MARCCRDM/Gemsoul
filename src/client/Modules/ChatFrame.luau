@@ -586,6 +586,15 @@ local function run(line: string)
 		elseif target then
 			ChallengeChooser.open(target.UserId, target.DisplayName)
 		end
+	elseif kind == "Gift" then
+		-- (the game's owners only: the server says no to anyone else)
+		local target = findPlayer(command.Target)
+		if target then
+			task.spawn(function()
+				local result = GemClient.request("GiftBundle", target.UserId, command.Bundle)
+				systemLine(result.Message or "")
+			end)
+		end
 	elseif kind == "Trade" then
 		local target = command.Target and findPlayer(command.Target)
 		if target then

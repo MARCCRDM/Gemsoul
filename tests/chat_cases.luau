@@ -48,6 +48,8 @@ check(parse("/invite Mira").Kind == "Invite" and parse("/invite Mira").Target ==
 check(parse("/duel Orrin").Kind == "Duel", "Duel didn't parse")
 check(parse("/trade Vex").Kind == "Trade" and parse("/trade Vex").Target == "Vex", "/trade name should open the Market")
 check(parse("/trade").Kind == "Trade" and parse("/trade").Target == nil, "Bare /trade should open the Market")
+check(parse("/gift kingreen reaper").Kind == "Gift" and parse("/gift kingreen reaper").Target == "kingreen" and parse("/gift kingreen reaper").Bundle == "reaper", "/gift name bundle")
+check(parse("/gift kingreen").Kind == "Error" and parse("/gift").Kind == "Error", "/gift without a name or bundle should explain itself")
 check(parse("/help").Kind == "Help" and parse("/who").Kind == "Who" and parse("/clear").Kind == "Clear", "Help/who/clear")
 check(parse("/dance").Kind == "Error", "Unknown commands should say so")
 check(parse("/W Kade hi").Kind == "Whisper", "Commands should ignore case")

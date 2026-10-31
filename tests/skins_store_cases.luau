@@ -690,6 +690,26 @@ check(stubs.Codes.allowed({ For = { "kingreen113" } }, { Name = "KINGREEN113", D
 check(stubs.Codes.allowed({ For = { 42 } }, { UserId = 42 }) and not stubs.Codes.allowed({ For = { 42 } }, { UserId = 7 }), "A gift by UserId")
 local Bundle = Store.bundle("ReaperHarvest")
 check(Bundle and table.concat(Bundle.Contents.Cosmetics, ",") == table.concat(stubs.Codes.List.REAPERGIFT113.Reward.Cosmetics, ","), "The Reaper gift isn't the whole Reaper's Harvest bundle")
+-- /gift name bundle: the game's owners give a player in the server a bundle.
+check(Store.findBundle("reaper").Id == "ReaperHarvest" and Store.findBundle("Reaper's Harvest").Id == "ReaperHarvest", "/gift reaper didn't find the Reaper's Harvest")
+check(Store.findBundle("") == nil and Store.findBundle(nil) == nil and Store.findBundle("zzzz") == nil, "/gift found a bundle in nothing")
+do
+	local notified = {}
+	stubs.Remotes = { Notify = { FireClient = function(_, who, text) table.insert(notified, { who, text }) end } }
+	stubs.TestAdmin = { Playtest = { Owners = { 99 } } }
+	freshProfile()
+	local stranger = { UserId = 5, DisplayName = "Stranger" }
+	check(not handlers.GiftBundle(stranger, 7, "reaper").Ok and not profile.Cosmetics.Owned.HelmetGrimReaper, "Someone who isn't an owner gave a gift")
+	local owner = { UserId = 99, DisplayName = "Devvolver" }
+	check(not handlers.GiftBundle(owner, 12345, "reaper").Ok, "A gift to someone not in the server")
+	check(not handlers.GiftBundle(owner, 7, "zzzz").Ok, "A gift of a bundle that doesn't exist")
+	local given = handlers.GiftBundle(owner, 7, "reaper")
+	check(given.Ok, "The owner's gift didn't go through: " .. tostring(given.Message))
+	for _, id in { "SuitStealth", "SkinVoid", "HelmetGrimReaper", "VisorTwilight", "PickVoid" } do
+		check(profile.Cosmetics.Owned[id], "/gift reaper didn't give " .. id)
+	end
+	check(#notified == 1 and notified[1][1] == thePlayer, "They weren't told about their gift")
+end
 -- The group: off with no id set.
 check(not handlers.CheckGroup(thePlayer).Ok, "The group reward paid out with no group set")
 local state = handlers.FreeRewards(thePlayer)

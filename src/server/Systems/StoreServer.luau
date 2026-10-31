@@ -407,7 +407,31 @@ local function processReceipt(receipt)
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 
+-- /gift name bundle (ChatRules): one of the game's owners (Config.Playtest
+-- Owners) gives a player in the server a bundle, put on like one bought.
+local function giftBundle(player: Player, userId: any, words: any)
+	local owners = require(script.Parent.TestAdmin).Playtest.Owners or {}
+	if not table.find(owners, player.UserId) then
+		return reply(false, "Only the game's owners can give gifts.")
+	end
+	local target = typeof(userId) == "number" and Players:GetPlayerByUserId(userId)
+	if not target then
+		return reply(false, "They're not in this server.")
+	end
+	local bundle = Store.findBundle(words)
+	if not bundle then
+		return reply(false, string.format('No single bundle matches "%s". Try more of its name.', tostring(words)))
+	end
+	local granted, lines = StoreServer.grantProduct(target, bundle.Id, "Gift")
+	if not granted then
+		return reply(false, "That didn't go through (their profile isn't loaded?). Try again in a moment.")
+	end
+	require(script.Parent.Remotes).Notify:FireClient(target, string.format("%s gave you the %s bundle! It's on.", player.DisplayName or "The owner", bundle.Name))
+	return reply(true, string.format("Gave %s the %s bundle: %s", target.DisplayName or target.Name or "them", bundle.Name, table.concat(lines or {}, ", ")))
+end
+
 function StoreServer.start()
+	Shop.register("GiftBundle", giftBundle)
 	Shop.register("BuyProduct", buyProduct)
 	Shop.register("BuyCosmetic", buyCosmetic)
 	Shop.register("EquipCosmetic", equipCosmetic)

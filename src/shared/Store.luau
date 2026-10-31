@@ -653,6 +653,35 @@ function Store.bundle(id: any): Bundle?
 	return nil
 end
 
+-- The bundle a few typed words name ("reaper", "Reaper's Harvest",
+-- "ReaperHarvest"): its Id or Name, else the only one either contains.
+function Store.findBundle(words: any): Bundle?
+	if type(words) ~= "string" then
+		return nil
+	end
+	local function squash(text: string): string
+		return string.lower((string.gsub(text, "[^%w]", "")))
+	end
+	local wanted = squash(words)
+	if wanted == "" then
+		return nil
+	end
+	local found
+	for _, bundle in Store.Bundles do
+		local id, name = squash(bundle.Id), squash(bundle.Name or "")
+		if id == wanted or name == wanted then
+			return bundle
+		end
+		if string.find(id, wanted, 1, true) or string.find(name, wanted, 1, true) then
+			if found then
+				return nil -- (more than one: type more of it)
+			end
+			found = bundle
+		end
+	end
+	return found
+end
+
 -- Is this a product no longer sold (a retired bundle, the squad kits)? It's
 -- still granted when a purchase of it goes through, never offered again.
 function Store.retired(key: any): boolean

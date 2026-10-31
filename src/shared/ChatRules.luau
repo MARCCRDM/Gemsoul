@@ -135,6 +135,8 @@ end
 --   { Kind = "Reply", Text }              "/r text"
 --   { Kind = "Roll", Max }
 --   { Kind = "Invite" | "Duel" | "Trade", Target }
+--   { Kind = "Gift", Target, Bundle }     "/gift name reaper" (the game's
+--                                          owners only: Systems/StoreServer)
 --   { Kind = "Help" | "Who" | "Clear" }
 --   { Kind = "Error", Message }
 --   nil for an empty line
@@ -169,6 +171,12 @@ function ChatRules.parse(line: string, speaking: string?): { [string]: any }?
 			else { Kind = "Error", Message = "Duel who? Try /duel name" }
 	elseif command == "trade" then
 		return { Kind = "Trade", Target = string.match(rest, "^(%S+)") }
+	elseif command == "gift" then
+		local target, bundle = string.match(rest, "^(%S+)%s*(.*)$")
+		if not target or bundle == "" then
+			return { Kind = "Error", Message = "Gift who what? Try /gift name reaper" }
+		end
+		return { Kind = "Gift", Target = target, Bundle = bundle }
 	elseif command == "help" or command == "?" then
 		return { Kind = "Help" }
 	elseif command == "who" then
