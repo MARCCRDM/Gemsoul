@@ -35,6 +35,7 @@ local Remotes = {
 	Challenges = Instance.new("RemoteEvent"), -- server -> client: daily challenge progress (Shared.DailyChallenges)
 	KaijuJump = Instance.new("RemoteEvent"), -- client -> server: you jumped (your kaiju jump after you: KaijuServer)
 	KaijuView = Instance.new("RemoteEvent"), -- client -> server: which way your camera looks (your kaiju stand where you see them: KaijuServer)
+	MeteorGolem = Instance.new("RemoteEvent"), -- server -> everyone: the Meteor Golem's fall, its blows and its end (Systems/MeteorGolemServer, Client.MeteorGolemFx)
 }
 for name, remote in Remotes do
 	remote.Name = name

@@ -144,7 +144,14 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			local FrontierServer = require(script.Parent.Systems.FrontierServer)
 			FrontierServer.start(OutpostServer.site())
 			-- Swings out past the core draw critters; a pick bonks them.
-			OutpostServer.onSwing = FrontierServer.swing
+			-- A new miner's first swings out there also start the Meteor
+			-- Golem's clock (once, theirs alone: Systems/MeteorGolemServer).
+			local MeteorGolemServer = require(script.Parent.Systems.MeteorGolemServer)
+			MeteorGolemServer.start()
+			OutpostServer.onSwing = function(player, strikes)
+				FrontierServer.swing(player, strikes)
+				MeteorGolemServer.swing(player)
+			end
 			OutpostServer.bonker = KaijuWilds
 			-- Gem raids: the gems mined out there are a trip's haul (no
 			-- knock-downs in the Outpost: you're killed or you're not).

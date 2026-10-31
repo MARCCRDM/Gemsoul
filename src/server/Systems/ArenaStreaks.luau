@@ -260,7 +260,8 @@ end
 
 -- `player` beat `boss`: their boss cache, saved with their other caches to
 -- claim whenever they like (the client opens it when it comes in).
-function ArenaStreaks.bossCache(player: Player, boss, gem, source: string?)
+-- `opts.NoKaijuRoll`: the cache alone, no kaiju roll with it.
+function ArenaStreaks.bossCache(player: Player, boss, gem, source: string?, opts: { NoKaijuRoll: boolean? }?)
 	local duel = record(player)
 	if not duel or type(boss) ~= "table" then
 		return nil
@@ -270,7 +271,9 @@ function ArenaStreaks.bossCache(player: Player, boss, gem, source: string?)
 	Remotes.Social:FireClient(player, "BossCache", { Id = cache.Id, Boss = boss.Name, Source = source })
 	-- And one kaiju roll for beating it (KaijuServer.grantBossRoll; required
 	-- here, as KaijuServer's chain comes back round to this module).
-	require(script.Parent.KaijuServer).grantBossRoll(player)
+	if not (opts and opts.NoKaijuRoll) then
+		require(script.Parent.KaijuServer).grantBossRoll(player)
+	end
 	return cache
 end
 

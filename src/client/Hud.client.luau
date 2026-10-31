@@ -437,3 +437,7 @@ ContextActionService:BindAction(
 -- Other players: their name and level over them, and their health once
 -- they're hit (PlayerPlates).
 require(script.Parent.Modules.PlayerPlates).start()
+
+-- The Meteor Golem: its meteor coming down for everyone near, and the
+-- cinematic for whoever it's come for (MeteorGolemFx).
+require(script.Parent.Modules.MeteorGolemFx).start()
