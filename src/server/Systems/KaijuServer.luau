@@ -2414,8 +2414,9 @@ local function infuse(player: Player, ids: any, kaijuId: any)
 	if pet then
 		keepHealth(pet)
 	end
-	-- (Gems heal only out of a fight: not one of yours, out or home, mid-fight.)
-	if KaijuServer.inDanger(player) then
+	-- (Gems heal only out of a fight while yours are out: called back, safe
+	-- in their Gemsouls, they heal any time.)
+	if KaijuServer.deployed(player) and KaijuServer.inDanger(player) then
 		return reply(false, "Not in the middle of a fight: get clear of the critters first.", { Danger = true })
 	end
 	local health, most = Kaiju.health(record)
@@ -2571,18 +2572,35 @@ Players.PlayerRemoving:Connect(function(player)
 	lastNamed[player] = nil
 end)
 
+-- Whether any of `player`'s kaiju is out in the world right now (not
+-- called back, not left at home with nothing out).
+function KaijuServer.deployed(player: Player): boolean
+	for _, pet in teams[player] or {} do
+		if pet.Model and pet.Model.Parent then
+			return true
+		end
+	end
+	return false
+end
+
 -- Auto heal (Kaiju.AutoHeal): your spare Commons heal the team by
--- themselves, out of danger, each one hurt in one go, then your spare
--- Uncommons once the Commons are gone (Kaiju.autoHealPick). Quiet (it
--- glows, and the strip's count of gems drops), but once for running out.
+-- themselves, each one hurt in one go, then your spare Uncommons once the
+-- Commons are gone (Kaiju.autoHealPick). Out, only out of danger (in the
+-- Outpost); called back (or none out), safe in their Gemsouls, any time
+-- but in a kaiju battle. Quiet (it glows, and the strip's count of gems
+-- drops), but once for running out.
 local healAt, toldEmpty = {}, {}
 local function autoHeal(player: Player, now: number)
 	local profile = PlayerData.get(player)
 	local roster = profile and profile.Kaiju
-	if not roster or not Kaiju.autoHealOn(roster) or not canBeOut(player) or now < (healAt[player] or 0) then
+	if not roster or not Kaiju.autoHealOn(roster) or now < (healAt[player] or 0) then
 		return
 	end
-	if KaijuServer.inDanger(player, now) then
+	if KaijuServer.deployed(player) then
+		if not canBeOut(player) or KaijuServer.inDanger(player, now) then
+			return
+		end
+	elseif player:GetAttribute("KaijuBattle") ~= nil then
 		return
 	end
 	local pools = {}
@@ -2842,12 +2860,9 @@ function KaijuServer.start()
 				if not ok then
 					warn("[Kaiju] auto heal:", err)
 				end
-				-- (The HUD's HEAL waits while you're in danger, the team out
-				-- or called back.)
-				local profile = PlayerData.get(player)
-				local away = profile ~= nil and Kaiju.away(profile.Kaiju) and canBeOut(player)
-				local danger = ((teams[player] ~= nil and next(teams[player]) ~= nil) or away)
-					and KaijuServer.inDanger(player, now)
+				-- (The HUD's HEAL waits while you're in danger with the team
+				-- out; called back, it heals any time.)
+				local danger = KaijuServer.deployed(player) and KaijuServer.inDanger(player, now)
 				if player:GetAttribute("KaijuDanger") ~= (danger or nil) then
 					player:SetAttribute("KaijuDanger", danger or nil)
 				end

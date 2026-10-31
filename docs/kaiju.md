@@ -1262,12 +1262,17 @@ A gem's **power** is its rarity's, and its element matters:
   7.5% and 15%; at level 41, 5% and 10%. Matching elements double healing;
   weakness elements halve it. Rare and higher healing is unchanged.
   The HEAL preview, manual healing and auto-heal use the same calculation.
-- **Only out of danger** (`Kaiju.Danger`): not while any of your team out
-  has fought in the last 4 seconds, and not with a critter or wild kaiju
-  within 45 studs of you (`KaijuServer.inDanger`). HEAL says IN A FIGHT then
-  (the server sets `KaijuDanger` on you), and the server refuses a heal sent
-  anyway, for any of yours, out or at home, while you're in danger (since
+- **Only out of danger while your team is out** (`Kaiju.Danger`): not
+  while any of your team out has fought in the last 4 seconds, and not with
+  a critter or wild kaiju within 45 studs of you (`KaijuServer.inDanger`).
+  HEAL says IN A FIGHT then (the server sets `KaijuDanger` on you), and the
+  server refuses a heal sent anyway while you're in danger (since
   2026-10-26: gems heal only out of a fight; in one, the support does).
+- **Called back, any time** (*2026-10-31*): with none of yours out
+  (`KaijuServer.deployed`), they're safe in their Gemsouls, so HEAL and
+  AUTO HEAL heal them with critters about, anywhere. The one exception is
+  mid kaiju battle (`KaijuBattle`), when auto heal waits. Deploy them again
+  and the danger rule is back.
 - **Not one that's down**: gems don't revive (see [Knocked out](#knocked-out)).
 
 ![In a fight: HEAL waits till you're clear](kaiju/in-a-fight.png)

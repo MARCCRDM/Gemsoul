@@ -1287,6 +1287,34 @@ local function autoHealing()
 	check(record.Down and #profiles[a].Gems == 30, "Auto heal revived one, or spent Commons on it")
 	KaijuServer.reviveAll(a)
 	pet = KaijuServer.pets()[a]
+	-- Called back, safe in their Gemsouls: auto heal heals them even with
+	-- critters about (only the team out waits for a fight to end); and so
+	-- does HEAL.
+	do
+		local inDanger = KaijuServer.inDanger
+		KaijuServer.inDanger = function() return true end
+		pet.Humanoid.Health = math.floor(pet.Humanoid.MaxHealth * 0.6)
+		now += Kaiju.AutoHeal.Every + 0.1
+		KaijuServer._autoHeal(a, now)
+		check(#profiles[a].Gems == 30, "Auto healed the team out mid-fight")
+		check(KaijuServer.recallTeam(a) and not KaijuServer.deployed(a), "Calling the team back didn't put it away")
+		local hurt = Kaiju.health(record)
+		check(hurt < select(2, Kaiju.health(record)), "Called back, its health wasn't kept")
+		now += Kaiju.AutoHeal.Every + 0.1
+		KaijuServer._autoHeal(a, now)
+		check(Kaiju.health(record) > hurt and #profiles[a].Gems < 30, "Called back, auto heal didn't heal it with critters about")
+		a:SetAttribute("KaijuBattle", "b1")
+		local mid = Kaiju.health(record)
+		record.Health = math.floor(mid * 0.5)
+		now += Kaiju.AutoHeal.Every + 0.1
+		local left = #profiles[a].Gems
+		KaijuServer._autoHeal(a, now)
+		check(#profiles[a].Gems == left, "Auto healed mid kaiju battle")
+		a:SetAttribute("KaijuBattle", nil)
+		KaijuServer.inDanger = inDanger
+		KaijuServer.deployTeam(a)
+		pet = KaijuServer.pets()[a]
+	end
 	-- Off again.
 	check(registered.KaijuAutoHeal(a, false).Ok and not Kaiju.autoHealOn(roster), "Couldn't switch auto heal off")
 	for _, g in table.clone(profiles[a].Gems) do
