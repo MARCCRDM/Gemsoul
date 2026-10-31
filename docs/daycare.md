@@ -21,15 +21,27 @@ ground flat (`DAYCARE` in `OutpostWorld`, which must match `Daycare.Pen`; the
 crater that was there is gone). The tests check it against the ramp, the
 Shelter's feet, the roads, the pad and the patch.
 
-The pen itself, 32 studs across:
+The pen itself, 32 studs across, is in the Outpost's own look, like the
+Kennel and the Shelter: dark steel, hazard gold, the quarry's crystals and
+cyan light.
 
-- a stone-edged lawn with a sand path ring
-- a white rail fence
-- a shade tree, flower beds, a water trough and hay
-- the **KAIJU DAYCARE** arch over the gate (east, to the ramp), strung with lights
-- a red barn behind it
-- four lamp posts
-- the keeper's desk under a striped awning, with a price board
+- **Deck:** a raised steel deck edged in hazard paint, with a bed of packed
+  regolith and a cyan ring path set in it.
+- **Training pylon:** in the middle, a glowing column with two holo rings.
+- **Fence:** a containment fence of steel posts with hazard caps and two
+  bars of cyan energy between them, open to the east.
+- **Inside:** four crystal clusters in the elements' colours, a coolant
+  pool, feeding troughs of glowing gem kibble, and cargo crates.
+- **Gantry:** the **KAIJU DAYCARE** gantry over the gate, with steel towers
+  banded in hazard paint and lit beacons.
+- **Habitat module:** behind the pen, a hull half-sunk in its deck, with lit
+  portholes, a hazard-framed door and a dish.
+- **Outside:** floodlight pylons round it, and regolith boulders.
+- **Way in:** a lit walkway out to the keeper's terminal: a steel counter
+  with a console screen, under a canopy, with a screen of the prices.
+
+(2026-10-31: in place of the first, farm-like look, which didn't fit the
+moon base.)
 
 Kaiju in it are full size (`Daycare.Scale` 1).
 
