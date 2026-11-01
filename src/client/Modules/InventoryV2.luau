@@ -1479,10 +1479,22 @@ function Info.gem(c, gem, slot: string?, key: string?, loadout)
 end
 -- item: { Slot } a worn slot, { Slot, Id } a spare piece, { Gem } a backpack
 -- gem; Key, when a Q / E / R card opened it.
+-- (Not for a click that lands on the Inventory while it isn't to be seen:
+-- behind the loading screen after the intro, or with the Inventory shut.
+-- A window opened then waited there, stale, for the next time it opened.)
+local function seen(): boolean
+	if not (gui and gui.Enabled and state.Active) then
+		return false
+	end
+	local ok, covered = pcall(function()
+		return require(script.Parent.LoadingFlow).active()
+	end)
+	return not (ok and covered)
+end
 function Info.open(item)
 	Info.close()
 	local canvas = ui.Canvas
-	if not canvas then
+	if not canvas or not seen() then
 		return
 	end
 	if InventoryV2.hideTip then
@@ -4580,6 +4592,13 @@ end
 local root: Frame? = nil
 function InventoryV2.mount(host: ScreenGui)
 	gui = host
+	-- Shut, it starts clean next time: no item window or drag left from before.
+	host:GetPropertyChangedSignal("Enabled"):Connect(function()
+		if not host.Enabled then
+			InventoryV2.cancelDrag()
+			Info.close()
+		end
+	end)
 	chooseLayout(host)
 	local holder = new("Frame", { Name = "InventoryV2", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 2 }, host)
 	root = holder

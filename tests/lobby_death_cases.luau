@@ -60,8 +60,8 @@ check(
 )
 check(has(spar, 'player.CharacterAdded:Connect(function(character)\n\t\t\tplayer:SetAttribute("Killed", nil)'), "A new body is still killed")
 check(
-	has(spar, 'if player:GetAttribute("SparWith") == nil then\n\t\ttask.spawn(SparServer.onKnockedOut, player)'),
-	"A spar's knock-down reaches the robbers"
+	has(spar, 'if player:GetAttribute("SparWith") == nil and not byPlayer then\n\t\ttask.spawn(SparServer.onKnockedOut, player)'),
+	"A creature's knock-down reaches the robbers (another player's in open combat doesn't)"
 )
 
 -- The client ---------------------------------------------------------------------------------------

@@ -329,12 +329,16 @@ task.spawn(function()
 		task.wait(1.5)
 	end
 	-- A first fight for someone new: after the mining tutorial when that's on,
-	-- or straight after the fast start's pick (not for saves that skipped it).
+	-- or straight after the fast start's roll, in this same visit (Intro.client
+	-- leaves its cover up for it). Never on joining: someone whose first fight
+	-- didn't finish (left, disconnected) starts in the Outpost, and NEXT STEP
+	-- or PLAY takes them back to it; nobody lands in the Arena unasked.
 	local intro = GemClient.Profile.Intro
 	local fresh = duelsPlayed() == 0 and not veteran()
+	local justRolled = player:GetAttribute("IntroCover") == true
 	if require(game:GetService("ReplicatedStorage").Shared.Tutorial).Enabled and fresh and not GemClient.Profile.Tutorial then
 		firstDuel()
-	elseif FastStart.Enabled and fresh and not (intro and intro.Skipped) then
+	elseif FastStart.Enabled and fresh and justRolled and not (intro and intro.Skipped) then
 		firstDuel()
 	end
 	uncover() -- (no first fight to wait for: the intro's cover can go)
