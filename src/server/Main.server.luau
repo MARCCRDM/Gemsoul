@@ -100,6 +100,8 @@ require(script.Parent.Systems.GearInspect).start()
 require(script.Parent.Systems.DaycareServer).start()
 -- A new miner's intro rounds: six wins in the Arena, a piece of gear each.
 require(script.Parent.Systems.IntroRoundsServer).start()
+-- The Owners hear (and see) whenever someone joins, any server.
+require(script.Parent.Systems.DevAlerts).start()
 TopPlayers.start()
 Equipment.start()
 -- One health-recovery rule for players and computer fighters alike.

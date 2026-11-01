@@ -72,6 +72,10 @@ FirstStepsCoach.start()
 require(script.Parent.Modules.IntroRoundsUI).start()
 -- A force field round the Arena's floor while you fight on it: no walking off.
 require(script.Parent.Modules.ArenaBarrier).start()
+-- Owners only: someone joined the game (any server), shown and said out loud.
+task.spawn(function()
+	require(script.Parent.Modules.DevAlerts).start()
+end)
 -- Who a Rift or raid boss is on right now: a red diamond over them (or their kaiju).
 require(script.Parent.Modules.BossFocus).start()
 
