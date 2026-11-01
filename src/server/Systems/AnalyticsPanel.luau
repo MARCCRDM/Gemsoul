@@ -4,6 +4,11 @@
 	shows them the button, and every request is checked here again).
 
 	  "AnalyticsReport", range    range: "Server" | "Today" | "Week"
+	  "AnalyticsExclude", userId, excluded   a player here: left out of the
+	                              numbers or counted again (Server.DevAccounts)
+
+	Dev and test accounts are left out of every report (DevAccounts.listed,
+	and anyone marked NOT COUNTED: their rows from before too).
 
 	  Server   this server since it started (Telemetry.here): instant, and
 	           who's here now: name, minutes in, onboarding step, intro
@@ -29,6 +34,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AnalyticsReport = require(ReplicatedStorage.Shared.AnalyticsReport)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
+local DevAccounts = require(script.Parent.DevAccounts)
 local DevAlerts = require(script.Parent.DevAlerts)
 local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
@@ -212,7 +218,7 @@ local function rangeReport(range: string)
 				end
 			end
 		end
-		loader.Report = AnalyticsReport.build(rows)
+		loader.Report = AnalyticsReport.build(rows, { Exclude = DevAccounts.listed() })
 		loader.BuiltAt = os.clock()
 		loader.Dirty = false
 	end
@@ -242,6 +248,9 @@ local function here(): { any }
 		local state = profile and type(profile.IntroRounds) == "table" and IntroRounds.state(profile) or nil
 		local since = joined[player.UserId]
 		table.insert(list, {
+			UserId = player.UserId,
+			Excluded = DevAccounts.excluded(player),
+			Listed = DevAccounts.listed()[player.UserId] == true or (profile ~= nil and profile.DevBackup ~= nil),
 			Name = player.DisplayName,
 			User = player.Name,
 			Minutes = if since then math.floor((now - since) / 60) else nil,
@@ -267,7 +276,7 @@ function AnalyticsPanel.request(player: Player, range: any)
 		local rows = Telemetry.here()
 		return reply(true, "", {
 			Range = "Server",
-			Report = AnalyticsReport.build(rows),
+			Report = AnalyticsReport.build(rows, { Exclude = DevAccounts.listed() }),
 			Here = here(),
 			Since = Telemetry.Since,
 			Server = Telemetry.Server,
@@ -289,6 +298,21 @@ function AnalyticsPanel.request(player: Player, range: any)
 	})
 end
 
+-- An Owner marks a player here COUNTED or NOT COUNTED (Server.DevAccounts).
+function AnalyticsPanel.exclude(player: Player, userId: any, excluded: any)
+	if not DevAlerts.owner(player.UserId) then
+		return reply(false, "Analytics are for the game's owners.")
+	end
+	local target = type(userId) == "number" and Players:GetPlayerByUserId(userId) or nil
+	if not target then
+		return reply(false, "They're not in this server.")
+	end
+	if not DevAccounts.set(target, excluded == true) then
+		return reply(false, "Their profile is still loading.")
+	end
+	return reply(true, if excluded == true then target.DisplayName .. " is left out of the numbers." else target.DisplayName .. " counts again.")
+end
+
 local started = false
 function AnalyticsPanel.start()
 	if started then
@@ -296,6 +320,7 @@ function AnalyticsPanel.start()
 	end
 	started = true
 	Shop.register("AnalyticsReport", AnalyticsPanel.request)
+	Shop.register("AnalyticsExclude", AnalyticsPanel.exclude)
 	local function mark(player: Player)
 		if DevAlerts.owner(player.UserId) then
 			player:SetAttribute("AnalyticsOwner", true)

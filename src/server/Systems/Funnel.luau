@@ -52,6 +52,11 @@ Funnel.FromClient = { Style = true }
 -- Tasks events (PlayerData.training) that are funnel steps.
 Funnel.FromTraining = { Mine = "First rock", MineGem = "First gem", Enchant = "Socketed", EquipSurge = "Surge ready" }
 
+-- Accounts left out of the numbers (Server.DevAccounts sets it).
+Funnel.excluded = function(_player: Player): boolean
+	return false
+end
+
 -- Sends one step to Roblox (tests swap it out).
 function Funnel.log(player: Player, step: number, name: string)
 	AnalyticsService:LogOnboardingFunnelStepEvent(player, step, name)
@@ -73,6 +78,9 @@ function Funnel.reach(player: Player, name: string): boolean
 		return false
 	end
 	done[name] = true
+	if Funnel.excluded(player) then
+		return true -- (a dev account: reached, not counted: Server.DevAccounts)
+	end
 	local ok, problem = pcall(Funnel.log, player, step, name)
 	if not ok then
 		warn("[Funnel] couldn't log " .. name .. ": " .. tostring(problem))

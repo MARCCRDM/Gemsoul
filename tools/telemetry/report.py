@@ -37,6 +37,40 @@ def load(data_dir):
     return rows
 
 
+def listed_accounts(config=HERE.parent.parent / 'src/shared/Config.luau'):
+    """Owners, Testers and NoAnalytics from Config.Playtest: dev and test
+    accounts, left out of every number (Server/Systems/DevAccounts)."""
+    import re
+    try:
+        text = Path(config).read_text()
+    except OSError:
+        return set()
+    ids = set()
+    for name in ('Owners', 'Testers', 'NoAnalytics'):
+        m = re.search(r'\b' + name + r'\s*=\s*\{([^}]*)\}', text)
+        if m:
+            ids.update(int(x) for x in re.findall(r'\d+', re.sub(r'--[^\n]*', '', m.group(1))))
+    return ids
+
+
+def drop_excluded(rows, listed=()):
+    """Rows without the left-out accounts: `listed`, and anyone whose latest
+    "analytics_excluded" row is 1 (marked NOT COUNTED in game), their rows
+    from before the mark too."""
+    skip = set(listed)
+    latest = {}
+    for r in rows:
+        if r['e'] == 'analytics_excluded':
+            if r['t'] >= latest.get(r['u'], (-1, None))[0]:
+                latest[r['u']] = (r['t'], r['v'])
+    for u, (_, v) in latest.items():
+        if v == 1:
+            skip.add(u)
+        elif u not in set(listed):
+            skip.discard(u)
+    return [r for r in rows if r['u'] not in skip and r['e'] != 'analytics_excluded']
+
+
 def pct(n, d):
     return None if not d else round(100.0 * n / d, 1)
 
@@ -209,7 +243,7 @@ def render(report, out):
 def main():
     data_dir = sys.argv[1] if len(sys.argv) > 1 else HERE / 'data'
     out = sys.argv[2] if len(sys.argv) > 2 else HERE / 'dashboard.html'
-    rows = load(data_dir)
+    rows = drop_excluded(load(data_dir), listed_accounts())
     report = build(rows)
     (Path(out).with_suffix('.json')).write_text(json.dumps(report, indent=1))
     print(f'{len(rows)} rows, {report["range"]["users"]} players -> {render(report, out)}')

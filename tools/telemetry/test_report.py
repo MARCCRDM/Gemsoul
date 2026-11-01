@@ -50,7 +50,17 @@ def check():
     assert r['intro_rounds'] == [{'round': 1, 'slot': 'Weapon', 'won': 1, 'lost': 1, 'rare': 1}], r['intro_rounds']
     assert r['products'][0] == ['Coins10k', 99, 1], r['products']
     assert r['range']['users'] == 2 and r['kpis']['d1'] == 50.0
-    print('PASS: telemetry report numbers (retention, funnel, revenue, sessions, concurrency, economy, intro rounds)')
+    # Dev and test accounts: dropped, a marked one's earlier rows too; the latest mark wins.
+    rows = [
+        {'t': 1, 'u': 1, 'e': 'session_start', 'v': 0}, {'t': 1, 'u': 9, 'e': 'session_start', 'v': 0},
+        {'t': 1, 'u': 5, 'e': 'session_start', 'v': 0}, {'t': 2, 'u': 5, 'e': 'analytics_excluded', 'v': 1},
+        {'t': 1, 'u': 6, 'e': 'session_start', 'v': 0}, {'t': 2, 'u': 6, 'e': 'analytics_excluded', 'v': 1},
+        {'t': 3, 'u': 6, 'e': 'analytics_excluded', 'v': 0},
+    ]
+    kept = report.drop_excluded(rows, {9})
+    assert sorted(r['u'] for r in kept) == [1, 6], kept
+    assert 11738957136 in report.listed_accounts(), 'Config.Playtest.Owners not read'
+    print('PASS: telemetry report numbers (retention, funnel, revenue, sessions, concurrency, economy, intro rounds, dev accounts left out)')
 
 
 def demo(dir_, days=21, seed=7):

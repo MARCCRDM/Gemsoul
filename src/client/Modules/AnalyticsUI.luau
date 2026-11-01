@@ -19,6 +19,10 @@
 	  AnalyticsUI.start()   once (Lobby.client)
 	  AnalyticsUI.open(range?)
 	  AnalyticsUI.commas(n) -> string, AnalyticsUI.minutes(m) -> string   (pure)
+
+	PLAYERS HERE NOW's last column: COUNTED / NOT COUNTED, a tap to leave a
+	test account out of the numbers (Server.DevAccounts); the Owners' and
+	DEV-reset accounts are always out (DEV · NOT COUNTED).
 ]]
 local Players = game:GetService("Players")
 
@@ -294,7 +298,7 @@ local function drawHere(list)
 		empty(sec, "Nobody.")
 		return
 	end
-	local columns = { { "PLAYER", 0, 200 }, { "IN FOR", 210, 70 }, { "LEVEL", 290, 50 }, { "ONBOARDING", 350, 200 }, { "INTRO ROUNDS", 560, 110 }, { "NOW", 680, 120 } }
+	local columns = { { "PLAYER", 0, 180 }, { "IN FOR", 190, 60 }, { "LEVEL", 255, 45 }, { "ONBOARDING", 305, 180 }, { "INTRO ROUNDS", 490, 90 }, { "NOW", 585, 85 }, { "IN THE NUMBERS", 675, 125 } }
 	for _, col in columns do
 		local h = words(sec.Body, col[1], 9, DUSK)
 		h.Position = UDim2.fromOffset(col[2], 0)
@@ -315,6 +319,40 @@ local function drawHere(list)
 			local l = words(sec.Body, cell[1], 11, cell[2], if c == 1 then Gilt.Display else nil)
 			l.Position = UDim2.fromOffset(col[2], y)
 			l.Size = UDim2.fromOffset(col[3], ROW - 4)
+		end
+		-- Counted in the numbers, or left out (a test account): a dev account
+		-- (an Owner, a Tester, NoAnalytics, or a DEV reset's) always is.
+		local col = columns[7]
+		if p.Listed then
+			local l = words(sec.Body, "DEV · NOT COUNTED", 10, DUSK, Gilt.Display)
+			l.Position = UDim2.fromOffset(col[2], y)
+			l.Size = UDim2.fromOffset(col[3], ROW - 4)
+		elseif p.UserId then
+			local excluded = p.Excluded == true
+			local toggle = new("TextButton", {
+				Name = "Counted",
+				Position = UDim2.fromOffset(col[2], y),
+				Size = UDim2.fromOffset(col[3] - 6, ROW - 4),
+				BackgroundColor3 = if excluded then TRACK else BAR:Lerp(TRACK, 0.55),
+				Font = Gilt.Display,
+				TextSize = 10,
+				TextColor3 = if excluded then DUSK else INK,
+				Text = if excluded then "NOT COUNTED" else "COUNTED",
+				AutoButtonColor = true,
+			}, sec.Body)
+			UiKit.round(toggle, 4)
+			toggle.Activated:Connect(function()
+				toggle.Text = "…"
+				task.spawn(function()
+					local answer = GemClient.request("AnalyticsExclude", p.UserId, not excluded)
+					if answer and answer.Message and answer.Message ~= "" then
+						UiKit.toast(answer.Message, if answer.Ok then GOLD else Gilt.Red)
+					end
+					if AnalyticsUI.refresh then
+						AnalyticsUI.refresh()
+					end
+				end)
+			end)
 		end
 	end
 end
@@ -432,6 +470,8 @@ local function ask()
 		ui.Loading = answer.Loading
 	end)
 end
+
+AnalyticsUI.refresh = ask
 
 local function poll()
 	if polling then

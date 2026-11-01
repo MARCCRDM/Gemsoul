@@ -6,6 +6,10 @@
 	  AnalyticsReport.build(rows, options?) -> report   (pure)
 	      options.Now    os.time() (for "today")
 	      options.Live   { [userId] = { Name, Since, Step } } players here now
+	      options.Exclude  { [userId] = true } accounts left out (dev and
+	                     test accounts); and anyone marked so in the rows
+	                     (an "analytics_excluded" row, its latest)
+	  AnalyticsReport.excludedIn(rows, listed?) -> { [userId] = true }
 
 	The report:
 	  Players, New, Returning, Sessions, AvgSession (minutes), MedianSession,
@@ -88,8 +92,36 @@ local function round1(x: number?): number?
 	return if x then math.floor(x * 10 + 0.5) / 10 else nil
 end
 
+-- The accounts to leave out: `listed` (UserId -> true) and anyone whose
+-- latest "analytics_excluded" row says so (marked NOT COUNTED).
+function AnalyticsReport.excludedIn(rows: { any }, listed: { [number]: boolean }?): { [number]: boolean }
+	local out = table.clone(listed or {})
+	local latest: { [number]: number } = {}
+	for _, r in rows do
+		if r[3] == "analytics_excluded" then
+			local u, t = tonumber(r[2]) or 0, tonumber(r[1]) or 0
+			if t >= (latest[u] or -math.huge) then
+				latest[u] = t
+				out[u] = if tonumber(r[4]) == 1 then true else (listed and listed[u]) or nil
+			end
+		end
+	end
+	return out
+end
+
 function AnalyticsReport.build(rows: { any }, options: any?)
 	options = options or {}
+	-- (dev and test accounts: none of their rows count)
+	local skip = AnalyticsReport.excludedIn(rows, options.Exclude)
+	if next(skip) then
+		local kept = {}
+		for _, r in rows do
+			if not skip[tonumber(r[2]) or 0] and r[3] ~= "analytics_excluded" then
+				table.insert(kept, r)
+			end
+		end
+		rows = kept
+	end
 	local players, newPlayers, payers = {}, {}, {}
 	local activeDays: { [number]: { [number]: boolean } } = {} -- day -> users
 	local newDay: { [number]: number } = {} -- user -> the day they came new

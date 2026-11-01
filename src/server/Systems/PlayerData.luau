@@ -884,6 +884,7 @@ function PlayerData.resetAsNewPlayer(player: Player): (boolean, string)
 	end
 	local fresh: any = newProfile()
 	fresh.DevBackup = backup
+	fresh.NoAnalytics = (profile :: any).NoAnalytics -- (still left out of the numbers: Systems/DevAccounts)
 	profiles[player] = fresh
 	local saved = save(player)
 	return true,
@@ -895,7 +896,9 @@ function PlayerData.restoreDevBackup(player: Player): (boolean, string)
 	if not backup then
 		return false, "No saved backup to restore: you haven't reset to a new player."
 	end
+	local excluded = (profile :: any).NoAnalytics
 	profiles[player] = migrate(backup)
+	;(profiles[player] :: any).NoAnalytics = excluded or (profiles[player] :: any).NoAnalytics
 	save(player)
 	return true, "Your old save is back."
 end

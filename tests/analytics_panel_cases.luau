@@ -148,9 +148,15 @@ local store = {
 	end,
 }
 local registered = {}
+local marked = {} -- (DevAccounts.set: who was marked NOT COUNTED)
 local Telemetry = { here = function() return { { now - 120, 11, "session_start", 0, "returning", "US" } } end, store = function() return store end, Since = now - 3600, Server = "cccc" }
 local stubs = {
 	DevAlerts = { owner = function(id) return owners[id] == true end },
+	DevAccounts = {
+		listed = function() return { [11] = true } end,
+		excluded = function(p) return p.UserId == 11 end,
+		set = function(p, on) marked[p.UserId] = on; return true end,
+	},
 	PlayerData = { get = function() return { Funnel = { Joined = true, Element = true }, IntroRounds = { Won = 2, Losses = 0, Pieces = {} } } end },
 	Funnel = { Steps = { "Joined", "Style", "Element", "Kit" } },
 	Shop = {
@@ -166,7 +172,11 @@ local stubs = {
 local sharedRef = setmetatable({}, { __index = function(_, k) return { Shared = k } end })
 local panelServices = {
 	DataStoreService = { GetRequestBudgetForRequestType = function() return budget end },
-	Players = { GetPlayers = function() return { owner } end, PlayerAdded = { Connect = function() end } },
+	Players = {
+		GetPlayers = function() return { owner } end,
+		GetPlayerByUserId = function(_, id) return if id == 11 then owner else nil end,
+		PlayerAdded = { Connect = function() end },
+	},
 	ReplicatedStorage = { Shared = sharedRef },
 }
 local sharedEnv = setmetatable({}, { __index = _G })
@@ -200,7 +210,12 @@ check(registered.AnalyticsReport(stranger, "Server").Ok == false, "A stranger go
 check(registered.AnalyticsReport(owner, "Nonsense").Ok == false, "An unknown range answered")
 -- THIS SERVER: at once, with who's here.
 local here = registered.AnalyticsReport(owner, "Server")
-check(here.Ok and here.Report.Players == 1 and #here.Here == 1, "THIS SERVER")
+check(here.Ok and here.Report.Players == 0 and #here.Here == 1, "THIS SERVER counted the owner")
+check(here.Here[1].Excluded == true and here.Here[1].Listed == true and here.Here[1].UserId == 11, "The owner isn't shown as a dev account")
+-- An owner marks someone here NOT COUNTED; nobody else can.
+check(registered.AnalyticsExclude(stranger, 11, true).Ok == false, "A stranger marked an account")
+check(registered.AnalyticsExclude(owner, 999, true).Ok == false, "Marked someone who isn't here")
+check(registered.AnalyticsExclude(owner, 11, true).Ok and marked[11] == true, "The owner couldn't mark an account")
 check(here.Here[1].Step == 3 and here.Here[1].StepName == "Element" and here.Here[1].Rounds == 2 and here.Here[1].Minutes == 2, "Who's here: step, rounds, minutes")
 -- TODAY: read in the background; asking again gets what's in.
 local first = registered.AnalyticsReport(owner, "Today")

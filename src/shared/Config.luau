@@ -100,7 +100,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.0 · 2026-11-01 intro funnel",
+		Build = "1.0 · 2026-11-01 no dev data",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error
@@ -109,6 +109,11 @@ local Config = {
 		Owners = { 11738957136 }, -- Devvolver
 		-- Extra UserIds with the test-admin actions (not the reports). Empty.
 		Testers = {},
+		-- More UserIds left out of the analytics (test accounts). Owners and
+		-- Testers are left out already, and any account marked NOT COUNTED in
+		-- the ANALYTICS window, or that has used DEV > NEW PLAYER
+		-- (Server/Systems/DevAccounts).
+		NoAnalytics = {},
 		-- On: every join starts as a brand-new player (zero coins, the fast
 		-- start: style, element, first fight) and nothing is loaded or saved,
 		-- so the first-time flow can be played again and again. Off (Beta and

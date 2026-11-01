@@ -71,6 +71,8 @@ require(script.Parent.Systems.Analytics).start(
 	require(game:GetService("ReplicatedStorage").Shared.Store).productKey
 )
 -- The game's own event log, in its own DataStore (tools/telemetry: the dashboard).
+-- Dev and test accounts are left out of every number (Systems/DevAccounts).
+require(script.Parent.Systems.DevAccounts).start()
 require(script.Parent.Systems.Telemetry).start(require(script.Parent.Systems.Remotes).Telemetry)
 PlayerData.start()
 Vip.start()

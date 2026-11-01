@@ -29,6 +29,9 @@
 	  Telemetry.start()
 	  Telemetry.record(player | userId, name, value?, a?, b?, c?)
 	  Telemetry.flush()               save now
+	  Telemetry.mark(userId, excluded)   an account left out (or counted again)
+	  Telemetry.excluded(who)         (Server.DevAccounts sets it) nothing's
+	                                  recorded for the accounts it names
 	  Telemetry.key(time, server, n?) -> string   (pure)
 	  Telemetry.here() -> rows        everything since this server started
 	                                  (about the newest KeepHere; the ANALYTICS
@@ -132,10 +135,12 @@ function Telemetry.flush()
 	end
 end
 
-function Telemetry.record(who: any, name: string, value: number?, a: any?, b: any?, c: any?)
-	if not Telemetry.Enabled or type(name) ~= "string" then
-		return
-	end
+-- Accounts left out of the log (Server.DevAccounts sets it: Player or UserId).
+Telemetry.excluded = function(_who: any): boolean
+	return false
+end
+
+local function append(who: any, name: string, value: number?, a: any?, b: any?, c: any?)
 	local now = os.time()
 	local hour = now - now % 3600
 	if hourKey ~= hour then
@@ -158,6 +163,24 @@ function Telemetry.record(who: any, name: string, value: number?, a: any?, b: an
 		here = table.move(here, 2001, #here, 1, {})
 	end
 	dirty = true
+end
+
+function Telemetry.record(who: any, name: string, value: number?, a: any?, b: any?, c: any?)
+	if not Telemetry.Enabled or type(name) ~= "string" then
+		return
+	end
+	if who ~= nil and who ~= 0 and Telemetry.excluded(who) then
+		return
+	end
+	append(who, name, value, a, b, c)
+end
+
+-- An account marked left out (or counted again): one row the reports go by,
+-- so its rows from before are dropped too (Shared.AnalyticsReport).
+function Telemetry.mark(userId: number, excluded: boolean)
+	if Telemetry.Enabled then
+		append(userId, "analytics_excluded", if excluded then 1 else 0)
+	end
 end
 
 local function sessionStart(player: Player)

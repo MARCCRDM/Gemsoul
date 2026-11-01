@@ -25,6 +25,24 @@ Each server saves its own rows under `ev/<UTC day>/<hour>/<server>` every 5
 minutes and when it shuts down. Studio writes to `SagaTelemetry_Studio`
 instead, so tests never mix with real data.
 
+## Dev and test accounts are left out
+
+Nothing from these accounts goes to Roblox's Analytics (funnels, custom
+events, the economy) or to the game's own log (Server/Systems/DevAccounts):
+
+- the Owners and Testers (`Config.Playtest`), and any UserId in
+  `Config.Playtest.NoAnalytics`
+- any account marked **NOT COUNTED** in ANALYTICS > THIS SERVER > PLAYERS HERE
+  NOW (join with your test account, tap its COUNTED button). This stays on
+  the account, through DEV resets.
+- any account that has used **DEV > NEW PLAYER** (so a reset never counts as
+  a new player)
+- everyone in Studio
+
+The in-game reports and `report.py` drop them too, including their rows from
+before they were marked. Roblox's own dashboard can't be cleaned of what it
+already received.
+
 ## In game: the ANALYTICS button
 
 The game's Owners (`Config.Playtest.Owners`) get an **ANALYTICS** button

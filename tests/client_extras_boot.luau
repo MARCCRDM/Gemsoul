@@ -224,7 +224,7 @@ local rows = {
 analyticsAnswer = function(range)
 	local answer = { Ok = true, Message = "", Range = range, Report = Report.build(rows), Now = day + 700 }
 	if range == "Server" then
-		answer.Here = { { Name = "Tester", User = "tester", Minutes = 4, New = true, Step = 2, StepName = "Element", Rounds = 1, Level = 2 }, { Name = "Vet", User = "vet", Minutes = 30, New = false } }
+		answer.Here = { { UserId = 5, Name = "Tester", User = "tester", Minutes = 4, New = true, Step = 2, StepName = "Element", Rounds = 1, Level = 2 }, { UserId = 6, Name = "Vet", User = "vet", Minutes = 30, New = false, Excluded = true }, { UserId = 1, Name = "Dev", User = "dev", Minutes = 9, Listed = true, Excluded = true } }
 		answer.Since, answer.Server = day, "abcd1234"
 	else
 		answer.Loading = { Done = 3, Total = 7, Busy = true }
@@ -250,6 +250,15 @@ end
 check(seen["Reading the saved logs…  3 / 7"], "ANALYTICS didn't draw 7 DAYS' loading line")
 check(seen["PLAYERS"] and seen["2"] and seen["99"] and seen["1  Joined"], "ANALYTICS didn't draw the report (tiles, funnel)")
 check(seen["R1 start · Sword"] and seen["R1 won · Sword"], "ANALYTICS didn't draw the intro rounds' funnel")
+do -- (who's in the numbers: a toggle each, a dev account just says so)
+	local counted, notCounted = 0, 0
+	for _, d in analytics:GetDescendants() do
+		if d.Name == "Counted" and d:IsA("TextButton") then
+			if d.Text == "COUNTED" then counted += 1 elseif d.Text == "NOT COUNTED" then notCounted += 1 end
+		end
+	end
+	check(counted == 1 and notCounted == 1 and seen["DEV · NOT COUNTED"], "PLAYERS HERE NOW's COUNTED / NOT COUNTED")
+end
 check(Analytics.commas(1234567) == "1,234,567" and Analytics.minutes(90) == "1h 30m" and Analytics.minutes(0.5) == "30s", "ANALYTICS' number formats")
 print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)

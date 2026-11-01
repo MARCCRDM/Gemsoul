@@ -143,7 +143,17 @@ Analytics.send = {
 	end,
 }
 
+-- Accounts left out of the numbers (Server.DevAccounts sets it: the game's
+-- owners and test accounts). Nothing of theirs is sent.
+Analytics.excluded = function(_player: Player): boolean
+	return false
+end
+
 local function call(what: string, fn, ...)
+	local first = ...
+	if typeof(first) == "Instance" and first:IsA("Player") and Analytics.excluded(first) then
+		return true
+	end
 	local ok, problem = pcall(fn, ...)
 	if not ok then
 		warnOnce(what, problem)
