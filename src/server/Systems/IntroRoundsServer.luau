@@ -4,8 +4,9 @@
 	A new miner's 1v1 wins, the first fight and every round after it (or a
 	queued Casual or Ranked 1v1 won anywhere), each roll the next piece of
 	their set: Uncommon, or Rare, for the round's slot, given and put on at
-	once. Round GemAfter also gives a gem (to socket), and the whole set pays
-	SetCoins.
+	once, then their best build auto-equipped (bestBuild: gems into the gear
+	and Q/E/R too). Round GemAfter also gives a gem (socketed by that), and
+	the whole set pays SetCoins.
 
 	Requests:
 	  "IntroRoundNext"    the next round: into a lone 1v1 searcher's queue if
@@ -104,6 +105,32 @@ local function grant(player: Player, profile, slot: string, rarity: string)
 	return { Slot = slot, Name = gear.Name, Rarity = rarity, Id = gear.Id }
 end
 
+-- Their best build, put on for them after a round (the AUTO EQUIP button's
+-- Best plan, Shared.AutoEquip): the gear, and gems into the gear and Q/E/R,
+-- the round's gem too. The server does it, as you can't change your build
+-- by hand mid-session in the Arena. Each gem counts as one socketed by hand
+-- (Server.Forge.counted: Tasks, the funnel). Your skins are left as they are.
+-- Returns gear pieces and gems changed.
+function IntroRoundsServer.bestBuild(player: Player, profile): (number, number)
+	local AutoEquip = require(ReplicatedStorage.Shared.AutoEquip)
+	local plan = AutoEquip.plan(profile, "Best")
+	local pieces, gems = 0, 0
+	for _, step in plan.Gear or {} do
+		if PlayerData.equipGear(player, Slots.Definitions[step.Slot].Kind, step.Id) then
+			pieces += 1
+		end
+	end
+	local Forge = nil
+	for _, step in plan.Gems or {} do
+		if PlayerData.socketGem(player, step.Gem, step.Slot) then
+			gems += 1
+			Forge = Forge or require(script.Parent.Forge)
+			pcall(Forge.counted, player, step.Slot)
+		end
+	end
+	return pieces, gems
+end
+
 local function stateOf(player: Player)
 	local profile = PlayerData.get(player)
 	return IntroRounds.state(profile), profile
@@ -146,6 +173,13 @@ function IntroRoundsServer.won(player: Player)
 			local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 			event.Gem = { Name = GemConfig.displayName(gem), Element = gem.Element }
 		end
+	end
+	-- Then their best build on, gems and all (no trip to the Inventory).
+	local ok, pieces, gems = pcall(IntroRoundsServer.bestBuild, player, profile)
+	if ok and (pieces > 0 or gems > 0) then
+		event.Auto = { Pieces = pieces, Gems = gems }
+	elseif not ok then
+		warn("[IntroRounds] auto equip failed: " .. tostring(pieces))
 	end
 	local done = state.Won >= IntroRounds.Count
 	if done then

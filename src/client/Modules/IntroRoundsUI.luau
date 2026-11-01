@@ -330,7 +330,9 @@ local function show(event)
 		leaveButton.Visible = true
 		leaveButton.Text = Lang.translate(if inArena() then "LEAVE ARENA" else "LATER")
 		if event.Gem then
-			extra.Text = Lang.translate(string.format("+ a gem: %s. Socket it into your gear!", event.Gem.Name))
+			extra.Text = Lang.translate(string.format("+ a gem: %s, socketed for you!", event.Gem.Name))
+		elseif event.Auto and (event.Auto.Gems or 0) > 0 then
+			extra.Text = Lang.translate("Your gems were moved to your best sockets.")
 		end
 		task.spawn(function()
 			reel(event.Piece, mine)

@@ -34,7 +34,7 @@ local function shared(name)
 	if cache[name] then return cache[name] end
 	local env = setmetatable({
 		script = { Parent = setmetatable({}, { __index = function(_, k) return k end }) },
-		game = { GetService = function() return setmetatable({}, { __index = function() return function() end end }) end },
+		game = { GetService = function() return { Shared = setmetatable({}, { __index = function(_, k) return k end }) } end },
 		require = function(m) return shared(m) end,
 	}, { __index = _G })
 	for k, v in baseEnv do env[k] = v end
@@ -46,6 +46,7 @@ local Slots = shared("EquipmentSlots")
 
 -- Stand-ins.
 local fired, equipped, coins, events = {}, {}, 0, {}
+local socketed = 0
 local profile
 local attributes = {}
 local player = {
@@ -65,6 +66,17 @@ local stubs = {
 			return true
 		end,
 		addCoins = function(_, n) coins += n end,
+		socketGem = function(_, gemId, slot)
+			for i, gem in profile.Gems do
+				if gem.Id == gemId then
+					table.remove(profile.Gems, i)
+					profile.Character[slot .. "Gem"] = gem
+					socketed += 1
+					return gem
+				end
+			end
+			return nil
+		end,
 		newGemId = function() gemIds += 1 return "g" .. gemIds end,
 	},
 	Remotes = {
@@ -72,6 +84,7 @@ local stubs = {
 		Notify = { FireClient = function() end },
 	},
 	Shop = { reply = function(ok, message, extra) local r = extra or {}; r.Ok, r.Message = ok, message; return r end, register = function() end },
+	Forge = { counted = function() end },
 	GemGenerator = { generate = function(_, _, spec) return { Id = spec.Id, Element = "Fire", Tier = spec.Rarity, Size = 5, Clarity = 5, Cut = 5 } end },
 }
 local names = setmetatable({}, { __index = function(_, k) return k end })
@@ -93,7 +106,7 @@ local function newProfile(funnel)
 	return {
 		Funnel = funnel,
 		Owned = { Weapons = {}, Shields = {}, Helmets = {}, Armors = {}, Gloves = {}, Boots = {} },
-		Character = { GearRolls = {}, ItemGems = {} },
+		Character = { Class = "Warrior", GearRolls = {}, ItemGems = {} },
 		Gems = {},
 		Coins = 0,
 	}
@@ -137,7 +150,9 @@ for round = 1, IntroRounds.Count do
 	check(event[1] == "IntroRound" and event[2].Phase == "Won" and event[2].Round == round, "No Won card for round " .. round)
 	check(profile.IntroRounds.Losses == 0, "A win didn't reset the losses")
 	if round == IntroRounds.GemAfter then
-		check(event[2].Gem ~= nil and #profile.Gems == 1, "No gem at round " .. round)
+		check(event[2].Gem ~= nil, "No gem at round " .. round)
+		-- (auto-equipped: the round's gem goes straight into a socket)
+		check(socketed >= 1 and #profile.Gems == 0, "The round's gem wasn't auto-socketed")
 	end
 	if round < IntroRounds.Count then
 		check(attributes.IntroRounds == true and coins == 0, "The rounds ended early")
