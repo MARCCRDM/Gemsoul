@@ -17,10 +17,13 @@ and the rival for the next round is harder (and wears rarer cosmetics).
   health than the last, by more than the piece you just won adds; the last
   two outhit a full Arena rival. Each loss of a round eases its next try
   (15% less damage, 10% slower, 10% less health, down to a floor).
+- **On the card:** the roll plays first: a strip of the pieces that round
+  can give (Uncommon, a Rare now and then) spins past a marker, slows and
+  stops on yours, then it shows in 3D.
 - **The roll:** Uncommon, with a 15% chance of Rare. If no Rare has come by
   round 6, round 6 is Rare. The sword round only gives one-handed swords.
 - **Optional:** between rounds a card shows the piece, the six-slot set and
-  who's next: NEXT ROUND (starts by itself after 5 s in the Arena) or LEAVE.
+  who's next: NEXT ROUND (starts by itself after 3 s in the Arena) or LEAVE.
   The NEXT STEP card offers WIN YOUR INTRO SET (FIGHT) until it's done.
 - **Any win counts:** a queued Casual or Ranked 1v1 won pays the round's piece
   in place of that win's usual reward. NEXT ROUND joins a real player who's

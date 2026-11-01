@@ -18,7 +18,8 @@
 	  "IntroRoundState"   -> IntroRounds.view: where their set stands
 
 	The Social remote tells the client (Client.IntroRoundsUI):
-	  "IntroRound", { Phase = "Won", Round, Piece = { Slot, Name, Rarity },
+	  "IntroRound", { Phase = "Won", Round, Piece = { Slot, Name, Rarity, Id },
+	                  Reel = { { Name, Rarity } }, ReelLand (the card's roll),
 	                  Gem?, Coins?, View }   a round won: the card, with the roll
 	  "IntroRound", { Phase = "Lost", Round, View }   a round lost: try again?
 
@@ -75,6 +76,28 @@ local function pool(slot: string, rarity: string)
 	return list
 end
 IntroRoundsServer._pool = pool -- (tests)
+
+-- The card's roll (Client IntroRoundsUI): ReelLength pieces from the same
+-- pools the round rolls from (Uncommon, a Rare at the odds), the one won at
+-- ReelLand, where the strip stops. Names and rarities only.
+IntroRoundsServer.ReelLength = 28
+IntroRoundsServer.ReelLand = 24
+function IntroRoundsServer.reel(slot: string, piece, random: Random?)
+	local r = random or rng
+	local uncommon, rare = pool(slot, "Uncommon"), pool(slot, "Rare")
+	local reel = {}
+	for i = 1, IntroRoundsServer.ReelLength do
+		if i == IntroRoundsServer.ReelLand then
+			reel[i] = { Name = piece.Name, Rarity = piece.Rarity }
+		else
+			local isRare = #rare > 0 and (#uncommon == 0 or r:NextNumber() < IntroRounds.RareChance + 0.1)
+			local list = if isRare then rare else uncommon
+			local gear = list[r:NextInteger(1, math.max(1, #list))]
+			reel[i] = { Name = if gear then gear.Name else piece.Name, Rarity = if gear then (if isRare then "Rare" else "Uncommon") else piece.Rarity }
+		end
+	end
+	return reel, IntroRoundsServer.ReelLand
+end
 
 -- Gives `player` a piece for `slot` at `rarity` and puts it on. Returns what
 -- it was, or nil (nothing in the pool, or no room).
@@ -161,6 +184,7 @@ function IntroRoundsServer.won(player: Player)
 	IntroRounds.won(state, piece.Rarity)
 	state.Pieces[slot] = { Name = piece.Name, Rarity = piece.Rarity }
 	local event = { Phase = "Won", Round = round, Piece = piece }
+	event.Reel, event.ReelLand = IntroRoundsServer.reel(slot, piece)
 	-- Halfway: a gem too, to socket (the NEXT STEP card takes it from there).
 	if round == IntroRounds.GemAfter then
 		local GemGenerator = require(script.Parent.GemGenerator)

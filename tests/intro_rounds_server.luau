@@ -148,6 +148,19 @@ for round = 1, IntroRounds.Count do
 	check(profile.Character.GearRolls[kind][piece.Id] ~= nil, "The piece has no roll")
 	local event = fired[#fired]
 	check(event[1] == "IntroRound" and event[2].Phase == "Won" and event[2].Round == round, "No Won card for round " .. round)
+	-- (the card's roll: the strip, from this slot's pools, stopping on the piece)
+	local strip, land = event[2].Reel, event[2].ReelLand
+	check(type(strip) == "table" and #strip == Server.ReelLength and land == Server.ReelLand, "No roll for round " .. round)
+	check(strip[land].Name == piece.Name and strip[land].Rarity == piece.Rarity, "The roll doesn't stop on the piece won")
+	local names = {}
+	for _, rarity in { "Uncommon", "Rare" } do
+		for _, gear in Server._pool(slot, rarity) do
+			names[gear.Name] = rarity
+		end
+	end
+	for i, entry in strip do
+		check(i == land or names[entry.Name] == entry.Rarity, "The roll shows a piece this round can't give: " .. tostring(entry.Name))
+	end
 	check(profile.IntroRounds.Losses == 0, "A win didn't reset the losses")
 	if round == IntroRounds.GemAfter then
 		check(event[2].Gem ~= nil, "No gem at round " .. round)

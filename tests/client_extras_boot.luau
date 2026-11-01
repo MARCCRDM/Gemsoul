@@ -168,7 +168,25 @@ local state = IntroRounds.state({ Funnel = {} })
 IntroRounds.won(state, "Uncommon")
 state.Pieces.Weapon = { Name = "Cryo-Edge Saber", Rarity = "Uncommon" }
 attrs.CombatSession = "Training" -- (in the Arena: the card's up 1.2 s after the win)
-social:Fire("IntroRound", { Phase = "Won", Round = 1, Piece = { Slot = "Weapon", Name = "Cryo-Edge Saber", Rarity = "Uncommon", Id = "w1" }, Gem = { Name = "Ember" }, View = IntroRounds.view(state) })
+local strip = {}
+for i = 1, 28 do
+	strip[i] = { Name = if i == 24 then "Cryo-Edge Saber" else "Blade " .. i, Rarity = if i % 5 == 0 then "Rare" else "Uncommon" }
+end
+social:Fire("IntroRound", { Phase = "Won", Round = 1, Piece = { Slot = "Weapon", Name = "Cryo-Edge Saber", Rarity = "Uncommon", Id = "w1" }, Reel = strip, ReelLand = 24, Gem = { Name = "Ember" }, View = IntroRounds.view(state) })
+task.wait(2.5)
+do -- (mid-roll: the strip's up, every piece on it, the marker over it)
+	local card = playerGui:FindFirstChild("IntroRounds")
+	local roll = card and card:FindFirstChild("Roll", true)
+	local marker = card and card:FindFirstChild("Marker", true)
+	local tiles = 0
+	for _, d in (roll and roll:GetDescendants() or {}) do
+		if string.match(d.Name, "^Tile%d+$") then
+			tiles += 1
+		end
+	end
+	check(roll ~= nil and roll.Visible and marker ~= nil and marker.Visible, "The items' roll isn't spinning on the card")
+	check(tiles == 28, "The roll's strip has " .. tiles .. " pieces, not 28")
+end
 task.wait(3.2)
 do
 	local card = playerGui:FindFirstChild("IntroRounds")

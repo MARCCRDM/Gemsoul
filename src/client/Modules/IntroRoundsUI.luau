@@ -10,7 +10,7 @@
 	  (⚔)──(⛨)──( )──( )──( )──( )    the set, each slot lit as it's won,
 	                                  the next one ringed in amber
 	  [ NEXT  Vera Coppercoil   SHIELD ]
-	  [ NEXT ROUND  5 ]  [ LEAVE ARENA ]    starts by itself after AutoNext
+	  [ NEXT ROUND  3 ]  [ LEAVE ARENA ]    starts by itself after AutoNext
 	                                        seconds (in the Arena)
 
 	A loss: KNOCKED DOWN, the piece still to win in grey, the next try is
@@ -39,13 +39,15 @@ local IntroRoundsUI = {}
 
 local new = IronUi.new
 local player = Players.LocalPlayer
-IntroRoundsUI.AutoNext = 5 -- seconds before NEXT ROUND starts by itself (in the Arena)
+IntroRoundsUI.AutoNext = 3 -- seconds before NEXT ROUND starts by itself (in the Arena)
 
 local W, H, PAD = 460, 432, 22 -- (px: the card, before scaling)
 local HERO_Y = 104 -- (the piece's centre)
 local TRACK_Y = 262 -- (the set's nodes' centres)
 local WELL_Y = 318
 local NODE = 34
+local TILE_W, TILE_H, TILE_GAP = 84, 108, 8 -- (the roll's strip)
+IntroRoundsUI.RollSeconds = 3.2 -- the strip's spin, fast to stopped
 
 local GOLD, INK, FADED, DUSK = Gilt.Gold, Gilt.Ink, Gilt.Faded, Gilt.Dusk
 local STEEL = Gilt.Brass
@@ -249,6 +251,43 @@ local function build()
 	ui.Mystery.Size = UDim2.fromScale(1, 1)
 	ui.Mystery.ZIndex = 5
 	ui.Mystery.Text = "?"
+
+	-- The roll: a strip of pieces running past a marker (fading out at its
+	-- ends), in the piece's place till it stops on yours.
+	local strip = new("CanvasGroup", {
+		Name = "Roll",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(PAD, HERO_Y - TILE_H / 2),
+		Size = UDim2.fromOffset(W - PAD * 2, TILE_H),
+		Visible = false,
+		ZIndex = 5,
+	}, panel)
+	new("UIGradient", {
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.22, 0),
+			NumberSequenceKeypoint.new(0.78, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	}, strip)
+	ui.Strip = strip
+	ui.Track = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(0, TILE_H) }, strip)
+	-- (the marker: an amber line through the middle, a point above and below)
+	local marker = new("Frame", { Name = "Marker", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(W / 2, HERO_Y), Size = UDim2.fromOffset(TILE_W + 10, TILE_H + 16), Visible = false, ZIndex = 7 }, panel)
+	local frameEdge = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 8), Size = UDim2.new(1, 0, 1, -16), ZIndex = 7 }, marker)
+	UiKit.round(frameEdge, 10)
+	new("UIStroke", { Color = GOLD, Thickness = 2, Transparency = 0.1 }, frameEdge)
+	for _, top in { true, false } do
+		new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, if top then 0 else 1, if top then 6 else -6),
+			Size = UDim2.fromOffset(9, 9),
+			Rotation = 45,
+			BackgroundColor3 = GOLD,
+			ZIndex = 8,
+		}, marker)
+	end
+	ui.Marker = marker
 
 	-- Its name, what it is, a gem with it.
 	ui.Name = line(26, INK, BLACK, 182, 32)
@@ -470,24 +509,119 @@ local function drawPiece(piece)
 	)
 end
 
--- The piece rolling in: a quick reel of rarities, slowing, then its own.
+-- One piece on the strip: its icon in its rarity's colour, its name.
+local function rollTile(i: number, entry, slot: string)
+	local color = rarityColor(entry.Rarity)
+	local tile = new("Frame", {
+		Name = "Tile" .. i,
+		Position = UDim2.fromOffset((i - 1) * (TILE_W + TILE_GAP), 0),
+		Size = UDim2.fromOffset(TILE_W, TILE_H),
+		BackgroundColor3 = color:Lerp(Gilt.Deep, 0.8),
+	}, ui.Track)
+	UiKit.round(tile, 8)
+	new("UIStroke", { Color = color, Thickness = 1.5, Transparency = 0.25 }, tile)
+	new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(0, 0.35) }, tile)
+	local art = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 56) }, tile)
+	icon(art, slot, color, 42)
+	local name = words(tile, 10, INK, BOLD)
+	name.Text = entry.Name or "?"
+	name.Position = UDim2.fromOffset(5, 64)
+	name.Size = UDim2.new(1, -10, 0, 26)
+	name.TextWrapped = true
+	name.TextTruncate = Enum.TextTruncate.None
+	name.TextYAlignment = Enum.TextYAlignment.Top
+	name:SetAttribute("NoTranslate", true)
+	local rarity = words(tile, 8, color, BLACK)
+	rarity.Text = Lang.translate(string.upper(entry.Rarity or ""))
+	rarity.Position = UDim2.fromOffset(5, 92)
+	rarity.Size = UDim2.new(1, -10, 0, 10)
+	return tile
+end
+
+-- The roll: the strip runs past the marker, fast then slowing (each piece
+-- that passes ticks, its name under it), and stops on yours.
+local function spin(piece, list, land: number, mine: number): boolean
+	for _, child in ui.Track:GetChildren() do
+		child:Destroy()
+	end
+	local tiles = {}
+	for i, entry in list do
+		tiles[i] = rollTile(i, entry, piece.Slot)
+	end
+	ui.Hero.Visible = false
+	ui.Strip.Visible, ui.Marker.Visible = true, true
+	local step = TILE_W + TILE_GAP
+	local centre = (W - PAD * 2) / 2 - TILE_W / 2
+	-- (it starts a few pieces in, and lands a touch off the middle of its tile)
+	local from, to = step * 2, (land - 1) * step + (math.random() - 0.5) * TILE_W * 0.5
+	local started = os.clock()
+	local last = 0
+	while true do
+		if mine ~= shown then
+			return false
+		end
+		local t = math.clamp((os.clock() - started) / IntroRoundsUI.RollSeconds, 0, 1)
+		local eased = 1 - (1 - t) ^ 4
+		local at = from + (to - from) * eased
+		ui.Track.Position = UDim2.fromOffset(centre - at, 0)
+		local index = math.clamp(math.floor(at / step + 0.5) + 1, 1, #list)
+		if index ~= last then
+			last = index
+			local entry = list[index]
+			ui.Name.Text = entry.Name or ""
+			ui.Name.TextColor3 = rarityColor(entry.Rarity)
+			UiSound.play("Tab")
+		end
+		if t >= 1 then
+			break
+		end
+		task.wait()
+	end
+	-- (settles dead centre on yours, which lights up)
+	ui.Track.Position = UDim2.fromOffset(centre - (land - 1) * step, 0)
+	local won = tiles[land]
+	if won then
+		local edge = won:FindFirstChildOfClass("UIStroke")
+		if edge then
+			edge.Thickness, edge.Transparency = 3, 0
+		end
+	end
+	task.wait(0.55)
+	if mine ~= shown then
+		return false
+	end
+	ui.Strip.Visible, ui.Marker.Visible = false, false
+	ui.Hero.Visible = true
+	return true
+end
+
+-- The piece rolling in: the strip (the server's Reel), or without one a
+-- quick reel of rarities; then it lands, in 3D.
 local function reel(piece, mine: number)
 	if type(piece) ~= "table" then
 		return
 	end
 	ui.Sub.Text = ""
-	local names = { "Common", "Uncommon", "Rare", "Uncommon", "Ultra Rare", "Uncommon", "Rare" }
-	for i = 1, 14 do
-		if mine ~= shown then
+	local list = current and current.Piece == piece and current.Reel
+	local land = current and current.ReelLand
+	if type(list) == "table" and #list > 1 and type(land) == "number" and list[land] then
+		if not spin(piece, list, land, mine) then
 			return
 		end
-		local pick = names[(i % #names) + 1]
-		local color = rarityColor(pick)
-		ui.Name.Text = Lang.translate(string.upper(pick))
-		ui.Name.TextColor3 = color
-		hero(piece.Slot, color)
-		UiSound.play("Tab")
-		task.wait(0.04 + i * 0.012)
+	else
+		local names = { "Common", "Uncommon", "Rare", "Uncommon", "Ultra Rare", "Uncommon", "Rare" }
+		for i = 1, 14 do
+			if mine ~= shown then
+				return
+			end
+			local pick = names[(i % #names) + 1]
+			local color = rarityColor(pick)
+			ui.Name.Text = Lang.translate(string.upper(pick))
+			ui.Name.TextColor3 = color
+			hero(piece.Slot, color)
+			UiSound.play("Tab")
+			task.wait(0.04 + i * 0.012)
+		end
 	end
 	if mine ~= shown then
 		return
@@ -592,6 +726,8 @@ local function show(event)
 	local mine = shown
 	current = event
 	gui.Enabled = true
+	-- (a roll cut short by this card: its strip goes)
+	ui.Strip.Visible, ui.Marker.Visible, ui.Hero.Visible = false, false, true
 	if event.Phase ~= "Lost" then
 		previews()
 	end
