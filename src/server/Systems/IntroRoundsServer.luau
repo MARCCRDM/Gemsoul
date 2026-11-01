@@ -154,6 +154,26 @@ function IntroRoundsServer.bestBuild(player: Player, profile): (number, number)
 	return pieces, gems
 end
 
+-- The Intro Rounds funnel (Analytics.introStep): a round started (step
+-- 2r - 1) or won (2r), each logged once a player (kept with the rounds).
+function IntroRoundsServer.funnel(player: Player, state, round: number, won: boolean)
+	if not state or round < 1 or round > IntroRounds.Count then
+		return
+	end
+	local step = round * 2 - (if won then 0 else 1)
+	state.Funnel = if type(state.Funnel) == "table" then state.Funnel else {}
+	if state.Funnel[tostring(step)] then
+		return
+	end
+	state.Funnel[tostring(step)] = true
+	-- (a win counts its start too, for a round begun before the funnel was)
+	if won and not state.Funnel[tostring(step - 1)] then
+		state.Funnel[tostring(step - 1)] = true
+		Analytics.introStep(player, step - 1)
+	end
+	Analytics.introStep(player, step)
+end
+
 local function stateOf(player: Player)
 	local profile = PlayerData.get(player)
 	return IntroRounds.state(profile), profile
@@ -181,6 +201,7 @@ function IntroRoundsServer.won(player: Player)
 		Remotes.Notify:FireClient(player, "Your gear bag is full: make room, then win again for your intro piece.")
 		return nil
 	end
+	IntroRoundsServer.funnel(player, state, round, true)
 	IntroRounds.won(state, piece.Rarity)
 	state.Pieces[slot] = { Name = piece.Name, Rarity = piece.Rarity }
 	local event = { Phase = "Won", Round = round, Piece = piece }
@@ -250,6 +271,7 @@ local function nextRound(player: Player)
 	-- Someone's waiting for a 1v1 and nobody's come: you're it.
 	local Duels = require(script.Parent.Duels)
 	if Duels.joinWaiting and Duels.joinWaiting(player) then
+		IntroRoundsServer.funnel(player, state, round, false)
 		player:SetAttribute("IntroRounds", nil)
 		return reply(true, "A miner is waiting for an opponent: you're in!", { Real = true, Round = round })
 	end
@@ -274,6 +296,7 @@ local function nextRound(player: Player)
 		player:SetAttribute("IntroRoundFight", nil)
 		return reply(false, "Leave your current fight first.")
 	end
+	IntroRoundsServer.funnel(player, state, round, false)
 	return reply(true, string.format("Round %d of %d!", round, IntroRounds.Count), { Round = round })
 end
 
@@ -304,6 +327,21 @@ function IntroRoundsServer.start()
 	Players.PlayerRemoving:Connect(function(player)
 		player:SetAttribute("IntroRounds", nil)
 	end)
+	-- Round 1 is the first fight: its start is the funnel's first step.
+	local function watch(player: Player)
+		player:GetAttributeChangedSignal("FirstFight"):Connect(function()
+			if player:GetAttribute("FirstFight") == true then
+				local state = stateOf(player)
+				if state and state.Won == 0 then
+					IntroRoundsServer.funnel(player, state, 1, false)
+				end
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
 end
 
 return IntroRoundsServer

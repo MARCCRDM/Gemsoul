@@ -48,6 +48,10 @@ add("aaaa", START + 300, 0, "server", 2, 700)
 add("bbbb", START + 300, 0, "server", 3, 700)
 add("aaaa", START + DAY + 60, 1, "session_start", 1, "returning", "US")
 add("aaaa", START + 7 * DAY + 60, 2, "session_start", 7, "returning", "US")
+add("aaaa", START + 110, 1, "store_funnel", 1, "R1 start · Sword", "IntroRounds")
+add("aaaa", START + 111, 2, "store_funnel", 1, "R1 start · Sword", "IntroRounds")
+add("aaaa", START + 112, 1, "store_funnel", 2, "R1 won · Sword", "IntroRounds")
+add("aaaa", START + 113, 1, "store_funnel", 1, "Opened store", "Store")
 local r = Report.build(rows)
 check(r.Players == 2 and r.New == 2 and r.Returning == 0 and r.Sessions == 4, "Players and sessions")
 check(r.AvgSession == 10 and r.MedianSession == 10, "Average session: " .. tostring(r.AvgSession))
@@ -60,6 +64,9 @@ check(r.Sources[1].Name == "Duel" and r.Sources[1].Value == 250 and r.Sinks[1].N
 check(r.Products[1].Name == "Coins10k" and r.Products[1].Value == 99, "Robux by product")
 check(r.Duels[1].Name == "Ranked" and r.Duels[1].Wins == 1 and r.Duels[1].Losses == 1, "Duels")
 check(r.Countries[1].Name == "US" and r.Countries[1].Value == 2, "Countries count players, not sessions")
+local intro = r.Funnels.IntroRounds
+check(intro and #intro == 2 and intro[1].Users == 2 and intro[2].Users == 1 and intro[2].Drop == 50 and intro[2].Name == "R1 won · Sword", "The intro rounds' funnel")
+check(r.Funnels.Store and r.Funnels.Store[1].Users == 1, "The Store's funnel")
 local bands = {}
 for _, band in r.Lengths do
 	bands[band.Name] = band.Value

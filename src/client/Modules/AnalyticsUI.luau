@@ -254,9 +254,10 @@ local function build()
 	ui.Here = section(ui.HereRow, "PLAYERS HERE NOW", CW, 60, 1)
 	-- The funnel and the rounds.
 	local half = math.floor((CW - GAP) / 2)
-	local r1 = row(scroll, 36 + 11 * ROW + 8, 3)
-	ui.Funnel = section(r1, "ONBOARDING FUNNEL", half, 36 + 11 * ROW + 8, 1)
-	ui.Rounds = section(r1, "INTRO ROUNDS", half, 36 + 11 * ROW + 8, 2)
+	local h1 = 36 + 12 * ROW + 8
+	local r1 = row(scroll, h1, 3)
+	ui.Funnel = section(r1, "ONBOARDING FUNNEL", half, h1, 1)
+	ui.Rounds = section(r1, "INTRO ROUNDS FUNNEL", half, h1, 2)
 	local third = math.floor((CW - GAP * 2) / 3)
 	local h2 = 36 + 8 * ROW + 8
 	local r2 = row(scroll, h2, 4)
@@ -350,36 +351,45 @@ local function draw(answer)
 	setTile(5, "ROBUX", AnalyticsUI.commas(report.Revenue), string.format("%d payers · %d buys", report.Payers, report.Purchases))
 	local d1 = report.D1
 	setTile(6, "DAY-1 RETURN", if d1 then string.format("%.0f%%", d1.Pct or 0) else "—", if d1 then string.format("%d of %d new", d1.Back, d1.Cohort) else "needs 2+ days (7 DAYS)")
-	-- The funnel: each step's players, its share of the first, the drop; the
+	-- A funnel: each step's players, the drop from the step before; its
 	-- biggest drop in amber.
-	local worst, worstAt = 0, nil
-	for i, step in report.Funnel do
-		if i > 1 and (step.Drop or 0) > worst then
-			worst, worstAt = step.Drop, i
+	local function funnelBars(sec, steps, labelW: number, numbered: boolean)
+		local worst, worstAt = 0, nil
+		for i, step in steps do
+			if i > 1 and (step.Drop or 0) > worst then
+				worst, worstAt = step.Drop, i
+			end
 		end
+		local items = {}
+		for i, step in steps do
+			table.insert(items, {
+				Name = if numbered then string.format("%d  %s", step.Step, step.Name) else step.Name,
+				Value = step.Users,
+				Note = if i == 1 then "" else string.format("-%s%%", tostring(step.Drop or 0)),
+				Hot = i == worstAt and worst > 0,
+			})
+		end
+		bars(sec, items, labelW)
+		sec.Note.Text = if worstAt then "biggest drop in amber" else ""
 	end
-	local funnel = {}
-	for i, step in report.Funnel do
-		table.insert(funnel, {
-			Name = string.format("%d  %s", step.Step, step.Name),
-			Value = step.Users,
-			Note = if i == 1 then "" else string.format("-%s%%", tostring(step.Drop or 0)),
-			Hot = i == worstAt and worst > 0,
-		})
+	funnelBars(ui.Funnel, report.Funnel, 140, true)
+	-- The intro rounds: each round's start and win (Analytics' IntroRounds
+	-- funnel); before it was sent, the rounds' wins and losses.
+	local intro = report.Funnels and report.Funnels.IntroRounds
+	if intro and #intro > 0 then
+		funnelBars(ui.Rounds, intro, 120, false)
+	else
+		local rounds = {}
+		for _, rd in report.Rounds do
+			table.insert(rounds, {
+				Name = string.format("%d  %s", rd.Round, rd.Slot or ""),
+				Value = rd.Won,
+				Note = string.format("%d lost", rd.Lost) .. (if rd.Rare > 0 then string.format(" · %d rare", rd.Rare) else ""),
+			})
+		end
+		bars(ui.Rounds, rounds, 110)
+		ui.Rounds.Note.Text = "players who won each round"
 	end
-	bars(ui.Funnel, funnel, 140)
-	ui.Funnel.Note.Text = if worstAt then "biggest drop in amber" else ""
-	-- The rounds: players who won each, the losses beside.
-	local rounds = {}
-	for _, rd in report.Rounds do
-		table.insert(rounds, {
-			Name = string.format("%d  %s", rd.Round, rd.Slot or ""),
-			Value = rd.Won,
-			Note = string.format("%d lost", rd.Lost) .. (if rd.Rare > 0 then string.format(" · %d rare", rd.Rare) else ""),
-		})
-	end
-	bars(ui.Rounds, rounds, 110)
-	ui.Rounds.Note.Text = "players who won it"
 	local function named(list)
 		local out = {}
 		for _, item in list do

@@ -20,6 +20,10 @@
 	The client reports 1 and 2 (Remotes.Funnel "StoreOpened" / "StoreViewed");
 	the server sees 3 (MarketplaceService.PromptProductPurchaseFinished) and
 	4 (a granted receipt: Analytics.purchased).
+
+	The Intro Rounds funnel (Funnels, one-time: a session a player):
+	  Analytics.introStep(player, step)   1 R1 start, 2 R1 won, ... 12 R6 won
+	                                      (Analytics.IntroSteps)
 ]]
 local AnalyticsService = game:GetService("AnalyticsService")
 local HttpService = game:GetService("HttpService")
@@ -237,6 +241,25 @@ local function storeStep(player: Player, step: number)
 	visit.Step = step
 	call("store funnel", Analytics.send.funnel, player, "Store", visit.Id, step, Analytics.StoreSteps[step])
 	return true
+end
+
+-- The Intro Rounds funnel (a one-time one: one session a player) ------------------------------
+-- Each round's start and its win, in order (Server.IntroRoundsServer logs
+-- each once a player): where new miners stop, between rounds (at the card)
+-- or in one (beaten, and never back).
+Analytics.IntroSteps = {
+	"R1 start · Sword", "R1 won · Sword",
+	"R2 start · Shield", "R2 won · Shield",
+	"R3 start · Chest", "R3 won · Chest",
+	"R4 start · Gloves", "R4 won · Gloves",
+	"R5 start · Boots", "R5 won · Boots",
+	"R6 start · Helmet", "R6 won · Helmet",
+}
+function Analytics.introStep(player: Player, step: number)
+	local name = Analytics.IntroSteps[step]
+	if name then
+		call("intro funnel", Analytics.send.funnel, player, "IntroRounds", "intro-" .. tostring(player.UserId), step, name)
+	end
 end
 
 -- A step the client reports from the Store window.

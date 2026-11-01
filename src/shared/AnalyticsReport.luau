@@ -18,6 +18,8 @@
 	           biggest first (Countries and Events: the top 8)
 	  Duels    { { Name, Wins, Losses } }
 	  Lengths  { { Name, Value } }   sessions by length (<2m ... 40m+)
+	  Funnels  { [name] = steps, as Funnel's }   the game's other funnels
+	           (Server.Analytics: "IntroRounds", "Store")
 	  From, To   the first and last row's time; Rows   how many
 ]]
 local AnalyticsReport = {}
@@ -100,6 +102,7 @@ function AnalyticsReport.build(rows: { any }, options: any?)
 	local countries: { [number]: string } = {}
 	local sources, sinks, products, events = {}, {}, {}, {}
 	local duels = {}
+	local funnels = {} -- name -> { Users = { [step] = set }, Names = { [step] = name } }
 	local online: { [number]: { [string]: number } } = {} -- 5-minute bucket -> server -> players
 	local from, to = math.huge, 0
 	for _, r in rows do
@@ -176,6 +179,17 @@ function AnalyticsReport.build(rows: { any }, options: any?)
 			revenue += robux
 			local product = if type(a) == "string" then a else "?"
 			products[product] = (products[product] or 0) + robux
+		elseif e == "store_funnel" and n then
+			-- (the game's other funnels: Analytics' Store and IntroRounds)
+			local name = if type(b) == "string" then b else "?"
+			local f = funnels[name] or { Users = {}, Names = {} }
+			funnels[name] = f
+			local step = math.floor(n)
+			f.Users[step] = f.Users[step] or {}
+			f.Users[step][u] = true
+			if type(a) == "string" then
+				f.Names[step] = a
+			end
 		elseif e == "server" and n then
 			local bucket = t - t % 300
 			online[bucket] = online[bucket] or {}
@@ -197,6 +211,35 @@ function AnalyticsReport.build(rows: { any }, options: any?)
 				back += 1
 			end
 		end
+	end
+
+	-- A funnel's steps in order: players at each, their share of the first
+	-- step's, and the drop from the step before.
+	local function stepsOf(users, names)
+		local order = {}
+		for step in users do
+			table.insert(order, step)
+		end
+		table.sort(order)
+		local out = {}
+		local first = if order[1] then count(users[order[1]]) else 0
+		local before = nil
+		for _, step in order do
+			local n = count(users[step])
+			table.insert(out, {
+				Step = step,
+				Name = names[step] or tostring(step),
+				Users = n,
+				Pct = pct(n, first),
+				Drop = if before then pct(before - n, before) else 0,
+			})
+			before = n
+		end
+		return out
+	end
+	local funnelList = {}
+	for name, f in funnels do
+		funnelList[name] = stepsOf(f.Users, f.Names)
 	end
 
 	local steps = {}
@@ -294,6 +337,7 @@ function AnalyticsReport.build(rows: { any }, options: any?)
 		Events = sorted(events, AnalyticsReport.Top),
 		Duels = duelList,
 		Lengths = lengthList,
+		Funnels = funnelList,
 	}
 end
 

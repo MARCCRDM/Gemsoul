@@ -46,6 +46,7 @@ local Slots = shared("EquipmentSlots")
 
 -- Stand-ins.
 local fired, equipped, coins, events = {}, {}, 0, {}
+local introSteps = {} -- (the Intro Rounds funnel's steps, as sent)
 local socketed = 0
 local profile
 local attributes = {}
@@ -56,7 +57,10 @@ local player = {
 }
 local gemIds = 0
 local stubs = {
-	Analytics = { event = function(_, name, ...) table.insert(events, { name, ... }) end },
+	Analytics = {
+		event = function(_, name, ...) table.insert(events, { name, ... }) end,
+		introStep = function(_, step) table.insert(introSteps, step) end,
+	},
 	PlayerData = {
 		get = function() return profile end,
 		sync = function() end,
@@ -176,5 +180,21 @@ check(coins == IntroRounds.SetCoins and fired[#fired][2].View.Done, "The set's c
 check(attributes.IntroRounds == nil and not Server.eligible(player), "Still on the rounds after the set")
 check(Server.won(player) == nil, "A seventh piece")
 check(#events >= IntroRounds.Count, "Rounds not sent to Analytics")
+-- The Intro Rounds funnel: every round's start and win, once each, in order.
+check(#introSteps == IntroRounds.Count * 2, "The intro funnel sent " .. #introSteps .. " steps, not 12")
+for i, step in introSteps do
+	check(step == i, "The intro funnel's step " .. i .. " came as " .. tostring(step))
+end
+local before = #introSteps
+Server.funnel(player, profile.IntroRounds, 3, true)
+Server.funnel(player, profile.IntroRounds, 3, false)
+check(#introSteps == before, "An intro funnel step was sent twice")
+-- (a round started: its own step, before its win)
+local fresh = { Won = 0, Losses = 0, Pieces = {} }
+local mark = #introSteps
+Server.funnel(player, fresh, 1, false)
+Server.funnel(player, fresh, 1, true)
+Server.funnel(player, fresh, 2, false)
+check(introSteps[mark + 1] == 1 and introSteps[mark + 2] == 2 and introSteps[mark + 3] == 3 and #introSteps == mark + 3, "Start, win, next start: not 1, 2, 3")
 
 print(string.format("PASS: %d intro rounds server checks", checks))

@@ -219,6 +219,7 @@ local rows = {
 	{ day + 90, 1, "coins", 250, "Duel", "Gameplay" }, { day + 91, 1, "coins", -50, "Store", "Shop" }, { day + 92, 1, "Purchase", 99, "Coins10k", "Robux" },
 	{ day + 93, 1, "DuelFinished", 1, "Ranked", "Win", "1v1" }, { day + 660, 1, "session_end", 600, 3, 100, 80 },
 	{ day + 61, 2, "session_start", 0, "returning", "BR" }, { day + 300, 0, "server", 2, 700 },
+	{ day + 63, 1, "store_funnel", 1, "R1 start · Sword", "IntroRounds" }, { day + 81, 1, "store_funnel", 2, "R1 won · Sword", "IntroRounds" },
 }
 analyticsAnswer = function(range)
 	local answer = { Ok = true, Message = "", Range = range, Report = Report.build(rows), Now = day + 700 }
@@ -248,6 +249,7 @@ for _, d in analytics:GetDescendants() do
 end
 check(seen["Reading the saved logs…  3 / 7"], "ANALYTICS didn't draw 7 DAYS' loading line")
 check(seen["PLAYERS"] and seen["2"] and seen["99"] and seen["1  Joined"], "ANALYTICS didn't draw the report (tiles, funnel)")
+check(seen["R1 start · Sword"] and seen["R1 won · Sword"], "ANALYTICS didn't draw the intro rounds' funnel")
 check(Analytics.commas(1234567) == "1,234,567" and Analytics.minutes(90) == "1h 30m" and Analytics.minutes(0.5) == "30s", "ANALYTICS' number formats")
 print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)

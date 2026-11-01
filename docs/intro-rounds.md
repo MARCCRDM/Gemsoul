@@ -40,3 +40,22 @@ Code: `Shared/IntroRounds.luau` (rules), `Server/Systems/IntroRoundsServer.luau`
 `Server/Systems/Duelist.luau` (the rivals), `Server/Systems/Duels.luau` (queued
 wins), `Client/Modules/IntroRoundsUI.luau` (the card),
 `Client/Modules/ArenaBarrier.luau`. Tests: `python3 tests/run_intro_rounds.py`.
+
+## The Intro Rounds funnel
+
+Sent to Roblox as a one-time funnel named **IntroRounds** (Creator Dashboard >
+Analytics > Funnels; one session per player), and shown in the in-game
+ANALYTICS window as INTRO ROUNDS FUNNEL. Twelve steps, each logged once per
+player:
+
+| Step | Name | When |
+|---|---|---|
+| 1 | R1 start · Sword | the first fight starts (round 1 is the first fight) |
+| 2 | R1 won · Sword | it's won |
+| 3, 5, 7, 9, 11 | R2..R6 start · Shield, Chest, Gloves, Boots, Helmet | NEXT ROUND (or TRY AGAIN) starts it, against the rival or a waiting player |
+| 4, 6, 8, 10, 12 | R2..R6 won · ... | it's won (12: the whole set) |
+
+A big drop from a **won** step to the next **start** means players leave at
+the card between rounds. A big drop from a **start** to its **won** means the
+round is too hard (or they quit mid-fight).
+
