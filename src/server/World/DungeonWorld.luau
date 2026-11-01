@@ -291,4 +291,53 @@ function World.buildOpen(id, camps, origin)
 		Radius = radius,
 	}
 end
+-- The Rot Beachhead's dressing over the canyon rooms (Shared.DungeonRules.First):
+-- glowing rot pods round each room, the rot's purple growth along its walls,
+-- and broken hull plates leaning where the invaders' ship came down.
+local ROT = Color3.fromRGB(70, 22, 84)
+local ROT_DARK = Color3.fromRGB(36, 12, 44)
+local ROT_GLOW = Color3.fromRGB(90, 255, 110)
+local HULL = Color3.fromRGB(62, 68, 80)
+local RUST = Color3.fromRGB(104, 56, 34)
+local function scenery(part)
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	return part
+end
+function World.dressBeachhead(folder, centers, rng)
+	rng = rng or Random.new()
+	for i, center in centers do
+		for n = 1, 4 do
+			local a = (n - 0.5) / 4 * math.pi * 2 + i
+			local at = center + Vector3.new(math.cos(a) * 25, 0, math.sin(a) * 25)
+			scenery(block(folder, "RotStalk", Vector3.new(0.8, 2.6, 0.8), at + Vector3.new(0, 2.3, 0), ROT_DARK))
+			local pod = scenery(block(folder, "RotPod", Vector3.new(2.4, 2.4, 2.4), at + Vector3.new(0, 4.4, 0), ROT_GLOW, Enum.Material.Neon))
+			pod.Shape = Enum.PartType.Ball
+			local glow = Instance.new("PointLight")
+			glow.Color = ROT_GLOW
+			glow.Range = 18
+			glow.Brightness = 1.2
+			glow.Shadows = false
+			glow.Parent = pod
+		end
+		for n = 1, 7 do
+			local a = rng:NextNumber(0, math.pi * 2)
+			local r = rng:NextNumber(26, 30)
+			local size = rng:NextNumber(3, 6.5)
+			local blob = scenery(block(folder, "RotGrowth", Vector3.new(size, size, size), center + Vector3.new(math.cos(a) * r, size * 0.3, math.sin(a) * r), if n % 3 == 0 then ROT_DARK else ROT, Enum.Material.SmoothPlastic))
+			blob.Shape = Enum.PartType.Ball
+			if n % 2 == 0 then
+				local spot = scenery(block(folder, "RotSpot", Vector3.new(1.1, 1.1, 1.1), blob.Position + Vector3.new(0, size * 0.42, 0), ROT_GLOW, Enum.Material.Neon))
+				spot.Shape = Enum.PartType.Ball
+			end
+		end
+		for n = 1, 3 do
+			local a = rng:NextNumber(0, math.pi * 2)
+			local plate = scenery(block(folder, "HullPlate", Vector3.new(rng:NextNumber(6, 10), rng:NextNumber(7, 12), 0.8), center + Vector3.new(math.cos(a) * 30, 4, math.sin(a) * 30), if n == 2 then RUST else HULL, Enum.Material.DiamondPlate))
+			plate.CFrame = CFrame.lookAt(plate.Position, center + Vector3.new(0, 4, 0)) * CFrame.Angles(rng:NextNumber(-0.35, 0.1), 0, rng:NextNumber(-0.25, 0.25))
+		end
+	end
+end
+
 return World

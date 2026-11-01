@@ -62,3 +62,24 @@ Fill Random searches among opted-in players in this server. It assembles three s
 This implementation does not match across Roblox servers. Developer solo test controls remain separate from public matchmaking.
 
 Validation: tests/run_dungeon_queue.py executes the actual Party and DungeonQueue modules using deterministic service doubles. Covers invitations, three solos, duo plus solo, leader/readiness restrictions, duplicate queue and launch prevention, cancellations, disconnects, occupied players, and preserving existing parties.
+
+## The Rot Beachhead (the campaign's first dungeon)
+
+The new player's first dungeon, after the intro fights (the New Player Pipeline proposal). For now it is reached only from the DEV panel's **FIRST DUNGEON (NEW INTRO)** button (owners and testers), which plays it as a new player would:
+
+1. The kaiju roll, if one is owed (Client KaijuRoll).
+2. The loading screens (Client FirstDungeonUI): YOUR KAIJU (your team out; "Your kaiju will defend you and heal you"), then the scout mission. A tap skips one.
+3. In: `DungeonTest "First"`. It's solo, with a pod drop, and your kaiju are let in (the `DungeonKaiju` attribute; Server KaijuServer) and fight the room's fighters (`KaijuFoes`, flagged as `OutpostCreature` targets).
+4. Room 1: The Gate (Sahur). Room 2: The Yard (Tralalero, Patapim). The Nest: the boss. All of it is in a straight line, with rot pods, growths and hull plates round each room (DungeonWorld.dressBeachhead).
+5. The boss down: a boss cache. Out after 6 s, with a clear's coins and XP.
+
+Shared.DungeonRules.First holds its numbers. The fighters are at 50% health and 60% damage; the boss is at 60% health and 80% damage. All of it hits softer the fewer intro pieces you've won (`firstDamage`: x0.75 with one, x1.0 with six).
+
+A lethal blow knocks you down instead (shielded, the Outpost's knock-down). After 3 s the card comes up:
+
+- **RECOVER** puts you back at the start of the room you fell in, at full health. The room's fighters are back at full too (`Duelist.healDungeon`). After 30 s it recovers you by itself.
+- **FINISH THE INTRO FIGHTS (n LEFT)** shows only while intro rounds are left to win. It takes you out, with no rewards, and on into the next round.
+
+The boss is Chimpanzini for now, standing in for Granchio Rottamino, whose model is still to come. After the dungeon you go back to the Outpost: the mining / socket / kaiju / critter steps that follow it aren't built yet.
+
+Tests: `tests/first_dungeon_cases.luau` (in tests/run_dungeons.py), and the Rot Beachhead's screens and card in tests/client_extras_boot.luau.

@@ -42,7 +42,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 490)
+panel.Size = UDim2.fromOffset(300, 526)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -89,7 +89,7 @@ if game:GetService("UserInputService").TouchEnabled then
 	fit.Parent = panel
 	local function shrink()
 		local height = gui.AbsoluteSize.Y
-		fit.Scale = if height > 0 then math.clamp((height - 70) / 490, 0.4, 1) else 1
+		fit.Scale = if height > 0 then math.clamp((height - 70) / 526, 0.4, 1) else 1
 	end
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(shrink)
 	shrink()
@@ -188,6 +188,39 @@ if not restart.Active and require(game:GetService("ReplicatedStorage").Shared.Fa
 	end)
 end
 
+-- FIRST DUNGEON: the new player's path after the intro fights, as it'll
+-- play: the kaiju and scout mission screens, the pod drop, the Rot
+-- Beachhead (Client FirstDungeonUI, Shared.DungeonRules.First).
+local firstDungeon = Instance.new("TextButton")
+firstDungeon.Name = "FirstDungeon"
+firstDungeon.Size = UDim2.fromOffset(288, 30)
+firstDungeon.Position = UDim2.fromOffset(6, 84)
+firstDungeon.BackgroundColor3 = Color3.fromRGB(206, 112, 40)
+firstDungeon.TextColor3 = Color3.fromRGB(255, 244, 226)
+firstDungeon.Font = Enum.Font.GothamBold
+firstDungeon.TextSize = 12
+firstDungeon.Text = "FIRST DUNGEON (NEW INTRO)"
+firstDungeon.Parent = panel
+corner(firstDungeon, 5)
+firstDungeon.Activated:Connect(function()
+	if busy then
+		return
+	end
+	panel.Visible = false
+	toggle.Text = arrow(false)
+	busy = true
+	task.spawn(function()
+		local ok, problem = pcall(function()
+			local message = require(script.Parent.Modules.FirstDungeonUI).play()
+			status.Text = message or "Into the Rot Beachhead."
+		end)
+		if not ok then
+			status.Text = "First dungeon failed: " .. tostring(problem)
+		end
+		busy = false
+	end)
+end)
+
 local buttons = {
 	{ "F7 / PATHWAY", "DungeonTest", "Full" },
 	{ "F8 / TUNG TUNG", "DungeonTest", "Sahur" },
@@ -200,7 +233,7 @@ for i, item in buttons do
 	local b = Instance.new("TextButton")
 	local wide = i >= 3
 	b.Size = UDim2.fromOffset(if wide then 288 else 141, 26)
-	b.Position = UDim2.fromOffset(if i == 2 then 153 else 6, if i <= 2 then 84 else 84 + (i - 2) * 32)
+	b.Position = UDim2.fromOffset(if i == 2 then 153 else 6, if i <= 2 then 120 else 120 + (i - 2) * 32)
 	b.BackgroundColor3 = if i >= 5 then Color3.fromRGB(70, 46, 84) else Color3.fromRGB(39, 61, 79)
 	b.TextColor3 = Color3.fromRGB(240, 245, 250)
 	b.Font = Enum.Font.GothamBold
@@ -222,7 +255,7 @@ end
 -- to test and compare. This session only.
 local versionCaption = Instance.new("TextLabel")
 versionCaption.Size = UDim2.fromOffset(96, 26)
-versionCaption.Position = UDim2.fromOffset(6, 296)
+versionCaption.Position = UDim2.fromOffset(6, 332)
 versionCaption.BackgroundTransparency = 1
 versionCaption.TextColor3 = Color3.fromRGB(255, 210, 126)
 versionCaption.Font = Enum.Font.GothamBold
@@ -243,7 +276,7 @@ for version = 1, 2 do
 	local b = Instance.new("TextButton")
 	b.Name = "InventoryV" .. version
 	b.Size = UDim2.fromOffset(92, 26)
-	b.Position = UDim2.fromOffset(104 + (version - 1) * 98, 296)
+	b.Position = UDim2.fromOffset(104 + (version - 1) * 98, 332)
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 12
 	b.Text = if version == 1 then "V1  OLD" else "V2  CURRENT"
@@ -263,7 +296,7 @@ player:GetAttributeChangedSignal("InventoryVersion"):Connect(paintVersions)
 -- sockets) or the triad (Q the sword's gem, E the core gem, R the shield's).
 -- Saved on your profile, so the server fights by the same rules.
 local abilityCaption = versionCaption:Clone()
-abilityCaption.Position = UDim2.fromOffset(6, 328)
+abilityCaption.Position = UDim2.fromOffset(6, 364)
 abilityCaption.Text = "ABILITIES"
 abilityCaption.Parent = panel
 local abilityButtons = {}
@@ -278,7 +311,7 @@ for i, mode in { "Classic", "Triad" } do
 	local b = Instance.new("TextButton")
 	b.Name = "Abilities" .. mode
 	b.Size = UDim2.fromOffset(92, 26)
-	b.Position = UDim2.fromOffset(104 + (i - 1) * 98, 328)
+	b.Position = UDim2.fromOffset(104 + (i - 1) * 98, 364)
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 12
 	b.Text = if mode == "Classic" then "CLASSIC" else "Q·E·R TRIAD"
@@ -296,14 +329,14 @@ paintAbilities("Triad")
 -- milestones (Shared.ArenaStreak) and open it, roll and all. Test caches
 -- pay no coins or titles and their leftovers never reach the Market.
 local cacheCaption = versionCaption:Clone()
-cacheCaption.Position = UDim2.fromOffset(6, 360)
+cacheCaption.Position = UDim2.fromOffset(6, 396)
 cacheCaption.Text = "ARENA CACHE"
 cacheCaption.Parent = panel
 for i, wins in { 10, 20, 30, 40, 50 } do
 	local b = Instance.new("TextButton")
 	b.Name = "StreakCache" .. wins
 	b.Size = UDim2.fromOffset(34, 26)
-	b.Position = UDim2.fromOffset(104 + (i - 1) * 38, 360)
+	b.Position = UDim2.fromOffset(104 + (i - 1) * 38, 396)
 	b.BackgroundColor3 = Color3.fromRGB(84, 64, 30)
 	b.TextColor3 = Color3.fromRGB(255, 210, 126)
 	b.Font = Enum.Font.GothamBold
@@ -319,14 +352,14 @@ end
 -- BOSS CACHE: a test boss cache (Shared.BossLoot) from a boss of threat I,
 -- II or III, its gem and all, opened the same way.
 local bossCaption = versionCaption:Clone()
-bossCaption.Position = UDim2.fromOffset(6, 392)
+bossCaption.Position = UDim2.fromOffset(6, 428)
 bossCaption.Text = "BOSS CACHE"
 bossCaption.Parent = panel
 for threat, numeral in { "I", "II", "III" } do
 	local b = Instance.new("TextButton")
 	b.Name = "BossCache" .. threat
 	b.Size = UDim2.fromOffset(60, 26)
-	b.Position = UDim2.fromOffset(104 + (threat - 1) * 64, 392)
+	b.Position = UDim2.fromOffset(104 + (threat - 1) * 64, 428)
 	b.BackgroundColor3 = Color3.fromRGB(92, 34, 30)
 	b.TextColor3 = Color3.fromRGB(255, 176, 150)
 	b.Font = Enum.Font.GothamBold
@@ -342,7 +375,7 @@ end
 -- LANGUAGE: the game in English or Spanish (client/Translate), whatever
 -- Roblox is set to. This session only.
 local languageCaption = versionCaption:Clone()
-languageCaption.Position = UDim2.fromOffset(6, 424)
+languageCaption.Position = UDim2.fromOffset(6, 460)
 languageCaption.Text = "LANGUAGE"
 languageCaption.Parent = panel
 local languageButtons = {}
@@ -358,7 +391,7 @@ for i, id in { "en", "es" } do
 	local b = Instance.new("TextButton")
 	b.Name = "Language" .. id
 	b.Size = UDim2.fromOffset(92, 26)
-	b.Position = UDim2.fromOffset(104 + (i - 1) * 98, 424)
+	b.Position = UDim2.fromOffset(104 + (i - 1) * 98, 460)
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 12
 	b.Text = if id == "en" then "ENGLISH" else "ESPAÑOL"
@@ -379,13 +412,13 @@ end)
 -- (Modules/KaijuRoll.preview): see it with all the kaiju in it. Nothing is
 -- claimed or saved; START just closes it.
 local rollCaption = versionCaption:Clone()
-rollCaption.Position = UDim2.fromOffset(6, 456)
+rollCaption.Position = UDim2.fromOffset(6, 492)
 rollCaption.Text = "KAIJU ROLL"
 rollCaption.Parent = panel
 local rollButton = Instance.new("TextButton")
 rollButton.Name = "KaijuRollPreview"
 rollButton.Size = UDim2.fromOffset(190, 26)
-rollButton.Position = UDim2.fromOffset(104, 456)
+rollButton.Position = UDim2.fromOffset(104, 492)
 rollButton.BackgroundColor3 = Color3.fromRGB(30, 84, 64)
 rollButton.TextColor3 = Color3.fromRGB(150, 255, 200)
 rollButton.Font = Enum.Font.GothamBold
@@ -416,7 +449,7 @@ end)
 local RivalPose = require(game:GetService("ReplicatedStorage").Shared.RivalPose)
 local poseLine = Instance.new("TextLabel")
 poseLine.Size = UDim2.new(1, -12, 0, 46)
-poseLine.Position = UDim2.fromOffset(6, 242)
+poseLine.Position = UDim2.fromOffset(6, 278)
 poseLine.BackgroundTransparency = 1
 poseLine.TextColor3 = Color3.fromRGB(160, 230, 255)
 poseLine.TextWrapped = true

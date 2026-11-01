@@ -24,6 +24,7 @@ local Restores = require(script.Parent.Restores)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local Shop = require(script.Parent.Shop)
 local Feedback = require(script.Parent.Feedback)
+local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
 local Dungeon = {}
 local function canTest(player)
 	return Feedback.isOwner(player)
@@ -96,7 +97,7 @@ finish = function(run, won, reason)
 		if memberRun[p] == run then
 			local humanoid = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
 			local eligible = won
-				and not run.Test
+				and (not run.Test or run.First)
 				and p.Parent
 				and p:GetAttribute("DungeonId") == run.Id
 				and humanoid
@@ -109,6 +110,16 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonObjective", nil)
 				p:SetAttribute("DungeonRoom", nil)
 				p:SetAttribute("DungeonBoss", nil)
+				p:SetAttribute("DungeonKaiju", nil)
+				p:SetAttribute("SparDown", nil)
+				local shield = p.Character and p.Character:FindFirstChild("FirstDownShield")
+				if shield then
+					shield:Destroy()
+				end
+				local downRoot = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+				if downRoot and run.First then
+					downRoot.Anchored = false
+				end
 				-- A clear also restores a share of the pick's swings (Shared.SwingRestore).
 				local swings, xp = 0, 0
 				if eligible then
@@ -161,7 +172,7 @@ beginLoot = function(run, room)
 		return
 	end
 	Duelist.removeDungeon(run.Id) -- clear hostile actors
-	if run.Test then
+	if run.Test and not run.First then
 		finish(run, true, "Owner expedition complete. No rewards.")
 		return
 	end
@@ -169,6 +180,13 @@ beginLoot = function(run, room)
 	run.Loot = { Boss = boss }
 	for _, p in living(run) do
 		ArenaStreaks.bossCache(p, boss, Dungeon.bossGem(boss.Element, room.GearTier), "Dungeon")
+	end
+	if run.First then
+		announce(run, "THE BEACHHEAD IS TAKEN · Open your boss cache: keep the piece you'll wear.")
+		task.delay(6, function()
+			finish(run, true, "That's one. There are more out there. Back to the Outpost: gear up.")
+		end)
+		return
 	end
 	announce(run, "BOSS DEFEATED · Each of you gets a boss cache: open it to roll your loot.")
 	task.delay(5, function()
@@ -195,7 +213,11 @@ local function spawnRoom(run, index)
 	end
 	announce(
 		run,
-		if room.Boss
+		if run.First
+			then (if room.Boss
+				then string.format("THE NEST · %s · weak to %s", spec.Name, GemConfig.elementName(spec.Weakness))
+				else string.format("%s · defeat %d fighter%s", room.Name or ("Room " .. index), #room.Foes, if #room.Foes == 1 then "" else "s"))
+		elseif room.Boss
 			then "BOSS: Colossus "
 				.. spec.Name
 				.. " · "
@@ -225,6 +247,9 @@ local function spawnRoom(run, index)
 			Spot = center + Vector3.new(math.cos(angle) * 14, if room.Boss then 7 else 4, math.sin(angle) * 14),
 			Spec = Rules.specOf(room, kind),
 			Boss = room.Boss,
+			HealthScale = room.HealthScale,
+			DamageScale = if run.First then (room.DamageScale or 1) * (run.PieceScale or 1) else nil,
+			KaijuFoes = run.First == true,
 			OnDeath = function()
 				if run.Done or (not run.OpenWorld and run.Index ~= index) then
 					return
@@ -263,7 +288,12 @@ local function spawnRoom(run, index)
 					h.Health = h.MaxHealth
 					CombatServer.reset(p)
 				end
-				announce(run, string.format("Room %d cleared. Gate open — proceed to room %d.", index, index + 1))
+				announce(
+					run,
+					if run.First
+						then string.format("%s clear. The gate's open: on to %s.", room.Name or ("Room " .. index), (run.Rooms[index + 1] or {}).Name or "the next room")
+						else string.format("Room %d cleared. Gate open — proceed to room %d.", index, index + 1)
+				)
 			end,
 		})
 		if not enemy then
@@ -331,6 +361,10 @@ local function queue(player, testMode)
 		PartyId = party and party.Id,
 		Test = testing,
 		OpenWorld = testing and testMode == "OpenWorld",
+		-- The campaign's first dungeon, the Rot Beachhead (Rules.First): solo,
+		-- with the player's kaiju, a knock-down card instead of a reserve.
+		First = testing and testMode == "First",
+		Down = {},
 		Slot = slot,
 		Index = 1,
 		Started = os.clock(),
@@ -349,6 +383,9 @@ local function queue(player, testMode)
 		p:SetAttribute("RaidId", id)
 		p:SetAttribute("PvPEnabled", false)
 		p:SetAttribute("CombatSession", "Raid")
+		if run.First then
+			p:SetAttribute("DungeonKaiju", true)
+		end
 	end
 	local success, problem = pcall(function()
 		for _, p in run.Members do
@@ -365,11 +402,23 @@ local function queue(player, testMode)
 			end
 			run.Rooms = { { Index = 1, X = 0, Z = 0, Boss = true, Theme = sahur, Foes = { sahur }, Pillars = 2 } }
 		end
+		if run.First then
+			run.Rooms = Rules.firstRooms()
+			-- (Softer hits the fewer intro pieces they've won; an older save, geared, as six.)
+			local state = IntroRounds.state(PlayerData.get(player))
+			run.PieceScale = Rules.firstDamage(if state then state.Won else 6)
+		end
 		run.World = (if run.OpenWorld then World.buildOpen else World.build)(
 			id,
 			run.Rooms,
 			Vector3.new(2500 + slot * 1400, 0, 2500)
 		)
+		if run.First then
+			local dressed, problem = pcall(World.dressBeachhead, run.World.Folder, run.World.Centers)
+			if not dressed then
+				warn("[Dungeon] beachhead dressing: " .. tostring(problem))
+			end
+		end
 		for i, p in run.Members do
 			CombatServer.reset(p)
 			local spot = (run.World.Arrival or run.World.Centers[1])
@@ -381,7 +430,9 @@ local function queue(player, testMode)
 		end
 		announce(
 			run,
-			if testing
+			if run.First
+				then "THE ROT BEACHHEAD · Scout the base, then take it. Your kaiju fight with you."
+			elseif testing
 				then "OWNER TEST  -  solo enabled, no rewards. Orbital deployment inbound."
 				else "PATHWAY DUNGEON · Clear five linked canyon encounters. Follow the trail to the Colossus."
 		)
@@ -467,8 +518,93 @@ local function chooseReserve(p, index)
 	end)
 	return Shop.reply(true, "Deploying Miner " .. index .. ".")
 end
+-- The first dungeon's knock-down: down where they fell (shielded, the
+-- Outpost's knock-down on screen), then a card: RECOVER at the start of this
+-- room (its fighters back to full), or back to the intro fights while there
+-- are rounds left to win (Client FirstDungeonUI). RECOVER by itself after
+-- ChooseSeconds.
+local function firstDown(run, p, humanoid)
+	if run.Down[p] then
+		return true
+	end
+	if humanoid.Health <= 0 then
+		return false
+	end
+	local first = Rules.First
+	run.Down[p] = { Until = os.clock() + first.DownSeconds + first.ChooseSeconds }
+	humanoid.Health = math.max(1, math.min(humanoid.Health, 1))
+	CombatServer.reset(p)
+	local shield = Instance.new("ForceField")
+	shield.Name, shield.Visible, shield.Parent = "FirstDownShield", false, p.Character
+	p:SetAttribute("SparDown", workspace:GetServerTimeNow() + first.DownSeconds)
+	Remotes.CombatFx:FireAllClients("SparKO", p.UserId, 0)
+	task.delay(first.DownSeconds, function()
+		if run.Done or memberRun[p] ~= run or not run.Down[p] then
+			return
+		end
+		p:SetAttribute("SparDown", nil)
+		local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+		if root then
+			root.Anchored = true
+		end
+		local room = run.Rooms[run.Index]
+		local state = IntroRounds.state(PlayerData.get(p))
+		Remotes.Social:FireClient(p, "FirstDungeon", {
+			Phase = "Down",
+			Room = room and room.Name,
+			Boss = room and room.Boss and Rules.specOf(room).Name or nil,
+			RoundsLeft = if state then math.max(0, IntroRounds.Count - state.Won) else 0,
+			Seconds = first.ChooseSeconds,
+		})
+	end)
+	return true
+end
+-- RECOVER: up at the start of the room they fell in, full health, its fighters too.
+local function firstRecover(p)
+	local run = memberRun[p]
+	if not run or not run.First or not run.Down[p] then
+		return Shop.reply(false, "You're not down.")
+	end
+	run.Down[p] = nil
+	local c = p.Character
+	local humanoid = c and c:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then
+		finish(run, false, "Knocked out. The Rot Beachhead waits for you.")
+		return Shop.reply(false, "Knocked out.")
+	end
+	local shield = c:FindFirstChild("FirstDownShield")
+	if shield then
+		shield:Destroy()
+	end
+	local root = c:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.Anchored = false
+	end
+	p:SetAttribute("SparDown", nil)
+	local center = run.World.Centers[run.Index] or run.World.Centers[1]
+	local spot = center + Vector3.new(0, 4, -22)
+	c:PivotTo(CFrame.lookAt(spot, Vector3.new(center.X, spot.Y, center.Z)))
+	humanoid.Health = humanoid.MaxHealth
+	CombatServer.reset(p)
+	Duelist.healDungeon(run.Id)
+	announce(run, "Back on your feet. Watch the wind-ups this time.")
+	return Shop.reply(true, "")
+end
+-- Back to the intro fights: out of the dungeon (the client starts the next round).
+local function firstQuit(p)
+	local run = memberRun[p]
+	if not run or not run.First then
+		return Shop.reply(false, "You're not in the Rot Beachhead.")
+	end
+	run.Down[p] = nil
+	finish(run, false, "Back to the intro fights: win more gear, then the Rot Beachhead waits.")
+	return Shop.reply(true, "")
+end
 local function reserveAfterDefeat(p, humanoid)
 	local run = memberRun[p]
+	if run and run.First then
+		return firstDown(run, p, humanoid)
+	end
 	local profile = PlayerData.get(p)
 	if not run or run.Done or not profile or not profile.Miners then return false end
 	if run.Selecting[p] then return true end
@@ -492,6 +628,8 @@ function Dungeon.queueParty(player)
 end
 function Dungeon.start()
 	Shop.register("DungeonMinerSelect", chooseReserve)
+	Shop.register("FirstDungeonRecover", firstRecover)
+	Shop.register("FirstDungeonQuit", firstQuit)
 	CombatServer.onDungeonLethal(reserveAfterDefeat)
 	Shop.register("PartyDungeon", function(player)
 		return queue(player)
@@ -500,8 +638,8 @@ function Dungeon.start()
 		if not canTest(player) then
 			return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
 		end
-		if mode ~= "Sahur" and mode ~= "Full" and mode ~= "OpenWorld" then
-			return Shop.reply(false, "Choose Pathway, Open World, or Sahur.")
+		if mode ~= "Sahur" and mode ~= "Full" and mode ~= "OpenWorld" and mode ~= "First" then
+			return Shop.reply(false, "Choose Pathway, Open World, Sahur, or First.")
 		end
 		return queue(player, mode)
 	end)
@@ -518,6 +656,19 @@ function Dungeon.start()
 		p:SetAttribute("DungeonRoom", nil)
 		p:SetAttribute("DungeonBoss", nil)
 		p:SetAttribute("DungeonObjective", nil)
+		p:SetAttribute("DungeonKaiju", nil)
+		p:SetAttribute("SparDown", nil)
+		if run.Down then
+			run.Down[p] = nil
+		end
+		local shield = p.Character and p.Character:FindFirstChild("FirstDownShield")
+		if shield then
+			shield:Destroy()
+		end
+		local downRoot = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+		if downRoot and run.First then
+			downRoot.Anchored = false
+		end
 		if #living(run) == 0 and not reservesPending(run) then
 			finish(run, false, "The squad has left the dungeon.")
 		end
@@ -566,6 +717,13 @@ function Dungeon.start()
 					local profile = PlayerData.get(p)
 					local available = MinerRoster.remaining(profile and profile.Miners, run.Defeated[p])
 					if available[1] then chooseReserve(p, available[1]) end
+				end
+			end
+			if run.First then
+				for p, down in run.Down do
+					if os.clock() >= down.Until then
+						firstRecover(p)
+					end
 				end
 			end
 			if #alive == 0 and not reservesPending(run) then

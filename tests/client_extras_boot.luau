@@ -104,6 +104,7 @@ local services = {
 	GuiService = { TopbarInset = roblox.Rect.new(290, 0, 1280, 58), GetPropertyChangedSignal = function() return signal() end },
 	SoundService = soundService,
 	StarterGui = { SetCore = function() end },
+	Debris = { AddItem = function() end },
 	LocalizationService = { RobloxLocaleId = "en-us" },
 }
 local game = { GetService = function(_, n) return services[n] or error("no service " .. n) end }
@@ -124,8 +125,11 @@ local GemClient = {
 		return { Ok = true, Message = "" }
 	end,
 }
+local kaijuRolled = 0
 local stubs = {
 	GemClient = GemClient,
+	-- (the kaiju roll is its own screen: just that it's played)
+	KaijuRoll = { play = function(after) kaijuRolled += 1; if after then after() end end },
 	UpgradeHints = { Current = { Equipment = true, Surges = { Changes = 0 } }, Changed = signal() },
 	LobbyUI = { openDashboard = function() end, openPicker = function() end },
 	Music = { setVolume = function(v) stubsMusic = v end },
@@ -260,5 +264,34 @@ do -- (who's in the numbers: a toggle each, a dev account just says so)
 	check(counted == 1 and notCounted == 1 and seen["DEV · NOT COUNTED"], "PLAYERS HERE NOW's COUNTED / NOT COUNTED")
 end
 check(Analytics.commas(1234567) == "1,234,567" and Analytics.minutes(90) == "1h 30m" and Analytics.minutes(0.5) == "30s", "ANALYTICS' number formats")
-print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range)", checks))
+-- The Rot Beachhead (FirstDungeonUI): its loading screens, then in; the
+-- knock-down card's RECOVER and FINISH THE INTRO FIGHTS.
+do
+	local First = load(clientRef.FirstDungeonUI)
+	First.SlideSeconds = 0.15
+	local before = #requests
+	local okPlay, message = pcall(First.play)
+	check(okPlay and message == nil, "FIRST DUNGEON didn't play: " .. tostring(message))
+	local asked = false
+	for i = before + 1, #requests do
+		if requests[i][1] == "DungeonTest" and requests[i][2] == "First" then
+			asked = true
+		end
+	end
+	check(asked, "FIRST DUNGEON didn't ask to go in")
+	check(kaijuRolled == 1, "A new player's kaiju roll didn't come first")
+	check(playerGui:FindFirstChild("FirstDungeonIntro") == nil, "The loading screens stayed up")
+	social:Fire("FirstDungeon", { Phase = "Down", Room = "Room 1: The Gate", RoundsLeft = 4, Seconds = 30 })
+	task.wait(0.2)
+	local down = playerGui:FindFirstChild("FirstDungeonDown")
+	check(down ~= nil, "No knock-down card")
+	check(down and down:FindFirstChild("Recover", true) ~= nil, "No RECOVER")
+	local quit = down and down:FindFirstChild("Quit", true)
+	check(quit ~= nil and string.find(quit.Text, "4 LEFT", 1, true) ~= nil, "No FINISH THE INTRO FIGHTS (4 LEFT)")
+	social:Fire("FirstDungeon", { Phase = "Down", Room = "The Nest", Boss = "Chimpanzini", RoundsLeft = 0, Seconds = 30 })
+	task.wait(0.2)
+	down = playerGui:FindFirstChild("FirstDungeonDown")
+	check(down ~= nil and down:FindFirstChild("Quit", true) == nil, "Back to the intro fights offered with none left")
+end
+print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range, the Rot Beachhead's screens and knock-down card)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)

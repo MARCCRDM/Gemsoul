@@ -547,8 +547,13 @@ local function spawnPet(player: Player, record, slot: number): Pet?
 end
 
 -- Can `player` have their kaiju out right now? In the Outpost, on their
--- feet, not in a fight, a match, a dungeon or an expedition.
+-- feet, not in a fight, a match, a dungeon or an expedition; or in the
+-- campaign's first dungeon, where they fight beside them (DungeonKaiju:
+-- Server.Dungeons).
 local function canBeOut(player: Player): boolean
+	if player:GetAttribute("DungeonKaiju") == true then
+		return player:GetAttribute("Expedition") == nil and aliveOf(player)
+	end
 	return player:GetAttribute("Outpost") == true
 		and player:GetAttribute("CombatSession") == nil
 		and player:GetAttribute("MatchId") == nil

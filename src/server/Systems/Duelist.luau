@@ -2466,6 +2466,8 @@ function spawnRival(owner: Player, raid, encounter)
 		if encounter then
 			health = math.floor(health * (if encounter.Boss then 2.2 else 0.38) * (encounter.HealthScale or 1))
 			raidDamage *= if encounter.Boss then 1 else 0.65
+			-- (The first dungeon's softer fighters: Shared.DungeonRules.First.)
+			raidDamage *= encounter.DamageScale or 1
 		end
 	end
 	local kind = {
@@ -2589,6 +2591,10 @@ function spawnRival(owner: Player, raid, encounter)
 		else
 			enemy.DungeonId = raid.Id
 			enemy.Model:SetAttribute("DungeonId", raid.Id)
+			-- (The first dungeon's: the player's kaiju fight beside them.)
+			if encounter.KaijuFoes then
+				(enemy :: any).OutpostCreature = true
+			end
 		end
 		enemy.Model:SetAttribute("RaidBandit", encounter.Bandit == true)
 		enemy.Model:SetAttribute("ElementWeakness", encounter.Spec.Weakness)
@@ -2855,6 +2861,15 @@ function Duelist.spawnDungeon(members, id, encounter)
 		Dungeon = true,
 	}
 	return spawnRival(members[1], raid, encounter)
+end
+-- A dungeon run's fighters still standing back to full health (the first
+-- dungeon's RECOVER: Server.Dungeons).
+function Duelist.healDungeon(id)
+	for enemy, duel in dungeonActors do
+		if duel.Raid.Id == id and enemy.Alive and enemy.Humanoid then
+			enemy.Humanoid.Health = enemy.Humanoid.MaxHealth
+		end
+	end
 end
 function Duelist.removeDungeon(id)
 	for enemy, duel in dungeonActors do

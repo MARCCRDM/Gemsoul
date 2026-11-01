@@ -209,6 +209,64 @@ function Dungeon.generate(rng)
 	end
 	return rooms
 end
+-- The campaign's first dungeon, the Rot Beachhead (docs: New Player Pipeline,
+-- First dungeon): solo, a straight run of two rooms and the boss's nest, its
+-- fighters softened for a new miner, and softer again the fewer intro pieces
+-- they've won (firstDamage). Played through the scout mission's loading
+-- screens and a pod drop (Client FirstDungeonUI; for now from the DEV panel).
+Dungeon.First = {
+	Name = "The Rot Beachhead",
+	Rooms = { "Room 1: The Gate", "Room 2: The Yard", "The Nest" },
+	Fighters = { { "Sahur" }, { "Tralalero", "Patapim" } },
+	Boss = "Chimpanzini", -- (Granchio Rottamino's model is to come; its stand-in)
+	FighterHealth = 0.5, -- of a dungeon fighter's
+	FighterDamage = 0.6,
+	BossHealth = 0.6, -- a starter boss's (Bosses' Starter.Health)
+	BossDamage = 0.8,
+	PieceDamage = { Base = 0.7, Per = 0.05 }, -- x0.75 with 1 intro piece, x1.0 with 6
+	DownSeconds = 3, -- knocked down this long before the card
+	ChooseSeconds = 30, -- then RECOVER by itself
+}
+
+local function indexOf(list, id: string): number
+	for i, spec in list do
+		if spec.Id == id then
+			return i
+		end
+	end
+	return 1
+end
+
+-- The Rot Beachhead's rooms, in a straight line: two of fighters, then the nest.
+function Dungeon.firstRooms()
+	local first = Dungeon.First
+	local rooms = {}
+	for i, ids in first.Fighters do
+		local foes = {}
+		for _, id in ids do
+			table.insert(foes, indexOf(Dungeon.Roster, id))
+		end
+		table.insert(rooms, {
+			Index = i, X = 0, Z = i - 1, Boss = false, Theme = foes[1], Foes = foes,
+			Pillars = 2, GearTier = 1, Name = first.Rooms[i],
+			HealthScale = first.FighterHealth, DamageScale = first.FighterDamage,
+		})
+	end
+	local boss = indexOf(Dungeon.Bosses, first.Boss)
+	table.insert(rooms, {
+		Index = #rooms + 1, X = 0, Z = #rooms, Boss = true, Theme = boss, Foes = { boss },
+		Pillars = 0, GearTier = 2, Name = first.Rooms[#first.Rooms],
+		HealthScale = first.BossHealth, DamageScale = first.BossDamage,
+	})
+	return rooms
+end
+
+-- The first dungeon's hits, by the intro pieces won (0 to 6): softer with fewer.
+function Dungeon.firstDamage(pieces: number?): number
+	local scale = Dungeon.First.PieceDamage
+	return scale.Base + scale.Per * math.clamp(math.max(1, pieces or 0), 1, 6)
+end
+
 function Dungeon.canEnter(count, leader, allReady)
 	if not leader then
 		return false, "Only the party leader can queue."
