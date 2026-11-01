@@ -30,6 +30,11 @@
 	  Telemetry.record(player | userId, name, value?, a?, b?, c?)
 	  Telemetry.flush()               save now
 	  Telemetry.key(time, server, n?) -> string   (pure)
+	  Telemetry.here() -> rows        everything since this server started
+	                                  (about the newest KeepHere; the ANALYTICS
+	                                  window's THIS SERVER: Server.AnalyticsPanel)
+	  Telemetry.store() -> DataStore? the log (nil if it can't be had)
+	  Telemetry.Server, Telemetry.Since   this server's id, when it started
 	  Telemetry.platform(info) -> string          (pure: a client's device report)
 ]]
 local DataStoreService = game:GetService("DataStoreService")
@@ -44,6 +49,7 @@ Telemetry.StudioName = "SagaTelemetry_Studio"
 Telemetry.FlushEvery = 300 -- seconds between saves
 Telemetry.MaxRows = 20000 -- rows under one key (well inside a DataStore entry's 4 MB)
 Telemetry.Enabled = true
+Telemetry.KeepHere = 40000 -- rows this server keeps in memory since it started
 
 local SERVER = string.sub(string.gsub(game.JobId, "-", ""), 1, 8)
 if SERVER == "" then
@@ -71,7 +77,11 @@ function Telemetry.platform(info): string
 	return "desktop"
 end
 
+Telemetry.Server = SERVER
+Telemetry.Since = os.time()
+
 local rows = {} -- this hour's
+local here = {} -- since this server started (Telemetry.here)
 local hourKey = nil -- (the hour they belong to)
 local part = 1
 local dirty = false
@@ -84,6 +94,11 @@ local function storeOf()
 		store = if ok then result else false
 	end
 	return store or nil
+end
+Telemetry.store = storeOf
+
+function Telemetry.here()
+	return here
 end
 
 local function clip(v: any): any
@@ -135,7 +150,13 @@ function Telemetry.record(who: any, name: string, value: number?, a: any?, b: an
 		rows = {}
 	end
 	local userId = if type(who) == "number" then who elseif who ~= nil then tonumber(who.UserId) or 0 else 0
-	table.insert(rows, { now, userId, string.sub(name, 1, 40), tonumber(value) or 1, clip(a), clip(b), clip(c) })
+	local row = { now, userId, string.sub(name, 1, 40), tonumber(value) or 1, clip(a), clip(b), clip(c) }
+	table.insert(rows, row)
+	table.insert(here, row)
+	if #here > Telemetry.KeepHere + 2000 then
+		-- (the oldest 2000 go, in one move)
+		here = table.move(here, 2001, #here, 1, {})
+	end
 	dirty = true
 end
 

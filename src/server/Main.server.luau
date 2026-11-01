@@ -106,6 +106,8 @@ require(script.Parent.Systems.IntroRoundsServer).start()
 require(script.Parent.Systems.DevAlerts).start()
 -- A player's settings (music, sound), saved with their profile.
 require(script.Parent.Systems.SettingsServer).start()
+-- The Owners' ANALYTICS window: this server, today, the last 7 days.
+require(script.Parent.Systems.AnalyticsPanel).start()
 TopPlayers.start()
 Equipment.start()
 -- One health-recovery rule for players and computer fighters alike.

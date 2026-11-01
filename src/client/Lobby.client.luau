@@ -92,6 +92,10 @@ end)
 extra("SettingsUI", function()
 	require(script.Parent.Modules.SettingsUI).start()
 end)
+-- ANALYTICS (the Owners only, beside DEV): the game's own event log.
+extra("AnalyticsUI", function()
+	require(script.Parent.Modules.AnalyticsUI).start()
+end)
 -- This screen's device, once (Server.Telemetry: the game's own analytics).
 task.spawn(function()
 	local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Telemetry", 30)

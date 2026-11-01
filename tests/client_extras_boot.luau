@@ -111,10 +111,17 @@ local camera = { ViewportSize = roblox.Vector2.new(1280, 720) }
 local workspaceStub = { CurrentCamera = camera, GetServerTimeNow = function() return os.clock() end }
 
 local requests = {}
+local analyticsAnswer = nil -- (set below, once the shared modules load)
 local GemClient = {
 	Profile = { Intro = { Done = true }, Funnel = {}, TrainingRewards = { Counts = {} }, Settings = { Music = 0.4, MusicOn = false } },
 	Changed = signal(),
-	request = function(action, ...) table.insert(requests, { action, ... }); return { Ok = true, Message = "" } end,
+	request = function(action, ...)
+		table.insert(requests, { action, ... })
+		if action == "AnalyticsReport" and analyticsAnswer then
+			return analyticsAnswer(...)
+		end
+		return { Ok = true, Message = "" }
+	end,
 }
 local stubs = {
 	GemClient = GemClient,
@@ -144,7 +151,8 @@ local function load(ref)
 	return loaded[key]
 end
 
-for _, name in { "FirstStepsCoach", "IntroRoundsUI", "ArenaBarrier", "SettingsUI", "DevAlerts" } do
+attrs.AnalyticsOwner = true -- (this tester is an owner: the ANALYTICS button shows)
+for _, name in { "FirstStepsCoach", "IntroRoundsUI", "ArenaBarrier", "SettingsUI", "DevAlerts", "AnalyticsUI" } do
 	require("@lune/stdio").ewrite("starting " .. name .. "\n")
 	local ok, problem = pcall(function() load(clientRef[name]).start() end)
 	check(ok, name .. " didn't start: " .. tostring(problem))
@@ -171,5 +179,44 @@ check(ok, "SETTINGS didn't open: " .. tostring(problem))
 check(playerGui:FindFirstChild("Settings") and playerGui:FindFirstChild("SettingsButton"), "No SETTINGS window or gear")
 check(stubsMusic == 0, "Music off wasn't applied (got " .. tostring(stubsMusic) .. ")")
 check(playerGui:FindFirstChild("FirstSteps") ~= nil, "No NEXT STEP card")
-print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens)", checks))
+-- ANALYTICS: the button, and the window drawing each range from a real report.
+local Report = load(sharedRef.AnalyticsReport)
+local day = 1793491200 -- (2026-11-01 00:00 UTC)
+local rows = {
+	{ day + 60, 1, "session_start", 0, "new", "US" }, { day + 61, 1, "device", 1, "phone", "844x390", "en-us" },
+	{ day + 62, 1, "onboarding", 1, "Joined" }, { day + 70, 1, "onboarding", 2, "Element" }, { day + 80, 1, "IntroRound", 1, "Weapon", "Rare", "Won" },
+	{ day + 90, 1, "coins", 250, "Duel", "Gameplay" }, { day + 91, 1, "coins", -50, "Store", "Shop" }, { day + 92, 1, "Purchase", 99, "Coins10k", "Robux" },
+	{ day + 93, 1, "DuelFinished", 1, "Ranked", "Win", "1v1" }, { day + 660, 1, "session_end", 600, 3, 100, 80 },
+	{ day + 61, 2, "session_start", 0, "returning", "BR" }, { day + 300, 0, "server", 2, 700 },
+}
+analyticsAnswer = function(range)
+	local answer = { Ok = true, Message = "", Range = range, Report = Report.build(rows), Now = day + 700 }
+	if range == "Server" then
+		answer.Here = { { Name = "Tester", User = "tester", Minutes = 4, New = true, Step = 2, StepName = "Element", Rounds = 1, Level = 2 }, { Name = "Vet", User = "vet", Minutes = 30, New = false } }
+		answer.Since, answer.Server = day, "abcd1234"
+	else
+		answer.Loading = { Done = 3, Total = 7, Busy = true }
+	end
+	return answer
+end
+task.wait(0.1)
+check(playerGui:FindFirstChild("AnalyticsButton") ~= nil, "No ANALYTICS button for an owner")
+local Analytics = load(clientRef.AnalyticsUI)
+for _, which in { "Server", "Today", "Week" } do
+	local okOpen, why = pcall(Analytics.open, which)
+	check(okOpen, "ANALYTICS didn't open on " .. which .. ": " .. tostring(why))
+	task.wait(0.2)
+end
+local analytics = playerGui:FindFirstChild("Analytics")
+check(analytics ~= nil and analytics.Enabled, "The ANALYTICS window isn't up")
+local seen = {}
+for _, d in analytics:GetDescendants() do
+	if d:IsA("TextLabel") then
+		seen[d.Text] = true
+	end
+end
+check(seen["Reading the saved logs…  3 / 7"], "ANALYTICS didn't draw 7 DAYS' loading line")
+check(seen["PLAYERS"] and seen["2"] and seen["99"] and seen["1  Joined"], "ANALYTICS didn't draw the report (tiles, funnel)")
+check(Analytics.commas(1234567) == "1,234,567" and Analytics.minutes(90) == "1h 30m" and Analytics.minutes(0.5) == "30s", "ANALYTICS' number formats")
+print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)

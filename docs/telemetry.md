@@ -25,6 +25,34 @@ Each server saves its own rows under `ev/<UTC day>/<hour>/<server>` every 5
 minutes and when it shuts down. Studio writes to `SagaTelemetry_Studio`
 instead, so tests never mix with real data.
 
+## In game: the ANALYTICS button
+
+The game's Owners (`Config.Playtest.Owners`) get an **ANALYTICS** button
+beside DEV, bottom right. Nobody else sees it, and the server checks every
+request again. It opens a window with three views:
+
+- **THIS SERVER**: everything since this server started, live (it refreshes
+  every 15 s while open), plus who's here now: how long they've been in, their
+  level, how far into onboarding they are, their intro rounds won, and where
+  they are.
+- **TODAY** and **7 DAYS**: every server, from the saved log (UTC days). The
+  server reads the log a few entries at a time, within the DataStore request
+  budget, so the window fills in over a few seconds the first time it's
+  opened. It keeps the finished hours in memory after that, so later opens
+  are quick. Up to 5 minutes behind, as each server saves.
+
+Each view shows players, new players, average session, peak online, Robux,
+day-1 return, the onboarding funnel (with the biggest drop in amber), intro
+rounds, devices, coins in and out, duels, top events, countries, Robux by
+product and session lengths. (Server.AnalyticsPanel, Client.AnalyticsUI,
+Shared.AnalyticsReport.)
+
+In Studio it reads `SagaTelemetry_Studio`, and only with "Enable Studio
+Access to API Services" on.
+
+The browser dashboard below covers more (retention cohorts, day-by-day
+charts) and works without opening the game.
+
 ## Setup (once)
 
 1. **Get the universe ID:** Creator Dashboard > your experience > the "..."
