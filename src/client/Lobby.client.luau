@@ -68,6 +68,10 @@ require(script.Parent.Modules.IntroGuide).start()
 -- A new miner's NEXT STEP card: mine, socket the gem, ready a surge, duel again.
 local FirstStepsCoach = require(script.Parent.Modules.FirstStepsCoach)
 FirstStepsCoach.start()
+-- The intro rounds' card between rounds in the Arena (Shared.IntroRounds).
+require(script.Parent.Modules.IntroRoundsUI).start()
+-- A force field round the Arena's floor while you fight on it: no walking off.
+require(script.Parent.Modules.ArenaBarrier).start()
 -- Who a Rift or raid boss is on right now: a red diamond over them (or their kaiju).
 require(script.Parent.Modules.BossFocus).start()
 
@@ -229,8 +233,14 @@ local function firstDuel()
 	waitFor(function()
 		return duelsPlayed() > 0 or player:GetAttribute("CombatSession") == nil
 	end, 900)
-	task.wait(3)
-	if player:GetAttribute("CombatSession") ~= nil then
+	task.wait(1.5)
+	-- A new miner's intro rounds (Client IntroRoundsUI): they stay in the Arena
+	-- for as many as they like; LEAVE (or the whole set) brings them out.
+	waitFor(function()
+		return player:GetAttribute("IntroRounds") ~= true or player:GetAttribute("CombatSession") == nil
+	end, 3 * 3600)
+	task.wait(1.5)
+	if player:GetAttribute("CombatSession") ~= nil and not player:GetAttribute("MatchId") then
 		GemClient.request("ArenaLeave")
 	end
 	waitFor(function()

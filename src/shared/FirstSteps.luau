@@ -6,7 +6,9 @@
 	  Socket   put that gem in your gear (its button does it: EQUIP BEST)
 	  Surge    put a gem in Q, E or R, when one would be stronger there
 	           (its button does it: UPGRADE SURGES)
-	  Duel     play another duel, to feel what the gems do (PLAY)
+	  Duel     play another duel, to feel what the gems do (PLAY); while
+	           their intro set isn't won (Shared.IntroRounds), WIN YOUR
+	           INTRO SET instead (FIGHT: the next round)
 
 	These are the onboarding funnel's steps 7 to 11 (Server.Funnel), where
 	new players were dropping: half of those who found a gem never socketed
@@ -22,6 +24,8 @@
 	      stronger in Q/E/R (UpgradeHints .Surges.Changes > 0) }
 	  FirstSteps.current(view) -> step?, index, total   nil: nothing to coach
 ]]
+local IntroRounds = require(script.Parent.IntroRounds)
+
 local FirstSteps = {}
 
 FirstSteps.Steps = {
@@ -51,6 +55,14 @@ FirstSteps.Steps = {
 		Button = "PLAY",
 	},
 }
+-- In the Duel step's place while their intro set isn't won (Shared.IntroRounds):
+-- back to the Arena for the next round.
+FirstSteps.Rounds = {
+	Id = "Rounds",
+	Title = "WIN YOUR INTRO SET",
+	Line = "Round {1} of {2}: a new piece of gear every win.",
+	Button = "FIGHT",
+}
 
 function FirstSteps.view(profile, extra)
 	extra = extra or {}
@@ -65,6 +77,8 @@ function FirstSteps.view(profile, extra)
 		Dueled = (type(extra.Duels) == "number" and extra.Duels >= 2) or (type(funnel) == "table" and funnel["Second duel"] == true),
 		SocketOpen = extra.SocketOpen == true,
 		SurgeOpen = extra.SurgeOpen == true,
+		RoundsLeft = IntroRounds.eligible(profile),
+		Round = IntroRounds.round(IntroRounds.state(profile)),
 	}
 end
 
@@ -72,7 +86,7 @@ end
 -- (skipped when there's nothing better to socket); Duel comes last.
 function FirstSteps.current(view)
 	local total = #FirstSteps.Steps
-	if not view or not view.New or not view.IntroDone or view.Dueled then
+	if not view or not view.New or not view.IntroDone or (view.Dueled and not view.RoundsLeft) then
 		return nil, 0, total
 	end
 	if not view.Mined then
@@ -83,6 +97,9 @@ function FirstSteps.current(view)
 	end
 	if not view.Surged and view.SurgeOpen then
 		return FirstSteps.Steps[3], 3, total
+	end
+	if view.RoundsLeft then
+		return FirstSteps.Rounds, 4, total
 	end
 	return FirstSteps.Steps[4], 4, total
 end

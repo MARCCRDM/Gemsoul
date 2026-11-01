@@ -171,7 +171,9 @@ local function refresh()
 	if step then
 		kicker.Text = Lang.format("NEXT STEP  ·  {1} / {2}", index, total)
 		title.Text = Lang.translate(step.Title)
-		line.Text = Lang.translate(if UiKit.touchOnly() and step.Mobile then step.Mobile else step.Line)
+		line.Text = if step.Id == "Rounds"
+			then Lang.format(step.Line, FirstSteps.view(GemClient.Profile).Round, require(ReplicatedStorage.Shared.IntroRounds).Count)
+			else Lang.translate(if UiKit.touchOnly() and step.Mobile then step.Mobile else step.Line)
 		go.Text = Lang.translate(step.Button)
 	end
 	card.Visible = show
@@ -214,6 +216,15 @@ local function act(step)
 		end)
 	elseif step.Id == "Duel" then
 		LobbyUI.openPicker()
+	elseif step.Id == "Rounds" then
+		busy = true
+		task.spawn(function()
+			local result = GemClient.request("IntroRoundNext")
+			busy = false
+			if result and not result.Ok then
+				UiKit.toast(Lang.translate(result.Message or "Couldn't start the round."), P.Bad)
+			end
+		end)
 	end
 end
 

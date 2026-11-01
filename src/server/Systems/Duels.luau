@@ -119,6 +119,8 @@ local CounterServer = require(script.Parent.CounterServer)
 local reply = Shop.reply
 
 local Duels = {}
+-- (Server.IntroRoundsServer, once started: a new miner's 1v1 wins pay their set.)
+Duels.IntroRounds = nil :: any
 
 -- { Id, Mode, Players, Since, SinceServer, Rating, Size, Asked }
 local queue = {}
@@ -443,10 +445,22 @@ function finish(match, winner: number?, reason: string)
 			-- Rewards (Shared.RewardRoll): every 1v1 played makes your rolls
 			-- rarer, and a queued 1v1 won (Ranked or Casual) pays a win
 			-- reward: two pieces, keep one, the other to the Market.
+			-- A new miner's intro rounds (Server.IntroRoundsServer): a 1v1 won
+			-- (any mode, the first fight too) pays the next piece of their set
+			-- in place of the usual win reward; a loss eases that round.
+			local introRound = nil
+			local IntroRoundsServer = Duels.IntroRounds
+			if IntroRoundsServer and solo and winner ~= nil and member.Parent and match.Rules.Kind ~= "Challenge" then
+				if won then
+					introRound = IntroRoundsServer.won(member)
+				elseif member:GetAttribute("IntroRounds") or match.Intro then
+					IntroRoundsServer.lost(member)
+				end
+			end
 			local winReward = nil
 			if record and solo and not match.Intro then
 				RewardRoll.count(record)
-				if won and match.Rules.Kind ~= "Challenge" and member.Parent then
+				if won and match.Rules.Kind ~= "Challenge" and member.Parent and not introRound then
 					winReward = ArenaStreaks.winReward(member, foe and foe.UserId)
 				end
 			end
@@ -1667,6 +1681,39 @@ end
 
 function Duels.matchOf(player: Player)
 	return matchOf[player]
+end
+
+-- A new miner's next intro round (Server.IntroRoundsServer): is someone alone
+-- in a 1v1 queue, waiting with nobody to meet? Then they meet this player
+-- (whose Training session ends where they stand: the match brings them into
+-- its lane). Returns whether it joined them.
+function Duels.joinWaiting(player: Player): boolean
+	for _, entry in queue do
+		local spec = Matchmaking.Modes[entry.Mode]
+		local other = entry.Players[1]
+		if
+			spec
+			and not spec.Intro
+			and spec.Size == 1
+			and entry.Size == 1
+			and #entry.Players == 1
+			and other ~= player
+			and other.Parent ~= nil
+			and not entry.Check
+		then
+			if player:GetAttribute("CombatSession") == "Training" then
+				require(script.Parent.Duelist).despawn(player)
+				player:SetAttribute("CombatSession", nil)
+				player:SetAttribute("PvPEnabled", false)
+			end
+			if busy(player) then
+				return false
+			end
+			enqueue(entry.Mode, { player }, 1)
+			return true
+		end
+	end
+	return false
 end
 
 function Duels.start()

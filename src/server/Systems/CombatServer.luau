@@ -420,6 +420,12 @@ end
 function CombatServer.onLethal(hook)
 	lethalHook = hook
 end
+-- A new miner's intro round lost (Server.Duelist): knocked down, not killed,
+-- so they stay in the Arena for the next try.
+local roundLethalHook: ((Player, Humanoid) -> boolean)? = nil
+function CombatServer.onRoundLethal(hook)
+	roundLethalHook = hook
+end
 -- A sparring player isn't finished, just knocked down (SparServer); nor is
 -- anyone in the Outpost (a rift's critter can catch a miner out there).
 -- Only in the lobby, though: in a rival fight or a 1v1 started from it (the
@@ -429,6 +435,7 @@ function CombatServer.onSparLethal(hook)
 end
 local function spared(player, humanoid, amount, source): boolean
 	if amount < humanoid.Health then return false end
+	if roundLethalHook and roundLethalHook(player, humanoid) then return true end
 	if sparLethalHook and Spar.knocksDown(player) then
 		return sparLethalHook(player, humanoid, source)
 	end

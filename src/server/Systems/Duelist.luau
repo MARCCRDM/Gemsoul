@@ -63,6 +63,7 @@ local Remotes = require(script.Parent.Remotes)
 local DamageLog = require(script.Parent.DamageLog)
 
 local DungeonLoadout = require(ReplicatedStorage.Shared.DungeonLoadout)
+local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
 local BrainrotSkins = require(script.Parent.BrainrotSkins)
 local BrainrotBosses = require(script.Parent.BrainrotBosses)
 local ExpeditionAmbient = require(script.Parent.ExpeditionAmbient)
@@ -72,6 +73,8 @@ local Tutorial = require(ReplicatedStorage.Shared.CombatTutorial)
 local Onboarding = require(ReplicatedStorage.Shared.Tutorial)
 local FastStart = require(ReplicatedStorage.Shared.FastStart)
 local Duelist = {}
+-- (Server.IntroRoundsServer, once started: a new miner's intro rounds.)
+Duelist.IntroRounds = nil :: any
 local dungeonActors = {}
 
 local NAMES = {
@@ -287,7 +290,8 @@ local function buildRig(loadout, name: string, at: CFrame): Model?
 	rig:PivotTo(at)
 	-- Its arms are posed (RivalPose), so it holds the sword in its fist.
 	rig:SetAttribute("FistGrip", true)
-	Equipment.dressModel(rig, loadout, math.random(1, 1e6))
+	-- (An intro round's rival wears its round's outfit: Shared.IntroRounds.)
+	Equipment.dressModel(rig, loadout, math.random(1, 1e6), loadout.RoundLooks)
 	return rig
 end
 
@@ -1461,6 +1465,9 @@ end
 
 local function think(enemy, now: number)
 	local duel = enemy.Duel
+	if duel.Ended then
+		return -- (an intro round lost: it's leaving)
+	end
 	if (enemy.Model:GetAttribute("ArenaDropUntil") or 0) > workspace:GetServerTimeNow() then
 		return
 	end
@@ -2241,8 +2248,22 @@ local function onWin(enemy)
 		return
 	end
 	local session = duel.Session
+	-- An intro round won (the first fight is round 1): the next piece of the
+	-- set, and the between-rounds card instead of another partner. (Before
+	-- the duel's counted: the client's first-fight wait sees the rounds go on.)
+	local introPiece = nil
+	if (duel.Round or duel.Intro) and Duelist.IntroRounds then
+		introPiece = Duelist.IntroRounds.won(owner)
+	end
 	countDuel(owner, true)
 	CombatEvents.fire(owner, "RivalWin")
+	if duel.Round then
+		owner:SetAttribute("IntroRoundFight", nil)
+		if not introPiece then
+			Remotes.Notify:FireClient(owner, string.format("You beat %s!", duel.Name))
+		end
+		return
+	end
 	if duel.FastTutorial then
 		clearTutorial(owner)
 		require(script.Parent.Intro).tutorialVictory(owner)
@@ -2251,8 +2272,11 @@ local function onWin(enemy)
 	end
 	if duel.Intro then
 		clearTutorial(owner)
-		-- The first-duel intro is one match; the client heads to the lobby.
-		Remotes.Notify:FireClient(owner, string.format("You beat %s! Welcome to the Saga Outpost.", duel.Name))
+		-- The first-duel intro is one match; the client heads to the lobby
+		-- (or, for a new miner, the intro rounds' card offers round 2).
+		if not introPiece then
+			Remotes.Notify:FireClient(owner, string.format("You beat %s! Welcome to the Saga Outpost.", duel.Name))
+		end
 		return
 	end
 	if session == "Training" then
@@ -2336,6 +2360,15 @@ function spawnRival(owner: Player, raid, encounter)
 	end
 	if encounter and encounter.Bandit then
 		name = "Space Bandit " .. NAMES[rng:NextInteger(1, #NAMES)]
+	end
+	-- A new miner's intro round (Shared.IntroRounds, Server.IntroRoundsServer):
+	-- that round's rival, by name, in its outfit.
+	local introRound = if not raid and not encounter and sparring then owner:GetAttribute("IntroRoundFight") else nil
+	if type(introRound) == "number" and IntroRounds.Rivals[introRound] then
+		name = IntroRounds.Rivals[introRound].Name
+		loadout.RoundLooks = IntroRounds.looks(introRound)
+	else
+		introRound = nil
 	end
 	-- Across the floor from the player, facing them.
 	local away = flat(center - root.Position)
@@ -2562,6 +2595,19 @@ function spawnRival(owner: Player, raid, encounter)
 	model:SetAttribute("RivalName", name)
 	model:SetAttribute("RivalElement", element)
 	model:SetAttribute("RivalSparring", sparring)
+	if introRound then
+		-- Harder each round, easier after each loss of it (Shared.IntroRounds).
+		local state = IntroRounds.state(PlayerData.get(owner))
+		local level = IntroRounds.difficulty(introRound, state and state.Losses or 0)
+		duel.Round = introRound
+		duel.Damage = rivalHit * level.Damage
+		duel.Rate = rules.BasicCooldown * level.Rate
+		if not level.Lunge then
+			duel.NextLunge = math.huge
+		end
+		model:SetAttribute("RivalTitle", IntroRounds.Rivals[introRound].Title)
+		model:SetAttribute("IntroRound", introRound)
+	end
 	if raid then
 		duel.Raid = raid
 		model:SetAttribute("RaidId", raid.Id)
@@ -2765,14 +2811,25 @@ function spawnRival(owner: Player, raid, encounter)
 	end
 	Remotes.Notify:FireClient(
 		owner,
-		if sparring
-			then string.format("Sparring partner %s steps in (%s). Hits are softened.", name, surgeList)
+		if duel.Round
+			then string.format("Round %d of %d: %s, %s, steps in (%s).", duel.Round, IntroRounds.Count, name, string.lower(IntroRounds.Rivals[duel.Round].Title), surgeList)
+			elseif sparring then string.format("Sparring partner %s steps in (%s). Hits are softened.", name, surgeList)
 			else string.format("%s inbound with %s. Prepare for impact.", name, surgeList)
 	)
 end
 
 -- A party raid begins (Raids): its members are already in the Arena, in a
 -- "Raid" session with this RaidId.
+-- A new miner's next intro round (Server.IntroRoundsServer): its rival, in
+-- their Training session (IntroRoundFight says which round).
+function Duelist.spawnRound(owner: Player): boolean
+	if duels[owner] or owner:GetAttribute("CombatSession") ~= "Training" then
+		return false
+	end
+	spawnRival(owner)
+	return duels[owner] ~= nil
+end
+
 function Duelist.startRaid(members: { Player }, id: string)
 	local raid = { Id = id, Members = table.clone(members), All = table.clone(members), Wave = 1 }
 	if raid.Members[1] then
@@ -2802,6 +2859,30 @@ function Duelist.removeDungeon(id)
 	end
 end
 function Duelist.start()
+	-- An intro round lost (the first fight too, for a new miner with rounds
+	-- to go): knocked down, back to full, the rival leaves, and the round's
+	-- next try is easier (Server.IntroRoundsServer). They stay in the Arena.
+	CombatServer.onRoundLethal(function(player, humanoid)
+		local duel = duels[player]
+		if not duel or duel.Ended or not (duel.Round or duel.Intro) or player:GetAttribute("CombatSession") ~= "Training" then
+			return false
+		end
+		local IntroRoundsServer = Duelist.IntroRounds
+		if not IntroRoundsServer or not IntroRoundsServer.eligible(player) then
+			return false
+		end
+		duel.Ended = true
+		humanoid.Health = humanoid.MaxHealth
+		if duel.Intro or duel.FirstFight then
+			clearTutorial(player)
+		end
+		player:SetAttribute("IntroRoundFight", nil)
+		IntroRoundsServer.lost(player) -- (before the duel's counted: the client's first-fight wait sees the rounds go on)
+		countDuel(player, false)
+		Remotes.Notify:FireClient(player, string.format("Knocked down by %s. Your next try at this round is easier.", duel.Name))
+		task.defer(Duelist.despawn, player)
+		return true
+	end)
 	-- Combat training counts what the player does (CombatServer's events),
 	-- and can be skipped straight to the spar.
 	CombatEvents.listen(function(player, kind, detail)

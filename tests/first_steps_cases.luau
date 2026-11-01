@@ -11,13 +11,22 @@ local function check(value, message)
 	checks += 1
 	assert(value, message)
 end
-local FirstSteps = luau.load(fs.readFile(ROOT .. "/src/shared/FirstSteps.luau"))()
+local IntroRounds = luau.load(fs.readFile(ROOT .. "/src/shared/IntroRounds.luau"))()
+local FirstSteps = luau.load(fs.readFile(ROOT .. "/src/shared/FirstSteps.luau"), {
+	environment = setmetatable({
+		script = { Parent = { IntroRounds = "IntroRounds" } },
+		require = function()
+			return IntroRounds
+		end,
+	}, { __index = _G }),
+})()
 
 local function profile(counts, funnel, done)
 	return {
 		Intro = { Done = if done == nil then true else done },
 		TrainingRewards = { Counts = counts or {} },
 		Funnel = funnel,
+		IntroRounds = { Won = 6, Losses = 0, Pieces = {} }, -- (their intro set won: the rounds' own checks are below)
 	}
 end
 local function id(p, extra)
@@ -58,5 +67,15 @@ check(id(profile({ Mine = 1 }, {}), { SocketOpen = false, SurgeOpen = false }) =
 check(id(profile({ Mine = 1, Enchant = 1, EquipSurge = 1 }, {}), { Duels = 2 }) == nil, "Still coaching after a second duel")
 check(id(profile({}, { ["Second duel"] = true }), open) == nil, "Still coaching after the funnel's Second duel")
 check(id(profile({ Mine = 1, Enchant = 1, EquipSurge = 1 }, {}), { Duels = 1 }) == "Duel", "One duel (the first fight) ended it")
+
+-- While their intro set isn't won, the last step sends them back for it
+-- (and it's not over at two duels).
+local rounds = profile({ Mine = 1, Enchant = 1, EquipSurge = 1 }, {})
+rounds.IntroRounds = { Won = 2, Losses = 0, Pieces = {} }
+local step, index = FirstSteps.current(FirstSteps.view(rounds, { Duels = 3 }))
+check(step and step.Id == "Rounds" and index == 4, "Didn't send them back for their intro set")
+check(FirstSteps.view(rounds).Round == 3, "The round to win isn't the next one")
+rounds.IntroRounds.Won = IntroRounds.Count
+check(FirstSteps.current(FirstSteps.view(rounds, { Duels = 3 })) == nil, "Still coaching once the set's won and they've dueled")
 
 print(string.format("PASS: %d first steps checks", checks))

@@ -98,6 +98,8 @@ require(script.Parent.Systems.FreeRewards).start()
 require(script.Parent.Systems.GearInspect).start()
 -- The Kaiju Daycare: kaiju boarded (stored or trained), in a pen by the Kennel.
 require(script.Parent.Systems.DaycareServer).start()
+-- A new miner's intro rounds: six wins in the Arena, a piece of gear each.
+require(script.Parent.Systems.IntroRoundsServer).start()
 TopPlayers.start()
 Equipment.start()
 -- One health-recovery rule for players and computer fighters alike.
