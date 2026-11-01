@@ -72,6 +72,8 @@ FirstStepsCoach.start()
 require(script.Parent.Modules.IntroRoundsUI).start()
 -- A force field round the Arena's floor while you fight on it: no walking off.
 require(script.Parent.Modules.ArenaBarrier).start()
+-- SETTINGS (the ⚙ in the top bar): music and sound, saved with your profile.
+require(script.Parent.Modules.SettingsUI).start()
 -- This screen's device, once (Server.Telemetry: the game's own analytics).
 task.spawn(function()
 	local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Telemetry", 30)

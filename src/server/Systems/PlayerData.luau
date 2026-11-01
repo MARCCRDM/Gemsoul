@@ -647,6 +647,7 @@ function PlayerData.snapshot(player: Player): { [string]: any }?
 		Coins = profile.Coins,
 		TrainingRewards = profile.TrainingRewards,
 		Funnel = profile.Funnel, -- (new accounts: their onboarding steps; Client FirstSteps coaches them)
+		Settings = (profile :: any).Settings, -- (music and sound: Shared.GameSettings)
 		Challenges = DailyChallenges.view(profile, player.UserId, today()),
 		Marks = profile.Marks,
 		Gems = profile.Gems,

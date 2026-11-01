@@ -4620,4 +4620,9 @@ return {
 	["Find a glowing rock nearby, walk up to it and click it (or press E)."] = "Busca una roca brillante cerca, acércate y haz clic (o pulsa E).",
 	["Gem socketed: you're stronger. Open INVENTORY to see it."] = "Gema engastada: eres más fuerte. Abre INVENTARIO para verla.",
 	["Surge ready: cast it in a fight with Q, E or R."] = "Descarga lista: lánzala en un combate con Q, E o R.",
+	-- SETTINGS (Client.SettingsUI)
+	["SETTINGS"] = "AJUSTES",
+	["Saved with your profile"] = "Se guardan con tu perfil",
+	["MUSIC"] = "MÚSICA",
+	["SOUND EFFECTS"] = "EFECTOS DE SONIDO",
 }

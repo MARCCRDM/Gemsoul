@@ -64,9 +64,29 @@ local function track(mood: string): Sound?
 			made.TimePosition = startAt
 		end)
 	end
+	made.SoundGroup = Music.group()
 	made.Parent = SoundService
 	sounds[mood] = made
 	return made
+end
+
+-- Every song plays through one sound group, whose volume is the player's
+-- music setting (Client.SettingsUI, Shared.GameSettings).
+local musicGroup: SoundGroup? = nil
+Music.Volume = 1
+function Music.group(): SoundGroup
+	if not musicGroup or not musicGroup.Parent then
+		local made = Instance.new("SoundGroup")
+		made.Name = "MusicSounds"
+		made.Volume = Music.Volume
+		made.Parent = SoundService
+		musicGroup = made
+	end
+	return musicGroup :: SoundGroup
+end
+function Music.setVolume(v: number)
+	Music.Volume = math.clamp(v, 0, 1)
+	Music.group().Volume = Music.Volume
 end
 
 -- Fades to `mood`'s loop, fading every other one out (and pausing it once silent).

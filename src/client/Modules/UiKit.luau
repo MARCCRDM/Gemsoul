@@ -72,6 +72,7 @@ end
 -- around them listens for the real one (UiKit.onTopbar).
 local ASSUMED_TOP, ASSUMED_LEFT = 58, 290
 local reservedRight = 0 -- (our own button at the strip's right end: DEV)
+local reservedLeft = 0 -- (ours just past Roblox's buttons on the left: SETTINGS' ⚙)
 local listeners = {}
 local watching = false
 
@@ -90,7 +91,7 @@ function UiKit.topbar(width: number): (number, number, number)
 			right = math.min(width, free)
 		end
 	end
-	return top, left, right - reservedRight
+	return top, left + reservedLeft, right - reservedRight
 end
 
 local function topbarChanged()
@@ -122,6 +123,18 @@ end
 function UiKit.reserveTopbar(width: number)
 	reservedRight = width
 	topbarChanged()
+end
+-- Keeps `width` just past Roblox's buttons on the left for our own button
+-- (SETTINGS' ⚙): UiKit.topbar's left edge moves past it. Returns where that
+-- button goes (the strip's left edge without it).
+function UiKit.reserveTopbarLeft(width: number)
+	if reservedLeft ~= width then
+		reservedLeft = width
+		topbarChanged()
+	end
+end
+function UiKit.topbarLeftReserved(): number
+	return reservedLeft
 end
 
 -- A box centred on a screen that ignores the top bar's inset. A big box
@@ -165,7 +178,7 @@ UiKit.Covers = {
 	MarketBoard = true, ChallengeChooser = true, Character = true, Party = true,
 	Referral = true, TopPlayers = true, EquipmentTrade = true, KaijuPanel = true,
 	Rift = true, Guide = true, GemPouch = true, KaijuRoll = true, KaijuPit = true,
-	KennelSale = true, TipGuide = true,
+	KennelSale = true, TipGuide = true, Settings = true,
 }
 local coverWatch = nil -- { Up = { [ScreenGui]: true }, Listeners = { fn } }
 -- Calls `fn(covered)` now, and again each time one of them opens or closes.
