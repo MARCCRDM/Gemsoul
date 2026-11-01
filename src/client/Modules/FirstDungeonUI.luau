@@ -273,7 +273,15 @@ function FirstDungeonUI.play(): string?
 			last = shown
 		end
 		-- In: the server drops you in (its pod); the last screen fades as it does.
+		-- (Out of the intro fights' queue and the Arena first: a dungeon won't
+		-- take you from either.)
+		FirstDungeonUI.free()
 		local result = GemClient.request("DungeonTest", "First")
+		if not result.Ok then
+			-- (once more, in case the queue put you back meanwhile)
+			FirstDungeonUI.free()
+			result = GemClient.request("DungeonTest", "First")
+		end
 		if last then
 			local fade = new("Frame", {
 				BackgroundColor3 = Color3.new(0, 0, 0),
@@ -287,13 +295,72 @@ function FirstDungeonUI.play(): string?
 		if not result.Ok then
 			return result.Message or "Couldn't start the Rot Beachhead."
 		end
+		-- (In, then straight back out: the run closed itself. Say so.)
+		local entered = os.clock()
+		task.spawn(function()
+			while os.clock() - entered < 10 do
+				if player:GetAttribute("DungeonId") == nil then
+					FirstDungeonUI.problem(
+						"The Rot Beachhead closed as it opened. Open the server's output (F9, Server) and look for [Dungeon] lines."
+					)
+					return
+				end
+				task.wait(0.25)
+			end
+		end)
 		return nil
 	end)
 	playing = false
 	if not ok then
+		FirstDungeonUI.problem(tostring(message))
 		error(message, 0)
 	end
+	if message then
+		FirstDungeonUI.problem(message)
+	end
 	return message
+end
+
+-- Out of the intro fights' queue and any Arena session (waits up to 3 s).
+function FirstDungeonUI.free()
+	if player:GetAttribute("DuelQueue") ~= nil then
+		GemClient.request("DuelCancel")
+	end
+	local session = player:GetAttribute("CombatSession")
+	if session ~= nil and session ~= "Raid" and player:GetAttribute("MatchId") == nil then
+		GemClient.request("ArenaLeave")
+	end
+	local deadline = os.clock() + 3
+	while os.clock() < deadline
+		and (player:GetAttribute("DuelQueue") ~= nil or (player:GetAttribute("CombatSession") ~= nil and player:GetAttribute("MatchId") == nil))
+	do
+		task.wait(0.1)
+	end
+end
+
+-- Why it didn't go in, on the screen (the DEV panel's closed by then).
+local problemGui: ScreenGui? = nil
+function FirstDungeonUI.problem(message: string)
+	warn("[FirstDungeon] " .. message)
+	if problemGui then
+		problemGui:Destroy()
+	end
+	local screen = UiKit.gui("FirstDungeonProblem", 76)
+	problemGui = screen
+	local body = Gilt.frame(screen, 380)
+	local kicker = Gilt.heading(body, "THE ROT BEACHHEAD", 1, true)
+	kicker.TextColor3 = ROT
+	local title = Gilt.words(body, "COULDN'T DROP IN", 24, Gilt.Red)
+	title.Font = Gilt.Display
+	title.LayoutOrder = 2
+	local line = Gilt.words(body, message, 14, Gilt.Ink)
+	line.Name = "Reason"
+	line.TextWrapped, line.TextTruncate = true, Enum.TextTruncate.None
+	line.Size, line.AutomaticSize = UDim2.new(1, 0, 0, 0), Enum.AutomaticSize.Y
+	line.LayoutOrder = 3
+	Gilt.button(body, "OK", true, 4, function()
+		screen:Destroy()
+	end, 40, 16)
 end
 
 -- The knock-down card ----------------------------------------------------------------

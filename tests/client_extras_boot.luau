@@ -114,6 +114,7 @@ local workspaceStub = { CurrentCamera = camera, GetServerTimeNow = function() re
 local requests = {}
 local drawnPiece = nil
 local analyticsAnswer = nil -- (set below, once the shared modules load)
+local dungeonAnswer = nil -- (the Rot Beachhead's reply, when it's not a plain Ok)
 local GemClient = {
 	Profile = { Intro = { Done = true }, Funnel = {}, TrainingRewards = { Counts = {} }, Settings = { Music = 0.4, MusicOn = false } },
 	Changed = signal(),
@@ -121,6 +122,13 @@ local GemClient = {
 		table.insert(requests, { action, ... })
 		if action == "AnalyticsReport" and analyticsAnswer then
 			return analyticsAnswer(...)
+		end
+		if action == "DuelCancel" then
+			attrs.DuelQueue = nil
+		elseif action == "ArenaLeave" then
+			attrs.CombatSession = nil
+		elseif action == "DungeonTest" and dungeonAnswer then
+			return dungeonAnswer
 		end
 		return { Ok = true, Message = "" }
 	end,
@@ -269,6 +277,7 @@ check(Analytics.commas(1234567) == "1,234,567" and Analytics.minutes(90) == "1h 
 do
 	local First = load(clientRef.FirstDungeonUI)
 	First.SlideSeconds = 0.15
+	attrs.DuelQueue, attrs.CombatSession = "Intro", "Training" -- (a new player, queued for the next round)
 	local before = #requests
 	local okPlay, message = pcall(First.play)
 	check(okPlay and message == nil, "FIRST DUNGEON didn't play: " .. tostring(message))
@@ -280,6 +289,21 @@ do
 	end
 	check(asked, "FIRST DUNGEON didn't ask to go in")
 	check(kaijuRolled == 1, "A new player's kaiju roll didn't come first")
+	local order = {}
+	for i = before + 1, #requests do
+		table.insert(order, requests[i][1])
+	end
+	check(table.concat(order, ",") == "DuelCancel,ArenaLeave,DungeonTest", "Not out of the queue and the Arena first: " .. table.concat(order, ","))
+	-- Refused: the reason on the screen.
+	attrs.DungeonId = nil
+	dungeonAnswer = { Ok = false, Message = "Dungeon setup failed." }
+	local okAgain, why = pcall(First.play)
+	check(okAgain and why == "Dungeon setup failed.", "A refusal's reason: " .. tostring(why))
+	local problem = playerGui:FindFirstChild("FirstDungeonProblem")
+	local reason = problem and problem:FindFirstChild("Reason", true)
+	check(reason ~= nil and reason.Text == "Dungeon setup failed.", "The refusal isn't on the screen")
+	problem:Destroy()
+	dungeonAnswer = nil
 	check(playerGui:FindFirstChild("FirstDungeonIntro") == nil, "The loading screens stayed up")
 	social:Fire("FirstDungeon", { Phase = "Down", Room = "Room 1: The Gate", RoundsLeft = 4, Seconds = 30 })
 	task.wait(0.2)
