@@ -72,6 +72,28 @@ FirstStepsCoach.start()
 require(script.Parent.Modules.IntroRoundsUI).start()
 -- A force field round the Arena's floor while you fight on it: no walking off.
 require(script.Parent.Modules.ArenaBarrier).start()
+-- This screen's device, once (Server.Telemetry: the game's own analytics).
+task.spawn(function()
+	local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Telemetry", 30)
+	local input = game:GetService("UserInputService")
+	local camera = workspace.CurrentCamera
+	task.wait(3) -- (the screen's real size)
+	if remote and camera then
+		local console = false
+		pcall(function()
+			console = game:GetService("GuiService"):IsTenFootInterface()
+		end)
+		remote:FireServer({
+			Touch = input.TouchEnabled,
+			Keyboard = input.KeyboardEnabled,
+			Gamepad = input.GamepadEnabled,
+			Console = console,
+			X = camera.ViewportSize.X,
+			Y = camera.ViewportSize.Y,
+			Locale = game:GetService("LocalizationService").RobloxLocaleId,
+		})
+	end
+end)
 -- Owners only: someone joined the game (any server), shown and said out loud.
 task.spawn(function()
 	require(script.Parent.Modules.DevAlerts).start()

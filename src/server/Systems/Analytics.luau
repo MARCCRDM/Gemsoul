@@ -260,9 +260,9 @@ function Analytics.prompted(player: Player, key: string?, bought: boolean)
 	storeStep(player, 3)
 end
 
--- A Robux purchase granted.
-function Analytics.purchased(player: Player, key: string)
-	Analytics.event(player, "Purchase", 1, key)
+-- A Robux purchase granted (`robux`: what it cost them, the receipt's CurrencySpent).
+function Analytics.purchased(player: Player, key: string, robux: number?)
+	Analytics.event(player, "Purchase", if type(robux) == "number" and robux > 0 then robux else 1, key, if robux then "Robux" else nil)
 	storeStep(player, 3)
 	storeStep(player, 4)
 end

@@ -37,6 +37,7 @@ local Remotes = {
 	KaijuView = Instance.new("RemoteEvent"), -- client -> server: which way your camera looks (your kaiju stand where you see them: KaijuServer)
 	MeteorGolem = Instance.new("RemoteEvent"), -- server -> everyone: the Meteor Golem's fall, its blows and its end (Systems/MeteorGolemServer, Client.MeteorGolemFx)
 	DevAlert = Instance.new("RemoteEvent"), -- server -> an Owner: someone joined the game, any server (Systems/DevAlerts, Client.DevAlerts)
+	Telemetry = Instance.new("RemoteEvent"), -- client -> server: its device, once a session (Systems/Telemetry)
 }
 for name, remote in Remotes do
 	remote.Name = name

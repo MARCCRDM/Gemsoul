@@ -394,7 +394,7 @@ local function processReceipt(receipt)
 	if not StoreServer.grantProduct(player, key, "Bundle") then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	Analytics.purchased(player, key)
+	Analytics.purchased(player, key, receipt.CurrencySpent)
 	table.insert(profile.Receipts, id)
 	while #profile.Receipts > 200 do
 		table.remove(profile.Receipts, 1)

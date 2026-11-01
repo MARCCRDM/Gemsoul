@@ -3,3 +3,7 @@
 *.rbxl.lock
 *.rbxlx.lock
 sourcemap.json
+# The game's own analytics, pulled to this machine (tools/telemetry): never committed.
+tools/telemetry/data/
+tools/telemetry/dashboard.html
+tools/telemetry/dashboard.json
