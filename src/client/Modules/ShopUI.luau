@@ -2797,7 +2797,8 @@ function ShopUI.showStarter()
 end
 
 -- After the first win, back out of the fight: put the Starter Pack on offer
--- and show it, once.
+-- (its clock starts; it's in the Store, at the top of BUNDLES). It doesn't
+-- pop up by itself any more: ShopUI.showStarter() opens it on purpose.
 local starterAsked = false
 local function maybeOfferStarter()
 	local p = profile()
@@ -2817,7 +2818,6 @@ local function maybeOfferStarter()
 			if result.OfferedAt then
 				p.StarterOfferAt = result.OfferedAt
 			end
-			ShopUI.showStarter()
 		end
 	end)
 end

@@ -285,11 +285,18 @@ local function firstDuel()
 	end, 900)
 	task.wait(1.5)
 	-- A new miner's intro rounds (Client IntroRoundsUI): they stay in the Arena
-	-- for as many as they like; LEAVE (or the whole set) brings them out.
+	-- for as many as they like; LEAVE (or the whole set) brings them out. The
+	-- rounds' card has the screen till it's closed: the set's SET COMPLETE
+	-- plays out, then back to the Outpost (its TO THE OUTPOST, or here).
+	local IntroRoundsUI = require(script.Parent.Modules.IntroRoundsUI)
 	waitFor(function()
-		return player:GetAttribute("IntroRounds") ~= true or player:GetAttribute("CombatSession") == nil
+		return (player:GetAttribute("IntroRounds") ~= true and not IntroRoundsUI.busy())
+			or player:GetAttribute("CombatSession") == nil
 	end, 3 * 3600)
 	task.wait(1.5)
+	waitFor(function()
+		return not IntroRoundsUI.busy()
+	end, 600)
 	if player:GetAttribute("CombatSession") ~= nil and not player:GetAttribute("MatchId") then
 		GemClient.request("ArenaLeave")
 	end

@@ -18,6 +18,9 @@
 	OUTPOST.
 
 	  IntroRoundsUI.start()   once (Lobby.client)
+	  IntroRoundsUI.busy()    true while a card is up or on its way: what
+	                          comes after (leaving the Arena, the kaiju roll)
+	                          waits for it, so they play one after another
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -79,6 +82,7 @@ local shown = 0 -- (each show's number: an older countdown stops)
 local current = nil -- the event on the card
 local busy = false
 local fitScale = 1
+local pending = 0 -- (cards on their way: an event in, its card not up yet)
 
 local function words(parent: Instance, size: number, color: Color3, font: Enum.Font): TextLabel
 	return new("TextLabel", {
@@ -636,6 +640,10 @@ local function show(event)
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = fitScale }):Play()
 end
 
+function IntroRoundsUI.busy(): boolean
+	return pending > 0 or (gui ~= nil and gui.Enabled)
+end
+
 local started = false
 function IntroRoundsUI.start()
 	if started then
@@ -654,7 +662,9 @@ function IntroRoundsUI.start()
 	ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Social").OnClientEvent:Connect(function(kind: string, event: any)
 		if kind == "IntroRound" and type(event) == "table" then
 			-- (after a queued match's result card, which has the screen for EndPause)
+			pending += 1
 			task.delay(if inArena() then 1.2 else 4.5, function()
+				pending -= 1
 				show(event)
 			end)
 		end

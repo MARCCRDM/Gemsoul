@@ -3560,8 +3560,11 @@ local function refresh()
 	local data = profile and profile.Kaiju
 	local team = Kaiju.teamIds(data)
 	local inOutpost = OutpostScene.isActive() and player:GetAttribute("Outpost") == true
+	local rounds = player.PlayerGui:FindFirstChild("IntroRounds")
 	local blocked = player.PlayerGui:FindFirstChild("Intro") ~= nil
 		or KaijuRoll.showing()
+		-- (the intro rounds' card first: Client IntroRoundsUI)
+		or (rounds ~= nil and rounds:IsA("ScreenGui") and rounds.Enabled)
 		or player:GetAttribute("CombatSession") ~= nil
 		or player:GetAttribute("MatchId") ~= nil
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")

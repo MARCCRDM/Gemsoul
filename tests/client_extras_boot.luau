@@ -184,6 +184,7 @@ social:Fire("IntroRound", { Phase = "Won", Round = 6, Piece = { Slot = "Helmet",
 task.wait(2.5)
 local card = playerGui:FindFirstChild("IntroRounds")
 check(card ~= nil and card.Enabled, "The intro rounds' card isn't up")
+check(load(clientRef.IntroRoundsUI).busy(), "The set's card is up, but it doesn't hold back what comes after it")
 -- SETTINGS: opens, and the saved settings were applied.
 local Settings = load(clientRef.SettingsUI)
 local ok, problem = pcall(Settings.open)
