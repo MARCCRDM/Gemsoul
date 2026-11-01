@@ -399,7 +399,10 @@ local function knockOut(player: Player, humanoid: Humanoid, source: Player?): bo
 	task.delay(seconds, getUp, player, humanoid, not Spar.sparring(player))
 	-- Knocked out by a creature (not in a spar with someone): killed, in
 	-- the Outpost, and robbed past its core (FrontierServer: Server.Robbery).
-	if player:GetAttribute("SparWith") == nil then
+	-- By another player in open combat (Spar.openFight): only knocked down,
+	-- up again where they fell.
+	local byPlayer = typeof(source) == "Instance" and source:IsA("Player") and source ~= player
+	if player:GetAttribute("SparWith") == nil and not byPlayer then
 		task.spawn(SparServer.onKnockedOut, player)
 	end
 	return true

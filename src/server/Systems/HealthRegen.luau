@@ -11,6 +11,9 @@
 	    with a soft green glow while it mends (LobbyMend on the player, for
 	    every client). Out in the quarry (mining, hunting, among the
 	    critters and wild kaiju) nothing mends: get back to the Shelter.
+	  · hit by another player in open combat in the Outpost (Shared.Spar.
+	    openFight: PvPHurtAt), anywhere in it: Boost.Rate a second once
+	    Boost.Delay seconds pass without a hit, for Boost.Window seconds
 	  · elsewhere (a spar with someone, a match), 1% of max health a second
 	    once 5 seconds have passed without taking damage
 ]]
@@ -25,6 +28,10 @@ local RATE = 0.01 -- of max health, per second
 local DELAY = 5 -- seconds without damage before recovery starts
 local STEP = 0.5
 HealthRegen.Lobby = { Rate = 0.08, Delay = 2 } -- back at base
+-- Hit by another player in open combat in the Outpost (Shared.Spar.openFight,
+-- PvPHurtAt): wherever you are in it, a fast mend once the hits stop, for
+-- Window seconds after the last one.
+HealthRegen.Boost = { Rate = 0.12, Delay = 2.5, Window = 30 }
 
 -- [humanoid] = { Health = last seen, HurtAt = os.clock() of the last drop }
 local seen = setmetatable({}, { __mode = "k" })
@@ -39,10 +46,13 @@ function HealthRegen.amount(
 	sinceHurt: number,
 	dt: number,
 	lobby: boolean?,
-	atBase: boolean?
+	atBase: boolean?,
+	boosted: boolean?
 ): number
 	local rate, delay = RATE, DELAY
-	if lobby then
+	if lobby and boosted then
+		rate, delay = HealthRegen.Boost.Rate, HealthRegen.Boost.Delay
+	elseif lobby then
 		if not atBase then
 			return 0 -- (out in the quarry: it mends back at the Shelter)
 		end
@@ -89,8 +99,18 @@ local function step(dt: number)
 			local inArena = player:GetAttribute("CombatSession") ~= nil
 			local lobby = HealthRegen.lobby(player)
 			local atBase = player:GetAttribute("AtBase") == true
-			local heal =
-				HealthRegen.amount(humanoid.Health, humanoid.MaxHealth, inArena, now - entry.HurtAt, dt, lobby, atBase)
+			local pvpAt = player:GetAttribute("PvPHurtAt")
+			local boosted = type(pvpAt) == "number" and workspace:GetServerTimeNow() - pvpAt < HealthRegen.Boost.Window
+			local heal = HealthRegen.amount(
+				humanoid.Health,
+				humanoid.MaxHealth,
+				inArena,
+				now - entry.HurtAt,
+				dt,
+				lobby,
+				atBase,
+				boosted
+			)
 			if heal > 0 then
 				humanoid.Health += heal
 			end

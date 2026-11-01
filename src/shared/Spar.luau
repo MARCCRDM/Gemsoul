@@ -42,7 +42,9 @@
 	                               creatures (KaijuWilds): a spar with no
 	                               partner, so no player can hit you or be hit
 	  Spar.paired(a, b)            sparring with each other
-	  Spar.canHit(sourceSpar, targetSpar, sourceDown, targetDown, same, paired)
+	  Spar.openFight(a, b)         both kit out on their own in the Outpost:
+	                               free to fight each other (knock-downs)
+	  Spar.canHit(sourceSpar, targetSpar, sourceDown, targetDown, same, paired, open?)
 	  Spar.startProblem(state)     why you can't spar now (nil if you can)
 	  Spar.askProblem(ask)         why you can't ask someone (nil if you can)
 	  Spar.stopWait(state, now)    seconds before it can end (0 = now)
@@ -114,20 +116,36 @@ function Spar.paired(a: any, b: any): boolean
 	return a ~= b and Spar.partner(a) == b.UserId and Spar.partner(b) == a.UserId
 end
 
--- Can one sparring player hit another? Both kit out, partners, both on
--- their feet, and not themselves. (Teams and parties don't matter: friends
--- spar too.)
+-- Open combat in the Outpost: two players each with their kit out on their
+-- own (hunting, no partner), in the lobby and in no match, can fight each
+-- other without asking. A finishing blow knocks down, as in a spar
+-- (Server.SparServer), and being hit by a player mends you fast once the
+-- hits stop (Server.HealthRegen: Boost).
+function Spar.openFight(a: Instance, b: Instance): boolean
+	return a ~= b
+		and Spar.hunting(a)
+		and Spar.hunting(b)
+		and a:GetAttribute("Outpost") == true
+		and b:GetAttribute("Outpost") == true
+		and not Spar.inMatch(a)
+		and not Spar.inMatch(b)
+end
+
+-- Can one sparring player hit another? Both kit out, partners (or both out
+-- on their own in the Outpost: `open`, Spar.openFight), both on their feet,
+-- and not themselves. (Teams and parties don't matter: friends spar too.)
 function Spar.canHit(
 	sourceSpar: any,
 	targetSpar: any,
 	sourceDown: boolean,
 	targetDown: boolean,
 	same: boolean,
-	paired: boolean
+	paired: boolean,
+	open: boolean?
 ): boolean
 	return sourceSpar == true
 		and targetSpar == true
-		and paired == true
+		and (paired == true or open == true)
 		and not sourceDown
 		and not targetDown
 		and not same

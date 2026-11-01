@@ -17,6 +17,27 @@ check(not Spar.canHit(nil, true, false, false, false, true), "A miner (kit away)
 check(not Spar.canHit(true, true, false, true, false, true), "A knocked-down player can be hit")
 check(not Spar.canHit(true, true, true, false, false, true), "A knocked-down player can hit")
 check(not Spar.canHit(true, true, false, false, true, true), "A player can hit themselves")
+-- Open combat in the Outpost: two players each with their kit out on their
+-- own can fight without asking; not a miner, not in a match, not a spar's pair.
+check(Spar.canHit(true, true, false, false, false, false, true), "Two hunters in the Outpost can't fight")
+check(not Spar.canHit(true, true, false, true, false, false, true), "A knocked-down hunter can be hit")
+do
+	local function hunter(id, extra)
+		local attrs = { Spar = true, Hunt = true, Outpost = true }
+		for k, v in extra or {} do
+			attrs[k] = v
+		end
+		return { UserId = id, GetAttribute = function(_, key) return attrs[key] end }
+	end
+	local a, b = hunter(1), hunter(2)
+	check(Spar.openFight(a, b) and Spar.openFight(b, a), "Two hunters in the Outpost aren't in open combat")
+	check(not Spar.openFight(a, a), "In open combat with yourself")
+	check(not Spar.openFight(a, hunter(3, { Hunt = false })), "A sparring partner's open to anyone")
+	check(not Spar.openFight(a, hunter(3, { Spar = false, Hunt = false })), "A miner with the pick out can be fought")
+	check(not Spar.openFight(a, hunter(3, { Outpost = false })), "Open combat outside the Outpost")
+	check(not Spar.openFight(a, hunter(3, { MatchId = "m1" })), "Open combat with someone in a match")
+	check(not Spar.openFight(a, hunter(3, { CombatSession = "Training" })), "Open combat with someone in the Arena")
+end
 local function fake(id, with, kit)
 	return {
 		UserId = id,
@@ -431,7 +452,12 @@ check(Hunt(a, true).Ok, "Hunting twice failed")
 tick()
 check(Spar.hunting(a), "The hunt ended on its own (no partner)")
 check(not CombatServer._canPvP(a, b) and not CombatServer._canPvP(b, a), "A hunter and a miner can fight")
-check(Hunt(b, true).Ok and not CombatServer._canPvP(a, b), "Two hunters can fight each other")
+-- Two hunters in the Outpost: open combat (Spar.openFight), no asking.
+check(Hunt(b, true).Ok, "A second hunter's kit didn't come out")
+check(CombatServer._canPvP(a, b) == Spar.openFight(a, b), "Two hunters' fight doesn't follow open combat's rule")
+if a:GetAttribute("Outpost") == true and b:GetAttribute("Outpost") == true then
+	check(CombatServer._canPvP(a, b) and CombatServer._canPvP(b, a), "Two hunters in the Outpost can't fight")
+end
 SparServer._stop(b)
 gap()
 check(Ask(c, a.UserId).Message == "P1 is out hunting.", "Asked a hunter to spar")

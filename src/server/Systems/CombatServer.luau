@@ -296,7 +296,8 @@ local function canPvP(source, target)
 			Spar.isDown(source),
 			Spar.isDown(target),
 			source == target,
-			Spar.paired(source, target)
+			Spar.paired(source, target),
+			Spar.openFight(source, target)
 		)
 	end
 	local sameTeam = source.Team ~= nil and source.Team == target.Team and not source.Neutral and not target.Neutral
@@ -457,6 +458,11 @@ local function rawDamage(target, amount, source, crit, color, matchTag)
 	if target.Player then
 		if not spared(target.Player, target.Humanoid, amount, source) then
 			target.Humanoid:TakeDamage(amount)
+		end
+		-- Hit by another player in the Outpost: they mend fast once it stops
+		-- (Server.HealthRegen's Boost).
+		if typeof(source) == "Instance" and source:IsA("Player") and source ~= target.Player and Spar.openFight(source, target.Player) then
+			target.Player:SetAttribute("PvPHurtAt", workspace:GetServerTimeNow())
 		end
 		if source then
 			Remotes.CombatFx:FireClient(source, "HitConfirm", crit == true)

@@ -233,6 +233,11 @@ check(HealthRegen.amount(50, 100, true, 60, 1) == 0, "Player healed during an Ar
 check(HealthRegen.amount(50, 100, false, 2, 1) == 0, "Player healed right after taking damage")
 check(HealthRegen.amount(50, 100, false, 6, 1) == 1, "Player never recovered out of combat")
 check(HealthRegen.amount(99.5, 100, false, 6, 1) == 0.5, "Recovery overfilled health")
+-- Hit by another player in the Outpost: a fast mend anywhere in it once the hits stop.
+check(HealthRegen.amount(50, 100, false, 3, 1, true, false, true) == 100 * HealthRegen.Boost.Rate, "No boosted mend after a player's hit, away from base")
+check(HealthRegen.amount(50, 100, false, 1, 1, true, false, true) == 0, "Mended mid-exchange")
+check(HealthRegen.amount(50, 100, false, 3, 1, true, false, false) == 0, "Mended away from base without a player's hit")
+check(HealthRegen.amount(50, 100, true, 60, 1, true, true, true) == 0, "Boosted in an Arena fight")
 -- In the Outpost lobby (after a critter or a wild kaiju): back quickly,
 -- but only back at base (the Shelter); out in the quarry nothing mends.
 do
