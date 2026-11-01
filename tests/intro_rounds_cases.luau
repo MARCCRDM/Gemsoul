@@ -42,9 +42,10 @@ end
 check(R.Order[1] == "Weapon", "The first piece isn't the sword")
 for round = 2, R.Count do
 	local a, b = R.difficulty(round - 1, 0), R.difficulty(round, 0)
-	check(b.Damage >= a.Damage and b.Rate <= a.Rate, "Round " .. round .. " isn't at least as hard as the last")
+	check(b.Damage > a.Damage and b.Rate < a.Rate and b.Health > a.Health, "Round " .. round .. " isn't harder than the last")
 end
-check(R.difficulty(R.Count, 0).Damage <= 1, "The champion hits harder than a full Arena rival")
+check(R.difficulty(R.Count, 0).Damage > 1 and R.difficulty(R.Count, 0).Damage <= 1.3, "The champion should outhit a full Arena rival, but not by much")
+check(R.difficulty(1, 0).Damage <= 0.5 and R.difficulty(1, 0).Health < 1, "Round 1 should stay the soft first fight")
 -- Outfits: real cosmetics, none exclusive, rarer as you climb.
 local RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 local best = 0
@@ -78,8 +79,8 @@ R.won(state, "Uncommon")
 R.lost(state); R.lost(state)
 check(state.Losses == 2, "Losses not counted")
 local eased = R.difficulty(R.round(state), state.Losses)
-check(eased.Damage < base.Damage and eased.Rate > base.Rate and not eased.Lunge, "Two losses didn't ease round 2")
-check(R.difficulty(6, 50).Damage >= R.Ease.Floor, "Eased under the floor")
+check(eased.Damage < base.Damage and eased.Rate > base.Rate and eased.Health < base.Health and not eased.Lunge, "Two losses didn't ease round 2")
+check(R.difficulty(6, 50).Damage >= R.Ease.Floor and R.difficulty(6, 50).Health >= R.Ease.HealthFloor, "Eased under the floor")
 check(R.won(state, "Uncommon") == 2 and state.Losses == 0 and R.round(state) == 3, "A win didn't pay round 2 and move on")
 
 -- Rarity: Uncommon or Rare by the roll; the last round Rare if none came.

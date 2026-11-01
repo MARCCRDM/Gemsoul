@@ -4,15 +4,19 @@ After the first fight, a new miner can stay in the Arena for a ladder of six
 rounds. Each win rolls a piece of gear for the next slot, puts it on at once,
 and the rival for the next round is harder (and wears rarer cosmetics).
 
-| Round | Rival | Pays | Rival's look |
-|---|---|---|---|
-| 1 | the first fight's sparring partner | Sword | default |
-| 2 | Vera Coppercoil, the Tinkerer | Shield | Copper Coil suit, Copper Wire blade, Hi-Vis Lime visor |
-| 3 | Sable, the Shadow | Chest (+ a gem to socket) | Stealth Black, Toxic Ooze, Twilight |
-| 4 | Korr, the Stormcaller | Gloves | Storm Conductor, Plasma Edge, Ion Storm, Arena Plume |
-| 5 | Magmar, the Forgeborn | Boots | Obsidian Lava, Molten Core, Thermal Core, Shogun Kabuto |
-| 6 | Nova, the Champion | Helmet (+500 coins: the set) | Nebula Suit, Solar Flare, Supernova, Wyrmking, Gem Halo |
+| Round | Rival | Hits (of an Arena rival) | Swings | Health | Pays | Rival's look |
+|---|---|---|---|---|---|---|
+| 1 | the first fight's sparring partner | 50% | slower | 90% | Sword | default |
+| 2 | Vera Coppercoil, the Tinkerer | 68% | slower | 100% | Shield | Copper Coil suit, Copper Wire blade, Hi-Vis Lime visor |
+| 3 | Sable, the Shadow | 82% | slower | 112% | Chest (+ a gem to socket) | Stealth Black, Toxic Ooze, Twilight |
+| 4 | Korr, the Stormcaller | 96% + lunge | even | 125% | Gloves | Storm Conductor, Plasma Edge, Ion Storm, Arena Plume |
+| 5 | Magmar, the Forgeborn | 110% + lunge | faster | 140% | Boots | Obsidian Lava, Molten Core, Thermal Core, Shogun Kabuto |
+| 6 | Nova, the Champion | 125% + lunge | faster | 160% | Helmet (+500 coins: the set) | Nebula Suit, Solar Flare, Supernova, Wyrmking, Gem Halo |
 
+- **Harder each round:** each rival hits harder, swings faster and has more
+  health than the last, by more than the piece you just won adds; the last
+  two outhit a full Arena rival. Each loss of a round eases its next try
+  (15% less damage, 10% slower, 10% less health, down to a floor).
 - **The roll:** Uncommon, with a 15% chance of Rare. If no Rare has come by
   round 6, round 6 is Rare. The sword round only gives one-handed swords.
 - **Optional:** between rounds a card shows the piece, the six-slot set and

@@ -2449,6 +2449,14 @@ function spawnRival(owner: Player, raid, encounter)
 	local rivalHit = (if rivalWeapon then rivalWeapon.Attack.Damage else 18) * Combat.powerMult(rating(mine, "Power"))
 	local ownerHumanoid = owner.Character:FindFirstChildOfClass("Humanoid")
 	local health = Classes.maxHealth(rating(mine, "Health"))
+	-- An intro round's rival: more health each round, less after each loss
+	-- of it (Shared.IntroRounds; its damage and pace are set below).
+	local introLevel = nil
+	if introRound then
+		local state = IntroRounds.state(PlayerData.get(owner))
+		introLevel = IntroRounds.difficulty(introRound, state and state.Losses or 0)
+		health = math.floor(health * introLevel.Health)
+	end
 	-- A raid boss: more health for every raider and wave, and heavier hits.
 	local raidHealth, raidDamage = 1, 1
 	if raid then
@@ -2597,8 +2605,7 @@ function spawnRival(owner: Player, raid, encounter)
 	model:SetAttribute("RivalSparring", sparring)
 	if introRound then
 		-- Harder each round, easier after each loss of it (Shared.IntroRounds).
-		local state = IntroRounds.state(PlayerData.get(owner))
-		local level = IntroRounds.difficulty(introRound, state and state.Losses or 0)
+		local level = introLevel
 		duel.Round = introRound
 		duel.Damage = rivalHit * level.Damage
 		duel.Rate = rules.BasicCooldown * level.Rate

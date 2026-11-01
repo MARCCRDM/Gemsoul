@@ -40,35 +40,39 @@ IntroRounds.SetCoins = 500 -- the whole set won
 IntroRounds.GemAfter = 3 -- this round's win also gives a gem (socket it: Shared.FirstSteps)
 
 -- The ladder: who you fight each round, how hard they hit (of a full Arena
--- rival's damage) and how fast they swing (their swing gap, times the
--- rules'), and what they wear (Shared.Cosmetics: none exclusive). Round 1 is
--- the first fight's softened sparring partner (Server.Duelist's own).
+-- rival's damage), how fast they swing (their swing gap, times the rules'),
+-- how much health they have (of their own kit's), and what they wear
+-- (Shared.Cosmetics: none exclusive). Each round's harder than the last, and
+-- by more than the piece you won makes you stronger: the last two outhit a
+-- full Arena rival. Round 1 is the first fight's softened sparring partner
+-- (Server.Duelist's own).
 IntroRounds.Rivals = {
-	{ Name = "Pell", Title = "THE ROOKIE", Damage = 0.5, Rate = 1.35 },
+	{ Name = "Pell", Title = "THE ROOKIE", Damage = 0.5, Rate = 1.35, Health = 0.9 },
 	{
-		Name = "Vera Coppercoil", Title = "THE TINKERER", Damage = 0.55, Rate = 1.3,
+		Name = "Vera Coppercoil", Title = "THE TINKERER", Damage = 0.68, Rate = 1.2, Health = 1.0,
 		Looks = { Suit = "SuitCopper", Skin = "SkinCopper", Visor = "VisorLime", Trim = "TrimEmber" },
 	},
 	{
-		Name = "Sable", Title = "THE SHADOW", Damage = 0.65, Rate = 1.22,
+		Name = "Sable", Title = "THE SHADOW", Damage = 0.82, Rate = 1.1, Health = 1.12,
 		Looks = { Suit = "SuitStealth", Skin = "SkinToxic", Visor = "VisorTwilight", Trim = "TrimVenom", Back = "BackBanner" },
 	},
 	{
-		Name = "Korr", Title = "THE STORMCALLER", Damage = 0.75, Rate = 1.15, Lunge = true,
+		Name = "Korr", Title = "THE STORMCALLER", Damage = 0.96, Rate = 1.02, Health = 1.25, Lunge = true,
 		Looks = { Suit = "SuitStorm", Skin = "SkinPlasma", Visor = "VisorIon", Trim = "TrimStorm", Helmet = "HelmetArenaPlume", Back = "BackCape" },
 	},
 	{
-		Name = "Magmar", Title = "THE FORGEBORN", Damage = 0.85, Rate = 1.08, Lunge = true,
+		Name = "Magmar", Title = "THE FORGEBORN", Damage = 1.1, Rate = 0.95, Health = 1.4, Lunge = true,
 		Looks = { Suit = "SuitObsidian", Skin = "SkinMolten", Visor = "VisorThermal", Trim = "TrimEmber", Helmet = "HelmetShogun", Back = "BackWings" },
 	},
 	{
-		Name = "Nova", Title = "THE CHAMPION", Damage = 1.0, Rate = 1.0, Lunge = true,
+		Name = "Nova", Title = "THE CHAMPION", Damage = 1.25, Rate = 0.88, Health = 1.6, Lunge = true,
 		Looks = { Suit = "SuitNebula", Skin = "SkinSolar", Visor = "VisorSupernova", Trim = "TrimPrismatic", Helmet = "HelmetWyrmking", Back = "BackHalo" },
 	},
 }
--- Each loss of a round eases its next try: this much less damage and this
--- much slower swings, a loss at a time, never under Floor.
-IntroRounds.Ease = { Damage = 0.85, Rate = 1.1, Floor = 0.4 }
+-- Each loss of a round eases its next try: this much less damage, this
+-- much slower swings and this much less health, a loss at a time, never
+-- under Floor (damage) or HealthFloor.
+IntroRounds.Ease = { Damage = 0.85, Rate = 1.1, Health = 0.9, Floor = 0.4, HealthFloor = 0.6 }
 
 function IntroRounds.state(profile)
 	if type(profile) ~= "table" then
@@ -135,6 +139,7 @@ function IntroRounds.difficulty(round: number, losses: number?)
 	return {
 		Damage = math.max(IntroRounds.Ease.Floor, rival.Damage * IntroRounds.Ease.Damage ^ n),
 		Rate = rival.Rate * IntroRounds.Ease.Rate ^ n,
+		Health = math.max(IntroRounds.Ease.HealthFloor, (rival.Health or 1) * IntroRounds.Ease.Health ^ n),
 		Lunge = rival.Lunge == true and n == 0,
 	}
 end
