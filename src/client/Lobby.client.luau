@@ -65,15 +65,33 @@ if Config.Features == nil or Config.Features.Kaiju ~= false then
 end
 -- After the intro's first fight: arrows to a mech, a few rocks, then out.
 require(script.Parent.Modules.IntroGuide).start()
+-- The extras below each start on their own: one that fails warns and is
+-- skipped, and never stops the lobby (getting into the game) after it.
+local function extra(name: string, start: () -> ())
+	local ok, problem = pcall(start)
+	if not ok then
+		warn("[Lobby] " .. name .. " didn't start: " .. tostring(problem))
+	end
+end
 -- A new miner's NEXT STEP card: mine, socket the gem, ready a surge, duel again.
-local FirstStepsCoach = require(script.Parent.Modules.FirstStepsCoach)
-FirstStepsCoach.start()
+local FirstStepsCoach: any = { setVisible = function(_: boolean) end }
+extra("FirstStepsCoach", function()
+	local coach = require(script.Parent.Modules.FirstStepsCoach)
+	coach.start()
+	FirstStepsCoach = coach
+end)
 -- The intro rounds' card between rounds in the Arena (Shared.IntroRounds).
-require(script.Parent.Modules.IntroRoundsUI).start()
+extra("IntroRoundsUI", function()
+	require(script.Parent.Modules.IntroRoundsUI).start()
+end)
 -- A force field round the Arena's floor while you fight on it: no walking off.
-require(script.Parent.Modules.ArenaBarrier).start()
+extra("ArenaBarrier", function()
+	require(script.Parent.Modules.ArenaBarrier).start()
+end)
 -- SETTINGS (the ⚙ in the top bar): music and sound, saved with your profile.
-require(script.Parent.Modules.SettingsUI).start()
+extra("SettingsUI", function()
+	require(script.Parent.Modules.SettingsUI).start()
+end)
 -- This screen's device, once (Server.Telemetry: the game's own analytics).
 task.spawn(function()
 	local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Telemetry", 30)
@@ -97,7 +115,7 @@ task.spawn(function()
 	end
 end)
 -- Owners only: someone joined the game (any server), shown and said out loud.
-task.spawn(function()
+task.spawn(extra, "DevAlerts", function()
 	require(script.Parent.Modules.DevAlerts).start()
 end)
 -- Who a Rift or raid boss is on right now: a red diamond over them (or their kaiju).

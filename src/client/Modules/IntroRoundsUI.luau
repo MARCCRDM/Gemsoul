@@ -62,7 +62,7 @@ local shown = 0 -- (each show's number: an older countdown stops)
 local current = nil -- the event on the card
 local busy = false
 
-local function label(parent, font, size, color, y, h)
+local function label(font: Enum.Font, size: number, color: Color3, y: number, h: number): TextLabel
 	local l = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = font,
