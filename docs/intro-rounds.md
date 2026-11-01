@@ -20,7 +20,7 @@ and the rival for the next round is harder (and wears rarer cosmetics).
 - **The roll:** Uncommon, with a 15% chance of Rare. If no Rare has come by
   round 6, round 6 is Rare. The sword round only gives one-handed swords.
 - **Optional:** between rounds a card shows the piece, the six-slot set and
-  who's next: NEXT ROUND (starts by itself after 10 s in the Arena) or LEAVE.
+  who's next: NEXT ROUND (starts by itself after 5 s in the Arena) or LEAVE.
   The NEXT STEP card offers WIN YOUR INTRO SET (FIGHT) until it's done.
 - **Any win counts:** a queued Casual or Ranked 1v1 won pays the round's piece
   in place of that win's usual reward. NEXT ROUND joins a real player who's

@@ -4,13 +4,13 @@
 	deep navy, an amber bar along the top, amber for what matters.
 
 	        ◆ ROUND 1 OF 6  WON ◆
-	              ( ⚔ )              the piece, in its rarity's glow: its
+	              ( ⚔ )              the piece itself (3D), in its rarity's glow: its
 	         Impact Falchion          name rolls in through the rarities
 	     UNCOMMON SWORD · EQUIPPED    and lands on its own
 	  (⚔)──(⛨)──( )──( )──( )──( )    the set, each slot lit as it's won,
 	                                  the next one ringed in amber
 	  [ NEXT  Vera Coppercoil   SHIELD ]
-	  [ NEXT ROUND  10 ]  [ LEAVE ARENA ]   starts by itself after AutoNext
+	  [ NEXT ROUND  5 ]  [ LEAVE ARENA ]    starts by itself after AutoNext
 	                                        seconds (in the Arena)
 
 	A loss: KNOCKED DOWN, the piece still to win in grey, the next try is
@@ -36,7 +36,7 @@ local IntroRoundsUI = {}
 
 local new = IronUi.new
 local player = Players.LocalPlayer
-IntroRoundsUI.AutoNext = 10 -- seconds before NEXT ROUND starts by itself (in the Arena)
+IntroRoundsUI.AutoNext = 5 -- seconds before NEXT ROUND starts by itself (in the Arena)
 
 local W, H, PAD = 460, 432, 22 -- (px: the card, before scaling)
 local HERO_Y = 104 -- (the piece's centre)
@@ -357,8 +357,70 @@ local function hero(slot: string, color: Color3, dim: boolean?)
 	for _, tick in ui.Ticks do
 		tick.BackgroundColor3 = color
 	end
+	if ui.Model then
+		ui.Model:Destroy()
+		ui.Model = nil
+	end
 	icon(ui.Glow[3], slot, if dim then LOCKED else color, 72)
 	ui.Mystery.Visible = dim == true
+end
+
+-- The piece itself, in 3D, in place of its icon: the server's bare preview
+-- of it (built on request, as the Inventory's are), or, while that's on its
+-- way, the one you're wearing if it's this piece. The icon stays if neither
+-- comes within a few seconds.
+local function previews()
+	task.spawn(function()
+		for attempt = 1, 4 do
+			local ok, result = pcall(GemClient.request, "GearPreviews")
+			if ok and type(result) == "table" and result.Ok and result.Done then
+				return
+			end
+			task.wait(0.4 * attempt)
+		end
+	end)
+end
+local function showModel(piece, mine: number)
+	if not (GearArt and type(piece) == "table" and piece.Id) then
+		return
+	end
+	for _ = 1, 16 do
+		if mine ~= shown then
+			return
+		end
+		local view = new("ViewportFrame", {
+			Name = "Piece",
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(112, 112),
+			Ambient = Color3.fromRGB(190, 186, 200),
+			LightColor = Color3.new(1, 1, 1),
+			LightDirection = Vector3.new(-0.4, -0.8, -0.6),
+			ZIndex = 6,
+		}, ui.Hero)
+		local ok, drawn = pcall(GearArt.draw, view, piece.Slot, piece.Id, false)
+		if not (ok and drawn) then
+			local worn = GemClient.Profile and GemClient.Profile.Character
+			if worn and worn[piece.Slot] == piece.Id then
+				ok, drawn = pcall(GearArt.draw, view, piece.Slot, piece.Id, true)
+			end
+		end
+		if ok and drawn and mine == shown then
+			if ui.Model then
+				ui.Model:Destroy()
+			end
+			ui.Model = view
+			for _, child in ui.Glow[3]:GetChildren() do
+				if child.Name == "Icon" then
+					child:Destroy()
+				end
+			end
+			return
+		end
+		view:Destroy()
+		task.wait(0.25)
+	end
 end
 
 -- The set: each node lit in its piece's rarity once won, the next one
@@ -427,6 +489,7 @@ local function reel(piece, mine: number)
 		return
 	end
 	drawPiece(piece)
+	task.spawn(showModel, piece, mine)
 	UiSound.play(if piece.Rarity == "Rare" then "Reward" else "Equip")
 	scale.Scale = fitScale * 1.04
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = fitScale }):Play()
@@ -525,6 +588,9 @@ local function show(event)
 	local mine = shown
 	current = event
 	gui.Enabled = true
+	if event.Phase ~= "Lost" then
+		previews()
+	end
 	ui.Extra.Text = ""
 	ui.Go:SetAttribute("Auto", nil)
 	local nextRival = view.Next

@@ -111,6 +111,7 @@ local camera = { ViewportSize = roblox.Vector2.new(1280, 720) }
 local workspaceStub = { CurrentCamera = camera, GetServerTimeNow = function() return os.clock() end }
 
 local requests = {}
+local drawnPiece = nil
 local analyticsAnswer = nil -- (set below, once the shared modules load)
 local GemClient = {
 	Profile = { Intro = { Done = true }, Funnel = {}, TrainingRewards = { Counts = {} }, Settings = { Music = 0.4, MusicOn = false } },
@@ -129,6 +130,9 @@ local stubs = {
 	LobbyUI = { openDashboard = function() end, openPicker = function() end },
 	Music = { setVolume = function(v) stubsMusic = v end },
 	CombatSound = { Volume = 0.85 },
+	-- (the piece's 3D art: drawn, as far as the card can tell; GearArt's own
+	-- framing is the Inventory's and runs in the game)
+	GearArt = { draw = function(view, slot, id) drawnPiece = { view, slot, id }; return true end, icon = function() return nil end },
 	Lang = { translate = function(s) return s end, format = function(k, ...) local a = { ... }; return (string.gsub(k, "{(%d)}", function(i) return tostring(a[tonumber(i)]) end)) end },
 }
 local loaded = {}
@@ -163,8 +167,16 @@ local IntroRounds = load(sharedRef.IntroRounds)
 local state = IntroRounds.state({ Funnel = {} })
 IntroRounds.won(state, "Uncommon")
 state.Pieces.Weapon = { Name = "Cryo-Edge Saber", Rarity = "Uncommon" }
-social:Fire("IntroRound", { Phase = "Won", Round = 1, Piece = { Slot = "Weapon", Name = "Cryo-Edge Saber", Rarity = "Uncommon" }, Gem = { Name = "Ember" }, View = IntroRounds.view(state) })
-task.wait(2)
+attrs.CombatSession = "Training" -- (in the Arena: the card's up 1.2 s after the win)
+social:Fire("IntroRound", { Phase = "Won", Round = 1, Piece = { Slot = "Weapon", Name = "Cryo-Edge Saber", Rarity = "Uncommon", Id = "w1" }, Gem = { Name = "Ember" }, View = IntroRounds.view(state) })
+task.wait(3.2)
+do
+	local card = playerGui:FindFirstChild("IntroRounds")
+	local piece = card and card:FindFirstChild("Piece", true)
+	check(drawnPiece and drawnPiece[2] == "Weapon" and drawnPiece[3] == "w1", "The won piece wasn't drawn in 3D")
+	check(piece ~= nil and piece:IsA("ViewportFrame"), "No 3D piece on the card")
+	attrs.CombatSession = nil
+end
 social:Fire("IntroRound", { Phase = "Lost", Round = 2, View = IntroRounds.view(state) })
 task.wait(2)
 for _ = 2, 6 do IntroRounds.won(state, "Rare") end

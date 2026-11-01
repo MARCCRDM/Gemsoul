@@ -64,6 +64,7 @@ local DamageLog = require(script.Parent.DamageLog)
 
 local DungeonLoadout = require(ReplicatedStorage.Shared.DungeonLoadout)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
+local Spar = require(ReplicatedStorage.Shared.Spar)
 local BrainrotSkins = require(script.Parent.BrainrotSkins)
 local BrainrotBosses = require(script.Parent.BrainrotBosses)
 local ExpeditionAmbient = require(script.Parent.ExpeditionAmbient)
@@ -2867,10 +2868,16 @@ function Duelist.removeDungeon(id)
 end
 function Duelist.start()
 	-- An intro round lost (the first fight too, for a new miner with rounds
-	-- to go): knocked down, back to full, the rival leaves, and the round's
-	-- next try is easier (Server.IntroRoundsServer). They stay in the Arena.
+	-- to go): knocked down where they stand (on the floor a moment, KNOCKED
+	-- DOWN on the screen: Client SparKit, as in the Outpost), then up at full
+	-- health, the rival gone, and the round's card: its next try is easier
+	-- (Server.IntroRoundsServer). They stay in the Arena.
 	CombatServer.onRoundLethal(function(player, humanoid)
 		local duel = duels[player]
+		-- (Down already: a blow still on its way, a ground blast, doesn't finish them.)
+		if duel and duel.Ended and (duel.Round or duel.Intro) and Spar.isDown(player) then
+			return true
+		end
 		if not duel or duel.Ended or not (duel.Round or duel.Intro) or player:GetAttribute("CombatSession") ~= "Training" then
 			return false
 		end
@@ -2878,16 +2885,32 @@ function Duelist.start()
 		if not IntroRoundsServer or not IntroRoundsServer.eligible(player) then
 			return false
 		end
-		duel.Ended = true
-		humanoid.Health = humanoid.MaxHealth
-		if duel.Intro or duel.FirstFight then
-			clearTutorial(player)
-		end
-		player:SetAttribute("IntroRoundFight", nil)
-		IntroRoundsServer.lost(player) -- (before the duel's counted: the client's first-fight wait sees the rounds go on)
-		countDuel(player, false)
-		Remotes.Notify:FireClient(player, string.format("Knocked down by %s. Your next try at this round is easier.", duel.Name))
-		task.defer(Duelist.despawn, player)
+		duel.Ended = true -- (the rival stops where it is: Brain's think)
+		humanoid.Health = math.max(1, math.min(humanoid.Health, 1))
+		CombatServer.reset(player)
+		player:SetAttribute("Blocking", false)
+		local seconds = Spar.DownSeconds
+		player:SetAttribute("SparDown", workspace:GetServerTimeNow() + seconds)
+		Remotes.CombatFx:FireAllClients("SparKO", player.UserId, 0)
+		Remotes.Notify:FireClient(player, string.format("Knocked down by %s.", duel.Name))
+		task.delay(seconds, function()
+			player:SetAttribute("SparDown", nil)
+			if humanoid.Parent and humanoid.Health > 0 then
+				humanoid.Health = humanoid.MaxHealth
+			end
+			if duels[player] == duel then
+				Duelist.despawn(player)
+			end
+			if not player.Parent then
+				return
+			end
+			if duel.Intro or duel.FirstFight then
+				clearTutorial(player)
+			end
+			player:SetAttribute("IntroRoundFight", nil)
+			IntroRoundsServer.lost(player) -- (before the duel's counted: the client's first-fight wait sees the rounds go on)
+			countDuel(player, false)
+		end)
 		return true
 	end)
 	-- Combat training counts what the player does (CombatServer's events),
