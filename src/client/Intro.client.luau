@@ -1670,7 +1670,7 @@ local function close()
 	LoadingFlow.hold("Intro", {
 		Instant = true,
 		Destination = LoadingFlow.home,
-		Status = "Finding your first opponent",
+		Status = "Your first fight is starting",
 		Max = 60,
 		Until = function()
 			return me:GetAttribute("IntroCover") ~= true

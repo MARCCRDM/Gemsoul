@@ -918,8 +918,23 @@ do
 		alone:SetAttribute("CombatSession", nil)
 		AutoQueue.Intro.Populated = populated
 	end
+	-- Search off (the default): the rival at once, however busy the server.
+	do
+		local was = AutoQueue.Intro.Search
+		AutoQueue.Intro.Search = false
+		check(not AutoQueue.introSearches(1000), "A first fight searched with Search off")
+		local busy = makePlayer(48, "Bo")
+		local before = #trainingEntered
+		local answer = handlers.IntroQueue(busy)
+		check(answer.Ok and answer.Bot and #trainingEntered == before + 1, "Search off: the first fight didn't go to the rival at once")
+		check(busy:GetAttribute("DuelQueue") == nil, "Search off: the first fight still searched")
+		busy:SetAttribute("CombatSession", nil)
+		AutoQueue.Intro.Search = was
+	end
+	-- (What follows is a busy server with Search on: first fights look for real players.)
+	local searchWas = AutoQueue.Intro.Search
+	AutoQueue.Intro.Search = true
 	check(AutoQueue.introSearches(AutoQueue.Intro.Populated) and not AutoQueue.introSearches(AutoQueue.Intro.Populated - 1), "introSearches")
-	-- (What follows is a busy server: first fights look for real players.)
 	local populatedWas = AutoQueue.Intro.Populated
 	AutoQueue.Intro.Populated = 1
 
@@ -1000,6 +1015,7 @@ do
 	check(string.find(last(new4, "Notify")[2], "sparring partner", 1, true), "Quin wasn't told about the rival")
 	new4:SetAttribute("CombatSession", nil)
 	AutoQueue.Intro.Populated = populatedWas
+	AutoQueue.Intro.Search = searchWas
 
 	-- Nobody is called while the Arena's lanes are full: the entry waits.
 	print("PASS: " .. (checks - before) .. " lobby invitation checks (explicit consent, muted invites, expiry, decline, forged requests, a moment after logging in, one card at a time, the bonus carried over, upfront intro bonus, no duplicate payment, normal PvP rewards unchanged, bot fallback)")

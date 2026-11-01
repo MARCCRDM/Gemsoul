@@ -57,6 +57,10 @@ AutoQueue.FillBonus = 20 -- first-fight join bonus; other fill-ins retain the wi
 AutoQueue.Settle = 20 -- seconds after you first reach the lobby before you're asked to join anything
 AutoQueue.CarryFor = 60 -- seconds a taken-down fill-in card's bonus waits for that same queue
 AutoQueue.Intro = {
+	-- Off: a first fight never looks for real players: the rival bot at once,
+	-- straight after the roll and the kit, and the intro rounds after it
+	-- (Shared.IntroRounds). On: a busy server's first fight searches first.
+	Search = false,
 	Populated = 6, -- players in the server before a first fight looks for real ones (fewer: the rival at once)
 	CallAfter = 4, -- seconds alone before lobby invitations
 	BotAfter = 10, -- seconds alone before the sparring rival steps in
@@ -118,7 +122,7 @@ end
 
 -- Where an intro search is after `waited` seconds alone.
 function AutoQueue.introSearches(players: number): boolean
-	return players >= AutoQueue.Intro.Populated
+	return AutoQueue.Intro.Search == true and players >= AutoQueue.Intro.Populated
 end
 
 function AutoQueue.introPhase(waited: number): string

@@ -4625,4 +4625,5 @@ return {
 	["Saved with your profile"] = "Se guardan con tu perfil",
 	["MUSIC"] = "MÚSICA",
 	["SOUND EFFECTS"] = "EFECTOS DE SONIDO",
+	["Your first fight is starting"] = "Tu primer combate va a empezar",
 }
