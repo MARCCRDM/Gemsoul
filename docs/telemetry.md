@@ -109,3 +109,12 @@ phone too. The pulled data and the dashboard are git-ignored.
 `python3 tools/telemetry/test_report.py demo.html` checks the numbers on a
 known log and writes a DEMO dashboard from made-up data (clearly marked).
 Tests: `python3 tests/run_telemetry.py`.
+
+## Micro-interactions (ui_tap, ui_window)
+
+Client UiTrack watches every button press and every window (a ScreenGui turned on, then off). It sends a batch every 20 s (`Remotes.UiTrack`), and Server.UiTrack logs it (dev and test accounts are left out, like everything else). There's a cap of 60 rows a player a minute.
+
+- `ui_tap`: v = taps, a = the window (ScreenGui name), b = the button (its name, or its words when it has a generic name).
+- `ui_window`: v = seconds open, a = the window, b = seconds to the first tap in it (-1: none).
+
+The ANALYTICS window shows them as **TAPS** (the most pressed, and by how many players) and **WINDOWS** (opens, average time up, average seconds to the first tap, and the share shut with no tap at all). A window people open and close without tapping, or sit in a long time before tapping, is where they're lost.

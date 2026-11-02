@@ -163,5 +163,50 @@ local skip = Report.excludedIn(rows, { [OWNER] = true })
 check(skip[OWNER] and skip[TEST] and not skip[77] and not skip[REAL], "Who the report leaves out")
 check(r.Events[1] == nil or r.Events[1].Name ~= "analytics_excluded", "The marks show as events")
 
-print(string.format("PASS: %d dev account checks (Owners, Testers, NoAnalytics, DEV resets, Studio and marked accounts left out of Roblox's Analytics, the funnels and the log; reports drop them, their earlier rows too)", checks))
+-- Micro-interactions (Server.UiTrack): a real player's taps and windows
+-- reach the log and the report; a dev account's don't; junk is dropped.
+do
+	local handler
+	local UiTrack = load("/src/server/Systems/UiTrack.luau", "UiTrack", {
+		Remotes = { UiTrack = { OnServerEvent = { Connect = function(_, fn) handler = fn end } } },
+	})
+	UiTrack.start()
+	local function rowsOf(name)
+		local out = {}
+		for _, row in Telemetry.here() do
+			if row[3] == name then
+				table.insert(out, row)
+			end
+		end
+		return out
+	end
+	handler(players[REAL], {
+		Taps = { ["IntroRounds/Next"] = 3, ["Inventory/EQUIP"] = 1, ["bad"] = 5, ["X/Y"] = "lots" },
+		Windows = { { Name = "Inventory", Seconds = 12.34, FirstTap = 4.2 }, { Name = "Shop", Seconds = 3 }, { Name = 5, Seconds = 1 } },
+	})
+	handler(players[OWNER], { Taps = { ["IntroRounds/Next"] = 9 }, Windows = { { Name = "Inventory", Seconds = 2 } } })
+	handler(players[REAL], "junk")
+	local tapRows, windowRows = rowsOf("ui_tap"), rowsOf("ui_window")
+	check(#tapRows == 2 and #windowRows == 2, string.format("UiTrack rows: %d taps, %d windows", #tapRows, #windowRows))
+	for _, row in tapRows do
+		check(row[2] == REAL, "A dev account's taps were logged")
+	end
+	local report = Report.build(Telemetry.here())
+	check(report.Taps[1] and report.Taps[1].Name == "IntroRounds/Next" and report.Taps[1].Value == 3 and report.Taps[1].Players == 1, "The report's TAPS")
+	local inv
+	for _, w in report.Windows do
+		if w.Name == "Inventory" then
+			inv = w
+		end
+	end
+	check(inv and inv.Value == 1 and inv.AvgSeconds == 12.3 and inv.AvgFirstTap == 4.2 and inv.NoTap == 0, "The report's WINDOWS")
+	local flood = { Taps = {} }
+	for i = 1, 200 do
+		flood.Taps["W/B" .. i] = 1
+	end
+	handler(players[REAL], flood)
+	check(#rowsOf("ui_tap") <= 2 + UiTrack.MaxRows, "A flood got past the per-minute cap")
+end
+
+print(string.format("PASS: %d dev account checks (Owners, Testers, NoAnalytics, DEV resets, Studio and marked accounts left out of Roblox's Analytics, the funnels and the log; reports drop them, their earlier rows too; micro-interactions logged for real players only, capped)", checks))
 process.exit(0)

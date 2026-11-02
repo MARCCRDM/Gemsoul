@@ -216,13 +216,15 @@ end
 -- screens and a pod drop (Client FirstDungeonUI; for now from the DEV panel).
 Dungeon.First = {
 	Name = "The Rot Beachhead",
-	Rooms = { "Room 1: The Gate", "Room 2: The Yard", "The Nest" },
-	Short = { "THE GATE", "THE YARD", "THE NEST" }, -- (the tracker's)
-	Fighters = { { "Sahur" }, { "Tralalero", "Patapim" } },
-	Boss = "Chimpanzini", -- (Granchio Rottamino's model is to come; its stand-in)
-	FighterHealth = 0.5, -- of a dungeon fighter's
-	FighterDamage = 0.6,
-	BossHealth = 0.6, -- a starter boss's (Bosses' Starter.Health)
+	-- The intro's dungeon (after the two intro 1v1s: Shared.IntroRounds):
+	-- a room of fighters your kaiju take on with you, then the nest.
+	Rooms = { "The Breach", "The Nest" },
+	Short = { "THE BREACH", "THE NEST" }, -- (the tracker's)
+	Fighters = { { "Sahur", "Tralalero", "Patapim" } },
+	Boss = "SahurTrio", -- Tung Tung Tung Sahur
+	FighterHealth = 0.4, -- of a dungeon fighter's (three at once, your kaiju with you)
+	FighterDamage = 0.5,
+	BossHealth = 0.7,
 	BossDamage = 0.8,
 	PieceDamage = { Base = 0.7, Per = 0.05 }, -- x0.75 with 1 intro piece, x1.0 with 6
 	DownSeconds = 3, -- knocked down this long before the card
@@ -230,6 +232,7 @@ Dungeon.First = {
 	-- The boss at half health: enraged, its rot-spawn join in (soft ones).
 	Enrage = { At = 0.5, Adds = { "Sahur", "Patapim" }, AddHealth = 0.3, AddDamage = 0.45 },
 	WinSeconds = 25, -- the victory card's up this long, then out by itself
+	IntroOutSeconds = 60, -- the intro's boss down: its roll cards, then out by itself after this long
 }
 
 -- A roster fighter's index by its Id (1 if there's none).

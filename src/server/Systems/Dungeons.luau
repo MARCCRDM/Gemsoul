@@ -25,6 +25,7 @@ local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local Shop = require(script.Parent.Shop)
 local Feedback = require(script.Parent.Feedback)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
+local IntroRoundsServer = require(script.Parent.IntroRoundsServer)
 local Dungeon = {}
 local function canTest(player)
 	return Feedback.isOwner(player)
@@ -91,8 +92,13 @@ local function phase(run, name, left, total)
 		end
 	end
 end
--- Intro rounds still to win (the first dungeon's way back to them).
+-- Intro rounds still to win (the first dungeon's way back to them). None
+-- in the intro's own dungeon (it is the intro: Server.IntroRoundsServer).
 local function roundsLeft(p): number
+	local run = memberRun[p]
+	if run and run.Intro then
+		return 0
+	end
 	local state = IntroRounds.state(PlayerData.get(p))
 	return if state then math.max(0, IntroRounds.Count - state.Won) else 0
 end
@@ -213,6 +219,22 @@ beginLoot = function(run, room)
 	end
 	local boss = Rules.specOf(room)
 	run.Loot = { Boss = boss }
+	if run.Intro then
+		-- The intro's boss: the rest of the set, a roll card each, then
+		-- TO THE LOBBY on the last (FirstDungeonDone), or out by itself.
+		phase(run, "Loot", 0)
+		announce(run, string.upper(boss.Name) .. " IS DOWN · Your set's complete.")
+		for _, p in living(run) do
+			local ok, problem = pcall(IntroRoundsServer.dungeonWon, p, "Boss")
+			if not ok then
+				report(run, "intro pieces", problem)
+			end
+		end
+		task.delay(Rules.First.IntroOutSeconds, function()
+			finish(run, true, "The intro's done. Welcome to the Outpost, miner.")
+		end)
+		return
+	end
 	for _, p in living(run) do
 		ArenaStreaks.bossCache(p, boss, Dungeon.bossGem(boss.Element, room.GearTier), "Dungeon")
 	end
@@ -333,6 +355,15 @@ local function spawnRoom(run, index)
 					CombatServer.reset(p)
 				end
 				phase(run, "Move", 0)
+				if run.Intro and index == 1 then
+					-- The intro's next piece, rolled on the card (Client IntroRoundsUI).
+					for _, p in living(run) do
+						local ok, problem = pcall(IntroRoundsServer.dungeonWon, p, "Room")
+						if not ok then
+							report(run, "intro piece", problem)
+						end
+					end
+				end
 				if run.First then
 					-- (a beam over the next room: where to go)
 					local nextCenter = run.World.Centers[index + 1]
@@ -436,7 +467,9 @@ local function queue(player, testMode)
 	if testMode ~= nil and not first and not testing then
 		return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
 	end
-	if first and not (Config.Features and Config.Features.FirstDungeon == true) then
+	-- (the intro's dungeon, its 1v1s won: IntroRoundsServer's stage)
+	local intro = first and IntroRoundsServer.stage(player) == "Dungeon"
+	if first and not intro and not (Config.Features and Config.Features.FirstDungeon == true) then
 		return Shop.reply(false, "The Rot Beachhead is off for now.")
 	end
 	-- Switched off (Config.Features): only the owners' tests get in.
@@ -485,6 +518,7 @@ local function queue(player, testMode)
 		-- The campaign's first dungeon, the Rot Beachhead (Rules.First): solo,
 		-- with the player's kaiju, a knock-down card instead of a reserve.
 		First = first,
+		Intro = intro, -- (the intro's: its first room and its boss pay intro pieces)
 		Down = {},
 		Downs = {}, -- (each player's knock-downs: the victory card's)
 		Slot = slot,
@@ -728,13 +762,13 @@ local function firstQuit(p, where)
 	if not run or not run.First then
 		return Shop.reply(false, "You're not in the Rot Beachhead.")
 	end
-	local lobby = where == "Lobby" or roundsLeft(p) == 0
+	local lobby = where == "Lobby" or run.Intro or roundsLeft(p) == 0
 	run.Down[p] = nil
 	finish(
 		run,
 		false,
 		if lobby
-			then "Back to the lobby. The Rot Beachhead waits for you."
+			then (if run.Intro then "Back to the lobby. The dungeon waits for you: PLAY to go back in." else "Back to the lobby. The Rot Beachhead waits for you.")
 			else "Back to the intro fights: win more gear, then the Rot Beachhead waits."
 	)
 	return Shop.reply(true, "", { To = if lobby then "Lobby" else "Intro" })

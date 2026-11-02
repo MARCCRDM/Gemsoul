@@ -197,4 +197,33 @@ Server.funnel(player, fresh, 1, true)
 Server.funnel(player, fresh, 2, false)
 check(introSteps[mark + 1] == 1 and introSteps[mark + 2] == 2 and introSteps[mark + 3] == 3 and #introSteps == mark + 3, "Start, win, next start: not 1, 2, 3")
 
+-- The dungeon path (Config.Features.IntroDungeon; the Owners always): two
+-- 1v1s, the second's card says the dungeon's next, then the dungeon's
+-- first room pays a piece and its boss the rest, a card each.
+do
+	local Config = shared("Config")
+	profile = newProfile({})
+	check(not Server.dungeonPath(player), "On the dungeon path with its switch off")
+	Config.Features.IntroDungeon = true
+	check(Server.dungeonPath(player) and Server.stage(player) == "Duel", "The dungeon path doesn't start with 1v1s")
+	fired = {}
+	Server.won(player)
+	check(fired[#fired][2].Next == nil, "The dungeon's next after one 1v1")
+	Server.won(player)
+	local second = fired[#fired][2]
+	check(second.Next == "Dungeon" and second.Where == nil, "The second 1v1's card doesn't say the dungeon's next")
+	check(Server.stage(player) == "Dungeon", "Not on to the dungeon after two 1v1s")
+	check(Server.dungeonWon(player, "Room") == 1 and profile.IntroRounds.Won == 3, "The first room didn't pay a piece")
+	local roomCard = fired[#fired][2]
+	check(roomCard.Where == "Dungeon" and roomCard.More == 0 and roomCard.Round == 3 and not roomCard.View.Done, "The room's card")
+	check(Server.dungeonWon(player, "Room") == 0, "The first room paid twice")
+	local before = #fired
+	check(Server.dungeonWon(player, "Boss") == 3 and profile.IntroRounds.Won == 6, "The boss didn't pay the rest")
+	check(#fired == before + 3, "Not a card a piece")
+	check(fired[before + 1][2].More == 2 and fired[before + 2][2].More == 1 and fired[before + 3][2].More == 0, "The cards' count of more to come")
+	check(fired[before + 3][2].View.Done and fired[before + 3][2].Coins == IntroRounds.SetCoins, "The last card isn't the set's")
+	check(Server.stage(player) == "Done" and Server.dungeonWon(player, "Boss") == 0, "Paid past the set")
+	Config.Features.IntroDungeon = nil
+end
+
 print(string.format("PASS: %d intro rounds server checks", checks))

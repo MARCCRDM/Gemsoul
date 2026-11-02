@@ -96,6 +96,10 @@ end)
 extra("AnalyticsUI", function()
 	require(script.Parent.Modules.AnalyticsUI).start()
 end)
+-- What players tap and open (Client UiTrack, Server.UiTrack): the ANALYTICS window's TAPS and WINDOWS.
+extra("UiTrack", function()
+	require(script.Parent.Modules.UiTrack).start()
+end)
 -- This screen's device, once (Server.Telemetry: the game's own analytics).
 task.spawn(function()
 	local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Telemetry", 30)

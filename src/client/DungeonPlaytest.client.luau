@@ -42,7 +42,7 @@ corner(toggle, 6)
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -14, 1, -42)
-panel.Size = UDim2.fromOffset(300, 526)
+panel.Size = UDim2.fromOffset(300, 562)
 panel.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
 panel.Visible = false
 panel.Parent = gui
@@ -89,7 +89,7 @@ if game:GetService("UserInputService").TouchEnabled then
 	fit.Parent = panel
 	local function shrink()
 		local height = gui.AbsoluteSize.Y
-		fit.Scale = if height > 0 then math.clamp((height - 70) / 526, 0.4, 1) else 1
+		fit.Scale = if height > 0 then math.clamp((height - 70) / 562, 0.4, 1) else 1
 	end
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(shrink)
 	shrink()
@@ -512,3 +512,166 @@ task.spawn(function()
 		end
 	end
 end)
+
+-- WATCH (Owners only: Server.DevSpectate checks it): the camera behind
+-- another player in this server, third person, to see what they do. PREV /
+-- NEXT go through who's here, STOP brings the camera back. A line at the
+-- top says who and where they are.
+do
+	local caption = Instance.new("TextLabel")
+	caption.Size = UDim2.fromOffset(96, 26)
+	caption.Position = UDim2.fromOffset(6, 528)
+	caption.BackgroundTransparency = 1
+	caption.TextColor3 = Color3.fromRGB(255, 210, 126)
+	caption.Font = Enum.Font.GothamBold
+	caption.TextSize = 12
+	caption.TextXAlignment = Enum.TextXAlignment.Left
+	caption.Text = "WATCH"
+	caption.Parent = panel
+	local banner = Instance.new("TextLabel")
+	banner.Name = "Watching"
+	banner.AnchorPoint = Vector2.new(0.5, 0)
+	banner.Position = UDim2.new(0.5, 0, 0, 6)
+	banner.Size = UDim2.fromOffset(520, 30)
+	banner.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
+	banner.BackgroundTransparency = 0.15
+	banner.TextColor3 = Color3.fromRGB(255, 210, 126)
+	banner.Font = Enum.Font.GothamBold
+	banner.TextSize = 13
+	banner.Visible = false
+	banner.Parent = gui
+	corner(banner, 6)
+
+	local target: Player? = nil
+	local saved = nil
+	local function others(): { Player }
+		local list = {}
+		for _, other in Players:GetPlayers() do
+			if other ~= player then
+				table.insert(list, other)
+			end
+		end
+		table.sort(list, function(a, b)
+			return a.UserId < b.UserId
+		end)
+		return list
+	end
+	-- Where they are and what's up, from what the server puts on them.
+	local function doing(other: Player): string
+		local bits = {}
+		local session = other:GetAttribute("CombatSession")
+		if other:GetAttribute("MatchId") then
+			table.insert(bits, "in a match")
+		elseif other:GetAttribute("DungeonId") then
+			table.insert(bits, "in a dungeon, room " .. tostring(other:GetAttribute("DungeonRoom") or 1))
+		elseif session then
+			table.insert(bits, "in the Arena (" .. tostring(session) .. ")")
+		elseif other:GetAttribute("Outpost") then
+			table.insert(bits, "in the Outpost")
+		else
+			table.insert(bits, "loading / menus")
+		end
+		if other:GetAttribute("IntroRounds") then
+			table.insert(bits, "intro card up")
+		end
+		if other:GetAttribute("MenuOpen") then
+			table.insert(bits, "menu open")
+		end
+		if other:GetAttribute("DuelQueue") then
+			table.insert(bits, "searching " .. tostring(other:GetAttribute("DuelQueue")))
+		end
+		return table.concat(bits, " · ")
+	end
+	local camera = workspace.CurrentCamera
+	local function stop()
+		if not target then
+			return
+		end
+		target = nil
+		banner.Visible = false
+		game:GetService("RunService"):UnbindFromRenderStep("DevWatch")
+		pcall(function()
+			request:InvokeServer("DevSpectate", nil)
+		end)
+		local own = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if own then
+			camera.CameraSubject = own
+		end
+		if saved then
+			player.CameraMode, player.CameraMaxZoomDistance, player.CameraMinZoomDistance = saved[1], saved[2], saved[3]
+			saved = nil
+		end
+		status.Text = "Back to you."
+	end
+	local function watch(other: Player)
+		local ok, result = pcall(function()
+			return request:InvokeServer("DevSpectate", other.UserId)
+		end)
+		if not ok or not result or not result.Ok then
+			status.Text = if ok and result then result.Message else "Couldn't watch them."
+			return
+		end
+		saved = saved or { player.CameraMode, player.CameraMaxZoomDistance, player.CameraMinZoomDistance }
+		target = other
+		banner.Visible = true
+		status.Text = result.Message
+		-- (each frame: other scenes set the camera too; this one wins while watching)
+		game:GetService("RunService"):BindToRenderStep("DevWatch", Enum.RenderPriority.Camera.Value - 2, function()
+			if not target or not target.Parent then
+				stop()
+				return
+			end
+			local humanoid = target.Character and target.Character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				player.CameraMode = Enum.CameraMode.Classic
+				player.CameraMaxZoomDistance = 45
+				player.CameraMinZoomDistance = 6
+				camera.CameraType = Enum.CameraType.Custom
+				if camera.CameraSubject ~= humanoid then
+					camera.CameraSubject = humanoid
+				end
+			end
+		end)
+	end
+	local function step(by: number)
+		local list = others()
+		if #list == 0 then
+			status.Text = "Nobody else is in this server."
+			return
+		end
+		local at = target and table.find(list, target) or 0
+		local nextOne = list[((at - 1 + by) % #list) + 1]
+		if at == 0 and by < 0 then
+			nextOne = list[#list]
+		end
+		watch(nextOne)
+	end
+	for i, item in { { "PREV", -1 }, { "NEXT", 1 }, { "STOP", 0 } } do
+		local b = Instance.new("TextButton")
+		b.Name = "Watch" .. item[1]
+		b.Size = UDim2.fromOffset(60, 26)
+		b.Position = UDim2.fromOffset(104 + (i - 1) * 64, 528)
+		b.BackgroundColor3 = if item[2] == 0 then Color3.fromRGB(70, 46, 84) else Color3.fromRGB(39, 61, 79)
+		b.TextColor3 = Color3.fromRGB(240, 245, 250)
+		b.Font = Enum.Font.GothamBold
+		b.TextSize = 12
+		b.Text = item[1]
+		b.Parent = panel
+		corner(b, 5)
+		b.Activated:Connect(function()
+			if item[2] == 0 then
+				stop()
+			else
+				step(item[2])
+			end
+		end)
+	end
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			if target then
+				banner.Text = string.format("WATCHING %s (@%s)  ·  %s", target.DisplayName, target.Name, doing(target))
+			end
+		end
+	end)
+end

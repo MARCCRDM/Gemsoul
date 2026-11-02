@@ -292,6 +292,58 @@ do -- (who's in the numbers: a toggle each, a dev account just says so)
 	check(counted == 1 and notCounted == 1 and seen["DEV · NOT COUNTED"], "PLAYERS HERE NOW's COUNTED / NOT COUNTED")
 end
 check(Analytics.commas(1234567) == "1,234,567" and Analytics.minutes(90) == "1h 30m" and Analytics.minutes(0.5) == "30s", "ANALYTICS' number formats")
+-- The dungeon path's cards (IntroRoundsUI): the second 1v1's says the
+-- dungeon's next (CONTINUE); in the dungeon, a card a piece, one way on:
+-- ON TO THE BOSS, then the boss's three one after another (NEXT PIECE),
+-- the last TO THE LOBBY (FirstDungeonDone).
+do
+	local Cards = load(clientRef.IntroRoundsUI)
+	local card = playerGui:FindFirstChild("IntroRounds")
+	if card and card.Enabled then
+		card.Enabled = false
+	end
+	local st = IntroRounds.state({ Funnel = {} })
+	IntroRounds.won(st, "Uncommon")
+	IntroRounds.won(st, "Uncommon")
+	social:Fire("IntroRound", { Phase = "Won", Round = 2, Next = "Dungeon", Piece = { Slot = "Shield", Name = "Buckler", Rarity = "Uncommon" }, View = IntroRounds.view(st) })
+	task.wait(9)
+	card = playerGui:FindFirstChild("IntroRounds")
+	check(card.Enabled and card:FindFirstChild("Next", true).Text == "CONTINUE", "The second 1v1's card doesn't say CONTINUE (to the dungeon)")
+	check(not card:FindFirstChild("Dungeon", true).Visible, "FIRST DUNGEON beside the dungeon path's CONTINUE")
+	card.Enabled = false
+	local function dungeonCard(round, more, done)
+		local s2 = IntroRounds.state({ Funnel = {} })
+		for _ = 1, round do
+			IntroRounds.won(s2, "Uncommon")
+		end
+		return { Phase = "Won", Round = round, Where = "Dungeon", More = more, Piece = { Slot = IntroRounds.slot(round), Name = "Piece " .. round, Rarity = "Uncommon" }, View = IntroRounds.view(s2), Coins = if done then 500 else nil }
+	end
+	social:Fire("IntroRound", dungeonCard(3, 0, false))
+	task.wait(1.5)
+	check(card.Enabled and card:FindFirstChild("Next", true).Text == "ON TO THE BOSS", "The first room's card isn't ON TO THE BOSS")
+	check(not card:FindFirstChild("Leave", true).Visible, "GO TO LOBBY on a dungeon card")
+	Cards.next()
+	check(not card.Enabled, "ON TO THE BOSS didn't close the card")
+	social:Fire("IntroRound", dungeonCard(4, 2, false))
+	social:Fire("IntroRound", dungeonCard(5, 1, false))
+	social:Fire("IntroRound", dungeonCard(6, 0, true))
+	task.wait(1.5)
+	check(card.Enabled and card:FindFirstChild("Next", true).Text == "NEXT PIECE", "The boss's first card isn't NEXT PIECE")
+	check(Cards.busy(), "The boss's cards don't hold back what comes after")
+	Cards.next()
+	check(card.Enabled and card:FindFirstChild("Next", true).Text == "NEXT PIECE", "The boss's second card")
+	Cards.next()
+	check(card.Enabled and card:FindFirstChild("Next", true).Text == "TO THE LOBBY", "The last card isn't TO THE LOBBY")
+	local before = #requests
+	Cards.next()
+	task.wait(0.2)
+	local asked = false
+	for i = before + 1, #requests do
+		asked = asked or requests[i][1] == "FirstDungeonDone"
+	end
+	check(asked and not card.Enabled and not Cards.busy(), "TO THE LOBBY didn't take you out")
+end
+
 -- The Rot Beachhead (FirstDungeonUI): its loading screens, then in; the
 -- knock-down card's RECOVER and FINISH THE INTRO FIGHTS.
 do
@@ -353,5 +405,5 @@ do
 	check(down ~= nil and down:FindFirstChild("Intro", true) == nil, "Back to the intro fights offered with none left")
 	check(down:FindFirstChild("Lobby", true) ~= nil, "No GO TO LOBBY with the intro done")
 end
-print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range, the Rot Beachhead's screens and knock-down card)", checks))
+print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range, the dungeon path's cards, the Rot Beachhead's screens and knock-down card)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)

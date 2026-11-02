@@ -28,6 +28,14 @@
 	  IntroRounds.difficulty(round, losses) -> { Damage, Rate, Lunge }
 	  IntroRounds.looks(round) -> cosmetics?    the rival's outfit
 	  IntroRounds.view(state) -> { Won, Round, Count, Losses, Slots, Done }
+
+	The dungeon path (Config.Features.IntroDungeon, and the Owners always):
+	only the first Duels pieces are 1v1 rounds. Then the kaiju roll and the
+	intro dungeon (Shared.DungeonRules.First): clearing its first room pays
+	the next piece (RoomPieces), beating its boss, Tung Tung Tung Sahur, the rest.
+	  IntroRounds.stage(state, dungeon) -> "Duel" | "Dungeon" | "Done"
+	  IntroRounds.dungeonPieces(state, where) -> number   pieces a dungeon
+	                              moment pays ("Room" or "Boss")
 ]]
 local IntroRounds = {}
 
@@ -37,6 +45,8 @@ IntroRounds.Order = { "Weapon", "Shield", "Armor", "Gloves", "Boots", "Helmet" }
 IntroRounds.SlotNames = { Weapon = "SWORD", Shield = "SHIELD", Armor = "CHEST", Gloves = "GLOVES", Boots = "BOOTS", Helmet = "HELMET" }
 IntroRounds.RareChance = 0.15
 IntroRounds.SetCoins = 500 -- the whole set won
+IntroRounds.Duels = 2 -- on the dungeon path, the 1v1 rounds before the dungeon
+IntroRounds.RoomPieces = 1 -- the dungeon's first room cleared: this many pieces (the boss: the rest)
 IntroRounds.GemAfter = 3 -- this round's win also gives a gem (socket it: Shared.FirstSteps)
 
 -- The ladder: who you fight each round, how hard they hit (of a full Arena
@@ -168,6 +178,32 @@ function IntroRounds.view(state)
 		Done = state.Won >= IntroRounds.Count,
 		Next = { Name = rival.Name, Title = rival.Title, Slot = IntroRounds.slot(round) },
 	}
+end
+
+-- Where a new miner's intro is: its 1v1 rounds, the dungeon (the dungeon
+-- path only, once the Duels are won) or done.
+function IntroRounds.stage(state, dungeon: boolean?): string
+	local won = if state then state.Won else IntroRounds.Count
+	if won >= IntroRounds.Count then
+		return "Done"
+	end
+	if dungeon and won >= IntroRounds.Duels then
+		return "Dungeon"
+	end
+	return "Duel"
+end
+
+-- How many pieces a moment in the intro dungeon pays: its first room
+-- ("Room", only as the dungeon's first piece is still to win), the boss
+-- ("Boss": whatever's left of the set).
+function IntroRounds.dungeonPieces(state, where: string): number
+	if not state or state.Won >= IntroRounds.Count then
+		return 0
+	end
+	if where == "Room" then
+		return if state.Won < IntroRounds.Duels + IntroRounds.RoomPieces then math.min(IntroRounds.RoomPieces, IntroRounds.Duels + IntroRounds.RoomPieces - state.Won) else 0
+	end
+	return IntroRounds.Count - state.Won
 end
 
 return IntroRounds

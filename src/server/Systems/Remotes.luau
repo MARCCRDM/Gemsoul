@@ -32,6 +32,7 @@ local Remotes = {
 	MechReport = Instance.new("RemoteEvent"),
 	MechExit = Instance.new("RemoteEvent"),
 	Funnel = Instance.new("RemoteEvent"), -- client -> server: an onboarding or Store step in its menus (Systems/Funnel, Systems/Analytics)
+	UiTrack = Instance.new("RemoteEvent"), -- client -> server: what players tap and open, in batches (Systems/UiTrack)
 	Challenges = Instance.new("RemoteEvent"), -- server -> client: daily challenge progress (Shared.DailyChallenges)
 	KaijuJump = Instance.new("RemoteEvent"), -- client -> server: you jumped (your kaiju jump after you: KaijuServer)
 	KaijuView = Instance.new("RemoteEvent"), -- client -> server: which way your camera looks (your kaiju stand where you see them: KaijuServer)

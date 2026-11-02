@@ -88,6 +88,7 @@ local current = nil -- the event on the card
 local busy = false
 local fitScale = 1
 local pending = 0 -- (cards on their way: an event in, its card not up yet)
+local queued = {} -- (the intro dungeon's cards waiting their turn: its boss pays three at once)
 
 local function words(parent: Instance, size: number, color: Color3, font: Enum.Font): TextLabel
 	return new("TextLabel", {
@@ -715,6 +716,27 @@ function IntroRoundsUI.next()
 	if busy or not current then
 		return
 	end
+	-- In the intro dungeon: the next card, or on (out, the set done: with
+	-- the clear's rewards, Server.Dungeons' FirstDungeonDone).
+	if current.Where == "Dungeon" then
+		local done = current.View and current.View.Done
+		hide()
+		if #queued > 0 then
+			IntroRoundsUI.showNext()
+		elseif done then
+			busy = true
+			task.spawn(function()
+				GemClient.request("FirstDungeonDone")
+				busy = false
+			end)
+		end
+		return
+	end
+	-- The dungeon path's last 1v1 won: the kaiju roll, then the dungeon.
+	if current.Next == "Dungeon" then
+		IntroRoundsUI.toDungeon()
+		return
+	end
 	if current.View and current.View.Done then
 		if dungeonOpen() then
 			IntroRoundsUI.toDungeon()
@@ -734,6 +756,14 @@ function IntroRoundsUI.next()
 	task.spawn(function()
 		local result = GemClient.request("IntroRoundNext")
 		busy = false
+		if result and result.Ok and result.Dungeon then
+			-- (the dungeon's next: Server.IntroRoundsServer)
+			if mine == shown then
+				hide()
+			end
+			IntroRoundsUI.toDungeon()
+			return
+		end
 		if result and result.Ok then
 			if mine == shown then
 				hide()
@@ -817,7 +847,31 @@ local function show(event)
 	local dungeon = dungeonOpen()
 	ui.Leave.Text = Lang.translate(if arena then "GO TO LOBBY" else "LATER")
 	ui.LeaveSub.Text = Lang.translate(if arena then "Mine & gear up · come back anytime" else "Carry on from PLAY anytime")
-	if event.Phase == "Lost" then
+	if event.Where == "Dungeon" then
+		-- A piece won in the intro dungeon: its roll, and one way on.
+		kicker(if view.Done then "STARTER SET COMPLETE" else string.format("PIECE %d OF %d", event.Round, view.Count), GOLD)
+		if view.Done then
+			ui.WellCaption.Text = string.format("+%d", event.Coins or IntroRounds.SetCoins)
+			ui.WellCaption.TextSize = 15
+			ui.WellMain.Text = ""
+			ui.WellNote.Text = Lang.translate("coins  ·  wins can now roll Rare or better")
+		else
+			ui.WellCaption.Text = Lang.translate(if (event.More or 0) > 0 then "AND" else "NEXT")
+			ui.WellCaption.TextSize = 10
+			ui.WellMain.Text = if (event.More or 0) > 0
+				then string.format(Lang.translate("%d more pieces"), event.More)
+				else Lang.translate("Tung Tung Tung Sahur")
+			ui.WellNote.Text = Lang.translate(if (event.More or 0) > 0 then "from the boss" else "THE NEST")
+		end
+		ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
+		ui.Go.Text = Lang.translate(if (event.More or 0) > 0 then "NEXT PIECE" elseif view.Done then "TO THE LOBBY" else "ON TO THE BOSS")
+		ui.GoSub.Text = Lang.translate(if (event.More or 0) > 0 then "Roll it" elseif view.Done then "Your set's complete" else "Follow the beam to the nest")
+		placeButtons(false, false)
+		if event.Gem then
+			ui.Extra.Text = Lang.translate(string.format("+ %s gem, socketed for you", event.Gem.Name))
+		end
+		task.spawn(reel, event.Piece, mine)
+	elseif event.Phase == "Lost" then
 		kicker(string.format("ROUND %d OF %d  ·  KNOCKED DOWN", event.Round, view.Count), RED)
 		hero(nextRival.Slot, LOCKED, true)
 		ui.Name.Text = Lang.translate("So close!")
@@ -846,8 +900,18 @@ local function show(event)
 		task.spawn(reel, event.Piece, mine)
 	else
 		kicker(string.format("ROUND %d OF %d  WON", event.Round, view.Count), GOLD)
-		nextUp("NEXT", nextRival)
-		placeButtons(true, dungeon)
+		if event.Next == "Dungeon" then
+			-- (the dungeon path's last 1v1: the kaiju roll and the dungeon next)
+			ui.WellCaption.Text = Lang.translate("NEXT")
+			ui.WellCaption.TextSize = 10
+			ui.WellMain.Text = Lang.translate("Your kaiju, then the dungeon")
+			ui.WellNote.Text = Lang.translate("Tung Tung Tung Sahur waits")
+			ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
+			placeButtons(true, false)
+		else
+			nextUp("NEXT", nextRival)
+			placeButtons(true, dungeon)
+		end
 		if event.Gem then
 			ui.Extra.Text = Lang.translate(string.format("+ %s gem, socketed for you", event.Gem.Name))
 		elseif event.Auto and (event.Auto.Gems or 0) > 0 then
@@ -855,7 +919,11 @@ local function show(event)
 		end
 		task.spawn(function()
 			reel(event.Piece, mine)
-			countdown("CONTINUE INTRO ROUNDS", string.format(Lang.translate("Round %d of %d"), event.Round + 1, view.Count), mine)
+			if event.Next == "Dungeon" then
+				countdown("CONTINUE", Lang.translate("Your kaiju, then the dungeon"), mine)
+			else
+				countdown("CONTINUE INTRO ROUNDS", string.format(Lang.translate("Round %d of %d"), event.Round + 1, view.Count), mine)
+			end
 		end)
 	end
 	fit()
@@ -864,7 +932,15 @@ local function show(event)
 end
 
 function IntroRoundsUI.busy(): boolean
-	return pending > 0 or (gui ~= nil and gui.Enabled)
+	return pending > 0 or #queued > 0 or (gui ~= nil and gui.Enabled)
+end
+
+-- The intro dungeon's next waiting card.
+function IntroRoundsUI.showNext()
+	local event = table.remove(queued, 1)
+	if event then
+		show(event)
+	end
 end
 
 local started = false
@@ -897,6 +973,20 @@ function IntroRoundsUI.start()
 		leave()
 	end)
 	ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Social").OnClientEvent:Connect(function(kind: string, event: any)
+		if kind == "IntroRound" and type(event) == "table" and event.Where == "Dungeon" then
+			-- (the intro dungeon's: one after another, NEXT PIECE between them)
+			table.insert(queued, event)
+			if #queued == 1 and not gui.Enabled then
+				pending += 1
+				task.delay(1, function()
+					pending -= 1
+					if not gui.Enabled then
+						IntroRoundsUI.showNext()
+					end
+				end)
+			end
+			return
+		end
 		if kind == "IntroRound" and type(event) == "table" then
 			-- (after a queued match's result card, which has the screen for EndPause)
 			pending += 1

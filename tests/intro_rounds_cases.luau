@@ -98,4 +98,19 @@ check(view.Done and #view.Slots == R.Count and view.Won == R.Count, "The view of
 local odd = R.state({ IntroRounds = { Won = 99, Losses = -3, Pieces = "x" } })
 check(odd.Won == R.Count and odd.Losses == 0 and type(odd.Pieces) == "table", "A bad saved state wasn't cleaned")
 
+-- The dungeon path's stages, and what its moments pay.
+do
+	local st = { Won = 0, Losses = 0, Pieces = {} }
+	check(R.stage(st, false) == "Duel" and R.stage(st, true) == "Duel", "A new set's stage")
+	st.Won = R.Duels
+	check(R.stage(st, true) == "Dungeon" and R.stage(st, false) == "Duel", "The dungeon after the Duels, on its path only")
+	check(R.dungeonPieces(st, "Room") == R.RoomPieces, "The first room's pieces")
+	check(R.dungeonPieces(st, "Boss") == R.Count - R.Duels, "The boss pays the rest")
+	st.Won = R.Duels + R.RoomPieces
+	check(R.dungeonPieces(st, "Room") == 0 and R.dungeonPieces(st, "Boss") == R.Count - st.Won, "The room paid twice, or the boss short")
+	st.Won = R.Count
+	check(R.stage(st, true) == "Done" and R.dungeonPieces(st, "Boss") == 0, "Done, and nothing more")
+	check(R.stage(nil, true) == "Done", "No state: done")
+end
+
 print(string.format("PASS: %d intro rounds checks", checks))

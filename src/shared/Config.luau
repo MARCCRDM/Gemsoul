@@ -36,6 +36,11 @@ local Config = {
 		-- .First): FIRST DUNGEON on the intro rounds' card and the DEV panel.
 		-- Off: hidden for everyone (removed for now); on: every player.
 		FirstDungeon = false,
+		-- The new intro (Shared.IntroRounds' dungeon path): two 1v1s, the
+		-- kaiju roll, then the intro dungeon (its first room pays a piece,
+		-- its boss the rest), then the lobby. Off: the six 1v1 rounds, but
+		-- the Owners always get the new one (to test it: DEV > PLAY AS A NEW PLAYER).
+		IntroDungeon = false,
 		-- The garage's drivable mechs (the Shelter; the Pilot prompt).
 		Mechs = true,
 		-- Three miners per account (Shared.MinerRoster): switch between them in
@@ -104,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.0 · 2026-11-02 three ways on",
+		Build = "1.0 · 2026-11-02 intro dungeon",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error

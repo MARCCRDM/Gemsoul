@@ -94,3 +94,7 @@ Tests: `tests/first_dungeon_cases.luau` (in tests/run_dungeons.py), and the Rot 
 - **The boss** enrages at half health and its rot-spawn join in (`Rules.First.Enrage`). The loot waits until they're down too.
 - **Ending:** a victory card after the boss cache shows the time, knock-downs and coins. It offers FINISH THE INTRO FIGHTS (while rounds are left) or BACK TO THE OUTPOST (`FirstDungeonDone`, with the clear's rewards). After `WinSeconds` (25 s) it heads out by itself.
 - **Errors** in a run (setup, an encounter, the dressing, the beacon) go to the server's output and to an owner's screen as `[Dungeon] ...`.
+
+### As the new intro (two rooms)
+
+The first dungeon is now the intro's own (docs/intro-rounds.md, the dungeon path): **The Breach** (Sahur, Tralalero and Patapim, at 40% health and 50% damage; your kaiju fight with you), then **The Nest** (Tung Tung Tung Sahur). An intro run (`run.Intro`) pays intro pieces instead of a boss cache and a victory card. Its knock-down and LEAVE cards offer only RECOVER / GO TO LOBBY.

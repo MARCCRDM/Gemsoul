@@ -10,6 +10,8 @@
 
 	Requests:
 	  "IntroRoundNext"    the next round: the round's rival in a Training session
+	                      (on the dungeon path once its 1v1s are won: { Dungeon
+	                      = true }, and the client takes them to the dungeon)
 	                      (Duelist.spawnRound; entering the Arena if need be)
 	  "IntroRoundLeave"   done for now: out of the Arena to the Outpost (they
 	                      can come back to it later from the PLAY menu)
@@ -30,6 +32,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ArmorFamilies = require(ReplicatedStorage.Shared.ArmorFamilies)
+local Config = require(ReplicatedStorage.Shared.Config)
 local ExpandedTraits = require(ReplicatedStorage.Shared.ExpandedItemTraits)
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
@@ -184,7 +187,42 @@ end
 
 -- A 1v1 won: the round's piece, if they're on their intro rounds. Returns the
 -- piece given, or nil (not theirs, or done).
-function IntroRoundsServer.won(player: Player)
+-- On the dungeon path (Shared.IntroRounds' stage): every player once
+-- Config.Features.IntroDungeon is on, the Owners always (to test it).
+function IntroRoundsServer.dungeonPath(player: Player): boolean
+	if Config.Features and Config.Features.IntroDungeon == true then
+		return true
+	end
+	local owners = Config.Playtest and Config.Playtest.Owners or {}
+	return table.find(owners, player.UserId) ~= nil
+end
+
+-- Where `player`'s intro is: "Duel", "Dungeon" or "Done" (nil: not a new miner's).
+function IntroRoundsServer.stage(player: Player): string?
+	local state = stateOf(player)
+	if not state then
+		return nil
+	end
+	return IntroRounds.stage(state, IntroRoundsServer.dungeonPath(player))
+end
+
+-- A moment in the intro dungeon (Server.Dungeons): its first room cleared
+-- ("Room") or its boss down ("Boss"). Pays its pieces, a roll card each
+-- (More: how many more are coming after this one). Returns how many.
+function IntroRoundsServer.dungeonWon(player: Player, where: string): number
+	local state = stateOf(player)
+	local count = IntroRounds.dungeonPieces(state, where)
+	local paid = 0
+	for i = 1, count do
+		if not IntroRoundsServer.won(player, "Dungeon", count - i) then
+			break
+		end
+		paid += 1
+	end
+	return paid
+end
+
+function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 	local state, profile = stateOf(player)
 	if not state or state.Won >= IntroRounds.Count then
 		return nil
@@ -202,7 +240,11 @@ function IntroRoundsServer.won(player: Player)
 	IntroRoundsServer.funnel(player, state, round, true)
 	IntroRounds.won(state, piece.Rarity)
 	state.Pieces[slot] = { Name = piece.Name, Rarity = piece.Rarity }
-	local event = { Phase = "Won", Round = round, Piece = piece }
+	local event = { Phase = "Won", Round = round, Piece = piece, Where = where, More = more }
+	-- (the dungeon path's last 1v1 won: next, the kaiju roll and the dungeon)
+	if where ~= "Dungeon" and IntroRoundsServer.dungeonPath(player) and IntroRounds.stage(state, true) == "Dungeon" then
+		event.Next = "Dungeon"
+	end
 	event.Reel, event.ReelLand = IntroRoundsServer.reel(slot, piece)
 	-- Halfway: a gem too, to socket (the NEXT STEP card takes it from there).
 	if round == IntroRounds.GemAfter then
@@ -264,6 +306,11 @@ local function nextRound(player: Player)
 	end
 	if player:GetAttribute("MatchId") or player:GetAttribute("DuelQueue") then
 		return reply(false, "You're already in a match.")
+	end
+	-- (The dungeon path, its 1v1s won: the dungeon's next. The client plays
+	-- the kaiju roll, then goes in: Client FirstDungeonUI, "FirstDungeon".)
+	if IntroRoundsServer.dungeonPath(player) and IntroRounds.stage(state, true) == "Dungeon" then
+		return reply(true, "", { Dungeon = true })
 	end
 	local round = IntroRounds.round(state)
 	-- (Always the round's rival: a new miner isn't sent into real players'

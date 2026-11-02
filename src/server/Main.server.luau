@@ -110,6 +110,10 @@ require(script.Parent.Systems.DevAlerts).start()
 require(script.Parent.Systems.SettingsServer).start()
 -- The Owners' ANALYTICS window: this server, today, the last 7 days.
 require(script.Parent.Systems.AnalyticsPanel).start()
+-- DEV > SPECTATE: an Owner watches a player in third person (Systems/DevSpectate).
+require(script.Parent.Systems.DevSpectate).start()
+-- What players tap and open (Systems/UiTrack), into the log the ANALYTICS window reads.
+require(script.Parent.Systems.UiTrack).start()
 TopPlayers.start()
 Equipment.start()
 -- One health-recovery rule for players and computer fighters alike.

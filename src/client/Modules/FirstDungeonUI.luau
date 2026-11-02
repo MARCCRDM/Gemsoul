@@ -527,7 +527,7 @@ local function objectiveText(): string
 	elseif type(boss) == "string" then
 		return if left > 1 then string.format("Defeat %s  ·  %d left", boss, left) else "Defeat " .. boss
 	end
-	return string.format("Defeat the rot-spawn  ·  %d / %d", total - left, total)
+	return string.format("Defeat the fighters  ·  %d / %d", total - left, total)
 end
 
 local function drawHud()

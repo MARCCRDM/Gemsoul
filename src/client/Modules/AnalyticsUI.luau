@@ -275,6 +275,12 @@ local function build()
 	local r4 = row(scroll, h2, 6)
 	ui.Products = section(r4, "ROBUX BY PRODUCT", half, h2, 1)
 	ui.Sessions = section(r4, "SESSION LENGTHS", half, h2, 2)
+	-- Micro-interactions (Server.UiTrack): what's pressed, what's opened and
+	-- how long before the first tap in it.
+	local h5 = 36 + 12 * ROW + 8
+	local r5 = row(scroll, h5, 7)
+	ui.Taps = section(r5, "TAPS", half, h5, 1)
+	ui.Windows = section(r5, "WINDOWS", half, h5, 2)
 end
 
 local function setTile(i: number, caption: string, value: string, note: string?)
@@ -450,6 +456,24 @@ local function draw(answer)
 	-- How long sessions last.
 	bars(ui.Sessions, named(report.Lengths or {}), 80)
 	ui.Sessions.Note.Text = "sessions that ended"
+	-- What's pressed, and the windows: opens, how long up, first tap.
+	local tapItems = {}
+	for _, t in report.Taps or {} do
+		table.insert(tapItems, { Name = t.Name, Value = t.Value, Note = string.format("%d players", t.Players) })
+	end
+	bars(ui.Taps, tapItems, 190)
+	ui.Taps.Note.Text = "most pressed"
+	local windowItems = {}
+	for _, w in report.Windows or {} do
+		table.insert(windowItems, {
+			Name = w.Name,
+			Value = w.Value,
+			Note = string.format("%ss up · %s", tostring(w.AvgSeconds or 0), if w.AvgFirstTap then "1st tap " .. tostring(w.AvgFirstTap) .. "s" else "no taps")
+				.. (if w.NoTap and w.NoTap > 0 then string.format(" · %d%% none", math.floor(w.NoTap + 0.5)) else ""),
+		})
+	end
+	bars(ui.Windows, windowItems, 130)
+	ui.Windows.Note.Text = "opens · time up · hesitation"
 end
 
 local function ask()

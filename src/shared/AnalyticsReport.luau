@@ -22,7 +22,13 @@
 	           biggest first (Countries and Events: the top 8)
 	  Duels    { { Name, Wins, Losses } }
 	  Lengths  { { Name, Value } }   sessions by length (<2m ... 40m+)
-	  Funnels  { [name] = steps, as Funnel's }   the game's other funnels
+	  Taps     { { Name = "window/button", Value = taps, Players } }   the most
+           pressed buttons (Server.UiTrack: micro-interactions), top 12
+  Windows  { { Name, Value = opens, Players, AvgSeconds, AvgFirstTap,
+           NoTap } }   windows opened: how long they stay up, how long
+           before the first tap in them (hesitation), and the share shut
+           with no tap at all; top 12 by opens
+  Funnels  { [name] = steps, as Funnel's }   the game's other funnels
 	           (Server.Analytics: "IntroRounds", "Store")
 	  From, To   the first and last row's time; Rows   how many
 ]]
@@ -135,6 +141,8 @@ function AnalyticsReport.build(rows: { any }, options: any?)
 	local sources, sinks, products, events = {}, {}, {}, {}
 	local duels = {}
 	local funnels = {} -- name -> { Users = { [step] = set }, Names = { [step] = name } }
+	local taps = {} -- "window/button" -> { Value, Players = set }
+	local windows = {} -- window -> { Opens, Seconds, Tapped, FirstTap, Players = set }
 	local online: { [number]: { [string]: number } } = {} -- 5-minute bucket -> server -> players
 	local from, to = math.huge, 0
 	for _, r in rows do
@@ -221,6 +229,23 @@ function AnalyticsReport.build(rows: { any }, options: any?)
 			f.Users[step][u] = true
 			if type(a) == "string" then
 				f.Names[step] = a
+			end
+		elseif e == "ui_tap" and n and type(a) == "string" and type(b) == "string" then
+			local key = a .. "/" .. b
+			local t = taps[key] or { Value = 0, Players = {} }
+			taps[key] = t
+			t.Value += n
+			t.Players[u] = true
+		elseif e == "ui_window" and n and type(a) == "string" then
+			local w = windows[a] or { Opens = 0, Seconds = 0, Tapped = 0, FirstTap = 0, Players = {} }
+			windows[a] = w
+			w.Opens += 1
+			w.Seconds += n
+			w.Players[u] = true
+			local first = tonumber(b)
+			if first and first >= 0 then
+				w.Tapped += 1
+				w.FirstTap += first
 			end
 		elseif e == "server" and n then
 			local bucket = t - t % 300
@@ -343,6 +368,33 @@ function AnalyticsReport.build(rows: { any }, options: any?)
 		end
 		table.insert(lengthList, { Name = band[3], Value = n })
 	end
+	local tapList = {}
+	for key, t in taps do
+		table.insert(tapList, { Name = key, Value = t.Value, Players = count(t.Players) })
+	end
+	table.sort(tapList, function(x, y)
+		return if x.Value ~= y.Value then x.Value > y.Value else x.Name < y.Name
+	end)
+	while #tapList > 12 do
+		table.remove(tapList)
+	end
+	local windowList = {}
+	for name, w in windows do
+		table.insert(windowList, {
+			Name = name,
+			Value = w.Opens,
+			Players = count(w.Players),
+			AvgSeconds = round1(w.Seconds / w.Opens),
+			AvgFirstTap = if w.Tapped > 0 then round1(w.FirstTap / w.Tapped) else nil,
+			NoTap = pct(w.Opens - w.Tapped, w.Opens),
+		})
+	end
+	table.sort(windowList, function(x, y)
+		return if x.Value ~= y.Value then x.Value > y.Value else x.Name < y.Name
+	end)
+	while #windowList > 12 do
+		table.remove(windowList)
+	end
 	local playerCount, newCount = count(players), count(newPlayers)
 	return {
 		Rows = #rows,
@@ -370,6 +422,8 @@ function AnalyticsReport.build(rows: { any }, options: any?)
 		Duels = duelList,
 		Lengths = lengthList,
 		Funnels = funnelList,
+		Taps = tapList,
+		Windows = windowList,
 	}
 end
 
