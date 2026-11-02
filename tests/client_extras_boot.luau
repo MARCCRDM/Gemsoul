@@ -207,6 +207,7 @@ do
 	check(piece ~= nil and piece:IsA("ViewportFrame"), "No 3D piece on the card")
 	-- (the first fight won: three ways on, the rounds first; no countdown taking it for them)
 	local go, leave, dungeon = card:FindFirstChild("Next", true), card:FindFirstChild("Leave", true), card:FindFirstChild("Dungeon", true)
+	check(kaijuRolled == 1, "The first win didn't roll their kaiju before the card")
 	check(go and go.Text == "CONTINUE ROUNDS" and go.Visible, "No CONTINUE ROUNDS")
 	local goSub = go and go:FindFirstChild("Sub")
 	check(goSub and string.find(goSub.Text, "Round 2 of 6", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) == nil, "CONTINUE ROUNDS' round, or a countdown on a choice: " .. tostring(goSub and goSub.Text))
@@ -349,6 +350,7 @@ end
 do
 	local First = load(clientRef.FirstDungeonUI)
 	First.SlideSeconds = 0.15
+	local rolledBefore = kaijuRolled
 	attrs.DuelQueue, attrs.CombatSession = "Intro", "Training" -- (a new player, queued for the next round)
 	local before = #requests
 	local okPlay, message = pcall(First.play)
@@ -360,7 +362,7 @@ do
 		end
 	end
 	check(asked, "FIRST DUNGEON didn't ask to go in")
-	check(kaijuRolled == 1, "A new player's kaiju roll didn't come first")
+	check(kaijuRolled == rolledBefore + 1, "A new player's kaiju roll didn't come first")
 	local order = {}
 	for i = before + 1, #requests do
 		table.insert(order, requests[i][1])

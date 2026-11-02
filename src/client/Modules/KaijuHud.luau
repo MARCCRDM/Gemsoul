@@ -3589,8 +3589,10 @@ local function refresh()
 	if not heroUi.RollTried and inOutpost and not blocked and not menu and Kaiju.rollsOwed(profile) > 0
 		and not LoadingFlow.active() and player:GetAttribute("IntroCover") ~= true
 		and player:GetAttribute("FirstFight") ~= true
-		-- (the intro's own: after the rot minions, Client IntroFinale)
-		and player:GetAttribute("IntroFinale") == nil and player:GetAttribute("IntroRoundsLeft") == nil then
+		-- (the intro's own: after the first win, Client IntroRoundsUI, or
+		-- the mines' finale, Client IntroFinale; any still owed in the
+		-- Outpost comes here)
+		and player:GetAttribute("IntroFinale") == nil then
 		heroUi.RollTried = true
 		task.spawn(KaijuRoll.play)
 	end

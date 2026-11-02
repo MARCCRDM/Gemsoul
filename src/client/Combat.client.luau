@@ -1530,6 +1530,12 @@ RunService.RenderStepped:Connect(function(dt)
 		or IronUi.anyOpen()
 		or require(script.Parent.Modules.StreakRewards).isOpen()
 		or require(script.Parent.Modules.RoundPivot).visible()
+		-- (the kaiju roll after the first win, and the intro rounds' card)
+		or require(script.Parent.Modules.KaijuRoll).showing()
+		or (function()
+			local card = player.PlayerGui:FindFirstChild("IntroRounds")
+			return card ~= nil and card:IsA("ScreenGui") and card.Enabled
+		end)()
 	if guideOpen ~= guideWasOpen then
 		cursorFree = guideOpen
 		FirstPerson.setCursorFree(cursorFree)

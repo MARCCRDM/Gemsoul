@@ -431,7 +431,7 @@ local function minions(): boolean
 end
 
 -- 4. The kaiju roll, then the fight -------------------------------------------------------------------------
-local function kaiju()
+local function kaiju(fight: boolean?)
 	local profile = GemClient.Profile
 	if profile and Kaiju.rollsOwed(profile) > 0 then
 		local KaijuRoll = require(script.Parent.KaijuRoll)
@@ -446,6 +446,9 @@ local function kaiju()
 			task.wait(0.2)
 		end
 		task.wait(1.5) -- (they come out round you)
+	end
+	if fight == false then
+		return
 	end
 	GemClient.request("IntroFinale", "Fight")
 	banner("YOUR KAIJU DEFEND YOU", "Train and protect them, and they'll protect you")
@@ -563,10 +566,10 @@ local function run()
 		step("Gems")
 		gems()
 		step("Minions")
-		if minions() then
-			step("Kaiju")
-			kaiju()
-		end
+		local came = minions()
+		step("Kaiju")
+		-- (the kaiju roll, even if the minions didn't come: nobody's left without one)
+		kaiju(came)
 	end)
 	if not ok then
 		warn("[IntroFinale] " .. tostring(problem))

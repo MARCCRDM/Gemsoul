@@ -117,7 +117,7 @@ IntroRoundsServer.ResumeAfter = 6 -- seconds after they're in before a rejoin go
 -- the set done, and they're taken out to the finale.
 IntroRoundsServer.StuckAfter = 25
 IntroRoundsServer.DoneOutAfter = 45
-IntroRoundsServer.ChoiceWait = 90 -- (after a win, the card offers three ways on: time to choose)
+IntroRoundsServer.ChoiceWait = 180 -- (after the first win: the kaiju roll, then the card's three ways on: time for both)
 function IntroRoundsServer.warm(player: Player)
 	if warming[player] then
 		return

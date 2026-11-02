@@ -1214,6 +1214,27 @@ function IntroRoundsUI.start()
 			-- (after a queued match's result card, which has the screen for EndPause)
 			pending += 1
 			task.delay(if inArena() then 1.2 else 4.5, function()
+				-- The first fight won: their kaiju first (the starter roll, if
+				-- it's owed), then the card and its ways on. Nobody leaves the
+				-- intro without a kaiju.
+				if event.Phase == "Won" and event.Where == nil and (event.Round or 0) == IntroRounds.ChoiceAfter then
+					local owed = false
+					pcall(function()
+						owed = require(ReplicatedStorage.Shared.Kaiju).rollsOwed(GemClient.Profile) > 0
+					end)
+					if owed then
+						local rolled = false
+						local ok = pcall(function()
+							require(script.Parent.KaijuRoll).play(function()
+								rolled = true
+							end)
+						end)
+						local started = os.clock()
+						while ok and not rolled and os.clock() - started < 150 do
+							task.wait(0.2)
+						end
+					end
+				end
 				pending -= 1
 				show(event)
 			end)
