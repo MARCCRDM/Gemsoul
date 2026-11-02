@@ -10,12 +10,14 @@
 	  (⚔)──(⛨)──( )──( )──( )──( )    the set, each slot lit as it's won,
 	                                  the next one ringed in amber
 	  [ NEXT  Vera Coppercoil   SHIELD ]
-	  [ NEXT ROUND  3 ]  [ LEAVE ARENA ]    starts by itself after AutoNext
-	                                        seconds (in the Arena)
+	  [      CONTINUE INTRO ROUNDS      ]   starts by itself after AutoNext
+	  [   GO TO LOBBY  ][ FIRST DUNGEON ]   seconds (in the Arena)
 
-	A loss: KNOCKED DOWN, the piece still to win in grey, the next try is
-	easier, TRY AGAIN / LEAVE. The whole set: SET COMPLETE, the coins, TO THE
-	OUTPOST.
+	Three ways on: the next round, the lobby (the Outpost: the set waits, PLAY
+	carries on), or the campaign's first dungeon (Client FirstDungeonUI; for
+	those it's open to: FirstDungeonUI.allowed). A loss: KNOCKED DOWN, the
+	piece still to win in grey, the next try is easier, TRY AGAIN. The whole
+	set: SET COMPLETE, the coins, TO THE FIRST DUNGEON (or the lobby).
 
 	  IntroRoundsUI.start()   once (Lobby.client)
 	  IntroRoundsUI.busy()    true while a card is up or on its way: what
@@ -39,9 +41,9 @@ local IntroRoundsUI = {}
 
 local new = IronUi.new
 local player = Players.LocalPlayer
-IntroRoundsUI.AutoNext = 3 -- seconds before NEXT ROUND starts by itself (in the Arena)
+IntroRoundsUI.AutoNext = 10 -- seconds before the next round starts by itself (in the Arena)
 
-local W, H, PAD = 460, 432, 22 -- (px: the card, before scaling)
+local W, H, PAD = 460, 496, 22 -- (px: the card, before scaling)
 local HERO_Y = 104 -- (the piece's centre)
 local TRACK_Y = 262 -- (the set's nodes' centres)
 local WELL_Y = 318
@@ -53,6 +55,7 @@ local GOLD, INK, FADED, DUSK = Gilt.Gold, Gilt.Ink, Gilt.Faded, Gilt.Dusk
 local STEEL = Gilt.Brass
 local RED = Gilt.Red
 local TEAL = Color3.fromRGB(58, 203, 233)
+local ROT = Color3.fromRGB(150, 236, 84) -- (the first dungeon's)
 local LOCKED = Color3.fromRGB(70, 82, 110) -- (a slot's icon, not won yet)
 local BLACK = Gilt.Display
 local BOLD = Gilt.Serif
@@ -342,13 +345,50 @@ local function build()
 	ui.Prize = fitted(right, 11, GOLD, BLACK, 1)
 	ui.PrizeIcon = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(24, 24), LayoutOrder = 2 }, right)
 
-	-- The buttons.
-	ui.Go = Gilt.button(panel, "NEXT ROUND", true, 1, nil, 44, 16)
+	-- The buttons: the next round across, the lobby and the first dungeon
+	-- under it; each with a line under its words.
+	local function subline(button: TextButton, color: Color3): TextLabel
+		local main = button:FindFirstChild("Words") :: TextLabel?
+		if main then
+			main.Position = UDim2.fromOffset(0, -7)
+		end
+		local l = words(button, 10, color, BOLD)
+		l.Name = "Sub"
+		l.AnchorPoint = Vector2.new(0.5, 0.5)
+		l.Position = UDim2.new(0.5, 0, 0.5, 11)
+		l.Size = UDim2.new(1, -16, 0, 14)
+		l.ZIndex = 3
+		return l
+	end
+	ui.Go = Gilt.button(panel, "CONTINUE INTRO ROUNDS", true, 1, nil, 52, 16)
 	ui.Go.Name = "Next"
 	ui.Go:SetAttribute("UiSound", "Confirm")
-	ui.Leave = Gilt.button(panel, "LEAVE ARENA", false, 2, nil, 44, 13)
+	ui.GoSub = subline(ui.Go, Color3.fromRGB(92, 52, 8))
+	ui.Leave = Gilt.button(panel, "GO TO LOBBY", false, 2, nil, 48, 14)
 	ui.Leave.Name = "Leave"
+	ui.Leave.Font = BLACK
 	ui.Leave:SetAttribute("UiSound", "Click")
+	ui.LeaveSub = subline(ui.Leave, FADED)
+	ui.Dungeon = Gilt.button(panel, "FIRST DUNGEON", false, 3, nil, 48, 14)
+	ui.Dungeon.Name = "Dungeon"
+	ui.Dungeon.Font = BLACK
+	ui.Dungeon:SetAttribute("UiSound", "Confirm")
+	ui.DungeonSub = subline(ui.Dungeon, ROT)
+	ui.DungeonSub.Text = Lang.translate("The Rot Beachhead")
+	-- (the rot's green: a tint over its face, its rim)
+	local tint = new("Frame", {
+		Name = "Tint",
+		BackgroundColor3 = ROT,
+		BackgroundTransparency = 0.86,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 2,
+	}, ui.Dungeon)
+	UiKit.round(tint, 8)
+	local rim = ui.Dungeon:FindFirstChildOfClass("UIStroke")
+	if rim then
+		rim.Color = ROT
+	end
 	pcall(IronUi.juice, ui.Go)
 
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
@@ -360,18 +400,31 @@ local function build()
 	fit()
 end
 
--- The buttons: NEXT wide with LEAVE beside it, or NEXT alone across.
-local function placeButtons(withLeave: boolean)
-	local y = H - PAD - 44
-	ui.Leave.Visible = withLeave
-	ui.Go.Position = UDim2.fromOffset(PAD, y)
-	if withLeave then
-		ui.Go.Size = UDim2.fromOffset(W - PAD * 2 - 140, 44)
-		ui.Leave.Position = UDim2.fromOffset(W - PAD - 130, y)
-		ui.Leave.Size = UDim2.fromOffset(130, 44)
-	else
-		ui.Go.Size = UDim2.fromOffset(W - PAD * 2, 44)
+-- The buttons: the main one across, then the lobby and the first dungeon
+-- side by side (or whichever shows, across).
+local function placeButtons(withLeave: boolean, withDungeon: boolean)
+	local full = W - PAD * 2
+	local half = (full - 10) / 2
+	local y2 = H - PAD - 48
+	local y1 = if withLeave or withDungeon then y2 - 8 - 52 else H - PAD - 52
+	ui.Go.Position, ui.Go.Size = UDim2.fromOffset(PAD, y1), UDim2.fromOffset(full, 52)
+	ui.Leave.Visible, ui.Dungeon.Visible = withLeave, withDungeon
+	if withLeave and withDungeon then
+		ui.Leave.Position, ui.Leave.Size = UDim2.fromOffset(PAD, y2), UDim2.fromOffset(half, 48)
+		ui.Dungeon.Position, ui.Dungeon.Size = UDim2.fromOffset(PAD + half + 10, y2), UDim2.fromOffset(half, 48)
+	elseif withLeave then
+		ui.Leave.Position, ui.Leave.Size = UDim2.fromOffset(PAD, y2), UDim2.fromOffset(full, 48)
+	elseif withDungeon then
+		ui.Dungeon.Position, ui.Dungeon.Size = UDim2.fromOffset(PAD, y2), UDim2.fromOffset(full, 48)
 	end
+end
+
+-- Whether the first dungeon's on offer to this player.
+local function dungeonOpen(): boolean
+	local ok, open = pcall(function()
+		return require(script.Parent.FirstDungeonUI).allowed()
+	end)
+	return ok and open == true
 end
 
 local function hide()
@@ -639,8 +692,9 @@ end
 
 -- NEXT ROUND counts down by itself in the Arena (nothing to wait for
 -- there).
-local function countdown(base: string, mine: number)
+local function countdown(base: string, sub: string, mine: number)
 	ui.Go.Text = Lang.translate(base)
+	ui.GoSub.Text = sub
 	if not inArena() then
 		return
 	end
@@ -648,7 +702,7 @@ local function countdown(base: string, mine: number)
 		if mine ~= shown then
 			return
 		end
-		ui.Go.Text = Lang.translate(base) .. "  " .. left
+		ui.GoSub.Text = sub .. "  ·  " .. Lang.translate("starts in") .. " " .. left
 		task.wait(1)
 	end
 	if mine == shown and gui.Enabled then
@@ -662,6 +716,10 @@ function IntroRoundsUI.next()
 		return
 	end
 	if current.View and current.View.Done then
+		if dungeonOpen() then
+			IntroRoundsUI.toDungeon()
+			return
+		end
 		busy = true
 		hide()
 		task.spawn(function()
@@ -686,7 +744,7 @@ function IntroRoundsUI.next()
 		else
 			UiKit.toast(Lang.translate(result and result.Message or "Couldn't start the round."), RED)
 			if mine == shown then
-				ui.Go.Text = Lang.translate("NEXT ROUND")
+				ui.Go.Text = Lang.translate("CONTINUE INTRO ROUNDS")
 			end
 		end
 	end)
@@ -702,6 +760,26 @@ local function leave()
 		GemClient.request("IntroRoundLeave")
 		busy = false
 		UiKit.toast(Lang.translate("Your intro set waits for you: NEXT STEP or PLAY to carry on."), GOLD)
+	end)
+end
+
+-- FIRST DUNGEON: out of the rounds (the set waits), then the Rot
+-- Beachhead's screens and in (Client FirstDungeonUI).
+function IntroRoundsUI.toDungeon()
+	if busy then
+		return
+	end
+	busy = true
+	hide()
+	task.spawn(function()
+		GemClient.request("IntroRoundLeave")
+		busy = false
+		local ok, problem = pcall(function()
+			return require(script.Parent.FirstDungeonUI).play()
+		end)
+		if not ok then
+			warn("[IntroRounds] first dungeon: " .. tostring(problem))
+		end
 	end)
 end
 
@@ -735,7 +813,10 @@ local function show(event)
 	ui.Go:SetAttribute("Auto", nil)
 	local nextRival = view.Next
 	drawSlots(view, if view.Done then nil else nextRival.Slot)
-	local leaveText = Lang.translate(if inArena() then "LEAVE ARENA" else "LATER")
+	local arena = inArena()
+	local dungeon = dungeonOpen()
+	ui.Leave.Text = Lang.translate(if arena then "GO TO LOBBY" else "LATER")
+	ui.LeaveSub.Text = Lang.translate(if arena then "Mine & gear up · come back anytime" else "Carry on from PLAY anytime")
 	if event.Phase == "Lost" then
 		kicker(string.format("ROUND %d OF %d  ·  KNOCKED DOWN", event.Round, view.Count), RED)
 		hero(nextRival.Slot, LOCKED, true)
@@ -743,9 +824,8 @@ local function show(event)
 		ui.Name.TextColor3 = INK
 		ui.Sub.Text = Lang.translate("Your next try at this round is easier")
 		nextUp("REMATCH", nextRival)
-		ui.Leave.Text = leaveText
-		placeButtons(true)
-		task.spawn(countdown, "TRY AGAIN", mine)
+		placeButtons(true, dungeon)
+		task.spawn(countdown, "TRY AGAIN", Lang.translate("Easier this time"), mine)
 	elseif view.Done then
 		kicker("STARTER SET COMPLETE", GOLD)
 		ui.WellCaption.Text = string.format("+%d", event.Coins or IntroRounds.SetCoins)
@@ -753,14 +833,21 @@ local function show(event)
 		ui.WellMain.Text = ""
 		ui.WellNote.Text = Lang.translate("coins  ·  wins can now roll Rare or better")
 		ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
-		ui.Go.Text = Lang.translate("TO THE OUTPOST")
-		placeButtons(false)
+		if dungeon then
+			ui.Go.Text = Lang.translate("TO THE FIRST DUNGEON")
+			ui.GoSub.Text = Lang.translate("The Rot Beachhead · your kaiju fight with you")
+			ui.Leave.Text = Lang.translate("GO TO LOBBY")
+			ui.LeaveSub.Text = Lang.translate("Mine & gear up · the dungeon waits")
+		else
+			ui.Go.Text = Lang.translate("GO TO LOBBY")
+			ui.GoSub.Text = Lang.translate("Mine & gear up")
+		end
+		placeButtons(dungeon, false)
 		task.spawn(reel, event.Piece, mine)
 	else
 		kicker(string.format("ROUND %d OF %d  WON", event.Round, view.Count), GOLD)
 		nextUp("NEXT", nextRival)
-		ui.Leave.Text = leaveText
-		placeButtons(true)
+		placeButtons(true, dungeon)
 		if event.Gem then
 			ui.Extra.Text = Lang.translate(string.format("+ %s gem, socketed for you", event.Gem.Name))
 		elseif event.Auto and (event.Auto.Gems or 0) > 0 then
@@ -768,7 +855,7 @@ local function show(event)
 		end
 		task.spawn(function()
 			reel(event.Piece, mine)
-			countdown("NEXT ROUND", mine)
+			countdown("CONTINUE INTRO ROUNDS", string.format(Lang.translate("Round %d of %d"), event.Round + 1, view.Count), mine)
 		end)
 	end
 	fit()
@@ -788,7 +875,21 @@ function IntroRoundsUI.start()
 	started = true
 	build()
 	ui.Go.Activated:Connect(IntroRoundsUI.next)
+	ui.Dungeon.Activated:Connect(IntroRoundsUI.toDungeon)
 	ui.Leave.Activated:Connect(function()
+		if current and current.View and current.View.Done then
+			-- (the set's done: GO TO LOBBY beside TO THE FIRST DUNGEON)
+			if busy then
+				return
+			end
+			busy = true
+			hide()
+			task.spawn(function()
+				GemClient.request("IntroRoundLeave")
+				busy = false
+			end)
+			return
+		end
 		if current and current.Phase ~= "Lost" and not inArena() then
 			hide() -- (LATER: out in the Outpost already)
 			return

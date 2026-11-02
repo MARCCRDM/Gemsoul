@@ -37,6 +37,14 @@ do
 	check(entry.Ok, "The Rot Beachhead didn't start: " .. tostring(entry.Message))
 	local id = scout:GetAttribute("DungeonId")
 	check(id ~= nil and scout:GetAttribute("DungeonKaiju") == true, "Kaiju aren't let in")
+	check(scout:GetAttribute("DungeonRooms") == 3 and scout:GetAttribute("DungeonTest") == nil, "The strip's room count, or shown as a test run")
+	local told
+	for _, sentEvent in sent[scout] do
+		if sentEvent[1] == "FirstDungeon" and sentEvent[2].Phase == "In" then
+			told = sentEvent[2]
+		end
+	end
+	check(told ~= nil and told.RoundsLeft == 4, "Not told it's in, with the rounds left (LEAVE's card)")
 	tick(3)
 	local fighters = {}
 	for _, e in spawned do
@@ -87,7 +95,8 @@ do
 	-- Back to the intro fights: out, and no rewards.
 	hit()
 	tick(first.DownSeconds + 0.1)
-	check(handlers.FirstDungeonQuit(scout).Ok, "FINISH THE INTRO FIGHTS refused")
+	local quit = handlers.FirstDungeonQuit(scout, "Intro")
+	check(quit.Ok and quit.To == "Intro", "FINISH THE INTRO FIGHTS refused")
 	check(scout:GetAttribute("DungeonId") == nil and scout:GetAttribute("DungeonKaiju") == nil, "Quit didn't leave")
 	check(scout:GetAttribute("CombatSession") == nil and profiles[scout].Coins == 0, "Quit left you in or paid you")
 	check(not scout.Root.Anchored, "Quit left you held")
@@ -118,5 +127,16 @@ do
 	tick(6.1)
 	check(scout:GetAttribute("DungeonId") == nil, "Not back out after the nest")
 	check(profiles[scout].Coins > 0, "No rewards for clearing the Rot Beachhead")
-	print("PASS: the Rot Beachhead: rooms, damage by intro pieces, kaiju let in, the knock-down card, RECOVER, back to the intro fights, boss cache and rewards")
+	-- Open to everyone (Config.Features.FirstDungeon), not before; GO TO LOBBY any time.
+	local miner = squad(1)[1]
+	check(not handlers.FirstDungeon(miner).Ok, "A player got in before it's open")
+	Config.Features.FirstDungeon = true
+	check(handlers.FirstDungeon(miner).Ok, "A player couldn't get in once it's open")
+	check(miner:GetAttribute("DungeonId") ~= nil, "Not in")
+	tick(3)
+	local out = handlers.FirstDungeonQuit(miner, "Lobby")
+	check(out.Ok and out.To == "Lobby" and miner:GetAttribute("DungeonId") == nil, "GO TO LOBBY didn't leave")
+	check(profiles[miner].Coins == 0, "Leaving paid out")
+	Config.Features.FirstDungeon = nil
+	print("PASS: the Rot Beachhead: rooms, damage by intro pieces, kaiju let in, the knock-down card, RECOVER, back to the intro fights, boss cache and rewards, open to players by its switch, GO TO LOBBY")
 end

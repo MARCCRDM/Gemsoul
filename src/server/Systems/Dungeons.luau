@@ -109,6 +109,7 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonTest", nil)
 				p:SetAttribute("DungeonObjective", nil)
 				p:SetAttribute("DungeonRoom", nil)
+				p:SetAttribute("DungeonRooms", nil)
 				p:SetAttribute("DungeonBoss", nil)
 				p:SetAttribute("DungeonKaiju", nil)
 				p:SetAttribute("SparDown", nil)
@@ -254,7 +255,7 @@ local function spawnRoom(run, index)
 				if run.Done or (not run.OpenWorld and run.Index ~= index) then
 					return
 				end
-                if room.Boss and not run.Test then
+                if room.Boss and (not run.Test or run.First) then
                     local spec = Rules.specOf(room, kind)
                     local here = living(run)
                     for _, member in here do
@@ -314,17 +315,29 @@ local function safeSpawnRoom(run, index)
 		finish(run, false, "The encounter failed to load. Please queue again.")
 	end
 end
+-- Intro rounds still to win (the first dungeon's way back to them).
+local function roundsLeft(p): number
+	local state = IntroRounds.state(PlayerData.get(p))
+	return if state then math.max(0, IntroRounds.Count - state.Won) else 0
+end
 local function queue(player, testMode)
-	local testing = testMode ~= nil and canTest(player)
-	if testMode ~= nil and not testing then
+	-- The campaign's first dungeon (Rules.First): solo, for anyone once it's
+	-- open (Config.Features.FirstDungeon), the owners before that.
+	local first = testMode == "First"
+	local testing = testMode ~= nil and not first and canTest(player)
+	if testMode ~= nil and not first and not testing then
 		return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
 	end
+	if first and not canTest(player) and not (Config.Features and Config.Features.FirstDungeon == true) then
+		return Shop.reply(false, "The Rot Beachhead isn't open yet.")
+	end
 	-- Switched off (Config.Features): only the owners' tests get in.
-	if not testing and Config.Features and Config.Features.Dungeons == false then
+	if not testing and not first and Config.Features and Config.Features.Dungeons == false then
 		return Shop.reply(false, "Squad dungeons are closed for the beta.")
 	end
 	local party = Party.of(player)
-	local members = if testing then { player } else party and party.Members or {}
+	local solo = testing or first
+	local members = if solo then { player } else party and party.Members or {}
 	local allReady = party ~= nil
 	for _, p in members do
 		if not party or not party.Ready[p] then
@@ -332,7 +345,7 @@ local function queue(player, testMode)
 		end
 	end
 	local ok, why = Rules.canEnter(#members, party ~= nil and party.Leader == player, allReady)
-	if not ok and not testing then
+	if not ok and not solo then
 		return Shop.reply(false, why)
 	end
 	for _, p in members do
@@ -359,11 +372,11 @@ local function queue(player, testMode)
 		Id = id,
 		Members = table.clone(members),
 		PartyId = party and party.Id,
-		Test = testing,
+		Test = solo, -- (solo: no squad minimum)
 		OpenWorld = testing and testMode == "OpenWorld",
 		-- The campaign's first dungeon, the Rot Beachhead (Rules.First): solo,
 		-- with the player's kaiju, a knock-down card instead of a reserve.
-		First = testing and testMode == "First",
+		First = first,
 		Down = {},
 		Slot = slot,
 		Index = 1,
@@ -379,7 +392,7 @@ local function queue(player, testMode)
 		memberRun[p] = run
 		run.Defeated[p] = {}
 		p:SetAttribute("DungeonId", id)
-		p:SetAttribute("DungeonTest", testing)
+		p:SetAttribute("DungeonTest", testing or nil)
 		p:SetAttribute("RaidId", id)
 		p:SetAttribute("PvPEnabled", false)
 		p:SetAttribute("CombatSession", "Raid")
@@ -407,6 +420,9 @@ local function queue(player, testMode)
 			-- (Softer hits the fewer intro pieces they've won; an older save, geared, as six.)
 			local state = IntroRounds.state(PlayerData.get(player))
 			run.PieceScale = Rules.firstDamage(if state then state.Won else 6)
+		end
+		for _, p in run.Members do
+			p:SetAttribute("DungeonRooms", #run.Rooms)
 		end
 		run.World = (if run.OpenWorld then World.buildOpen else World.build)(
 			id,
@@ -472,6 +488,11 @@ local function queue(player, testMode)
 		end
 		finish(run, false, "Dungeon setup failed. Please try again.")
 		return Shop.reply(false, "Dungeon setup failed.")
+	end
+	if run.First then
+		for _, p in run.Members do
+			Remotes.Social:FireClient(p, "FirstDungeon", { Phase = "In", RoundsLeft = roundsLeft(p) })
+		end
 	end
 	return Shop.reply(true, "Dungeon queued for your ready squad. Deploying now.")
 end
@@ -548,12 +569,11 @@ local function firstDown(run, p, humanoid)
 			root.Anchored = true
 		end
 		local room = run.Rooms[run.Index]
-		local state = IntroRounds.state(PlayerData.get(p))
 		Remotes.Social:FireClient(p, "FirstDungeon", {
 			Phase = "Down",
 			Room = room and room.Name,
 			Boss = room and room.Boss and Rules.specOf(room).Name or nil,
-			RoundsLeft = if state then math.max(0, IntroRounds.Count - state.Won) else 0,
+			RoundsLeft = roundsLeft(p),
 			Seconds = first.ChooseSeconds,
 		})
 	end)
@@ -590,15 +610,23 @@ local function firstRecover(p)
 	announce(run, "Back on your feet. Watch the wind-ups this time.")
 	return Shop.reply(true, "")
 end
--- Back to the intro fights: out of the dungeon (the client starts the next round).
-local function firstQuit(p)
+-- Out of the first dungeon, any time (no rewards): "Intro", back to the
+-- intro fights (the client starts the next round), or "Lobby".
+local function firstQuit(p, where)
 	local run = memberRun[p]
 	if not run or not run.First then
 		return Shop.reply(false, "You're not in the Rot Beachhead.")
 	end
+	local lobby = where == "Lobby" or roundsLeft(p) == 0
 	run.Down[p] = nil
-	finish(run, false, "Back to the intro fights: win more gear, then the Rot Beachhead waits.")
-	return Shop.reply(true, "")
+	finish(
+		run,
+		false,
+		if lobby
+			then "Back to the lobby. The Rot Beachhead waits for you."
+			else "Back to the intro fights: win more gear, then the Rot Beachhead waits."
+	)
+	return Shop.reply(true, "", { To = if lobby then "Lobby" else "Intro" })
 end
 local function reserveAfterDefeat(p, humanoid)
 	local run = memberRun[p]
@@ -634,6 +662,10 @@ function Dungeon.start()
 	Shop.register("PartyDungeon", function(player)
 		return queue(player)
 	end)
+	-- The Rot Beachhead from the intro rounds' card or the DEV panel (Client FirstDungeonUI).
+	Shop.register("FirstDungeon", function(player)
+		return queue(player, "First")
+	end)
 	Shop.register("DungeonTest", function(player, mode)
 		if not canTest(player) then
 			return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
@@ -654,6 +686,7 @@ function Dungeon.start()
 		p:SetAttribute("DungeonId", nil)
 		p:SetAttribute("DungeonTest", nil)
 		p:SetAttribute("DungeonRoom", nil)
+		p:SetAttribute("DungeonRooms", nil)
 		p:SetAttribute("DungeonBoss", nil)
 		p:SetAttribute("DungeonObjective", nil)
 		p:SetAttribute("DungeonKaiju", nil)

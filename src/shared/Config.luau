@@ -32,6 +32,10 @@ local Config = {
 		-- until their whole entry-to-reward flow passes testing; Owners can
 		-- still run them from the DEV panel's dungeon tests.
 		Dungeons = false,
+		-- The campaign's first dungeon, the Rot Beachhead (Shared.DungeonRules
+		-- .First): FIRST DUNGEON on the intro rounds' card. Off: the Owners
+		-- only (and the DEV panel's FIRST DUNGEON); on: every player.
+		FirstDungeon = false,
 		-- The garage's drivable mechs (the Shelter; the Pilot prompt).
 		Mechs = true,
 		-- Three miners per account (Shared.MinerRoster): switch between them in
@@ -100,7 +104,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.0 · 2026-11-01 first dungeon",
+		Build = "1.0 · 2026-11-02 three ways on",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error

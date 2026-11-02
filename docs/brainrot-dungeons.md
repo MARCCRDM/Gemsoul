@@ -65,7 +65,7 @@ Validation: tests/run_dungeon_queue.py executes the actual Party and DungeonQueu
 
 ## The Rot Beachhead (the campaign's first dungeon)
 
-The new player's first dungeon, after the intro fights (the New Player Pipeline proposal). For now it is reached only from the DEV panel's **FIRST DUNGEON (NEW INTRO)** button (owners and testers), which plays it as a new player would:
+The new player's first dungeon, after the intro fights (the New Player Pipeline proposal). It's reached from the intro rounds' card (**FIRST DUNGEON**, beside GO TO LOBBY, and TO THE FIRST DUNGEON once the set's done) and from the DEV panel's **FIRST DUNGEON (NEW INTRO)**. While `Config.Features.FirstDungeon` is off, only the Owners see and can use it; switch it on to open it to every player (the `FirstDungeon` request). Either way it plays as a new player would:
 
 1. The kaiju roll, if one is owed (Client KaijuRoll).
 2. The loading screens (Client FirstDungeonUI): YOUR KAIJU (your team out; "Your kaiju will defend you and heal you"), then the scout mission. A tap skips one.
@@ -79,6 +79,9 @@ A lethal blow knocks you down instead (shielded, the Outpost's knock-down). Afte
 
 - **RECOVER** puts you back at the start of the room you fell in, at full health. The room's fighters are back at full too (`Duelist.healDungeon`). After 30 s it recovers you by itself.
 - **FINISH THE INTRO FIGHTS (n LEFT)** shows only while intro rounds are left to win. It takes you out, with no rewards, and on into the next round.
+- **GO TO LOBBY** takes you out to the Outpost, with no rewards.
+
+The same ways out are on **LEAVE** (top right, any time in the dungeon), with STAY to carry on (`FirstDungeonQuit`, "Intro" or "Lobby").
 
 The boss is Chimpanzini for now, standing in for Granchio Rottamino, whose model is still to come. After the dungeon you go back to the Outpost: the mining / socket / kaiju / critter steps that follow it aren't built yet.
 

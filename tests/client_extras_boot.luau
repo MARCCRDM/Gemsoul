@@ -127,7 +127,7 @@ local GemClient = {
 			attrs.DuelQueue = nil
 		elseif action == "ArenaLeave" then
 			attrs.CombatSession = nil
-		elseif action == "DungeonTest" and dungeonAnswer then
+		elseif action == "FirstDungeon" and dungeonAnswer then
 			return dungeonAnswer
 		end
 		return { Ok = true, Message = "" }
@@ -205,8 +205,16 @@ do
 	local piece = card and card:FindFirstChild("Piece", true)
 	check(drawnPiece and drawnPiece[2] == "Weapon" and drawnPiece[3] == "w1", "The won piece wasn't drawn in 3D")
 	check(piece ~= nil and piece:IsA("ViewportFrame"), "No 3D piece on the card")
+	-- (three ways on: the next round, the lobby; no first dungeon for a player it's not open to)
+	local go, leave, dungeon = card:FindFirstChild("Next", true), card:FindFirstChild("Leave", true), card:FindFirstChild("Dungeon", true)
+	check(go and go.Text == "CONTINUE INTRO ROUNDS" and go.Visible, "No CONTINUE INTRO ROUNDS")
+	local goSub = go and go:FindFirstChild("Sub")
+	check(goSub and string.find(goSub.Text, "Round 2 of 6", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) ~= nil, "CONTINUE INTRO ROUNDS' round and countdown: " .. tostring(goSub and goSub.Text))
+	check(leave and leave.Text == "GO TO LOBBY" and leave.Visible, "No GO TO LOBBY")
+	check(dungeon and not dungeon.Visible, "FIRST DUNGEON offered to a player it's not open to")
 	attrs.CombatSession = nil
 end
+load(clientRef.IntroRoundsUI).AutoNext = 1 -- (the loss's card on its way before the set's: a round between them in the game)
 social:Fire("IntroRound", { Phase = "Lost", Round = 2, View = IntroRounds.view(state) })
 task.wait(2)
 for _ = 2, 6 do IntroRounds.won(state, "Rare") end
@@ -215,6 +223,18 @@ task.wait(2.5)
 local card = playerGui:FindFirstChild("IntroRounds")
 check(card ~= nil and card.Enabled, "The intro rounds' card isn't up")
 check(load(clientRef.IntroRoundsUI).busy(), "The set's card is up, but it doesn't hold back what comes after it")
+do -- (the set done: to the lobby; for an owner, TO THE FIRST DUNGEON and the lobby beside it)
+	task.wait(2.5) -- (out of the Arena, a card's up 4.5 s after its event)
+	local go = card:FindFirstChild("Next", true)
+	check(go.Text == "GO TO LOBBY" and not card:FindFirstChild("Leave", true).Visible, "The set's card without the first dungeon: " .. go.Text .. " " .. tostring(card:FindFirstChild("Leave", true).Visible))
+	attrs.CanTestDungeon = true
+	social:Fire("IntroRound", { Phase = "Lost", Round = 2, View = IntroRounds.view(IntroRounds.state({ Funnel = {} })) })
+	task.wait(5)
+	local dungeon = card:FindFirstChild("Dungeon", true)
+	check(dungeon.Visible and dungeon.Text == "FIRST DUNGEON" and card:FindFirstChild("Leave", true).Visible, "No FIRST DUNGEON beside GO TO LOBBY for an owner")
+	check(card:FindFirstChild("Next", true).Text == "TRY AGAIN", "A loss's TRY AGAIN")
+	attrs.CanTestDungeon = nil
+end
 -- SETTINGS: opens, and the saved settings were applied.
 local Settings = load(clientRef.SettingsUI)
 local ok, problem = pcall(Settings.open)
@@ -283,7 +303,7 @@ do
 	check(okPlay and message == nil, "FIRST DUNGEON didn't play: " .. tostring(message))
 	local asked = false
 	for i = before + 1, #requests do
-		if requests[i][1] == "DungeonTest" and requests[i][2] == "First" then
+		if requests[i][1] == "FirstDungeon" then
 			asked = true
 		end
 	end
@@ -293,7 +313,7 @@ do
 	for i = before + 1, #requests do
 		table.insert(order, requests[i][1])
 	end
-	check(table.concat(order, ",") == "DuelCancel,ArenaLeave,DungeonTest", "Not out of the queue and the Arena first: " .. table.concat(order, ","))
+	check(table.concat(order, ",") == "DuelCancel,ArenaLeave,FirstDungeon", "Not out of the queue and the Arena first: " .. table.concat(order, ","))
 	-- Refused: the reason on the screen.
 	attrs.DungeonId = nil
 	dungeonAnswer = { Ok = false, Message = "Dungeon setup failed." }
@@ -305,17 +325,34 @@ do
 	problem:Destroy()
 	dungeonAnswer = nil
 	check(playerGui:FindFirstChild("FirstDungeonIntro") == nil, "The loading screens stayed up")
+	-- In: LEAVE, top right; its card: back to the intro fights, the lobby, or stay.
+	social:Fire("FirstDungeon", { Phase = "In", RoundsLeft = 4 })
+	task.wait(0.2)
+	local leaveGui = playerGui:FindFirstChild("FirstDungeonLeave")
+	check(leaveGui ~= nil and leaveGui:FindFirstChild("Leave", true) ~= nil, "No LEAVE in the dungeon")
+	First.showLeave()
+	local leaveCard = playerGui:FindFirstChild("FirstDungeonLeaveCard")
+	local intro = leaveCard and leaveCard:FindFirstChild("Intro", true)
+	check(intro ~= nil and string.find(intro.Text, "4 LEFT", 1, true) ~= nil, "LEAVE's card: no FINISH THE INTRO FIGHTS (4 LEFT)")
+	check(leaveCard:FindFirstChild("Lobby", true) ~= nil and leaveCard:FindFirstChild("Stay", true) ~= nil, "LEAVE's card: no GO TO LOBBY or STAY")
+	local quitsBefore = #requests
+	First.leave("Lobby")
+	check(requests[quitsBefore + 1] and requests[quitsBefore + 1][1] == "FirstDungeonQuit" and requests[quitsBefore + 1][2] == "Lobby", "GO TO LOBBY didn't ask to leave for the lobby")
+	check(playerGui:FindFirstChild("FirstDungeonLeaveCard") == nil, "LEAVE's card stayed up")
+	-- Knocked down: RECOVER, or out (the intro fights while rounds are left, the lobby).
 	social:Fire("FirstDungeon", { Phase = "Down", Room = "Room 1: The Gate", RoundsLeft = 4, Seconds = 30 })
 	task.wait(0.2)
 	local down = playerGui:FindFirstChild("FirstDungeonDown")
 	check(down ~= nil, "No knock-down card")
 	check(down and down:FindFirstChild("Recover", true) ~= nil, "No RECOVER")
-	local quit = down and down:FindFirstChild("Quit", true)
+	local quit = down and down:FindFirstChild("Intro", true)
 	check(quit ~= nil and string.find(quit.Text, "4 LEFT", 1, true) ~= nil, "No FINISH THE INTRO FIGHTS (4 LEFT)")
+	check(down and down:FindFirstChild("Lobby", true) ~= nil, "No GO TO LOBBY on the knock-down card")
 	social:Fire("FirstDungeon", { Phase = "Down", Room = "The Nest", Boss = "Chimpanzini", RoundsLeft = 0, Seconds = 30 })
 	task.wait(0.2)
 	down = playerGui:FindFirstChild("FirstDungeonDown")
-	check(down ~= nil and down:FindFirstChild("Quit", true) == nil, "Back to the intro fights offered with none left")
+	check(down ~= nil and down:FindFirstChild("Intro", true) == nil, "Back to the intro fights offered with none left")
+	check(down:FindFirstChild("Lobby", true) ~= nil, "No GO TO LOBBY with the intro done")
 end
 print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range, the Rot Beachhead's screens and knock-down card)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)

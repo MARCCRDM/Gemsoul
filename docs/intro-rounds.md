@@ -59,3 +59,7 @@ A big drop from a **won** step to the next **start** means players leave at
 the card between rounds. A big drop from a **start** to its **won** means the
 round is too hard (or they quit mid-fight).
 
+
+## Between rounds: three ways on
+
+The card between rounds offers **CONTINUE INTRO ROUNDS** (or TRY AGAIN after a loss; it starts by itself after `IntroRoundsUI.AutoNext`, 10 s, in the Arena), **GO TO LOBBY** (the set waits; PLAY carries on) and **FIRST DUNGEON** (the Rot Beachhead: docs/brainrot-dungeons.md; shown to those it's open to, `Config.Features.FirstDungeon`). The set done: TO THE FIRST DUNGEON with GO TO LOBBY beside it, or GO TO LOBBY alone.

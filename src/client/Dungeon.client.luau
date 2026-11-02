@@ -17,7 +17,7 @@ local function announce()
 	end
 	local line = if player:GetAttribute("DungeonTest")
 		then "Test run · " .. objective
-		else string.format("Room %d / 5 · %s", player:GetAttribute("DungeonRoom") or 1, objective)
+		else string.format("Room %d / %d · %s", player:GetAttribute("DungeonRoom") or 1, player:GetAttribute("DungeonRooms") or 5, objective)
 	if line ~= last then
 		last = line
 		UiKit.toast(line)

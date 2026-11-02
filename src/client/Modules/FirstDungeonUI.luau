@@ -3,17 +3,22 @@
 	.First, Server Dungeons' "First" mode): for now from the DEV panel's
 	FIRST DUNGEON, as it'll play after the intro fights.
 
+	  FirstDungeonUI.allowed() -> bool   whether this player can go in (the
+	                        Owners; everyone once Config.Features.FirstDungeon)
 	  FirstDungeonUI.play() -> message?   the kaiju roll if one's owed, then
 	                        the loading screens (YOUR KAIJU, then the SCOUT
 	                        MISSION), then into the dungeon (the pod drop is
 	                        the server's). A tap skips a screen. Returns the
 	                        server's message when it couldn't start.
-	  FirstDungeonUI.start()   listens for the knock-down (Remotes.Social
-	                        "FirstDungeon", Phase "Down"): a card with RECOVER
-	                        (back at the start of the room, its fighters at
-	                        full too) and, while intro rounds are left to win,
-	                        FINISH THE INTRO FIGHTS (out, and into the next
-	                        round). RECOVER by itself when its time's up.
+	  FirstDungeonUI.start()   in the dungeon (Remotes.Social "FirstDungeon",
+	                        Phase "In"): a LEAVE button, top right, for a card
+	                        with the ways out. Knocked down (Phase "Down"): a
+	                        card with RECOVER (back at the start of the room,
+	                        its fighters at full too), or out; RECOVER by
+	                        itself when its time's up. The ways out: FINISH
+	                        THE INTRO FIGHTS (while intro rounds are left to
+	                        win: out, and into the next round), GO TO LOBBY.
+	  FirstDungeonUI.leave(where)   "Intro" or "Lobby"
 	  FirstDungeonUI.Slides   the loading screens' words
 	  FirstDungeonUI.SlideSeconds
 ]]
@@ -244,6 +249,12 @@ end
 
 local playing = false
 
+function FirstDungeonUI.allowed(): boolean
+	local Config = require(ReplicatedStorage.Shared.Config)
+	return player:GetAttribute("CanTestDungeon") == true
+		or (Config.Features ~= nil and Config.Features.FirstDungeon == true)
+end
+
 function FirstDungeonUI.play(): string?
 	if playing then
 		return "Already on the way in."
@@ -252,10 +263,15 @@ function FirstDungeonUI.play(): string?
 	FirstDungeonUI.start()
 	local ok, message = pcall(function()
 		-- (A new player's kaiju come first: the roll they're owed.)
+		-- (one already up, from the lobby's own sequence: it finishes first)
+		local KaijuRoll = require(script.Parent.KaijuRoll)
+		while KaijuRoll.showing and KaijuRoll.showing() do
+			task.wait(0.1)
+		end
 		local profile = GemClient.Profile
 		if profile and Kaiju.rollsOwed(profile) > 0 then
 			local rolled = false
-			require(script.Parent.KaijuRoll).play(function()
+			KaijuRoll.play(function()
 				rolled = true
 			end)
 			while not rolled do
@@ -276,11 +292,11 @@ function FirstDungeonUI.play(): string?
 		-- (Out of the intro fights' queue and the Arena first: a dungeon won't
 		-- take you from either.)
 		FirstDungeonUI.free()
-		local result = GemClient.request("DungeonTest", "First")
+		local result = GemClient.request("FirstDungeon")
 		if not result.Ok then
 			-- (once more, in case the queue put you back meanwhile)
 			FirstDungeonUI.free()
-			result = GemClient.request("DungeonTest", "First")
+			result = GemClient.request("FirstDungeon")
 		end
 		if last then
 			local fade = new("Frame", {
@@ -363,9 +379,11 @@ function FirstDungeonUI.problem(message: string)
 	end, 40, 16)
 end
 
--- The knock-down card ----------------------------------------------------------------
+-- Ways out: back to the intro fights (while rounds are left), the lobby ------------
 
 local card: ScreenGui? = nil
+local leaveGui: ScreenGui? = nil
+local roundsLeft = 0 -- (intro rounds still to win: the server's, on the way in)
 
 local function closeCard()
 	if card then
@@ -384,9 +402,38 @@ local function nextRound()
 	GemClient.request("IntroRoundNext")
 end
 
-function FirstDungeonUI.showDown(event: { [string]: any })
+-- Out of the Rot Beachhead: "Intro" (then the next round) or "Lobby".
+local leaving = false
+function FirstDungeonUI.leave(where: string)
+	if leaving then
+		return
+	end
+	leaving = true
 	closeCard()
-	local screen = UiKit.gui("FirstDungeonDown", 75)
+	local result = GemClient.request("FirstDungeonQuit", where)
+	leaving = false
+	if result.Ok and result.To == "Intro" then
+		task.spawn(nextRound)
+	end
+end
+
+-- The card's buttons out, from `order` down.
+local function exits(body: Frame, order: number, primaryIntro: boolean)
+	if roundsLeft > 0 then
+		local intro = Gilt.button(body, string.format("FINISH THE INTRO FIGHTS (%d LEFT)", roundsLeft), primaryIntro, order, function()
+			FirstDungeonUI.leave("Intro")
+		end, if primaryIntro then 46 else 40, if primaryIntro then 15 else 13)
+		intro.Name = "Intro"
+	end
+	local lobby = Gilt.button(body, "GO TO LOBBY", false, order + 1, function()
+		FirstDungeonUI.leave("Lobby")
+	end, 40, 13)
+	lobby.Name = "Lobby"
+end
+
+local function cardFrame(name: string, kickerText: string, titleText: string, titleColor: Color3, lineText: string): Frame
+	closeCard()
+	local screen = UiKit.gui(name, 75)
 	card = screen
 	new("Frame", {
 		Name = "Shade",
@@ -395,61 +442,83 @@ function FirstDungeonUI.showDown(event: { [string]: any })
 		Size = UDim2.fromScale(1, 1),
 	}, screen)
 	local body = Gilt.frame(screen, 380)
-	local kicker = Gilt.heading(body, if event.Room then tostring(event.Room) else "THE ROT BEACHHEAD", 1, true)
+	local kicker = Gilt.heading(body, kickerText, 1, true)
 	kicker.TextColor3 = ROT
-	local title = Gilt.words(body, "KNOCKED DOWN", 30, Gilt.Red)
+	local title = Gilt.words(body, titleText, 28, titleColor)
 	title.Font = Gilt.Display
 	title.LayoutOrder = 2
-	local line = Gilt.words(
-		body,
-		if event.Boss
-			then string.format("%s put you down. Watch for its wind-up, then hit it while it recovers.", tostring(event.Boss))
-			else "The rot-spawn got you. Stay by your kaiju: they heal you.",
-		14,
-		Gilt.Faded
-	)
+	local line = Gilt.words(body, lineText, 14, Gilt.Faded)
 	line.TextWrapped, line.TextTruncate = true, Enum.TextTruncate.None
 	line.Size, line.AutomaticSize = UDim2.new(1, 0, 0, 0), Enum.AutomaticSize.Y
 	line.LayoutOrder = 3
+	return body
+end
+
+-- LEAVE (in the dungeon, any time): back to the intro fights or the lobby.
+function FirstDungeonUI.showLeave()
+	local body = cardFrame(
+		"FirstDungeonLeaveCard",
+		"THE ROT BEACHHEAD",
+		"LEAVE THE DUNGEON?",
+		Gilt.Ink,
+		if roundsLeft > 0
+			then "Your intro fights aren't finished: win them for more gear, then come back."
+			else "You'll start the Rot Beachhead over next time."
+	)
+	exits(body, 4, true)
+	local stay = Gilt.button(body, "STAY", false, 6, closeCard, 36, 12)
+	stay.Name = "Stay"
+end
+
+-- The LEAVE button, top right, while you're in the Rot Beachhead.
+local function showLeaveButton(on: boolean)
+	if not on then
+		if leaveGui then
+			leaveGui:Destroy()
+			leaveGui = nil
+		end
+		return
+	end
+	if leaveGui then
+		return
+	end
+	local screen = UiKit.gui("FirstDungeonLeave", 40)
+	leaveGui = screen
+	local holder = new("Frame", {
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -14, 0, 10),
+		Size = UDim2.fromOffset(104, 36),
+		BackgroundTransparency = 1,
+	}, screen)
+	local b = Gilt.button(holder, "LEAVE", false, 1, FirstDungeonUI.showLeave, 36, 13)
+	b.Name = "Leave"
+end
+
+-- The knock-down card: RECOVER, or out.
+function FirstDungeonUI.showDown(event: { [string]: any })
+	roundsLeft = tonumber(event.RoundsLeft) or roundsLeft
+	local body = cardFrame(
+		"FirstDungeonDown",
+		if event.Room then tostring(event.Room) else "THE ROT BEACHHEAD",
+		"KNOCKED DOWN",
+		Gilt.Red,
+		if event.Boss
+			then string.format("%s put you down. Watch for its wind-up, then hit it while it recovers.", tostring(event.Boss))
+			else "The rot-spawn got you. Stay by your kaiju: they heal you."
+	)
+	local screen = card
 	local seconds = math.max(1, math.floor(tonumber(event.Seconds) or 30))
 	local ends = os.clock() + seconds
-	local sent = false
 	local recover = Gilt.button(body, "RECOVER", true, 4, function()
-		if sent then
-			return
-		end
-		sent = true
 		closeCard()
 		GemClient.request("FirstDungeonRecover")
 	end, 46, 18)
 	recover.Name = "Recover"
-	local roundsLeft = tonumber(event.RoundsLeft) or 0
-	if roundsLeft > 0 then
-		local quit = Gilt.button(
-			body,
-			string.format("FINISH THE INTRO FIGHTS (%d LEFT)", roundsLeft),
-			false,
-			5,
-			function()
-				if sent then
-					return
-				end
-				sent = true
-				closeCard()
-				local result = GemClient.request("FirstDungeonQuit")
-				if result.Ok then
-					task.spawn(nextRound)
-				end
-			end,
-			40,
-			13
-		)
-		quit.Name = "Quit"
-	end
+	exits(body, 5, false)
 	local timer = Gilt.words(body, "", 12, Gilt.Dusk)
 	timer.Name = "Timer"
 	timer.TextXAlignment = Enum.TextXAlignment.Center
-	timer.LayoutOrder = 6
+	timer.LayoutOrder = 8
 	task.spawn(function()
 		while card == screen do
 			local left = math.max(0, math.ceil(ends - os.clock()))
@@ -474,14 +543,18 @@ function FirstDungeonUI.start()
 		if kind ~= "FirstDungeon" or type(event) ~= "table" then
 			return
 		end
-		if event.Phase == "Down" then
+		if event.Phase == "In" then
+			roundsLeft = tonumber(event.RoundsLeft) or 0
+			showLeaveButton(true)
+		elseif event.Phase == "Down" then
 			FirstDungeonUI.showDown(event)
 		end
 	end)
-	-- (out of the dungeon: the card goes with it)
+	-- (out of the dungeon: its cards and LEAVE go with it)
 	player:GetAttributeChangedSignal("DungeonId"):Connect(function()
 		if player:GetAttribute("DungeonId") == nil then
 			closeCard()
+			showLeaveButton(false)
 		end
 	end)
 end
