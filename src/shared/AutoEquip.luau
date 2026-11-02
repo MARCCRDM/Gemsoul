@@ -318,7 +318,7 @@ end
 -- Looks: the rarest you own of each kind, over what you wear. A back piece
 -- only over one you wear already: nothing on your back stays that way (it
 -- put a Geode Shell on players who'd never chosen one).
-AutoEquip.LookKinds = { "Suit", "Skin", "Shield", "Helmet", "Visor", "Pick", "Trim", "Back" }
+AutoEquip.LookKinds = { "Suit", "Skin", "Shield", "Helmet", "Visor", "Pick", "Trim", "Back", "Aura" }
 AutoEquip.OnlyOverWorn = { Back = true }
 local LOOK_RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
 -- (the catalogue, loaded on first use: planning gear never needs it)

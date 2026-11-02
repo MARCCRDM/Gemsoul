@@ -941,7 +941,7 @@ function PlayerData.setRigManeuvers(player: Player, ids: { string })
 	end
 end
 
--- Wears (or with nil, removes) a trim or back piece; ownership is checked by the caller.
+-- Wears (or with nil, removes) a look of `kind` (a trim, back piece, aura...); ownership is checked by the caller.
 function PlayerData.setCosmetic(player: Player, kind: string, id: string?)
 	local profile = profiles[player]
 	if profile then

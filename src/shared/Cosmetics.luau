@@ -80,7 +80,7 @@ export type VisorLook = {
 }
 export type Cosmetic = {
 	Id: string,
-	Kind: "Trim" | "Back" | "Skin" | "Shield" | "Suit" | "Pick" | "Visor" | "Helmet" | "Title",
+	Kind: "Trim" | "Back" | "Aura" | "Skin" | "Shield" | "Suit" | "Pick" | "Visor" | "Helmet" | "Title",
 	Name: string,
 	Description: string,
 	Rarity: string, -- a gem tier: Common, Uncommon, Rare, UltraRare
@@ -289,11 +289,23 @@ Cosmetics.List = {
 		Exclusive = "Code",
 		How = "Redeem a promo code.",
 	},
+	-- Auras: effects all round you, worn with anything (Equipment's AURAS).
+	AuraThunder = {
+		Id = "AuraThunder",
+		Kind = "Aura",
+		Name = "Thunder Aura",
+		Description = "Blue sparks crackle all over you, arcs of current jump round your body, and every jump lands in a flash of lightning.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(80, 200, 255),
+		Look = "Thunder",
+		Exclusive = "Code",
+		How = "Redeem a promo code.",
+	},
 	TitleStormborn = {
 		Id = "TitleStormborn",
 		Kind = "Title",
 		Name = "STORMBORN",
-		Description = "Over your head, in storm blue, for everyone to see. Came with the Stormcaller Wings.",
+		Description = "Over your head, in storm blue, for everyone to see. Came with the Thunder Aura.",
 		Rarity = "UltraRare",
 		Color = Color3.fromRGB(80, 200, 255),
 		Exclusive = "Code",

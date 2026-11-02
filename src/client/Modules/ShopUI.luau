@@ -136,6 +136,7 @@ local KIND_NAMES = {
 	Pick = "Pickaxe",
 	Trim = "Trim",
 	Back = "Back piece",
+	Aura = "Aura",
 	Title = "Title",
 }
 local RARITY_NAMES =

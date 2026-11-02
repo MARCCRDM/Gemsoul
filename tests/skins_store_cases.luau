@@ -48,7 +48,7 @@ local FreeRewards = shared("FreeRewards")
 
 -- Catalog -----------------------------------------------------------------------------
 local equipment = fs.readFile(ROOT .. "/src/server/Systems/Equipment.luau")
-local KINDS = { Trim = true, Back = true, Skin = true, Shield = true, Suit = true, Pick = true, Visor = true, Helmet = true, Title = true }
+local KINDS = { Trim = true, Back = true, Aura = true, Skin = true, Shield = true, Suit = true, Pick = true, Visor = true, Helmet = true, Title = true }
 local skins, suits, titles, picks, visors, helmets = 0, 0, 0, 0, 0, 0
 local helmetSource = fs.readFile(ROOT .. "/src/server/Systems/HelmetLooks.luau")
 -- Visors: what each rarity promises.
@@ -125,6 +125,8 @@ for id, cosmetic in Cosmetics.List do
 		titles += 1
 	elseif cosmetic.Kind == "Back" then
 		check(cosmetic.Look and string.find(equipment, "BACKS." .. cosmetic.Look .. " =", 1, true), id .. " can't be built")
+	elseif cosmetic.Kind == "Aura" then
+		check(cosmetic.Look and string.find(equipment, "AURAS." .. cosmetic.Look .. " =", 1, true), id .. " can't be built")
 	end
 end
 check(
@@ -751,12 +753,13 @@ local again = handlers.RedeemCode(thePlayer, "THUNDER")
 check(again.Ok and profile.Cosmetics.Owned.PickThunderclap, "Typing a used code didn't give back the look it gives")
 clock += 3
 check(not handlers.RedeemCode(thePlayer, "THUNDER").Ok, "A used code with nothing missing redeemed again")
--- STORM: the Stormcaller Wings and the STORMBORN title, both owned and on;
--- limited to 100.
+-- STORM: the Thunder Aura and the STORMBORN title, both owned and on;
+-- limited to 100. (The Stormcaller Wings stay in the game for a later one.)
 clock += 3
 local storm = handlers.RedeemCode(thePlayer, "storm")
-check(storm.Ok and profile.Cosmetics.Owned.BackStormwings and profile.Cosmetics.Owned.TitleStormborn, "STORM didn't give the Stormcaller Wings and the STORMBORN title")
-check(profile.Cosmetics.Back == "BackStormwings" and profile.Cosmetics.Title == "TitleStormborn", "The Stormcaller Wings or the title weren't put on")
+check(storm.Ok and profile.Cosmetics.Owned.AuraThunder and profile.Cosmetics.Owned.TitleStormborn, "STORM didn't give the Thunder Aura and the STORMBORN title")
+check(profile.Cosmetics.Aura == "AuraThunder" and profile.Cosmetics.Title == "TitleStormborn", "The Thunder Aura or the title weren't put on")
+check(not profile.Cosmetics.Owned.BackStormwings, "STORM still gives the Stormcaller Wings")
 check(stubs.Codes.List.STORM.Limit == 100, "STORM isn't limited to 100")
 check(stubs.Codes.allowed({ For = { "kingreen113" } }, { Name = "KINGREEN113", DisplayName = "x" }), "A gift by username")
 check(stubs.Codes.allowed({ For = { 42 } }, { UserId = 42 }) and not stubs.Codes.allowed({ For = { 42 } }, { UserId = 7 }), "A gift by UserId")

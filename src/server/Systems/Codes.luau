@@ -40,10 +40,11 @@ Codes.List = {
 		Note = "Free Thunderclap storm pickaxe skin for players (limited: 100)",
 	},
 	STORM = {
-		-- The Stormcaller Wings promo: the wings and the STORMBORN title, 100 only.
-		Reward = { Cosmetics = { "BackStormwings", "TitleStormborn" } },
+		-- The Thunder Aura promo: the aura and the STORMBORN title, 100 only.
+		-- (The Stormcaller Wings, BackStormwings, are kept for a later code.)
+		Reward = { Cosmetics = { "AuraThunder", "TitleStormborn" } },
 		Limit = 100,
-		Note = "Stormcaller Wings + STORMBORN title for players (limited: 100)",
+		Note = "Thunder Aura + STORMBORN title for players (limited: 100)",
 	},
 	TRISKULL = {
 		-- The Triskull promo video: a Legendary Triskull, 100 only, for two weeks.

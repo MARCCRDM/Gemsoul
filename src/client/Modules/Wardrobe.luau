@@ -44,7 +44,7 @@ local C = {
 	Accent = Color3.fromRGB(255, 120, 190),
 }
 local HEAVY, HEADING, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
-local KINDS = { "Suit", "Skin", "Shield", "Helmet", "Visor", "Pick", "Trim", "Back", "Title" }
+local KINDS = { "Suit", "Skin", "Shield", "Helmet", "Visor", "Pick", "Trim", "Back", "Aura", "Title" }
 local KIND_TITLE = {
 	Suit = "SUITS",
 	Skin = "WEAPON SKINS",
@@ -54,9 +54,10 @@ local KIND_TITLE = {
 	Pick = "PICKAXES",
 	Trim = "TRIMS",
 	Back = "BACKS",
+	Aura = "AURAS",
 	Title = "TITLES",
 }
-local KIND_WIDTH = { Suit = 98, Skin = 150, Shield = 150, Helmet = 116, Visor = 108, Pick = 124, Trim = 92, Back = 92, Title = 98 }
+local KIND_WIDTH = { Suit = 98, Skin = 150, Shield = 150, Helmet = 116, Visor = 108, Pick = 124, Trim = 92, Back = 92, Aura = 92, Title = 98 }
 local KIND_STANDARD = {
 	Suit = "Your armour in its own colours, as crafted.",
 	Skin = "Your weapon in its own colours, as forged.",
@@ -66,6 +67,7 @@ local KIND_STANDARD = {
 	Pick = "Your pick as it came from supply, in its own colour.",
 	Trim = "Your class glow in its own colour.",
 	Back = "Nothing on your back.",
+	Aura = "No aura round you.",
 	Title = "No title over your head.",
 }
 -- The "nothing" tile's name, per kind.
@@ -78,6 +80,7 @@ local KIND_NONE = {
 	Pick = "Standard",
 	Trim = "No trim",
 	Back = "None",
+	Aura = "None",
 	Title = "None",
 }
 local RANK = { Common = 1, Uncommon = 2, Rare = 3, UltraRare = 4, Legendary = 5 }
@@ -557,7 +560,7 @@ local function build(canvas: Instance)
 	-- (Under the title: the tabs take the rest of the row.)
 	ui.Sub = text(window, "", 11, C.Dim, HEADING, 30, 50, 400, 14)
 	ui.Tabs = {}
-	-- (Right of the title: eight tabs take the rest of the row.)
+	-- (Right of the title: the tabs take the rest of the row, scrolling.)
 	local tabStrip = new("ScrollingFrame", {
 		BackgroundTransparency = 1, BorderSizePixel = 0,
 		Position = UDim2.fromOffset(316, 20), Size = UDim2.fromOffset(WIN_W - 390, 42),

@@ -1710,6 +1710,56 @@ local FIRE_TEXTURE = "rbxasset://textures/particles/fire_main.dds"
 local SPARK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
+-- Auras (cosmetics) ------------------------------------------------------------------------
+-- Effects all round the wearer rather than a piece of gear: an invisible
+-- shell welded round the body carries them.
+
+local AURAS: { [string]: (Instance, Model, BasePart, Color3) -> () } = {}
+
+-- Thunder Aura (a promo code's): blue sparks crackle all over you, arcs of
+-- current jump round your body, and you land from a jump in a flash of
+-- lightning (the shell's ThunderArc "Aura": Client ThunderArcs).
+AURAS.Thunder = function(folder, _character, torso, glow)
+	local shell = Instance.new("Part")
+	shell.Name = "Aura"
+	shell.Size = Vector3.new(3.2, 5.2, 2)
+	shell.Transparency = 1
+	shell.CanCollide, shell.CanQuery, shell.CanTouch, shell.Massless = false, false, false, true
+	shell.CastShadow = false
+	shell.CFrame = torso.CFrame * CFrame.new(0, -0.9, 0)
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0, weld.Part1 = torso, shell
+	weld.Parent = shell
+	shell:SetAttribute("ThunderArc", "Aura")
+	CollectionService:AddTag(shell, Tags.ThunderArc)
+	local white = Color3.fromRGB(235, 248, 255)
+	-- { name, rate, size, lifetime, speed }: quick sparks, and now and then a
+	-- bigger crackle.
+	for _, spec in { { "Sparks", 22, 0.3, NumberRange.new(0.1, 0.28), NumberRange.new(3, 7) }, { "Crackle", 5, 0.75, NumberRange.new(0.06, 0.12), NumberRange.new(0, 0.5) } } do
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Name = spec[1]
+		emitter.Texture = SPARK_TEXTURE
+		emitter.Color = ColorSequence.new(white, glow)
+		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, spec[3]), NumberSequenceKeypoint.new(1, 0) })
+		emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+		emitter.Lifetime = spec[4]
+		emitter.Speed = spec[5]
+		emitter.Rate = spec[2]
+		emitter.SpreadAngle = Vector2.new(180, 180)
+		emitter.LightEmission = 1
+		emitter.LockedToPart = true
+		emitter.Shape = Enum.ParticleEmitterShape.Box
+		emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+		emitter.Parent = shell
+	end
+	local light = Instance.new("PointLight")
+	light.Name = "AuraLight"
+	light.Color, light.Range, light.Brightness, light.Shadows = glow, 9, 1.1, false
+	light.Parent = shell
+	shell.Parent = folder
+end
+
+
 type ParticleStyle = {
 	Texture: string,
 	Colors: { Color3 },
@@ -2859,6 +2909,12 @@ local function dress(character: Model, loadout, cosmetics, userId: number, only:
 	if torso and build and not only then
 		local mount = CFrame.new(0, 0, torso.Size.Z / 2 + 0.55) * CFrame.Angles(0, math.rad(180), 0)
 		build(folder, torso, mount, back.Color, accent)
+	end
+	-- An aura (cosmetic): effects all round you.
+	local aura = cosmetics and Cosmetics.get(cosmetics.Aura)
+	local buildAura = aura and aura.Look and AURAS[aura.Look]
+	if torso and buildAura and not only then
+		buildAura(folder, character, torso, aura.Color)
 	end
 
 	-- The weapon gets its own folder, so its parts are easy to tell apart.

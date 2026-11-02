@@ -7,6 +7,9 @@
 	The Stormcaller Wings crackle too (Server Equipment tags their storm
 	core "WingCore" and their spark tips "Wing"), and worn with the pick,
 	current jumps from it to the wings.
+	A Thunder Aura (Server Equipment's shell round the body, "Aura"): arcs
+	jump off its wearer's limbs, and they land from a jump in a strike of
+	lightning with current running out along the ground.
 	Purely local: nothing replicates.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -20,6 +23,9 @@ local NEAR = 120 -- studs from the camera: further off, no arcs
 local EVERY = { 0.35, 1.1 } -- seconds between one pick's arcs
 local STRIKE_AGAIN = 60 -- seconds before a pick's arrival strikes again
 local WING_EVERY = { 0.5, 1.4 } -- seconds between the Stormcaller Wings' arcs
+local AURA_EVERY = { 0.25, 0.7 } -- seconds between a Thunder Aura's arcs round its wearer
+local LAND_AGAIN = 1.2 -- seconds: a Thunder Aura's landing strike at most this often
+local LAND_FALL = 18 -- studs/s falling (or more) for a landing to strike
 local SET_ARC = 0.35 -- with the wings on too: how often a pick's arc goes to them
 local SET_REACH = 9 -- studs: the furthest a pick-to-wing arc jumps
 
@@ -62,6 +68,72 @@ local function partsOf(owner: Instance?, role: string): { BasePart }
 	return list
 end
 
+-- A wearer's body parts on screen (none in first person: your own limbs
+-- are hidden then).
+local function bodyOf(owner: Instance?): { BasePart }
+	local list = {}
+	if owner then
+		for _, child in owner:GetChildren() do
+			if child:IsA("BasePart") and child.Name ~= "HumanoidRootPart" and child.Transparency < 1 and child.LocalTransparencyModifier < 1 then
+				table.insert(list, child)
+			end
+		end
+	end
+	return list
+end
+
+-- A Thunder Aura's wearer lands from a jump or a fall: lightning cracks
+-- down where they land, and current runs out along the ground.
+local landed: { [Instance]: number } = {}
+local watching: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local function watchLandings(shell: BasePart)
+	local owner = wearer(shell)
+	local humanoid = owner and owner:FindFirstChildOfClass("Humanoid")
+	-- (One watch per shell: rebuilt gear brings a new shell, and the old
+	-- watch lets go at its next state change.)
+	if not owner or not humanoid or watching[shell] then
+		return
+	end
+	watching[shell] = true
+	local falling = 0
+	local connection
+	connection = humanoid.StateChanged:Connect(function(_, state)
+		if not shell.Parent or not shell:IsDescendantOf(owner) then
+			watching[shell] = nil
+			connection:Disconnect()
+			return
+		end
+		local root = owner:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if state == Enum.HumanoidStateType.Freefall then
+			falling = 0
+		elseif state == Enum.HumanoidStateType.Landed and root and near(root, NEAR) then
+			local now = os.clock()
+			local speed = math.max(falling, -root.AssemblyLinearVelocity.Y)
+			if speed >= LAND_FALL and now - (landed[owner] or 0) >= LAND_AGAIN then
+				landed[owner] = now
+				local feet = root.Position - Vector3.new(0, 2.8, 0)
+				pcall(CombatVfx.lightning, feet + Vector3.new(rng:NextNumber(-2, 2), 22, rng:NextNumber(-2, 2)), feet, VOLT)
+				for i = 1, 4 do
+					local angle = (i + rng:NextNumber(-0.3, 0.3)) * math.pi / 2
+					local out = feet + Vector3.new(math.cos(angle), 0.1, math.sin(angle)) * rng:NextNumber(2.5, 4)
+					pcall(CombatVfx.arc, feet + Vector3.new(0, 0.1, 0), out, VOLT, 0.05)
+				end
+			end
+		end
+	end)
+	-- (How fast they were falling, read while they fall: by the time they've
+	-- landed it's gone.)
+	task.spawn(function()
+		while connection.Connected do
+			local root = owner:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if root and humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+				falling = math.max(falling, -root.AssemblyLinearVelocity.Y)
+			end
+			task.wait(0.05)
+		end
+	end)
+end
+
 -- The tip beside a core (the same pick: the same parent).
 local function tipOf(core: BasePart): BasePart?
 	for _, other in CollectionService:GetTagged(Tags.ThunderArc) do
@@ -95,6 +167,15 @@ local function arrived(part: Instance)
 end
 
 CollectionService:GetInstanceAddedSignal(Tags.ThunderArc):Connect(arrived)
+local function auraArrived(part: Instance)
+	if part:IsA("BasePart") and part:GetAttribute("ThunderArc") == "Aura" then
+		task.defer(watchLandings, part)
+	end
+end
+CollectionService:GetInstanceAddedSignal(Tags.ThunderArc):Connect(auraArrived)
+for _, part in CollectionService:GetTagged(Tags.ThunderArc) do
+	auraArrived(part)
+end
 CollectionService:GetInstanceRemovedSignal(Tags.ThunderArc):Connect(function(part)
 	nextArc[part :: BasePart] = nil
 end)
@@ -125,6 +206,21 @@ task.spawn(function()
 							then tip.Position
 							else from + rng:NextUnitVector() * rng:NextNumber(1.2, 2.6)
 						pcall(CombatVfx.arc, from, to, VOLT, 0.045)
+					end
+				end
+			elseif part:IsA("BasePart") and part:GetAttribute("ThunderArc") == "Aura" and part:IsDescendantOf(workspace) and near(part, NEAR) then
+				-- A Thunder Aura: current jumps off a limb into the air round it.
+				local due = nextArc[part]
+				if not due then
+					nextArc[part] = now + rng:NextNumber(AURA_EVERY[1], AURA_EVERY[2])
+				elseif now >= due then
+					nextArc[part] = now + rng:NextNumber(AURA_EVERY[1], AURA_EVERY[2])
+					local limbs = bodyOf(wearer(part))
+					if #limbs > 0 then
+						local limb = limbs[rng:NextInteger(1, #limbs)]
+						local from = limb.Position + rng:NextUnitVector() * 0.4
+						local to = from + rng:NextUnitVector() * rng:NextNumber(1.2, 2.4)
+						pcall(CombatVfx.arc, from, to, VOLT, 0.04)
 					end
 				end
 			elseif part:IsA("BasePart") and part:GetAttribute("ThunderArc") == "WingCore" and shows(part) and near(part, NEAR) then

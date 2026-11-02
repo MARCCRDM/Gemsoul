@@ -284,7 +284,7 @@ end
 
 local function equipCosmetic(player: Player, kind: any, id: any)
 	local profile = PlayerData.get(player)
-	if not profile or (kind ~= "Trim" and kind ~= "Back" and kind ~= "Title" and not Cosmetics.isMinerKind(kind)) then
+	if not profile or (kind ~= "Trim" and kind ~= "Back" and kind ~= "Aura" and kind ~= "Title" and not Cosmetics.isMinerKind(kind)) then
 		return reply(false, "Pick something to wear.")
 	end
 	if id ~= nil then

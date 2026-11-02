@@ -396,6 +396,39 @@ function BACKS.Halo(root: Frame, size: number, color: Color3)
 	end
 end
 
+-- An aura: a miner's dark silhouette in a glow of its colour, bolts and
+-- sparks all round it (the Thunder Aura).
+local function auraArt(root: Frame, size: number, color: Color3)
+	local glow = piece(root, 0.5, 0.52, 0.8, 0.86, color)
+	glow.BackgroundTransparency = 0.82
+	round(glow, size)
+	local ink = Color3.fromRGB(16, 22, 40)
+	local head = piece(root, 0.5, 0.25, 0.16, 0.16, ink)
+	round(head, size)
+	local body = piece(root, 0.5, 0.48, 0.26, 0.3, ink)
+	round(body, math.max(2, size / 20))
+	for _, side in { -1, 1 } do
+		local arm = piece(root, 0.5 + side * 0.17, 0.47, 0.08, 0.26, ink, side * 12)
+		round(arm, math.max(2, size / 30))
+		local leg = piece(root, 0.5 + side * 0.07, 0.75, 0.1, 0.24, ink)
+		round(leg, math.max(2, size / 30))
+		for _, rim in { body, head } do
+			stroke(rim, color:Lerp(WHITE, 0.4), math.max(1, size / 60))
+		end
+	end
+	-- Bolts: zigzags of three short bars, round the figure.
+	for _, at in { { 0.2, 0.3, 1 }, { 0.8, 0.36, -1 }, { 0.24, 0.72, -1 }, { 0.78, 0.7, 1 } } do
+		for i, bar in { { 0, 0, 0.12, 60 }, { 0.03, 0.05, 0.08, -50 }, { 0.06, 0.1, 0.12, 60 } } do
+			local seg = piece(root, at[1] + at[3] * bar[1], at[2] + bar[2], bar[3], 0.03, if i == 2 then WHITE else color:Lerp(WHITE, 0.5), at[3] * bar[4])
+			round(seg, 2)
+		end
+	end
+	for _, spark in { { 0.36, 0.14 }, { 0.66, 0.18 }, { 0.14, 0.52 }, { 0.88, 0.54 }, { 0.5, 0.92 } } do
+		local dot = piece(root, spark[1], spark[2], 0.04, 0.04, WHITE, 45)
+		stroke(dot, color, math.max(1, size / 70))
+	end
+end
+
 local function trim(root: Frame, size: number, color: Color3)
 	local glow = piece(root, 0.5, 0.5, 0.94, 0.94, color)
 	glow.BackgroundTransparency = 0.8
@@ -634,6 +667,8 @@ function ShopArt.icon(parent: Instance, kind: string, cosmeticId: string?, size:
 		CosmeticView.attach(root, cosmetic.Id, size >= 120)
 	elseif cosmetic and cosmetic.Kind == "Title" then
 		titleArt(root, size, cosmetic)
+	elseif cosmetic and cosmetic.Kind == "Aura" then
+		auraArt(root, size, cosmetic.Color)
 	elseif cosmetic then
 		local draw = BACKS[cosmetic.Look or ""] or BACKS.Pack
 		draw(root, size, cosmetic.Color)
