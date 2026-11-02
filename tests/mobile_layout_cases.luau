@@ -35,6 +35,12 @@ local SCREENS = {
 	{ 896, 414 - 58, 414 },
 	{ 932, 430 - 58, 430 },
 	{ 1024, 768 - 36, 768 },
+	-- Bigger tablets: an iPad (10th gen, Air), an iPad Pro 11, an Android
+	-- tablet, an iPad Pro 12.9.
+	{ 1180, 820 - 36, 820 },
+	{ 1194, 834 - 36, 834 },
+	{ 1280, 800 - 36, 800 },
+	{ 1366, 1024 - 36, 1024 },
 }
 local TILES = 8 -- PLAY, INVENTORY, STORE, TASKS, MARKET, GUIDE, SOCIAL, INVITE
 for _, s in SCREENS do
@@ -441,6 +447,11 @@ for _, s in {
 	{ 568, 320, 36 },
 	{ 960, 411, 58 },
 	{ 1000, 400, 58 },
+	-- tablets
+	{ 1024, 768, 36 },
+	{ 1180, 820, 36 },
+	{ 1280, 800, 36 },
+	{ 1366, 1024, 36 },
 } do
 	local screen = Vector2.new(s[1], s[2])
 	local label = "Store " .. s[1] .. "x" .. s[2]
@@ -475,5 +486,5 @@ check(thin.Strip >= thin.Close.H + 8 and thin.Close.Y >= 0, "No strip, and the c
 print(
 	"PASS: "
 		.. checks
-		.. " mobile layout checks (your kaiju's card small, two rows, at the top left, CATCH under it, the pick card beside it, the team keys above the move stick and the HYPERBEAM right of them, the foe list at the top right over the fight's ring, coins, chat, dock with TASKS, teammates' rows under your health and its size, the toast beside the pick card's place or under your health, the loot card under or beside them clear of the jump button, the kit switch by PLAY and clear of the fight's ring and vitals, at 7 screen sizes with 0 to 3 teammates; the Store filling the screen at 10 phone sizes, its rail and page beside it)"
+		.. " mobile layout checks (your kaiju's card small, two rows, at the top left, CATCH under it, the pick card beside it, the team keys above the move stick and the HYPERBEAM right of them, the foe list at the top right over the fight's ring, coins, chat, dock with TASKS, teammates' rows under your health and its size, the toast beside the pick card's place or under your health, the loot card under or beside them clear of the jump button, the kit switch by PLAY and clear of the fight's ring and vitals, at 11 phone and tablet sizes with 0 to 3 teammates; the Store filling the screen at 14 phone and tablet sizes, its rail and page beside it)"
 )
