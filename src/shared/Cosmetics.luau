@@ -1365,6 +1365,24 @@ Cosmetics.List = {
 			SeamColor = Color3.fromRGB(60, 230, 255),
 		},
 	},
+	SkinEclipse = {
+		Id = "SkinEclipse",
+		Kind = "Skin",
+		Name = "Eclipse Cleaver",
+		Description = "Turns your weapon into a war-axe of black glass: a crescent edged in gold, a dark sun burning on its back.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(255, 190, 70),
+		Exclusive = "Code",
+		How = "Redeem a promo code.",
+		Look = "Eclipse",
+		Palette = {
+			Plate = Color3.fromRGB(22, 20, 30),
+			PlateMaterial = Enum.Material.Glass,
+			Under = Color3.fromRGB(46, 28, 70),
+			Glow = Color3.fromRGB(255, 196, 72),
+			SeamColor = Color3.fromRGB(150, 70, 255),
+		},
+	},
 	SkinBanana = {
 		Id = "SkinBanana",
 		Kind = "Skin",
@@ -1517,16 +1535,6 @@ Cosmetics.List = {
 		Color = Color3.fromRGB(255, 215, 120),
 		Exclusive = "Invite",
 		How = "Invite 2 friends who join the game.",
-	},
-	PickEclipse = {
-		Id = "PickEclipse",
-		Kind = "Pick",
-		Name = "Eclipse Cleaver",
-		Description = "A war-axe of black glass, its crescent edged in gold, a dark sun burning on its back. The light goes out where it bites.",
-		Rarity = "Legendary",
-		Color = Color3.fromRGB(255, 190, 70),
-		Exclusive = "Code",
-		How = "Redeem a promo code.",
 	},
 	-- Visors (Equipment.applyVisor lays one on any helmet's lens). Glass
 	-- tints, then lit lenses, then moving ones, then the elements, then the

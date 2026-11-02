@@ -32,8 +32,8 @@ Codes.List = {
 		Note = "Like milestone",
 	},
 	ECLIPSE = {
-		Reward = { Cosmetics = { "PickEclipse" } },
-		Note = "Free Eclipse Cleaver pickaxe skin for players",
+		Reward = { Cosmetics = { "SkinEclipse" } },
+		Note = "Free Eclipse Cleaver axe weapon skin for players",
 	},
 	-- Gifts --------------------------------------------------------------
 	REAPERGIFT113 = {
