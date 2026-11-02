@@ -60,8 +60,9 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	  "Feed", text                              a duel result, for everyone's chat
 
 	A match: both sides are moved into one of the Arena's lanes, shielded and
-	facing off for a countdown, then fight until a side is down (or the time
-	runs out: the healthier side wins). Duel fighters only hurt their
+	facing off for a countdown, then fight until a side is down. There's no
+	clock on screen: only a long stalemate cap (Matchmaking.TimeLimit) ends a
+	fight nobody finishes, the healthier side winning. Duel fighters only hurt their
 	opponents (Shared.Matchmaking.versus). Leaving the Arena, the session or
 	the game forfeits. Each match plays by a PvP rule (Shared.PvPRules):
 	Ranked queues are rated (Elo) and Casual is unrated, both on full
@@ -69,8 +70,9 @@ local ArenaDrop = require(script.Parent.ArenaDrop)
 	choice of full progression or even stats. Fighters carry it as MatchStats /
 	MatchRarityCap, which the combat kit and stats read.
 	1v1 Ranked plays rounds (Shared.Matchmaking.Rounds): first to two, three
-	at most. A lethal blow downs the loser of a round instead of killing them
-	(CombatServer.onLethal). Between rounds, the pivot window: preset swaps
+	at most. A lethal blow ends the round: the loser's body blows apart as in
+	any death (RoundKO: client ElementalDeath), but they aren't killed, so the
+	match goes on, and the next round puts them back together (stage). Between rounds, the pivot window: preset swaps
 	only (Presets.wear), both lock at once, then the picks are revealed.
 	Each player's rating, wins and losses save in their profile (Duel).
 	Auto queue (Shared.AutoQueue): a lone 1v1 queue entry calls the lobby
@@ -336,6 +338,9 @@ local function release(match)
 				member:SetAttribute("MatchTeam", nil)
 				member:SetAttribute("MatchStats", nil)
 				member:SetAttribute("MatchRarityCap", nil)
+				if member.Character then
+					member.Character:SetAttribute("RoundKO", nil)
+				end
 				if member:GetAttribute("CombatSession") == "Duel" then
 					ArenaSessions.leave(member)
 				end
@@ -575,6 +580,7 @@ local function stage(match)
 			if humanoid and root and typeof(floor) == "Vector3" then
 				local at = floor + spot + Vector3.new(0, 3, 0)
 				member.Character:PivotTo(CFrame.lookAt(at, floor + centre + Vector3.new(0, 3, 0)))
+				member.Character:SetAttribute("RoundKO", nil) -- (blown apart last round: back in one piece)
 				humanoid.Health = humanoid.MaxHealth
 				shield(match, member)
 			end
@@ -941,6 +947,13 @@ local function lethal(player: Player, humanoid: Humanoid): boolean
 	end
 	if match.State == "Fight" then
 		humanoid.Health = 1
+		-- They go down as anyone killed does: the body blows apart (client
+		-- ElementalDeath, by the element that finished them) and is gone
+		-- until the next round puts them back on their lane (stage).
+		local character = player.Character
+		if character then
+			character:SetAttribute("RoundKO", true)
+		end
 		match.State = "RoundOver"
 		local team = player:GetAttribute("MatchTeam")
 		local winner = if team == 1 then 2 elseif team == 2 then 1 else nil

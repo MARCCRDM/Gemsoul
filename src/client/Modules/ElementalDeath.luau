@@ -532,8 +532,23 @@ function ElementalDeath.play(model: Model?, element: string?, color: Color3?): b
 	return true
 end
 
+-- Back in one piece (a Ranked round's loser, RoundKO cleared for the next
+-- round): the real body shows again, and can blow apart again.
+function ElementalDeath.revive(model: Model?)
+	if not model then
+		return
+	end
+	played[model] = nil
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then
+			d.LocalTransparencyModifier = 0
+		end
+	end
+end
+
 -- Players' bodies too (a duel, the Arena, a dungeon): on death, the last
--- element that hit them.
+-- element that hit them; and a Ranked round's loser (Server Duels sets
+-- RoundKO on the body: down, not dead, so the match goes on).
 local started = false
 function ElementalDeath.start()
 	if started then
@@ -546,6 +561,20 @@ function ElementalDeath.start()
 			humanoid.Died:Connect(function()
 				ElementalDeath.play(character, character:GetAttribute("LastHitElement"))
 			end)
+			local function knockedOut()
+				if character:GetAttribute("RoundKO") then
+					local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+					if ElementalDeath.play(character, character:GetAttribute("LastHitElement")) and root then
+						CombatSound.play("Death", root.Position)
+					end
+				else
+					ElementalDeath.revive(character)
+				end
+			end
+			character:GetAttributeChangedSignal("RoundKO"):Connect(knockedOut)
+			if character:GetAttribute("RoundKO") then
+				knockedOut()
+			end
 		end
 	end
 	local function track(player: Player)

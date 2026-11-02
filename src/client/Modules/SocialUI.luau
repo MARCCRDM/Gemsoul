@@ -2022,16 +2022,11 @@ game:GetService("RunService").RenderStepped:Connect(function()
 		else
 			faceoff.Visible = false
 		end
-		fightTimer.Visible = left <= 0 and not RoundPivot.visible()
+		-- (No clock: a fight to the finish. Rounds show the score.)
+		fightTimer.Visible = left <= 0 and not RoundPivot.visible() and match.Score ~= nil
 		fightTimer.Text = if match.Score
-			then string.format(
-				"R%d  ·  %d – %d  ·  ⚔ %s",
-				match.Round or 1,
-				match.Score.Mine,
-				match.Score.Theirs,
-				clock(match.Ends - now)
-			)
-			else "⚔ " .. clock(match.Ends - now)
+			then string.format("ROUND %d  ·  %d – %d", match.Round or 1, match.Score.Mine, match.Score.Theirs)
+			else ""
 	end
 	RoundPivot.tick(now)
 	-- (not over the Social window: its Arena section shows the search; nor

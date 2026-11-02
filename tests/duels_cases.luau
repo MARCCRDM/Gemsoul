@@ -388,6 +388,8 @@ do
 	-- Round 1: Hal takes a lethal blow and is downed, not killed.
 	lethalBlow(hal)
 	check(hal.Humanoid.Health == 1 and m.State == "Pivot", "A lethal blow killed instead of ending the round")
+	check(hal.Character:GetAttribute("RoundKO") == true, "The round's loser didn't blow apart (RoundKO)")
+	check(gus.Character:GetAttribute("RoundKO") == nil, "The round's winner blew apart")
 	local pivot = last(gus, "Round")[2]
 	check(pivot.Phase == "Pivot" and pivot.Winner == "You" and pivot.Wins.Mine == 1, "Round 1 not Gus's")
 	check(last(hal, "Round")[2].Winner == "Them", "Hal wasn't told he lost the round")
@@ -410,6 +412,7 @@ do
 	check(profiles[hal].Miners.Active == 2 and profiles[gus].Miners.Active == 1, "Whole miner counter-pick failed")
 	check(revealed.Picks.Mine[1].Preset == "Miner 2" and revealed.Picks.Theirs[1].Preset == "Miner 1", "Wrong miners revealed")
 	check(hal.Humanoid.Health == hal.Humanoid.MaxHealth, "Hal wasn't healed for round 2")
+	check(hal.Character:GetAttribute("RoundKO") == nil, "Hal's body wasn't put back together for round 2")
 	-- Round 2 starts like round 1: both back in their pods while the picks
 	-- show, then dropped onto the lanes.
 	check(preparedDrops[gus] and preparedDrops[hal], "Round 2 didn't put them back in the pods")

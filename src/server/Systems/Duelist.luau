@@ -2978,10 +2978,19 @@ function Duelist.start()
 		player:SetAttribute("Blocking", false)
 		local seconds = Spar.DownSeconds
 		player:SetAttribute("SparDown", workspace:GetServerTimeNow() + seconds)
+		-- (The body blows apart as in any death, and is back together when
+		-- they get up: RoundKO, client ElementalDeath.)
+		local body = player.Character
+		if body then
+			body:SetAttribute("RoundKO", true)
+		end
 		Remotes.CombatFx:FireAllClients("SparKO", player.UserId, 0)
 		Remotes.Notify:FireClient(player, string.format("Knocked down by %s.", duel.Name))
 		task.delay(seconds, function()
 			player:SetAttribute("SparDown", nil)
+			if body and body.Parent then
+				body:SetAttribute("RoundKO", nil)
+			end
 			if humanoid.Parent and humanoid.Health > 0 then
 				humanoid.Health = humanoid.MaxHealth
 			end

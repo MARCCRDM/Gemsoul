@@ -337,6 +337,13 @@ local function makePlayer(id, name)
 	local root = { Position = Vector3.new(0, 5, 0) }
 	p.Character = {
 		Humanoid = humanoid,
+		Attrs = {},
+		SetAttribute = function(self, key, value)
+			self.Attrs[key] = value
+		end,
+		GetAttribute = function(self, key)
+			return self.Attrs[key]
+		end,
 		FindFirstChildOfClass = function(_, class)
 			return if class == "Humanoid" then humanoid else nil
 		end,
