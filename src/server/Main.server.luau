@@ -123,6 +123,7 @@ if Config.CombatEnabled or not Config.MenuOnly then
 	Enemies.start(Config.MenuOnly)
 	CombatServer.start()
 	require(script.Parent.Systems.ArenaSessions).start()
+	require(script.Parent.Systems.PrivateArenas).start()
 	-- PvP sessions bring a computer rival with a random loadout.
 	require(script.Parent.Systems.Duelist).start()
 	-- Player duels: the 1v1 and 2v2 queues, challenges and rated matches.

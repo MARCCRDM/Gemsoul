@@ -1,5 +1,7 @@
 local ArenaDrop = require(script.Parent.ArenaDrop)
 -- Joining the PvP Arena is explicit; training visitors cannot receive player damage.
+-- A Training session (a first fight, the intro rounds, practice) is fought
+-- in a private copy of the Arena (Server.PrivateArenas): nobody else's.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
@@ -9,6 +11,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Shop = require(script.Parent.Shop)
 local SeatExit = require(script.Parent.SeatExit)
 local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
+local PrivateArenas = require(script.Parent.PrivateArenas)
 local ArenaSessions = {}
 -- Hooks set by the Duelist (a computer rival in PvP); nil when not running.
 ArenaSessions.onDungeonLeave = nil
@@ -32,6 +35,9 @@ local function enter(player, pvp)
 	if not PlayerData.get(player) or not humanoid or humanoid.Health <= 0 or typeof(center) ~= "Vector3" then
 		return Shop.reply(false, "The Arena isn't ready yet.")
 	end
+	if not pvp then
+		center = PrivateArenas.claim(player) or center
+	end
 	busy[player] = true
 	ArenaDrop.prepare(player)
 	local angle = math.rad((player.UserId % 8) * 45)
@@ -45,6 +51,7 @@ local function enter(player, pvp)
 	end)
 	busy[player] = nil
 	if not ok then
+		PrivateArenas.release(player)
 		ArenaDrop.cancel(character)
 		return Shop.reply(false, "Couldn't enter the Arena. Try again.")
 	end
@@ -82,6 +89,7 @@ local function leave(player)
 	player:SetAttribute("CombatSession", nil)
 	player:SetAttribute("RaidId", nil)
 	player:SetAttribute("Blocking", false)
+	PrivateArenas.release(player)
 	-- The same body goes back (no respawn), so free it first: out of any
 	-- seat, unfrozen (the arena drop anchors it), still, and with no fight
 	-- pose left on it for anyone's screen to draw. (The client settles its
@@ -149,6 +157,7 @@ function ArenaSessions.start()
 			player:SetAttribute("PvPEnabled", false)
 			player:SetAttribute("CombatSession", nil)
 			player:SetAttribute("RaidId", nil)
+			PrivateArenas.release(player)
 		end)
 	end
 	Players.PlayerAdded:Connect(watch)

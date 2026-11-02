@@ -51,7 +51,9 @@ local panels: { BasePart } = {}
 
 local function landmarks(): (Vector3?, number?)
 	local marks = ReplicatedStorage:FindFirstChild("Landmarks")
-	local center = marks and marks:GetAttribute("ArenaFloor")
+	-- (a Training session's private copy of the Arena: Server.PrivateArenas)
+	local own = game:GetService("Players").LocalPlayer:GetAttribute("ArenaCenter")
+	local center = if typeof(own) == "Vector3" then own else marks and marks:GetAttribute("ArenaFloor")
 	local radius = marks and marks:GetAttribute("ArenaRadius")
 	if typeof(center) ~= "Vector3" or type(radius) ~= "number" then
 		return nil, nil
@@ -113,10 +115,15 @@ local function door(parent: Instance, center: Vector3, radius: number)
 end
 
 local function build()
-	if folder then
+	local center, radius = landmarks()
+	if folder and folder:GetAttribute("Center") == center then
 		return
 	end
-	local center, radius = landmarks()
+	if folder then
+		-- (its floor moved: a private copy of the Arena, or back: Server.PrivateArenas)
+		folder:Destroy()
+		folder = nil
+	end
 	if not center or not radius then
 		return
 	end
@@ -142,6 +149,7 @@ local function build()
 		table.insert(panels, p)
 	end
 	pcall(door, f, center, radius)
+	f:SetAttribute("Center", center)
 	f.Parent = workspace
 	folder = f
 end

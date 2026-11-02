@@ -25,6 +25,7 @@ source+=module('CombatServer','src/server/Systems/CombatServer.luau')
 source+=module('Motion','src/shared/InsertionMotion.luau')
 source+=module('SeatExit','src/server/Systems/SeatExit.luau')
 source+=module('ArenaDrop','src/server/Systems/ArenaDrop.luau')
+source+='PrivateArenas = { claim = function() return nil end, release = function() end } -- (a global: the file is at its 200 locals)\n'
 source+=module('ArenaSessions','src/server/Systems/ArenaSessions.luau')
 source+=module('AugmentSystem','src/server/Systems/Augments.luau')
 source+='Levelling=(function()\n'+read('src/shared/Levelling.luau')+'\nend)()\n'

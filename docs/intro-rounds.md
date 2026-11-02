@@ -79,3 +79,14 @@ Until their set's done, a new miner only fights the intro rivals: the next round
 5. **The Nest:** the Shardhorn Behemoth, a glowing-horned rhino (gentle for a new miner; at half health it's enraged and one rot-spawn joins). Down: the last three pieces' roll cards one after another (`dungeonWon(p, "Boss")`; NEXT PIECE), the set's coins, TO THE LOBBY (`FirstDungeonDone`, with the clear's rewards; out by itself after `IntroOutSeconds`).
 
 Knocked down in there: RECOVER or GO TO LOBBY (no "back to the intro fights": this is the intro). Left early, PLAY / NEXT STEP takes them back in (`IntroRoundNext` answers `{ Dungeon = true }`); its first room only pays once.
+
+## Private arenas
+
+Every Training session gets its own copy of the Arena (`Server.PrivateArenas`). That covers a new miner's first fight, the intro rounds and practice. Each copy sits 1500 studs from the next, around z −6000 from the Arena, so new players never land in each other's intro fights. They don't see or hear each other either. Duels, PvP and raids keep the shared Arena.
+
+A copy is the Arena's scenery only: no vendors, prompts, scripts, spawn pads, seats, sounds or tags. Its floor is the player's `ArenaCenter` attribute:
+- the rival steps in there (Duelist);
+- the barrier rings it (ArenaBarrier);
+- `Shared.Combat.inArena` counts it as the Arena.
+
+Copies go back to a small pool when the session ends (`Spare` = 3).

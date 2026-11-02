@@ -2327,7 +2327,12 @@ function spawnRival(owner: Player, raid, encounter)
 	local sparring = session == "Training"
 	local root = ownerRoot(owner)
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
-	local center = if encounter then encounter.Center else landmarks and landmarks:GetAttribute("ArenaFloor")
+	-- (a Training session's own copy of the Arena: Server.PrivateArenas)
+	local own = owner:GetAttribute("ArenaCenter")
+	local center = if encounter
+		then encounter.Center
+		elseif typeof(own) == "Vector3" then own
+		else landmarks and landmarks:GetAttribute("ArenaFloor")
 	local ownerLoadout = PlayerData.character(owner)
 	if not root or typeof(center) ~= "Vector3" or not ownerLoadout then
 		return

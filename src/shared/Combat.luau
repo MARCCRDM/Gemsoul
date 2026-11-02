@@ -62,13 +62,41 @@ local function landmark(name: string): any
 	return landmarks and landmarks:GetAttribute(name)
 end
 
-function Combat.inArena(position: Vector3): boolean
-	local center, radius = landmark("ArenaFloor"), landmark("ArenaRadius")
-	if typeof(center) ~= "Vector3" or typeof(radius) ~= "number" then
+local function onFloor(position: Vector3, center: any, radius: number): boolean
+	if typeof(center) ~= "Vector3" then
 		return false
 	end
 	local offset = position - center
 	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= radius + 2 and math.abs(offset.Y) < 30
+end
+
+-- On the Arena's floor, or on a private copy's (Server.PrivateArenas: a
+-- Training session's own, its Center under workspace.PrivateArenas).
+function Combat.inArena(position: Vector3): boolean
+	local radius = landmark("ArenaRadius")
+	if typeof(radius) ~= "number" then
+		return false
+	end
+	if onFloor(position, landmark("ArenaFloor"), radius) then
+		return true
+	end
+	local copies = workspace:FindFirstChild("PrivateArenas")
+	for _, copy in if copies then copies:GetChildren() else {} do
+		if onFloor(position, copy:GetAttribute("Center"), radius) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Where `player`'s Arena floor is: their private copy's (ArenaCenter), or the Arena's.
+function Combat.arenaCenter(player: Player?): Vector3?
+	local own = player and player:GetAttribute("ArenaCenter")
+	if typeof(own) == "Vector3" then
+		return own
+	end
+	local center = landmark("ArenaFloor")
+	return if typeof(center) == "Vector3" then center else nil
 end
 
 -- Can a fight happen at this spot?
