@@ -818,7 +818,11 @@ function IntroRoundsUI.next()
 		busy = true
 		hide()
 		task.spawn(function()
-			GemClient.request("IntroRoundLeave")
+			local result = GemClient.request("IntroRoundLeave")
+			if not (result and result.Ok) and player:GetAttribute("CombatSession") ~= nil then
+				-- (never left standing in the Arena: out the plain way)
+				GemClient.request("ArenaLeave")
+			end
 			busy = false
 		end)
 		return

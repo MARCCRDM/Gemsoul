@@ -106,6 +106,7 @@ local env = setmetatable({
 	require = function(name) return stubs[name] or shared(name) end,
 	warn = function(...) print("warn:", ...) end,
 	task = { spawn = function(f, ...) f(...) end, delay = function() end, wait = function() end },
+	workspace = { FindFirstChild = function() return nil end }, -- (no rival up: Server._rivalUp)
 }, { __index = _G })
 for k, v in baseEnv do env[k] = v end
 local Server = luau.load(fs.readFile(ROOT .. "/src/server/Systems/IntroRoundsServer.luau"), { debugName = "IntroRoundsServer", environment = env })()
@@ -259,6 +260,30 @@ do
 	check(fired[before + 3][2].View.Done and fired[before + 3][2].Coins == IntroRounds.SetCoins, "The last card isn't the set's")
 	check(Server.stage(player) == "Done" and Server.dungeonWon(player, "Boss") == 0, "Paid past the set")
 	Config.Features.IntroDungeon = nil
+end
+
+-- Never stuck in the intro's Arena (Server.unstick, the watch's look at a player).
+do
+	local nexts, leaves = 0, 0
+	local realNext, realLeave = Server._next, Server._leave
+	Server._next = function() nexts += 1 end
+	Server._leave = function() leaves += 1 end
+	profile = newProfile({})
+	attributes.CombatSession = "Training"
+	check(Server.left(player) == IntroRounds.Count, "A new set has rounds left")
+	check(Server.unstick(player, 100) == nil and Server.unstick(player, 100 + Server.StuckAfter - 1) == nil, "Moved on too soon")
+	check(Server.unstick(player, 100 + Server.StuckAfter + 1) == "Next" and nexts == 1, "Left in the Arena with no rival and rounds to go")
+	-- The set done but still in there: out to the finale.
+	profile.IntroRounds.Won = IntroRounds.Count
+	profile.IntroFinale = "Mines"
+	check(Server.unstick(player, 500) == nil, "Taken out the moment the set was done (the card's CONTINUE first)")
+	check(Server.unstick(player, 500 + Server.DoneOutAfter + 1) == "Out" and leaves == 1, "Left in the Arena after the set")
+	-- Practice after the intro: never moved.
+	profile.IntroFinale = "Done"
+	check(Server.unstick(player, 1000) == nil and Server.unstick(player, 2000) == nil, "A veteran's practice was cut short")
+	attributes.CombatSession = nil
+	check(Server.unstick(player, 3000) == nil, "Moved someone not in the Arena")
+	Server._next, Server._leave = realNext, realLeave
 end
 
 print(string.format("PASS: %d intro rounds server checks", checks))

@@ -111,6 +111,12 @@ end
 -- a few tries if the mannequin's busy; once built they stay.
 local warming = {} :: { [Player]: boolean }
 IntroRoundsServer.ResumeAfter = 6 -- seconds after they're in before a rejoin goes back to its rounds
+-- Never stuck in the intro's Arena (no way out of it mid-set): StuckAfter
+-- seconds in it with rounds left and no rival, and the next round comes in
+-- (the card's own countdown does it sooner); DoneOutAfter seconds in it with
+-- the set done, and they're taken out to the finale.
+IntroRoundsServer.StuckAfter = 25
+IntroRoundsServer.DoneOutAfter = 45
 function IntroRoundsServer.warm(player: Player)
 	if warming[player] then
 		return
@@ -138,6 +144,75 @@ function IntroRoundsServer.warm(player: Player)
 		end
 		warming[player] = nil
 	end)
+end
+
+-- Their round's rival, if it's up (Server.Duelist tags it RivalOwner).
+local function rivalUp(player: Player): boolean
+	local enemies = workspace:FindFirstChild("Enemies")
+	for _, model in if enemies then enemies:GetChildren() else {} do
+		if model:GetAttribute("RivalOwner") == player.UserId then
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.Health > 0 then
+				return true
+			end
+		end
+	end
+	return false
+end
+IntroRoundsServer._rivalUp = rivalUp
+
+-- One look at `player` (the watch's): moves them on if they're stuck in
+-- the intro's Arena. `since` remembers since when; returns what it did.
+local stuckSince = {} :: { [Player]: number }
+function IntroRoundsServer.unstick(player: Player, now: number): string?
+	local profile = PlayerData.get(player) :: any
+	if not profile or player:GetAttribute("CombatSession") ~= "Training" then
+		stuckSince[player] = nil
+		return nil
+	end
+	local left = IntroRoundsServer.left(player)
+	if left == 0 then
+		-- (the set's done: CONTINUE should have taken them out)
+		if profile.IntroFinale ~= "Mines" then
+			stuckSince[player] = nil
+			return nil
+		end
+	elseif rivalUp(player) then
+		stuckSince[player] = nil
+		return nil
+	end
+	local since = stuckSince[player] or now
+	stuckSince[player] = since
+	local wait = if left == 0 then IntroRoundsServer.DoneOutAfter else IntroRoundsServer.StuckAfter
+	if now - since < wait then
+		return nil
+	end
+	stuckSince[player] = nil
+	if left == 0 then
+		IntroRoundsServer._leave(player)
+		return "Out"
+	end
+	player:SetAttribute("IntroRounds", nil)
+	IntroRoundsServer._next(player)
+	return "Next"
+end
+
+function IntroRoundsServer.watch()
+	while true do
+		task.wait(5)
+		local now = os.clock()
+		for _, player in Players:GetPlayers() do
+			local ok, problem = pcall(IntroRoundsServer.unstick, player, now)
+			if not ok then
+				warn("[IntroRounds] unstick: " .. tostring(problem))
+			end
+		end
+		for player in stuckSince do
+			if not player.Parent then
+				stuckSince[player] = nil
+			end
+		end
+	end
 end
 
 -- Gives `player` a piece for `slot` at `rarity` and puts it on. Returns what
@@ -554,6 +629,8 @@ local function leaveRounds(player: Player)
 	end
 	return reply(true, "Back to the Outpost.")
 end
+-- (the watch's ways on: IntroRoundsServer.unstick)
+IntroRoundsServer._next, IntroRoundsServer._leave = nextRound, leaveRounds
 
 local started = false
 function IntroRoundsServer.start()
@@ -615,6 +692,7 @@ function IntroRoundsServer.start()
 	for _, player in Players:GetPlayers() do
 		resume(player)
 	end
+	task.spawn(IntroRoundsServer.watch)
 	Players.PlayerRemoving:Connect(function(player)
 		finaleCritters[player] = nil
 		finaleLoose[player] = nil
