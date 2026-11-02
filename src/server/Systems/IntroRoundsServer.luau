@@ -117,6 +117,7 @@ IntroRoundsServer.ResumeAfter = 6 -- seconds after they're in before a rejoin go
 -- the set done, and they're taken out to the finale.
 IntroRoundsServer.StuckAfter = 25
 IntroRoundsServer.DoneOutAfter = 45
+IntroRoundsServer.ChoiceWait = 90 -- (after a win, the card offers three ways on: time to choose)
 function IntroRoundsServer.warm(player: Player)
 	if warming[player] then
 		return
@@ -183,7 +184,12 @@ function IntroRoundsServer.unstick(player: Player, now: number): string?
 	end
 	local since = stuckSince[player] or now
 	stuckSince[player] = since
-	local wait = if left == 0 then IntroRoundsServer.DoneOutAfter else IntroRoundsServer.StuckAfter
+	local state = IntroRounds.state(profile)
+	local choosing = left > 0 and state ~= nil and state.Won >= IntroRounds.ChoiceAfter
+	local wait = if left == 0
+		then IntroRoundsServer.DoneOutAfter
+		elseif choosing then IntroRoundsServer.ChoiceWait
+		else IntroRoundsServer.StuckAfter
 	if now - since < wait then
 		return nil
 	end
@@ -329,9 +335,15 @@ function IntroRoundsServer.left(player: Player): number
 	end
 	return math.max(0, IntroRounds.Count - state.Won)
 end
+-- Whether they're held in the rounds now: rounds left, and they haven't
+-- stepped out to the Outpost or the first boss (state.Paused: choose).
+function IntroRoundsServer.held(player: Player): boolean
+	local state = stateOf(player)
+	return IntroRoundsServer.left(player) > 0 and not (state and state.Paused)
+end
 local function markLeft(player: Player)
 	local left = IntroRoundsServer.left(player)
-	player:SetAttribute("IntroRoundsLeft", if left > 0 then left else nil)
+	player:SetAttribute("IntroRoundsLeft", if left > 0 and IntroRoundsServer.held(player) then left else nil)
 end
 
 -- After the six rounds, the intro's finale (Client IntroFinale): out by
@@ -594,6 +606,11 @@ local function nextRound(player: Player)
 	if player:GetAttribute("MatchId") or player:GetAttribute("DuelQueue") then
 		return reply(false, "You're already in a match.")
 	end
+	-- (back to the rounds after a step out: held in them again)
+	if state.Paused then
+		state.Paused = nil
+		markLeft(player)
+	end
 	-- (The dungeon path, its 1v1s won: the dungeon's next. The client plays
 	-- the kaiju roll, then goes in: Client FirstDungeonUI, "FirstDungeon".)
 	if IntroRoundsServer.dungeonPath(player) and IntroRounds.stage(state, true) == "Dungeon" then
@@ -629,7 +646,7 @@ local function nextRound(player: Player)
 end
 
 local function leaveRounds(player: Player)
-	if IntroRoundsServer.left(player) > 0 then
+	if IntroRoundsServer.held(player) then
 		return reply(false, "Finish your intro rounds first.")
 	end
 	player:SetAttribute("IntroRounds", nil)
@@ -639,6 +656,36 @@ local function leaveRounds(player: Player)
 	end
 	return reply(true, "Back to the Outpost.")
 end
+-- The card after a win (from IntroRounds.ChoiceAfter wins on): out of the
+-- rounds for now, to the Outpost ("Outpost": the mines, the gems, the
+-- minions and the kaiju roll: IntroFinale) or to the first boss ("Boss":
+-- the Bounty Board's Bombardiro Drago, then the mines when they're back).
+-- The rest of the set waits: CONTINUE ROUNDS or PLAY takes it up again.
+local CHOICES = { Outpost = true, Boss = true }
+function IntroRoundsServer.choose(player: Player, which: any)
+	local state, profile = stateOf(player)
+	if not state or not CHOICES[which] then
+		return reply(false, "Pick a way on.")
+	end
+	if state.Won < IntroRounds.ChoiceAfter then
+		return reply(false, "Win your first fight first.")
+	end
+	if state.Won >= IntroRounds.Count then
+		return leaveRounds(player)
+	end
+	state.Paused = true
+	if (profile :: any).IntroFinale == nil then
+		(profile :: any).IntroFinale = "Mines"
+	end
+	markFinale(player)
+	markLeft(player)
+	pcall(Analytics.event, player, "IntroChoice", state.Won, which)
+	local out = leaveRounds(player)
+	out.Choice = which
+	return out
+end
+IntroRoundsServer.choiceAfter = IntroRounds.ChoiceAfter
+
 -- (the watch's ways on: IntroRoundsServer.unstick)
 IntroRoundsServer._next, IntroRoundsServer._leave = nextRound, leaveRounds
 
@@ -669,6 +716,7 @@ function IntroRoundsServer.start()
 	require(script.Parent.Duelist).IntroRounds = IntroRoundsServer
 	Shop.register("IntroRoundNext", nextRound)
 	Shop.register("IntroRoundLeave", leaveRounds)
+	Shop.register("IntroRoundChoose", IntroRoundsServer.choose)
 	Shop.register("IntroFinale", finale)
 	-- Coming back mid-intro: straight back into their next round (they
 	-- don't get the lobby till the six are won); the finale if it's to do.
@@ -689,7 +737,7 @@ function IntroRoundsServer.start()
 				return -- (a first join: the intro's first fight starts the rounds)
 			end
 			task.wait(IntroRoundsServer.ResumeAfter)
-			if player.Parent and IntroRoundsServer.left(player) > 0
+			if player.Parent and IntroRoundsServer.held(player)
 				and player:GetAttribute("CombatSession") == nil
 				and player:GetAttribute("MatchId") == nil
 				and player:GetAttribute("DuelQueue") == nil

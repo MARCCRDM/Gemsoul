@@ -48,6 +48,11 @@ IntroRounds.SetCoins = 500 -- the whole set won
 IntroRounds.Duels = 2 -- on the dungeon path, the 1v1 rounds before the dungeon
 IntroRounds.RoomPieces = 1 -- the dungeon's first room cleared: this many pieces (the boss: the rest)
 IntroRounds.GemAfter = 3 -- this round's win also gives a gem (socket it: Shared.FirstSteps)
+-- From this many wins on, the card after a win offers three ways on:
+-- CONTINUE ROUNDS, EXPLORE THE OUTPOST (the mines, the kaiju roll: the rest
+-- of the set waits for PLAY) or FIRST BOSS (Bombardiro Drago). Before it,
+-- the first fight has to be won (Server IntroRoundsServer.choose).
+IntroRounds.ChoiceAfter = 1
 
 -- The ladder: who you fight each round, how hard they hit (of a full Arena
 -- rival's damage), how fast they swing (their swing gap, times the rules'),

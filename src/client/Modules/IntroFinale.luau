@@ -28,6 +28,7 @@
 	can't happen (no rock near, no roll owed) is passed over.
 
 	  IntroFinale.start()   once (Lobby.client)
+	  IntroFinale.offerBoss()   FIRST BOSS from the rounds' card: its window
 	  IntroFinale.Lines     what's said
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -595,12 +596,24 @@ local function run()
 end
 
 -- In the Outpost, nothing else up: the finale's turn.
--- (Due: in the Outpost with it to do, out of any fight.)
+-- (Held a moment: the first boss chosen from the rounds' card, its window
+-- and the gate's lobby first: IntroFinale.offerBoss.)
+local heldUntil = 0
+local function gateUp(): boolean
+	local ok, up = pcall(function()
+		return require(script.Parent.RiftClient).gateOpen()
+	end)
+	return ok and up == true
+end
+-- (Due: in the Outpost with it to do, out of any fight, the Rift and its gate.)
 local function due(): boolean
 	if player:GetAttribute("IntroFinale") ~= "Mines" or player:GetAttribute("Outpost") ~= true then
 		return false
 	end
 	if player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil then
+		return false
+	end
+	if os.clock() < heldUntil or player:GetAttribute("RiftRun") ~= nil or gateUp() then
 		return false
 	end
 	return root() ~= nil
@@ -616,6 +629,22 @@ local function ready(): boolean
 	return not busy
 end
 IntroFinale.WaitAtMost = 20 -- seconds it waits for a screen still up (a card, a loading screen) when it's due
+
+-- FIRST BOSS on the rounds' card (Client IntroRoundsUI): once they're out
+-- in the Outpost, the first boss's window (TAKE HIM ON: the Bounty Board's
+-- gate). The mines and the kaiju wait till that's done with.
+function IntroFinale.offerBoss()
+	heldUntil = os.clock() + 30
+	task.spawn(function()
+		local waited = 0
+		while waited < 15 and (player:GetAttribute("Outpost") ~= true or player:GetAttribute("CombatSession") ~= nil) do
+			waited += task.wait(0.25)
+		end
+		task.wait(0.6)
+		pcall(invite)
+		heldUntil = os.clock() + 3 -- (the gate's lobby opens: due() waits on it)
+	end)
+end
 
 local started = false
 function IntroFinale.start()

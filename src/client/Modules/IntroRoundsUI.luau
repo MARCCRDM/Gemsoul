@@ -11,6 +11,8 @@
 	                                  the next one ringed in amber
 	  [ NEXT  Vera Coppercoil   SHIELD ]
 	  [      CONTINUE INTRO ROUNDS      ]   starts by itself after AutoNext
+	                                      (or Enter, on a computer: there,
+	                                      the card's keys, not clicks)
 	  [   GO TO LOBBY  ][ FIRST DUNGEON ]   seconds (in the Arena)
 
 	Three ways on: the next round, the lobby (the Outpost: the set waits, PLAY
@@ -27,6 +29,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
@@ -418,6 +421,21 @@ local function placeButtons(withLeave: boolean, withDungeon: boolean)
 	elseif withDungeon then
 		ui.Dungeon.Position, ui.Dungeon.Size = UDim2.fromOffset(PAD, y2), UDim2.fromOffset(full, 48)
 	end
+end
+
+-- The lower right button's colour: the rot's green (the first dungeon), or
+-- ember (the first boss, on the card after a win).
+local EMBER = Color3.fromRGB(255, 128, 84)
+local function tintDungeon(color: Color3)
+	local tint = ui.Dungeon:FindFirstChild("Tint")
+	if tint and tint:IsA("GuiObject") then
+		tint.BackgroundColor3 = color
+	end
+	local rim = ui.Dungeon:FindFirstChildOfClass("UIStroke")
+	if rim then
+		rim.Color = color
+	end
+	ui.DungeonSub.TextColor3 = color
 end
 
 -- Whether the first dungeon's on offer to this player.
@@ -870,6 +888,37 @@ local function leave()
 	end)
 end
 
+-- After a win (IntroRounds.ChoiceAfter on), the card's two lower buttons
+-- are the ways out for now: EXPLORE THE OUTPOST (the mines, the gems, the
+-- minions, the kaiju roll: Client IntroFinale) and FIRST BOSS (Bombardiro
+-- Drago's window, then the gate). The rest of the set waits for PLAY.
+local choosing = false
+-- A computer (a keyboard, not a touch screen): the card's keys, not clicks.
+local function keysOnly(): boolean
+	return UserInputService.KeyboardEnabled and not UiKit.touchOnly()
+end
+local function choose(which: string)
+	if busy then
+		return
+	end
+	busy = true
+	hide()
+	task.spawn(function()
+		local result = GemClient.request("IntroRoundChoose", which)
+		busy = false
+		if not (result and result.Ok) then
+			UiKit.toast(Lang.translate(result and result.Message or "Couldn't leave the rounds."), RED)
+			return
+		end
+		UiKit.toast(Lang.translate("Your intro rounds wait for you: PLAY carries on."), GOLD)
+		if which == "Boss" then
+			pcall(function()
+				require(script.Parent.IntroFinale).offerBoss()
+			end)
+		end
+	end)
+end
+
 -- FIRST DUNGEON: out of the rounds (the set waits), then the Rot
 -- Beachhead's screens and in (Client FirstDungeonUI).
 function IntroRoundsUI.toDungeon()
@@ -921,6 +970,14 @@ local function show(event)
 	end
 	ui.Extra.Text = ""
 	ui.Go:SetAttribute("Auto", nil)
+	choosing = false
+	if ui.Key1 then
+		ui.Key1.Visible, ui.Key2.Visible = false, false
+		ui.EnterKey.Visible = keysOnly()
+	end
+	ui.Dungeon.Text = Lang.translate("FIRST DUNGEON")
+	ui.DungeonSub.Text = Lang.translate("The Rot Beachhead")
+	tintDungeon(ROT)
 	local nextRival = view.Next
 	drawSlots(view, if view.Done then nil else nextRival.Slot)
 	local arena = inArena()
@@ -983,9 +1040,22 @@ local function show(event)
 			ui.WellNote.Text = Lang.translate("Tung Tung Tung Sahur waits")
 			ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
 			placeButtons(true, false)
+		elseif (view.Won or event.Round or 0) >= IntroRounds.ChoiceAfter then
+			-- (three ways on: the rounds, the Outpost, the first boss)
+			nextUp("NEXT", nextRival)
+			choosing = true
+			ui.Leave.Text = Lang.translate("EXPLORE THE OUTPOST")
+			ui.LeaveSub.Text = Lang.translate("Mines · gems · your kaiju")
+			ui.Dungeon.Text = Lang.translate("FIRST BOSS")
+			ui.DungeonSub.Text = Lang.translate("Bombardiro Drago")
+			tintDungeon(EMBER)
+			placeButtons(true, true)
 		else
 			nextUp("NEXT", nextRival)
 			placeButtons(false, false)
+		end
+		if ui.Key1 then
+			ui.Key1.Visible, ui.Key2.Visible = choosing and keysOnly(), choosing and keysOnly()
 		end
 		if event.Gem then
 			ui.Extra.Text = Lang.translate(string.format(if event.Auto and (event.Auto.Gems or 0) > 0 then "+ %s gem, socketed for you" else "+ %s gem, in your pouch", event.Gem.Name))
@@ -996,6 +1066,10 @@ local function show(event)
 			reel(event.Piece, mine)
 			if event.Next == "Dungeon" then
 				countdown("CONTINUE", Lang.translate("Your kaiju, then the dungeon"), mine)
+			elseif choosing then
+				-- (a choice to make: no countdown taking it for them)
+				ui.Go.Text = Lang.translate("CONTINUE ROUNDS")
+				ui.GoSub.Text = string.format(Lang.translate("Round %d of %d · next gear piece"), event.Round + 1, view.Count)
 			else
 				countdown("CONTINUE INTRO ROUNDS", string.format(Lang.translate("Round %d of %d"), event.Round + 1, view.Count), mine)
 			end
@@ -1025,9 +1099,83 @@ function IntroRoundsUI.start()
 	end
 	started = true
 	build()
-	ui.Go.Activated:Connect(IntroRoundsUI.next)
-	ui.Dungeon.Activated:Connect(IntroRoundsUI.toDungeon)
+	ui.Go.Activated:Connect(function()
+		if keysOnly() then
+			return -- (a computer: Enter, so nobody's stuck freeing the mouse)
+		end
+		IntroRoundsUI.next()
+	end)
+	-- On a computer the card is played from the keyboard (its key caps say
+	-- how): Enter carries on, 1 explores the Outpost, 2 takes on the first
+	-- boss; its buttons don't take clicks (no freeing the mouse to press
+	-- them). A controller: A, X, Y. Not while typing in chat.
+	local function keyCap(button: GuiObject, text: string, name: string): TextLabel
+		local key = new("TextLabel", {
+			Name = name,
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 10, 0.5, 0),
+			Size = UDim2.fromOffset(30, 30),
+			BackgroundColor3 = Color3.fromRGB(240, 246, 255),
+			BackgroundTransparency = 0.08,
+			Font = Enum.Font.GothamBlack,
+			TextSize = 16,
+			TextColor3 = Color3.fromRGB(14, 18, 28),
+			Text = text,
+			ZIndex = 6,
+			Visible = false,
+		}, button)
+		UiKit.round(key, 7)
+		return key
+	end
+	ui.Key1 = keyCap(ui.Leave, "1", "Key1")
+	ui.Key2 = keyCap(ui.Dungeon, "2", "Key2")
+	local cap = new("TextLabel", {
+		Name = "EnterKey",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -14, 0.5, 0),
+		Size = UDim2.fromOffset(78, 28),
+		BackgroundColor3 = Color3.fromRGB(70, 36, 6),
+		BackgroundTransparency = 0.55,
+		Font = Enum.Font.GothamBlack,
+		TextSize = 13,
+		TextColor3 = Color3.fromRGB(255, 244, 220),
+		Text = "ENTER ↵",
+		ZIndex = 6,
+		Visible = not UiKit.touchOnly(),
+	}, ui.Go)
+	UiKit.round(cap, 6)
+	ui.EnterKey = cap
+	UserInputService.InputBegan:Connect(function(input, typing)
+		if typing or not gui.Enabled or not ui.Go.Visible then
+			return
+		end
+		local k = input.KeyCode
+		if k == Enum.KeyCode.Return or k == Enum.KeyCode.KeypadEnter or k == Enum.KeyCode.ButtonA then
+			IntroRoundsUI.next()
+		elseif choosing and (k == Enum.KeyCode.One or k == Enum.KeyCode.KeypadOne or k == Enum.KeyCode.ButtonX) then
+			choose("Outpost")
+		elseif choosing and (k == Enum.KeyCode.Two or k == Enum.KeyCode.KeypadTwo or k == Enum.KeyCode.ButtonY) then
+			choose("Boss")
+		end
+	end)
+	ui.Dungeon.Activated:Connect(function()
+		if keysOnly() then
+			return
+		end
+		if choosing then
+			choose("Boss")
+			return
+		end
+		IntroRoundsUI.toDungeon()
+	end)
 	ui.Leave.Activated:Connect(function()
+		if keysOnly() then
+			return
+		end
+		if choosing then
+			choose("Outpost")
+			return
+		end
 		if current and current.View and current.View.Done then
 			-- (the set's done: GO TO LOBBY beside TO THE FIRST DUNGEON)
 			if busy then

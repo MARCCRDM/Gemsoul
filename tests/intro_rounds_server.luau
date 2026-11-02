@@ -290,4 +290,23 @@ do
 	Server._next, Server._leave = realNext, realLeave
 end
 
+-- The card after the first win: three ways on. EXPLORE THE OUTPOST or FIRST
+-- BOSS step out of the rounds for now (no longer held, the mines' finale
+-- open to them); CONTINUE or PLAY takes them up again.
+do
+	profile = newProfile({})
+	check(not Server.choose(player, "Outpost").Ok, "Stepped out before winning a fight")
+	Server.won(player)
+	check(attributes.IntroRoundsLeft == IntroRounds.Count - 1 and Server.held(player), "Not held in the rounds after the first win")
+	check(not Server.choose(player, "Hax").Ok, "A way out that isn't one")
+	local out = Server.choose(player, "Outpost")
+	check(out.Ok and out.Choice == "Outpost", "EXPLORE THE OUTPOST didn't take them out")
+	check(profile.IntroRounds.Paused == true and not Server.held(player) and attributes.IntroRoundsLeft == nil, "Still held after stepping out")
+	check(profile.IntroFinale == "Mines" and attributes.IntroFinale == "Mines", "The mines and the kaiju aren't open to them")
+	check(Server.left(player) == IntroRounds.Count - 1, "Stepping out lost them their rounds")
+	-- (back to the rounds: held again)
+	pcall(Server._next, player)
+	check(profile.IntroRounds.Paused == nil and Server.held(player) and attributes.IntroRoundsLeft == IntroRounds.Count - 1, "Back to the rounds but not held in them")
+	check(Server.choose(player, "Boss").Ok and not Server.held(player), "FIRST BOSS didn't take them out")
+end
 print(string.format("PASS: %d intro rounds server checks", checks))

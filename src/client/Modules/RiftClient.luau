@@ -49,6 +49,7 @@
 	  RiftClient.openGate(vein, at?)  the gate's lobby (`at`: the gate, for who's at it);
 	                                vein "Bounty": Brutus's bounty board, the same lobby
 	                                with a tab for each biome's ladder (Shared.Bounties)
+	  RiftClient.gateOpen() -> bool  the gate's lobby up
 	  RiftClient.leave()            through a way home
 	  RiftClient.stripText(state) -> (string, string)   the strip's two lines (pure)
 ]]
@@ -859,6 +860,11 @@ end
 --   3 YOUR PARTY         its four places, two by two, and who's about to
 --                        invite (an invite says which boss: Party's context)
 -- with ENTER under them.
+-- Whether the gate's lobby is up on this screen.
+function RiftClient.gateOpen(): boolean
+	return gateCard ~= nil and gateCard.Parent ~= nil
+end
+
 function RiftClient.openGate(vein: any, at: Vector3?)
 	if gateCard and gateCard.Parent or player:GetAttribute("RiftRun") then
 		return

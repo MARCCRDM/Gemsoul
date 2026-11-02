@@ -205,13 +205,13 @@ do
 	local piece = card and card:FindFirstChild("Piece", true)
 	check(drawnPiece and drawnPiece[2] == "Weapon" and drawnPiece[3] == "w1", "The won piece wasn't drawn in 3D")
 	check(piece ~= nil and piece:IsA("ViewportFrame"), "No 3D piece on the card")
-	-- (one way on: the next round; no lobby, no first dungeon, till all six are won)
+	-- (the first fight won: three ways on, the rounds first; no countdown taking it for them)
 	local go, leave, dungeon = card:FindFirstChild("Next", true), card:FindFirstChild("Leave", true), card:FindFirstChild("Dungeon", true)
-	check(go and go.Text == "CONTINUE INTRO ROUNDS" and go.Visible, "No CONTINUE INTRO ROUNDS")
+	check(go and go.Text == "CONTINUE ROUNDS" and go.Visible, "No CONTINUE ROUNDS")
 	local goSub = go and go:FindFirstChild("Sub")
-	check(goSub and string.find(goSub.Text, "Round 2 of 6", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) ~= nil, "CONTINUE INTRO ROUNDS' round and countdown: " .. tostring(goSub and goSub.Text))
-	check(leave and not leave.Visible, "GO TO LOBBY offered mid-set")
-	check(dungeon and not dungeon.Visible, "FIRST DUNGEON offered to a player it's not open to")
+	check(goSub and string.find(goSub.Text, "Round 2 of 6", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) == nil, "CONTINUE ROUNDS' round, or a countdown on a choice: " .. tostring(goSub and goSub.Text))
+	check(leave and leave.Visible and leave.Text == "EXPLORE THE OUTPOST", "No EXPLORE THE OUTPOST after the first win")
+	check(dungeon and dungeon.Visible and dungeon.Text == "FIRST BOSS", "No FIRST BOSS after the first win")
 	attrs.CombatSession = nil
 end
 load(clientRef.IntroRoundsUI).AutoNext = 1 -- (the loss's card on its way before the set's: a round between them in the game)
@@ -405,5 +405,5 @@ do
 	check(down ~= nil and down:FindFirstChild("Intro", true) == nil, "Back to the intro fights offered with none left")
 	check(down:FindFirstChild("Lobby", true) ~= nil, "No GO TO LOBBY with the intro done")
 end
-print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win, a loss and a set, SETTINGS opens, ANALYTICS draws every range, the dungeon path's cards, the Rot Beachhead's screens and knock-down card)", checks))
+print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win (its three ways on), a loss and a set, SETTINGS opens, ANALYTICS draws every range, the dungeon path's cards, the Rot Beachhead's screens and knock-down card)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)
