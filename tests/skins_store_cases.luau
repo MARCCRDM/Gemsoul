@@ -686,6 +686,23 @@ for _, id in { "SuitStealth", "SkinVoid", "HelmetGrimReaper", "VisorTwilight", "
 end
 check(profile.Cosmetics.Helmet == "HelmetGrimReaper", "The Reaper gift's hood wasn't put on")
 thePlayer.Name, thePlayer.DisplayName = nil, nil
+-- THUNDER: the Thunderclap pickaxe, owned and on. Redeemed back when it gave
+-- a weapon skin (gone now), the pickaxe is theirs on joining, and typing
+-- it again gives it too.
+clock += 3
+check(handlers.RedeemCode(thePlayer, "thunder").Ok and profile.Cosmetics.Owned.PickThunderclap and profile.Cosmetics.Pick == "PickThunderclap", "THUNDER didn't give the Thunderclap pickaxe")
+profile.Cosmetics.Owned.PickThunderclap, profile.Cosmetics.Pick = nil, "SkinThunderclap"
+profile.Cosmetics.Owned.SkinThunderclap = true
+local given = Free.honourCodes(thePlayer)
+check(#given == 1 and given[1] == "PickThunderclap" and profile.Cosmetics.Owned.PickThunderclap, "A code redeemed when it gave something else didn't give what it gives now")
+check(profile.Cosmetics.Pick == "PickThunderclap", "The pickaxe wasn't put on in place of a look that's gone")
+check(#Free.honourCodes(thePlayer) == 0, "A code's look was handed over twice")
+profile.Cosmetics.Owned.PickThunderclap = nil
+clock += 3
+local again = handlers.RedeemCode(thePlayer, "THUNDER")
+check(again.Ok and profile.Cosmetics.Owned.PickThunderclap, "Typing a used code didn't give back the look it gives")
+clock += 3
+check(not handlers.RedeemCode(thePlayer, "THUNDER").Ok, "A used code with nothing missing redeemed again")
 check(stubs.Codes.allowed({ For = { "kingreen113" } }, { Name = "KINGREEN113", DisplayName = "x" }), "A gift by username")
 check(stubs.Codes.allowed({ For = { 42 } }, { UserId = 42 }) and not stubs.Codes.allowed({ For = { 42 } }, { UserId = 7 }), "A gift by UserId")
 local Bundle = Store.bundle("ReaperHarvest")

@@ -71,6 +71,41 @@ local function checkGroup(player: Player)
 end
 
 -- One try every 2 seconds, so codes can't be guessed by brute force.
+-- Every code `player` has redeemed gives what it gives now: a look its
+-- code was changed to (THUNDER once gave a weapon skin, now the Thunderclap
+-- pickaxe), or one lost, is theirs. Returns the looks it handed over
+-- (their ids), and the first is put on if they had none of its kind on.
+function FreeRewards.honourCodes(player: Player): { string }
+	local profile = PlayerData.get(player) :: any
+	local given = {}
+	if not profile or type(profile.Codes) ~= "table" then
+		return given
+	end
+	profile.Cosmetics = profile.Cosmetics or { Owned = {} }
+	profile.Cosmetics.Owned = profile.Cosmetics.Owned or {}
+	for code in profile.Codes do
+		local entry = Codes.List[code]
+		if entry and Codes.allowed(entry, player) then
+			for _, id in entry.Reward.Cosmetics or {} do
+				local cosmetic = Cosmetics.get(id)
+				if cosmetic and not owns(profile, id) then
+					profile.Cosmetics.Owned[id] = true
+					table.insert(given, id)
+					-- (on, if it's the look they'd have had on from the code)
+					local worn = profile.Cosmetics[cosmetic.Kind]
+					if worn == nil or not Cosmetics.get(worn) then
+						PlayerData.setCosmetic(player, cosmetic.Kind, id)
+					end
+				end
+			end
+		end
+	end
+	if #given > 0 then
+		PlayerData.sync(player)
+	end
+	return given
+end
+
 local lastTry: { [Player]: number } = {}
 local function redeem(player: Player, text: any)
 	local profile = PlayerData.get(player) :: any
@@ -89,6 +124,15 @@ local function redeem(player: Player, text: any)
 	end
 	profile.Codes = profile.Codes or {}
 	if profile.Codes[code] then
+		-- (Used, but what it gives now is missing: theirs again.)
+		local given = FreeRewards.honourCodes(player)
+		if #given > 0 then
+			local names = {}
+			for _, id in given do
+				table.insert(names, Cosmetics.get(id).Name)
+			end
+			return reply(true, "Code " .. code .. ": " .. table.concat(names, ", "), { Lines = names })
+		end
 		return reply(false, "You've already used that code.")
 	end
 	profile.Codes[code] = os.time()
@@ -152,6 +196,8 @@ local function onJoin(player: Player)
 	if profile and not owns(profile, Rules.Group.Reward) and inGroup(player) then
 		FreeRewards.give(player, Rules.Group.Reward)
 	end
+	-- (and every code they've redeemed gives what it gives now)
+	pcall(FreeRewards.honourCodes, player)
 end
 
 function FreeRewards.start()
