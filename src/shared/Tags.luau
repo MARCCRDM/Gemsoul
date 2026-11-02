@@ -5,6 +5,8 @@ return {
 	NodeSpawner = "NodeSpawner",
 	QuotaTerminal = "QuotaTerminal",
 	VipGate = "VipGate",
+	-- The DEV desk's gate in the Shelter: solid for all but the Owners.
+	DevGate = "DevGate",
 
 	-- Marketplace
 	TradeKiosk = "TradeKiosk",

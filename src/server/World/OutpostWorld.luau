@@ -1581,6 +1581,115 @@ local function duelBooth(parent, at: CFrame)
 	return { Counter = terminal }
 end
 
+-- The DEV desk, `at` its back on the Shelter's south wall between the
+-- pilaster and Brutus's booth, facing into the hall: a counter with a
+-- holo gate at one end that only the game's Owners walk through (it's
+-- solid for everyone else: Client DevDesk, tagged DevGate), a wall of
+-- monitors behind, a gaming chair, and a lightbox over it all. Everything
+-- that glows is marked DevGlow (its lit colour): Server DevDesk lights it
+-- up while an Owner is in the server and puts it out when they go, and
+-- writes who's on the sign (DevSign).
+local DEV_PURPLE = Color3.fromRGB(170, 90, 255)
+local DEV_CYAN = Color3.fromRGB(80, 220, 255)
+local function devDesk(parent, at: CFrame)
+	local m = folder(parent, "DevDesk")
+	local half, deep, tall = 6.2, 9, 16 -- (tall: how high nobody gets over it)
+	local GLASS = Color3.fromRGB(18, 20, 28)
+	local function glow(p: BasePart, color: Color3): BasePart
+		p:SetAttribute("DevGlow", color)
+		return p
+	end
+	local function invisibleWall(cf: CFrame, size: Vector3): BasePart
+		local w = solid(part(m, cf, size, GLASS, Enum.Material.SmoothPlastic, nil, { Transparency = 1, CastShadow = false }))
+		w.Name = "DevWall"
+		return w
+	end
+	-- The sides: dark partitions with a lit edge, walled up out of reach.
+	for _, sx in { -1, 1 } do
+		solid(part(m, at * CFrame.new(sx * half, 3.6, -deep / 2), Vector3.new(0.6, 7.2, deep), HULL_DARK, Enum.Material.Metal))
+		glow(part(m, at * CFrame.new(sx * half, 7.25, -deep / 2), Vector3.new(0.7, 0.14, deep), DEV_PURPLE, Enum.Material.Neon), DEV_PURPLE)
+		glow(part(m, at * CFrame.new(sx * half, 3.6, -deep + 0.05), Vector3.new(0.7, 7.2, 0.14), DEV_CYAN, Enum.Material.Neon), DEV_CYAN)
+		invisibleWall(at * CFrame.new(sx * half, tall / 2, -deep / 2), Vector3.new(0.6, tall, deep))
+	end
+	-- The counter, leaving a gap at the right end: the gate.
+	local gap = 2.6
+	local counterW = half * 2 - 0.6 - gap
+	local counterX = -half + 0.3 + counterW / 2
+	local counter = at * CFrame.new(counterX, 0, -deep + 1.2)
+	solid(part(m, counter * CFrame.new(0, 1.7, 0), Vector3.new(counterW, 3.4, 2), HULL_DARK, Enum.Material.Metal))
+	part(m, counter * CFrame.new(0, 3.5, -0.1), Vector3.new(counterW + 0.3, 0.2, 2.4), GLASS, Enum.Material.Glass, nil, { Reflectance = 0.2 })
+	glow(part(m, counter * CFrame.new(0, 3.38, -1.22), Vector3.new(counterW + 0.3, 0.12, 0.08), DEV_CYAN, Enum.Material.Neon), DEV_CYAN)
+	glow(part(m, counter * CFrame.new(0, 0.2, -1.04), Vector3.new(counterW, 0.12, 0.08), DEV_PURPLE, Enum.Material.Neon), DEV_PURPLE)
+	-- Its front: DEV in big letters on a dark plate.
+	local plate = part(m, counter * CFrame.new(0, 1.85, -1.04), Vector3.new(counterW - 1, 2.2, 0.06), GLASS, Enum.Material.SmoothPlastic)
+	plate.Name = "DevPlate"
+	letters(plate, Enum.NormalId.Front, plate.Size, "</> DEV", DEV_CYAN, 0)
+	invisibleWall(counter * CFrame.new(0, (tall + 3.4) / 2, 0), Vector3.new(counterW, tall - 3.4, 2))
+	-- The gate: an open doorway with laser bars across it. Solid for all but
+	-- the Owners (their own client lets them through).
+	local gateX = half - 0.3 - gap / 2
+	local gateAt = at * CFrame.new(gateX, 0, -deep + 1.2)
+	for _, y in { 1.2, 2.4, 3.6, 4.8 } do
+		glow(part(m, gateAt * CFrame.new(0, y, 0), Vector3.new(gap, 0.08, 0.08), Color3.fromRGB(255, 70, 110), Enum.Material.Neon), Color3.fromRGB(255, 70, 110))
+	end
+	solid(part(m, gateAt * CFrame.new(-gap / 2 + 0.15, 3, 0), Vector3.new(0.3, 6, 0.6), HULL_DARK, Enum.Material.Metal))
+	local gate = solid(part(m, gateAt * CFrame.new(0, tall / 2, 0), Vector3.new(gap, tall, 0.6), GLASS, Enum.Material.SmoothPlastic, nil, { Transparency = 1, CastShadow = false }))
+	gate.Name = "DevGate"
+	pcall(function()
+		game:GetService("CollectionService"):AddTag(gate, "DevGate")
+	end)
+	-- Behind: a wall of monitors, the middle one big, code-lit; a desk under
+	-- them with a keyboard; the chair.
+	part(m, at * CFrame.new(0, 7.5, -0.35), Vector3.new(half * 2 - 0.6, 9, 0.3), GLASS, Enum.Material.Metal)
+	for i, spec in { { -3.6, 7.6, 3, 2 }, { 0, 7.8, 4.4, 2.8 }, { 3.6, 7.6, 3, 2 }, { -1.9, 10.4, 3, 1.8 }, { 1.9, 10.4, 3, 1.8 } } do
+		local bezel = part(m, at * CFrame.new(spec[1], spec[2], -0.6), Vector3.new(spec[3] + 0.3, spec[4] + 0.3, 0.2), Color3.fromRGB(10, 10, 14), Enum.Material.Metal)
+		local screen = glow(
+			part(m, bezel.CFrame * CFrame.new(0, 0, -0.11), Vector3.new(spec[3], spec[4], 0.04), if i == 2 then DEV_PURPLE else DEV_CYAN, Enum.Material.Neon),
+			if i == 2 then DEV_PURPLE else DEV_CYAN
+		)
+		screen.Name = "DevScreen"
+		screen.Transparency = 0.25
+		letters(screen, Enum.NormalId.Front, screen.Size, if i == 2 then "{ build }" else "> _", Color3.fromRGB(235, 245, 255), 0.1)
+	end
+	local desk = at * CFrame.new(0, 0, -2.2)
+	solid(part(m, desk * CFrame.new(0, 2.6, 0), Vector3.new(half * 2 - 2, 0.25, 2.2), GLASS, Enum.Material.Metal))
+	for _, sx in { -1, 1 } do
+		part(m, desk * CFrame.new(sx * (half - 1.4), 1.25, 0), Vector3.new(0.25, 2.5, 2), HULL_DARK, Enum.Material.Metal)
+	end
+	glow(part(m, desk * CFrame.new(0, 2.78, -0.3), Vector3.new(2.4, 0.1, 0.8), DEV_PURPLE, Enum.Material.Neon), DEV_PURPLE)
+	-- The chair: a black seat with purple sides, facing the monitors.
+	local chair = at * CFrame.new(0, 0, -4.4) * CFrame.Angles(0, math.rad(180), 0)
+	disc(m, chair * CFrame.new(0, 0.15, 0), 1.1, 0.2, HULL_DARK, Enum.Material.Metal)
+	part(m, chair * CFrame.new(0, 1, 0), Vector3.new(0.3, 1.6, 0.3), HULL_DARK, Enum.Material.Metal)
+	part(m, chair * CFrame.new(0, 1.9, 0), Vector3.new(2, 0.4, 2), Color3.fromRGB(22, 22, 28), Enum.Material.Fabric)
+	part(m, chair * CFrame.new(0, 3.4, -0.95), Vector3.new(2, 2.8, 0.3), Color3.fromRGB(22, 22, 28), Enum.Material.Fabric)
+	for _, sx in { -1, 1 } do
+		glow(part(m, chair * CFrame.new(sx * 0.95, 3.4, -0.95), Vector3.new(0.12, 2.6, 0.34), DEV_PURPLE, Enum.Material.Neon), DEV_PURPLE)
+	end
+	-- The sign over it all: a lightbox (DevSign) and a beacon on top.
+	local box = part(m, at * CFrame.new(0, 13.4, -deep), Vector3.new(half * 2, 2.6, 1), HULL_DARK, Enum.Material.Metal)
+	local sign = part(m, box.CFrame * CFrame.new(0, 0, -0.52), Vector3.new(half * 2 - 0.8, 2, 0.06), GLASS, Enum.Material.SmoothPlastic)
+	sign.Name = "DevSign"
+	letters(sign, Enum.NormalId.Front, sign.Size, "DEV · OFFLINE", Color3.fromRGB(110, 114, 126), 0)
+	glow(part(m, box.CFrame * CFrame.new(0, -1.45, -0.3), Vector3.new(half * 2, 0.25, 0.5), DEV_PURPLE, Enum.Material.Neon), DEV_PURPLE)
+	glow(part(m, box.CFrame * CFrame.new(0, 1.45, -0.3), Vector3.new(half * 2, 0.25, 0.5), DEV_CYAN, Enum.Material.Neon), DEV_CYAN)
+	for _, sx in { -1, 1 } do
+		solid(part(m, at * CFrame.new(sx * half, 10.6, -deep), Vector3.new(0.6, 3.2, 0.6), HULL_DARK, Enum.Material.Metal))
+	end
+	local beacon = glow(part(m, box.CFrame * CFrame.new(0, 1.9, 0), Vector3.new(1.3, 1.3, 1.3), Color3.fromRGB(80, 255, 140), Enum.Material.Neon, "Ball"), Color3.fromRGB(80, 255, 140))
+	beacon.Name = "DevBeacon"
+	-- Lights (on only while it's lit).
+	for _, spec in { { sign, DEV_PURPLE, 16, 1.2 }, { beacon, Color3.fromRGB(80, 255, 140), 14, 1.5 } } do
+		light(spec[1], spec[2], spec[3], spec[4]).Name = "DevLight"
+	end
+	local lamp = glow(part(m, at * CFrame.new(0, 12, -3.5), Vector3.new(8, 0.2, 1), DEV_CYAN, Enum.Material.Neon), DEV_CYAN)
+	light(lamp, Color3.fromRGB(190, 220, 255), 18, 1, true).Name = "DevLight"
+	-- A rug in front, edged in light.
+	part(m, at * CFrame.new(0, 0.03, -deep - 3.2), Vector3.new(half * 2 - 1, 0.06, 5), Color3.fromRGB(26, 22, 40), Enum.Material.Fabric)
+	glow(part(m, at * CFrame.new(0, 0.05, -deep - 5.8), Vector3.new(half * 2 - 1, 0.07, 0.2), DEV_PURPLE, Enum.Material.Neon), DEV_PURPLE)
+	return m
+end
+
 -- The Shelter: the outpost's base in the middle of the basin, built like a
 -- barracks: a block of dark armour plate with rusted inserts and red running
 -- lights, a raised deck over the garage with two exhaust stacks glowing red,
@@ -2394,6 +2503,7 @@ local function shelter(parent, at: CFrame, rules)
 		Board = at3(W - 0.2, 0.86, 10) * CFrame.Angles(0, math.rad(90), 0),
 		Bounty = at3(W - 0.2, 0.86, 46) * CFrame.Angles(0, math.rad(90), 0),
 		Duel = at3(52, 0.86, D - 0.2),
+		Dev = at3(35.7, 0.86, D - 0.2),
 		Hall = at * CFrame.new(0, 0, 0),
 		Store = store,
 		Market = market,
@@ -2901,6 +3011,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local face = hallOfFame(root, home.Board)
 	local bounty = bountyBooth(root, home.Bounty, OutpostWorld.BountyPosters)
 	local duel = duelBooth(root, home.Duel)
+	devDesk(root, home.Dev)
 	hallDressing(root, home.Hall)
 	local festiveExclusions = harvestPatches(root, at)
 	sky(root, at)
@@ -2959,11 +3070,12 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- beside its ramp down and past its foot, flanking a clear lane out to
 	-- the quarry.
 	-- (More round the ramp's foot, where the intro's finale starts them:
-	-- ShelterFront.)
+	-- ShelterFront; off the ramp and the lane out, clear of the landing pad
+	-- and the Kaiju Daycare, all inside the safe core.)
 	for _, p in { { -27, 80 }, { 27, 80 }, { -30, 96 }, { 30, 96 },
 		{ -16, 126 }, { 16, 126 }, { -28, 138 }, { 28, 138 },
-		{ -46, 84 }, { 46, 84 }, { -18, 108 }, { 18, 108 }, { -44, 110 }, { 44, 110 },
-		{ -44, 134 }, { 44, 134 }, { -12, 150 }, { 12, 150 } } do
+		{ -44, 74 }, { 44, 74 }, { -28, 120 }, { 28, 120 }, { -16, 140 }, { 16, 140 },
+		{ -42, 124 } } do
 		table.insert(spots, at * CFrame.new(p[1], 0, p[2]))
 		table.insert(arrivalSpots, #spots)
 	end

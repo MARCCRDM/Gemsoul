@@ -112,6 +112,8 @@ require(script.Parent.Systems.SettingsServer).start()
 require(script.Parent.Systems.AnalyticsPanel).start()
 -- DEV > SPECTATE: an Owner watches a player in third person (Systems/DevSpectate).
 require(script.Parent.Systems.DevSpectate).start()
+-- The DEV desk in the Shelter: lit while an Owner's in (Systems/DevDesk).
+require(script.Parent.Systems.DevDesk).start()
 -- What players tap and open (Systems/UiTrack), into the log the ANALYTICS window reads.
 require(script.Parent.Systems.UiTrack).start()
 TopPlayers.start()

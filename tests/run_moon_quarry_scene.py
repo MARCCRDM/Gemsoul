@@ -79,7 +79,7 @@ local bay4=site.Parking[4].CFrame.Position
 assert(site.Spawn.Position.X==bay4.X and site.Spawn.Position.Z==7000-24 and site.Spawn.Position.Y==3.5+Rules.ShelterLift,"Spawn isn't in the garage lane, on its floor")
 assert(site.Parking[4].Kind=="Mole" and bay4.Z<site.Spawn.Position.Z,"No Mole drill in front of the spawn")
 assert(site.Spawn.LookVector.Z<-.99,"Spawn doesn't face the Mole drill")
-assert(#site.ArrivalSpots==8,"Welcome mining field missing")
+assert(#site.ArrivalSpots==15,"Welcome mining field missing")
 -- (beside the ramp down from the door, or past its foot, off the lane out)
 local front=site.Shelter.Ramps[1]
 local frontMid=front.Middle-origin.Position
@@ -87,7 +87,7 @@ for _,index in site.ArrivalSpots do
  local p=site.Spots[index].Position-origin.Position
  local beside=math.abs(p.X)>=front.SlopeHalf+6 and p.Z<frontMid.Z+front.Half.Y
  local past=p.Z>=frontMid.Z+front.Half.Y+8 and math.abs(p.X)>=14
- assert(p.Z>box.Y and math.abs(p.X)<=30 and (beside or past),"Welcome nodes aren't outside the door, or block the ramp or the lane out")
+ assert(p.Z>box.Y and math.abs(p.X)<=48 and (beside or past),"Welcome nodes aren't outside the door, or block the ramp or the lane out")
 end
 -- (PROBE-7 and the duels are crew now: no station or gate to hand out.)
 assert(site.Probe==nil and site.Gate==nil and site.Board.Name=="BoardFace","Missing lobby services, or a station or gate is back")
@@ -270,7 +270,24 @@ for _,p in builtParts do
  end
 end
 assert(rim>1000 and skyModel and skyModel.ModelStreamingMode=="Persistent","Crater rim or sky missing or streamed")
-assert(#builtParts<4000,"Quarry scenery budget exceeded")
+assert(#builtParts<4100,"Quarry scenery budget exceeded") -- (4000 till the DEV desk: 51 parts in the hall)
+-- The DEV desk on the Shelter's south wall: lit parts to switch, the sign,
+-- a solid gate (only the Owners' clients open it) and walls nobody jumps.
+local devGlow,devGate,devSign,devWalls,devDesk=0,nil,nil,0,nil
+for _,p in builtParts do
+ local a=p.Parent
+ while a and a.Name~="DevDesk" do a=a.Parent end
+ if a then
+  devDesk=a
+  if p.DevGlow~=nil then devGlow+=1 end -- (the harness keeps attributes on the part)
+  if p.Name=="DevGate" then devGate=p end
+  if p.Name=="DevSign" then devSign=p end
+  if p.Name=="DevWall" and p.CanCollide then devWalls+=1 end
+ end
+end
+assert(devDesk and devGlow>=12 and devSign,"No DEV desk, or nothing on it lights up")
+assert(devGate and devGate.CanCollide and devGate.Size.Y>=14 and devWalls>=3,"The DEV desk's gate or walls let anyone in")
+assert(inShelter(devGate.CFrame.Position-origin.Position),"The DEV desk isn't in the Shelter")
 -- The Shelter up on its legs: three solid ramps (the rules' slope, from its
 -- floor's height down to the quarry floor: a mech climbs it), and every
 -- one of its eight feet on the ground.
@@ -526,7 +543,7 @@ for id,node in nodes do if node.Spot==outcropIndex then nodes[id]=nil end end
 freeSpots[outcropIndex]=true
 spawnNode(false,outcropIndex)
 assert(nodes[nextId].Spot==outcropIndex and nodes[nextId].Zone==site.Zones[outcropIndex],"An outcrop rock grew back elsewhere")
-print("PASS: actual server node population, 8 welcome rocks, the field round the middle first, "..population.." rocks (every spot), outcrop rocks regrow in place, veins with room to move, replenishment and zone isolation")
+print("PASS: actual server node population, 15 welcome rocks, the field round the middle first, "..population.." rocks (every spot), outcrop rocks regrow in place, veins with room to move, replenishment and zone isolation")
 end
 '''
 lighting = (ROOT / "src/client/Modules/Scenes.luau").read_text(encoding="utf-8")
