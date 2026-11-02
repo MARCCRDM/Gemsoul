@@ -1566,6 +1566,125 @@ BACKS.Wings = function(folder, torso, m, glow, _accent)
 	end
 end
 
+-- Stormcaller Wings (a promo code's): two wings of storm steel. The top of
+-- each is a lightning bolt, blade feathers fan down from it, a live edge
+-- crackles blue and white along every one (SkinSeam "Flicker": Client
+-- SeamVisibility) and a storm core sits between the shoulders. Their tips
+-- and the core throw arcs, and worn with the Thunderclap pick, current
+-- jumps between the two (ThunderArc "Wing"/"WingCore": Client ThunderArcs).
+BACKS.Stormwings = function(folder, torso, m, glow, _accent)
+	local STEEL, DARK = Color3.fromRGB(176, 188, 210), Color3.fromRGB(54, 66, 100)
+	local BRIGHT = Color3.fromRGB(225, 245, 255)
+	local seed = 0
+	local function live(part: BasePart): BasePart
+		seed += 1
+		part.Name = "SkinSeam"
+		part:SetAttribute("SeamFx", "Flicker")
+		part:SetAttribute("SeamA", glow)
+		part:SetAttribute("SeamB", BRIGHT)
+		part:SetAttribute("SeamSeed", seed)
+		CollectionService:AddTag(part, Tags.SkinSeam)
+		return part
+	end
+	local function arcs(part: BasePart, role: string): BasePart
+		part:SetAttribute("ThunderArc", role)
+		CollectionService:AddTag(part, Tags.ThunderArc)
+		return part
+	end
+	-- A bar from `a` to `b` (in m's space), `width` across the wing's face.
+	local function bar(a: Vector3, b: Vector3, width: number, depth: number, normal: Vector3, color, material)
+		local along = b - a
+		local z = -along.Unit
+		local x = (normal - z * normal:Dot(z)).Unit
+		local frame = CFrame.fromMatrix((a + b) / 2, x, z:Cross(x), z)
+		return piece(folder, torso, m * frame, Vector3.new(depth, width, along.Magnitude), color, material)
+	end
+	-- A pointed blade from `root` along `dir`: two wedges back to back.
+	local function blade(root: Vector3, dir: Vector3, length: number, width: number, normal: Vector3)
+		local z = -dir.Unit
+		local x = (normal - z * normal:Dot(z)).Unit
+		local y = z:Cross(x)
+		local frame = CFrame.fromMatrix(root + dir.Unit * (length / 2), x, y, z)
+		for _, half in { 1, -1 } do
+			local wedge = Instance.new("WedgePart")
+			wedge.Name = "Gear"
+			wedge.Size = Vector3.new(0.1, width / 2, length)
+			wedge.Color, wedge.Material = DARK, Enum.Material.Metal
+			wedge.CanCollide, wedge.CanQuery, wedge.CanTouch, wedge.Massless = false, false, false, true
+			wedge.CFrame = torso.CFrame
+				* m
+				* frame
+				* CFrame.new(0, half * width / 4, 0)
+				* (if half < 0 then CFrame.Angles(0, 0, math.pi) else CFrame.new())
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0, weld.Part1 = torso, wedge
+			weld.Parent = wedge
+			wedge.Parent = folder
+		end
+		return root + dir.Unit * length, root + y * (width / 2)
+	end
+	-- The storm core between the shoulders.
+	local hub = m * CFrame.new(0, 0.35, -0.2)
+	-- (a mesh cylinder's axis is its Y: turned to face out of the back)
+	meshed(piece(folder, torso, hub * CFrame.Angles(math.rad(90), 0, 0), Vector3.new(1.05, 0.3, 1.05), DARK, Enum.Material.Metal), Enum.MeshType.Cylinder)
+	meshed(neon(folder, torso, hub * CFrame.new(0, 0, -0.12) * CFrame.Angles(math.rad(90), 0, 0), Vector3.new(1.2, 0.1, 1.2), glow), Enum.MeshType.Cylinder).Transparency = 0.35
+	arcs(meshed(neon(folder, torso, hub * CFrame.new(0, 0, -0.25), Vector3.one * 0.55, BRIGHT), Enum.MeshType.Sphere), "WingCore")
+	for _, side in { -1, 1 } do
+		-- The wing's plane: out along `u`, up along `v`, swept back a little.
+		local sweep = math.rad(22)
+		local u = Vector3.new(side * math.cos(sweep), 0, -math.sin(sweep))
+		local v = Vector3.new(0, 1, 0)
+		local normal = Vector3.new(side * math.sin(sweep), 0, math.cos(sweep))
+		local origin = Vector3.new(side * 0.42, 0.45, -0.3)
+		local function at(a: number, b: number): Vector3
+			return origin + u * a + v * b
+		end
+		-- The top: a bolt (out and up, a kink back, then on out to a point).
+		local bolt = { at(0, 0), at(1.1, 1.45), at(1.5, 0.9), at(3, 2.2) }
+		for i = 1, #bolt - 1 do
+			local a, b = bolt[i], bolt[i + 1]
+			bar(a, b, 0.3, 0.2, normal, STEEL, Enum.Material.Metal)
+			-- (its live edge along the top)
+			local up = (v - (b - a).Unit * v:Dot((b - a).Unit)).Unit
+			live(bar(a + up * 0.17 - normal * 0.02, b + up * 0.17 - normal * 0.02, 0.07, 0.12, normal, glow, Enum.Material.Neon))
+			-- (and a white-hot line down its face: the bolt itself)
+			local hot = live(bar(a - normal * 0.1, b - normal * 0.1, 0.11, 0.04, normal, BRIGHT, Enum.Material.Neon))
+			hot:SetAttribute("SeamA", BRIGHT)
+			hot:SetAttribute("SeamB", glow)
+		end
+		local function spark(at: Vector3)
+			arcs(meshed(neon(folder, torso, m * CFrame.new(at), Vector3.one * 0.2, BRIGHT), Enum.MeshType.Sphere), "Wing")
+		end
+		spark((blade(bolt[#bolt], (bolt[#bolt] - bolt[#bolt - 1]).Unit, 0.9, 0.3, normal)))
+		-- The feathers: blades fanning down and out from the bolt.
+		-- { bolt segment, how far along it, degrees out from straight down, length, width }
+		local feathers = {
+			{ 1, 0.5, 6, 1.5, 0.8 },
+			{ 1, 0.85, 14, 2, 0.9 },
+			{ 2, 0.7, 22, 2.35, 0.95 },
+			{ 3, 0.2, 31, 2.6, 0.95 },
+			{ 3, 0.45, 40, 2.7, 0.9 },
+			{ 3, 0.7, 51, 2.45, 0.8 },
+			{ 3, 0.92, 63, 1.95, 0.65 },
+		}
+		for i, spec in feathers do
+			local segment, t = spec[1], spec[2]
+			local a, b = bolt[segment], bolt[segment + 1]
+			-- (each a little further back than the one before: they overlap)
+			local root = a:Lerp(b, t) + normal * (0.05 + i * 0.03)
+			local angle = math.rad(spec[3])
+			local dir = u * math.sin(angle) - v * math.cos(angle)
+			local point = blade(root, dir, spec[4], spec[5], normal)
+			-- (the live edge down its outer side)
+			local outer = root + (u * math.cos(angle) + v * math.sin(angle)) * (spec[5] / 2)
+			live(bar(outer - normal * 0.02, point - normal * 0.02, 0.05, 0.12, normal, glow, Enum.Material.Neon))
+			if i == 3 or i == 5 or i == 7 then
+				spark(point)
+			end
+		end
+	end
+end
+
 BACKS.Halo = function(folder, torso, m, glow, _accent)
 	local center = m * CFrame.new(0, torso.Size.Y / 2 + 0.9, -0.3)
 	for i = 0, 7 do

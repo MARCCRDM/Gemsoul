@@ -39,6 +39,12 @@ Codes.List = {
 		Limit = 100, -- the promo video: "only 100/100 left"
 		Note = "Free Thunderclap storm pickaxe skin for players (limited: 100)",
 	},
+	STORM = {
+		-- The Stormcaller Wings promo: the wings and the STORMBORN title, 100 only.
+		Reward = { Cosmetics = { "BackStormwings", "TitleStormborn" } },
+		Limit = 100,
+		Note = "Stormcaller Wings + STORMBORN title for players (limited: 100)",
+	},
 	TRISKULL = {
 		-- The Triskull promo video: a Legendary Triskull, 100 only, for two weeks.
 		Reward = { KaijuSale = "Promo" },

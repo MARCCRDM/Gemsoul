@@ -751,6 +751,13 @@ local again = handlers.RedeemCode(thePlayer, "THUNDER")
 check(again.Ok and profile.Cosmetics.Owned.PickThunderclap, "Typing a used code didn't give back the look it gives")
 clock += 3
 check(not handlers.RedeemCode(thePlayer, "THUNDER").Ok, "A used code with nothing missing redeemed again")
+-- STORM: the Stormcaller Wings and the STORMBORN title, both owned and on;
+-- limited to 100.
+clock += 3
+local storm = handlers.RedeemCode(thePlayer, "storm")
+check(storm.Ok and profile.Cosmetics.Owned.BackStormwings and profile.Cosmetics.Owned.TitleStormborn, "STORM didn't give the Stormcaller Wings and the STORMBORN title")
+check(profile.Cosmetics.Back == "BackStormwings" and profile.Cosmetics.Title == "TitleStormborn", "The Stormcaller Wings or the title weren't put on")
+check(stubs.Codes.List.STORM.Limit == 100, "STORM isn't limited to 100")
 check(stubs.Codes.allowed({ For = { "kingreen113" } }, { Name = "KINGREEN113", DisplayName = "x" }), "A gift by username")
 check(stubs.Codes.allowed({ For = { 42 } }, { UserId = 42 }) and not stubs.Codes.allowed({ For = { 42 } }, { UserId = 7 }), "A gift by UserId")
 local Bundle = Store.bundle("ReaperHarvest")

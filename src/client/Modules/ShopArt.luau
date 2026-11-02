@@ -360,6 +360,29 @@ function BACKS.Wings(root: Frame, size: number, color: Color3)
 	round(core, 2)
 end
 
+-- Stormcaller Wings: dark blade feathers with live edges fanning under a
+-- lightning bolt each side, a white-hot storm core between them.
+function BACKS.Stormwings(root: Frame, size: number, color: Color3)
+	local steel = Color3.fromRGB(54, 66, 100)
+	for _, side in { -1, 1 } do
+		for i = 0, 4 do
+			local feather = piece(root, 0.5 + side * (0.16 + i * 0.065), 0.56 + i * 0.01, 0.075, 0.36 - math.abs(i - 2) * 0.03, steel, side * (8 + i * 13))
+			round(feather, math.max(2, size / 40))
+			gradient(feather, steel:Lerp(color, 0.35), steel:Lerp(BLACK, 0.4))
+			stroke(feather, color:Lerp(WHITE, 0.3), math.max(1, size / 70))
+		end
+		-- The bolt: out and up, a kink, on out to a point.
+		for _, bar in { { 0.13, 0.4, 0.24, -40 }, { 0.25, 0.33, 0.1, 50 }, { 0.36, 0.27, 0.22, -38 } } do
+			local bolt = piece(root, 0.5 + side * bar[1], bar[2], bar[3], 0.045, WHITE, side * bar[4])
+			round(bolt, 2)
+			stroke(bolt, color, math.max(1.5, size / 50))
+		end
+	end
+	local core = piece(root, 0.5, 0.47, 0.13, 0.13, WHITE)
+	round(core, size)
+	stroke(core, color, math.max(2, size / 30))
+end
+
 function BACKS.Halo(root: Frame, size: number, color: Color3)
 	local glow = piece(root, 0.5, 0.5, 0.86, 0.3, color)
 	glow.BackgroundTransparency = 0.88
