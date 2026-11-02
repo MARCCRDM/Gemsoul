@@ -678,11 +678,50 @@ do
 			end
 		end)
 	end
+	-- The timer under the banner: their time in the game (JoinedAt, stamped
+	-- by Server.DevSpectate), on what they're doing now (since it last
+	-- changed: someone stuck shows it climbing), and how long you've watched.
+	local clock = Instance.new("TextLabel")
+	clock.Name = "WatchTimer"
+	clock.AnchorPoint = Vector2.new(0.5, 0)
+	clock.Position = UDim2.new(0.5, 0, 0, 38)
+	clock.Size = UDim2.fromOffset(520, 22)
+	clock.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
+	clock.BackgroundTransparency = 0.15
+	clock.TextColor3 = Color3.fromRGB(150, 225, 255)
+	clock.Font = Enum.Font.GothamBold
+	clock.TextSize = 13
+	clock.Visible = false
+	clock.Parent = gui
+	corner(clock, 6)
+	local function mmss(seconds: number): string
+		seconds = math.max(0, math.floor(seconds))
+		local h = math.floor(seconds / 3600)
+		if h > 0 then
+			return string.format("%d:%02d:%02d", h, math.floor(seconds / 60) % 60, seconds % 60)
+		end
+		return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
+	end
+	local watchedSince, watchedWho, onThis, onSince = 0, nil :: Player?, "", 0
 	task.spawn(function()
 		while true do
 			task.wait(0.5)
 			if target then
-				banner.Text = string.format("WATCHING %s (@%s)  ·  %s", target.DisplayName, target.Name, doing(target))
+				local now = os.clock()
+				local what = doing(target)
+				if watchedWho ~= target then
+					watchedWho, watchedSince, onThis, onSince = target, now, what, now
+				elseif what ~= onThis then
+					onThis, onSince = what, now
+				end
+				banner.Text = string.format("WATCHING %s (@%s)  ·  %s", target.DisplayName, target.Name, what)
+				local joined = target:GetAttribute("JoinedAt")
+				local inGame = if type(joined) == "number" then mmss(workspace:GetServerTimeNow() - joined) else "?"
+				clock.Text = string.format("IN GAME %s   ·   ON THIS %s   ·   WATCHING %s", inGame, mmss(now - onSince), mmss(now - watchedSince))
+				clock.Visible = true
+			else
+				watchedWho = nil
+				clock.Visible = false
 			end
 		end
 	end)
@@ -694,7 +733,7 @@ do
 	local bars = Instance.new("Frame")
 	bars.Name = "WatchHealth"
 	bars.AnchorPoint = Vector2.new(0.5, 0)
-	bars.Position = UDim2.new(0.5, 0, 0, 40)
+	bars.Position = UDim2.new(0.5, 0, 0, 64)
 	bars.Size = UDim2.fromOffset(360, 0)
 	bars.AutomaticSize = Enum.AutomaticSize.Y
 	bars.BackgroundColor3 = Color3.fromRGB(17, 25, 36)

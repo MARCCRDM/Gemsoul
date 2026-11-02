@@ -8,6 +8,8 @@
 
 	Owners only (Config.Playtest.Owners, checked here on every request).
 	Watching changes nothing for the one watched, and they aren't told.
+	(Every player's JoinedAt attribute, server time, is stamped here: the
+	watcher's timer counts their time in the game from it.)
 
 	  DevSpectate.start()
 ]]
@@ -63,8 +65,18 @@ function DevSpectate.start()
 	end
 	started = true
 	Shop.register("DevSpectate", DevSpectate.request)
+	-- When each player joined (server time), for the watcher's timer.
+	local function stamp(player: Player)
+		if player:GetAttribute("JoinedAt") == nil then
+			player:SetAttribute("JoinedAt", workspace:GetServerTimeNow())
+		end
+	end
+	for _, player in Players:GetPlayers() do
+		stamp(player)
+	end
 	-- (the one watched respawns or leaves: follow the new body, or stop)
 	Players.PlayerAdded:Connect(function(player)
+		stamp(player)
 		player.CharacterAdded:Connect(function()
 			task.defer(function()
 				for owner, target in watching do
