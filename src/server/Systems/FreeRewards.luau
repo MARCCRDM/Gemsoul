@@ -198,7 +198,22 @@ local function redeem(player: Player, text: any)
 	end
 	local rest = table.clone(entry.Reward)
 	rest.Cosmetics = nil
+	rest.KaijuSale = nil
 	local lines = StoreServer.grant(player, rest, "Code")
+	-- A kaiju from a code (a Kennel sale's kind: Shared.Kaiju.Sale).
+	if entry.Reward.KaijuSale then
+		local ok, got = false, nil
+		if StoreServer.kaijuSale then
+			ok, got = StoreServer.kaijuSale(player, entry.Reward.KaijuSale)
+		end
+		if ok then
+			for _, line in got or {} do
+				table.insert(lines, 1, line)
+			end
+		else
+			table.insert(lines, "your kaiju is on its way: rejoin if it's not in YOUR KAIJU")
+		end
+	end
 	for _, id in entry.Reward.Cosmetics or {} do
 		table.insert(lines, 1, Cosmetics.get(id) and Cosmetics.get(id).Name or id)
 	end

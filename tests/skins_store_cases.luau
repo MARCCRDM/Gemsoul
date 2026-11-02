@@ -714,6 +714,25 @@ do
 	Free.claim = real
 	stubs.Codes.List.FEWLEFT = nil
 	check(stubs.Codes.List.THUNDER.Limit == 100, "THUNDER isn't limited to 100")
+	-- TRISKULL: the Legendary Triskull (a Kennel sale's kind), 100 only, for a while.
+	local tri = stubs.Codes.List.TRISKULL
+	check(tri and tri.Limit == 100 and tri.Reward.KaijuSale == "Promo" and type(tri.Expires) == "number", "TRISKULL isn't a limited, timed Legendary Triskull")
+	local sold
+	StoreServer.kaijuSale = function(_, which)
+		sold = which
+		return true, { "Legendary Triskull" }
+	end
+	local realExpiry = tri.Expires
+	tri.Expires = os.time() + 3600
+	clock += 3
+	local got = handlers.RedeemCode(thePlayer, "triskull")
+	check(got.Ok and sold == "Promo" and string.find(got.Message, "Legendary Triskull", 1, true), "TRISKULL didn't hand over the Legendary Triskull: " .. tostring(got.Message))
+	tri.Expires = os.time() - 10
+	profile.Codes.TRISKULL = nil
+	clock += 3
+	check(not handlers.RedeemCode(thePlayer, "TRISKULL").Ok, "TRISKULL redeemed after it ended")
+	tri.Expires = realExpiry
+	StoreServer.kaijuSale = nil
 end
 -- THUNDER: the Thunderclap pickaxe, owned and on. Redeemed back when it gave
 -- a weapon skin (gone now), the pickaxe is theirs on joining, and typing

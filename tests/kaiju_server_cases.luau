@@ -6478,10 +6478,14 @@ end)()
 	boss.Humanoid.Health = boss.Humanoid.MaxHealth * 0.6
 	tick()
 	settle()
-	check(#tears - tornBefore == RiftRun.Boss.AddCount + RiftRun.Boss.AddFighters, "Its adds didn't come through tears")
+	-- (a first boss, fought alone, calls fewer and no armed fighter: DungeonRules.starter)
+	local starterAdds = DungeonRules.starter(run.Boss)
+	local addCount = if starterAdds then starterAdds.Adds or RiftRun.Boss.AddCount else RiftRun.Boss.AddCount
+	local addFighters = if starterAdds then 0 else RiftRun.Boss.AddFighters
+	check(#tears - tornBefore == addCount + addFighters, "Its adds didn't come through tears")
 	check(run.Adds[1] and not run.Adds[2], "It didn't call critters through")
-	check(foesLeft(run) == RiftRun.Boss.AddCount + RiftRun.Boss.AddFighters, "Not its critters through: " .. foesLeft(run))
-	check(#fighters == before + RiftRun.Boss.AddFighters and fighters[#fighters].Encounter.GearTier == RiftRun.Boss.AddTier, "No fighter through with them")
+	check(foesLeft(run) == addCount + addFighters, "Not its critters through: " .. foesLeft(run))
+	check(#fighters == before + addFighters and (addFighters == 0 or fighters[#fighters].Encounter.GearTier == RiftRun.Boss.AddTier), "No fighter through with them")
 	-- Knocked out at the boss: kept down to choose.
 	a:SetAttribute("SparDown", now + 3)
 	tick()
@@ -7432,6 +7436,19 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 	check(Kaiju.count(roster) == before + 1, "Two of today's kaiju in a day")
 	check(KaijuServer.saleGrant(d, "Rare") and profiles[d].KaijuRareRollBought == true and profiles[d].KaijuRareRolls == 2, "The Starter Rare Roll wasn't owed")
 	check(not KaijuServer.saleGrant(d, "Nothing"), "An unknown sale was given")
+	-- The promo code's: a Triskull in Shock, its Gemsoul Legendary, its traits at the floor or better.
+	local beforePromo = Kaiju.count(roster)
+	check(KaijuServer.saleGrant(d, "Promo") and Kaiju.count(roster) == beforePromo + 1, "The promo Triskull wasn't given")
+	local promo
+	for _, record in roster.List do
+		if record.Species == "Triskull" and record.Element == "Shock" and record.Soul and record.Soul.Tier == "Legendary" then
+			promo = record
+		end
+	end
+	check(promo ~= nil, "The promo kaiju isn't a Shock Triskull with a Legendary Gemsoul")
+	for _, name in Kaiju.Traits.Names do
+		check(promo == nil or promo.Traits[name] >= Kaiju.Sale.Promo.TraitFloor, "The promo Triskull has a poor trait")
+	end
 	-- The rare roll plays on the roll screen: one of the rarest batch, its
 	-- traits at least the floor, taken from the rare rolls (not boss rolls).
 	local bossBefore = profiles[d].KaijuBossRolls or 0

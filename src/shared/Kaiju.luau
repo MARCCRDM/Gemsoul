@@ -2252,6 +2252,17 @@ Kaiju.Sale = {
 		Best = "All",
 		TraitFloor = 8,
 	},
+	-- A promo code's (Server Codes: TRISKULL): a Triskull in the Shock
+	-- element's gold, its Gemsoul a Legendary holding the element's best Q,
+	-- E and R; never sold.
+	Promo = {
+		Name = "Legendary Triskull",
+		Species = "Triskull",
+		Element = "Shock",
+		Rarity = "Legendary",
+		Best = "All",
+		TraitFloor = 9,
+	},
 	Showcase = {
 		{ Species = "Emberjaw", Element = "Fire" },
 		{ Species = "Razorclaw", Element = "Frost" },

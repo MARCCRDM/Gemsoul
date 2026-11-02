@@ -7,7 +7,8 @@
 	only (players can type it any way: "launch" or "Launch!" both work).
 
 	  Reward   any Store.Reward: Coins,
-	           Cosmetics = { "TitleFounder" }, XPBoostMinutes, ...
+	           Cosmetics = { "TitleFounder" }, XPBoostMinutes, ...,
+	           KaijuSale = "Promo" (a kaiju: Shared.Kaiju.Sale)
 	  Expires  optional: os.time() after which it stops working
 	           (os.time({ year = 2026, month = 12, day = 1 }))
 	  For      optional: a gift for certain players only, by username,
@@ -37,6 +38,13 @@ Codes.List = {
 		Reward = { Cosmetics = { "PickThunderclap" } },
 		Limit = 100, -- the promo video: "only 100/100 left"
 		Note = "Free Thunderclap storm pickaxe skin for players (limited: 100)",
+	},
+	TRISKULL = {
+		-- The Triskull promo video: a Legendary Triskull, 100 only, for two weeks.
+		Reward = { KaijuSale = "Promo" },
+		Limit = 100,
+		Expires = os.time({ year = 2026, month = 11, day = 16, hour = 23, min = 59 }),
+		Note = "Legendary Triskull kaiju promo (limited: 100, ends 16 Nov 2026)",
 	},
 	-- Gifts --------------------------------------------------------------
 	REAPERGIFT113 = {

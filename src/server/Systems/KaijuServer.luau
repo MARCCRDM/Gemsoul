@@ -2840,6 +2840,29 @@ function KaijuServer.saleGrant(player: Player, which: string): (boolean, { strin
 			string.format("%s join your kaiju. Swap them into a team from YOUR KAIJU.", table.concat(names, ", "))
 		)
 		return true, names
+	elseif which == "Promo" then
+		-- A promo code's kaiju (Sale.Promo): one, its Gemsoul Legendary with
+		-- its element's best moves; into your reserves past a full roster.
+		local sale = Kaiju.Sale.Promo
+		local random = Gems.random()
+		local soul = Kaiju.rollSoul(random, sale.Element, {
+			Id = PlayerData.newGemId(),
+			Time = os.time(),
+			Species = sale.Species,
+			Rarity = sale.Rarity,
+			Best = sale.Best,
+		})
+		local record = Kaiju.add(Kaiju.roster(profile), sale.Species, soul, Kaiju.StarterLevel, true, Kaiju.rollTraits(random, sale.TraitFloor))
+		if not record then
+			return false
+		end
+		PlayerData.sync(player)
+		local grade = Kaiju.grade(Kaiju.traits(record))
+		Remotes.Notify:FireClient(
+			player,
+			string.format("%s joins your kaiju (Grade %s, Legendary Gemsoul). Swap it into a team from YOUR KAIJU.", Kaiju.nameOf(record), grade)
+		)
+		return true, { string.format("%s (%s), Grade %s", sale.Name, Kaiju.nameOf(record), grade) }
 	end
 	return false
 end
