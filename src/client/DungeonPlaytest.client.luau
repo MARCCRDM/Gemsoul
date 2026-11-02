@@ -679,4 +679,155 @@ do
 			end
 		end
 	end)
+
+	-- Health bars under the banner while watching: theirs, their kaiju's, and
+	-- whoever they're fighting (their rival, the other side of their match,
+	-- the creatures closest to them).
+	local BAR_ROWS, NEAR = 9, 70
+	local bars = Instance.new("Frame")
+	bars.Name = "WatchHealth"
+	bars.AnchorPoint = Vector2.new(0.5, 0)
+	bars.Position = UDim2.new(0.5, 0, 0, 40)
+	bars.Size = UDim2.fromOffset(360, 0)
+	bars.AutomaticSize = Enum.AutomaticSize.Y
+	bars.BackgroundColor3 = Color3.fromRGB(17, 25, 36)
+	bars.BackgroundTransparency = 0.2
+	bars.Visible = false
+	bars.Parent = gui
+	corner(bars, 6)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop, pad.PaddingBottom = UDim.new(0, 6), UDim.new(0, 6)
+	pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 8), UDim.new(0, 8)
+	pad.Parent = bars
+	local list = Instance.new("UIListLayout")
+	list.Padding = UDim.new(0, 4)
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Parent = bars
+	local rows = {}
+	for i = 1, BAR_ROWS do
+		local row = Instance.new("Frame")
+		row.Name = "Row" .. i
+		row.LayoutOrder = i
+		row.Size = UDim2.new(1, 0, 0, 18)
+		row.BackgroundTransparency = 1
+		row.Visible = false
+		row.Parent = bars
+		local name = Instance.new("TextLabel")
+		name.Name = "Who"
+		name.Size = UDim2.new(0, 130, 1, 0)
+		name.BackgroundTransparency = 1
+		name.Font = Enum.Font.GothamBold
+		name.TextSize = 12
+		name.TextXAlignment = Enum.TextXAlignment.Left
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		name.Parent = row
+		local track = Instance.new("Frame")
+		track.Name = "Track"
+		track.Position = UDim2.fromOffset(136, 3)
+		track.Size = UDim2.new(1, -136, 1, -6)
+		track.BackgroundColor3 = Color3.fromRGB(40, 46, 58)
+		track.Parent = row
+		corner(track, 4)
+		local fill = Instance.new("Frame")
+		fill.Name = "Fill"
+		fill.Size = UDim2.fromScale(1, 1)
+		fill.Parent = track
+		corner(fill, 4)
+		local amount = Instance.new("TextLabel")
+		amount.Name = "Amount"
+		amount.Size = UDim2.fromScale(1, 1)
+		amount.BackgroundTransparency = 1
+		amount.Font = Enum.Font.GothamBold
+		amount.TextSize = 11
+		amount.TextColor3 = Color3.new(1, 1, 1)
+		amount.TextStrokeTransparency = 0.4
+		amount.ZIndex = 3
+		amount.Parent = track
+		rows[i] = { Row = row, Name = name, Fill = fill, Amount = amount }
+	end
+	local SIDES = {
+		You = { Color3.fromRGB(110, 230, 120), Color3.fromRGB(235, 245, 235) },
+		Kaiju = { Color3.fromRGB(80, 200, 255), Color3.fromRGB(190, 230, 255) },
+		Foe = { Color3.fromRGB(240, 80, 80), Color3.fromRGB(255, 200, 200) },
+	}
+	local function humanoidOf(model: Instance?): Humanoid?
+		return if model then model:FindFirstChildOfClass("Humanoid") else nil
+	end
+	local function show(i: number, side: string, label: string, humanoid: Humanoid)
+		local r = rows[i]
+		local colors = SIDES[side]
+		local max = math.max(humanoid.MaxHealth, 1)
+		local hp = math.clamp(humanoid.Health, 0, max)
+		r.Row.Visible = true
+		r.Name.Text = label
+		r.Name.TextColor3 = colors[2]
+		r.Fill.BackgroundColor3 = colors[1]
+		r.Fill.Size = UDim2.fromScale(hp / max, 1)
+		r.Amount.Text = string.format("%d / %d", math.ceil(hp), math.floor(max))
+	end
+	-- Who's on the board, in order: them, their kaiju, then their foes.
+	local function board(): { { any } }
+		local out = {}
+		local me = target :: Player
+		local own = humanoidOf(me.Character)
+		if own then
+			table.insert(out, { "You", me.DisplayName, own })
+		end
+		local kaijuFolder = workspace:FindFirstChild("Kaiju")
+		for _, model in if kaijuFolder then kaijuFolder:GetChildren() else {} do
+			local h = humanoidOf(model)
+			if h and model:GetAttribute("KaijuOwner") == me.UserId then
+				table.insert(out, { "Kaiju", tostring(model:GetAttribute("KaijuName") or "Kaiju"), h })
+			end
+		end
+		-- The other side of their match.
+		local match = me:GetAttribute("MatchId")
+		if match then
+			for _, other in Players:GetPlayers() do
+				local h = other ~= me and other:GetAttribute("MatchId") == match and humanoidOf(other.Character)
+				if h then
+					table.insert(out, { "Foe", other.DisplayName, h })
+				end
+			end
+		end
+		-- Their rival first, then the creatures closest to them.
+		local root = me.Character and me.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local enemies = workspace:FindFirstChild("Enemies")
+		local near = {}
+		for _, model in if enemies then enemies:GetChildren() else {} do
+			local h = humanoidOf(model)
+			local at = model:IsA("Model") and model.PrimaryPart
+			if h and h.Health > 0 then
+				local mine = model:GetAttribute("RivalOwner") == me.UserId
+				local d = if root and at then (at.Position - root.Position).Magnitude else math.huge
+				if mine or d <= NEAR then
+					table.insert(near, { Model = model, H = h, Rank = if mine then -1 else d })
+				end
+			end
+		end
+		table.sort(near, function(a, b)
+			return a.Rank < b.Rank
+		end)
+		for _, e in near do
+			table.insert(out, { "Foe", tostring(e.Model:GetAttribute("CombatTitle") or e.Model.Name), e.H })
+		end
+		return out
+	end
+	local lastDrawn = 0
+	game:GetService("RunService").Heartbeat:Connect(function()
+		bars.Visible = target ~= nil and target.Parent ~= nil
+		if not bars.Visible or os.clock() - lastDrawn < 0.1 then
+			return
+		end
+		lastDrawn = os.clock()
+		local shown = board()
+		for i = 1, BAR_ROWS do
+			local entry = shown[i]
+			if entry then
+				show(i, entry[1], entry[2], entry[3])
+			else
+				rows[i].Row.Visible = false
+			end
+		end
+	end)
 end
