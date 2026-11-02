@@ -166,6 +166,9 @@ Dungeon.Bosses = {
 -- boss room's from Bosses, any other's from the Roster. `kind` defaults to
 -- the room's Theme.
 function Dungeon.specOf(room, kind: number?)
+	if room.FirstBoss then
+		return Dungeon.firstBoss()
+	end
 	local list = if room.Boss then Dungeon.Bosses else Dungeon.Roster
 	return list[kind or room.Theme]
 end
@@ -221,16 +224,21 @@ Dungeon.First = {
 	Rooms = { "The Breach", "The Nest" },
 	Short = { "THE BREACH", "THE NEST" }, -- (the tracker's)
 	Fighters = { { "Sahur", "Tralalero", "Patapim" } },
-	Boss = "SahurTrio", -- Tung Tung Tung Sahur
+	-- The nest's boss: the one-headed Tung Tung Tung Sahur, the Roster's,
+	-- grown to a boss (not the three-headed SahurTrio): firstBoss.
+	Boss = "Sahur",
+	BossThreat = 1,
+	BossLoot = "Weapons",
 	FighterHealth = 0.4, -- of a dungeon fighter's (three at once, your kaiju with you)
 	FighterDamage = 0.5,
-	BossHealth = 0.7,
-	BossDamage = 0.8,
+	-- (A new miner's first boss: beatable, not a wall.)
+	BossHealth = 0.5,
+	BossDamage = 0.55,
 	PieceDamage = { Base = 0.7, Per = 0.05 }, -- x0.75 with 1 intro piece, x1.0 with 6
 	DownSeconds = 3, -- knocked down this long before the card
 	ChooseSeconds = 30, -- then RECOVER by itself
 	-- The boss at half health: enraged, its rot-spawn join in (soft ones).
-	Enrage = { At = 0.5, Adds = { "Sahur", "Patapim" }, AddHealth = 0.3, AddDamage = 0.45 },
+	Enrage = { At = 0.5, Adds = { "Patapim" }, AddHealth = 0.3, AddDamage = 0.4 },
 	WinSeconds = 25, -- the victory card's up this long, then out by itself
 	IntroOutSeconds = 60, -- the intro's boss down: its roll cards, then out by itself after this long
 }
@@ -269,13 +277,22 @@ function Dungeon.firstRooms()
 			HealthScale = first.FighterHealth, DamageScale = first.FighterDamage,
 		})
 	end
-	local boss = indexOf(Dungeon.Bosses, first.Boss)
+	local boss = indexOf(Dungeon.Roster, first.Boss)
 	table.insert(rooms, {
-		Index = #rooms + 1, X = 0, Z = #rooms, Boss = true, Theme = boss, Foes = { boss },
+		Index = #rooms + 1, X = 0, Z = #rooms, Boss = true, FirstBoss = true, Theme = boss, Foes = { boss },
 		Pillars = 0, GearTier = 2, Name = first.Rooms[#first.Rooms],
 		HealthScale = first.BossHealth, DamageScale = first.BossDamage,
 	})
 	return rooms
+end
+
+-- The Rot Beachhead's boss: its Roster fighter (First.Boss) as a boss,
+-- with a boss's Threat and Loot for its cache.
+function Dungeon.firstBoss()
+	local spec = table.clone(Dungeon.Roster[indexOf(Dungeon.Roster, Dungeon.First.Boss)])
+	spec.Threat = Dungeon.First.BossThreat
+	spec.Loot = Dungeon.First.BossLoot
+	return spec
 end
 
 -- The first dungeon's hits, by the intro pieces won (0 to 6): softer with fewer.

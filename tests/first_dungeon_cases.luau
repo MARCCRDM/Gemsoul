@@ -21,7 +21,9 @@ do
 		idOf(Rules.Roster, rooms[1].Foes[1]) == "Sahur" and idOf(Rules.Roster, rooms[1].Foes[2]) == "Tralalero" and idOf(Rules.Roster, rooms[1].Foes[3]) == "Patapim",
 		"The Breach isn't Sahur, Tralalero and Patapim"
 	)
-	check(Rules.specOf(rooms[N]).Id == "SahurTrio", "The nest's boss isn't Tung Tung Tung Sahur")
+	check(Rules.specOf(rooms[N]).Id == "Sahur", "The nest's boss isn't the one-headed Tung Tung Tung Sahur")
+	check(Rules.specOf(rooms[N]).Loot ~= nil and Rules.specOf(rooms[N]).Threat == 1, "The nest's boss has no cache to drop")
+	check(Rules.Roster[Rules.rosterIndex("Sahur")].Loot == nil, "Dressing the boss changed the room fighter")
 	check(rooms[1].HealthScale < 1 and rooms[1].DamageScale < 1 and rooms[N].DamageScale < 1, "Not softened for a new miner")
 	local near = function(a, b)
 		return math.abs(a - b) < 1e-6

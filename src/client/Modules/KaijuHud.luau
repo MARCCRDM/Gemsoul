@@ -3560,12 +3560,15 @@ local function refresh()
 	local data = profile and profile.Kaiju
 	local team = Kaiju.teamIds(data)
 	local inOutpost = OutpostScene.isActive() and player:GetAttribute("Outpost") == true
+	-- (the campaign's first dungeon, where your kaiju fight beside you: the
+	-- card too, its team keys and HYPERBEAM, mid-fight: Server.Dungeons)
+	local dungeonKaiju = player:GetAttribute("DungeonKaiju") == true
 	local rounds = player.PlayerGui:FindFirstChild("IntroRounds")
 	local blocked = player.PlayerGui:FindFirstChild("Intro") ~= nil
 		or KaijuRoll.showing()
 		-- (the intro rounds' card first: Client IntroRoundsUI)
 		or (rounds ~= nil and rounds:IsA("ScreenGui") and rounds.Enabled)
-		or player:GetAttribute("CombatSession") ~= nil
+		or (not dungeonKaiju and player:GetAttribute("CombatSession") ~= nil)
 		or player:GetAttribute("MatchId") ~= nil
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
 	local menu = dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled or player:GetAttribute("MenuOpen") == true
@@ -3602,7 +3605,7 @@ local function refresh()
 	if window.Gui.Enabled then
 		liveRows()
 	end
-	wantShown = #team > 0 and inOutpost and not blocked and not menu
+	wantShown = #team > 0 and (inOutpost or dungeonKaiju) and not blocked and not menu
 	gui.Enabled = wantShown
 	if not wantShown then
 		tameModel, tame.Visible = nil, false
