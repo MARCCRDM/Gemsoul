@@ -5,7 +5,8 @@
 
 	  PickImpacts.play(kind, at, from, power, crit, scale?)
 	      kind   "Magma", "Frost", "Storm", "Void", "Gold", "Prism",
-	             "Neon", "Bone" or "Geode" (anything else: false)
+	             "Neon", "Bone", "Geode", "TwinStar" or "Eclipse" (anything
+	             else: false)
 	      at     the point on the rock that was hit
 	      from   where the swing came from (bits fly back that way)
 	      power  0-1, how close the rock is to breaking: bigger near the end
@@ -494,6 +495,32 @@ function LOOKS.TwinStar(at: Vector3, out: Vector3, k: number, crit: boolean, sca
 			ring(at, Vector3.yAxis, TEAL, 0.6, 6, 0.4)
 		end
 	end)
+end
+
+-- The sun goes out: a dark flash on the rock, a gold corona flaring out
+-- round it, black glass flying.
+function LOOKS.Eclipse(at: Vector3, out: Vector3, k: number, crit: boolean, scale: number)
+	local GOLD, CORONA = Color3.fromRGB(255, 196, 72), Color3.fromRGB(255, 236, 170)
+	local DUSK = Color3.fromRGB(150, 70, 255)
+	local dark = piece(CFrame.new(at), Vector3.one * 0.6, Color3.fromRGB(8, 6, 12), Enum.Material.Glass, 0.3, {
+		Shape = Enum.PartType.Ball,
+	})
+	tween(dark, 0.3, { Size = Vector3.one * 1.8 * k, Transparency = 1 })
+	bloom(at, CORONA, 2.6 * k, 0.28, 0.3)
+	ring(at, out, GOLD, 0.6, 4.6 * k, 0.4)
+	fling(at, out, math.ceil((5 + 4 * k + (if crit then 5 else 0)) * scale), 15, function()
+		return piece(CFrame.new(at), Vector3.new(0.12, 0.4, 0.22), Color3.fromRGB(20, 18, 28), Enum.Material.Glass, 1, {
+			Flies = true,
+		})
+	end, 1)
+	streaks(at, out, math.ceil((6 + 4 * k) * scale), 5 * k, { GOLD, CORONA }, 0.3)
+	if crit then
+		task.delay(0.08, function()
+			ring(at, out, DUSK, 0.4, 6.5, 0.45)
+			ring(at, Vector3.yAxis, GOLD, 1, 8, 0.45)
+		end)
+	end
+	CombatFx.burst(at, GOLD, "Sparks", 0.5 * k)
 end
 
 PickImpacts.Looks = LOOKS

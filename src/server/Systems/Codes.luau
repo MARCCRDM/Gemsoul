@@ -31,6 +31,10 @@ Codes.List = {
 		Reward = { Coins = 750, XPBoostMinutes = 30 },
 		Note = "Like milestone",
 	},
+	ECLIPSE = {
+		Reward = { Cosmetics = { "PickEclipse" } },
+		Note = "Free Eclipse Cleaver pickaxe skin for players",
+	},
 	-- Gifts --------------------------------------------------------------
 	REAPERGIFT113 = {
 		-- The Reaper's Harvest bundle (Store "ReaperHarvest"), all of it.

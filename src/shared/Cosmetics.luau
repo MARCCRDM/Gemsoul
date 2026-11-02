@@ -1518,6 +1518,16 @@ Cosmetics.List = {
 		Exclusive = "Invite",
 		How = "Invite 2 friends who join the game.",
 	},
+	PickEclipse = {
+		Id = "PickEclipse",
+		Kind = "Pick",
+		Name = "Eclipse Cleaver",
+		Description = "A war-axe of black glass, its crescent edged in gold, a dark sun burning on its back. The light goes out where it bites.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(255, 190, 70),
+		Exclusive = "Code",
+		How = "Redeem a promo code.",
+	},
 	-- Visors (Equipment.applyVisor lays one on any helmet's lens). Glass
 	-- tints, then lit lenses, then moving ones, then the elements, then the
 	-- many-coloured legends.

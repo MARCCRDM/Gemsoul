@@ -1051,6 +1051,116 @@ LOOKS.PickTwinStar = {
 	end,
 }
 
+-- Eclipse Cleaver (a promo code's): a war-axe of black glass, its crescent
+-- edged in gold, a burning corona round the dark sun on its back.
+LOOKS.PickEclipse = {
+	Impact = "Eclipse",
+	Color = Color3.fromRGB(255, 190, 70),
+	Build = function(add: Add): BasePart
+		local OBSIDIAN, NIGHT = Color3.fromRGB(22, 20, 30), Color3.fromRGB(10, 9, 14)
+		local GOLD, CORONA = Color3.fromRGB(255, 196, 72), Color3.fromRGB(255, 236, 170)
+		local DUSK = Color3.fromRGB(150, 70, 255)
+		-- An obsidian haft, gold bands spiralling up it, a burning seam on its front.
+		add(CFrame.new(0, 1.05, 0), Vector3.new(0.21, 2.5, 0.21), OBSIDIAN, Enum.Material.Glass, { Reflectance = 0.2 })
+		add(CFrame.new(0, 1.15, -0.1), Vector3.new(0.04, 2.1, 0.03), GOLD, Enum.Material.Neon)
+		for i, y in { 0.75, 1.15, 1.55, 1.95 } do
+			add(
+				CFrame.new(0, y, 0) * CFrame.Angles(0, math.rad(i * 40), math.rad(14)),
+				Vector3.new(0.27, 0.05, 0.27),
+				GOLD,
+				Enum.Material.Foil,
+				{ Reflectance = 0.35 }
+			)
+		end
+		add(CFrame.new(0, 0.25, 0), Vector3.new(0.27, 0.6, 0.27), Color3.fromRGB(46, 28, 70), Enum.Material.Fabric)
+		-- The pommel: a little dark sun in a ring of light.
+		local pommel = add(
+			CFrame.new(0, -0.14, 0),
+			Vector3.new(0.3, 0.3, 0.3),
+			NIGHT,
+			Enum.Material.Glass,
+			{ Shape = Enum.PartType.Ball, Reflectance = 0.3 }
+		)
+		add(
+			CFrame.new(0, -0.14, 0),
+			Vector3.new(0.03, 0.42, 0.42),
+			GOLD,
+			Enum.Material.Neon,
+			{ Shape = Enum.PartType.Cylinder, Transparency = 0.1 }
+		)
+		-- The collar, gold-banded.
+		local head = add(CFrame.new(0, 2.45, 0), Vector3.new(0.38, 0.62, 0.42), NIGHT, Enum.Material.Metal)
+		add(CFrame.new(0, 2.45, 0), Vector3.new(0.42, 0.1, 0.46), GOLD, Enum.Material.Foil, { Reflectance = 0.4 })
+		add(CFrame.new(0, 2.78, 0), Vector3.new(0.3, 0.08, 0.34), GOLD, Enum.Material.Foil, { Reflectance = 0.4 })
+		-- The crescent: black glass flaring out from the collar into a
+		-- round bit, gold all along its edge, its horns sweeping back.
+		local NECK = 0.25 -- half its height at the collar
+		local FLARE = 0.37 -- what it grows by to the bit
+		add(CFrame.new(0, 2.45, -0.5), Vector3.new(0.1, NECK * 2, 0.5), OBSIDIAN, Enum.Material.Glass, { Reflectance = 0.25 })
+		for side = -1, 1, 2 do
+			add(
+				CFrame.new(0, 2.45 + side * (NECK + FLARE / 2), -0.5)
+					* (if side > 0 then CFrame.Angles(0, math.pi, 0) else CFrame.Angles(math.pi, 0, 0)),
+				Vector3.new(0.1, FLARE, 0.5),
+				OBSIDIAN,
+				Enum.Material.Glass,
+				{ Wedge = true, Reflectance = 0.25 }
+			)
+		end
+		local CENTRE, R = Vector3.new(0, 2.45, -0.4), 0.72
+		local tip = nil
+		for i = -3, 3 do
+			local a = math.rad(i * 20)
+			local out = Vector3.new(0, math.sin(a), -math.cos(a))
+			local fan = CENTRE + out * (R - 0.2)
+			add(CFrame.lookAt(fan, fan + out), Vector3.new(0.1, 0.3, 0.4), OBSIDIAN, Enum.Material.Glass, { Reflectance = 0.25 })
+			local rim = CENTRE + out * R
+			local edge = add(CFrame.lookAt(rim, rim + out), Vector3.new(0.13, 0.27, 0.07), GOLD, Enum.Material.Neon)
+			if i == 0 then
+				tip = edge
+			end
+		end
+		for side = -1, 1, 2 do
+			local a = math.rad(side * 64)
+			local along = Vector3.new(0, side * math.cos(a), side * math.sin(a))
+			local at = CENTRE + Vector3.new(0, math.sin(a), -math.cos(a)) * (R - 0.04) + along * 0.18
+			spike(add, CFrame.lookAt(at, at + along), 0.09, 0.2, 0.42, GOLD, Enum.Material.Neon)
+		end
+		-- Runes burnt into the glass.
+		for _, y in { 2.68, 2.45, 2.22 } do
+			add(
+				CFrame.new(0, y, -0.62) * CFrame.Angles(math.rad(45), 0, 0),
+				Vector3.new(0.12, 0.1, 0.1),
+				DUSK,
+				Enum.Material.Neon
+			)
+		end
+		-- The back: a dark sun eclipsing a ring of fire, its flares round it.
+		local SUN = CFrame.new(0, 2.45, 0.6)
+		local corona = add(
+			SUN,
+			Vector3.new(0.05, 0.92, 0.92),
+			GOLD,
+			Enum.Material.Neon,
+			{ Shape = Enum.PartType.Cylinder }
+		)
+		add(SUN, Vector3.new(0.64, 0.64, 0.64), NIGHT, Enum.Material.Glass, { Shape = Enum.PartType.Ball, Reflectance = 0.35 })
+		for i = 0, 7 do
+			local a = i / 8 * math.pi * 2 + math.pi / 8
+			local out = Vector3.new(0, math.sin(a), math.cos(a))
+			local at = SUN.Position + out * (if i % 2 == 0 then 0.54 else 0.51)
+			add(CFrame.lookAt(at, at + out), Vector3.new(0.05, 0.05, if i % 2 == 0 then 0.2 else 0.12), CORONA, Enum.Material.Neon)
+		end
+		add(CFrame.new(0, 2.45, 0.25), Vector3.new(0.16, 0.16, 0.24), GOLD, Enum.Material.Foil, { Reflectance = 0.4 })
+		emitter(corona, GOLD, 16, { From = CORONA, Size = 0.14, Speed = 0.7, Life = 0.7, Acceleration = Vector3.zero })
+		emitter(head, DUSK, 4, { Size = 0.1, Speed = 0.3, Life = 0.9 })
+		emitter(pommel, GOLD, 3, { Size = 0.08, Speed = 0.3, Life = 0.6 })
+		glow(corona, GOLD, 2.2, 11)
+		trail(tip :: BasePart, Vector3.new(0, 1.2, 0), CORONA, DUSK)
+		return tip :: BasePart
+	end,
+}
+
 PickaxeLooks.Looks = LOOKS
 
 -- Builds a pickaxe into `parent` (see the top). `skinId` nil or unknown:
