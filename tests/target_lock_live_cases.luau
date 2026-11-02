@@ -141,6 +141,27 @@ do
  check(Lock.target()==opponent.Character and lerps>before,"Mouse look let go of the 1v1 opponent, or the camera stopped following it")
  input.Delta=Vector3.new(0,0,0); camera.CFrame=pose(camera.CFrame.Position,Vector3.new(0,0,-1))
 end
+-- A Ranked 1v1 (Server Duels: CombatSession "Duel", the two of you in one
+-- match): on desktop the opponent is locked by itself from the moment their
+-- spawn shield drops, and kept through the whole fight however you look.
+player.Session="Duel"
+opponent.Character.Protected=true; Lock.reset(); now+=0.2; bound(1/60)
+check(Lock.auto() and Lock.target()==nil,"Ranked: locked a shielded opponent, or no automatic lock on desktop")
+opponent.Character.Protected=false; now+=0.2; bound(1/60)
+check(Lock.target()==opponent.Character,"Ranked 1v1 on desktop: the opponent wasn't locked by itself")
+do
+ local before=lerps
+ for _=1,20 do
+  input.Delta=Vector3.new(8,0,0)
+  camera.CFrame=pose(camera.CFrame.Position,Vector3.new(0.9,0,0.4))
+  now+=0.05; bound(1/60)
+ end
+ check(Lock.target()==opponent.Character and lerps>before,"Ranked 1v1 on desktop: a second of mouse look lost the opponent")
+ input.Delta=Vector3.new(0,0,0); camera.CFrame=pose(camera.CFrame.Position,Vector3.new(0,0,-1))
+ now+=0.5; bound(1/60)
+ check(Lock.target()==opponent.Character,"Ranked 1v1 on desktop: the lock didn't hold after looking back")
+end
+player.Session=nil
 player.MatchId,player.MatchTeam,opponent.MatchId,opponent.MatchTeam=nil,nil,nil,nil
 check(not Lock.auto(),"Desktop stayed automatic after the 1v1 match")
 player.Spar,player.SparWith,opponent.Spar,opponent.SparWith=true,opponent.UserId,true,player.UserId
