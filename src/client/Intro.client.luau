@@ -72,6 +72,11 @@ local C = {
 }
 local gui = UiKit.gui("Intro", 15)
 gui.IgnoreGuiInset = false
+-- (No picker: nothing of it may show, not for a frame, before the roll's
+-- cover is over it: hidden till then.)
+if not FastStart.Pick then
+	gui.Enabled = false
+end
 -- The strip under Roblox's top bar is dark too (the screens below start
 -- under it), or the sky shows through it: a planet above the launch screen.
 new("Frame", {
@@ -2539,6 +2544,7 @@ fit()
 if not FastStart.Pick then
 	do
 		local list = FastStart.StarterElements
+		gui.Enabled = true
 		local veil = new("TextButton", {
 			Name = "ElementRoll",
 			Size = UDim2.fromScale(1, 1),

@@ -954,7 +954,8 @@ local function show(event)
 		ui.Name.TextColor3 = INK
 		ui.Sub.Text = Lang.translate("Your next try at this round is easier")
 		nextUp("REMATCH", nextRival)
-		placeButtons(true, dungeon)
+		-- (no way out mid-set: all six rounds first)
+		placeButtons(false, false)
 		task.spawn(countdown, "TRY AGAIN", Lang.translate("Easier this time"), mine)
 	elseif view.Done then
 		kicker("STARTER SET COMPLETE", GOLD)
@@ -963,16 +964,10 @@ local function show(event)
 		ui.WellMain.Text = ""
 		ui.WellNote.Text = Lang.translate("coins  ·  wins can now roll Rare or better")
 		ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
-		if dungeon then
-			ui.Go.Text = Lang.translate("TO THE FIRST DUNGEON")
-			ui.GoSub.Text = Lang.translate("The Rot Beachhead · your kaiju fight with you")
-			ui.Leave.Text = Lang.translate("GO TO LOBBY")
-			ui.LeaveSub.Text = Lang.translate("Mine & gear up · the dungeon waits")
-		else
-			ui.Go.Text = Lang.translate("GO TO LOBBY")
-			ui.GoSub.Text = Lang.translate("Mine & gear up")
-		end
-		placeButtons(dungeon, false)
+		-- (on to the intro's finale: the mines, then your kaiju: Client IntroFinale)
+		ui.Go.Text = Lang.translate("CONTINUE")
+		ui.GoSub.Text = Lang.translate("Out to the mines")
+		placeButtons(false, false)
 		task.spawn(reel, event.Piece, mine)
 	else
 		kicker(string.format("ROUND %d OF %d  WON", event.Round, view.Count), GOLD)
@@ -986,7 +981,7 @@ local function show(event)
 			placeButtons(true, false)
 		else
 			nextUp("NEXT", nextRival)
-			placeButtons(true, dungeon)
+			placeButtons(false, false)
 		end
 		if event.Gem then
 			ui.Extra.Text = Lang.translate(string.format(if event.Auto and (event.Auto.Gems or 0) > 0 then "+ %s gem, socketed for you" else "+ %s gem, in your pouch", event.Gem.Name))

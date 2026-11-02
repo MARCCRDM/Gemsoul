@@ -144,7 +144,14 @@ function ArenaSessions.start()
 	Shop.register("ArenaPvP", function(player)
 		return enter(player, true)
 	end)
-	Shop.register("ArenaLeave", leave)
+	Shop.register("ArenaLeave", function(player)
+		-- (A new miner's intro rounds: all six won before the lobby.
+		-- IntroRoundsLeft: Server.IntroRoundsServer.)
+		if player:GetAttribute("IntroRoundsLeft") and player:GetAttribute("CombatSession") == "Training" then
+			return Shop.reply(false, "Finish your intro rounds first.")
+		end
+		return leave(player)
+	end)
 	local function watch(player)
 		player.CharacterAdded:Connect(function()
 			if player:GetAttribute("DungeonSelecting") then return end

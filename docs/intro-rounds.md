@@ -90,3 +90,13 @@ A copy is the Arena's scenery only: no vendors, prompts, scripts, spawn pads, se
 - `Shared.Combat.inArena` counts it as the Arena.
 
 Copies go back to a small pool when the session ends (`Spare` = 3).
+
+## The new intro (all six rounds, then the finale)
+
+1. **Six rounds, nothing else.** All six rival-bot rounds come before the lobby. The round card has one way on: CONTINUE, or TRY AGAIN after a loss. There's no GO TO LOBBY and no LEAVE ARENA. The server refuses `IntroRoundLeave` and `ArenaLeave` while `IntroRoundsLeft` is on the player. A rejoin mid-set goes straight back into its next round (`ResumeAfter`). The dungeon detour is off for everyone, the Owners included (`dungeonPath`: `Features.IntroDungeon` only). The kaiju roll waits for the finale (KaijuHud's starter roll holds while `IntroFinale` or `IntroRoundsLeft` is set).
+2. **The finale** (`Client.IntroFinale`; `profile.IntroFinale` = `"Mines"` once the set's done, then `"Done"`):
+   1. You're put beside the nearest plain rock, with arrows to it: **HIT THE ROCK**.
+   2. **GEMS & ENCHANTING**: a small window, read out (`VoiceOver`), then OK.
+   3. A letterboxed cinematic: three rift portals tear open ahead (`FrontierServer.open`). A rot minion hops out of each and is held where it lands. The line *"These are rot minions…"* shows and is read out. The cinematic ends once they've all landed.
+   4. The kaiju roll. The minions are let loose (`"Fight"`) and the kaiju engage: *"Your kaijus will defend you. Train and protect them, and they will protect you."*
+   5. A window: **your first boss, Bombardiro Drago**, with its rewards. TAKE HIM ON opens the Bounty Board; LATER closes it.

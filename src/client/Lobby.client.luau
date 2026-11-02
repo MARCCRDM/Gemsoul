@@ -84,6 +84,10 @@ end)
 extra("IntroRoundsUI", function()
 	require(script.Parent.Modules.IntroRoundsUI).start()
 end)
+-- After the intro's six rounds: the mines, gems, the rot minions and the kaiju roll.
+extra("IntroFinale", function()
+	require(script.Parent.Modules.IntroFinale).start()
+end)
 -- A force field round the Arena's floor while you fight on it: no walking off.
 extra("ArenaBarrier", function()
 	require(script.Parent.Modules.ArenaBarrier).start()

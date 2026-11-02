@@ -3588,7 +3588,9 @@ local function refresh()
 	-- at the Kennel offers it too, if it's closed unclaimed.)
 	if not heroUi.RollTried and inOutpost and not blocked and not menu and Kaiju.rollsOwed(profile) > 0
 		and not LoadingFlow.active() and player:GetAttribute("IntroCover") ~= true
-		and player:GetAttribute("FirstFight") ~= true then
+		and player:GetAttribute("FirstFight") ~= true
+		-- (the intro's own: after the rot minions, Client IntroFinale)
+		and player:GetAttribute("IntroFinale") == nil and player:GetAttribute("IntroRoundsLeft") == nil then
 		heroUi.RollTried = true
 		task.spawn(KaijuRoll.play)
 	end

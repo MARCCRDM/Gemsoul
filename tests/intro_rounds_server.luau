@@ -184,8 +184,19 @@ for round = 1, IntroRounds.Count do
 	end
 	if round < IntroRounds.Count then
 		check(attributes.IntroRounds == true and coins == 0, "The rounds ended early")
+		-- (all six before the lobby: no leaving, and no finale yet)
+		check(Server.left(player) == IntroRounds.Count - round and attributes.IntroRoundsLeft == IntroRounds.Count - round, "The rounds left aren't on them")
+		check(attributes.IntroFinale == nil and profile.IntroFinale == nil, "The finale came before the set's done")
 	end
 end
+-- The set done: free to leave, and the finale (the mines, the minions, the kaiju) to do.
+check(Server.left(player) == 0 and attributes.IntroRoundsLeft == nil, "Still held in the rounds after the set")
+check(profile.IntroFinale == "Mines" and attributes.IntroFinale == "Mines", "No finale after the set")
+check(Server.finale(player, "Nonsense").Ok == false, "An unknown finale step went through")
+check(Server.finale(player, "Done").Ok and profile.IntroFinale == "Done" and attributes.IntroFinale == nil, "The finale didn't finish")
+check(Server.finale(player, "Done").Ok == false, "The finale finished twice")
+-- (the dungeon detour's off for everyone, the Owners too)
+check(not Server.dungeonPath(player), "The intro still goes by the dungeon")
 check(rares >= 1, "No Rare in the whole set")
 check(coins == IntroRounds.SetCoins and fired[#fired][2].View.Done, "The set's coins weren't paid")
 check(attributes.IntroRounds == nil and not Server.eligible(player), "Still on the rounds after the set")

@@ -110,6 +110,7 @@ end
 -- "Slot|R:<id>", drawn by the client's GearArt). Quietly, in the background,
 -- a few tries if the mannequin's busy; once built they stay.
 local warming = {} :: { [Player]: boolean }
+IntroRoundsServer.ResumeAfter = 6 -- seconds after they're in before a rejoin goes back to its rounds
 function IntroRoundsServer.warm(player: Player)
 	if warming[player] then
 		return
@@ -237,13 +238,154 @@ end
 -- piece given, or nil (not theirs, or done).
 -- On the dungeon path (Shared.IntroRounds' stage): every player once
 -- Config.Features.IntroDungeon is on, the Owners always (to test it).
-function IntroRoundsServer.dungeonPath(player: Player): boolean
-	if Config.Features and Config.Features.IntroDungeon == true then
-		return true
-	end
-	local owners = Config.Playtest and Config.Playtest.Owners or {}
-	return table.find(owners, player.UserId) ~= nil
+function IntroRoundsServer.dungeonPath(_player: Player): boolean
+	-- (Off for everyone, the Owners too: the intro's six rounds, then the
+	-- mines and the kaiju: IntroRoundsServer.finale.)
+	return Config.Features ~= nil and Config.Features.IntroDungeon == true
 end
+
+-- How many rounds `player` has still to win (0 once their set's done),
+-- on them as IntroRoundsLeft: no leaving the Arena till it's 0 (Server
+-- ArenaSessions, the LEAVE button: Client Combat).
+function IntroRoundsServer.left(player: Player): number
+	local state = stateOf(player)
+	if not state then
+		return 0
+	end
+	return math.max(0, IntroRounds.Count - state.Won)
+end
+local function markLeft(player: Player)
+	local left = IntroRoundsServer.left(player)
+	player:SetAttribute("IntroRoundsLeft", if left > 0 then left else nil)
+end
+
+-- After the six rounds, the intro's finale (Client IntroFinale): out by
+-- the mines, a rock to hit, gems and enchanting in a few words, then the
+-- rot minions coming, the kaiju roll, and the kaiju seeing them off.
+-- profile.IntroFinale: "Mines" till it's done, then "Done"; the player's
+-- IntroFinale attribute while it's to do.
+IntroRoundsServer.Critters = {
+	Count = 3, -- portals, a rot minion out of each
+	Away = 30, -- studs ahead of them
+	Hop = 1.6, -- seconds a portal crackles open before its minion hops out
+	Stagger = 0.9, -- between one portal's hop and the next's
+	Linger = 6, -- seconds a portal stays open after
+	Land = 1.6, -- seconds after the hop it's held still (landed)
+	Health = 0.5,
+	Damage = 0.3,
+	Life = 150,
+}
+local function markFinale(player: Player)
+	local profile = PlayerData.get(player) :: any
+	player:SetAttribute("IntroFinale", if profile and profile.IntroFinale == "Mines" then "Mines" else nil)
+end
+local finaleCritters = {} :: { [Player]: { any } }
+local finaleLoose = {} :: { [Player]: boolean } -- (the kaiju are out: the minions let go)
+local function finale(player: Player, step: any)
+	local profile = PlayerData.get(player) :: any
+	if not profile or profile.IntroFinale ~= "Mines" then
+		return reply(false, "Nothing to do here.")
+	end
+	if step == "Critters" then
+		-- Three rift portals tearing open ahead of them (FrontierServer's,
+		-- drawn by RiftTear), a rot minion hopping out of each and landing,
+		-- then held still (the cinematic shows them all come through) till
+		-- the kaiju are out ("Fight").
+		if finaleCritters[player] then
+			return reply(true, "")
+		end
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not root then
+			return reply(false, "No character.")
+		end
+		local KaijuWilds = require(script.Parent.KaijuWilds)
+		local Frontier = require(script.Parent.FrontierServer)
+		local c = IntroRoundsServer.Critters
+		local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)
+		look = if look.Magnitude > 0.1 then look.Unit else Vector3.new(0, 0, -1)
+		local floorY = root.Position.Y - 3
+		local list, portals = {}, {}
+		finaleCritters[player] = list
+		for i = 1, c.Count do
+			-- (as in the sketch: left, middle a touch nearer, right a touch further)
+			local angle = (i - (c.Count + 1) / 2) * 0.55
+			local reach = c.Away + (if i == 2 then -6 elseif i == 3 then 4 else 0)
+			local dir = (CFrame.Angles(0, angle, 0) * CFrame.new(look)).Position
+			local at = Vector3.new(root.Position.X, floorY, root.Position.Z) + dir * reach
+			local ok, anchor, life = pcall(Frontier.open, at, root.Position, {
+				Prey = player,
+				Hop = c.Hop + (i - 1) * c.Stagger,
+				Linger = c.Linger,
+			})
+			if ok and anchor and life then
+				table.insert(portals, { At = at, HopAt = life.HopAt })
+				task.delay(math.max(0, life.HopAt - workspace:GetServerTimeNow()), function()
+					if not player.Parent or finaleCritters[player] ~= list then
+						return
+					end
+					local target = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+					local toward = if target then (target.Position - at) * Vector3.new(1, 0, 1) else -dir
+					toward = if toward.Magnitude > 0.1 then toward.Unit else -dir
+					local made, enemy = pcall(KaijuWilds.spawnBug, at, {
+						Prey = player,
+						Level = 1,
+						Health = c.Health,
+						Damage = c.Damage,
+						Life = c.Life,
+						Facing = if target then target.Position else at - dir,
+						Hop = toward * 16 + Vector3.new(0, 24, 0),
+						Title = "Rot Minion",
+					})
+					if made and enemy then
+						table.insert(list, enemy)
+						-- (landed: held there till the kaiju are out)
+						task.delay(c.Land, function()
+							local e = enemy :: any
+							if not finaleLoose[player] and e.Root and e.Root.Parent then
+								e.Root.Anchored = true
+							end
+						end)
+					end
+				end)
+			end
+		end
+		return reply(true, "", { Portals = portals, Deployed = workspace:GetServerTimeNow() + c.Hop + (c.Count - 1) * c.Stagger + c.Land + 0.5 })
+	elseif step == "Fight" then
+		finaleLoose[player] = true
+		for _, enemy in finaleCritters[player] or {} do
+			local e = enemy :: any
+			if e.Root and e.Root.Parent then
+				e.Root.Anchored = false
+			end
+		end
+		return reply(true, "")
+	elseif step == "Left" then
+		-- How many of them are still standing.
+		local left = 0
+		for _, enemy in finaleCritters[player] or {} do
+			local e = enemy :: any
+			if e.Alive and e.Model and e.Model.Parent then
+				left += 1
+			end
+		end
+		return reply(true, "", { Left = left })
+	elseif step == "Done" then
+		profile.IntroFinale = "Done"
+		for _, enemy in finaleCritters[player] or {} do
+			local e = enemy :: any
+			if e.Root and e.Root.Parent then
+				e.Root.Anchored = false
+			end
+		end
+		finaleCritters[player] = nil
+		finaleLoose[player] = nil
+		markFinale(player)
+		PlayerData.sync(player)
+		return reply(true, "Welcome to the Outpost, miner.")
+	end
+	return reply(false, "Unknown step.")
+end
+IntroRoundsServer.finale = finale
 
 -- Where `player`'s intro is: "Duel", "Dungeon" or "Done" (nil: not a new miner's).
 function IntroRoundsServer.stage(player: Player): string?
@@ -288,6 +430,12 @@ function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 	IntroRoundsServer.funnel(player, state, round, true)
 	IntroRounds.won(state, piece.Rarity)
 	state.Pieces[slot] = { Name = piece.Name, Rarity = piece.Rarity }
+	markLeft(player)
+	if state.Won >= IntroRounds.Count and (profile :: any).IntroFinale == nil then
+		-- (the set's done: the mines and the kaiju next)
+		(profile :: any).IntroFinale = "Mines"
+		markFinale(player)
+	end
 	local event = { Phase = "Won", Round = round, Piece = piece, Where = where, More = more }
 	-- (the dungeon path's last 1v1 won: next, the kaiju roll and the dungeon)
 	if where ~= "Dungeon" and IntroRoundsServer.dungeonPath(player) and IntroRounds.stage(state, true) == "Dungeon" then
@@ -391,6 +539,9 @@ local function nextRound(player: Player)
 end
 
 local function leaveRounds(player: Player)
+	if IntroRoundsServer.left(player) > 0 then
+		return reply(false, "Finish your intro rounds first.")
+	end
 	player:SetAttribute("IntroRounds", nil)
 	player:SetAttribute("IntroRoundFight", nil)
 	if player:GetAttribute("CombatSession") == "Training" then
@@ -426,6 +577,43 @@ function IntroRoundsServer.start()
 	require(script.Parent.Duelist).IntroRounds = IntroRoundsServer
 	Shop.register("IntroRoundNext", nextRound)
 	Shop.register("IntroRoundLeave", leaveRounds)
+	Shop.register("IntroFinale", finale)
+	-- Coming back mid-intro: straight back into their next round (they
+	-- don't get the lobby till the six are won); the finale if it's to do.
+	local function resume(player: Player)
+		task.spawn(function()
+			local waited = 0
+			while player.Parent and waited < 90 and not (PlayerData.get(player) and player.Character) do
+				task.wait(1)
+				waited += 1
+			end
+			if not player.Parent then
+				return
+			end
+			markLeft(player)
+			markFinale(player)
+			local profile = PlayerData.get(player) :: any
+			if not profile or not (profile.Intro and profile.Intro.Done) then
+				return -- (a first join: the intro's first fight starts the rounds)
+			end
+			task.wait(IntroRoundsServer.ResumeAfter)
+			if player.Parent and IntroRoundsServer.left(player) > 0
+				and player:GetAttribute("CombatSession") == nil
+				and player:GetAttribute("MatchId") == nil
+				and player:GetAttribute("DuelQueue") == nil
+			then
+				nextRound(player)
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(resume)
+	for _, player in Players:GetPlayers() do
+		resume(player)
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		finaleCritters[player] = nil
+		finaleLoose[player] = nil
+	end)
 	-- DEV > NEW INTRO: DUNGEON (Owners only): the new intro from its
 	-- dungeon, on this account: its two 1v1s counted won (the pieces they
 	-- paid kept), the dungeon's pieces still to come. Again any time.

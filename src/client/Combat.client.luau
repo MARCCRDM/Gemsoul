@@ -1502,7 +1502,9 @@ RunService.RenderStepped:Connect(function(dt)
 	-- The lock stays on through menus and a free cursor; only its camera pull pauses.
 	TargetLock.setActive(fight)
 	TargetLock.setPaused(CombatGuide.isOpen() or AugmentTreeUI.isOpen())
+	-- (no LEAVE in a new miner's intro rounds: all six first)
 	leave.Visible = ArenaScene.isActive()
+		and not (player:GetAttribute("IntroRoundsLeft") and player:GetAttribute("CombatSession") == "Training")
 	if not fight then
 		if shown.Active then
 			-- (The view first: the camera and mouse are back whatever follows.)

@@ -205,12 +205,12 @@ do
 	local piece = card and card:FindFirstChild("Piece", true)
 	check(drawnPiece and drawnPiece[2] == "Weapon" and drawnPiece[3] == "w1", "The won piece wasn't drawn in 3D")
 	check(piece ~= nil and piece:IsA("ViewportFrame"), "No 3D piece on the card")
-	-- (three ways on: the next round, the lobby; no first dungeon for a player it's not open to)
+	-- (one way on: the next round; no lobby, no first dungeon, till all six are won)
 	local go, leave, dungeon = card:FindFirstChild("Next", true), card:FindFirstChild("Leave", true), card:FindFirstChild("Dungeon", true)
 	check(go and go.Text == "CONTINUE INTRO ROUNDS" and go.Visible, "No CONTINUE INTRO ROUNDS")
 	local goSub = go and go:FindFirstChild("Sub")
 	check(goSub and string.find(goSub.Text, "Round 2 of 6", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) ~= nil, "CONTINUE INTRO ROUNDS' round and countdown: " .. tostring(goSub and goSub.Text))
-	check(leave and leave.Text == "GO TO LOBBY" and leave.Visible, "No GO TO LOBBY")
+	check(leave and not leave.Visible, "GO TO LOBBY offered mid-set")
 	check(dungeon and not dungeon.Visible, "FIRST DUNGEON offered to a player it's not open to")
 	attrs.CombatSession = nil
 end
@@ -223,15 +223,15 @@ task.wait(2.5)
 local card = playerGui:FindFirstChild("IntroRounds")
 check(card ~= nil and card.Enabled, "The intro rounds' card isn't up")
 check(load(clientRef.IntroRoundsUI).busy(), "The set's card is up, but it doesn't hold back what comes after it")
-do -- (the set done: to the lobby; the first dungeon's off for now, an owner's too)
+do -- (the set done: CONTINUE, out to the mines; the first dungeon's off for now, an owner's too)
 	task.wait(2.5) -- (out of the Arena, a card's up 4.5 s after its event)
 	local go = card:FindFirstChild("Next", true)
-	check(go.Text == "GO TO LOBBY" and not card:FindFirstChild("Leave", true).Visible, "The set's card without the first dungeon: " .. go.Text .. " " .. tostring(card:FindFirstChild("Leave", true).Visible))
+	check(go.Text == "CONTINUE" and not card:FindFirstChild("Leave", true).Visible, "The set's card: " .. go.Text .. " " .. tostring(card:FindFirstChild("Leave", true).Visible))
 	attrs.CanTestDungeon = true
 	social:Fire("IntroRound", { Phase = "Lost", Round = 2, View = IntroRounds.view(IntroRounds.state({ Funnel = {} })) })
 	task.wait(5)
 	local dungeon = card:FindFirstChild("Dungeon", true)
-	check(not dungeon.Visible and card:FindFirstChild("Leave", true).Visible, "FIRST DUNGEON shown while it's off (Config.Features.FirstDungeon), owner or not")
+	check(not dungeon.Visible and not card:FindFirstChild("Leave", true).Visible, "FIRST DUNGEON or GO TO LOBBY on a mid-set loss")
 	check(card:FindFirstChild("Next", true).Text == "TRY AGAIN", "A loss's TRY AGAIN")
 	attrs.CanTestDungeon = nil
 end
