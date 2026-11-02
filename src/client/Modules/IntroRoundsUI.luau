@@ -41,7 +41,7 @@ local IntroRoundsUI = {}
 
 local new = IronUi.new
 local player = Players.LocalPlayer
-IntroRoundsUI.AutoNext = 10 -- seconds before the next round starts by itself (in the Arena)
+IntroRoundsUI.AutoNext = 5 -- seconds before the next round starts by itself (in the Arena)
 
 local W, H, PAD = 460, 496, 22 -- (px: the card, before scaling)
 local HERO_Y = 104 -- (the piece's centre)

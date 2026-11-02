@@ -38,6 +38,7 @@ local player = Players.LocalPlayer
 local FirstDungeonUI = {}
 
 FirstDungeonUI.SlideSeconds = 2.8
+FirstDungeonUI.ShowSlides = false -- the kaiju and scout mission screens before going in (off: the game's own loading)
 FirstDungeonUI.Slides = {
 	{
 		Kicker = "YOUR KAIJU",
@@ -278,19 +279,22 @@ function FirstDungeonUI.play(): string?
 				task.wait(0.1)
 			end
 		end
-		local screen = UiKit.gui("FirstDungeonIntro", 70)
-		screen.IgnoreGuiInset = true
-		local last
-		for i, spec in FirstDungeonUI.Slides do
-			local shown = slide(screen, spec, i, #FirstDungeonUI.Slides)
-			if last then
-				last:Destroy()
+		-- (Straight in: the game's own loading, the pod drop's. The kaiju and
+		-- scout mission screens are kept for later: ShowSlides.)
+		local screen, last = nil, nil
+		if FirstDungeonUI.ShowSlides then
+			screen = UiKit.gui("FirstDungeonIntro", 70)
+			screen.IgnoreGuiInset = true
+			for i, spec in FirstDungeonUI.Slides do
+				local shown = slide(screen, spec, i, #FirstDungeonUI.Slides)
+				if last then
+					last:Destroy()
+				end
+				last = shown
 			end
-			last = shown
 		end
-		-- In: the server drops you in (its pod); the last screen fades as it does.
-		-- (Out of the intro fights' queue and the Arena first: a dungeon won't
-		-- take you from either.)
+		-- In: the server drops you in (its pod). (Out of the intro fights'
+		-- queue and the Arena first: a dungeon won't take you from either.)
 		FirstDungeonUI.free()
 		local result = GemClient.request("FirstDungeon")
 		if not result.Ok then
@@ -298,16 +302,9 @@ function FirstDungeonUI.play(): string?
 			FirstDungeonUI.free()
 			result = GemClient.request("FirstDungeon")
 		end
-		if last then
-			local fade = new("Frame", {
-				BackgroundColor3 = Color3.new(0, 0, 0),
-				BackgroundTransparency = 1,
-				Size = UDim2.fromScale(1, 1),
-				ZIndex = 30,
-			}, last)
-			tween(fade, 0.35, { BackgroundTransparency = 0 }).Completed:Wait()
+		if screen then
+			screen:Destroy()
 		end
-		screen:Destroy()
 		if not result.Ok then
 			return result.Message or "Couldn't start the Rot Beachhead."
 		end
