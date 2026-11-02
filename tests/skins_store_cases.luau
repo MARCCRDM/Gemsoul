@@ -686,6 +686,35 @@ for _, id in { "SuitStealth", "SkinVoid", "HelmetGrimReaper", "VisorTwilight", "
 end
 check(profile.Cosmetics.Helmet == "HelmetGrimReaper", "The Reaper gift's hood wasn't put on")
 thePlayer.Name, thePlayer.DisplayName = nil, nil
+-- A limited code: first come, its Limit across every server, then sold out.
+do
+	local real = Free.claim
+	local claims = 0
+	Free.claim = function(_, limit)
+		if claims >= limit then
+			return false, nil
+		end
+		claims += 1
+		return true, claims
+	end
+	stubs.Codes.List.FEWLEFT = { Reward = { Coins = 1 }, Limit = 1 }
+	clock += 3
+	local first = handlers.RedeemCode(thePlayer, "FEWLEFT")
+	check(first.Ok and first.Number == 1 and string.find(first.Message, "#1 of 1", 1, true), "A limited code's first claim didn't say which it was")
+	profile.Codes.FEWLEFT = nil
+	clock += 3
+	local late = handlers.RedeemCode(thePlayer, "FEWLEFT")
+	check(not late.Ok and string.find(late.Message, "Sold out", 1, true) and not profile.Codes.FEWLEFT, "A limited code went past its limit")
+	Free.claim = function()
+		return nil, nil
+	end
+	stubs.Codes.List.FEWLEFT.Limit = 5
+	clock += 3
+	check(not handlers.RedeemCode(thePlayer, "FEWLEFT").Ok and not profile.Codes.FEWLEFT, "A limited code redeemed with its counter out of reach")
+	Free.claim = real
+	stubs.Codes.List.FEWLEFT = nil
+	check(stubs.Codes.List.THUNDER.Limit == 100, "THUNDER isn't limited to 100")
+end
 -- THUNDER: the Thunderclap pickaxe, owned and on. Redeemed back when it gave
 -- a weapon skin (gone now), the pickaxe is theirs on joining, and typing
 -- it again gives it too.

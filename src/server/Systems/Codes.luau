@@ -14,6 +14,8 @@
 	           display name (the name chat shows) or UserId
 	           ({ "kingreen113" } or { 123456 }); to anyone else it's a code
 	           that doesn't exist
+	  Limit    optional: only this many, first come, across every server
+	           (counted in a DataStore: FreeRewards.claim); then "Sold out"
 	  Note     for you: where it was posted
 ]]
 local Codes = {}
@@ -33,7 +35,8 @@ Codes.List = {
 	},
 	THUNDER = {
 		Reward = { Cosmetics = { "PickThunderclap" } },
-		Note = "Free Thunderclap storm pickaxe skin for players",
+		Limit = 100, -- the promo video: "only 100/100 left"
+		Note = "Free Thunderclap storm pickaxe skin for players (limited: 100)",
 	},
 	-- Gifts --------------------------------------------------------------
 	REAPERGIFT113 = {

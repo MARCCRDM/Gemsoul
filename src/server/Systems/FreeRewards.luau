@@ -106,6 +106,47 @@ function FreeRewards.honourCodes(player: Player): { string }
 	return given
 end
 
+-- A limited code's claims, counted across every server (a DataStore key
+-- per code: Codes.List[code].Limit). Returns whether there was one left
+-- (and which it was, 1 to Limit), or nil and why it couldn't be counted.
+-- With no DataStore (Studio without API access) every claim goes through.
+FreeRewards.ClaimStore = "PromoCodeClaims"
+function FreeRewards.claim(code: string, limit: number): (boolean?, number?)
+	local ok, store = pcall(function()
+		return game:GetService("DataStoreService"):GetDataStore(FreeRewards.ClaimStore)
+	end)
+	if not ok or not store or not store.UpdateAsync then
+		return true, nil
+	end
+	local got: number? = nil
+	local done = pcall(function()
+		store:UpdateAsync(code, function(count)
+			count = tonumber(count) or 0
+			if count >= limit then
+				got = nil
+				return nil -- (sold out: nothing written)
+			end
+			got = count + 1
+			return got
+		end)
+	end)
+	if not done then
+		return nil, nil
+	end
+	return got ~= nil, got
+end
+
+-- How many of a limited code are left (nil: can't tell).
+function FreeRewards.left(code: string, limit: number): number?
+	local ok, count = pcall(function()
+		return game:GetService("DataStoreService"):GetDataStore(FreeRewards.ClaimStore):GetAsync(code)
+	end)
+	if not ok then
+		return nil
+	end
+	return math.max(0, limit - (tonumber(count) or 0))
+end
+
 local lastTry: { [Player]: number } = {}
 local function redeem(player: Player, text: any)
 	local profile = PlayerData.get(player) :: any
@@ -135,6 +176,17 @@ local function redeem(player: Player, text: any)
 		end
 		return reply(false, "You've already used that code.")
 	end
+	-- A limited code: one of its Limit, the first come (every server counts).
+	local which: number? = nil
+	if entry.Limit then
+		local claimed, n = FreeRewards.claim(code, entry.Limit)
+		if claimed == nil then
+			return reply(false, "Couldn't reach the code counter. Try again in a moment.")
+		elseif not claimed then
+			return reply(false, "Sold out! All " .. entry.Limit .. " are gone.")
+		end
+		which = n
+	end
 	profile.Codes[code] = os.time()
 	-- A cosmetic from a code goes straight on, like the other free ones.
 	for _, id in entry.Reward.Cosmetics or {} do
@@ -151,7 +203,11 @@ local function redeem(player: Player, text: any)
 		table.insert(lines, 1, Cosmetics.get(id) and Cosmetics.get(id).Name or id)
 	end
 	PlayerData.sync(player)
-	return reply(true, "Code " .. code .. ": " .. table.concat(lines, ", "), { Lines = lines })
+	local message = "Code " .. code .. ": " .. table.concat(lines, ", ")
+	if which and entry.Limit then
+		message ..= string.format(" (#%d of %d)", which, entry.Limit)
+	end
+	return reply(true, message, { Lines = lines, Number = which, Limit = entry.Limit })
 end
 
 local function state(player: Player)
