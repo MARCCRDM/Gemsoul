@@ -63,3 +63,7 @@ round is too hard (or they quit mid-fight).
 ## Between rounds: three ways on
 
 The card between rounds offers **CONTINUE INTRO ROUNDS** (or TRY AGAIN after a loss; it starts by itself after `IntroRoundsUI.AutoNext`, 10 s, in the Arena), **GO TO LOBBY** (the set waits; PLAY carries on) and **FIRST DUNGEON** (the Rot Beachhead: docs/brainrot-dungeons.md; shown to those it's open to, `Config.Features.FirstDungeon`). The set done: TO THE FIRST DUNGEON with GO TO LOBBY beside it, or GO TO LOBBY alone.
+
+## Kept out of real players' matches
+
+Until their set's done, a new miner only fights the intro rivals: the next round is always the round's rival (never a real player waiting in a 1v1 queue), the lobby's auto queue doesn't search for them, and they aren't called in to fill someone else's 1v1 (Server.Duels' `inIntro`). They can still pick a mode from the PLAY menu themselves.

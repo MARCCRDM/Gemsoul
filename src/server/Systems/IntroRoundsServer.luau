@@ -9,9 +9,7 @@
 	the whole set pays SetCoins.
 
 	Requests:
-	  "IntroRoundNext"    the next round: into a lone 1v1 searcher's queue if
-	                      someone's waiting for an opponent (Duels.joinWaiting),
-	                      else the round's rival in a Training session
+	  "IntroRoundNext"    the next round: the round's rival in a Training session
 	                      (Duelist.spawnRound; entering the Arena if need be)
 	  "IntroRoundLeave"   done for now: out of the Arena to the Outpost (they
 	                      can come back to it later from the PLAY menu)
@@ -268,13 +266,8 @@ local function nextRound(player: Player)
 		return reply(false, "You're already in a match.")
 	end
 	local round = IntroRounds.round(state)
-	-- Someone's waiting for a 1v1 and nobody's come: you're it.
-	local Duels = require(script.Parent.Duels)
-	if Duels.joinWaiting and Duels.joinWaiting(player) then
-		IntroRoundsServer.funnel(player, state, round, false)
-		player:SetAttribute("IntroRounds", nil)
-		return reply(true, "A miner is waiting for an opponent: you're in!", { Real = true, Round = round })
-	end
+	-- (Always the round's rival: a new miner isn't sent into real players'
+	-- queues till their set's done: Server.Duels' inIntro.)
 	local Duelist = require(script.Parent.Duelist)
 	player:SetAttribute("IntroRoundFight", round)
 	player:SetAttribute("IntroRounds", true)

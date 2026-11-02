@@ -1075,3 +1075,33 @@ do
 	assert(finished > 0, "No duel result was sent to Analytics")
 	print("PASS: duel results sent to Analytics (" .. finished .. ")")
 end
+
+-- A new miner with intro rounds still to win isn't pulled into real
+-- players' matches: no auto search, no fill-in calls. Done: they are.
+do
+	local function lobby(p, played)
+		p:SetAttribute("Outpost", true)
+		local record = Duels.record(p)
+		record.Played = played
+		p:SetAttribute("DuelsPlayed", played)
+	end
+	local vet, newbie, other = makePlayer(91, "Vet"), makePlayer(92, "Newbie"), makePlayer(93, "Other")
+	profiles[newbie].Funnel = {}
+	profiles[newbie].IntroRounds = { Won = 2, Losses = 0, Pieces = {} }
+	lobby(newbie, 2)
+	lobby(other, 4)
+	advance(AutoQueue.Settle)
+	local refused = handlers.DuelReturnQueue(newbie)
+	check(not refused.Ok and refused.Message == Duels.IntroMessage, "A new miner mid-intro was auto-queued")
+	check(newbie:GetAttribute("DuelQueue") == nil, "A new miner mid-intro is searching")
+	check(handlers.DuelQueue(vet, "1v1").Ok, "The veteran couldn't queue")
+	advance(AutoQueue.CallAfter + 0.5)
+	check(last(newbie, "FillIn") == nil, "A new miner mid-intro was invited into a real player's 1v1")
+	check(last(other, "FillIn") ~= nil, "The lobby wasn't called at all")
+	check(Duels.matchOf(newbie) == nil, "A new miner mid-intro was matched")
+	handlers.DuelCancel(vet)
+	profiles[newbie].IntroRounds.Won = 6
+	check(handlers.DuelReturnQueue(newbie).Ok, "A new miner whose set's done can't auto-queue")
+	handlers.DuelCancel(newbie)
+	print("PASS: new miners mid-intro kept out of real players' matches (auto queue, fill-in calls)")
+end

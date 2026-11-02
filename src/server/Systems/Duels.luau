@@ -107,6 +107,7 @@ local CombatServer = require(script.Parent.CombatServer)
 local ArenaSessions = require(script.Parent.ArenaSessions)
 local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
+local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
 local MinerRoster = require(ReplicatedStorage.Shared.MinerRoster)
 local Progress = require(script.Parent.Progress)
 local ArenaStreaks = require(script.Parent.ArenaStreaks)
@@ -1262,12 +1263,21 @@ local function introJoin(player: Player)
 	return reply(true, "Finding your first opponent…")
 end
 
+-- A new miner with intro rounds still to win: kept out of real players'
+-- matches (no auto search, no fill-in calls) till their set's done; they
+-- can still pick a mode from the PLAY menu themselves.
+Duels.IntroMessage = "Finish your intro rounds first."
+local function inIntro(player: Player): boolean
+	return IntroRounds.eligible(PlayerData.get(player))
+end
+
 -- Auto queue: everyone with it on (the default) searches ranked 1v1 while
 -- they're in the lobby, without being asked (arriving there, and back from
 -- a dungeon or the Rift); CANCEL on the SEARCHING card leaves it. Only a
 -- fill-in, pulled into someone else's match, is asked first (FillIn).
 local function autoReturn(player: Player)
 	if entryOf(player) then return reply(true, "Already searching.") end
+	if inIntro(player) then return reply(false, Duels.IntroMessage) end
 	local ready = AutoQueue.ready(function(name) return player:GetAttribute(name) end, false)
 	if not ready or busy(player) then return reply(false, "Return to the lobby first.") end
 	local record = Duels.record(player)
@@ -1286,7 +1296,7 @@ end
 local function onCall(entry)
 	local manual = {}
 	for _, other in Players:GetPlayers() do
-		if not table.find(entry.Players, other) and not busy(other) and AutoQueue.settled(arrived[other], os.clock()) then
+		if not table.find(entry.Players, other) and not busy(other) and not inIntro(other) and AutoQueue.settled(arrived[other], os.clock()) then
 			local ok = AutoQueue.ready(function(name)
 				return other:GetAttribute(name)
 			end, entryOf(other) ~= nil)
@@ -1430,6 +1440,9 @@ local function fillRespond(player: Player, id: any, accept: any)
 	end
 	if table.find(entry.Players, player) then
 		return reply(false, "That's your own queue.")
+	end
+	if inIntro(player) and not (Matchmaking.Modes[entry.Mode] and Matchmaking.Modes[entry.Mode].Intro) then
+		return reply(false, Duels.IntroMessage)
 	end
 	local ready = AutoQueue.ready(function(name) return player:GetAttribute(name) end, entryOf(player) ~= nil)
 	if not ready or not AutoQueue.setting(Duels.record(player)) then

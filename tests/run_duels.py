@@ -18,6 +18,7 @@ source += module('AutoQueue', 'src/shared/AutoQueue.luau')
 source += module('Season', 'src/shared/Season.luau')
 source += module('SwingRestore', 'src/shared/SwingRestore.luau')
 source += module('RewardRoll', 'src/shared/RewardRoll.luau')
+source += module('IntroRounds', 'src/shared/IntroRounds.luau')
 source += 'Duels=(function()\n' + re.sub(r'^local \w+ = (require\([^\n]+\)|game:GetService\([^\n]+\))\n', '', read('src/server/Systems/Duels.luau'), flags=re.M) + '\nend)()\n'
 source += read('tests/duels_cases.luau')
 source += 'local Config={Features={}}\n'
