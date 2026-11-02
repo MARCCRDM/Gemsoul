@@ -77,7 +77,7 @@ Dungeon.Bosses = {
 		Moves = { "FlameBreath", "TailSweep", "FirebombDive" },
 		Threat = 1,
 		Loot = "Helmets",
-		Starter = { Level = 2, Health = 0.6, Foes = 1 },
+		Starter = { Level = 2, Health = 0.6, Foes = 1, Damage = 0.65, Adds = 2 },
 	},
 	{
 		Id = "Paperotti",
@@ -108,7 +108,7 @@ Dungeon.Bosses = {
 		Moves = { "PeelToss", "JungleRush", "BananaBounce" },
 		Threat = 1,
 		Loot = "Boots",
-		Starter = { Level = 2, Health = 0.6, Foes = 1 },
+		Starter = { Level = 2, Health = 0.6, Foes = 1, Damage = 0.65, Adds = 2 },
 	},
 	{
 		Id = "SahurTrio",
@@ -368,8 +368,10 @@ function Dungeon.elementTips(boss)
 	}
 end
 
--- A first boss for a new miner (Starter), and the level it's for.
-function Dungeon.starter(boss): { Level: number, Health: number, Foes: number }?
+-- A first boss for a new miner (Starter), and the level it's for: its
+-- health and damage (times a boss's), its rooms' foes, and the critters it
+-- calls (no armed fighter with them: it's for one miner alone).
+function Dungeon.starter(boss): { Level: number, Health: number, Foes: number, Damage: number?, Adds: number? }?
 	return boss and boss.Starter
 end
 

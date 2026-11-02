@@ -2521,7 +2521,13 @@ function spawnRival(owner: Player, raid, encounter)
 	-- A raid boss: more health for every raider and wave, and heavier hits.
 	local raidHealth, raidDamage = 1, 1
 	if raid then
-		raidHealth, raidDamage = Matchmaking.raidScale(#raid.Members, raid.Wave)
+		-- (A Rift's boss is scaled by the Rift's own rules, RiftRun.bossHealth:
+		-- its runners and its threat; not again as a raid's last wave and party.)
+		if raid.OwnScale then
+			raidHealth, raidDamage = Matchmaking.raidScale(1, 1)
+		else
+			raidHealth, raidDamage = Matchmaking.raidScale(#raid.Members, raid.Wave)
+		end
 		health = math.floor(health * raidHealth)
 		if encounter then
 			health = math.floor(health * (if encounter.Boss then 2.2 else 0.38) * (encounter.HealthScale or 1))
@@ -2924,6 +2930,7 @@ function Duelist.spawnDungeon(members, id, encounter)
 		All = table.clone(members),
 		Wave = if encounter.OpenWorld then 1 else encounter.Room,
 		Dungeon = true,
+		OwnScale = encounter.Rift == true and encounter.Boss == true,
 	}
 	return spawnRival(members[1], raid, encounter)
 end

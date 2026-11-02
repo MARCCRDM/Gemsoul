@@ -422,6 +422,8 @@ local function spawnFighter(run, at: Vector3, spec, tier: number, boss: boolean?
 		Boss = boss == true,
 		MinPlayers = 1,
 		HealthScale = scale,
+		-- (A first boss hits softer: it's fought alone. DungeonRules.starter)
+		DamageScale = if boss then (DungeonRules.starter(run.Boss) or {} :: any).Damage else nil,
 		OnDeath = function(e)
 			foeDied(run, e)
 		end,
@@ -602,9 +604,12 @@ local function callAdds(run)
 	local rule = RiftRun.Boss
 	local level = run.BossLevel or RiftRun.bossLevel(levelsOf(run), run.Boss)
 	local arena = run.World.Boss
-	local wave = Kaiju.wave(rule.AddCount, run.Rng)
+	-- (A first boss calls fewer critters and no armed fighter: it's fought alone.)
+	local starter = DungeonRules.starter(run.Boss)
+	local addFighters = if starter then 0 else rule.AddFighters
+	local wave = Kaiju.wave(if starter then starter.Adds or rule.AddCount else rule.AddCount, run.Rng)
 	local fighters = RiftRun.pickFighters(RiftRun.Rooms, 1, run.Rng, run.Element, run.Boss)
-	local spots = RiftRun.portalSpots(arena.Center, arena.Radius, #wave + rule.AddFighters, runnersAt(run), run.Rng)
+	local spots = RiftRun.portalSpots(arena.Center, arena.Radius, #wave + addFighters, runnersAt(run), run.Rng)
 	local every = RiftRun.Portal.Every
 	for i, id in wave do
 		local at = spots[i] + Vector3.new(0, 0.5, 0)
@@ -619,7 +624,7 @@ local function callAdds(run)
 			})
 		end)
 	end
-	for j = 1, rule.AddFighters do
+	for j = 1, addFighters do
 		local at = spots[#wave + j] + Vector3.new(0, 0.5, 0)
 		through(run, at, (#wave + j - 1) * every, RiftRun.Portal.Leader, function()
 			spawnFighter(run, at, fighters[1], rule.AddTier, false, RiftRun.Fighters.Health)

@@ -936,6 +936,28 @@ local server = fs.readFile(ROOT .. "/src/server/Systems/RiftServer.luau")
 check(server:find('Gems.award(player, "RiftCache"', 1, true) ~= nil, "Caches aren't Rift gems")
 local gems = fs.readFile(ROOT .. "/src/shared/GemConfig.luau")
 check(gems:find('RiftCache = "Found in the Rift"', 1, true) ~= nil, "A Rift gem has no source label")
+-- The boss is scaled once, by the Rift's rules (bossHealth: its runners and
+-- threat), never again as a raid's last wave and party on top.
+local duelist = fs.readFile(ROOT .. "/src/server/Systems/Duelist.luau")
+check(
+	duelist:find("OwnScale = encounter.Rift == true and encounter.Boss == true", 1, true)
+		and duelist:find("raidHealth, raidDamage = Matchmaking.raidScale(1, 1)", 1, true)
+		and server:find("Boss = boss == true", 1, true),
+	"The Rift's boss is scaled again as a raid's last wave"
+)
+-- A first boss is for one miner: softer hits, fewer critters, no armed fighter with them.
+for _, b in DungeonRules.Bosses do
+	local st = DungeonRules.starter(b)
+	if st then
+		check(type(st.Damage) == "number" and st.Damage < 1, b.Name .. ": a first boss hits as hard as any")
+		check(type(st.Adds) == "number" and st.Adds < RiftRun.Boss.AddCount, b.Name .. ": a first boss calls a full pack")
+	end
+end
+check(
+	server:find("DamageScale = if boss then (DungeonRules.starter(run.Boss)", 1, true)
+		and server:find("local addFighters = if starter then 0 else rule.AddFighters", 1, true),
+	"A first boss isn't softened for one miner"
+)
 local main = fs.readFile(ROOT .. "/src/server/Main.server.luau")
 check(
 	main:find("RiftServer.start(OutpostServer.site())", 1, true)
