@@ -341,7 +341,7 @@ end
 -- IntroFinale attribute while it's to do.
 IntroRoundsServer.Critters = {
 	Count = 3, -- portals, a rot minion out of each
-	Away = 30, -- studs ahead of them
+	Away = 24, -- studs ahead of them (inside the kaiju's reach, Kaiju.Follow.Engage)
 	Hop = 1.6, -- seconds a portal crackles open before its minion hops out
 	Stagger = 0.9, -- between one portal's hop and the next's
 	Linger = 6, -- seconds a portal stays open after
@@ -410,6 +410,10 @@ local function finale(player: Player, step: any)
 						Facing = if target then target.Position else at - dir,
 						Hop = toward * 16 + Vector3.new(0, 24, 0),
 						Title = "Rot Minion",
+						-- (after them right here by the Shelter, and not off back
+						-- through a rift while the kaiju roll plays)
+						Hunt = true,
+						Stay = true,
 					})
 					if made and enemy then
 						table.insert(list, enemy)

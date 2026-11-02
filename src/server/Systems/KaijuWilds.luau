@@ -193,6 +193,7 @@ type Wild = {
 	Prey: Player?, -- a rift's critter: whoever drew it
 	Wander: any?, -- out of a wandering rift: { Home, Roam, Notice }
 	Life: number?, -- seconds before a critter slips back (Frontier.Life)
+	Hunt: boolean?, -- after its Prey even by the Shelter (spawnBug's opts.Hunt)
 	RoamAt: number?,
 	-- A wild kaiju's: who started a fight with it (and when they last did
 	-- anything in it). Its Enemies record carries the same table (Engaged),
@@ -315,6 +316,10 @@ local function prey(player: Player, wild: any?): boolean
 	-- (A mech's pilot too: its swings draw critters like a pick's.)
 	if not humanoid or humanoid.Health <= 0 or humanoid.SeatPart ~= nil or not root then
 		return false
+	end
+	-- (One sent after them, wherever they are: the intro's rot minions.)
+	if wild ~= nil and wild.Hunt and wild.Prey == player then
+		return true
 	end
 	if Frontier.distance(root.Position, Outpost.Location.Position) >= Frontier.Core - Frontier.Safe then
 		return true
@@ -2927,6 +2932,8 @@ end
 --   Stay     never slips back: it roams its patch (Wander) till someone
 --            comes (the Rift's: Server.RiftServer)
 --   Boss     a Rift boss (RiftBoss on its model, for the clients)
+--   Hunt     goes for its Prey wherever they are, by the Shelter too (the
+--            intro's rot minions: Server.IntroRoundsServer)
 -- }
 function KaijuWilds.spawnBug(at: Vector3, opts)
 	Duelist = Duelist or require(script.Parent.Duelist)
@@ -3001,6 +3008,7 @@ function KaijuWilds.spawnBug(at: Vector3, opts)
 			Serial = serial + 1,
 			Raider = (opts.Raider == true or opts.Robbery ~= nil) or nil,
 			Stay = opts.Stay == true or nil,
+			Hunt = opts.Hunt == true or nil,
 			Size = if scale ~= Kaiju.Bug.Scale then size else nil,
 			Robbery = opts.Robbery,
 			Hell = opts.Hell == true or nil,

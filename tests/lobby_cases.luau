@@ -280,10 +280,20 @@ MobileLayout.claimTop("MinerLoot", false)
 local function welcomeLayer()
 	return playerGui:FindFirstChild("Welcome")
 end
+player:SetAttribute("DailyReward", 125)
+player:SetAttribute("DailyStreak", 3)
+LobbyFeed.welcome()
+check(welcomeLayer() == nil, "The daily reward popped up in the session's first ten minutes")
+check(LobbyFeed._waiting ~= nil, "The banner didn't wait to show after the first ten minutes")
+if type(LobbyFeed._waiting) == "thread" then
+	task.cancel(LobbyFeed._waiting)
+end
+LobbyFeed._waiting = nil
+LobbyFeed.WelcomeAfter = 0
+player:SetAttribute("DailyReward", nil)
 LobbyFeed.welcome()
 check(welcomeLayer() == nil and gui:FindFirstChild("Welcome") == nil, "A banner without a reward")
 player:SetAttribute("DailyReward", 125)
-player:SetAttribute("DailyStreak", 3)
 LobbyFeed.welcome()
 local layer = welcomeLayer()
 local banner = layer and layer:FindFirstChild("Welcome")

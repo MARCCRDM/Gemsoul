@@ -20,6 +20,9 @@
 	                                   (MobileLayout.claimTop)
 	  LobbyFeed.push(icon, text, color?)   adds a line (rich text)
 	  LobbyFeed.welcome()         shows the banner if there's a reward to show
+	                              (not in a session's first WelcomeAfter
+	                              seconds: a new miner's first minutes are
+	                              theirs; it waits, then shows in the lobby)
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -167,9 +170,26 @@ end
 -- The welcome banner ------------------------------------------------------------------------------
 
 local shownWelcome = false
+LobbyFeed.WelcomeAfter = 600 -- seconds into the session before it may show
+local sessionStart = os.clock()
+LobbyFeed._waiting = nil :: any
 
 function LobbyFeed.welcome()
-	if shownWelcome or not root or not root.Enabled then
+	if shownWelcome or not root then
+		return
+	end
+	local wait = LobbyFeed.WelcomeAfter - (os.clock() - sessionStart)
+	if wait > 0 then
+		-- (Too early: try again once the time's up, if the lobby's showing.)
+		if not LobbyFeed._waiting then
+			LobbyFeed._waiting = task.delay(wait + 1, function()
+				LobbyFeed._waiting = nil
+				LobbyFeed.welcome()
+			end) or true
+		end
+		return
+	end
+	if not root.Enabled then
 		return
 	end
 	local reward = player:GetAttribute("DailyReward")

@@ -54,6 +54,8 @@ IntroFinale.Commons = { Field = true, Common = true } -- (the plain rocks: Intro
 IntroFinale.MineFor = 90 -- seconds before the rock step moves on by itself
 IntroFinale.FightFor = 75 -- and the minions' fight
 IntroFinale.Hit = 24 -- a rock losing health this close to you: you hit it
+IntroFinale.Near = 60 -- a rock this near counts as one by you (else it waits for one to stream in)
+IntroFinale.FindFor = 6 -- seconds it waits for one
 IntroFinale.CinematicSeconds = 7 -- at least (till every minion's landed)
 IntroFinale.MeteorWait = 25 -- seconds the first boss's window waits for the meteor to come
 IntroFinale.GolemFor = 6 * 60 -- and for its golem's fight
@@ -144,12 +146,23 @@ local function mine()
 	local front = landmarks and landmarks:GetAttribute("ShelterFront")
 	if typeof(front) == "CFrame" then
 		pcall(function()
+			player:RequestStreamAroundAsync(front.Position, 4)
+		end)
+		pcall(function()
 			(player.Character :: Model):PivotTo(front + Vector3.new(0, 1, 0))
 		end)
 		task.wait(0.3)
 		r = root() or r
 	end
+	-- (The rocks round you stream in a moment after you land: wait for one
+	-- close by before picking, so the arrows don't lead off to a far one.)
 	local rock, at = nearestRock(r.Position)
+	local waited = os.clock()
+	while os.clock() - waited < IntroFinale.FindFor and (not at or (at - r.Position).Magnitude > IntroFinale.Near) do
+		task.wait(0.25)
+		r = root() or r
+		rock, at = nearestRock(r.Position)
+	end
 	if not rock or not at then
 		return
 	end
@@ -164,28 +177,61 @@ local function mine()
 	end
 	banner("HIT THE ROCK", "Swing your pick at it: click, or tap")
 	VoiceOver.say(IntroFinale.Lines.Mine)
+	-- The arrows always lead to the rock nearest you now (a rock mined out or
+	-- one nearer as you walk: the way follows).
 	local GroundGuide = nil
 	pcall(function()
 		GroundGuide = require(script.Parent.GroundGuide)
+		local looked = 0
 		GroundGuide.set("IntroFinale", function()
+			local me = root()
+			if me and os.clock() - looked > 0.5 then
+				looked = os.clock()
+				local _, near = nearestRock(me.Position)
+				if near then
+					at = near
+				end
+			end
 			return at
 		end, 0)
 	end)
+	-- A hit on any rock close to you counts.
 	local hit = false
-	local last = rock:GetAttribute("Hp")
-	local watch = rock:GetAttributeChangedSignal("Hp"):Connect(function()
-		local hp = rock:GetAttribute("Hp")
-		local me = root()
-		if type(hp) == "number" and type(last) == "number" and hp < last and me and (me.Position - at).Magnitude < IntroFinale.Hit then
-			hit = true
+	local watches = {}
+	local function watch(node: Instance)
+		if watches[node] then
+			return
 		end
-		last = hp
-	end)
+		local last = node:GetAttribute("Hp")
+		watches[node] = node:GetAttributeChangedSignal("Hp"):Connect(function()
+			local hp = node:GetAttribute("Hp")
+			local me = root()
+			local part = if node:IsA("Model") then node.PrimaryPart else nil
+			if
+				type(hp) == "number"
+				and type(last) == "number"
+				and hp < last
+				and me
+				and part
+				and (me.Position - part.Position).Magnitude < IntroFinale.Hit
+			then
+				hit = true
+			end
+			last = hp
+		end)
+	end
+	for _, node in CollectionService:GetTagged("OutpostNode") do
+		watch(node)
+	end
+	local added = CollectionService:GetInstanceAddedSignal("OutpostNode"):Connect(watch)
 	local started = os.clock()
-	while not hit and rock.Parent and os.clock() - started < IntroFinale.MineFor do
+	while not hit and os.clock() - started < IntroFinale.MineFor do
 		task.wait(0.2)
 	end
-	watch:Disconnect()
+	added:Disconnect()
+	for _, c in watches do
+		c:Disconnect()
+	end
 	if GroundGuide then
 		pcall(GroundGuide.clear, "IntroFinale")
 	end
