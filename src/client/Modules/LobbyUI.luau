@@ -35,6 +35,7 @@ local UserInputService = game:GetService("UserInputService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
+local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local BodyHealth = require(script.Parent.BodyHealth)
 local CoinShop = require(script.Parent.CoinShop)
 local GemClient = require(script.Parent.GemClient)
@@ -362,7 +363,7 @@ end
 -- Ranked first, the big card where the eye lands; Casual and Practice
 -- stacked beside it; the Bounty Board a bar along the bottom. Casual and
 -- Ranked fight on your current stats (Shared.PvPRules: full progression).
-card({
+local rankedCard = card({
 	Title = "1v1 RANKED",
 	Art = "Ranked",
 	Kicker = "RATING 1000",
@@ -380,6 +381,107 @@ card({
 		run("DuelQueue", "1v1")
 	end,
 })
+-- Ranked's reward track, across the top of its card: the streak's
+-- milestones (Shared.ArenaStreak: an Arena Cache at each, its coins and
+-- gear's floor), the bar filled to your Ranked win streak (RankedStreak).
+LobbyUI.TrackWins = { 10, 20, 30, 50, 100 }
+do
+	local b = rankedCard
+	local w = b.Size.X.Offset - 160
+	local panel = new("Frame", {
+		Name = "StreakTrack",
+		Position = UDim2.fromOffset(20, 14),
+		Size = UDim2.fromOffset(w, 104),
+		BackgroundColor3 = Color3.fromRGB(8, 10, 16),
+		BackgroundTransparency = 0.25,
+		ZIndex = 23,
+	}, b)
+	UiKit.round(panel, 12)
+	new("UIStroke", { Color = RED, Thickness = 1, Transparency = 0.55 }, panel)
+	local heading = text(panel, "STREAK REWARDS", 12, RED, IronUi.Heading)
+	heading.Position, heading.Size = UDim2.fromOffset(14, 8), UDim2.fromOffset(160, 16)
+	heading.TextXAlignment, heading.ZIndex = Enum.TextXAlignment.Left, 24
+	local status = text(panel, "", 12, P.Dim, IronUi.Body)
+	status.AnchorPoint = Vector2.new(1, 0)
+	status.Position, status.Size = UDim2.new(1, -14, 0, 8), UDim2.fromOffset(w - 200, 16)
+	status.TextXAlignment, status.ZIndex = Enum.TextXAlignment.Right, 24
+	status.RichText = true
+	local x0, x1, y = 30, w - 30, 40
+	local rail = new("Frame", {
+		Position = UDim2.fromOffset(x0, y - 2),
+		Size = UDim2.fromOffset(x1 - x0, 4),
+		BackgroundColor3 = Color3.fromRGB(44, 40, 52),
+		BorderSizePixel = 0,
+		ZIndex = 24,
+	}, panel)
+	UiKit.round(rail, 2)
+	local fill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = RED, BorderSizePixel = 0, ZIndex = 25 }, rail)
+	UiKit.round(fill, 2)
+	local milestones = {}
+	for _, m in ArenaStreak.Milestones do
+		if table.find(LobbyUI.TrackWins, m.Wins) then
+			table.insert(milestones, m)
+		end
+	end
+	local nodes = {}
+	for i, m in milestones do
+		local x = x0 + (x1 - x0) * (i - 1) / math.max(1, #milestones - 1)
+		local node = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(x, y),
+			Size = UDim2.fromOffset(16, 16),
+			BackgroundColor3 = Color3.fromRGB(44, 40, 52),
+			ZIndex = 26,
+		}, panel)
+		UiKit.round(node, 8)
+		local ring = new("UIStroke", { Color = RED, Thickness = 2, Transparency = 0.4 }, node)
+		local floor = ArenaStreak.floor(m)
+		local floorName = if floor == "UltraRare" then "Ultra Rare" else floor
+		local wins = text(panel, string.format("%d WINS", m.Wins), 11, P.Text, IronUi.Heading)
+		wins.AnchorPoint = Vector2.new(0.5, 0)
+		wins.Position, wins.Size = UDim2.fromOffset(x, y + 12), UDim2.fromOffset(110, 14)
+		wins.ZIndex = 24
+		local name = text(panel, string.format("%s · ◆ %s", m.Name, if m.Coins >= 1000 then string.format("%gk", m.Coins / 1000) else tostring(m.Coins)), 10, P.Gold, IronUi.Body)
+		name.AnchorPoint = Vector2.new(0.5, 0)
+		name.Position, name.Size = UDim2.fromOffset(x, y + 27), UDim2.fromOffset(130, 13)
+		name.ZIndex = 24
+		local gear = text(panel, string.format("Cache · %s+ gear%s", floorName, if m.Title then " · title" else ""), 10, P.Dim, IronUi.Body)
+		gear.AnchorPoint = Vector2.new(0.5, 0)
+		gear.Position, gear.Size = UDim2.fromOffset(x, y + 41), UDim2.fromOffset(150, 13)
+		gear.ZIndex = 24
+		nodes[i] = { Node = node, Ring = ring, Wins = m.Wins }
+	end
+	local function draw()
+		local streak = player:GetAttribute("RankedStreak")
+		if type(streak) ~= "number" then
+			local profile = GemClient.Profile
+			streak = profile and profile.Duel and profile.Duel.RankedStreak or 0
+		end
+		-- (the bar: whole segments passed, and the share of the one you're in)
+		local share = 0
+		for i, node in nodes do
+			local reached = streak >= node.Wins
+			node.Node.BackgroundColor3 = if reached then RED else Color3.fromRGB(44, 40, 52)
+			node.Ring.Transparency = if reached then 0 else 0.4
+			if reached then
+				share = (i - 1) / math.max(1, #nodes - 1)
+			elseif i > 1 and streak > nodes[i - 1].Wins then
+				local from, to = nodes[i - 1].Wins, node.Wins
+				share = ((i - 2) + (streak - from) / (to - from)) / math.max(1, #nodes - 1)
+			elseif i == 1 then
+				share = 0
+			end
+		end
+		fill.Size = UDim2.fromScale(math.clamp(share, 0, 1), 1)
+		local nextOne = ArenaStreak.next(streak)
+		status.Text = if nextOne
+			then string.format("Streak <b>%d</b>  ·  next: %s in %d", streak, nextOne.Name, nextOne.Wins - streak)
+			else string.format("Streak <b>%d</b>", streak)
+	end
+	player:GetAttributeChangedSignal("RankedStreak"):Connect(draw)
+	GemClient.Changed:Connect(draw)
+	draw()
+end
 if LobbyUI.DungeonsOpen then
 	card({
 		Title = "SQUAD DUNGEON",
