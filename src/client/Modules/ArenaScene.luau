@@ -62,6 +62,16 @@ function ArenaScene.leave()
 	if busy then
 		return
 	end
+	-- In the Rot Beachhead: its own card (back to the intro fights, the
+	-- lobby, or stay: Client FirstDungeonUI).
+	if player:GetAttribute("DungeonKaiju") == true then
+		local ok = pcall(function()
+			require(script.Parent.FirstDungeonUI).showLeave()
+		end)
+		if ok then
+			return
+		end
+	end
 	busy = true
 	task.spawn(function()
 		local result = GemClient.request("ArenaLeave")

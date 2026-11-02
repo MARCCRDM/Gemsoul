@@ -325,11 +325,10 @@ do
 	problem:Destroy()
 	dungeonAnswer = nil
 	check(playerGui:FindFirstChild("FirstDungeonIntro") == nil, "The loading screens stayed up")
-	-- In: LEAVE, top right; its card: back to the intro fights, the lobby, or stay.
+	-- In: the combat screen's LEAVE opens its card: back to the intro fights, the lobby, or stay.
 	social:Fire("FirstDungeon", { Phase = "In", RoundsLeft = 4 })
 	task.wait(0.2)
-	local leaveGui = playerGui:FindFirstChild("FirstDungeonLeave")
-	check(leaveGui ~= nil and leaveGui:FindFirstChild("Leave", true) ~= nil, "No LEAVE in the dungeon")
+	check(playerGui:FindFirstChild("FirstDungeonLeave") == nil, "A second LEAVE over the combat screen's own")
 	First.showLeave()
 	local leaveCard = playerGui:FindFirstChild("FirstDungeonLeaveCard")
 	local intro = leaveCard and leaveCard:FindFirstChild("Intro", true)

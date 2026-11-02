@@ -11,8 +11,8 @@
 	                        the server's). A tap skips a screen. Returns the
 	                        server's message when it couldn't start.
 	  FirstDungeonUI.start()   in the dungeon (Remotes.Social "FirstDungeon",
-	                        Phase "In"): a LEAVE button, top right, for a card
-	                        with the ways out. Knocked down (Phase "Down"): a
+	                        Phase "In"): the combat screen's LEAVE (top right)
+	                        opens a card with the ways out. Knocked down (Phase "Down"): a
 	                        card with RECOVER (back at the start of the room,
 	                        its fighters at full too), or out; RECOVER by
 	                        itself when its time's up. The ways out: FINISH
@@ -382,7 +382,6 @@ end
 -- Ways out: back to the intro fights (while rounds are left), the lobby ------------
 
 local card: ScreenGui? = nil
-local leaveGui: ScreenGui? = nil
 local roundsLeft = 0 -- (intro rounds still to win: the server's, on the way in)
 
 local function closeCard()
@@ -454,7 +453,8 @@ local function cardFrame(name: string, kickerText: string, titleText: string, ti
 	return body
 end
 
--- LEAVE (in the dungeon, any time): back to the intro fights or the lobby.
+-- LEAVE (the combat screen's own, top right: Client ArenaScene.leave), any
+-- time in the dungeon: back to the intro fights or the lobby.
 function FirstDungeonUI.showLeave()
 	local body = cardFrame(
 		"FirstDungeonLeaveCard",
@@ -468,30 +468,6 @@ function FirstDungeonUI.showLeave()
 	exits(body, 4, true)
 	local stay = Gilt.button(body, "STAY", false, 6, closeCard, 36, 12)
 	stay.Name = "Stay"
-end
-
--- The LEAVE button, top right, while you're in the Rot Beachhead.
-local function showLeaveButton(on: boolean)
-	if not on then
-		if leaveGui then
-			leaveGui:Destroy()
-			leaveGui = nil
-		end
-		return
-	end
-	if leaveGui then
-		return
-	end
-	local screen = UiKit.gui("FirstDungeonLeave", 40)
-	leaveGui = screen
-	local holder = new("Frame", {
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -14, 0, 10),
-		Size = UDim2.fromOffset(104, 36),
-		BackgroundTransparency = 1,
-	}, screen)
-	local b = Gilt.button(holder, "LEAVE", false, 1, FirstDungeonUI.showLeave, 36, 13)
-	b.Name = "Leave"
 end
 
 -- The knock-down card: RECOVER, or out.
@@ -545,16 +521,14 @@ function FirstDungeonUI.start()
 		end
 		if event.Phase == "In" then
 			roundsLeft = tonumber(event.RoundsLeft) or 0
-			showLeaveButton(true)
 		elseif event.Phase == "Down" then
 			FirstDungeonUI.showDown(event)
 		end
 	end)
-	-- (out of the dungeon: its cards and LEAVE go with it)
+	-- (out of the dungeon: its cards go with it)
 	player:GetAttributeChangedSignal("DungeonId"):Connect(function()
 		if player:GetAttribute("DungeonId") == nil then
 			closeCard()
-			showLeaveButton(false)
 		end
 	end)
 end
