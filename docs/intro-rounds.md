@@ -76,6 +76,6 @@ Until their set's done, a new miner only fights the intro rivals: the next round
 2. **1v1 #2**: the shield's roll card. It says the dungeon's next (CONTINUE: `IntroRounds.stage` = "Dungeon", the event's `Next = "Dungeon"`).
 3. CONTINUE plays **the kaiju roll** (if owed), then the pod drop into **the intro dungeon** (Shared.DungeonRules.First: the Rot Beachhead, two rooms).
 4. **The Breach:** your kaiju fight with you (Sahur, Tralalero, Patapim, softened). Its last fighter down: the gate opens, the chest's roll card (`IntroRoundsServer.dungeonWon(p, "Room")`), ON TO THE BOSS, and a beam over the nest.
-5. **The Nest:** Tung Tung Tung Sahur (enraged at half health, two fighters join). Down: the last three pieces' roll cards one after another (`dungeonWon(p, "Boss")`; NEXT PIECE), the set's coins, TO THE LOBBY (`FirstDungeonDone`, with the clear's rewards; out by itself after `IntroOutSeconds`).
+5. **The Nest:** the Shardhorn Behemoth, a glowing-horned rhino (gentle for a new miner; at half health it's enraged and one rot-spawn joins). Down: the last three pieces' roll cards one after another (`dungeonWon(p, "Boss")`; NEXT PIECE), the set's coins, TO THE LOBBY (`FirstDungeonDone`, with the clear's rewards; out by itself after `IntroOutSeconds`).
 
 Knocked down in there: RECOVER or GO TO LOBBY (no "back to the intro fights": this is the intro). Left early, PLAY / NEXT STEP takes them back in (`IntroRoundNext` answers `{ Dungeon = true }`); its first room only pays once.

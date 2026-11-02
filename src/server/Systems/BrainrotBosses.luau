@@ -22,6 +22,7 @@
 	  TreeTrio    Brr Brr Patapim        an old treant, three long-nosed faces
 	  Frigo       Frigo Camelo           two camels out of a frosted freezer
 	  Cappuccino  Cappuccino Assassino   a ninja coffee cup with four blades
+	  Shardhorn   Shardhorn Behemoth     a rhino on all fours, the Rot Beachhead's own
 
 	Shapes are placed in the body's own space (put: x right, y up, -z
 	forward, from its root at rest), on the bone that carries them.
@@ -2062,6 +2063,195 @@ local function cappuccino(rig, accent)
 	end
 end
 
+-- Shardhorn Behemoth -----------------------------------------------------------------------------------
+-- The Rot Beachhead's boss (Shared.DungeonRules.First.BossSpec): a rhino
+-- behemoth on all fours. A deep blue scarred hide, one great glowing cyan
+-- horn and a short one behind it, angry cyan eyes, green crystal shards
+-- down its spine and its long curling tail, and a war harness of orange
+-- leather with plates carved with cyan runes on its shoulders, hips and
+-- forelegs. It doesn't stand on the skeleton's legs as the titans do: its
+-- trunk rides the root (Body: it heaves, rears and charges), each leg
+-- strides on its own (Stride, paired diagonally), its head looks about and
+-- tosses its horn (Head), its jaw opens (Jaw) and its tail curls segment by
+-- segment (Tail), all posed by its own fight profile (CreatureFight:
+-- Shared.CreatureMotion.Fight.Shardhorn, Client.CreatureAnimation).
+local HORN = {
+	Hide = C(36, 56, 98),
+	Dark = C(22, 34, 66),
+	Light = C(60, 86, 136),
+	Glow = C(80, 232, 255),
+	Shard = C(66, 230, 120),
+	ShardBase = C(26, 112, 64),
+	Strap = C(186, 94, 42),
+	StrapDark = C(126, 60, 28),
+	Plate = C(42, 66, 116),
+	Metal = C(150, 154, 166),
+	Nail = C(24, 26, 34),
+}
+local function metal(p)
+	p.Material = Enum.Material.Metal
+	return p
+end
+local function light(p, color: Color3, range: number, brightness: number)
+	local glow = Instance.new("PointLight")
+	glow.Color, glow.Range, glow.Brightness, glow.Shadows = color, range, brightness, false
+	glow.Parent = p
+	return glow
+end
+-- A crystal spike standing on `bone` at `base` (the body's space), `h`
+-- tall and `w` wide at its foot, leaning back by `lean` and out by `roll`:
+-- two crossed fins coming to a point, glowing green.
+local function shard(rig, bone: string, base: Vector3, h: number, w: number, lean: number, roll: number)
+	local turn = A(lean, 0, roll)
+	local tip = base + (turn * CFrame.new(0, h, 0)).Position
+	for _, p in { tri(rig, bone, "Shard", base + V(0, 0, -w), base + V(0, 0, w), tip, HORN.Shard, w * 0.5) } do
+		neon(p)
+	end
+	for _, p in { tri(rig, bone, "Shard", base + V(-w * 0.6, 0, 0), base + V(w * 0.6, 0, 0), tip, HORN.ShardBase, w * 0.4) } do
+		neon(p)
+	end
+end
+-- A smooth curved horn on `bone`: from `from` bowing toward `bow` to `to`,
+-- tapering from `base` thick to a point, in `n` glowing pieces.
+local function hornRun(rig, bone: string, from: Vector3, bow: Vector3, to: Vector3, base: number, n: number)
+	local function at(t: number): Vector3
+		return from * (1 - t) ^ 2 + bow * 2 * t * (1 - t) + to * t * t
+	end
+	local last
+	for i = 1, n do
+		local a, b = at((i - 1) / n), at(i / n)
+		local t = base * (1 - (i - 1) / n) + 0.08
+		last = neon(put(rig, bone, "Horn", V((b - a).Magnitude + t * 1.1, t, t * 0.92), (a + b) / 2, HORN.Glow, BALL, along(b - a)))
+	end
+	return last
+end
+-- Rune lines cut into a plate and glowing (`at`: the glyph's middle on the
+-- plate's face, `out`: the face's outward axis, x or z; `s`: its side).
+local function rune(rig, bone: string, at: Vector3, out: string, k: number)
+	local bars = { { 0, 0.32, 0.9, 0.11 }, { -0.4, 0, 0.11, 0.75 }, { 0, -0.32, 0.9, 0.11 }, { 0.38, 0.1, 0.11, 0.52 }, { 0.12, 0.05, 0.5, 0.11 } }
+	for _, b in bars do
+		local offset, size
+		if out == "x" then
+			offset, size = V(0, b[2] * k, b[1] * k), V(0.06, b[4] * k, b[3] * k)
+		else
+			offset, size = V(b[1] * k, b[2] * k, 0), V(b[3] * k, b[4] * k, 0.06)
+		end
+		neon(put(rig, bone, "Rune", size, at + offset, HORN.Glow))
+	end
+end
+local function shardhorn(rig, _accent)
+	local H = HORN
+	rig:SetAttribute("CreatureFight", "Shardhorn")
+	-- The trunk: its shoulder hump, barrel, rump and belly, on the root.
+	local trunk = put(rig, "HumanoidRootPart", "Trunk", V(3.4, 3.0, 5.6), V(0, -0.1, 1.6), H.Hide, BALL)
+	ball(rig, "Trunk", "Hump", V(3.6, 3.3, 2.9), V(0, 0.2, -0.2), H.Hide)
+	ball(rig, "Trunk", "Rump", V(3.25, 2.9, 2.7), V(0, 0.05, 3.7), H.Hide)
+	ball(rig, "Trunk", "Belly", V(2.9, 1.5, 4.6), V(0, -0.95, 1.6), H.Dark)
+	ball(rig, "Trunk", "Neck", V(2.6, 2.4, 1.9), V(0, 0, -1.45), H.Hide)
+	for _, s in SIDES do
+		-- Folds of hide at the shoulder and the flank.
+		ball(rig, "Trunk", "Fold", V(0.35, 2.3, 0.55), V(s * 1.62, -0.15, -1.05), H.Light, A(0, 0, s * 0.12))
+		ball(rig, "Trunk", "Fold", V(0.35, 2.0, 0.5), V(s * 1.58, -0.2, 2.75), H.Light, A(0, 0, s * 0.1))
+		-- The shoulder plates: carved with runes, rimmed in leather.
+		ball(rig, "Trunk", "PlateRim", V(0.42, 2.5, 2.7), V(s * 1.86, 0.35, -0.3), H.Strap, A(0, 0, -s * 0.18))
+		metal(ball(rig, "Trunk", "Pauldron", V(0.5, 2.3, 2.5), V(s * 1.94, 0.35, -0.3), H.Plate, A(0, 0, -s * 0.18)))
+		rune(rig, "Trunk", V(s * 2.19, 0.33, -0.3), "x", 1)
+		-- The hip plates.
+		metal(ball(rig, "Trunk", "HipPlate", V(0.42, 1.7, 1.9), V(s * 1.66, 0.25, 3.75), H.Plate, A(0, 0, -s * 0.14)))
+		rune(rig, "Trunk", V(s * 1.88, 0.25, 3.75), "x", 0.7)
+	end
+	-- The harness: bands round its chest, its girth and its rump, buckled,
+	-- and two straps over its back between them.
+	ball(rig, "Trunk", "Strap", V(2.85, 2.65, 0.42), V(0, 0.02, -1.3), H.Strap, A(0.15, 0, 0))
+	ball(rig, "Trunk", "Strap", V(3.55, 3.15, 0.42), V(0, -0.1, 0.95), H.Strap)
+	ball(rig, "Trunk", "Strap", V(3.15, 2.85, 0.42), V(0, 0.02, 3.1), H.Strap)
+	for _, s in SIDES do
+		for _, z in { 0.95, 3.1 } do
+			metal(put(rig, "Trunk", "Buckle", V(0.16, 0.5, 0.56), V(s * (if z < 2 then 1.76 else 1.55), 0.35, z), H.Metal))
+		end
+		rod(rig, "Trunk", "BackStrap", V(s * 0.62, 1.4, 0.95), V(s * 0.62, 1.42, 3.1), 0.2, H.StrapDark)
+	end
+	-- Crystal shards down its spine, biggest over the hump.
+	local spine = {
+		{ -1.4, 1.1, 0.8 }, { -0.8, 1.55, 1.1 }, { -0.2, 1.78, 1.55 }, { 0.4, 1.7, 1.35 }, { 1.0, 1.45, 1.1 },
+		{ 1.6, 1.38, 1.2 }, { 2.2, 1.35, 1.0 }, { 2.8, 1.38, 0.95 }, { 3.4, 1.42, 0.8 }, { 4.0, 1.28, 0.65 }, { 4.6, 0.9, 0.5 },
+	}
+	for i, d in spine do
+		shard(rig, "Trunk", V(0, d[2] - 0.1, d[1]), d[3], 0.3, 0.38, 0)
+		if i % 2 == 0 then
+			for _, s in SIDES do
+				shard(rig, "Trunk", V(s * 0.42, d[2] - 0.2, d[1] + 0.15), d[3] * 0.6, 0.22, 0.3, -s * 0.4)
+			end
+		end
+	end
+	animate(trunk, "Body", pivotOn(rig, "HumanoidRootPart", V(0, -0.3, 1.4)), 1)
+
+	-- The head: a heavy skull and snout, the great horn and the short one,
+	-- angry eyes under a dark brow, ears, the bridle; its jaw opens.
+	local skull = ball(rig, "Trunk", "ShardSkull", V(2.1, 2.0, 2.4), V(0, 0.05, -2.55), H.Hide)
+	ball(rig, "ShardSkull", "Snout", V(1.75, 1.55, 2.0), V(0, -0.35, -3.75), H.Hide)
+	ball(rig, "ShardSkull", "Nose", V(1.45, 1.15, 0.9), V(0, -0.45, -4.6), H.Hide)
+	ball(rig, "ShardSkull", "Brow", V(2.0, 0.55, 0.9), V(0, 0.72, -3.0), H.Dark, A(0.25, 0, 0))
+	for _, s in SIDES do
+		ball(rig, "ShardSkull", "Socket", V(0.3, 0.42, 0.58), V(s * 0.9, 0.3, -3.2), H.Nail)
+		neon(ball(rig, "ShardSkull", "Eye", V(0.14, 0.15, 0.3), V(s * 1.0, 0.3, -3.24), H.Glow, A(0, s * 0.35, 0)))
+		put(rig, "ShardSkull", "AngryBrow", V(0.3, 0.2, 0.75), V(s * 0.95, 0.56, -3.22), H.Dark, nil, A(0.4, 0, s * 0.25))
+		ball(rig, "ShardSkull", "Ear", V(0.45, 0.95, 0.35), V(s * 0.78, 1.15, -2.2), H.Hide, A(0, 0, -s * 0.45))
+		ball(rig, "ShardSkull", "EarInner", V(0.2, 0.6, 0.2), V(s * 0.8, 1.12, -2.36), H.Dark, A(0, 0, -s * 0.45))
+		ball(rig, "ShardSkull", "Nostril", V(0.26, 0.18, 0.12), V(s * 0.36, -0.52, -5.0), H.Nail)
+		rod(rig, "ShardSkull", "CheekStrap", V(s * 0.98, 0.45, -2.55), V(s * 0.86, -0.35, -3.45), 0.17, H.Strap)
+	end
+	ball(rig, "ShardSkull", "Bridle", V(1.95, 1.75, 0.3), V(0, -0.3, -3.45), H.Strap)
+	local tip = hornRun(rig, "ShardSkull", V(0, 0.05, -4.35), V(0, 1.55, -5.4), V(0, 2.6, -4.85), 0.62, 8)
+	light(tip, H.Glow, 16, 2.2)
+	hornRun(rig, "ShardSkull", V(0, 0.85, -3.5), V(0, 1.4, -3.85), V(0, 1.8, -3.5), 0.38, 4)
+	local jaw = ball(rig, "ShardSkull", "ShardJaw", V(1.45, 0.6, 1.9), V(0, -1.02, -3.6), H.Dark)
+	animate(jaw, "Jaw", pivotOn(rig, "ShardSkull", V(0, -0.75, -2.8)), 1)
+	animate(skull, "Head", pivotOn(rig, "Trunk", V(0, 0.1, -1.6)), 1)
+
+	-- The legs: thick pillars on round feet with blunt nails, the forelegs
+	-- armoured and strapped. Each strides from its shoulder or hip,
+	-- diagonal pairs in step (fore-left with hind-right).
+	for _, front in { true, false } do
+		for _, s in SIDES do
+			local x, z = s * 1.2, if front then -0.35 else 3.55
+			local name = "ShardLeg" .. (if front then "F" else "H") .. LR[s]
+			local leg = ball(rig, "Trunk", name, if front then V(1.35, 1.9, 1.55) else V(1.55, 2.1, 1.85), V(x, -0.75, z), H.Hide)
+			ball(rig, name, "Shin", V(1.05, 1.55, 1.15), V(x, -1.85, z - 0.05), H.Hide)
+			ball(rig, name, "Knee", V(0.95, 0.7, 0.95), V(x, -1.35, z - 0.14), H.Dark)
+			put(rig, name, "Foot", V(0.55, 1.32, 1.32), V(x, -2.68, z - 0.05), H.Dark, CYL, UPRIGHT)
+			for _, o in { -0.4, 0, 0.4 } do
+				ball(rig, name, "Nail", V(0.36, 0.3, 0.3), V(x + o, -2.8, z - 0.68), H.Nail)
+			end
+			if front then
+				put(rig, name, "LegStrap", V(0.22, 1.36, 1.36), V(x, -1.25, z), H.Strap, CYL, UPRIGHT)
+				metal(put(rig, name, "Greave", V(1.1, 1.0, 0.2), V(x, -1.85, z - 0.62), H.Plate))
+				rune(rig, name, V(x, -1.85, z - 0.74), "z", 0.65)
+			end
+			animate(leg, "Stride", pivotOn(rig, "Trunk", V(x, -0.2, z)), if front then s else -s)
+		end
+	end
+
+	-- The tail: five segments, each curling on the last, crystal shards
+	-- along its top and a cluster at its tip.
+	local points = { V(0, 0.35, 4.75), V(0, -0.1, 5.8), V(0, -0.4, 6.8), V(0, -0.35, 7.7), V(0, 0.1, 8.4), V(0, 0.85, 8.85) }
+	local thick = { 1.05, 0.85, 0.68, 0.52, 0.4 }
+	local carrier = "Trunk"
+	for i = 1, 5 do
+		local a, b = points[i], points[i + 1]
+		local name = "ShardTail" .. i
+		local seg = ball(rig, carrier, name, V((b - a).Magnitude + thick[i] * 0.8, thick[i], thick[i] * 0.95), (a + b) / 2, H.Hide, along(b - a))
+		shard(rig, name, (a + b) / 2 + V(0, thick[i] * 0.4, 0), 0.5 * thick[i] + 0.15, 0.2, 0.6, 0)
+		if i == 5 then
+			for _, r in { -0.5, 0, 0.5 } do
+				shard(rig, name, b, 0.55, 0.16, 0.3, r)
+			end
+		end
+		animate(seg, "Tail", pivotOn(rig, carrier, a), 1)
+		carrier = name
+	end
+end
+
 Bosses.Builders = {
 	TwinCat = twinCat,
 	DragonCroc = dragonCroc,
@@ -2073,6 +2263,7 @@ Bosses.Builders = {
 	TreeTrio = treeTrio,
 	Frigo = frigo,
 	Cappuccino = cappuccino,
+	Shardhorn = shardhorn,
 }
 
 -- Dresses `rig` as boss `spec` (DungeonRules.Bosses). False when it isn't

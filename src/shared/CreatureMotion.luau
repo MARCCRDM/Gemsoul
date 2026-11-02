@@ -133,6 +133,40 @@ Motion.Fight = {
 	},
 }
 
+-- The Shardhorn Behemoth (a dungeon boss on all fours: Server.BrainrotBosses,
+-- CreatureFight), its blows by the rival's action kinds (Server.Duelist:
+-- Slash, Heavy, Leap, Spin; its surges' Bolt and Nova as Cast).
+do
+	local hook = {
+		-- Horn Hook: head drawn back and to one side, then tossed across,
+		-- horn first.
+		Wind = { Pitch = 0.2, Yaw = 0.35, Push = -0.25, Jaw = 0.25 },
+		Hit = { Pitch = -0.2, Yaw = -0.5, Push = 0.65, Roll = 0.08 },
+	}
+	local charge = {
+		-- Shard Charge: low on its forelegs, pawing back, then head down and in.
+		Wind = { Pitch = -0.12, Lift = -0.1, Push = -0.45, Tail = 0.4 },
+		Hit = { Pitch = -0.2, Lift = 0.05, Push = 1.3, Tail = -0.3 },
+	}
+	Motion.Fight.Shardhorn = {
+		Light = hook,
+		Slash = hook,
+		-- Shard Quake: rears up high on its hind legs, roaring, then crashes down.
+		Heavy = {
+			Wind = { Pitch = 0.5, Lift = 0.45, Jaw = 0.7, Tail = 0.3 },
+			Hit = { Pitch = -0.16, Lift = -0.1, Jaw = 0.25, Push = 0.25 },
+		},
+		Lunge = charge,
+		Leap = charge,
+		-- A spin: swung round on its forelegs, tail first.
+		Spin = { Wind = { Yaw = 0.6, Tail = -0.7 }, Hit = { Yaw = -1.3, Tail = 1, Roll = 0.1 } },
+		-- Its horn gathers the power: head up, jaw wide, then thrust out.
+		Cast = { Wind = { Pitch = 0.35, Jaw = 0.8, Lift = 0.12 }, Hit = { Pitch = -0.2, Jaw = 0.5, Push = 0.35 } },
+		-- Head down behind its horn, braced.
+		Guard = { Pitch = -0.22, Lift = -0.2, Push = -0.1 },
+	}
+end
+
 -- The roster's kinds (Shared.KaijuRoster): each moves like the first-four
 -- kind its body is nearest to (`like`), with blows of its own where they
 -- differ, after its blows' names (KaijuRoster's Fight.Names). A flyer's

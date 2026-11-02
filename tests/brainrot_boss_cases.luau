@@ -383,6 +383,93 @@ for _, spec in Rules.Bosses do
 	print(string.format("  %-13s %3d parts, %d head%s", name, parts, count, if count == 1 then "" else "s"))
 end
 
+-- The Rot Beachhead's own boss, the Shardhorn Behemoth (DungeonRules.First.BossSpec): on all
+-- fours, its pieces carried by its trunk, head, legs and tail as well as by bones.
+do
+	local spec = Rules.firstBoss()
+	local name = spec.Id
+	check(Bosses.Builders[spec.Shape] ~= nil, name .. ": nothing builds it")
+	local own = 0
+	for _, move in spec.Moves do
+		local creature = Creature.get(move)
+		check(creature ~= nil and creature.Pose ~= nil, name .. ": not its own move " .. move)
+		check(not usedBy[move], name .. ": " .. move .. " is another boss's")
+		if creature and creature.Big then
+			own += 1
+		end
+	end
+	check(own == 1, name .. ": not one big attack")
+	check(Motion.Fight.Shardhorn ~= nil, name .. ": no fight profile")
+	for _, kind in { "Light", "Slash", "Heavy", "Lunge", "Leap", "Spin", "Cast", "Guard" } do
+		check(Motion.Fight.Shardhorn[kind] ~= nil, name .. ": no " .. kind .. " in its fight profile")
+	end
+	local straight = buildBody(roblox.Color3.new(1, 1, 1))
+	Bosses.apply(straight, spec, accent, false)
+	local rig = buildBody(roblox.Color3.new(1, 1, 1))
+	for _, p in rig:GetChildren() do
+		if p:IsA("BasePart") then
+			p.CFrame = turn * p.CFrame
+			p:SetAttribute("TestBone", true)
+		end
+	end
+	local root = rig:FindFirstChild("HumanoidRootPart")
+	check(Bosses.apply(rig, spec, accent, false), name .. ": not dressed")
+	check(rig:GetAttribute("CreatureFight") == "Shardhorn", name .. ": CreatureAnimation won't pose it as itself")
+	check(rig:GetAttribute("CreatureShape") == spec.Shape, name .. ": CreatureAnimation won't find it")
+	local want, got = layout(straight), layout(rig)
+	check(#want == #got, name .. ": built differently when turned")
+	for i, entry in got do
+		local offset = entry[2].Position - want[i][2].Position
+		check(entry[1] == want[i][1] and offset.Magnitude < 1e-3, name .. ": " .. entry[1] .. " moves when it's turned")
+	end
+	local parts, kinds, strides, lowest = 0, {}, {}, math.huge
+	for _, p in rig:GetDescendants() do
+		if not p:IsA("BasePart") then
+			continue
+		end
+		parts += 1
+		if p:GetAttribute("TestBone") then
+			check(p.Transparency == 1, name .. ": its skeleton shows (" .. p.Name .. ")")
+			continue
+		end
+		check(not p.CanCollide and not p.CanTouch and not p.CanQuery and p.Massless, name .. ": " .. p.Name .. " gets in the way")
+		local at = root.CFrame:PointToObjectSpace(p.CFrame.Position)
+		check(math.abs(at.X) <= 3 and at.Z >= -6 and at.Z <= 10 and at.Y > -3.2 and at.Y < 3.4, string.format("%s: %s is off its body (%.1f, %.1f, %.1f)", name, p.Name, at.X, at.Y, at.Z))
+		lowest = math.min(lowest, at.Y - p.Size.X / 2)
+		local hold = p:FindFirstChild("CreatureDetail") or p:FindFirstChild("CreatureMotion")
+		check(hold ~= nil and hold.Part1 == p and hold.Part0 ~= nil, name .. ": " .. p.Name .. " hangs loose")
+		-- Carried, link by link, back to a bone.
+		local link, steps = hold and hold.Part0, 0
+		while link and not link:GetAttribute("TestBone") and steps < 12 do
+			local up = link:FindFirstChild("CreatureDetail") or link:FindFirstChild("CreatureMotion")
+			link, steps = up and up.Part0, steps + 1
+		end
+		check(link ~= nil and link:GetAttribute("TestBone") == true, name .. ": " .. p.Name .. " isn't carried by its body")
+		local joint = p:FindFirstChild("CreatureMotion")
+		if joint then
+			local kind = joint:GetAttribute("CreatureMotion")
+			kinds[kind] = (kinds[kind] or 0) + 1
+			check(joint:GetAttribute("CreatureRest") == joint.C0, name .. ": " .. p.Name .. " has no rest pose")
+			local placed = joint.Part0.CFrame * joint.C0 * joint.C1:Inverse()
+			check((placed.Position - p.CFrame.Position).Magnitude < 1e-3, name .. ": " .. p.Name .. " jumps on its joint")
+			if kind == "Stride" then
+				local side = joint:GetAttribute("CreatureSide")
+				local front = string.find(p.Name, "ShardLegF", 1, true) ~= nil
+				local left = string.find(p.Name, "Left", 1, true) ~= nil
+				-- (diagonal pairs: fore-left steps with hind-right)
+				check(side == (if front == left then -1 else 1), name .. ": " .. p.Name .. " steps out of its pair")
+				strides[side] = (strides[side] or 0) + 1
+			end
+		end
+	end
+	check(kinds.Body == 1 and kinds.Head == 1 and kinds.Jaw == 1, name .. ": no trunk, head or jaw that moves")
+	check(kinds.Stride == 4 and strides[1] == 2 and strides[-1] == 2, name .. ": not four legs in diagonal pairs")
+	check(kinds.Tail == 5, name .. ": its tail doesn't curl segment by segment")
+	check(lowest > -3.2 and lowest < -2.7, string.format("%s: its feet aren't on the ground (%.2f)", name, lowest))
+	check(parts <= 260, string.format("%s: %d parts", name, parts))
+	print(string.format("  %-13s %3d parts, on all fours", name, parts))
+end
+
 -- How they move --------------------------------------------------------------------------------------
 for _, kind in { "Head", "Wing", "Blade" } do
 	local moved = false

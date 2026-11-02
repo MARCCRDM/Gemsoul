@@ -102,6 +102,9 @@ RunService.PreSimulation:Connect(function(dt)
 					Phase = 0,
 					Amount = 0,
 					Species = model:GetAttribute("KaijuSpecies"),
+					-- (a boss on all fours fights with its whole body too: its
+					-- own profile, CreatureMotion.Fight[CreatureFight])
+					Fight = model:GetAttribute("CreatureFight"),
 					Far = if model:GetAttribute("MoonBug") then BUG_FAR else FAR,
 				}
 				rigs[model] = rig
@@ -141,7 +144,7 @@ RunService.PreSimulation:Connect(function(dt)
 		local at = model:GetAttribute("ActionAt")
 		-- A foot lands each half stride (a kaiju on the ground, near enough to see the dust).
 		if
-			rig.Species
+			(rig.Species or rig.Fight)
 			and rig.Amount > 0.35
 			and math.floor(rig.Phase / math.pi) ~= math.floor(before / math.pi)
 			and (model:GetAttribute("KaijuHover") or 0) <= 0
@@ -183,8 +186,8 @@ RunService.PreSimulation:Connect(function(dt)
 				CombatSound.play("Roar" .. (kind and kind.Voice or rig.Species), rig.Root.Position)
 			end
 		end
-		if rig.Species then
-			pose = Motion.fight(rig.Species, {
+		if rig.Species or rig.Fight then
+			pose = Motion.fight(rig.Species or rig.Fight, {
 				Kind = model:GetAttribute("ActionKind"),
 				Start = model:GetAttribute("ActionStart"),
 				At = at,

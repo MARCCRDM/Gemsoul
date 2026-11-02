@@ -120,6 +120,49 @@ Moves.Catalog = {
 		Cooldown = 9,
 	},
 
+	-- The Shardhorn Behemoth, the Rot Beachhead's boss (a new miner's first:
+	-- Shared.DungeonRules.First.BossSpec), gentle and easy to read: a horn
+	-- hook in reach, a charge you can sidestep (a long, clear wind-up), and
+	-- its big attack, a quake round its feet to step back out of.
+	HornHook = {
+		Name = "Horn Hook",
+		Shape = "Strike",
+		Pose = "Light",
+		Windup = 0.5,
+		Hits = 2,
+		Gap = 0.45,
+		Damage = 0.9,
+		Riders = { Slow = 0.2, SlowTime = 1.5 },
+		Range = 7,
+		Cooldown = 6,
+	},
+	ShardCharge = {
+		Name = "Shard Charge",
+		Shape = "Dash",
+		Pose = "Lunge",
+		Windup = 0.9,
+		Length = 22,
+		Width = 4.5,
+		Damage = 1.6,
+		Riders = { Stun = 0.4 },
+		Min = 6,
+		Range = 22,
+		Cooldown = 9,
+	},
+	ShardQuake = {
+		Name = "Shard Quake",
+		Shape = "Slam",
+		Pose = "Heavy",
+		Big = true,
+		Windup = 1.7,
+		Radius = 11,
+		Damage = 2.6,
+		Heavy = true,
+		Riders = { Slow = 0.3, SlowTime = 2.5 },
+		Range = 9,
+		Cooldown = 15,
+	},
+
 	-- The ten bosses. No two share a big attack's shape, and each has one
 	-- shape the others don't. Their strikes are each of their own form.
 

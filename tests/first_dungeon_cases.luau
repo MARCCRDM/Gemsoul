@@ -21,9 +21,9 @@ do
 		idOf(Rules.Roster, rooms[1].Foes[1]) == "Sahur" and idOf(Rules.Roster, rooms[1].Foes[2]) == "Tralalero" and idOf(Rules.Roster, rooms[1].Foes[3]) == "Patapim",
 		"The Breach isn't Sahur, Tralalero and Patapim"
 	)
-	check(Rules.specOf(rooms[N]).Id == "Sahur", "The nest's boss isn't the one-headed Tung Tung Tung Sahur")
+	check(Rules.specOf(rooms[N]).Id == "Shardhorn" and Rules.specOf(rooms[N]).Shape == "Shardhorn", "The nest's boss isn't the Shardhorn Behemoth")
 	check(Rules.specOf(rooms[N]).Loot ~= nil and Rules.specOf(rooms[N]).Threat == 1, "The nest's boss has no cache to drop")
-	check(Rules.Roster[Rules.rosterIndex("Sahur")].Loot == nil, "Dressing the boss changed the room fighter")
+	check(Rules.specOf(rooms[N]) ~= Rules.First.BossSpec and Rules.specOf(rooms[N]).Moves ~= Rules.First.BossSpec.Moves, "The boss's spec isn't its own copy")
 	check(rooms[1].HealthScale < 1 and rooms[1].DamageScale < 1 and rooms[N].DamageScale < 1, "Not softened for a new miner")
 	local near = function(a, b)
 		return math.abs(a - b) < 1e-6
@@ -162,7 +162,7 @@ do
 			won = sentEvent[2]
 		end
 	end
-	check(won ~= nil and won.Boss == "Tung Tung Tung Sahur" and won.Seconds == first.WinSeconds, "No victory card")
+	check(won ~= nil and won.Boss == "Shardhorn Behemoth" and won.Seconds == first.WinSeconds, "No victory card")
 	check(won.RoundsLeft == 4 and type(won.Time) == "number" and won.Downs == 0, "The victory card's numbers")
 	check(scout:GetAttribute("DungeonPhase") == "Loot", "The tracker's not on the loot")
 	check(#bossCaches == caches + 1 and bossCaches[#bossCaches].Player == scout, "No boss cache")

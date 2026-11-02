@@ -224,11 +224,20 @@ Dungeon.First = {
 	Rooms = { "The Breach", "The Nest" },
 	Short = { "THE BREACH", "THE NEST" }, -- (the tracker's)
 	Fighters = { { "Sahur", "Tralalero", "Patapim" } },
-	-- The nest's boss: the one-headed Tung Tung Tung Sahur, the Roster's,
-	-- grown to a boss (not the three-headed SahurTrio): firstBoss.
-	Boss = "Sahur",
-	BossThreat = 1,
-	BossLoot = "Weapons",
+	-- The nest's boss: the Shardhorn Behemoth, a rhino on all fours with a
+	-- glowing horn (Server.BrainrotBosses' Shardhorn): its own, in none of
+	-- the dungeons' or the Rift's lists (firstBoss).
+	BossSpec = {
+		Id = "Shardhorn",
+		Name = "Shardhorn Behemoth",
+		Element = "Frost",
+		Weakness = "Shock",
+		Shape = "Shardhorn",
+		Moves = { "HornHook", "ShardCharge", "ShardQuake" },
+		Threat = 1,
+		Loot = "Weapons",
+		Scale = 1.7,
+	},
 	FighterHealth = 0.4, -- of a dungeon fighter's (three at once, your kaiju with you)
 	FighterDamage = 0.5,
 	-- (A new miner's first boss: beatable, not a wall.)
@@ -277,21 +286,18 @@ function Dungeon.firstRooms()
 			HealthScale = first.FighterHealth, DamageScale = first.FighterDamage,
 		})
 	end
-	local boss = indexOf(Dungeon.Roster, first.Boss)
 	table.insert(rooms, {
-		Index = #rooms + 1, X = 0, Z = #rooms, Boss = true, FirstBoss = true, Theme = boss, Foes = { boss },
+		Index = #rooms + 1, X = 0, Z = #rooms, Boss = true, FirstBoss = true, Theme = 1, Foes = { 1 },
 		Pillars = 0, GearTier = 2, Name = first.Rooms[#first.Rooms],
 		HealthScale = first.BossHealth, DamageScale = first.BossDamage,
 	})
 	return rooms
 end
 
--- The Rot Beachhead's boss: its Roster fighter (First.Boss) as a boss,
--- with a boss's Threat and Loot for its cache.
+-- The Rot Beachhead's boss (First.BossSpec), a copy of its own.
 function Dungeon.firstBoss()
-	local spec = table.clone(Dungeon.Roster[indexOf(Dungeon.Roster, Dungeon.First.Boss)])
-	spec.Threat = Dungeon.First.BossThreat
-	spec.Loot = Dungeon.First.BossLoot
+	local spec = table.clone(Dungeon.First.BossSpec)
+	spec.Moves = table.clone(spec.Moves)
 	return spec
 end
 
