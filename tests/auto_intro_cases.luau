@@ -31,6 +31,29 @@ for _,other in {"Shock","Poison"} do
  for _,o in objects do if not o.Destroyed and o.Name==other and o.Parent==veil then found=true end end
  check(not found,"Ion or Corrosive on the starter reel")
 end
+local nextUp
+if not FastStart.ElementScreen then
+ -- (Its screen off: rolled quietly behind a plain cover, straight on to the surge roll.)
+ for element,card in cards do check(not card.Visible,"The "..element.." card shows with the element screen off") end
+ local retry=named("Retry")
+ local kicker=named("Kicker")
+ check(requests[1]=="PrepareStarterLottery" and #requests==1,"The element wasn't rolled by itself")
+ if failPrepare then
+  runDelayed(now+0.1)
+  check(retry.Visible and kicker.Text=="COULDN'T SET UP YOUR KIT","A failed roll didn't offer RETRY")
+  check(not profile.Intro.Done and named("NextUp")==nil,"A failed roll went on")
+  failPrepare=false
+  retry.Activated.Fire()
+  check(#requests==2,"RETRY didn't roll again")
+ end
+ runDelayed(now+0.1)
+ local expected=profile.Intro.Lottery.Element
+ check(expected==(if resuming then "Frost" else autoElement),"The server's roll isn't the one kept")
+ nextUp=named("NextUp")
+ check(nextUp~=nil,"Not straight on to the surge roll")
+ runDelayed(now+0.5)
+ check(veil.Destroyed,"The element roll's cover stayed under the surge roll")
+else
 local result=named("ElementResult")
 local retry=named("Retry")
 local kicker=named("Kicker")
@@ -61,10 +84,11 @@ check(kicker.Text=="YOUR ELEMENT","No YOUR ELEMENT over the result")
 -- A beat to see it, then the surge roll, by itself.
 check(named("NextUp")==nil,"The surge roll came too soon")
 runDelayed(now+1.5)
-local nextUp=named("NextUp")
+nextUp=named("NextUp")
 check(nextUp~=nil,"The surge roll didn't come by itself")
 runDelayed(now+0.5)
 check(veil.Destroyed,"The element roll stayed under the surge roll")
+end
 check(string.find(nextUp.Text,"FIRST FIGHT",1,true)~=nil,"The surge roll's next line isn't the first fight")
 -- The surge roll lands and goes on to the fight by itself.
 local shade=nextUp.Parent

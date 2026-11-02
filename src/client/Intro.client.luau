@@ -2802,6 +2802,37 @@ if not FastStart.Pick then
 			rolling, busy = true, true
 			retry.Visible, result.Text, hit.Text = false, "", ""
 			kicker.Text = "ROLLING YOUR ELEMENT"
+			if not FastStart.ElementScreen then
+				-- (No screen for it: rolled quietly behind a plain cover, then
+				-- straight on to the surge roll. Only a failure shows: RETRY.)
+				for _, child in veil:GetChildren() do
+					if child:IsA("GuiObject") and child ~= retry and child ~= kicker then
+						child.Visible = false
+					end
+				end
+				kicker.Text = ""
+				local answer = GemClient.request("PrepareStarterLottery")
+				rolling = false
+				if closed or not veil.Parent then
+					return
+				end
+				if answer and answer.Ok and answer.Lottery and answer.Lottery.Element then
+					reward = answer.Lottery
+					revealMoves(reward, function()
+						busy = false
+						finish()
+					end)
+					task.delay(0.4, function()
+						veil:Destroy()
+					end)
+				else
+					busy = false
+					kicker.Text = "COULDN'T SET UP YOUR KIT"
+					retry.Visible = true
+					UiKit.toast(answer and answer.Message or "Couldn't roll your element.")
+				end
+				return
+			end
 			local kit, failed = nil, nil
 			task.spawn(function()
 				local answer = GemClient.request("PrepareStarterLottery")

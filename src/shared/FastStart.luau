@@ -37,6 +37,10 @@ local FastStart = {}
 
 FastStart.Enabled = true
 FastStart.Pick = false -- off: no style or element picker (rolled for them)
+-- The rolled element's screen (THERMAL OR CRYO, the starter armor's
+-- element landing): off, it's rolled quietly and the intro goes straight
+-- on to the surge roll (everyone starts in the same default set).
+FastStart.ElementScreen = false
 FastStart.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
 FastStart.Elements = { "Fire", "Frost", "Shock", "Poison" }
 FastStart.StarterElements = { "Fire", "Frost" } -- Thermal or Cryo, at random
