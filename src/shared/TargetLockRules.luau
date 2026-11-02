@@ -23,7 +23,9 @@
 --   * Rules.pick locks a target chosen directly (the target list), pinned
 --     the same way
 -- On desktop (a mouse to aim with) the lock is only automatic in a 1v1: the
--- Arena (against a player or a rival) and a 1v1 match (Rules.auto). In
+-- Arena (against a player or a rival), any match with just the two of you
+-- and a spar with a partner (Rules.auto). There the other player is held
+-- like a rival (Priority): never dropped for looking around. In
 -- spars, quarry hunts, the Rift, raids and dungeons you aim with the mouse:
 -- nothing is picked for you (Rules.hold keeps only what you chose), and T
 -- locks what you're aiming at, then the next one around you, then lets go
@@ -41,9 +43,10 @@ local Rules = {
 	AutoSessions = { PvP = true, Training = true, Duel = true },
 }
 -- Does the lock pick targets by itself? Always with touch or a gamepad;
--- with a mouse, only in a 1v1 (`session`: the player's CombatSession).
-function Rules.auto(session: any, desktop: boolean): boolean
-	return not desktop or Rules.AutoSessions[session] == true
+-- with a mouse, only in a 1v1 (`session`: the player's CombatSession;
+-- `oneVsOne`: a match or spar with just one other player).
+function Rules.auto(session: any, desktop: boolean, oneVsOne: boolean?): boolean
+	return not desktop or Rules.AutoSessions[session] == true or oneVsOne == true
 end
 function Rules.new()
 	return {

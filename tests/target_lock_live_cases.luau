@@ -123,5 +123,30 @@ lastInput({Name="MouseMovement"})
 check(not Lock.auto(),"Back on the mouse, the lock stayed automatic")
 input.KeyboardEnabled=false
 check(Lock.auto(),"A touch screen (no keyboard) lost the automatic lock")
+-- Any 1v1 against another player on desktop (a match of two, a spar with a
+-- partner): locked by itself, and held through mouse look like a rival.
+lastInput({Name="MouseMovement"}); input.KeyboardEnabled=true; player.Session=nil
+player.Team,opponent.Team,player.Neutral,opponent.Neutral=nil,nil,true,true
+dummy.Removed=true; opponent.OptedIn=true
+player.MatchId,player.MatchTeam,opponent.MatchId,opponent.MatchTeam="m1",1,"m1",2
+check(Lock.auto(),"No automatic lock on desktop in a 1v1 match against a player")
+Lock.reset(); camera.CFrame=pose(camera.CFrame.Position,Vector3.new(0,0,-1))
+now+=0.2; bound(1/60)
+check(Lock.target()==opponent.Character,"The other player in a 1v1 match wasn't locked on desktop")
+do
+ local before=lerps
+ input.Delta=Vector3.new(6,0,0)
+ camera.CFrame=pose(camera.CFrame.Position,Vector3.new(0,0,1))
+ now+=0.02; bound(1/60)
+ check(Lock.target()==opponent.Character and lerps>before,"Mouse look let go of the 1v1 opponent, or the camera stopped following it")
+ input.Delta=Vector3.new(0,0,0); camera.CFrame=pose(camera.CFrame.Position,Vector3.new(0,0,-1))
+end
+player.MatchId,player.MatchTeam,opponent.MatchId,opponent.MatchTeam=nil,nil,nil,nil
+check(not Lock.auto(),"Desktop stayed automatic after the 1v1 match")
+player.Spar,player.SparWith,opponent.Spar,opponent.SparWith=true,opponent.UserId,true,player.UserId
+check(Lock.auto(),"No automatic lock on desktop in a spar with a partner")
+Lock.reset(); now+=0.2; bound(1/60)
+check(Lock.target()==opponent.Character,"The sparring partner wasn't locked on desktop")
+player.Spar,player.SparWith,opponent.Spar,opponent.SparWith=nil,nil,nil,nil
 Lock.setActive(false)
 print("PASS: "..checks.." real target-lock camera, input, LOS, PvP, pause, auto-engage, lifecycle, switching and desktop 1v1-only checks")

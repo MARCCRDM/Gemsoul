@@ -196,6 +196,23 @@ end
 check(not Rules.auto(nil, true), "Automatic lock on desktop in the lobby, the quarry or the Rift")
 check(not Rules.auto("Raid", true), "Automatic lock on desktop in a raid or dungeon")
 check(Rules.auto(nil, false) and Rules.auto("Raid", false), "A touch screen or gamepad lost the automatic lock")
+check(Rules.auto(nil, true, true), "No automatic lock on desktop in a 1v1 against a player")
+do
+	local function who(id, attrs)
+		return { UserId = id, GetAttribute = function(_, key) return attrs[key] end }
+	end
+	local a = who(1, { MatchId = "m", MatchTeam = 1 })
+	local b = who(2, { MatchId = "m", MatchTeam = 2 })
+	local c = who(3, { MatchId = "m", MatchTeam = 2 })
+	local out = who(4, {})
+	check(Matchmaking.oneVsOne(a, { a, b, out }) and Matchmaking.soleFoe(a, b, { a, b, out }), "A match of two isn't a 1v1")
+	check(not Matchmaking.oneVsOne(a, { a, b, c }) and not Matchmaking.soleFoe(a, b, { a, b, c }), "A 1v2 counted as a 1v1")
+	check(not Matchmaking.soleFoe(a, out, { a, b, out }), "Someone outside your match was your 1v1 foe")
+	local s1 = who(5, { SparWith = 6 })
+	local s2 = who(6, { SparWith = 5 })
+	check(Matchmaking.oneVsOne(s1, {}) and Matchmaking.soleFoe(s1, s2, {}), "A spar with a partner isn't a 1v1")
+	check(not Matchmaking.oneVsOne(out, { a, b, out }), "No match and no spar counted as a 1v1")
+end
 do
 	local function b(id, distance, facing, bearing, visible)
 		local candidate = c(id, distance, facing, visible)

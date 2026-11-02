@@ -3,7 +3,8 @@
 -- you're looking around yourself). Anything else, the pull stops while you
 -- look around yourself, and turned well off it, you're let go. Selection is local; hits remain
 -- server-validated. On desktop it only picks targets by itself in a 1v1
--- (Lock.auto); elsewhere a mouse player aims freely and T locks on.
+-- (Lock.auto: the Arena, a match of two, a spar), and holds the other player
+-- like a rival; elsewhere a mouse player aims freely and T locks on.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -164,7 +165,16 @@ end
 -- always; with a mouse and keyboard only in a 1v1 (the Arena, a 1v1 match).
 function Lock.auto(): boolean
 	local desktop = UserInputService.MouseEnabled and UserInputService.KeyboardEnabled and not padInHand
-	return Rules.auto(player:GetAttribute("CombatSession"), desktop == true)
+	return Rules.auto(player:GetAttribute("CombatSession"), desktop == true, Matchmaking.oneVsOne(player, Players:GetPlayers()))
+end
+-- Your Arena rival, or the other player in a 1v1: always the one to lock,
+-- held through looking around (the camera keeps a softer pull on it).
+local function rivalOf(model, everyone): boolean
+	if Matchmaking.ownsRival(model, player) then
+		return true
+	end
+	local opponent = Players:GetPlayerFromCharacter(model)
+	return opponent ~= nil and Matchmaking.soleFoe(player, opponent, everyone)
 end
 -- T: moves the lock to the next target within SwitchRange (left to right).
 -- Without the automatic lock it locks what you're aiming at, moves on, and
@@ -262,12 +272,13 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 		nextScan = now + 0.1
 	end
 	records = {}
+	local everyone = Players:GetPlayers()
 	for _, model in candidates do
 		local point = pointOf(model)
 		if point and eligible(model) then
 			local delta = point - camera.CFrame.Position
 			local distance = (point - ownRoot.Position).Magnitude
-			local rival = Matchmaking.ownsRival(model, player)
+			local rival = rivalOf(model, everyone)
 			if delta.Magnitude > 0.01 and (distance <= Rules.RetainRange or rival) then
 				local look = camera.CFrame.LookVector
 				-- Line of sight is a raycast per foe: the locked one every frame
@@ -302,7 +313,7 @@ RunService:BindToRenderStep("SagaTargetLock", Enum.RenderPriority.Camera.Value +
 	outline.Adornee, outline.Enabled = target, target ~= nil
 	-- (No pull at all while you look around, so you can look away and it
 	-- lets go; only your Arena rival keeps a softer pull through it.)
-	local rival = target ~= nil and Matchmaking.ownsRival(target, player)
+	local rival = target ~= nil and rivalOf(target, everyone)
 	if target and not paused and (rival or not looking) then
 		-- A hard pull, softer on your rival while you look around.
 		local point = pointOf(target)

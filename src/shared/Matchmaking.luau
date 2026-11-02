@@ -133,6 +133,37 @@ function Matchmaking.versus(a, b): boolean
 	return partyA == nil or partyA ~= attribute(b, "PartyId")
 end
 
+-- A 1v1 against another player: a duel match with only the two of you in
+-- it (`everyone`: the players in the server), or a spar with a partner.
+function Matchmaking.oneVsOne(player, everyone): boolean
+	if not player then
+		return false
+	end
+	local match = attribute(player, "MatchId")
+	if match then
+		local count = 0
+		for _, other in everyone do
+			if attribute(other, "MatchId") == match then
+				count += 1
+			end
+		end
+		return count == 2
+	end
+	return type(player:GetAttribute("SparWith")) == "number"
+end
+
+-- That 1v1's other player (`opponent`): the one the lock never lets go of.
+function Matchmaking.soleFoe(player, opponent, everyone): boolean
+	if not player or not opponent or opponent == player or not Matchmaking.oneVsOne(player, everyone) then
+		return false
+	end
+	local match = attribute(player, "MatchId")
+	if match then
+		return attribute(opponent, "MatchId") == match and opponent:GetAttribute("MatchTeam") ~= player:GetAttribute("MatchTeam")
+	end
+	return player:GetAttribute("SparWith") == opponent.UserId and opponent:GetAttribute("SparWith") == player.UserId
+end
+
 -- Your own Arena rival, or the boss your raid is fighting.
 function Matchmaking.ownsRival(model, player): boolean
 	if not model or not player then
