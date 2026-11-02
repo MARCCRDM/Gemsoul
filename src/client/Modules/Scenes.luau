@@ -618,9 +618,9 @@ end
 -- Space: a black, starry sky, no haze, cool light that still shows colours.
 function Scenes.spaceLighting()
 	Lighting.ClockTime = 0
-	Lighting.Brightness = 2
-	Lighting.Ambient = Color3.fromRGB(96, 102, 122)
-	Lighting.OutdoorAmbient = Color3.fromRGB(150, 156, 176)
+	Lighting.Brightness = 1.8
+	Lighting.Ambient = Color3.fromRGB(84, 90, 108)
+	Lighting.OutdoorAmbient = Color3.fromRGB(126, 132, 150)
 	Lighting.GlobalShadows = true
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atmosphere then
@@ -657,7 +657,7 @@ Scenes.OutpostFinish = {
 function Scenes.outpostLighting()
 	local finish = Scenes.OutpostFinish
 	Scenes.spaceLighting()
-	Lighting.ExposureCompensation = 0
+	Lighting.ExposureCompensation = -0.2 -- (a touch under: players found it too bright)
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = finish.Specular
 	local sky = Lighting:FindFirstChildOfClass("Sky")

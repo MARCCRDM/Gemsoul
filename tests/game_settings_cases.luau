@@ -16,4 +16,8 @@ check(G.clean({ Music = 0 / 0 }).Music == 1, "NaN kept")
 check(G.clean({ Music = 0.333333 }).Music == 0.33, "Not rounded to a percent")
 check(G.music({ Music = 0.5, MusicOn = false }) == 0 and G.music({ Music = 0.5 }) == 0.5, "Music level wrong")
 check(G.effects({ Effects = 0.25, EffectsOn = true }) == 0.25 and G.effects({ EffectsOn = false }) == 0, "Effects level wrong")
+-- Brightness: as made by default, darker or brighter by a grade over every scene.
+check(d.Brightness == 0.5 and G.brightness(nil) == 0, "Brightness isn't as made by default")
+check(G.clean({ Brightness = 4 }).Brightness == 1 and G.clean({ Brightness = -1 }).Brightness == 0, "Brightness not kept in range")
+check(G.brightness({ Brightness = 0 }) < -0.1 and G.brightness({ Brightness = 1 }) > 0.1, "Brightness doesn't darken or brighten")
 print(string.format("PASS: %d game settings checks", checks))

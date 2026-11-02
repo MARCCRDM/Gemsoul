@@ -574,7 +574,7 @@ Lighting.ClockTime=14.2
 Lighting.ExposureCompensation=.5
 Lighting:FindFirstChildOfClass("Sky").SkyboxUp="custom-day-sky"
 Scenes.outpostLighting()
-assert(Lighting.ClockTime==0 and Lighting.ExposureCompensation==0 and not clouds.Enabled,"Daylight leaked into quarry")
+assert(Lighting.ClockTime==0 and Lighting.ExposureCompensation==-0.2 and not clouds.Enabled,"Daylight leaked into quarry")
 local atmosphere=Lighting:FindFirstChildOfClass("Atmosphere")
 assert(atmosphere.Density==Scenes.OutpostFinish.Fog.Density and atmosphere.Density>0 and atmosphere.Density<=0.35,"Quarry fog not slight")
 assert(atmosphere.Haze==0 and atmosphere.Glare==0,"Atmosphere hides space")

@@ -23,10 +23,10 @@ local ArenaNight = {}
 ArenaNight.Mood = {
 	-- Neutral light on fighters; sapphire color comes from the architecture.
 	Lighting = {
-		Brightness = 1.8,
-		Ambient = Color3.fromRGB(96, 104, 118),
-		OutdoorAmbient = Color3.fromRGB(128, 138, 152),
-		ExposureCompensation = -0.2,
+		Brightness = 1.6,
+		Ambient = Color3.fromRGB(90, 98, 112),
+		OutdoorAmbient = Color3.fromRGB(118, 128, 142),
+		ExposureCompensation = -0.35,
 		EnvironmentDiffuseScale = 0.7,
 		EnvironmentSpecularScale = 0.15,
 	},
@@ -50,10 +50,10 @@ ArenaNight.Mood = {
 -- Dungeon silhouettes must remain readable between combat flashes.
 ArenaNight.DungeonMood = {
 	Lighting = {
-		Brightness = 1.8,
-		Ambient = Color3.fromRGB(104, 110, 126),
-		OutdoorAmbient = Color3.fromRGB(132, 140, 156),
-		ExposureCompensation = 0,
+		Brightness = 1.7,
+		Ambient = Color3.fromRGB(96, 102, 118),
+		OutdoorAmbient = Color3.fromRGB(124, 132, 148),
+		ExposureCompensation = -0.2,
 		EnvironmentDiffuseScale = 0.7,
 		EnvironmentSpecularScale = 0.2,
 	},
@@ -78,16 +78,16 @@ ArenaNight.DungeonMood = {
 -- and clouds (RotSky), a light sea haze, the rot's glow still blooming.
 ArenaNight.RotMood = {
 	Lighting = {
-		Brightness = 2.6,
-		Ambient = Color3.fromRGB(118, 114, 106),
-		OutdoorAmbient = Color3.fromRGB(150, 146, 136),
-		ExposureCompensation = 0,
+		Brightness = 2.1,
+		Ambient = Color3.fromRGB(104, 100, 94),
+		OutdoorAmbient = Color3.fromRGB(132, 128, 120),
+		ExposureCompensation = -0.25,
 		EnvironmentDiffuseScale = 0.9,
 		EnvironmentSpecularScale = 0.35,
 	},
-	BloomEffect = { Intensity = 0.25, Size = 18, Threshold = 1.8 },
+	BloomEffect = { Intensity = 0.18, Size = 18, Threshold = 2 },
 	ColorCorrectionEffect = {
-		Brightness = 0.02,
+		Brightness = -0.02,
 		Contrast = 0.1,
 		Saturation = 0.14,
 		TintColor = Color3.fromRGB(255, 250, 240),
@@ -95,11 +95,11 @@ ArenaNight.RotMood = {
 	Atmosphere = {
 		Density = 0.26,
 		Haze = 0.6,
-		Glare = 0.15,
+		Glare = 0.06,
 		Color = Color3.fromRGB(196, 216, 230),
 		Decay = Color3.fromRGB(140, 176, 196),
 	},
-	SunRaysEffect = { Intensity = 0.06 },
+	SunRaysEffect = { Intensity = 0.03 },
 }
 ArenaNight.RotClockTime = 13.5 -- early afternoon
 -- Its sky: the day sky, no stars, the sun shown (put back on the way out).

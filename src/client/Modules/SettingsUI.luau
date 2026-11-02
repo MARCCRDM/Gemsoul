@@ -4,6 +4,7 @@
 
 	  MUSIC            [ ON ]   ━━━━━━●━━━  80%
 	  SOUND EFFECTS    [ ON ]   ━━━━━━━━━●  100%
+	  BRIGHTNESS                ━━━━●━━━━━  NORMAL
 
 	Each row's switch turns it off or on; its slider sets how loud. They take
 	effect at once (Client.Music's sound group, UiSound and CombatSound) and
@@ -29,7 +30,7 @@ local SettingsUI = {}
 
 local P = IronUi.Colors
 local new = IronUi.new
-local W, H = 440, 250
+local W, H = 440, 304
 local COMBAT_BASE = 0.85 -- (CombatSound's own level, at 100%)
 
 local current = GameSettings.clean(nil)
@@ -58,6 +59,17 @@ function SettingsUI.apply(settings)
 			combat.Volume = COMBAT_BASE * effects
 		end
 	end)
+	-- The picture's brightness: a grade of its own over every scene's.
+	pcall(function()
+		local Lighting = game:GetService("Lighting")
+		local grade = Lighting:FindFirstChild("PlayerBrightness")
+		if not grade then
+			grade = Instance.new("ColorCorrectionEffect")
+			grade.Name = "PlayerBrightness"
+			grade.Parent = Lighting
+		end
+		grade.Brightness = GameSettings.brightness(current)
+	end)
 	for _, row in rows do
 		row.draw()
 	end
@@ -81,8 +93,9 @@ local function change(key: string, value: any)
 	save()
 end
 
--- One row: its name, an ON/OFF switch, a slider.
-local function row(parent: Instance, y: number, label: string, onKey: string, levelKey: string)
+-- One row: its name, an ON/OFF switch (none if `onKey` is nil), a slider.
+-- `shown(level)`: what the value reads (a percentage if not given).
+local function row(parent: Instance, y: number, label: string, onKey: string?, levelKey: string, shown: ((number) -> string)?)
 	local name = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(24, y),
@@ -119,8 +132,8 @@ local function row(parent: Instance, y: number, label: string, onKey: string, le
 	UiKit.round(knob, 9)
 	local value = new("TextLabel", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(378, y),
-		Size = UDim2.fromOffset(46, 34),
+		Position = UDim2.fromOffset(370, y),
+		Size = UDim2.fromOffset(58, 34),
 		Font = IronUi.Bold,
 		TextSize = 13,
 		TextColor3 = P.Dim,
@@ -134,26 +147,29 @@ local function row(parent: Instance, y: number, label: string, onKey: string, le
 		Size = UDim2.fromOffset(132, 42),
 		ZIndex = 3,
 	}, parent)
+	switch.Visible = onKey ~= nil
 	local function draw()
-		local on, level = current[onKey], current[levelKey]
+		local on, level = if onKey then current[onKey] else true, current[levelKey]
 		switch.Text = Lang.translate(if on then "ON" else "OFF")
 		switch.BackgroundColor3 = if on then P.Gold else Color3.fromRGB(44, 52, 76)
 		switch.TextColor3 = if on then Color3.fromRGB(26, 18, 6) else P.Dim
 		fill.Size = UDim2.fromScale(level, 1)
 		knob.Position = UDim2.fromScale(level, 0.5)
 		fill.BackgroundColor3 = if on then P.Gold else P.Dim
-		value.Text = math.floor(level * 100 + 0.5) .. "%"
+		value.Text = if shown then shown(level) else math.floor(level * 100 + 0.5) .. "%"
 		name.TextColor3 = if on then P.Text else P.Dim
 	end
 	switch.Activated:Connect(function()
-		change(onKey, not current[onKey])
+		if onKey then
+			change(onKey, not current[onKey])
+		end
 	end)
 	local dragging = false
 	local function setFrom(x: number)
 		local a, w = track.AbsolutePosition.X, track.AbsoluteSize.X
 		if w > 0 then
 			local level = math.clamp((x - a) / w, 0, 1)
-			if not current[onKey] and level > 0 then
+			if onKey and not current[onKey] and level > 0 then
 				current[onKey] = true -- (turning it up turns it on)
 			end
 			change(levelKey, level)
@@ -191,6 +207,10 @@ local function build()
 	end)
 	row(w.Panel, 96, "MUSIC", "MusicOn", "Music")
 	row(w.Panel, 150, "SOUND EFFECTS", "EffectsOn", "Effects")
+	row(w.Panel, 204, "BRIGHTNESS", nil, "Brightness", function(level)
+		local off = math.floor((level - 0.5) * 200 + 0.5)
+		return if off == 0 then Lang.translate("NORMAL") else (if off > 0 then "+" else "") .. off .. "%"
+	end)
 	window = w
 	return w
 end
@@ -250,7 +270,7 @@ function SettingsUI.start()
 	local applied = nil
 	local function fromProfile()
 		local saved = GemClient.Profile and GemClient.Profile.Settings
-		local key = if type(saved) == "table" then table.concat({ tostring(saved.Music), tostring(saved.MusicOn), tostring(saved.Effects), tostring(saved.EffectsOn) }, "/") else "none"
+		local key = if type(saved) == "table" then table.concat({ tostring(saved.Music), tostring(saved.MusicOn), tostring(saved.Effects), tostring(saved.EffectsOn), tostring(saved.Brightness) }, "/") else "none"
 		if key ~= applied and os.clock() > saveAt then
 			applied = key
 			SettingsUI.apply(saved)

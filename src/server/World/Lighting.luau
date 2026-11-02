@@ -19,9 +19,9 @@ end
 return function(space: boolean?)
 	if space then
 		Lighting.ClockTime = 0
-		Lighting.Brightness = 2
-		Lighting.Ambient = Color3.fromRGB(96, 102, 122)
-		Lighting.OutdoorAmbient = Color3.fromRGB(150, 156, 176)
+		Lighting.Brightness = 1.8
+		Lighting.Ambient = Color3.fromRGB(84, 90, 108)
+		Lighting.OutdoorAmbient = Color3.fromRGB(126, 132, 150)
 		Lighting.GlobalShadows = true
 		local sky = getOrCreate(Lighting, "Sky")
 		sky.StarCount = 5000
@@ -40,8 +40,8 @@ return function(space: boolean?)
 	end
 	Lighting.ClockTime = 14.5
 	Lighting.GeographicLatitude = 30
-	Lighting.Brightness = 2.4
-	Lighting.ExposureCompensation = -0.1
+	Lighting.Brightness = 2.2
+	Lighting.ExposureCompensation = -0.25
 	Lighting.GlobalShadows = true
 	Lighting.Ambient = Color3.fromRGB(110, 108, 118)
 	Lighting.OutdoorAmbient = Color3.fromRGB(150, 148, 160)
