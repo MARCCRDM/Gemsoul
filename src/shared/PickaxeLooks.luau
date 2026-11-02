@@ -1138,6 +1138,11 @@ LOOKS.PickThunderclap = {
 			Vector3.new(0, 2.38, 1.02),
 			Vector3.new(0, 2.16, 1.36),
 		}, { 0.28, 0.22, 0.17 }, false)
+		-- (arcs crackle off the core and the tip: Client ThunderArcs)
+		for part, role in { [core] = "Core", [tip] = "Tip" } do
+			part:SetAttribute("ThunderArc", role)
+			CollectionService:AddTag(part, Tags.ThunderArc)
+		end
 		emitter(core, VOLT, 22, { From = BRIGHT, Size = 0.14, Speed = 3, Life = 0.2, Acceleration = Vector3.zero })
 		emitter(tip, VOLT, 8, { From = BRIGHT, Size = 0.1, Speed = 1.5, Life = 0.2, Acceleration = Vector3.zero })
 		emitter(pommel, VOLT, 3, { Size = 0.08, Speed = 0.5, Life = 0.3 })

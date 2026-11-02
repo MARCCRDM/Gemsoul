@@ -503,6 +503,18 @@ end
 
 lightningRef = CombatVfx.lightning
 
+-- A small arc of live current from `from` to `to` (a few studs): a thin
+-- jagged spark with a glow, gone in a blink. No burst, no flash (the
+-- Thunderclap pickaxe crackles with these: Client ThunderArcs).
+function CombatVfx.arc(from: Vector3, to: Vector3, color: Color3, width: number?)
+	local distance = (to - from).Magnitude
+	if distance < 0.2 or distance ~= distance or distance > 40 then
+		return
+	end
+	local kinks = math.clamp(math.floor(distance / 0.6), 2, 6)
+	drawBolt(jagged(from, to, kinks, math.min(0.9, distance * 0.3)), color, width or 0.05, 0.12, true)
+end
+
 local floorRay = RaycastParams.new()
 floorRay.FilterType = Enum.RaycastFilterType.Exclude
 floorRay.RespectCanCollide = true

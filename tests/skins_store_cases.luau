@@ -1126,7 +1126,7 @@ do
 	end
 	local prism, live = 0, 0
 	for _, tag in tagged do
-		check(tag == Tags.Prismatic or tag == Tags.SkinSeam, "A pickaxe part has an unknown tag")
+		check(tag == Tags.Prismatic or tag == Tags.SkinSeam or tag == Tags.ThunderArc, "A pickaxe part has an unknown tag")
 		prism += if tag == Tags.Prismatic then 1 else 0
 		live += if tag == Tags.SkinSeam then 1 else 0
 	end

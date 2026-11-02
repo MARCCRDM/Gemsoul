@@ -32,6 +32,9 @@ return {
 	-- gear): animated on every client, and a box shown only while its part
 	-- shows (SeamVisibility).
 	SkinSeam = "SkinSeam",
+	-- The Thunderclap pickaxe's live parts (ThunderArc "Core" or "Tip"):
+	-- arcs crackle between them on every client (ThunderArcs).
+	ThunderArc = "ThunderArc",
 	-- A socketed stone's light (PointLight): it breathes its element's way
 	-- on every client (GemLights), from its PulseBase, PulsePeriod and
 	-- PulseDim attributes.
