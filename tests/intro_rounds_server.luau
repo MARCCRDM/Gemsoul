@@ -197,6 +197,19 @@ Server.funnel(player, fresh, 1, true)
 Server.funnel(player, fresh, 2, false)
 check(introSteps[mark + 1] == 1 and introSteps[mark + 2] == 2 and introSteps[mark + 3] == 3 and #introSteps == mark + 3, "Start, win, next start: not 1, 2, 3")
 
+-- The sword's, chest's and shield's stones (Q, E, R) stay through the intro's
+-- best build: a better stone in the pouch doesn't take their place.
+do
+	profile = newProfile({})
+	local weak = { Id = "weak", Element = "Frost", Tier = "Common", Size = 1, Clarity = 1, Cut = 1 }
+	local strong = { Id = "strong", Element = "Fire", Tier = "Rare", Size = 9, Clarity = 9, Cut = 9 }
+	profile.Character.WeaponGem = weak
+	profile.Gems = { strong }
+	Server.won(player)
+	check(profile.Character.WeaponGem and profile.Character.WeaponGem.Id == "weak", "The intro's best build swapped the sword's stone (its Q)")
+	check(#profile.Gems == 1 and profile.Gems[1].Id == "strong", "The better stone left the pouch for the sword")
+end
+
 -- The dungeon path (Config.Features.IntroDungeon; the Owners always): two
 -- 1v1s, the second's card says the dungeon's next, then the dungeon's
 -- first room pays a piece and its boss the rest, a card each.

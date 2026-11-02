@@ -868,7 +868,7 @@ local function show(event)
 		ui.GoSub.Text = Lang.translate(if (event.More or 0) > 0 then "Roll it" elseif view.Done then "Your set's complete" else "Follow the beam to the nest")
 		placeButtons(false, false)
 		if event.Gem then
-			ui.Extra.Text = Lang.translate(string.format("+ %s gem, socketed for you", event.Gem.Name))
+			ui.Extra.Text = Lang.translate(string.format(if event.Auto and (event.Auto.Gems or 0) > 0 then "+ %s gem, socketed for you" else "+ %s gem, in your pouch", event.Gem.Name))
 		end
 		task.spawn(reel, event.Piece, mine)
 	elseif event.Phase == "Lost" then
@@ -913,7 +913,7 @@ local function show(event)
 			placeButtons(true, dungeon)
 		end
 		if event.Gem then
-			ui.Extra.Text = Lang.translate(string.format("+ %s gem, socketed for you", event.Gem.Name))
+			ui.Extra.Text = Lang.translate(string.format(if event.Auto and (event.Auto.Gems or 0) > 0 then "+ %s gem, socketed for you" else "+ %s gem, in your pouch", event.Gem.Name))
 		elseif event.Auto and (event.Auto.Gems or 0) > 0 then
 			ui.Extra.Text = Lang.translate("Gems moved to your best sockets")
 		end

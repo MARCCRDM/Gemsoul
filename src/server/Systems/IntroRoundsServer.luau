@@ -130,8 +130,10 @@ local function grant(player: Player, profile, slot: string, rarity: string)
 end
 
 -- Their best build, put on for them after a round (the AUTO EQUIP button's
--- Best plan, Shared.AutoEquip): the gear, and gems into the gear and Q/E/R,
--- the round's gem too. The server does it, as you can't change your build
+-- Best plan, Shared.AutoEquip): the gear, and gems into the gear, the
+-- round's gem too; but a stone already in the sword, chest or shield (Q, E,
+-- R: GemTraits) stays, so a new piece there keeps the same abilities (the
+-- slot's stone goes onto the new piece: PlayerData.equipGear). The server does it, as you can't change your build
 -- by hand mid-session in the Arena. Each gem counts as one socketed by hand
 -- (Server.Forge.counted: Tasks, the funnel). Your skins are left as they are.
 -- Returns gear pieces and gems changed.
@@ -145,7 +147,14 @@ function IntroRoundsServer.bestBuild(player: Player, profile): (number, number)
 		end
 	end
 	local Forge = nil
+	local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 	for _, step in plan.Gems or {} do
+		-- (The sword's, chest's and shield's stones are your Q, E and R: a
+		-- stone already in one stays, so the intro's new piece keeps the same
+		-- abilities. Only an empty one of them is filled.)
+		if GemTraits.KeyOfSocket[step.Slot] and profile.Character[step.Slot .. "Gem"] ~= nil then
+			continue
+		end
 		if PlayerData.socketGem(player, step.Gem, step.Slot) then
 			gems += 1
 			Forge = Forge or require(script.Parent.Forge)
