@@ -579,6 +579,13 @@ do
 		if other:GetAttribute("IntroRounds") then
 			table.insert(bits, "intro card up")
 		end
+		local left = other:GetAttribute("IntroRoundsLeft")
+		if type(left) == "number" and left > 0 then
+			table.insert(bits, "intro rounds left: " .. left)
+		end
+		if other:GetAttribute("IntroFinale") then
+			table.insert(bits, "outpost intro: " .. tostring(other:GetAttribute("IntroFinaleStep") or "not started"))
+		end
 		if other:GetAttribute("MenuOpen") then
 			table.insert(bits, "menu open")
 		end

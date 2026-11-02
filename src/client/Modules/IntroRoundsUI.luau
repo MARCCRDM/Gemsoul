@@ -1073,6 +1073,14 @@ function IntroRoundsUI.start()
 	end)
 	-- Left the Arena some other way (the match moved them, a respawn): a card
 	-- still up for the Arena goes.
+	-- Out of the Arena with the set's done card still up (the server moved
+	-- them out: IntroRoundsServer.unstick): it goes, so the Outpost's intro
+	-- (IntroFinale, which waits on busy()) can start.
+	player:GetAttributeChangedSignal("CombatSession"):Connect(function()
+		if player:GetAttribute("CombatSession") == nil and gui.Enabled and current and current.View and current.View.Done then
+			hide()
+		end
+	end)
 	player:GetAttributeChangedSignal("MatchId"):Connect(function()
 		if player:GetAttribute("MatchId") and gui.Enabled then
 			hide()

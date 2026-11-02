@@ -356,7 +356,13 @@ local function markFinale(player: Player)
 end
 local finaleCritters = {} :: { [Player]: { any } }
 local finaleLoose = {} :: { [Player]: boolean } -- (the kaiju are out: the minions let go)
-local function finale(player: Player, step: any)
+-- The steps the client says it's on (for the DEV spectator: IntroFinaleStep).
+local FINALE_STEPS = { Mine = true, Gems = true, Minions = true, Kaiju = true, Invite = true, Over = true }
+local function finale(player: Player, step: any, name: any)
+	if step == "Step" then
+		player:SetAttribute("IntroFinaleStep", if FINALE_STEPS[name] then name else nil)
+		return reply(true, "")
+	end
 	local profile = PlayerData.get(player) :: any
 	if not profile or profile.IntroFinale ~= "Mines" then
 		return reply(false, "Nothing to do here.")

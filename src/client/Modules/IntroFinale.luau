@@ -34,6 +34,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local GemClient = require(script.Parent.GemClient)
@@ -59,6 +60,8 @@ IntroFinale.FindFor = 6 -- seconds it waits for one
 IntroFinale.CinematicSeconds = 7 -- at least (till every minion's landed)
 IntroFinale.MeteorWait = 25 -- seconds the first boss's window waits for the meteor to come
 IntroFinale.GolemFor = 6 * 60 -- and for its golem's fight
+IntroFinale.GemsFor = 30 -- seconds the gems window waits for OK before it moves on by itself
+IntroFinale.InviteFor = 45 -- and the first boss's window (then: LATER)
 
 local player = Players.LocalPlayer
 local GOLD = Color3.fromRGB(240, 186, 92)
@@ -76,6 +79,37 @@ end
 local function root(): BasePart?
 	local character = player.Character
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+-- Where they are in it, for the DEV spectator (Server.IntroRoundsServer
+-- puts it on them as IntroFinaleStep).
+local function step(name: string)
+	task.spawn(function()
+		pcall(GemClient.request, "IntroFinale", "Step", name)
+	end)
+end
+
+-- Waits for a window's answer: `picked()` set by its buttons, Enter, Space
+-- or a controller's A for `key`, or `late` after `seconds` (never stuck
+-- behind a window: a locked mouse, something over the button). Its buttons
+-- free the mouse while it's up (Modal).
+local function answer(buttons: { TextButton }, picked: () -> string?, key: string, late: string, seconds: number, shade: Instance): string
+	for _, b in buttons do
+		b.Modal = true
+	end
+	local keyed: string? = nil
+	local keys = UserInputService.InputBegan:Connect(function(input)
+		local k = input.KeyCode
+		if k == Enum.KeyCode.Return or k == Enum.KeyCode.KeypadEnter or k == Enum.KeyCode.Space or k == Enum.KeyCode.ButtonA then
+			keyed = key
+		end
+	end)
+	local started = os.clock()
+	while not picked() and not keyed and shade.Parent and os.clock() - started < seconds do
+		task.wait(0.1)
+	end
+	keys:Disconnect()
+	return picked() or keyed or late
 end
 
 -- A strip at the top: a big line and a small one under it.
@@ -307,9 +341,9 @@ local function gems()
 		done = true
 	end)
 	VoiceOver.say(IntroFinale.Lines.Gems)
-	while not done and shade.Parent do
-		task.wait(0.1)
-	end
+	answer({ ok }, function()
+		return if done then "Ok" else nil
+	end, "Ok", "Ok", IntroFinale.GemsFor, shade)
 	VoiceOver.stop()
 	shade:Destroy()
 end
@@ -480,6 +514,7 @@ local function invite()
 		text(row[2], 66, y, 386, 34, 16, Color3.fromRGB(236, 238, 244), Enum.Font.GothamMedium)
 	end
 	local choice = nil
+	local buttons = {}
 	local function button(label: string, x: number, w: number, primary: boolean, pick: string)
 		local b = Instance.new("TextButton")
 		b.Name = pick
@@ -494,12 +529,17 @@ local function invite()
 		b.Activated:Connect(function()
 			choice = pick
 		end)
+		table.insert(buttons, b)
 	end
 	button("LATER", 30, 130, false, "Later")
 	button("TAKE HIM ON", 176, 274, true, "Go")
 	VoiceOver.say(IntroFinale.Lines.Invite)
-	while not choice and shade.Parent do
-		task.wait(0.1)
+	-- (Enter takes him on; left alone, LATER: the Bounty Board has him)
+	choice = answer(buttons, function()
+		return choice
+	end, "Go", "Later", IntroFinale.InviteFor, shade)
+	if not choice then
+		choice = "Later"
 	end
 	VoiceOver.stop()
 	shade:Destroy()
@@ -517,9 +557,13 @@ local function run()
 	end
 	running = true
 	local ok, problem = pcall(function()
+		step("Mine")
 		mine()
+		step("Gems")
 		gems()
+		step("Minions")
 		if minions() then
+			step("Kaiju")
 			kaiju()
 		end
 	end)
@@ -544,24 +588,34 @@ local function run()
 		end
 		task.wait(2)
 	end
+	step("Invite")
 	pcall(invite)
+	step("Over")
 	running = false
 end
 
 -- In the Outpost, nothing else up: the finale's turn.
-local function ready(): boolean
+-- (Due: in the Outpost with it to do, out of any fight.)
+local function due(): boolean
 	if player:GetAttribute("IntroFinale") ~= "Mines" or player:GetAttribute("Outpost") ~= true then
 		return false
 	end
 	if player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil then
 		return false
 	end
+	return root() ~= nil
+end
+local function ready(): boolean
+	if not due() then
+		return false
+	end
 	local busy = false
 	pcall(function()
 		busy = require(script.Parent.LoadingFlow).active() or require(script.Parent.IntroRoundsUI).busy()
 	end)
-	return not busy and root() ~= nil
+	return not busy
 end
+IntroFinale.WaitAtMost = 20 -- seconds it waits for a screen still up (a card, a loading screen) when it's due
 
 local started = false
 function IntroFinale.start()
@@ -570,13 +624,27 @@ function IntroFinale.start()
 	end
 	started = true
 	task.spawn(function()
+		local dueSince: number? = nil
 		while true do
 			task.wait(0.5)
-			if not running and ready() then
+			if running then
+				dueSince = nil
+			elseif ready() then
 				task.wait(1) -- (a beat in the Outpost first)
 				if ready() then
+					dueSince = nil
 					run()
 				end
+			elseif due() then
+				-- (Something's held the screen too long: never stuck behind it.)
+				dueSince = dueSince or os.clock()
+				if os.clock() - dueSince > IntroFinale.WaitAtMost then
+					warn("[IntroFinale] starting past a screen still up")
+					dueSince = nil
+					run()
+				end
+			else
+				dueSince = nil
 			end
 		end
 	end)
