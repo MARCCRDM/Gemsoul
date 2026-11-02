@@ -15,6 +15,10 @@ local function announce()
 	if not objective then
 		return
 	end
+	-- (The Rot Beachhead has its own tracker: Client FirstDungeonUI.)
+	if player:GetAttribute("DungeonKaiju") == true then
+		return
+	end
 	local line = if player:GetAttribute("DungeonTest")
 		then "Test run · " .. objective
 		else string.format("Room %d / %d · %s", player:GetAttribute("DungeonRoom") or 1, player:GetAttribute("DungeonRooms") or 5, objective)

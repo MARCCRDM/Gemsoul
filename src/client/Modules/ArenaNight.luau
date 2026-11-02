@@ -73,6 +73,34 @@ ArenaNight.DungeonMood = {
 	},
 	SunRaysEffect = { Intensity = 0 },
 }
+-- The Rot Beachhead (the first dungeon: DungeonKaiju): dusk on a wrecked
+-- shore, a green-violet haze, the rot's glow blooming.
+ArenaNight.RotMood = {
+	Lighting = {
+		Brightness = 1.3,
+		Ambient = Color3.fromRGB(78, 70, 92),
+		OutdoorAmbient = Color3.fromRGB(98, 92, 112),
+		ExposureCompensation = -0.1,
+		EnvironmentDiffuseScale = 0.6,
+		EnvironmentSpecularScale = 0.25,
+	},
+	BloomEffect = { Intensity = 0.4, Size = 20, Threshold = 1.5 },
+	ColorCorrectionEffect = {
+		Brightness = -0.02,
+		Contrast = 0.16,
+		Saturation = 0.04,
+		TintColor = Color3.fromRGB(236, 255, 240),
+	},
+	Atmosphere = {
+		Density = 0.34,
+		Haze = 1.4,
+		Glare = 0,
+		Color = Color3.fromRGB(118, 146, 112),
+		Decay = Color3.fromRGB(74, 44, 96),
+	},
+	SunRaysEffect = { Intensity = 0 },
+}
+ArenaNight.RotClockTime = 18.3 -- dusk
 ArenaNight.ClockTime = 14.2 -- clear afternoon light on crystal faces
 ArenaNight.DungeonClockTime = 16.8 -- preserve the dungeon's existing mood
 ArenaNight.LampScale = 1 -- four restrained architectural lamps
@@ -163,8 +191,11 @@ local function nightfall(mood)
 		saved[instance] = saved[instance] or before
 		TweenService:Create(instance, FADE, goal):Play()
 	end
-	Lighting.ClockTime = if mood == ArenaNight.DungeonMood then ArenaNight.DungeonClockTime else ArenaNight.ClockTime
-	CombatFx.LightBoost = if mood == ArenaNight.DungeonMood then 1 else ArenaNight.FlashBoost
+	Lighting.ClockTime = if mood == ArenaNight.RotMood
+		then ArenaNight.RotClockTime
+		elseif mood == ArenaNight.DungeonMood then ArenaNight.DungeonClockTime
+		else ArenaNight.ClockTime
+	CombatFx.LightBoost = if mood == ArenaNight.DungeonMood or mood == ArenaNight.RotMood then 1 else ArenaNight.FlashBoost
 	dimLamps()
 	glowGear()
 end
@@ -206,13 +237,19 @@ function ArenaNight.start()
 	local player = Players.LocalPlayer
 	local function follow()
 		if player:GetAttribute("CombatSession") ~= nil then
-			nightfall(if player:GetAttribute("DungeonId") then ArenaNight.DungeonMood else ArenaNight.Mood)
+			nightfall(
+				if player:GetAttribute("DungeonKaiju") == true
+					then ArenaNight.RotMood
+					elseif player:GetAttribute("DungeonId") then ArenaNight.DungeonMood
+					else ArenaNight.Mood
+			)
 		else
 			daybreak()
 		end
 	end
 	player:GetAttributeChangedSignal("CombatSession"):Connect(follow)
 	player:GetAttributeChangedSignal("DungeonId"):Connect(follow)
+	player:GetAttributeChangedSignal("DungeonKaiju"):Connect(follow)
 	follow()
 	-- New fighters, re-equipped gear and streamed-in lamps.
 	task.spawn(function()

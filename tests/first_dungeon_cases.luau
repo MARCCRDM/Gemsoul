@@ -28,8 +28,13 @@ do
 	check(near(Rules.firstDamage(1), 0.75) and near(Rules.firstDamage(6), 1), "Damage by intro pieces won")
 	check(near(Rules.firstDamage(0), 0.75) and near(Rules.firstDamage(40), 1), "Damage outside 1 to 6 pieces")
 
-	-- Into it (an owner's test, from the DEV panel).
+	-- Off (Config.Features.FirstDungeon): no one gets in, owners too.
 	local scout = squad(1)[1]
+	permittedTester = scout
+	check(not handlers.DungeonTest(scout, "First").Ok and not handlers.FirstDungeon(scout).Ok, "In while it's off")
+	check(scout:GetAttribute("DungeonId") == nil, "In while it's off")
+	Config.Features.FirstDungeon = true
+	-- Into it (from the DEV panel).
 	permittedTester = scout
 	profiles[scout].IntroRounds = { Won = 2, Losses = 0, Pieces = {} }
 	check(not handlers.FirstDungeonRecover(scout).Ok, "RECOVER outside the dungeon")
@@ -53,6 +58,7 @@ do
 		end
 	end
 	check(#fighters >= 1, "Room 1's fighters didn't come")
+	check(scout:GetAttribute("DungeonPhase") == "Fight" and scout:GetAttribute("DungeonFoesLeft") == #fighters and scout:GetAttribute("DungeonFoesTotal") == #fighters, "The tracker's room state")
 	local enc = fighters[1].Encounter
 	check(enc.KaijuFoes == true, "Your kaiju can't fight them")
 	check(near(enc.HealthScale, first.FighterHealth), "Room 1's health isn't softened")
@@ -102,7 +108,16 @@ do
 	check(not scout.Root.Anchored, "Quit left you held")
 	check(not handlers.FirstDungeonQuit(scout).Ok, "Quit outside the dungeon")
 
-	-- Through it: two rooms, the nest, the boss cache, then out with the clear's rewards.
+	-- Through it: two rooms, the nest (enraged at half health: its rot-spawn
+	-- join in), the victory card, the boss cache, then out with the clear's rewards.
+	local plainSpawn = Duelist.spawnDungeon
+	Duelist.spawnDungeon = function(...)
+		local e = plainSpawn(...)
+		if e then
+			e.Humanoid = { Health = 100, MaxHealth = 100, HealthChanged = signal() }
+		end
+		return e
+	end
 	scout.Humanoid.Health = scout.Humanoid.MaxHealth
 	check(handlers.DungeonTest(scout, "First").Ok, "The Rot Beachhead didn't start again")
 	id = scout:GetAttribute("DungeonId")
@@ -110,6 +125,7 @@ do
 	local caches = #bossCaches
 	for room = 1, 2 do
 		check(clearRoom(id, room) >= 1, "Room " .. room .. " had nobody to clear")
+		check(scout:GetAttribute("DungeonPhase") == "Move", "Not told to move on after room " .. room)
 		scout.Root.Position = worlds[id].Centers[room + 1] + Vector3.new(0, 4, 0)
 		tick(0.6)
 	end
@@ -121,22 +137,64 @@ do
 	end
 	check(nest ~= nil and nest.Encounter.KaijuFoes == true, "The nest's boss didn't come")
 	check(near(nest.Encounter.HealthScale, first.BossHealth), "The boss isn't softened")
+	local before = #spawned
+	nest.Humanoid.Health = 70
+	nest.Humanoid.HealthChanged.Fire(70)
+	check(#spawned == before, "Enraged too early")
+	nest.Humanoid.Health = 45
+	nest.Humanoid.HealthChanged.Fire(45)
+	check(#spawned == before + #first.Enrage.Adds, "The enraged boss's rot-spawn didn't come")
+	check(scout:GetAttribute("DungeonFoesLeft") == 1 + #first.Enrage.Adds, "The tracker's count with the rot-spawn in")
+	nest.Humanoid.HealthChanged.Fire(30)
+	check(#spawned == before + #first.Enrage.Adds, "Enraged twice")
+	sent[scout] = {}
+	nest.Dead = true
+	nest.Encounter.OnDeath()
+	check(#bossCaches == caches, "Loot before the rot-spawn were down")
 	clearRoom(id, 3)
+	local won
+	for _, sentEvent in sent[scout] do
+		if sentEvent[1] == "FirstDungeon" and sentEvent[2].Phase == "Won" then
+			won = sentEvent[2]
+		end
+	end
+	check(won ~= nil and won.Boss == "Chimpanzini Bananini" and won.Seconds == first.WinSeconds, "No victory card")
+	check(won.RoundsLeft == 4 and type(won.Time) == "number" and won.Downs == 0, "The victory card's numbers")
+	check(scout:GetAttribute("DungeonPhase") == "Loot", "The tracker's not on the loot")
 	check(#bossCaches == caches + 1 and bossCaches[#bossCaches].Player == scout, "No boss cache")
 	check(scout:GetAttribute("DungeonId") == id, "Out before the cache")
-	tick(6.1)
+	tick(first.WinSeconds - 1)
+	check(scout:GetAttribute("DungeonId") == id, "Out before the victory card's time")
+	tick(1.1)
 	check(scout:GetAttribute("DungeonId") == nil, "Not back out after the nest")
 	check(profiles[scout].Coins > 0, "No rewards for clearing the Rot Beachhead")
+	check(scout:GetAttribute("DungeonPhase") == nil and scout:GetAttribute("DungeonFoesLeft") == nil, "The tracker's state left on")
+	-- CONTINUE on the victory card: out at once, rewards and all.
+	local coins = profiles[scout].Coins
+	check(not handlers.FirstDungeonDone(scout).Ok, "CONTINUE outside the dungeon")
+	check(handlers.DungeonTest(scout, "First").Ok, "The Rot Beachhead didn't start a third time")
+	id = scout:GetAttribute("DungeonId")
+	tick(3)
+	check(not handlers.FirstDungeonDone(scout).Ok, "CONTINUE before the boss is down")
+	for room = 1, 2 do
+		clearRoom(id, room)
+		scout.Root.Position = worlds[id].Centers[room + 1] + Vector3.new(0, 4, 0)
+		tick(0.6)
+	end
+	clearRoom(id, 3)
+	clearRoom(id, 3) -- (the enraged boss's rot-spawn, if it got that far)
+	local done = handlers.FirstDungeonDone(scout)
+	check(done.Ok and done.To == "Intro" and scout:GetAttribute("DungeonId") == nil, "CONTINUE didn't take you out")
+	check(profiles[scout].Coins > coins, "CONTINUE skipped the rewards")
+	Duelist.spawnDungeon = plainSpawn
 	-- Open to everyone (Config.Features.FirstDungeon), not before; GO TO LOBBY any time.
 	local miner = squad(1)[1]
-	check(not handlers.FirstDungeon(miner).Ok, "A player got in before it's open")
-	Config.Features.FirstDungeon = true
-	check(handlers.FirstDungeon(miner).Ok, "A player couldn't get in once it's open")
+	check(handlers.FirstDungeon(miner).Ok, "A player couldn't get in while it's on")
 	check(miner:GetAttribute("DungeonId") ~= nil, "Not in")
 	tick(3)
 	local out = handlers.FirstDungeonQuit(miner, "Lobby")
 	check(out.Ok and out.To == "Lobby" and miner:GetAttribute("DungeonId") == nil, "GO TO LOBBY didn't leave")
 	check(profiles[miner].Coins == 0, "Leaving paid out")
 	Config.Features.FirstDungeon = nil
-	print("PASS: the Rot Beachhead: rooms, damage by intro pieces, kaiju let in, the knock-down card, RECOVER, back to the intro fights, boss cache and rewards, open to players by its switch, GO TO LOBBY")
+	print("PASS: the Rot Beachhead: rooms, damage by intro pieces, kaiju let in, the knock-down card, RECOVER, back to the intro fights, boss cache and rewards, the tracker, the enraged boss, the victory card and CONTINUE, on and off by its switch, GO TO LOBBY")
 end

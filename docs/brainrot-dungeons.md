@@ -65,7 +65,7 @@ Validation: tests/run_dungeon_queue.py executes the actual Party and DungeonQueu
 
 ## The Rot Beachhead (the campaign's first dungeon)
 
-The new player's first dungeon, after the intro fights (the New Player Pipeline proposal). It's reached from the intro rounds' card (**FIRST DUNGEON**, beside GO TO LOBBY, and TO THE FIRST DUNGEON once the set's done) and from the DEV panel's **FIRST DUNGEON (NEW INTRO)**. While `Config.Features.FirstDungeon` is off, only the Owners see and can use it; switch it on to open it to every player (the `FirstDungeon` request). Either way it plays as a new player would:
+The new player's first dungeon, after the intro fights (the New Player Pipeline proposal). It's reached from the intro rounds' card (**FIRST DUNGEON**, beside GO TO LOBBY, and TO THE FIRST DUNGEON once the set's done) and from the DEV panel's **FIRST DUNGEON (NEW INTRO)**. **It's off for now** (`Config.Features.FirstDungeon = false`): hidden on the card and the DEV panel, and the server refuses it for everyone, owners too. Switch it on to bring it back for every player (the `FirstDungeon` request). Either way it plays as a new player would:
 
 1. The kaiju roll, if one is owed (Client KaijuRoll).
 2. The loading screens (Client FirstDungeonUI): YOUR KAIJU (your team out; "Your kaiju will defend you and heal you"), then the scout mission. A tap skips one.
@@ -86,3 +86,11 @@ The same ways out are on **LEAVE** (top right, any time in the dungeon), with ST
 The boss is Chimpanzini for now, standing in for Granchio Rottamino, whose model is still to come. After the dungeon you go back to the Outpost: the mining / socket / kaiju / critter steps that follow it aren't built yet.
 
 Tests: `tests/first_dungeon_cases.luau` (in tests/run_dungeons.py), and the Rot Beachhead's screens and card in tests/client_extras_boot.luau.
+
+### Its look, tracker and ending
+
+- **Look:** the rooms are built in the Rot theme (`World.build(..., "Rot")`): wet black sand, the invaders' hull for walls, rot-green lamps and crystals, violet membrane gates. `World.dressBeachhead` adds rot pods, growth, glowing tendrils, slime pools, drifting spores and hull plates to every room. In the Nest it adds a rot stain, a ring of growth and egg sacs, with the crashed ship's nose behind. The client lights it with `ArenaNight.RotMood`: dusk, green-violet haze, bloom on the glow.
+- **Tracker** (Client FirstDungeonUI, top right): the three rooms, what to do now, and the latest word. It follows the server's `DungeonPhase` ("Fight" / "Move" / "Loot"), `DungeonFoesLeft` and `DungeonFoesTotal`. A cleared room puts a beam over the next one (`World.beacon`: NEXT ROOM, THE NEST).
+- **The boss** enrages at half health and its rot-spawn join in (`Rules.First.Enrage`). The loot waits until they're down too.
+- **Ending:** a victory card after the boss cache shows the time, knock-downs and coins. It offers FINISH THE INTRO FIGHTS (while rounds are left) or BACK TO THE OUTPOST (`FirstDungeonDone`, with the clear's rewards). After `WinSeconds` (25 s) it heads out by itself.
+- **Errors** in a run (setup, an encounter, the dressing, the beacon) go to the server's output and to an owner's screen as `[Dungeon] ...`.

@@ -223,7 +223,7 @@ task.wait(2.5)
 local card = playerGui:FindFirstChild("IntroRounds")
 check(card ~= nil and card.Enabled, "The intro rounds' card isn't up")
 check(load(clientRef.IntroRoundsUI).busy(), "The set's card is up, but it doesn't hold back what comes after it")
-do -- (the set done: to the lobby; for an owner, TO THE FIRST DUNGEON and the lobby beside it)
+do -- (the set done: to the lobby; the first dungeon's off for now, an owner's too)
 	task.wait(2.5) -- (out of the Arena, a card's up 4.5 s after its event)
 	local go = card:FindFirstChild("Next", true)
 	check(go.Text == "GO TO LOBBY" and not card:FindFirstChild("Leave", true).Visible, "The set's card without the first dungeon: " .. go.Text .. " " .. tostring(card:FindFirstChild("Leave", true).Visible))
@@ -231,7 +231,7 @@ do -- (the set done: to the lobby; for an owner, TO THE FIRST DUNGEON and the lo
 	social:Fire("IntroRound", { Phase = "Lost", Round = 2, View = IntroRounds.view(IntroRounds.state({ Funnel = {} })) })
 	task.wait(5)
 	local dungeon = card:FindFirstChild("Dungeon", true)
-	check(dungeon.Visible and dungeon.Text == "FIRST DUNGEON" and card:FindFirstChild("Leave", true).Visible, "No FIRST DUNGEON beside GO TO LOBBY for an owner")
+	check(not dungeon.Visible and card:FindFirstChild("Leave", true).Visible, "FIRST DUNGEON shown while it's off (Config.Features.FirstDungeon), owner or not")
 	check(card:FindFirstChild("Next", true).Text == "TRY AGAIN", "A loss's TRY AGAIN")
 	attrs.CanTestDungeon = nil
 end

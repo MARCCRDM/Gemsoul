@@ -251,9 +251,9 @@ end
 local playing = false
 
 function FirstDungeonUI.allowed(): boolean
+	-- (Off for now, for everyone: Config.Features.FirstDungeon.)
 	local Config = require(ReplicatedStorage.Shared.Config)
-	return player:GetAttribute("CanTestDungeon") == true
-		or (Config.Features ~= nil and Config.Features.FirstDungeon == true)
+	return Config.Features ~= nil and Config.Features.FirstDungeon == true
 end
 
 function FirstDungeonUI.play(): string?
@@ -506,6 +506,248 @@ function FirstDungeonUI.showDown(event: { [string]: any })
 	end)
 end
 
+
+-- The tracker, top right under the combat screen's LEAVE, while you're in
+-- the Rot Beachhead: its three rooms (done, here, to come), what to do now
+-- (from the server's DungeonPhase, DungeonFoesLeft / DungeonFoesTotal) and
+-- the latest word (DungeonObjective) for a few seconds.
+local hud: ScreenGui? = nil
+local hudParts: any = nil
+local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
+
+local function objectiveText(): string
+	local phaseName = player:GetAttribute("DungeonPhase")
+	local left = tonumber(player:GetAttribute("DungeonFoesLeft")) or 0
+	local total = math.max(left, tonumber(player:GetAttribute("DungeonFoesTotal")) or 0)
+	local boss = player:GetAttribute("DungeonBoss")
+	if phaseName == "Move" then
+		return "Through the gate: follow the beam ▸"
+	elseif phaseName == "Loot" then
+		return "Open your boss cache"
+	elseif type(boss) == "string" then
+		return if left > 1 then string.format("Defeat %s  ·  %d left", boss, left) else "Defeat " .. boss
+	end
+	return string.format("Defeat the rot-spawn  ·  %d / %d", total - left, total)
+end
+
+local function drawHud()
+	if not hud or not hudParts then
+		return
+	end
+	local room = tonumber(player:GetAttribute("DungeonRoom")) or 1
+	local phaseName = player:GetAttribute("DungeonPhase")
+	for i, pip in hudParts.Pips do
+		local done = i < room or (i == room and (phaseName == "Move" or phaseName == "Loot"))
+		local here = i == room and not done
+		pip.Bar.BackgroundColor3 = if done then ROT elseif here then Gilt.Gold else Gilt.Bronze
+		pip.Name_.TextColor3 = if done then ROT elseif here then Gilt.Gold else Gilt.Dusk
+	end
+	hudParts.Goal.Text = objectiveText()
+end
+
+local wordShown = 0
+local function sayWord()
+	if not hudParts then
+		return
+	end
+	local word = player:GetAttribute("DungeonObjective")
+	wordShown += 1
+	local mine = wordShown
+	hudParts.Word.Text = if type(word) == "string" then word else ""
+	hudParts.Word.TextTransparency = 0
+	task.delay(6, function()
+		if mine == wordShown and hudParts then
+			tween(hudParts.Word, 0.6, { TextTransparency = 1 })
+		end
+	end)
+end
+
+local function placeHud()
+	if not hud or not hudParts then
+		return
+	end
+	local size = hud.AbsoluteSize
+	local portrait = size.Y > size.X
+	hudParts.Panel.Position = UDim2.new(1, -12, 0, if portrait then 124 else 62)
+end
+
+local function showHud(on: boolean)
+	if not on then
+		if hud then
+			hud:Destroy()
+			hud, hudParts = nil, nil
+		end
+		return
+	end
+	if hud then
+		drawHud()
+		return
+	end
+	local screen = UiKit.gui("FirstDungeonHud", 30)
+	hud = screen
+	local panel = new("Frame", {
+		Name = "Tracker",
+		AnchorPoint = Vector2.new(1, 0),
+		Size = UDim2.fromOffset(250, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = Gilt.Deep,
+		BackgroundTransparency = 0.15,
+	}, screen)
+	UiKit.round(panel, 10)
+	new("UIStroke", { Color = Gilt.Bronze, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, panel)
+	new("UIPadding", {
+		PaddingLeft = UDim.new(0, 12),
+		PaddingRight = UDim.new(0, 12),
+		PaddingTop = UDim.new(0, 9),
+		PaddingBottom = UDim.new(0, 10),
+	}, panel)
+	UiKit.list(panel, 6)
+	text(panel, {
+		Name = "Title",
+		Text = "THE ROT BEACHHEAD",
+		TextSize = 11,
+		TextColor3 = ROT,
+		Font = Gilt.Display,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, 0, 0, 14),
+		LayoutOrder = 1,
+	})
+	local row = new("Frame", { Name = "Rooms", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 22), LayoutOrder = 2 }, panel)
+	local pips = {}
+	local names = DungeonRules.First.Short
+	for i, name in names do
+		local cell = new("Frame", {
+			BackgroundTransparency = 1,
+			Position = UDim2.new((i - 1) / #names, if i > 1 then 3 else 0, 0, 0),
+			Size = UDim2.new(1 / #names, -3, 1, 0),
+		}, row)
+		local bar = new("Frame", { Name = "Bar", Size = UDim2.new(1, 0, 0, 4), BackgroundColor3 = Gilt.Bronze }, cell)
+		UiKit.round(bar, 2)
+		local label = text(cell, {
+			Name = "Name",
+			Text = name,
+			TextSize = 10,
+			TextColor3 = Gilt.Dusk,
+			Font = Gilt.Display,
+			Position = UDim2.fromOffset(0, 7),
+			Size = UDim2.new(1, 0, 0, 14),
+			TextWrapped = false,
+		})
+		pips[i] = { Bar = bar, Name_ = label }
+	end
+	local goal = text(panel, {
+		Name = "Goal",
+		Text = "",
+		TextSize = 14,
+		TextColor3 = Gilt.Ink,
+		Font = Gilt.Display,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = 3,
+	})
+	local word = text(panel, {
+		Name = "Word",
+		Text = "",
+		TextSize = 11,
+		TextColor3 = Gilt.Faded,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = 4,
+	})
+	hudParts = { Panel = panel, Pips = pips, Goal = goal, Word = word }
+	screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeHud)
+	placeHud()
+	drawHud()
+	sayWord()
+end
+
+-- The victory card ----------------------------------------------------------------------
+
+local function clock(seconds: number): string
+	seconds = math.max(0, math.floor(seconds))
+	return string.format("%d:%02d", seconds // 60, seconds % 60)
+end
+
+-- After the boss: once its cache is opened (or soon anyway), how it went
+-- and the way on (the intro fights while rounds are left, or the lobby).
+-- Out by itself as its time's up (the server's WinSeconds).
+function FirstDungeonUI.showWon(event: { [string]: any })
+	local ends = os.clock() + math.max(1, tonumber(event.Seconds) or 25)
+	roundsLeft = tonumber(event.RoundsLeft) or roundsLeft
+	-- (the boss cache's roll first: Client StreakRewards)
+	local ok, StreakRewards = pcall(require, script.Parent.StreakRewards)
+	local waitUntil = ends - 7
+	task.wait(1.5)
+	while ok and os.clock() < waitUntil and (StreakRewards.pending() or StreakRewards.isOpen()) do
+		task.wait(0.25)
+	end
+	if player:GetAttribute("DungeonId") == nil then
+		return
+	end
+	local body = cardFrame(
+		"FirstDungeonWon",
+		"THE ROT BEACHHEAD",
+		"BEACHHEAD TAKEN",
+		ROT,
+		string.format("%s is down. That's one: there are more out there.", tostring(event.Boss or "The boss"))
+	)
+	local screen = card
+	local stats = new("Frame", { Name = "Stats", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 46), LayoutOrder = 4 }, body)
+	local entries = {
+		{ "TIME", clock(tonumber(event.Time) or 0) },
+		{ "KNOCK-DOWNS", tostring(tonumber(event.Downs) or 0) },
+		{ "COINS", "+" .. tostring(tonumber(event.Coins) or 0) },
+	}
+	for i, entry in entries do
+		local cell = new("Frame", {
+			Position = UDim2.new((i - 1) / 3, if i > 1 then 4 else 0, 0, 0),
+			Size = UDim2.new(1 / 3, -4, 1, 0),
+		}, stats)
+		Gilt.well(cell)
+		text(cell, { Text = entry[2], TextSize = 17, TextColor3 = Gilt.Ink, Font = Gilt.Display, Position = UDim2.fromOffset(0, 5), Size = UDim2.new(1, 0, 0, 20) })
+		text(cell, { Text = entry[1], TextSize = 9, TextColor3 = Gilt.Dusk, Font = Gilt.Display, Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 12) })
+	end
+	local function go(to: string)
+		closeCard()
+		local result = GemClient.request("FirstDungeonDone")
+		if result.Ok and to == "Intro" then
+			task.spawn(nextRound)
+		end
+	end
+	if roundsLeft > 0 then
+		local intro = Gilt.button(body, string.format("FINISH THE INTRO FIGHTS (%d LEFT)", roundsLeft), true, 5, function()
+			go("Intro")
+		end, 46, 15)
+		intro.Name = "Intro"
+		local lobby = Gilt.button(body, "BACK TO THE OUTPOST", false, 6, function()
+			go("Lobby")
+		end, 40, 13)
+		lobby.Name = "Lobby"
+	else
+		local lobby = Gilt.button(body, "BACK TO THE OUTPOST", true, 5, function()
+			go("Lobby")
+		end, 46, 15)
+		lobby.Name = "Lobby"
+	end
+	local timer = Gilt.words(body, "", 12, Gilt.Dusk)
+	timer.Name = "Timer"
+	timer.TextXAlignment = Enum.TextXAlignment.Center
+	timer.LayoutOrder = 8
+	task.spawn(function()
+		while card == screen do
+			local left = math.max(0, math.ceil(ends - os.clock()))
+			timer.Text = string.format("Heading out in %ds", left)
+			if left <= 0 then
+				closeCard()
+				break
+			end
+			task.wait(0.25)
+		end
+	end)
+end
+
 local started = false
 function FirstDungeonUI.start()
 	if started then
@@ -518,14 +760,26 @@ function FirstDungeonUI.start()
 		end
 		if event.Phase == "In" then
 			roundsLeft = tonumber(event.RoundsLeft) or 0
+			showHud(true)
 		elseif event.Phase == "Down" then
 			FirstDungeonUI.showDown(event)
+		elseif event.Phase == "Won" then
+			task.spawn(FirstDungeonUI.showWon, event)
 		end
+	end)
+	-- The tracker follows the room's state.
+	for _, name in { "DungeonRoom", "DungeonPhase", "DungeonFoesLeft", "DungeonFoesTotal", "DungeonBoss" } do
+		player:GetAttributeChangedSignal(name):Connect(drawHud)
+	end
+	player:GetAttributeChangedSignal("DungeonObjective"):Connect(sayWord)
+	player:GetAttributeChangedSignal("DungeonKaiju"):Connect(function()
+		showHud(player:GetAttribute("DungeonKaiju") == true and player:GetAttribute("DungeonId") ~= nil)
 	end)
 	-- (out of the dungeon: its cards go with it)
 	player:GetAttributeChangedSignal("DungeonId"):Connect(function()
 		if player:GetAttribute("DungeonId") == nil then
 			closeCard()
+			showHud(false)
 		end
 	end)
 end

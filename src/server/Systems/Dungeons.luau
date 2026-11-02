@@ -71,7 +71,38 @@ local function announce(run, text)
 	for _, p in run.Members do
 		if p.Parent and memberRun[p] == run then
 			p:SetAttribute("DungeonObjective", text)
-			Remotes.Notify:FireClient(p, text)
+			-- (The first dungeon's tracker shows it: Client FirstDungeonUI.)
+			if not run.First then
+				Remotes.Notify:FireClient(p, text)
+			end
+		end
+	end
+end
+-- What a room's state is, on its members (the first dungeon's tracker):
+-- DungeonPhase "Fight" | "Move" | "Loot", DungeonFoesLeft / DungeonFoesTotal.
+local function phase(run, name, left, total)
+	for _, p in run.Members do
+		if p.Parent and memberRun[p] == run then
+			p:SetAttribute("DungeonPhase", name)
+			p:SetAttribute("DungeonFoesLeft", left)
+			if total then
+				p:SetAttribute("DungeonFoesTotal", total)
+			end
+		end
+	end
+end
+-- Intro rounds still to win (the first dungeon's way back to them).
+local function roundsLeft(p): number
+	local state = IntroRounds.state(PlayerData.get(p))
+	return if state then math.max(0, IntroRounds.Count - state.Won) else 0
+end
+-- Something broke: in the server's output, and on an owner's screen too
+-- (an owner's test says what went wrong, not just that it did).
+local function report(run, what, problem)
+	warn("[Dungeon] " .. what .. ": " .. tostring(problem))
+	for _, p in run.Members do
+		if p.Parent and canTest(p) then
+			Remotes.Notify:FireClient(p, "[Dungeon] " .. what .. ": " .. string.sub(tostring(problem), 1, 160))
 		end
 	end
 end
@@ -112,6 +143,9 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonRooms", nil)
 				p:SetAttribute("DungeonBoss", nil)
 				p:SetAttribute("DungeonKaiju", nil)
+				p:SetAttribute("DungeonPhase", nil)
+				p:SetAttribute("DungeonFoesLeft", nil)
+				p:SetAttribute("DungeonFoesTotal", nil)
 				p:SetAttribute("SparDown", nil)
 				local shield = p.Character and p.Character:FindFirstChild("FirstDownShield")
 				if shield then
@@ -183,8 +217,23 @@ beginLoot = function(run, room)
 		ArenaStreaks.bossCache(p, boss, Dungeon.bossGem(boss.Element, room.GearTier), "Dungeon")
 	end
 	if run.First then
-		announce(run, "THE BEACHHEAD IS TAKEN · Open your boss cache: keep the piece you'll wear.")
-		task.delay(6, function()
+		-- The victory card (Client FirstDungeonUI): how it went, the boss
+		-- cache, then on (CONTINUE, or by itself after WinSeconds).
+		phase(run, "Loot", 0)
+		announce(run, "THE BEACHHEAD IS TAKEN · Open your boss cache.")
+		local first = Rules.First
+		for _, p in living(run) do
+			Remotes.Social:FireClient(p, "FirstDungeon", {
+				Phase = "Won",
+				Boss = boss.Name,
+				Seconds = first.WinSeconds,
+				Time = math.floor(os.clock() - run.Started),
+				Downs = run.Downs[p] or 0,
+				Coins = 300,
+				RoundsLeft = roundsLeft(p),
+			})
+		end
+		task.delay(first.WinSeconds, function()
 			finish(run, true, "That's one. There are more out there. Back to the Outpost: gear up.")
 		end)
 		return
@@ -207,6 +256,10 @@ local function spawnRoom(run, index)
 	run.Index = index
 	run.Remaining = #room.Foes
 	run.Cleared = false
+	if run.Beacon then
+		run.Beacon:Destroy()
+		run.Beacon = nil
+	end
 	local spec = Rules.specOf(room)
 	for _, p in members do
 		p:SetAttribute("DungeonRoom", index)
@@ -235,27 +288,14 @@ local function spawnRoom(run, index)
 			)
 	)
 	local arrivals = {}
-	for n, kind in room.Foes do
-		local center = run.World.Centers[index]
-		local angle = (n - 1) / #room.Foes * math.pi * 2
-		local enemy = Duelist.spawnDungeon(members, run.Id, {
-			Room = index,
-			GearTier = room.GearTier or (if room.Boss then 4 else 1),
-			Center = center,
-			OpenWorld = run.OpenWorld,
-			Bandit = room.Bandit,
-			MinPlayers = if run.Test then 1 else Rules.Min,
-			Spot = center + Vector3.new(math.cos(angle) * 14, if room.Boss then 7 else 4, math.sin(angle) * 14),
-			Spec = Rules.specOf(room, kind),
-			Boss = room.Boss,
-			HealthScale = room.HealthScale,
-			DamageScale = if run.First then (room.DamageScale or 1) * (run.PieceScale or 1) else nil,
-			KaijuFoes = run.First == true,
-			OnDeath = function()
+	phase(run, "Fight", #room.Foes, #room.Foes)
+	-- A foe of this room down (`kind`: its spec's; `bossKill`: the room's boss itself).
+	local function deathOf(kind, bossKill)
+		return function()
 				if run.Done or (not run.OpenWorld and run.Index ~= index) then
 					return
 				end
-                if room.Boss and (not run.Test or run.First) then
+                if bossKill and (not run.Test or run.First) then
                     local spec = Rules.specOf(room, kind)
                     local here = living(run)
                     for _, member in here do
@@ -271,7 +311,10 @@ local function spawnRoom(run, index)
 				end
 				run.Remaining -= 1
 				if run.Remaining > 0 then
-					announce(run, string.format("Room %d · %d fighters remaining", index, run.Remaining))
+					phase(run, "Fight", run.Remaining)
+					if not run.First then
+						announce(run, string.format("Room %d · %d fighters remaining", index, run.Remaining))
+					end
 					return
 				end
 				run.Cleared = true
@@ -289,19 +332,89 @@ local function spawnRoom(run, index)
 					h.Health = h.MaxHealth
 					CombatServer.reset(p)
 				end
+				phase(run, "Move", 0)
+				if run.First then
+					-- (a beam over the next room: where to go)
+					local nextCenter = run.World.Centers[index + 1]
+					if nextCenter and World.beacon then
+						local ok, beam = pcall(World.beacon, run.World.Folder, nextCenter, index + 1 == #run.Rooms)
+						if ok then
+							run.Beacon = beam
+						else
+							report(run, "beacon", beam)
+						end
+					end
+				end
 				announce(
 					run,
 					if run.First
-						then string.format("%s clear. The gate's open: on to %s.", room.Name or ("Room " .. index), (run.Rooms[index + 1] or {}).Name or "the next room")
+						then string.format("%s clear · Through the gate: on to %s.", room.Name or ("Room " .. index), (run.Rooms[index + 1] or {}).Name or "the next room")
 						else string.format("Room %d cleared. Gate open — proceed to room %d.", index, index + 1)
 				)
-			end,
+		end
+	end
+	for n, kind in room.Foes do
+		local center = run.World.Centers[index]
+		local angle = (n - 1) / #room.Foes * math.pi * 2
+		local enemy = Duelist.spawnDungeon(members, run.Id, {
+			Room = index,
+			GearTier = room.GearTier or (if room.Boss then 4 else 1),
+			Center = center,
+			OpenWorld = run.OpenWorld,
+			Bandit = room.Bandit,
+			MinPlayers = if run.Test then 1 else Rules.Min,
+			Spot = center + Vector3.new(math.cos(angle) * 14, if room.Boss then 7 else 4, math.sin(angle) * 14),
+			Spec = Rules.specOf(room, kind),
+			Boss = room.Boss,
+			HealthScale = room.HealthScale,
+			DamageScale = if run.First then (room.DamageScale or 1) * (run.PieceScale or 1) else nil,
+			KaijuFoes = run.First == true,
+			OnDeath = deathOf(kind, room.Boss),
 		})
 		if not enemy then
 			finish(run, false, "The encounter could not start. Your squad has been returned safely.")
 			return
 		end
 		table.insert(arrivals, enemy.Model)
+		-- The first dungeon's boss: at half health it's enraged, and its
+		-- rot-spawn join the fight (Rules.First.Enrage).
+		if run.First and room.Boss and enemy.Humanoid and enemy.Humanoid.HealthChanged then
+			local enrage = Rules.First.Enrage
+			local connection
+			connection = enemy.Humanoid.HealthChanged:Connect(function(health)
+				local most = enemy.Humanoid.MaxHealth
+				if run.Enraged or run.Done or run.Index ~= index or most <= 0 or health <= 0 or health > most * enrage.At then
+					return
+				end
+				run.Enraged = true
+				if connection then
+					connection:Disconnect()
+				end
+				local spec = Rules.specOf(room, kind)
+				announce(run, string.format("%s IS ENRAGED · Its rot-spawn join the fight!", string.upper(spec.Name)))
+				for a, id in enrage.Adds do
+					local addSpec = Rules.Roster[Rules.rosterIndex(id)]
+					local angle2 = a / #enrage.Adds * math.pi * 2 + 0.6
+					local add = Duelist.spawnDungeon(living(run), run.Id, {
+						Room = index,
+						GearTier = 1,
+						Center = center,
+						MinPlayers = 1,
+						Spot = center + Vector3.new(math.cos(angle2) * 18, 4, math.sin(angle2) * 18),
+						Spec = addSpec,
+						Boss = false,
+						HealthScale = enrage.AddHealth,
+						DamageScale = enrage.AddDamage * (run.PieceScale or 1),
+						KaijuFoes = true,
+						OnDeath = deathOf(nil, false),
+					})
+					if add then
+						run.Remaining += 1
+					end
+				end
+				phase(run, "Fight", run.Remaining)
+			end)
+		end
 	end
 	if not run.Inserted and not run.OpenWorld then
 		ArenaDrop.encounter(members, arrivals, true, false, true)
@@ -311,25 +424,20 @@ end
 local function safeSpawnRoom(run, index)
 	local ok, problem = pcall(spawnRoom, run, index)
 	if not ok then
-		warn("[Dungeon] encounter failed: " .. tostring(problem))
+		report(run, "encounter failed", problem)
 		finish(run, false, "The encounter failed to load. Please queue again.")
 	end
 end
--- Intro rounds still to win (the first dungeon's way back to them).
-local function roundsLeft(p): number
-	local state = IntroRounds.state(PlayerData.get(p))
-	return if state then math.max(0, IntroRounds.Count - state.Won) else 0
-end
 local function queue(player, testMode)
-	-- The campaign's first dungeon (Rules.First): solo, for anyone once it's
-	-- open (Config.Features.FirstDungeon), the owners before that.
+	-- The campaign's first dungeon (Rules.First): solo, for anyone while it's
+	-- on (Config.Features.FirstDungeon); off, for no one (owners too).
 	local first = testMode == "First"
 	local testing = testMode ~= nil and not first and canTest(player)
 	if testMode ~= nil and not first and not testing then
 		return Shop.reply(false, "Dungeon testing is restricted to playtest owners.")
 	end
-	if first and not canTest(player) and not (Config.Features and Config.Features.FirstDungeon == true) then
-		return Shop.reply(false, "The Rot Beachhead isn't open yet.")
+	if first and not (Config.Features and Config.Features.FirstDungeon == true) then
+		return Shop.reply(false, "The Rot Beachhead is off for now.")
 	end
 	-- Switched off (Config.Features): only the owners' tests get in.
 	if not testing and not first and Config.Features and Config.Features.Dungeons == false then
@@ -378,6 +486,7 @@ local function queue(player, testMode)
 		-- with the player's kaiju, a knock-down card instead of a reserve.
 		First = first,
 		Down = {},
+		Downs = {}, -- (each player's knock-downs: the victory card's)
 		Slot = slot,
 		Index = 1,
 		Started = os.clock(),
@@ -427,12 +536,13 @@ local function queue(player, testMode)
 		run.World = (if run.OpenWorld then World.buildOpen else World.build)(
 			id,
 			run.Rooms,
-			Vector3.new(2500 + slot * 1400, 0, 2500)
+			Vector3.new(2500 + slot * 1400, 0, 2500),
+			if run.First then "Rot" else nil
 		)
 		if run.First then
 			local dressed, problem = pcall(World.dressBeachhead, run.World.Folder, run.World.Centers)
 			if not dressed then
-				warn("[Dungeon] beachhead dressing: " .. tostring(problem))
+				report(run, "beachhead dressing", problem)
 			end
 		end
 		for i, p in run.Members do
@@ -482,7 +592,7 @@ local function queue(player, testMode)
 		end)
 	end)
 	if not success then
-		warn("[Dungeon] start failed: " .. tostring(problem))
+		report(run, "start failed", problem)
 		if not run.World then
 			run.World = { Folder = workspace:FindFirstChild("Dungeon_" .. id) or Instance.new("Folder") }
 		end
@@ -553,6 +663,7 @@ local function firstDown(run, p, humanoid)
 	end
 	local first = Rules.First
 	run.Down[p] = { Until = os.clock() + first.DownSeconds + first.ChooseSeconds }
+	run.Downs[p] = (run.Downs[p] or 0) + 1
 	humanoid.Health = math.max(1, math.min(humanoid.Health, 1))
 	CombatServer.reset(p)
 	local shield = Instance.new("ForceField")
@@ -628,6 +739,15 @@ local function firstQuit(p, where)
 	)
 	return Shop.reply(true, "", { To = if lobby then "Lobby" else "Intro" })
 end
+-- CONTINUE on the victory card: out now, with the clear's rewards.
+local function firstDone(p)
+	local run = memberRun[p]
+	if not run or not run.First or not run.Loot then
+		return Shop.reply(false, "The Rot Beachhead isn't taken yet.")
+	end
+	finish(run, true, "That's one. There are more out there. Back to the Outpost: gear up.")
+	return Shop.reply(true, "", { To = if roundsLeft(p) > 0 then "Intro" else "Lobby" })
+end
 local function reserveAfterDefeat(p, humanoid)
 	local run = memberRun[p]
 	if run and run.First then
@@ -658,6 +778,7 @@ function Dungeon.start()
 	Shop.register("DungeonMinerSelect", chooseReserve)
 	Shop.register("FirstDungeonRecover", firstRecover)
 	Shop.register("FirstDungeonQuit", firstQuit)
+	Shop.register("FirstDungeonDone", firstDone)
 	CombatServer.onDungeonLethal(reserveAfterDefeat)
 	Shop.register("PartyDungeon", function(player)
 		return queue(player)
@@ -690,6 +811,9 @@ function Dungeon.start()
 		p:SetAttribute("DungeonBoss", nil)
 		p:SetAttribute("DungeonObjective", nil)
 		p:SetAttribute("DungeonKaiju", nil)
+		p:SetAttribute("DungeonPhase", nil)
+		p:SetAttribute("DungeonFoesLeft", nil)
+		p:SetAttribute("DungeonFoesTotal", nil)
 		p:SetAttribute("SparDown", nil)
 		if run.Down then
 			run.Down[p] = nil

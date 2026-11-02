@@ -33,8 +33,8 @@ local Config = {
 		-- still run them from the DEV panel's dungeon tests.
 		Dungeons = false,
 		-- The campaign's first dungeon, the Rot Beachhead (Shared.DungeonRules
-		-- .First): FIRST DUNGEON on the intro rounds' card. Off: the Owners
-		-- only (and the DEV panel's FIRST DUNGEON); on: every player.
+		-- .First): FIRST DUNGEON on the intro rounds' card and the DEV panel.
+		-- Off: hidden for everyone (removed for now); on: every player.
 		FirstDungeon = false,
 		-- The garage's drivable mechs (the Shelter; the Pilot prompt).
 		Mechs = true,

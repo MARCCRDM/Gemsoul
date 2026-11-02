@@ -217,6 +217,7 @@ end
 Dungeon.First = {
 	Name = "The Rot Beachhead",
 	Rooms = { "Room 1: The Gate", "Room 2: The Yard", "The Nest" },
+	Short = { "THE GATE", "THE YARD", "THE NEST" }, -- (the tracker's)
 	Fighters = { { "Sahur" }, { "Tralalero", "Patapim" } },
 	Boss = "Chimpanzini", -- (Granchio Rottamino's model is to come; its stand-in)
 	FighterHealth = 0.5, -- of a dungeon fighter's
@@ -226,7 +227,20 @@ Dungeon.First = {
 	PieceDamage = { Base = 0.7, Per = 0.05 }, -- x0.75 with 1 intro piece, x1.0 with 6
 	DownSeconds = 3, -- knocked down this long before the card
 	ChooseSeconds = 30, -- then RECOVER by itself
+	-- The boss at half health: enraged, its rot-spawn join in (soft ones).
+	Enrage = { At = 0.5, Adds = { "Sahur", "Patapim" }, AddHealth = 0.3, AddDamage = 0.45 },
+	WinSeconds = 25, -- the victory card's up this long, then out by itself
 }
+
+-- A roster fighter's index by its Id (1 if there's none).
+function Dungeon.rosterIndex(id: string): number
+	for i, spec in Dungeon.Roster do
+		if spec.Id == id then
+			return i
+		end
+	end
+	return 1
+end
 
 local function indexOf(list, id: string): number
 	for i, spec in list do

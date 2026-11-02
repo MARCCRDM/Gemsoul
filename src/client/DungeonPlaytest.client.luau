@@ -200,6 +200,8 @@ firstDungeon.TextColor3 = Color3.fromRGB(255, 244, 226)
 firstDungeon.Font = Enum.Font.GothamBold
 firstDungeon.TextSize = 12
 firstDungeon.Text = "FIRST DUNGEON (NEW INTRO)"
+-- (Hidden while it's off: Config.Features.FirstDungeon.)
+firstDungeon.Visible = require(game:GetService("ReplicatedStorage").Shared.Config).Features.FirstDungeon == true
 firstDungeon.Parent = panel
 corner(firstDungeon, 5)
 firstDungeon.Activated:Connect(function()
