@@ -51,11 +51,12 @@ local socketed = 0
 local profile
 local attributes = {}
 local player = {
-	Name = "Newbie", UserId = 1,
+	Name = "Newbie", UserId = 1, Parent = true,
 	SetAttribute = function(_, k, v) attributes[k] = v end,
 	GetAttribute = function(_, k) return attributes[k] end,
 }
 local gemIds = 0
+local warmed = {}
 local stubs = {
 	Analytics = {
 		event = function(_, name, ...) table.insert(events, { name, ... }) end,
@@ -89,6 +90,8 @@ local stubs = {
 	},
 	Shop = { reply = function(ok, message, extra) local r = extra or {}; r.Ok, r.Message = ok, message; return r end, register = function() end },
 	Forge = { counted = function() end },
+	-- (the reel's pictures: IntroRoundsServer.warm)
+	Equipment = { groupPreviews = function(_, group, items) table.insert(warmed, { group, items }) return true end },
 	GemGenerator = { generate = function(_, _, spec) return { Id = spec.Id, Element = "Fire", Tier = spec.Rarity, Size = 5, Clarity = 5, Cut = 5 } end },
 }
 local names = setmetatable({}, { __index = function(_, k) return k end })
@@ -102,6 +105,7 @@ local env = setmetatable({
 	script = { Parent = names },
 	require = function(name) return stubs[name] or shared(name) end,
 	warn = function(...) print("warn:", ...) end,
+	task = { spawn = function(f, ...) f(...) end, delay = function() end, wait = function() end },
 }, { __index = _G })
 for k, v in baseEnv do env[k] = v end
 local Server = luau.load(fs.readFile(ROOT .. "/src/server/Systems/IntroRoundsServer.luau"), { debugName = "IntroRoundsServer", environment = env })()
@@ -164,6 +168,13 @@ for round = 1, IntroRounds.Count do
 	end
 	for i, entry in strip do
 		check(i == land or names[entry.Name] == entry.Rarity, "The roll shows a piece this round can't give: " .. tostring(entry.Name))
+	end
+	-- (each tile names its piece, so it's drawn in 3D; its picture was asked for)
+	check(strip[land].Id == piece.Id, "The roll's piece has no id to draw")
+	local asked = warmed[#warmed]
+	check(asked ~= nil and asked[1] == "R", "The reel's pictures were never asked for")
+	for _, entry in strip do
+		check(entry.Id ~= nil and asked[2][entry.Id] ~= nil and asked[2][entry.Id].Slot == slot, "A tile's picture isn't built: " .. tostring(entry.Name))
 	end
 	check(profile.IntroRounds.Losses == 0, "A win didn't reset the losses")
 	if round == IntroRounds.GemAfter then

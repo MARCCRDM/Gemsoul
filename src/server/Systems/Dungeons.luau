@@ -551,6 +551,10 @@ local function queue(player, testMode)
 		if run.First then
 			p:SetAttribute("DungeonKaiju", true)
 		end
+		-- (the intro's roll cards ahead: their reel's pictures built now)
+		if run.Intro and IntroRoundsServer.warm then
+			pcall(IntroRoundsServer.warm, p)
+		end
 	end
 	local success, problem = pcall(function()
 		for _, p in run.Members do

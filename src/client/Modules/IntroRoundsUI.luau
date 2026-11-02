@@ -563,7 +563,42 @@ local function drawPiece(piece)
 	)
 end
 
--- One piece on the strip: its icon in its rarity's colour, its name.
+-- A tile's piece in 3D (the server's reel previews, "Slot|R:<id>":
+-- IntroRoundsServer.warm). True once it's drawn; till then its icon shows.
+local function tileModel(tile, entry, slot: string): boolean
+	if not (GearArt and entry.Id) then
+		return true -- (nothing to draw it with: the icon stays)
+	end
+	local art = tile:FindFirstChild("Art")
+	if not art or art:FindFirstChild("Piece") then
+		return true
+	end
+	local view = new("ViewportFrame", {
+		Name = "Piece",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(64, 64),
+		Ambient = Color3.fromRGB(190, 186, 200),
+		LightColor = Color3.new(1, 1, 1),
+		LightDirection = Vector3.new(-0.4, -0.8, -0.6),
+		ZIndex = 3,
+	}, art)
+	local ok, drawn = pcall(GearArt.draw, view, slot, "R:" .. tostring(entry.Id), false)
+	if not (ok and drawn) then
+		view:Destroy()
+		return false
+	end
+	for _, child in art:GetChildren() do
+		if child ~= view and child.Name ~= "Halo" then
+			child:Destroy()
+		end
+	end
+	return true
+end
+
+-- One piece on the strip: the piece itself in 3D (its icon till that's
+-- in) over a glow in its rarity's colour, its name.
 local function rollTile(i: number, entry, slot: string)
 	local color = rarityColor(entry.Rarity)
 	local tile = new("Frame", {
@@ -575,8 +610,22 @@ local function rollTile(i: number, entry, slot: string)
 	UiKit.round(tile, 8)
 	new("UIStroke", { Color = color, Thickness = 1.5, Transparency = 0.25 }, tile)
 	new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(0, 0.35) }, tile)
-	local art = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 56) }, tile)
+	local art = new("Frame", { Name = "Art", BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 4), Size = UDim2.new(1, 0, 0, 60) }, tile)
+	-- (a soft glow of its rarity behind it)
+	local halo = new("Frame", {
+		Name = "Halo",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(58, 58),
+		BackgroundColor3 = color,
+		BackgroundTransparency = 0.55,
+	}, art)
+	UiKit.round(halo, 29)
+	new("UIGradient", {
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) }),
+	}, halo)
 	icon(art, slot, color, 42)
+	tileModel(tile, entry, slot)
 	local name = words(tile, 10, INK, BOLD)
 	name.Text = entry.Name or "?"
 	name.Position = UDim2.fromOffset(5, 64)
@@ -610,9 +659,26 @@ local function spin(piece, list, land: number, mine: number): boolean
 	local from, to = step * 2, (land - 1) * step + (math.random() - 0.5) * TILE_W * 0.5
 	local started = os.clock()
 	local last = 0
+	-- (pieces whose pictures weren't in yet: tried again as it spins)
+	local pending = {}
+	for i, tile in tiles do
+		if not (tile:FindFirstChild("Art") and tile.Art:FindFirstChild("Piece")) and list[i].Id then
+			table.insert(pending, i)
+		end
+	end
+	local retryAt = 0
 	while true do
 		if mine ~= shown then
 			return false
+		end
+		if #pending > 0 and os.clock() >= retryAt then
+			retryAt = os.clock() + 0.2
+			for n = #pending, math.max(1, #pending - 3), -1 do
+				local i = pending[n]
+				if tileModel(tiles[i], list[i], piece.Slot) then
+					table.remove(pending, n)
+				end
+			end
 		end
 		local t = math.clamp((os.clock() - started) / IntroRoundsUI.RollSeconds, 0, 1)
 		local eased = 1 - (1 - t) ^ 4
@@ -639,8 +705,15 @@ local function spin(piece, list, land: number, mine: number): boolean
 		if edge then
 			edge.Thickness, edge.Transparency = 3, 0
 		end
+		-- (it pops, and its glow flares)
+		local pop = new("UIScale", { Scale = 1 }, won)
+		TweenService:Create(pop, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1.12 }):Play()
+		local halo = won:FindFirstChild("Art") and won.Art:FindFirstChild("Halo")
+		if halo then
+			TweenService:Create(halo, TweenInfo.new(0.3), { BackgroundTransparency = 0.1, Size = UDim2.fromOffset(70, 70) }):Play()
+		end
 	end
-	task.wait(0.55)
+	task.wait(0.75)
 	if mine ~= shown then
 		return false
 	end

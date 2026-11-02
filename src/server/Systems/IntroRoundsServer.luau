@@ -89,15 +89,54 @@ function IntroRoundsServer.reel(slot: string, piece, random: Random?)
 	local reel = {}
 	for i = 1, IntroRoundsServer.ReelLength do
 		if i == IntroRoundsServer.ReelLand then
-			reel[i] = { Name = piece.Name, Rarity = piece.Rarity }
+			reel[i] = { Name = piece.Name, Rarity = piece.Rarity, Id = piece.Id }
 		else
 			local isRare = #rare > 0 and (#uncommon == 0 or r:NextNumber() < IntroRounds.RareChance + 0.1)
 			local list = if isRare then rare else uncommon
 			local gear = list[r:NextInteger(1, math.max(1, #list))]
-			reel[i] = { Name = if gear then gear.Name else piece.Name, Rarity = if gear then (if isRare then "Rare" else "Uncommon") else piece.Rarity }
+			reel[i] = {
+				Name = if gear then gear.Name else piece.Name,
+				Rarity = if gear then (if isRare then "Rare" else "Uncommon") else piece.Rarity,
+				Id = if gear then gear.Id else piece.Id,
+			}
 		end
 	end
 	return reel, IntroRoundsServer.ReelLand
+end
+
+-- The reel's pictures: a 3D preview of every piece the set's rolls can show
+-- (each slot's Uncommon and Rare pool: a few a slot), built on the server's
+-- mannequin ahead of the card (Equipment.groupPreviews, group "R":
+-- "Slot|R:<id>", drawn by the client's GearArt). Quietly, in the background,
+-- a few tries if the mannequin's busy; once built they stay.
+local warming = {} :: { [Player]: boolean }
+function IntroRoundsServer.warm(player: Player)
+	if warming[player] then
+		return
+	end
+	warming[player] = true
+	task.spawn(function()
+		local items = {}
+		for _, slot in IntroRounds.Order do
+			for _, rarity in { "Uncommon", "Rare" } do
+				for _, gear in pool(slot, rarity) do
+					items[gear.Id] = { Slot = slot, Id = gear.Id, Quality = RewardRoll.quality(rarity) }
+				end
+			end
+		end
+		local Equipment = require(script.Parent.Equipment)
+		for _ = 1, 8 do
+			if not player.Parent then
+				break
+			end
+			local ok, done = pcall(Equipment.groupPreviews, player, "R", items)
+			if ok and done then
+				break
+			end
+			task.wait(1.5)
+		end
+		warming[player] = nil
+	end)
 end
 
 -- Gives `player` a piece for `slot` at `rarity` and puts it on. Returns what
@@ -255,6 +294,7 @@ function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 		event.Next = "Dungeon"
 	end
 	event.Reel, event.ReelLand = IntroRoundsServer.reel(slot, piece)
+	IntroRoundsServer.warm(player) -- (built already by now, most times: a no-op)
 	-- Halfway: a gem too, to socket (the NEXT STEP card takes it from there).
 	if round == IntroRounds.GemAfter then
 		local GemGenerator = require(script.Parent.GemGenerator)
@@ -346,6 +386,7 @@ local function nextRound(player: Player)
 		return reply(false, "Leave your current fight first.")
 	end
 	IntroRoundsServer.funnel(player, state, round, false)
+	IntroRoundsServer.warm(player)
 	return reply(true, string.format("Round %d of %d!", round, IntroRounds.Count), { Round = round })
 end
 
@@ -366,6 +407,22 @@ function IntroRoundsServer.start()
 	started = true
 	-- (Duels and Duelist call in here on a win or a lost round.)
 	require(script.Parent.Duels).IntroRounds = IntroRoundsServer
+	-- (A new miner's reel pictures, built soon after they join: ready for
+	-- their first fight's roll.)
+	local function arrived(player: Player)
+		task.delay(10, function()
+			if player.Parent and IntroRoundsServer.eligible(player) then
+				IntroRoundsServer.warm(player)
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(arrived)
+	for _, player in Players:GetPlayers() do
+		arrived(player)
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		warming[player] = nil
+	end)
 	require(script.Parent.Duelist).IntroRounds = IntroRoundsServer
 	Shop.register("IntroRoundNext", nextRound)
 	Shop.register("IntroRoundLeave", leaveRounds)
