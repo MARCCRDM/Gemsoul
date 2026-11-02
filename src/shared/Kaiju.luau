@@ -2128,6 +2128,45 @@ function Kaiju.squadIds(roster): ({ string }, { [string]: number })
 	return ids, slots
 end
 
+-- The campaign's first dungeon's squad (DungeonKaiju: Server.Dungeons):
+-- every kaiju you have fights it with you, not just the team your level
+-- lets out. The team in its slots, then your other fighters on their feet
+-- (the best first) in the next, up to StarterTeam, then the support.
+function Kaiju.dungeonSquadIds(roster): ({ string }, { [string]: number })
+	local ids, slots = {}, {}
+	if not roster or type(roster.List) ~= "table" then
+		return ids, slots
+	end
+	for _, id in Kaiju.teamIds(roster) do
+		if #ids < Kaiju.StarterTeam then
+			table.insert(ids, id)
+			slots[id] = #ids
+		end
+	end
+	local rest = {}
+	for id, record in roster.List do
+		if not slots[id] and fighter(roster, id) and not record.Down then
+			table.insert(rest, id)
+		end
+	end
+	table.sort(rest, function(a, b)
+		return better(roster, a, b)
+	end)
+	for _, id in rest do
+		if #ids >= Kaiju.StarterTeam then
+			break
+		end
+		table.insert(ids, id)
+		slots[id] = #ids
+	end
+	local support = Kaiju.supportId(roster)
+	if support and not slots[support] then
+		table.insert(ids, support)
+		slots[support] = Kaiju.SupportSlot
+	end
+	return ids, slots
+end
+
 -- Puts `id` (a support kind of yours) in the support slot. False if it isn't one.
 function Kaiju.setSupport(roster, id: string): boolean
 	local record = roster and roster.List and roster.List[id]

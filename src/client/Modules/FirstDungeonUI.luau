@@ -256,7 +256,9 @@ function FirstDungeonUI.allowed(): boolean
 	return Config.Features ~= nil and Config.Features.FirstDungeon == true
 end
 
-function FirstDungeonUI.play(): string?
+-- `leave`: what takes you out of where you are first (the intro rounds'
+-- IntroRoundLeave), under the loading screen with the rest.
+function FirstDungeonUI.play(leave: (() -> ())?): string?
 	if playing then
 		return "Already on the way in."
 	end
@@ -293,6 +295,31 @@ function FirstDungeonUI.play(): string?
 				last = shown
 			end
 		end
+		-- The loading screen from here till the pod drop's own takes over,
+		-- so where you leave from (the Arena) and the lobby never show in
+		-- between.
+		local hold = nil
+		pcall(function()
+			local LoadingFlow = require(script.Parent.LoadingFlow)
+			hold = LoadingFlow.hold("Dungeon", {
+				Force = true,
+				Status = "Dropping into the Rot Beachhead",
+				Max = 30,
+				Until = function()
+					return player:GetAttribute("DungeonId") ~= nil
+				end,
+			})
+			LoadingFlow.waitCovered(2)
+		end)
+		local function uncover()
+			if hold then
+				pcall(hold.cancel)
+				hold = nil
+			end
+		end
+		if leave then
+			pcall(leave)
+		end
 		-- In: the server drops you in (its pod). (Out of the intro fights'
 		-- queue and the Arena first: a dungeon won't take you from either.)
 		FirstDungeonUI.free()
@@ -306,6 +333,7 @@ function FirstDungeonUI.play(): string?
 			screen:Destroy()
 		end
 		if not result.Ok then
+			uncover()
 			return result.Message or "Couldn't start the Rot Beachhead."
 		end
 		-- (In, then straight back out: the run closed itself. Say so.)

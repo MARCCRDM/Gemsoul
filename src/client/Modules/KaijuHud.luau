@@ -3559,6 +3559,16 @@ local function refresh()
 	local profile = GemClient.Profile
 	local data = profile and profile.Kaiju
 	local team = Kaiju.teamIds(data)
+	if player:GetAttribute("DungeonKaiju") == true and data then
+		-- (Everyone's out in the first dungeon: Kaiju.dungeonSquadIds.)
+		local ids, slots = Kaiju.dungeonSquadIds(data)
+		team = {}
+		for _, id in ids do
+			if slots[id] ~= Kaiju.SupportSlot then
+				table.insert(team, id)
+			end
+		end
+	end
 	local inOutpost = OutpostScene.isActive() and player:GetAttribute("Outpost") == true
 	-- (the campaign's first dungeon, where your kaiju fight beside you: the
 	-- card too, its team keys and HYPERBEAM, mid-fight: Server.Dungeons)

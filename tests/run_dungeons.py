@@ -23,6 +23,7 @@ s+='local Config={Features={}}\n'
 s+=read('tests/dungeon_services.luau')
 s+=module('IntroRounds','src/shared/IntroRounds.luau')
 s+='local introStages, introWins = {}, {}\nlocal IntroRoundsServer={stage=function(p) return introStages[p] end, dungeonWon=function(p, where) table.insert(introWins, {p, where}); if where == "Boss" then introStages[p] = "Done" end; return 1 end}\n'
+s+='local kaijuRestored = {}\nlocal KaijuServer={restoreAll=function(p) kaijuRestored[p]=(kaijuRestored[p] or 0)+1; return 0 end}\n'
 s+='-- (the Rot Beachhead: its knock-down, its fighters healed, its scenery)\n'
 s+='Remotes.CombatFx={FireAllClients=function() end}\nlocal healedDungeons={}\nDuelist.healDungeon=function(id) healedDungeons[id]=(healedDungeons[id] or 0)+1 end\nWorld.dressBeachhead=function() end\n'
 s+='CombatServer.onDungeonLethal=function(hook) dungeonLethal=hook end\nPlayerData.selectMiner=function(p,index) return MinerRoster.switch(profiles[p],index) end\n'

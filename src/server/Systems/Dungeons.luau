@@ -26,6 +26,7 @@ local Shop = require(script.Parent.Shop)
 local Feedback = require(script.Parent.Feedback)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
 local IntroRoundsServer = require(script.Parent.IntroRoundsServer)
+local KaijuServer = require(script.Parent.KaijuServer)
 local Dungeon = {}
 local function canTest(player)
 	return Feedback.isOwner(player)
@@ -149,6 +150,14 @@ finish = function(run, won, reason)
 				p:SetAttribute("DungeonRooms", nil)
 				p:SetAttribute("DungeonBoss", nil)
 				p:SetAttribute("DungeonKaiju", nil)
+				if run.First then
+					-- (Your kaiju fought it beside you: out of it, all of them
+					-- healed, the knocked out back on their feet.)
+					local ok, problem = pcall(KaijuServer.restoreAll, p)
+					if not ok then
+						report(run, "kaiju heal", problem)
+					end
+				end
 				p:SetAttribute("DungeonPhase", nil)
 				p:SetAttribute("DungeonFoesLeft", nil)
 				p:SetAttribute("DungeonFoesTotal", nil)

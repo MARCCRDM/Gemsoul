@@ -243,6 +243,7 @@ do
 	local coins2 = profiles[rookie].Coins
 	local done2 = handlers.FirstDungeonDone(rookie)
 	check(done2.Ok and rookie:GetAttribute("DungeonId") == nil, "TO THE LOBBY didn't take you out")
+	check((kaijuRestored[rookie] or 0) >= 1, "The kaiju weren't healed after the intro's dungeon")
 	check(profiles[rookie].Coins > coins2, "No clear rewards for the intro's dungeon")
 	-- (left early: the lobby, and the dungeon waits)
 	introStages[rookie] = "Dungeon"

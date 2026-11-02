@@ -828,7 +828,12 @@ local function upkeep(player: Player, now: number)
 	local want = {}
 	if roster and canBeOut(player) and not Kaiju.away(roster) then
 		-- (The team in its slots, the support in SupportSlot: Kaiju.squadIds.)
-		local ids, slots = Kaiju.squadIds(roster)
+		local ids, slots
+		if player:GetAttribute("DungeonKaiju") == true then
+			ids, slots = Kaiju.dungeonSquadIds(roster)
+		else
+			ids, slots = Kaiju.squadIds(roster)
+		end
 		for _, id in ids do
 			-- (One knocked out keeps its place, down, till it's revived.)
 			if not roster.List[id].Down then

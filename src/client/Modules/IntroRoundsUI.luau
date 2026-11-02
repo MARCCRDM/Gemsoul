@@ -802,11 +802,14 @@ function IntroRoundsUI.toDungeon()
 	busy = true
 	hide()
 	task.spawn(function()
-		GemClient.request("IntroRoundLeave")
-		busy = false
+		-- (The kaiju roll first, here in the Arena; then out of it under the
+		-- loading screen and straight into the drop: FirstDungeonUI.play.)
 		local ok, problem = pcall(function()
-			return require(script.Parent.FirstDungeonUI).play()
+			return require(script.Parent.FirstDungeonUI).play(function()
+				GemClient.request("IntroRoundLeave")
+			end)
 		end)
+		busy = false
 		if not ok then
 			warn("[IntroRounds] first dungeon: " .. tostring(problem))
 		end

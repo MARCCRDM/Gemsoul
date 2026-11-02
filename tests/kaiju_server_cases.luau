@@ -1003,6 +1003,14 @@ check(roster.Active == starter.Id and Kaiju.teamIds(roster)[1] == starter.Id, "T
 -- (The checks below follow one kaiju out: one slot, till "Your team" at the end.)
 Kaiju.SlotLevels = { 1 }
 KaijuServer._upkeep(a, now)
+-- (The first dungeon, DungeonKaiju: every kaiju out beside you, not just
+-- the slots your level opens; out of it, the one slot again.)
+a:SetAttribute("DungeonKaiju", true)
+KaijuServer._upkeep(a, now)
+check(#KaijuServer.team(a) == 3, "Not all the kaiju out in the first dungeon: " .. #KaijuServer.team(a))
+a:SetAttribute("DungeonKaiju", nil)
+KaijuServer._upkeep(a, now)
+check(#KaijuServer.team(a) == 1, "Still all out after the first dungeon")
 check(#KaijuServer.team(a) == 1, "One slot, more than one out")
 local pet = KaijuServer.pets()[a]
 check(pet and pet.Model.Parent == kaijuFolder, "The kaiju isn't out")
