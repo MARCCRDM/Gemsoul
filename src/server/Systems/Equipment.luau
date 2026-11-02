@@ -1450,136 +1450,140 @@ SKINS.Banana = function(weaponFolder: Instance, _color: Color3, palette)
 	light.Parent = grip
 end
 
--- Eclipse Cleaver (a promo code's): a war-axe of black glass. A crescent
--- bit fans out ahead (-Z, an axe's edge, as the Greataxe's), gold all along
--- its edge and its horns; a dark sun eclipsing a ring of fire on its back;
--- gold bands spiralling up an obsidian haft.
-SKINS.Eclipse = function(weaponFolder: Instance, _color: Color3, palette)
+-- Thunderclap (a promo code's): a double-bladed storm axe. Two broad steel
+-- bits, front (-Z, an axe's edge, as the Greataxe's) and back, edged in
+-- live electric blue; lightning bolts set in each face that crackle on every
+-- client (SkinSeam "Flicker": SeamVisibility); a storm core humming between
+-- them, throwing sparks; a spike on top.
+SKINS.Thunderclap = function(weaponFolder: Instance, _color: Color3, palette)
 	local grip, mount, length = swapShape(weaponFolder)
 	if not grip then
 		return
 	end
-	local glass, wrap = palette.Plate, palette.Under
-	local gold, corona, dusk = palette.Glow, Color3.fromRGB(255, 236, 170), palette.SeamColor or palette.Glow
-	local NIGHT = Color3.fromRGB(10, 9, 14)
+	local steel, haft, volt = palette.Plate, palette.Under, palette.Glow
+	local white = palette.SeamColor or Color3.new(1, 1, 1)
+	local DARK = Color3.fromRGB(58, 64, 80)
 	local k = math.clamp(length / 3.2, 0.85, 1.3)
-	local head = length - 0.5 * k
-	local function glassy(part: BasePart): BasePart
-		part.Reflectance = 0.25
+	local head = length - 0.55 * k
+	-- At `at`, looking along `out` (in the blade's plane: its X stays the mount's).
+	local function facing(at: Vector3, out: Vector3): CFrame
+		return CFrame.fromMatrix(at, Vector3.xAxis, (-out):Cross(Vector3.xAxis))
+	end
+	-- A live wire: crackles between volt and white on every client.
+	local seed = 0
+	local function live(part: BasePart): BasePart
+		seed += 1
+		part.Name = "SkinSeam"
+		part:SetAttribute("SeamFx", "Flicker")
+		part:SetAttribute("SeamA", part.Color)
+		part:SetAttribute("SeamB", white)
+		part:SetAttribute("SeamSeed", seed)
+		CollectionService:AddTag(part, Tags.SkinSeam)
 		return part
 	end
-	-- The haft, its wrap and its pommel.
+	-- The haft: dark steel, a black grip, blue rings.
 	meshed(
-		glassy(piece(weaponFolder, grip, mount * CFrame.new(0, (head - 0.45) / 2, 0), Vector3.new(0.22, head + 0.45, 0.22), glass, Enum.Material.Glass)),
+		piece(weaponFolder, grip, mount * CFrame.new(0, (head - 0.5) / 2, 0), Vector3.new(0.2, head + 0.5, 0.2), haft, Enum.Material.Metal),
 		Enum.MeshType.Cylinder
 	)
 	meshed(
-		piece(weaponFolder, grip, mount * CFrame.new(0, 0.05, 0), Vector3.new(0.26, 0.8, 0.26), wrap, Enum.Material.Fabric),
+		piece(weaponFolder, grip, mount * CFrame.new(0, 0.05, 0), Vector3.new(0.25, 0.85, 0.25), Color3.fromRGB(20, 22, 28), Enum.Material.Leather),
 		Enum.MeshType.Cylinder
 	)
-	for i = 1, 4 do
-		local y = 0.5 + (head - 0.9) * i / 5
-		piece(
-			weaponFolder,
-			grip,
-			mount * CFrame.new(0, y, 0) * CFrame.Angles(0, math.rad(i * 40), math.rad(14)),
-			Vector3.new(0.27, 0.05, 0.27),
-			gold,
-			Enum.Material.Foil
-		).Reflectance = 0.35
+	for _, y in { -0.38, 0.5, head - 0.42 * k } do
+		meshed(live(neon(weaponFolder, grip, mount * CFrame.new(0, y, 0), Vector3.new(0.27, 0.05, 0.27), volt)), Enum.MeshType.Cylinder)
 	end
-	neon(weaponFolder, grip, mount * CFrame.new(0, head / 2, -0.1), Vector3.new(0.04, head * 0.8, 0.03), gold)
-	glassy(piece(weaponFolder, grip, mount * CFrame.new(0, -0.5, 0), Vector3.one * 0.3, NIGHT, Enum.Material.Glass, Enum.PartType.Ball))
-	neon(weaponFolder, grip, mount * CFrame.new(0, -0.5, 0), Vector3.new(0.03, 0.42, 0.42), gold).Shape = Enum.PartType.Cylinder
-	-- The collar, gold-banded.
-	piece(weaponFolder, grip, mount * CFrame.new(0, head, 0), Vector3.new(0.38, 0.66 * k, 0.42), NIGHT, Enum.Material.Metal)
-	for _, dy in { -0.18, 0.18 } do
-		piece(weaponFolder, grip, mount * CFrame.new(0, head + dy * k, 0), Vector3.new(0.42, 0.08, 0.46), gold, Enum.Material.Foil).Reflectance = 0.4
+	piece(weaponFolder, grip, mount * CFrame.new(0, -0.52, 0), Vector3.new(0.26, 0.22, 0.26), DARK, Enum.Material.Metal)
+	-- The hub, and the storm core set through it.
+	piece(weaponFolder, grip, mount * CFrame.new(0, head, 0), Vector3.new(0.34, 0.62 * k, 0.4), DARK, Enum.Material.Metal)
+	local core = neon(weaponFolder, grip, mount * CFrame.new(0, head, 0), Vector3.new(0.4, 0.3 * k, 0.3 * k), volt)
+	core.Shape = Enum.PartType.Cylinder
+	-- Two broad bits, front and back: steel fanning out to a live edge.
+	local R = 1.0 * k
+	local edges = {}
+	for _, dir in { -1, 1 } do
+		local centre = Vector3.new(0, head, dir * 0.1)
+		local mid: BasePart? = nil
+		for i = -3, 3 do
+			local a = math.rad(i * 16)
+			local out = Vector3.new(0, math.sin(a), dir * math.cos(a))
+			local fan = centre + out * (R * 0.55)
+			piece(weaponFolder, grip, mount * facing(fan, out), Vector3.new(0.09, R * 0.3, R * 0.9), steel, Enum.Material.Metal).Reflectance =
+				0.25
+			local rim = centre + out * R
+			local edge = live(neon(weaponFolder, grip, mount * facing(rim, out), Vector3.new(0.12, R * 0.29, 0.08), volt))
+			if i == 0 then
+				mid = edge
+			end
+		end
+		-- Its horns, a short point off each end of the edge.
+		for side = -1, 1, 2 do
+			local a = math.rad(side * 52)
+			local out = Vector3.new(0, math.sin(a), dir * math.cos(a))
+			local along = Vector3.new(0, side * math.cos(a), -dir * side * math.sin(a))
+			bladeTip(weaponFolder, grip, mount * CFrame.fromMatrix(centre + out * (R - 0.04), out:Cross(along).Unit:Cross(along), along), 0.2 * k, 0.32 * k, steel)
+		end
+		-- A lightning bolt set in each face, hub to edge.
+		for _, face in { -1, 1 } do
+			local bolt = {
+				Vector3.new(0, 0.12, 0.28),
+				Vector3.new(0, -0.08, 0.5),
+				Vector3.new(0, 0.1, 0.62),
+				Vector3.new(0, -0.1, 0.86),
+			}
+			for j = 1, #bolt - 1 do
+				local p0 = Vector3.new(face * 0.055, head + bolt[j].Y * k, dir * bolt[j].Z * k)
+				local p1 = Vector3.new(face * 0.055, head + bolt[j + 1].Y * k, dir * bolt[j + 1].Z * k)
+				local mid2 = (p0 + p1) / 2
+				live(neon(weaponFolder, grip, mount * facing(mid2, (p1 - p0).Unit), Vector3.new(0.02, 0.05, (p1 - p0).Magnitude + 0.04), white))
+			end
+		end
+		table.insert(edges, mid)
 	end
-	-- The crescent: black glass fanning out from just ahead of the collar.
-	local centre = Vector3.new(0, head, -0.15)
-	local R = 0.95 * k
-	local edgeMid: BasePart? = nil
-	for i = -3, 3 do
-		local a = math.rad(i * 19)
-		local out = Vector3.new(0, math.sin(a), -math.cos(a))
-		local fan = centre + out * (R * 0.55)
-		glassy(piece(
-			weaponFolder,
-			grip,
-			mount * CFrame.lookAt(fan, fan + out),
-			Vector3.new(0.1, R * 0.36, R * 0.9),
-			glass,
-			Enum.Material.Glass
-		))
-		local rim = centre + out * R
-		local edge = neon(weaponFolder, grip, mount * CFrame.lookAt(rim, rim + out), Vector3.new(0.13, R * 0.34, 0.07), gold)
-		if i == 0 then
-			edgeMid = edge
+	-- A spike on top.
+	bladeTip(weaponFolder, grip, mount * CFrame.new(0, head + 0.3 * k, 0), 0.2 * k, 0.5 * k, steel)
+	-- Sparks off the core and the edges, a blue light, and a streak along the
+	-- front edge through every swing.
+	local function sparks(part: BasePart, rate: number, speed: number)
+		local e = Instance.new("ParticleEmitter")
+		e.Name = "SkinFx"
+		e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		e.Color = ColorSequence.new(white, volt)
+		e.LightEmission = 1
+		e.Size = NumberSequence.new(0.14, 0)
+		e.Transparency = NumberSequence.new(0, 1)
+		e.Lifetime = NumberRange.new(0.12, 0.3)
+		e.Speed = NumberRange.new(speed, speed * 2)
+		e.SpreadAngle = Vector2.new(180, 180)
+		e.Acceleration = Vector3.zero
+		e.Rate = rate
+		e.Parent = part
+	end
+	sparks(core, 22, 3)
+	for _, edge in edges do
+		if edge then
+			sparks(edge, 8, 1.5)
 		end
 	end
-	-- Its horns sweeping back off the ends of the edge.
-	for side = -1, 1, 2 do
-		local a = math.rad(side * 60)
-		local out = Vector3.new(0, math.sin(a), -math.cos(a))
-		local along = Vector3.new(0, side * math.cos(a), side * math.sin(a))
-		local at = centre + out * (R - 0.05)
-		bladeTip(weaponFolder, grip, mount * CFrame.fromMatrix(at, out:Cross(along).Unit:Cross(along), along), 0.22 * k, 0.45 * k, gold)
-	end
-	-- Runes burnt into the glass.
-	for _, dy in { 0.25, 0, -0.25 } do
-		neon(
-			weaponFolder,
-			grip,
-			mount * CFrame.new(0, head + dy * k, -0.15 - R * 0.5) * CFrame.Angles(math.rad(45), 0, 0),
-			Vector3.new(0.12, 0.1, 0.1),
-			dusk
-		)
-	end
-	-- The back: a dark sun eclipsing a ring of fire, its flares round it.
-	local sun = CFrame.new(0, head, 0.32 + 0.3 * k)
-	local ring = neon(weaponFolder, grip, mount * sun, Vector3.new(0.05, 0.9 * k, 0.9 * k), gold)
-	ring.Shape = Enum.PartType.Cylinder
-	glassy(piece(weaponFolder, grip, mount * sun, Vector3.one * 0.62 * k, NIGHT, Enum.Material.Glass, Enum.PartType.Ball))
-	for i = 0, 7 do
-		local a = i / 8 * math.pi * 2 + math.pi / 8
-		local out = Vector3.new(0, math.sin(a), math.cos(a))
-		local at = sun.Position + out * (if i % 2 == 0 then 0.53 else 0.5) * k
-		neon(weaponFolder, grip, mount * CFrame.lookAt(at, at + out), Vector3.new(0.05, 0.05, (if i % 2 == 0 then 0.2 else 0.12) * k), corona)
-	end
-	piece(weaponFolder, grip, mount * CFrame.new(0, head, 0.25), Vector3.new(0.16, 0.16, 0.24), gold, Enum.Material.Foil)
-	-- Embers off the corona, a gold light, and a streak along the edge through every swing.
-	local embers = Instance.new("ParticleEmitter")
-	embers.Name = "SkinFx"
-	embers.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-	embers.Color = ColorSequence.new(corona, gold)
-	embers.LightEmission = 1
-	embers.Size = NumberSequence.new(0.16, 0)
-	embers.Transparency = NumberSequence.new(0.15, 1)
-	embers.Lifetime = NumberRange.new(0.6, 1)
-	embers.Speed = NumberRange.new(0.6, 1.4)
-	embers.SpreadAngle = Vector2.new(180, 180)
-	embers.Acceleration = Vector3.zero
-	embers.Rate = 14
-	embers.Parent = ring
 	local light = Instance.new("PointLight")
-	light.Color, light.Range, light.Brightness, light.Shadows = gold, 8, 1.2, false
-	light.Parent = ring
-	if edgeMid then
+	light.Color, light.Range, light.Brightness, light.Shadows = volt, 9, 1.4, false
+	light.Parent = core
+	local front = edges[1]
+	if front then
 		local tip, base = Instance.new("Attachment"), Instance.new("Attachment")
 		tip.Name, base.Name = "SkinTrailTip", "SkinTrailBase"
-		tip.Position, base.Position = Vector3.new(0, 0.7 * k, 0), Vector3.new(0, -0.7 * k, 0)
-		tip.Parent, base.Parent = edgeMid, edgeMid
+		tip.Position, base.Position = Vector3.new(0, 0.75 * k, 0), Vector3.new(0, -0.75 * k, 0)
+		tip.Parent, base.Parent = front, front
 		local trail = Instance.new("Trail")
 		trail.Name = "SkinTrail"
 		trail.Attachment0, trail.Attachment1 = tip, base
-		trail.Color = ColorSequence.new(corona, dusk)
+		trail.Color = ColorSequence.new(white, volt)
 		trail.LightEmission = 1
-		trail.Transparency = NumberSequence.new(0.3, 1)
+		trail.Transparency = NumberSequence.new(0.2, 1)
 		trail.Lifetime = 0.2
 		trail.MinLength = 0.05
 		trail.FaceCamera = true
-		trail.Parent = edgeMid
+		trail.Parent = front
 	end
 end
 

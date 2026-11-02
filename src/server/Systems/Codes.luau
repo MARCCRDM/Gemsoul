@@ -31,9 +31,9 @@ Codes.List = {
 		Reward = { Coins = 750, XPBoostMinutes = 30 },
 		Note = "Like milestone",
 	},
-	ECLIPSE = {
-		Reward = { Cosmetics = { "SkinEclipse" } },
-		Note = "Free Eclipse Cleaver axe weapon skin for players",
+	THUNDER = {
+		Reward = { Cosmetics = { "SkinThunderclap" } },
+		Note = "Free Thunderclap storm axe weapon skin for players",
 	},
 	-- Gifts --------------------------------------------------------------
 	REAPERGIFT113 = {
