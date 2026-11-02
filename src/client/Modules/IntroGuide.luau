@@ -2,7 +2,8 @@
 	After the intro's first fight (real player or bot), the yellow floor
 	arrows (GroundGuide) walk a new player through the Outpost, once:
 
-	  1. Mech     to the nearest free mech, until they're in one (MechPilot)
+	  1. Mech     (off: FirstStage skips it) to the nearest free mech,
+	              until they're in one (MechPilot)
 	  2. Mine     to the nearest common rock near the outpost, then the next,
 	              until they've mined MineRocks of them
 	  3. Out      outward from where they are, a stretch at a time, toward
@@ -36,6 +37,9 @@ IntroGuide.Outskirts = Frontier.Core + 30 -- where it leaves them
 IntroGuide.Stretch = 35 -- how far ahead it leads each time, heading out
 IntroGuide.FadeOver = 60 -- the last stretch, fading out
 IntroGuide.GiveUp = 8 * 60
+-- Where the arrows start: the rocks ("Mech", to a free mech first, is off:
+-- new players aren't led to the mechs).
+IntroGuide.FirstStage = "Mine"
 -- The plain rocks round the outpost.
 IntroGuide.Commons = { Field = true, Common = true }
 
@@ -229,7 +233,7 @@ function IntroGuide.start()
 		if state or me:GetAttribute("IntroGuide") ~= true then
 			return
 		end
-		state = { Stage = "Mech", Mined = 0 }
+		state = { Stage = IntroGuide.FirstStage, Mined = 0 }
 		since = os.clock()
 	end
 	me:GetAttributeChangedSignal("IntroGuide"):Connect(begin)

@@ -505,6 +505,8 @@ do
 	to, strength = Intro.step(state, view({ At = center + Vector3.new(0, 3, Intro.Outskirts + 1) }))
 	check(to == nil and strength == 0 and state.Stage == "Done", "The arrows don't go at the outskirts")
 	check(Intro.step(state, view()) == nil, "Done, and still led somewhere")
+	-- New players aren't led to the mechs: the arrows start at the rocks.
+	check(Intro.FirstStage == "Mine" and string.find(source, "Stage = IntroGuide.FirstStage", 1, true) ~= nil, "New players are led to a mech")
 	-- No free mech: straight to the rocks.
 	state = { Stage = "Mech", Mined = 0 }
 	check(Intro.step(state, view({ Mechs = {} })) == rocks[2] and state.Stage == "Mine", "No mech and stuck waiting for one")
