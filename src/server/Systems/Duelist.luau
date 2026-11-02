@@ -61,6 +61,9 @@ local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local Remotes = require(script.Parent.Remotes)
 local DamageLog = require(script.Parent.DamageLog)
+-- (A showcase move cast as the kaiju cast it: its own look, its own shape.)
+local KaijuAbilities = require(script.Parent.KaijuAbilities)
+local KaijuShared = require(game:GetService("ReplicatedStorage").Shared.Kaiju)
 
 local DungeonLoadout = require(ReplicatedStorage.Shared.DungeonLoadout)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
@@ -329,6 +332,7 @@ end
 
 local spawnRival
 local castSurge
+local showSurge
 local strike
 local P_GOLD = Color3.fromRGB(255, 190, 80)
 
@@ -729,6 +733,47 @@ local function healSelf(duel, share: number, ability: string)
 	)
 end
 
+-- A showcase surge let go (its wind-up done): cast the way a kaiju casts
+-- it (KaijuAbilities), its own look and shape (a leap, a storm, a wave, a
+-- pillar, a cannon), each blow of it landing on its player through strike
+-- (guards, dodges and armor count, as they do for its other blows).
+function showSurge(enemy, duel, surge, target: BasePart, damage: number)
+	local owner = duel.Owner
+	local caster = {
+		Model = enemy.Model,
+		Root = enemy.Root,
+		Size = 1,
+		Element = surge.Element,
+		Ability = surge.Plan,
+		Damage = damage * (surge.Power or 1),
+		Body = enemy.Root,
+		Humanoid = enemy.Humanoid,
+		Foes = function(center: Vector3, radius: number)
+			if target.Parent and flat(target.Position - center).Magnitude <= radius + 1.5 then
+				return { { Root = target } }
+			end
+			return {}
+		end,
+		Hit = function(_victim, amount: number, _status)
+			if enemy.Alive and duels[owner] == duel then
+				strike(duel, amount, surge.Element, false, surge.Gem, surge.Name, surge.Crit)
+			end
+		end,
+		Alive = function(): boolean
+			return enemy.Alive and duels[owner] == duel
+		end,
+	}
+	local ok, cast = pcall(KaijuAbilities.cast, caster, { Root = target }, surge.Plan)
+	if not (ok and cast) then
+		-- (couldn't: a plain blast on them instead, so the turn isn't lost)
+		local color = GemConfig.ElementColors[surge.Element] or P_GOLD
+		fx("Nova", target.Position - Vector3.new(0, 2.5, 0), 8, color, 0)
+		if flat(target.Position - enemy.Root.Position).Magnitude <= (surge.Range or 30) then
+			strike(duel, damage * (surge.Power or 1), surge.Element, false, surge.Gem, surge.Name, surge.Crit)
+		end
+	end
+end
+
 function castSurge(enemy, duel, surge, now: number, target: BasePart)
 	local root = enemy.Root
 	local model = enemy.Model
@@ -746,6 +791,12 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 		{ Dir = "Foe", Kind = "Cast", Who = duel.Name, Ability = surge.Name, Element = surge.Element }
 	)
 	duel.CastElement = surge.Element
+	if surge.Plan then
+		-- Wound up as a player's cast is, then let go as itself (showSurge).
+		animate(duel, surge.Pose, surge.CastTime, nil, surge.Name)
+		duel.Action = { Kind = "Show", Name = surge.Name, At = now + surge.CastTime, Surge = surge }
+		return
+	end
 	if surge.Kind == "Self" then
 		animate(duel, surge.Pose, surge.CastTime, nil, surge.Name)
 		duel.Action = { Kind = "Buff", Name = surge.Name, At = now + surge.CastTime, Surge = surge }
@@ -1835,6 +1886,10 @@ local function think(enemy, now: number)
 			end
 			duel.NextAttack = now + duel.Rate
 			setStance(duel, "")
+		elseif action.Kind == "Show" then
+			showSurge(enemy, duel, action.Surge, target, damage)
+			duel.NextAttack = now + duel.Rate
+			setStance(duel, "")
 		elseif action.Kind == "Buff" then
 			applyBuff(enemy, duel, action.Surge, now)
 			duel.NextAttack = now + 0.3
@@ -2690,6 +2745,11 @@ function spawnRival(owner: Player, raid, encounter)
 				Ward = stats.Ward,
 				Leech = stats.Leech,
 				Next = now + 2.5 + slot * 1.5,
+				-- A showcase move (the starter kit's leaps, storms, waves,
+				-- pillars, cannons: KaijuShared.AbilityPlans) plays as itself,
+				-- as a player's does: in a duel (the intro rounds, practice,
+				-- PvP), not a raid's or a dungeon's crowd.
+				Plan = if not raid and not encounter and KaijuShared.AbilityPlans[id] then id else nil,
 			}
 			table.insert(duel.Surges, surge)
 			table.insert(names, surge.Name)
@@ -2979,6 +3039,7 @@ function Duelist.start()
 					and (
 						action.Kind == "Nova"
 						or action.Kind == "Bolt"
+						or action.Kind == "Show"
 						or action.Kind == "Buff"
 						or action.Kind == "Channel"
 					)
