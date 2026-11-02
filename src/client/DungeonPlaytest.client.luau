@@ -188,9 +188,10 @@ if not restart.Active and require(game:GetService("ReplicatedStorage").Shared.Fa
 	end)
 end
 
--- FIRST DUNGEON: the new player's path after the intro fights, as it'll
--- play: the kaiju and scout mission screens, the pod drop, the Rot
--- Beachhead (Client FirstDungeonUI, Shared.DungeonRules.First).
+-- NEW INTRO: DUNGEON: the new intro from its dungeon, on this account (its
+-- two 1v1s counted won): the kaiju roll if owed, the pod drop, the Breach
+-- and the Nest, their roll cards, then the lobby. The whole new intro from
+-- its start: PLAY AS A NEW PLAYER.
 local firstDungeon = Instance.new("TextButton")
 firstDungeon.Name = "FirstDungeon"
 firstDungeon.Size = UDim2.fromOffset(288, 30)
@@ -199,9 +200,7 @@ firstDungeon.BackgroundColor3 = Color3.fromRGB(206, 112, 40)
 firstDungeon.TextColor3 = Color3.fromRGB(255, 244, 226)
 firstDungeon.Font = Enum.Font.GothamBold
 firstDungeon.TextSize = 12
-firstDungeon.Text = "FIRST DUNGEON (NEW INTRO)"
--- (Hidden while it's off: Config.Features.FirstDungeon.)
-firstDungeon.Visible = require(game:GetService("ReplicatedStorage").Shared.Config).Features.FirstDungeon == true
+firstDungeon.Text = "NEW INTRO: DUNGEON"
 firstDungeon.Parent = panel
 corner(firstDungeon, 5)
 firstDungeon.Activated:Connect(function()
@@ -213,8 +212,14 @@ firstDungeon.Activated:Connect(function()
 	busy = true
 	task.spawn(function()
 		local ok, problem = pcall(function()
+			-- (the new intro at its dungeon on this account: Server.IntroRoundsServer's DevIntroDungeon)
+			local set = request:InvokeServer("DevIntroDungeon")
+			if not (set and set.Ok) then
+				status.Text = if set then set.Message else "Couldn't set up the new intro."
+				return
+			end
 			local message = require(script.Parent.Modules.FirstDungeonUI).play()
-			status.Text = message or "Into the Rot Beachhead."
+			status.Text = message or "New intro: into the dungeon."
 		end)
 		if not ok then
 			status.Text = "First dungeon failed: " .. tostring(problem)

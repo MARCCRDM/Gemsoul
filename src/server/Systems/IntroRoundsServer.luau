@@ -369,6 +369,28 @@ function IntroRoundsServer.start()
 	require(script.Parent.Duelist).IntroRounds = IntroRoundsServer
 	Shop.register("IntroRoundNext", nextRound)
 	Shop.register("IntroRoundLeave", leaveRounds)
+	-- DEV > NEW INTRO: DUNGEON (Owners only): the new intro from its
+	-- dungeon, on this account: its two 1v1s counted won (the pieces they
+	-- paid kept), the dungeon's pieces still to come. Again any time.
+	Shop.register("DevIntroDungeon", function(player: Player)
+		local owners = Config.Playtest and Config.Playtest.Owners or {}
+		if not table.find(owners, player.UserId) then
+			return reply(false, "This test tool is for the game's owners.")
+		end
+		local profile = PlayerData.get(player)
+		if not profile then
+			return reply(false, "Your profile is still loading.")
+		end
+		local p = profile :: any
+		local state = if type(p.IntroRounds) == "table" then p.IntroRounds else { Won = 0, Losses = 0, Pieces = {} }
+		state.Won, state.Losses = IntroRounds.Duels, 0
+		state.Pieces = if type(state.Pieces) == "table" then state.Pieces else {}
+		p.IntroRounds = state
+		player:SetAttribute("IntroRounds", nil)
+		player:SetAttribute("IntroRoundFight", nil)
+		PlayerData.sync(player)
+		return reply(true, "New intro: into the dungeon.")
+	end)
 	Shop.register("IntroRoundState", function(player: Player)
 		local state = stateOf(player)
 		return reply(true, "", { View = IntroRounds.view(state) })
