@@ -58,4 +58,10 @@ local Client = luau.load(fs.readFile(ROOT .. "/src/client/Modules/DevAlerts.luau
 })()
 check(Client.line({ Name = "Sam", New = true }) == "New player! Sam just joined.", "Wrong line for a new player")
 check(Client.line({ Name = "Kai", New = false }) == "Kai joined.", "Wrong line for a returning player")
+-- The idle alarm: at 16 minutes, by name, with the minutes left before Roblox's 20-minute kick.
+check(Client.IdleWarn == 16 * 60 and Client.IdleKick == 20 * 60, "The idle alarm isn't at 16 minutes")
+local warn16 = Client.idleLine(16 * 60 + 3)
+check(string.find(warn16, "Attention captain hunchies!", 1, true) == 1, "The alarm doesn't call the captain")
+check(string.find(warn16, "idle 16 minutes", 1, true) and string.find(warn16, "kicked in 4 minutes", 1, true), "Wrong minutes: " .. warn16)
+check(string.find(Client.idleLine(19 * 60 + 10), "kicked in 1 minute.", 1, true) ~= nil, "Wrong last-minute line")
 print(string.format("PASS: %d dev alert checks", checks))
