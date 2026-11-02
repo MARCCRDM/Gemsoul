@@ -1986,8 +1986,8 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- Pointing the way (Client MineCue, Outpost.MineCue): the rocks around you
--- glow, the one in reach brightest, with its label over it: always in a
--- mech, on foot for your first stones. Not over a screen or a fight, nor
+-- glow, the one in reach brightest, with its label over it only for your
+-- first gems (Rules.MineButton.Training): it's for learning. Not over a screen or a fight, nor
 -- in a mech that can't mine.
 local cueAt = 0
 local function cue()
@@ -2008,7 +2008,7 @@ local function cue()
 	local stats = GemClient.Profile and GemClient.Profile.Stats
 	local learning = ((stats and tonumber(stats.GemsMined)) or 0) < Rules.MineButton.Training
 	MineCue.show(nearestRock(), near, {
-		Label = mech ~= nil or learning,
+		Label = learning,
 		Mech = mech ~= nil,
 		Input = UserInputService:GetLastInputType(),
 	})

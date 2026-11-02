@@ -46,11 +46,11 @@ Outpost.Heal = { Count = 8, Apart = 38, Hp = 5, Swing = 0.07, Pop = 0.25, Kaiju 
 -- learning, your first Training stones (profile.Stats.GemsMined); after that
 -- the rocks' glow points the way and you mine as in any game: tap or click
 -- to swing at the rock in reach, or walk into it. In a mech it always shows.
-Outpost.MineButton = { Training = 50 }
+Outpost.MineButton = { Training = 15 } -- gems mined before the "Click to mine" label goes (it's for learning)
 -- Pointing the way to the rocks (Client MineCue): the Max nearest within
 -- Glow studs of you (MechGlow in a mech, measured flat) glow with a soft
--- outline, the one in reach brightest, with its label over it. A mech's
--- label always shows; on foot only for your first Training stones.
+-- outline, the one in reach brightest, with its label over it: only for
+-- your first Training gems, on foot or in a mech (the glow stays).
 Outpost.MineCue = { Glow = 42, MechGlow = 70, Max = 6, Every = 0.1 }
 
 -- The original moon quarry, with haul roads and the Shelter in the middle (its garage holds the mechs).

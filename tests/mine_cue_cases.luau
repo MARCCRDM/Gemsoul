@@ -232,7 +232,7 @@ check(scene:find("cueAt = now + Rules.MineCue.Every", 1, true) ~= nil, "The cue 
 -- always labels; on foot, the label while learning.
 check(scene:find("if mech then spec.MechGlow else spec.Glow", 1, true) ~= nil, "A mech doesn't glow further")
 check(scene:find("root.Position,\n\t\tmech ~= nil,", 1, true) ~= nil, "A mech doesn't measure across the ground")
-check(scene:find("Label = mech ~= nil or learning,", 1, true) ~= nil, "A mech doesn't always show the label")
+check(scene:find("Label = learning,", 1, true) ~= nil, "The label shows past learning (on foot or in a mech)")
 check(scene:find("< Rules.MineButton.Training", 1, true) ~= nil, "On foot, the label isn't for learners")
 check(scene:find("MineCue.show(nearestRock(), near, {", 1, true) ~= nil, "The target isn't the rock a swing would hit")
 -- Never over a screen or a fight, nor in a mech that can't mine.
