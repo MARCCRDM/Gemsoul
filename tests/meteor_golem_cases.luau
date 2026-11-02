@@ -28,6 +28,9 @@ check(not Rules.eligible({ Intro = { Done = false } }, { Outpost = true }), "Sen
 check(not Rules.eligible({ Intro = { Done = true }, Milestones = { MeteorGolem = true } }, { Outpost = true }), "Sent it again after beating it")
 check(not Rules.eligible(fresh, { Outpost = false }), "Sent it outside the Outpost")
 check(not Rules.eligible(fresh, {}), "Sent it with no Outpost attribute")
+-- (Not during the intro's finale: it comes a little after its rot minions.)
+check(not Rules.eligible(fresh, { Outpost = true, IntroFinale = "Mines" }), "Sent it in the middle of the intro's finale")
+check(has("src/server/Systems/IntroRoundsServer.luau", "MeteorGolemServer).soon(player)"), "The finale doesn't send the meteor after its minions")
 for _, busy in { "CombatSession", "MatchId", "FirstFight", "IntroCover", "DungeonId", "MechPilot", "KaijuBattle" } do
 	local attrs = { Outpost = true }
 	attrs[busy] = "x"

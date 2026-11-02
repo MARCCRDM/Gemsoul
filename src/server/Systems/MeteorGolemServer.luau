@@ -95,6 +95,7 @@ local function attrsOf(player: Player)
 		DungeonId = player:GetAttribute("DungeonId"),
 		MechPilot = player:GetAttribute("MechPilot"),
 		KaijuBattle = player:GetAttribute("KaijuBattle"),
+		IntroFinale = player:GetAttribute("IntroFinale"),
 	}
 end
 
@@ -479,6 +480,7 @@ local function stand(golem: Golem, why: string?)
 	end
 	golem.Phase = "Gone"
 	golems[golem.Owner] = nil
+	pcall(golem.Owner.SetAttribute, golem.Owner, "MeteorGolem", nil)
 	retryAt[golem.Owner] = os.clock() + Rules.Retry
 	local humanoid = humanoidOf(golem.Owner)
 	if humanoid and golem.WalkSpeed and humanoid.WalkSpeed == 0 then
@@ -552,6 +554,7 @@ local function died(enemy)
 	end
 	golem.Phase = "Gone"
 	golems[golem.Owner] = nil
+	pcall(golem.Owner.SetAttribute, golem.Owner, "MeteorGolem", nil)
 	local rng = Random.new()
 	local center = enemy.Root.Position
 	for _, p in enemy.Model:GetDescendants() do
@@ -630,6 +633,7 @@ function MeteorGolemServer.send(player: Player)
 		WalkSpeed = nil,
 	}
 	golems[player] = golem
+	player:SetAttribute("MeteorGolem", true) -- (its fight is on: Client IntroFinale waits for it)
 	-- They stand and watch it come (the cinematic: Client.MeteorGolemFx).
 	local humanoid = humanoidOf(player)
 	if humanoid then
@@ -735,6 +739,19 @@ function MeteorGolemServer.swing(player: Player)
 		return
 	end
 	waiting[player] = os.clock() + Rules.Delay
+end
+
+-- The meteor `seconds` from now (the intro's finale: a little after its
+-- rot minions are seen off), if it's still to come for them and they're
+-- free then. (Their first swing doesn't start its clock while the finale's
+-- on: the IntroFinale attribute, MeteorGolem.eligible.)
+MeteorGolemServer.AfterFinale = 8
+function MeteorGolemServer.soon(player: Player, seconds: number?): boolean
+	if golems[player] or not Rules.eligible(PlayerData.get(player), attrsOf(player)) then
+		return false
+	end
+	waiting[player] = os.clock() + (seconds or MeteorGolemServer.AfterFinale)
+	return true
 end
 
 local started = false

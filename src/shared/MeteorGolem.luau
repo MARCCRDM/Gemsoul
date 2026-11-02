@@ -74,7 +74,9 @@ function MeteorGolem.eligible(profile, attrs): (boolean, string?)
 	if attrs.Outpost ~= true then
 		return false, "not in the Outpost"
 	end
-	for _, busy in { "CombatSession", "MatchId", "FirstFight", "IntroCover", "DungeonId", "MechPilot", "KaijuBattle" } do
+	-- (IntroFinale: the intro's finale still on: the meteor comes a little
+	-- after its rot minions, Server.IntroRoundsServer)
+	for _, busy in { "CombatSession", "MatchId", "FirstFight", "IntroCover", "DungeonId", "MechPilot", "KaijuBattle", "IntroFinale" } do
 		if attrs[busy] ~= nil and attrs[busy] ~= false then
 			return false, busy
 		end

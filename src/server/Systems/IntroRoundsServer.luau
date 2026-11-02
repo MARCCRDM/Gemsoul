@@ -381,7 +381,12 @@ local function finale(player: Player, step: any)
 		finaleLoose[player] = nil
 		markFinale(player)
 		PlayerData.sync(player)
-		return reply(true, "Welcome to the Outpost, miner.")
+		-- (and a little after, the meteor: its Magma Golem, a first boss)
+		local meteor = false
+		pcall(function()
+			meteor = require(script.Parent.MeteorGolemServer).soon(player)
+		end)
+		return reply(true, "Welcome to the Outpost, miner.", { Meteor = meteor })
 	end
 	return reply(false, "Unknown step.")
 end

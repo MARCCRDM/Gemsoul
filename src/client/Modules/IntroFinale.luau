@@ -2,7 +2,8 @@
 	The intro's finale, after its six rounds (Server.IntroRoundsServer: the
 	IntroFinale attribute, "Mines", while it's to do). Short and sweet:
 
-	  1. Mine     out by the mines (put beside the nearest plain rock),
+	  1. Mine     out at the foot of the Shelter's ramp (ShelterFront), its
+	              welcome rocks round it,
 	              arrows to it: HIT THE ROCK, read out too
 	  2. Gems     a small window, GEMS & ENCHANTING: mining digs up gems,
 	              a gem in your gear enchants it with a move on Q, E or R,
@@ -17,6 +18,8 @@
 	              loose ("Fight") and the kaiju engage: "Your kaijus will
 	              defend you. Train and protect them, and they will protect
 	              you."
+	  4½. Meteor  a little after the minions, the meteor and its Magma Golem
+	              (Server.MeteorGolemServer.soon: its own cinematic and fight)
 	  5. Invite   a window: your first boss, Bombardiro Drago, its rewards,
 	              GO (the Bounty Board on it) or LATER
 	  6. Done     the lobby's yours
@@ -52,6 +55,8 @@ IntroFinale.MineFor = 90 -- seconds before the rock step moves on by itself
 IntroFinale.FightFor = 75 -- and the minions' fight
 IntroFinale.Hit = 24 -- a rock losing health this close to you: you hit it
 IntroFinale.CinematicSeconds = 7 -- at least (till every minion's landed)
+IntroFinale.MeteorWait = 25 -- seconds the first boss's window waits for the meteor to come
+IntroFinale.GolemFor = 6 * 60 -- and for its golem's fight
 
 local player = Players.LocalPlayer
 local GOLD = Color3.fromRGB(240, 186, 92)
@@ -133,17 +138,30 @@ local function mine()
 	if not r then
 		return
 	end
+	-- Out at the foot of the Shelter's ramp (its welcome rocks round it:
+	-- the ShelterFront landmark), facing the quarry.
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	local front = landmarks and landmarks:GetAttribute("ShelterFront")
+	if typeof(front) == "CFrame" then
+		pcall(function()
+			(player.Character :: Model):PivotTo(front + Vector3.new(0, 1, 0))
+		end)
+		task.wait(0.3)
+		r = root() or r
+	end
 	local rock, at = nearestRock(r.Position)
 	if not rock or not at then
 		return
 	end
-	-- (put out by it: a few steps off, facing it)
-	local away = Vector3.new(r.Position.X - at.X, 0, r.Position.Z - at.Z)
-	away = if away.Magnitude > 0.5 then away.Unit else Vector3.new(0, 0, 1)
-	local stand = at + away * 11 + Vector3.new(0, 4, 0)
-	pcall(function()
-		(player.Character :: Model):PivotTo(CFrame.lookAt(stand, Vector3.new(at.X, stand.Y, at.Z)))
-	end)
+	if typeof(front) ~= "CFrame" then
+		-- (no landmark: put out by the nearest rock, a few steps off, facing it)
+		local away = Vector3.new(r.Position.X - at.X, 0, r.Position.Z - at.Z)
+		away = if away.Magnitude > 0.5 then away.Unit else Vector3.new(0, 0, 1)
+		local stand = at + away * 11 + Vector3.new(0, 4, 0)
+		pcall(function()
+			(player.Character :: Model):PivotTo(CFrame.lookAt(stand, Vector3.new(at.X, stand.Y, at.Z)))
+		end)
+	end
 	banner("HIT THE ROCK", "Swing your pick at it: click, or tap")
 	VoiceOver.say(IntroFinale.Lines.Mine)
 	local GroundGuide = nil
@@ -462,11 +480,24 @@ local function run()
 	if not ok then
 		warn("[IntroFinale] " .. tostring(problem))
 	end
-	GemClient.request("IntroFinale", "Done")
+	local done = GemClient.request("IntroFinale", "Done")
 	banner("WELL DONE, MINER", "The Outpost is yours")
 	VoiceOver.say(IntroFinale.Lines.Done)
 	task.wait(3)
 	banner(nil)
+	-- A little after, the meteor (its Magma Golem: Server.MeteorGolemServer):
+	-- its fight first, then the first boss's window.
+	if done and done.Meteor then
+		local started = os.clock()
+		while player:GetAttribute("MeteorGolem") == nil and os.clock() - started < IntroFinale.MeteorWait do
+			task.wait(0.5)
+		end
+		started = os.clock()
+		while player:GetAttribute("MeteorGolem") ~= nil and os.clock() - started < IntroFinale.GolemFor do
+			task.wait(1)
+		end
+		task.wait(2)
+	end
 	pcall(invite)
 	running = false
 end

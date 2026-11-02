@@ -2958,8 +2958,12 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- The welcome rocks: two loose clusters right outside the Shelter's door,
 	-- beside its ramp down and past its foot, flanking a clear lane out to
 	-- the quarry.
+	-- (More round the ramp's foot, where the intro's finale starts them:
+	-- ShelterFront.)
 	for _, p in { { -27, 80 }, { 27, 80 }, { -30, 96 }, { 30, 96 },
-		{ -16, 126 }, { 16, 126 }, { -28, 138 }, { 28, 138 } } do
+		{ -16, 126 }, { 16, 126 }, { -28, 138 }, { 28, 138 },
+		{ -46, 84 }, { 46, 84 }, { -18, 108 }, { 18, 108 }, { -44, 110 }, { 44, 110 },
+		{ -44, 134 }, { 44, 134 }, { -12, 150 }, { 12, 150 } } do
 		table.insert(spots, at * CFrame.new(p[1], 0, p[2]))
 		table.insert(arrivalSpots, #spots)
 	end
@@ -3115,9 +3119,14 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		floor.Transparency = 1
 	end
 	root.Parent = parent
+	-- Just past the foot of the Shelter's main ramp, facing out to the
+	-- quarry: where the intro's finale starts a new miner (Client IntroFinale).
+	local frontAt = (at * CFrame.new(0, 3, 120)).Position
+	local front = CFrame.lookAt(frontAt, frontAt + at:VectorToWorldSpace(Vector3.new(0, 0, 1)))
 	return {
 		Model = root,
 		Spawn = home.Spawn,
+		Front = front,
 		Stations = { Store = home.Store, Market = home.Market },
 		Crew = home.Crew,
 		Shelter = { Box = home.Box, Lift = lift, Ramps = home.Ramps, Feet = home.Feet },

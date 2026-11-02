@@ -1172,6 +1172,10 @@ function OutpostServer.start()
 		landmarks.Parent = ReplicatedStorage
 	end
 	landmarks:SetAttribute("OutpostSpawn", site.Spawn)
+	-- (the foot of the Shelter's ramp: the intro's finale starts there)
+	if site.Front then
+		landmarks:SetAttribute("ShelterFront", site.Front)
+	end
 
 	Shop.register("OutpostEnter", enter)
 	Shop.register("OutpostLeave", leave)
