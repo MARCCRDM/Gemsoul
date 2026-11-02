@@ -1,7 +1,7 @@
 --[[
 	The DEV desk in the Shelter (World OutpostWorld's devDesk): lit while one
 	of the game's Owners (Config.Playtest.Owners: DevAlerts.owner) is in the
-	server, its sign saying who; dark, DEV · OFFLINE, when none is. Every
+	server, its sign saying DEV ONLINE; dark, DEV · OFFLINE, when none is. Every
 	part marked DevGlow takes its lit colour (the attribute) and neon, or
 	goes dark plastic; the DevLight lights go on and off with it. The desk's
 	DevOnline attribute says which.
@@ -36,7 +36,7 @@ function DevDesk.apply(desk: Instance, name: string?)
 	local sign = desk:FindFirstChild("DevSign", true)
 	local word = sign and sign:FindFirstChild("Letters") and sign.Letters:FindFirstChild("Word")
 	if word and word:IsA("TextLabel") then
-		word.Text = if online then "DEV ONLINE · " .. string.upper(name :: string) else "DEV · OFFLINE"
+		word.Text = if online then "DEV ONLINE" else "DEV · OFFLINE"
 		word.TextColor3 = if online then DevDesk.OnInk else DevDesk.OffInk
 	end
 	desk:SetAttribute("DevOnline", online)

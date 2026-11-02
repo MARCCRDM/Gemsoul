@@ -56,7 +56,7 @@ DevDesk.apply(desk, "Devvolver")
 for _, p in glows do
 	check(p.Color == PURPLE and p.Material == R.Enum.Material.Neon, "A light didn't come on for the Owner")
 end
-check(lamp.Enabled and word.Text == "DEV ONLINE · DEVVOLVER" and desk:GetAttribute("DevOnline") == true, "The sign doesn't say who's on")
+check(lamp.Enabled and word.Text == "DEV ONLINE" and desk:GetAttribute("DevOnline") == true, "The sign doesn't say DEV ONLINE")
 DevDesk.apply(desk, nil)
 check(glows[1].Material == R.Enum.Material.SmoothPlastic and not lamp.Enabled, "The desk stayed lit after the Owner left")
-print("PASS: " .. checks .. " DEV desk checks (dark with no Owner in, lit with one, the sign says who, out again when they go)")
+print("PASS: " .. checks .. " DEV desk checks (dark with no Owner in, lit with one, the sign says DEV ONLINE, out again when they go)")

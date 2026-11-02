@@ -1584,11 +1584,11 @@ end
 -- The DEV desk, `at` its back on the Shelter's south wall between the
 -- pilaster and Brutus's booth, facing into the hall: a counter with a
 -- holo gate at one end that only the game's Owners walk through (it's
--- solid for everyone else: Client DevDesk, tagged DevGate), a wall of
--- monitors behind, a gaming chair, and a lightbox over it all. Everything
+-- solid for everyone else: Client DevDesk, tagged DevGate), a desk and a
+-- gaming chair behind, and a lightbox over it all. Everything
 -- that glows is marked DevGlow (its lit colour): Server DevDesk lights it
 -- up while an Owner is in the server and puts it out when they go, and
--- writes who's on the sign (DevSign).
+-- says so on the sign (DevSign).
 local DEV_PURPLE = Color3.fromRGB(170, 90, 255)
 local DEV_CYAN = Color3.fromRGB(80, 220, 255)
 local function devDesk(parent, at: CFrame)
@@ -1638,26 +1638,15 @@ local function devDesk(parent, at: CFrame)
 	pcall(function()
 		game:GetService("CollectionService"):AddTag(gate, "DevGate")
 	end)
-	-- Behind: a wall of monitors, the middle one big, code-lit; a desk under
-	-- them with a keyboard; the chair.
+	-- Behind: a dark back panel, a desk with a keyboard, the chair.
 	part(m, at * CFrame.new(0, 7.5, -0.35), Vector3.new(half * 2 - 0.6, 9, 0.3), GLASS, Enum.Material.Metal)
-	for i, spec in { { -3.6, 7.6, 3, 2 }, { 0, 7.8, 4.4, 2.8 }, { 3.6, 7.6, 3, 2 }, { -1.9, 10.4, 3, 1.8 }, { 1.9, 10.4, 3, 1.8 } } do
-		local bezel = part(m, at * CFrame.new(spec[1], spec[2], -0.6), Vector3.new(spec[3] + 0.3, spec[4] + 0.3, 0.2), Color3.fromRGB(10, 10, 14), Enum.Material.Metal)
-		local screen = glow(
-			part(m, bezel.CFrame * CFrame.new(0, 0, -0.11), Vector3.new(spec[3], spec[4], 0.04), if i == 2 then DEV_PURPLE else DEV_CYAN, Enum.Material.Neon),
-			if i == 2 then DEV_PURPLE else DEV_CYAN
-		)
-		screen.Name = "DevScreen"
-		screen.Transparency = 0.25
-		letters(screen, Enum.NormalId.Front, screen.Size, if i == 2 then "{ build }" else "> _", Color3.fromRGB(235, 245, 255), 0.1)
-	end
 	local desk = at * CFrame.new(0, 0, -2.2)
 	solid(part(m, desk * CFrame.new(0, 2.6, 0), Vector3.new(half * 2 - 2, 0.25, 2.2), GLASS, Enum.Material.Metal))
 	for _, sx in { -1, 1 } do
 		part(m, desk * CFrame.new(sx * (half - 1.4), 1.25, 0), Vector3.new(0.25, 2.5, 2), HULL_DARK, Enum.Material.Metal)
 	end
 	glow(part(m, desk * CFrame.new(0, 2.78, -0.3), Vector3.new(2.4, 0.1, 0.8), DEV_PURPLE, Enum.Material.Neon), DEV_PURPLE)
-	-- The chair: a black seat with purple sides, facing the monitors.
+	-- The chair: a black seat with purple sides, facing the desk.
 	local chair = at * CFrame.new(0, 0, -4.4) * CFrame.Angles(0, math.rad(180), 0)
 	disc(m, chair * CFrame.new(0, 0.15, 0), 1.1, 0.2, HULL_DARK, Enum.Material.Metal)
 	part(m, chair * CFrame.new(0, 1, 0), Vector3.new(0.3, 1.6, 0.3), HULL_DARK, Enum.Material.Metal)
