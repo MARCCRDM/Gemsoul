@@ -64,6 +64,8 @@ local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
 local RiftRealms = require(ReplicatedStorage.Shared.RiftRealms)
 local RiftLobby = require(ReplicatedStorage.Shared.RiftLobby)
 local Slots = require(ReplicatedStorage.Shared.EquipmentSlots)
+local BossLoot = require(ReplicatedStorage.Shared.BossLoot)
+local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
 local Store = require(ReplicatedStorage.Shared.Store)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
@@ -548,6 +550,53 @@ local function bossCard(parent: Instance, entry, order: number, compact: boolean
 	sub.TextXAlignment = Enum.TextXAlignment.Center
 	sub.Position = UDim2.fromOffset(6, if compact then 19 else 29)
 	sub.Size = UDim2.new(1, -12, 0, if compact then 11 else 14)
+	-- What beating it pays, along the bottom of its stage: its cache's piece
+	-- (the gear it favours, at its threat's floor or better: Shared.BossLoot),
+	-- a gem, and a kaiju (a boss roll for each boss beaten).
+	if entry.Unlocked then
+		local rules = BossLoot.Threats[BossLoot.threat(entry)] or BossLoot.Threats[1]
+		local floorName = if rules.Floor == "UltraRare" then "Ultra Rare" else rules.Floor
+		local floorColor = Gilt.Ink
+		for _, rarity in GearRolls.Rarities do
+			if rarity.Name == floorName then
+				floorColor = rarity.Color
+			end
+		end
+		local favour = Slots.Definitions[Slots.ByKind[entry.Loot or ""] or ""]
+		local strip = new("Frame", {
+			Name = "Rewards",
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -foot - (if compact then 3 else 6)),
+			Size = UDim2.new(1, -12, 0, if compact then 16 else 22),
+		}, card)
+		new("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0, 4),
+		}, strip)
+		local function chip(label: string, color: Color3, order: number)
+			local c = new("TextLabel", {
+				Name = "Reward",
+				LayoutOrder = order,
+				AutomaticSize = Enum.AutomaticSize.X,
+				Size = UDim2.new(0, 0, 1, 0),
+				BackgroundColor3 = Color3.fromRGB(10, 12, 18),
+				BackgroundTransparency = 0.2,
+				Font = Enum.Font.GothamBold,
+				TextSize = if compact then 9 else 11,
+				TextColor3 = color,
+				Text = label,
+			}, strip)
+			UiKit.round(c, 6)
+			new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, c)
+			new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.55, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, c)
+		end
+		chip(string.format("%s · %s+", if favour then favour.Label else "Gear", floorName), floorColor, 1)
+		chip("Gem", Color3.fromRGB(94, 206, 221), 2)
+		chip("Kaiju", Color3.fromRGB(150, 230, 120), 3)
+	end
 	if not entry.Unlocked then
 		local lock = Gilt.words(card, "Locked", if compact then 11 else 14, Gilt.Faded)
 		lock.TextXAlignment = Enum.TextXAlignment.Center
