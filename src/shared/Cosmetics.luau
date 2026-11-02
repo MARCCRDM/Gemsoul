@@ -1365,24 +1365,6 @@ Cosmetics.List = {
 			SeamColor = Color3.fromRGB(60, 230, 255),
 		},
 	},
-	SkinThunderclap = {
-		Id = "SkinThunderclap",
-		Kind = "Skin",
-		Name = "Thunderclap",
-		Description = "Turns your weapon into a double-bladed storm axe: steel bits with live electric edges, lightning crackling through them.",
-		Rarity = "Legendary",
-		Color = Color3.fromRGB(80, 200, 255),
-		Exclusive = "Code",
-		How = "Redeem a promo code.",
-		Look = "Thunderclap",
-		Palette = {
-			Plate = Color3.fromRGB(200, 210, 226),
-			PlateMaterial = Enum.Material.Metal,
-			Under = Color3.fromRGB(28, 34, 54),
-			Glow = Color3.fromRGB(80, 200, 255),
-			SeamColor = Color3.fromRGB(225, 245, 255),
-		},
-	},
 	SkinBanana = {
 		Id = "SkinBanana",
 		Kind = "Skin",
@@ -1535,6 +1517,16 @@ Cosmetics.List = {
 		Color = Color3.fromRGB(255, 215, 120),
 		Exclusive = "Invite",
 		How = "Invite 2 friends who join the game.",
+	},
+	PickThunderclap = {
+		Id = "PickThunderclap",
+		Kind = "Pick",
+		Name = "Thunderclap",
+		Description = "A double-pointed storm pick of bright steel, live blue edges crackling down both spikes and a storm core humming in its head. Every hit calls blue lightning down on the rock.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(80, 200, 255),
+		Exclusive = "Code",
+		How = "Redeem a promo code.",
 	},
 	-- Visors (Equipment.applyVisor lays one on any helmet's lens). Glass
 	-- tints, then lit lenses, then moving ones, then the elements, then the

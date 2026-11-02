@@ -32,8 +32,8 @@ Codes.List = {
 		Note = "Like milestone",
 	},
 	THUNDER = {
-		Reward = { Cosmetics = { "SkinThunderclap" } },
-		Note = "Free Thunderclap storm axe weapon skin for players",
+		Reward = { Cosmetics = { "PickThunderclap" } },
+		Note = "Free Thunderclap storm pickaxe skin for players",
 	},
 	-- Gifts --------------------------------------------------------------
 	REAPERGIFT113 = {

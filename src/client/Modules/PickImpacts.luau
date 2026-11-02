@@ -5,7 +5,8 @@
 
 	  PickImpacts.play(kind, at, from, power, crit, scale?)
 	      kind   "Magma", "Frost", "Storm", "Void", "Gold", "Prism",
-	             "Neon", "Bone" or "Geode" (anything else: false)
+	             "Neon", "Bone", "Geode", "TwinStar" or "Thunder" (anything
+	             else: false)
 	      at     the point on the rock that was hit
 	      from   where the swing came from (bits fly back that way)
 	      power  0-1, how close the rock is to breaking: bigger near the end
@@ -494,6 +495,25 @@ function LOOKS.TwinStar(at: Vector3, out: Vector3, k: number, crit: boolean, sca
 			ring(at, Vector3.yAxis, TEAL, 0.6, 6, 0.4)
 		end
 	end)
+end
+
+-- Blue lightning cracks down on the rock: a white flash, a blue ring and
+-- sparks flying.
+function LOOKS.Thunder(at: Vector3, out: Vector3, k: number, crit: boolean, scale: number)
+	local VOLT, BRIGHT = Color3.fromRGB(80, 200, 255), Color3.fromRGB(225, 245, 255)
+	for n = 1, if crit then 3 else 1 do
+		task.delay((n - 1) * 0.06, function()
+			local sky = at + Vector3.new((math.random() - 0.5) * 5, 16 + math.random() * 6, (math.random() - 0.5) * 5)
+			CombatVfx.lightning(sky, at, if n == 2 then BRIGHT else VOLT)
+		end)
+	end
+	bloom(at, BRIGHT, 2.4 * k, 0.15, 0)
+	ring(at, out, VOLT, 0.5, 5 * k, 0.3)
+	streaks(at, out, math.ceil((7 + 5 * k) * scale), 5, { VOLT, BRIGHT }, 0.25)
+	if crit then
+		ring(at, Vector3.yAxis, VOLT, 1, 9, 0.4)
+	end
+	CombatFx.burst(at, VOLT, "Sparks", 0.5 * k)
 end
 
 PickImpacts.Looks = LOOKS

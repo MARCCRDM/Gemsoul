@@ -1051,6 +1051,102 @@ LOOKS.PickTwinStar = {
 	end,
 }
 
+-- Thunderclap (a promo code's): a double-pointed storm pick. Bright steel
+-- spikes curving down both ways, a live blue edge along each that crackles
+-- on every client (SkinSeam "Flicker": Client SeamVisibility), lightning
+-- bolts set in the long spike's faces, a storm core through the head
+-- throwing sparks.
+LOOKS.PickThunderclap = {
+	Impact = "Thunder",
+	Color = Color3.fromRGB(80, 200, 255),
+	Build = function(add: Add): BasePart
+		local STEEL, DARK = Color3.fromRGB(200, 210, 226), Color3.fromRGB(52, 58, 74)
+		local HAFT = Color3.fromRGB(28, 34, 54)
+		local VOLT, BRIGHT = Color3.fromRGB(80, 200, 255), Color3.fromRGB(225, 245, 255)
+		local seed = 0
+		-- A live wire: crackles between blue and white.
+		local function live(part: BasePart): BasePart
+			seed += 1
+			part.Name = "SkinSeam"
+			part:SetAttribute("SeamFx", "Flicker")
+			part:SetAttribute("SeamA", part.Color)
+			part:SetAttribute("SeamB", BRIGHT)
+			part:SetAttribute("SeamSeed", seed)
+			CollectionService:AddTag(part, Tags.SkinSeam)
+			return part
+		end
+		-- At `at`, its -Z (a spike's point) along `dir` (in the pick's plane).
+		-- (its up stays up whichever way it points)
+		local function facing(at: Vector3, dir: Vector3): CFrame
+			local side = if dir.Z > 0 then -Vector3.xAxis else Vector3.xAxis
+			return CFrame.fromMatrix(at, side, (-dir.Unit):Cross(side))
+		end
+		-- The haft: dark steel, a black grip, blue rings.
+		add(CFrame.new(0, 1.05, 0), Vector3.new(0.2, 2.5, 0.2), HAFT, Enum.Material.Metal)
+		add(CFrame.new(0, 0.25, 0), Vector3.new(0.26, 0.62, 0.26), Color3.fromRGB(20, 22, 28), Enum.Material.Leather)
+		for _, y in { -0.08, 0.58, 2.08 } do
+			live(add(CFrame.new(0, y, 0), Vector3.new(0.27, 0.05, 0.27), VOLT, Enum.Material.Neon))
+		end
+		local pommel = add(CFrame.new(0, -0.2, 0), Vector3.new(0.24, 0.2, 0.24), DARK, Enum.Material.Metal)
+		-- The head: a dark hub, the storm core through it, a crest on top.
+		local head = add(CFrame.new(0, 2.45, 0), Vector3.new(0.36, 0.5, 0.48), DARK, Enum.Material.Metal)
+		local core = add(
+			CFrame.new(0, 2.45, 0),
+			Vector3.new(0.42, 0.3, 0.3),
+			VOLT,
+			Enum.Material.Neon,
+			{ Shape = Enum.PartType.Cylinder }
+		)
+		spike(add, CFrame.new(0, 2.82, 0.02) * CFrame.Angles(math.rad(90), 0, 0), 0.1, 0.3, 0.3, STEEL, Enum.Material.Metal, { Reflectance = 0.25 })
+		-- The spikes: steel bending down to a point, a live edge along the top.
+		local function arm(points: { Vector3 }, widths: { number }, bolts: boolean): BasePart
+			for i = 1, #points - 2 do
+				local a, b = points[i], points[i + 1]
+				local dir = b - a
+				local frame = facing((a + b) / 2, dir)
+				local w = widths[i]
+				add(frame, Vector3.new(w, w * 1.25, dir.Magnitude + 0.06), STEEL, Enum.Material.Metal, { Reflectance = 0.25 })
+				live(add(frame * CFrame.new(0, w * 0.62, 0), Vector3.new(0.07, 0.05, dir.Magnitude + 0.04), VOLT, Enum.Material.Neon))
+				if bolts then
+					-- (a zigzag on each face)
+					for _, face in { -1, 1 } do
+						local zig = if i % 2 == 0 then 1 else -1
+						live(add(
+							frame * CFrame.new(face * (w / 2 + 0.01), 0, 0) * CFrame.Angles(math.rad(zig * 32), 0, 0),
+							Vector3.new(0.02, 0.05, dir.Magnitude * 0.95),
+							BRIGHT,
+							Enum.Material.Neon
+						))
+					end
+				end
+			end
+			local a, b = points[#points - 1], points[#points]
+			local dir = b - a
+			local w = widths[#points - 1]
+			return spike(add, facing(a + dir / 2, dir), w, w * 1.25, dir.Magnitude, BRIGHT, Enum.Material.Neon)
+		end
+		local tip = arm({
+			Vector3.new(0, 2.47, -0.2),
+			Vector3.new(0, 2.52, -0.7),
+			Vector3.new(0, 2.44, -1.2),
+			Vector3.new(0, 2.24, -1.62),
+			Vector3.new(0, 1.98, -2.02),
+		}, { 0.3, 0.25, 0.2, 0.16 }, true)
+		arm({
+			Vector3.new(0, 2.47, 0.2),
+			Vector3.new(0, 2.5, 0.62),
+			Vector3.new(0, 2.38, 1.02),
+			Vector3.new(0, 2.16, 1.36),
+		}, { 0.28, 0.22, 0.17 }, false)
+		emitter(core, VOLT, 22, { From = BRIGHT, Size = 0.14, Speed = 3, Life = 0.2, Acceleration = Vector3.zero })
+		emitter(tip, VOLT, 8, { From = BRIGHT, Size = 0.1, Speed = 1.5, Life = 0.2, Acceleration = Vector3.zero })
+		emitter(pommel, VOLT, 3, { Size = 0.08, Speed = 0.5, Life = 0.3 })
+		glow(head, VOLT, 2.2, 11)
+		trail(tip, Vector3.new(0, 0, 0.5), BRIGHT, VOLT)
+		return tip
+	end,
+}
+
 PickaxeLooks.Looks = LOOKS
 
 -- Builds a pickaxe into `parent` (see the top). `skinId` nil or unknown:

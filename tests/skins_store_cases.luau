@@ -1078,12 +1078,14 @@ do
 			end
 		end
 	end
-	local prism = 0
+	local prism, live = 0, 0
 	for _, tag in tagged do
-		check(tag == Tags.Prismatic, "A pickaxe part has an unknown tag")
-		prism += 1
+		check(tag == Tags.Prismatic or tag == Tags.SkinSeam, "A pickaxe part has an unknown tag")
+		prism += if tag == Tags.Prismatic then 1 else 0
+		live += if tag == Tags.SkinSeam then 1 else 0
 	end
 	check(prism >= 3, "Prism Shard doesn't shimmer")
+	check(live >= 6, "Thunderclap's edges don't crackle")
 	-- No skin (or one you can't have): the tier's own pick, glowing if bright.
 	local model = roblox.Instance.new("Model")
 	local parts, tip = PickaxeLooks.build(model, roblox.CFrame.new(), "NotAPick", roblox.Color3.fromRGB(255, 0, 0), nil, true)
