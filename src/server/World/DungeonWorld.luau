@@ -4,8 +4,10 @@ local GemConfig = require(game:GetService("ReplicatedStorage").Shared.GemConfig)
 local FallenMiners = require(script.Parent.FallenMiners)
 local World = {}
 -- A run's look: the canyon (every dungeon's), or the Rot Beachhead's
--- (Shared.DungeonRules.First): wet black sand, the invaders' wrecked hull
--- for walls, the rot's glow for lamps and crystals, membranes for gates.
+-- (Shared.DungeonRules.First): a sunny beach the rot came down on. Warm
+-- sand, sandstone dunes for walls with beach grass along their tops, a
+-- boardwalk between rooms, the rot's glow for lamps and crystals, its
+-- membranes for gates.
 local ROT = Color3.fromRGB(70, 22, 84)
 local ROT_DARK = Color3.fromRGB(36, 12, 44)
 local ROT_GLOW = Color3.fromRGB(90, 255, 110)
@@ -21,12 +23,13 @@ World.Themes = {
 		Trail = Color3.fromRGB(76, 69, 66), TrailMaterial = Enum.Material.Slate,
 	},
 	Rot = {
-		Floor = Color3.fromRGB(46, 42, 44), FloorMaterial = Enum.Material.Sand,
-		Wall = HULL, WallMaterial = Enum.Material.DiamondPlate,
-		Crown = RUST, CrownMaterial = Enum.Material.CorrodedMetal,
-		Crag = Color3.fromRGB(40, 44, 54), CragMaterial = Enum.Material.Metal,
+		Floor = Color3.fromRGB(226, 200, 150), FloorMaterial = Enum.Material.Sand,
+		Wall = Color3.fromRGB(196, 160, 116), WallMaterial = Enum.Material.Sandstone,
+		Crown = Color3.fromRGB(170, 132, 92), CrownMaterial = Enum.Material.Sandstone,
+		Crag = Color3.fromRGB(176, 138, 100), CragMaterial = Enum.Material.Sandstone,
 		Glow = ROT_GLOW, Gate = Color3.fromRGB(150, 60, 190), GateMaterial = Enum.Material.Glass, GateTransparency = 0.25,
-		Trail = Color3.fromRGB(58, 62, 72), TrailMaterial = Enum.Material.DiamondPlate,
+		Trail = Color3.fromRGB(150, 108, 70), TrailMaterial = Enum.Material.WoodPlanks,
+		Daylight = true, -- (the fill lights' fixtures hidden: the sun's up)
 	},
 }
 local function block(parent, name, size, at, color, material)
@@ -41,9 +44,12 @@ local function block(parent, name, size, at, color, material)
 	return p
 end
 -- Neutral fixtures reveal material and facial detail without washing out element colors.
-local function fillLight(parent, at, range, brightness)
+local function fillLight(parent, at, range, brightness, hidden)
 	local fixture =
 		block(parent, "CombatFill", Vector3.new(5, 0.25, 2), at, Color3.fromRGB(215, 228, 245), Enum.Material.Neon)
+	if hidden then
+		fixture.Transparency = 1
+	end
 	fixture.CanCollide = false
 	fixture.CanTouch = false
 	fixture.CanQuery = false
@@ -68,8 +74,8 @@ function World.build(id, rooms, origin, theme)
 		centers[i] = center
 		local color = T.Glow or GemConfig.ElementColors[Rules.specOf(room).Element]
 		block(folder, "CanyonClearing", Vector3.new(64, 2, 64), center, T.Floor, T.FloorMaterial)
-		fillLight(folder, center + Vector3.new(-16, 16, 0), 48, 1.7)
-		fillLight(folder, center + Vector3.new(16, 16, 0), 48, 1.7)
+		fillLight(folder, center + Vector3.new(-16, 16, 0), 48, 1.7, T.Daylight)
+		fillLight(folder, center + Vector3.new(16, 16, 0), 48, 1.7, T.Daylight)
 		local doors = {}
 		for _, index in { i - 1, i + 1 } do
 			local neighbor = rooms[index]
@@ -186,7 +192,7 @@ function World.build(id, rooms, origin, theme)
 			local delta = center - previous
 			local midpoint = (center + previous) / 2
 			local horizontal = delta.X ~= 0
-			fillLight(folder, midpoint + Vector3.new(0, 11, 0), 30, 1.4)
+			fillLight(folder, midpoint + Vector3.new(0, 11, 0), 30, 1.4, T.Daylight)
 			block(
 				folder,
 				"ConnectingTrail",
@@ -348,8 +354,8 @@ local function light(part, color, range, brightness)
 	return glow
 end
 -- A flat pool on the floor (`at`: its middle, on the floor's top).
-local function pool(folder, name, at, diameter, color, transparency)
-	local part = scenery(block(folder, name, Vector3.new(0.2, diameter, diameter), at, color, Enum.Material.Neon))
+local function pool(folder, name, at, diameter, color, transparency, material)
+	local part = scenery(block(folder, name, Vector3.new(0.2, diameter, diameter), at, color, material or Enum.Material.Neon))
 	part.Shape = Enum.PartType.Cylinder
 	part.CFrame = CFrame.new(at) * CFrame.Angles(0, 0, math.pi / 2)
 	part.Transparency = transparency
@@ -372,9 +378,121 @@ local function spores(folder, at)
 	fx.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.25), NumberSequenceKeypoint.new(1, 1) })
 	fx.Parent = emitter
 end
+local SAND = Color3.fromRGB(226, 200, 150)
+local WET_SAND = Color3.fromRGB(190, 160, 116)
+local SEA = Color3.fromRGB(36, 148, 186)
+local FOAM = Color3.fromRGB(236, 246, 250)
+local BARK = Color3.fromRGB(124, 88, 56)
+local FROND = Color3.fromRGB(70, 150, 62)
+-- A tuft of beach grass: three flat blades fanned out from `at` (on the ground).
+local function grass(folder, at, h, color, rng)
+	for n = 1, 3 do
+		local blade = scenery(block(folder, "BeachGrass", Vector3.new(0.5, h, 0.12), Vector3.zero, color, Enum.Material.Grass))
+		blade.CFrame = at * CFrame.Angles(0, n * 2.1 + rng:NextNumber(-0.3, 0.3), 0) * CFrame.Angles(0, 0, rng:NextNumber(0.15, 0.45)) * CFrame.new(0, h / 2, 0)
+	end
+end
+-- A palm: its trunk in leaning, narrowing segments, fronds drooping all
+-- round its top, coconuts under them. (`base`: on the ground.)
+local function palm(folder, base, rng)
+	local height = rng:NextNumber(16, 24)
+	local lean = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+	local at = CFrame.new(base) * lean
+	local segments = 6
+	for n = 1, segments do
+		local length = height / segments
+		local width = 1.9 - n * 0.14
+		at *= CFrame.Angles(0.07 + n * 0.012, 0, 0)
+		local seg = scenery(block(folder, "PalmTrunk", Vector3.new(width, length + 0.3, width), Vector3.zero, if n % 2 == 0 then BARK else BARK:Lerp(SAND, 0.18), Enum.Material.Wood))
+		seg.CFrame = at * CFrame.new(0, length / 2, 0)
+		at *= CFrame.new(0, length, 0)
+	end
+	local top = at.Position
+	for n = 1, 7 do
+		local a = n / 7 * math.pi * 2 + rng:NextNumber(-0.2, 0.2)
+		local length = rng:NextNumber(7, 10)
+		local frond = scenery(block(folder, "PalmFrond", Vector3.new(2.4, 0.25, length), Vector3.zero, FROND:Lerp(Color3.fromRGB(150, 190, 70), rng:NextNumber(0, 0.35)), Enum.Material.Grass))
+		frond.CFrame = CFrame.new(top) * CFrame.Angles(0, a, 0) * CFrame.Angles(-rng:NextNumber(0.25, 0.55), 0, 0) * CFrame.new(0, 0, -length / 2)
+	end
+	for n = 1, 3 do
+		local a = n / 3 * math.pi * 2
+		ball(folder, "Coconut", 1.1, top + Vector3.new(math.cos(a) * 0.9, -0.8, math.sin(a) * 0.9), Color3.fromRGB(96, 66, 40), Enum.Material.Wood)
+	end
+end
+-- The beach round the rooms: sand under and between them, dunes and palms
+-- inland, the shore and the sea out past one side, rocks and driftwood.
+local function beach(folder, centers, rng)
+	local lo, hi = centers[1], centers[1]
+	for _, c in centers do
+		lo = Vector3.new(math.min(lo.X, c.X), c.Y, math.min(lo.Z, c.Z))
+		hi = Vector3.new(math.max(hi.X, c.X), c.Y, math.max(hi.Z, c.Z))
+	end
+	local y = centers[1].Y + 0.6 -- (just under the rooms' floors)
+	local zLo, zHi = lo.Z - 110, hi.Z + 130
+	local inland, shore = lo.X - 260, hi.X + 52
+	local ground = block(folder, "BeachSand", Vector3.new(shore - inland, 4, zHi - zLo), Vector3.new((inland + shore) / 2, y - 2, (zLo + zHi) / 2), SAND, Enum.Material.Sand)
+	ground.CanQuery = false
+	-- The wet strip, the surf and the sea.
+	local wet = scenery(block(folder, "WetSand", Vector3.new(14, 4, zHi - zLo), Vector3.new(shore + 7, y - 2.4, (zLo + zHi) / 2), WET_SAND, Enum.Material.Sand))
+	wet.CFrame *= CFrame.Angles(0, 0, -0.05)
+	local sea = scenery(block(folder, "Sea", Vector3.new(900, 2, zHi - zLo + 700), Vector3.new(shore + 14 + 450, y - 3.2, (zLo + zHi) / 2), SEA, Enum.Material.Glass))
+	sea.Transparency = 0.12
+	sea.Reflectance = 0.08
+	for n = 0, 2 do
+		local foam = scenery(block(folder, "Surf", Vector3.new(1.4, 0.3, zHi - zLo), Vector3.new(shore + 15 + n * 9, y - 2.15, (zLo + zHi) / 2), FOAM, Enum.Material.SmoothPlastic))
+		foam.Transparency = 0.25 + n * 0.25
+	end
+	-- Dunes inland, beach grass on them.
+	for n = 1, 16 do
+		local at = Vector3.new(rng:NextNumber(inland + 30, lo.X - 60), y - 4, rng:NextNumber(zLo + 20, zHi - 20))
+		local size = rng:NextNumber(26, 50)
+		local dune = scenery(block(folder, "Dune", Vector3.new(size * 1.6, size * 0.5, size), at, SAND:Lerp(Color3.fromRGB(205, 172, 118), rng:NextNumber(0, 1)), Enum.Material.Sand))
+		dune.CFrame = CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0)
+		-- (a squashed dome: a ball part would stay round)
+		local mesh = Instance.new("SpecialMesh")
+		mesh.MeshType = Enum.MeshType.Sphere
+		mesh.Parent = dune
+	end
+	for n = 1, 40 do
+		local at = CFrame.new(rng:NextNumber(inland + 20, lo.X - 40), y, rng:NextNumber(zLo + 10, zHi - 10))
+		grass(folder, at, rng:NextNumber(1.5, 3), FROND:Lerp(Color3.fromRGB(190, 190, 110), rng:NextNumber(0.2, 0.7)), rng)
+	end
+	-- Beach grass along the dunes' tops (the rooms' walls).
+	for _, part in folder:GetChildren() do
+		if part:IsA("BasePart") and part.Name == "RidgeCrown" then
+			for n = 1, 3 do
+				local at = CFrame.new((part.CFrame * CFrame.new(rng:NextNumber(-0.4, 0.4) * part.Size.X, part.Size.Y / 2 - 0.2, rng:NextNumber(-0.4, 0.4) * part.Size.Z)).Position)
+				grass(folder, at, rng:NextNumber(1.6, 3.2), FROND:Lerp(Color3.fromRGB(190, 190, 110), rng:NextNumber(0.1, 0.6)), rng)
+			end
+		end
+	end
+	-- Palms: inland of the rooms, and a few along the shore.
+	for _, c in centers do
+		for n = 1, 3 do
+			palm(folder, Vector3.new(c.X - rng:NextNumber(42, 70), y, c.Z + rng:NextNumber(-34, 34)), rng)
+		end
+		for n = 1, 2 do
+			palm(folder, Vector3.new(c.X + rng:NextNumber(38, 48), y, c.Z + rng:NextNumber(-34, 34)), rng)
+		end
+	end
+	-- Rocks and driftwood on the sand.
+	for n = 1, 18 do
+		local onShore = n % 2 == 0
+		local x = if onShore then rng:NextNumber(hi.X + 37, shore + 6) else rng:NextNumber(lo.X - 110, lo.X - 38)
+		local at = Vector3.new(x, y, rng:NextNumber(zLo + 15, zHi - 15))
+		if n % 3 == 0 then
+			local log = scenery(block(folder, "Driftwood", Vector3.new(rng:NextNumber(6, 11), 0.9, 0.9), at + Vector3.new(0, 0.3, 0), Color3.fromRGB(168, 146, 120), Enum.Material.Wood))
+			log.CFrame *= CFrame.Angles(0, rng:NextNumber(0, math.pi), 0.06)
+		else
+			local size = rng:NextNumber(2.5, 6)
+			local rock = scenery(block(folder, "ShoreRock", Vector3.new(size * 1.3, size * 0.8, size), at + Vector3.new(0, size * 0.25, 0), Color3.fromRGB(120, 118, 112):Lerp(Color3.fromRGB(150, 140, 120), rng:NextNumber(0, 1)), Enum.Material.Slate))
+			rock.CFrame *= CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(0, math.pi), rng:NextNumber(-0.3, 0.3))
+		end
+	end
+end
 function World.dressBeachhead(folder, centers, rng)
 	rng = rng or Random.new()
 	local last = #centers
+	beach(folder, centers, rng)
 	for i, center in centers do
 		local floor = center + Vector3.new(0, 1.05, 0) -- (the floor's top)
 		-- Rot pods on stalks round the room, glowing.
@@ -410,7 +528,7 @@ function World.dressBeachhead(folder, centers, rng)
 		for n = 1, 3 do
 			local a = rng:NextNumber(0, math.pi * 2)
 			local r = rng:NextNumber(14, 24)
-			pool(folder, "RotSlime", floor + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r), rng:NextNumber(5, 9), Color3.fromRGB(70, 200, 90), 0.3)
+			pool(folder, "RotSlime", floor + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r), rng:NextNumber(5, 9), Color3.fromRGB(84, 168, 70), 0.2, Enum.Material.Glass)
 		end
 		-- Hull plates where the invaders' ship came down.
 		for n = 1, 3 do

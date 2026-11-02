@@ -73,34 +73,37 @@ ArenaNight.DungeonMood = {
 	},
 	SunRaysEffect = { Intensity = 0 },
 }
--- The Rot Beachhead (the first dungeon: DungeonKaiju): dusk on a wrecked
--- shore, a green-violet haze, the rot's glow blooming.
+-- The Rot Beachhead (the first dungeon: DungeonKaiju): a sunny afternoon
+-- on the beach the rot came down on. Warm sun, a blue sky with its sun
+-- and clouds (RotSky), a light sea haze, the rot's glow still blooming.
 ArenaNight.RotMood = {
 	Lighting = {
-		Brightness = 1.3,
-		Ambient = Color3.fromRGB(78, 70, 92),
-		OutdoorAmbient = Color3.fromRGB(98, 92, 112),
-		ExposureCompensation = -0.1,
-		EnvironmentDiffuseScale = 0.6,
-		EnvironmentSpecularScale = 0.25,
+		Brightness = 2.6,
+		Ambient = Color3.fromRGB(118, 114, 106),
+		OutdoorAmbient = Color3.fromRGB(150, 146, 136),
+		ExposureCompensation = 0,
+		EnvironmentDiffuseScale = 0.9,
+		EnvironmentSpecularScale = 0.35,
 	},
-	BloomEffect = { Intensity = 0.4, Size = 20, Threshold = 1.5 },
+	BloomEffect = { Intensity = 0.25, Size = 18, Threshold = 1.8 },
 	ColorCorrectionEffect = {
-		Brightness = -0.02,
-		Contrast = 0.16,
-		Saturation = 0.04,
-		TintColor = Color3.fromRGB(236, 255, 240),
+		Brightness = 0.02,
+		Contrast = 0.1,
+		Saturation = 0.14,
+		TintColor = Color3.fromRGB(255, 250, 240),
 	},
 	Atmosphere = {
-		Density = 0.34,
-		Haze = 1.4,
-		Glare = 0,
-		Color = Color3.fromRGB(118, 146, 112),
-		Decay = Color3.fromRGB(74, 44, 96),
+		Density = 0.26,
+		Haze = 0.6,
+		Glare = 0.15,
+		Color = Color3.fromRGB(196, 216, 230),
+		Decay = Color3.fromRGB(140, 176, 196),
 	},
-	SunRaysEffect = { Intensity = 0 },
+	SunRaysEffect = { Intensity = 0.06 },
 }
-ArenaNight.RotClockTime = 18.3 -- dusk
+ArenaNight.RotClockTime = 13.5 -- early afternoon
+-- Its sky: the day sky, no stars, the sun shown (put back on the way out).
+ArenaNight.RotSky = { Faces = "rbxasset://textures/sky/sky512_", StarCount = 0, CelestialBodiesShown = true }
 ArenaNight.ClockTime = 14.2 -- clear afternoon light on crystal faces
 ArenaNight.DungeonClockTime = 16.8 -- preserve the dungeon's existing mood
 ArenaNight.LampScale = 1 -- four restrained architectural lamps
@@ -191,6 +194,33 @@ local function nightfall(mood)
 		saved[instance] = saved[instance] or before
 		TweenService:Create(instance, FADE, goal):Play()
 	end
+	local sky = Lighting:FindFirstChildOfClass("Sky")
+	if sky and saved.Sky then
+		-- (another mood after the Rot's: its own sky back first)
+		for property, value in saved.Sky.Props do
+			pcall(function()
+				(sky :: any)[property] = value
+			end)
+		end
+		saved.Sky = nil
+	end
+	if sky and mood == ArenaNight.RotMood then
+		local look = ArenaNight.RotSky
+		local props = { StarCount = look.StarCount, CelestialBodiesShown = look.CelestialBodiesShown }
+		for face, suffix in { Bk = "bk", Dn = "dn", Ft = "ft", Lf = "lf", Rt = "rt", Up = "up" } do
+			props["Skybox" .. face] = look.Faces .. suffix .. ".tex"
+		end
+		local before = {}
+		for property in props do
+			before[property] = (sky :: any)[property]
+		end
+		saved.Sky = { Props = before }
+		for property, value in props do
+			pcall(function()
+				(sky :: any)[property] = value
+			end)
+		end
+	end
 	Lighting.ClockTime = if mood == ArenaNight.RotMood
 		then ArenaNight.RotClockTime
 		elseif mood == ArenaNight.DungeonMood then ArenaNight.DungeonClockTime
@@ -213,6 +243,14 @@ local function daybreak()
 	end
 	if saved then
 		Lighting.ClockTime = saved.ClockTime
+		local sky = Lighting:FindFirstChildOfClass("Sky")
+		if sky and saved.Sky then
+			for property, value in saved.Sky.Props do
+				pcall(function()
+					(sky :: any)[property] = value
+				end)
+			end
+		end
 	end
 	saved = nil
 	CombatFx.LightBoost = 1
