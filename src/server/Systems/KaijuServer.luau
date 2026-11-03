@@ -197,6 +197,7 @@ export type Pet = {
 	HopAgain: boolean?, -- (another jump of yours came while it waited its turn)
 	-- The support's pulse (pulse): when each of its moves is next ready.
 	PulseAt: { [string]: number }?,
+	FarSince: number?, -- (off past the leash since: Kaiju.Follow.Stuck)
 	LastPulse: string?, -- (the support: what it cast last, Kaiju.supportChoice)
 	-- In the team's hyperbeam (KaijuBeamServer): its own thinking waits till then.
 	BeamUntil: number?,
@@ -438,10 +439,40 @@ end
 
 -- Where `player`'s kaiju in `slot` walks, leading `root` the way it's going,
 -- where their camera sees it (Kaiju.TeamSpots, Kaiju.leadSpot).
+-- Whether there's floor under `spot` within Kaiju.Follow.Ledge of the
+-- height `from` stands at (no drop to walk off).
+local function floored(spot: Vector3, from: number): boolean
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local skip = { folder }
+	for _, other in Players:GetPlayers() do
+		if other.Character then
+			table.insert(skip, other.Character)
+		end
+	end
+	params.FilterDescendantsInstances = skip
+	local hit = workspace:Raycast(Vector3.new(spot.X, from + 6, spot.Z), Vector3.new(0, -(Kaiju.Follow.Ledge + 12), 0), params)
+	return hit ~= nil
+end
 local function spotBy(root: BasePart, slot: number, player: Player): Vector3
 	local moving = root.AssemblyLinearVelocity or Vector3.zero
-	return Kaiju.leadSpot(root.Position, root.CFrame.LookVector, moving, slot, views[player])
+	local spot = Kaiju.leadSpot(root.Position, root.CFrame.LookVector, moving, slot, views[player])
+	-- (Over a drop, a ledge or the Rift's edge: pulled in toward you till
+	-- there's floor, else right by you.)
+	local feet = root.Position.Y - 3
+	if floored(spot, feet) or not floored(root.Position, feet) then
+		return spot -- (floor there; or none under you either, nothing to go by)
+	end
+	for _, share in { 0.5, 0.25 } do
+		local nearer = root.Position:Lerp(spot, share)
+		nearer = Vector3.new(nearer.X, spot.Y, nearer.Z)
+		if floored(nearer, feet) then
+			return nearer
+		end
+	end
+	return Vector3.new(root.Position.X, spot.Y, root.Position.Z)
 end
+KaijuServer._spotBy = spotBy -- (tests)
 
 local creaturesNear -- (the creatures about a point: below)
 
@@ -1623,15 +1654,48 @@ local function think(pet: Pet, now: number, _dt: number)
 	if pet.Brain then
 		KaijuBattleBrain.reset(pet) -- (just out of a battle)
 	end
+	-- Deployed but far away, for whatever reason (Kaiju.Follow): redeployed
+	-- beside you. Its body gone (fell past the world's floor): out again
+	-- fresh (upkeep).
+	if not pet.Root.Parent then
+		despawn(owner, pet.Record.Id)
+		return
+	end
+	local function redeploy()
+		pet.Target, pet.FightAt, pet.FarSince = nil, nil, nil
+		KaijuFighter.calm(pet.Fighter)
+		pet.Root.AssemblyLinearVelocity = Vector3.zero
+		KaijuServer.place(pet.Model, spotBy(ownerRoot, pet.Slot, owner), ownerRoot.Position)
+		fx("Deploy", pet.Root.Position, 4 * PET_SIZE, pet.Element, ownerRoot.Position)
+	end
+	-- Fallen, off a ledge or out of the world (from the floor under you, so
+	-- your own jump or leap isn't its fall).
+	if
+		math.abs(ownerRoot.Position.Y - pet.Root.Position.Y) > Kaiju.Follow.Fall
+		and not (pet.BeamUntil and now < pet.BeamUntil)
+		and math.abs(KaijuServer.ground(ownerRoot.Position).Y - pet.Root.Position.Y) > Kaiju.Follow.Fall
+	then
+		redeploy()
+		return
+	end
 	local away = flat(ownerRoot.Position - pet.Root.Position).Magnitude
 	-- In a fight it sees it through, however far you've walked off to mine
 	-- (up to Kaiju.Follow.Battle): no running back, no putting back beside you.
 	local fighting = inFight(pet, owner) and away <= Kaiju.Follow.Battle
 	if away > Kaiju.Follow.Teleport and not fighting then
-		pet.Target, pet.FightAt = nil, nil
-		KaijuFighter.calm(pet.Fighter)
-		KaijuServer.place(pet.Model, spotBy(ownerRoot, pet.Slot, owner), ownerRoot.Position)
+		redeploy()
 		return
+	end
+	-- Off past the leash and not fighting for Stuck seconds (stuck behind
+	-- something, left behind): redeployed too.
+	if away > Kaiju.Follow.Leash and not fighting then
+		pet.FarSince = pet.FarSince or now
+		if now - pet.FarSince >= Kaiju.Follow.Stuck then
+			redeploy()
+			return
+		end
+	else
+		pet.FarSince = nil
 	end
 	local recalled = now < pet.RecallUntil
 	if Kaiju.isSupport(pet.Record.Species) then

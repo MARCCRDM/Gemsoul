@@ -346,7 +346,15 @@ end
 -- and Engage + 12 from you. And you come first: with a creature on you or
 -- on your support (it can't fight back), a fight anywhere else is dropped
 -- and the team comes for what's on you (KaijuServer's teamPlan).
-Kaiju.Follow = { Engage = 32, Leash = 45, Battle = 150, Teleport = 90, Gap = 5, Chase = 22 }
+Kaiju.Follow = { Engage = 32, Leash = 45, Battle = 150, Teleport = 90, Gap = 5, Chase = 22, Ledge = 8, Fall = 25, Stuck = 4 }
+-- Ledge: a place in your line with no floor under it, or floor more than
+-- this far below you (the Rift's edges, a gate's drop), is pulled in toward
+-- you, so the team never walks off it.
+-- Far away, for whatever reason, it's redeployed beside you (its deploy
+-- flash): over Teleport studs off (Battle while it's in a fight), Fall
+-- studs below or above you (fallen), past Leash for Stuck seconds without
+-- a fight (stuck, left behind), or its body lost (fell out of the world:
+-- out again fresh).
 
 -- Jumping after you: when you jump (your root rising faster than Rise studs
 -- a second, from under Settle), the team following you jumps too, follow

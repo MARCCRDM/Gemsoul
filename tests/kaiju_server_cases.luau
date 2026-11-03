@@ -3268,6 +3268,85 @@ local function petPotters()
 end
 petPotters()
 
+-- Off a ledge (the Rift's edges, a gate's drop): a place in your line over
+-- the void is pulled in toward you; one that falls anyway is put back
+-- beside you; one whose body fell out of the world comes out again fresh.
+;(function()
+	pet = KaijuServer.pets()[a]
+	pet.RecallUntil, pet.StunUntil, pet.Target = 0, 0, nil
+	rootA.CFrame = CFrame.new(center2)
+	local raycast = workspaceObject.Raycast
+	-- (floor only within 3 studs of you: a ledge over the void all round)
+	workspaceObject.Raycast = function(_, origin)
+		if math.abs(origin.X - center2.X) <= 3 and math.abs(origin.Z - center2.Z) <= 3 then
+			return { Position = Vector3.new(origin.X, center2.Y - 3, origin.Z), Instance = workspaceObject }
+		end
+		return nil
+	end
+	local spot = KaijuServer._spotBy(rootA, pet.Slot, a)
+	check(math.abs(spot.X - center2.X) <= 3 and math.abs(spot.Z - center2.Z) <= 3, "A place in your line over the void: " .. tostring(spot - center2))
+	pet.Root.CFrame = CFrame.new(center2 + Vector3.new(2, -60, 2))
+	now += 0.15
+	KaijuServer._think(pet, now, 0.15)
+	check(math.abs(pet.Root.Position.Y - center2.Y) < 10, "A kaiju that fell wasn't put back beside you: " .. tostring(pet.Root.Position.Y - center2.Y))
+	-- (You up in a jump: not its fall.)
+	pet.Root.CFrame = CFrame.new(center2 + Vector3.new(2, -1, 2))
+	rootA.CFrame = CFrame.new(center2 + Vector3.new(0, 30, 0))
+	local before = pet.Root.Position
+	now += 0.15
+	KaijuServer._think(pet, now, 0.15)
+	check((pet.Root.Position - before).Magnitude < 0.01, "Your jump put your kaiju back as if it fell")
+	rootA.CFrame = CFrame.new(center2)
+	workspaceObject.Raycast = raycast
+	-- Its body gone past the world's floor: out again fresh.
+	local gone = pet
+	gone.Root.Parent = nil
+	now += 0.15
+	KaijuServer._think(gone, now, 0.15)
+	local still = false
+	for _, other in KaijuServer.all() do
+		if other == gone then
+			still = true
+		end
+	end
+	check(not still, "A kaiju whose body fell out of the world stayed on the team")
+	KaijuServer._upkeep(a, now)
+	local back = false
+	for _, other in KaijuServer.all() do
+		if other.Owner == a and other.Record == gone.Record and other ~= gone then
+			back = true
+		end
+	end
+	check(back, "A kaiju whose body fell out of the world didn't come out again")
+	pet = KaijuServer.pets()[a]
+	-- Stuck off past the leash, not fighting: redeployed beside you once
+	-- it's been Stuck seconds (not before), with its deploy flash.
+	pet.RecallUntil, pet.StunUntil, pet.Target, pet.FarSince = 0, 0, nil, nil
+	rootA.CFrame = CFrame.new(center2)
+	local farAt = center2 + Vector3.new(Kaiju.Follow.Leash + 10, 0, 0)
+	local function stuckThere()
+		pet.Root.CFrame = CFrame.new(farAt) -- (it can't get to you)
+	end
+	local function flat(v)
+		return Vector3.new(v.X, 0, v.Z)
+	end
+	stuckThere()
+	table.clear(fxs)
+	local t0 = now
+	while now - t0 < Kaiju.Follow.Stuck - 0.5 do
+		now += 0.15
+		stuckThere()
+		KaijuServer._think(pet, now, 0.15)
+	end
+	check((pet.Root.Position - farAt).Magnitude < 0.5, "Redeployed before it was stuck long enough")
+	for _ = 1, 8 do
+		now += 0.15
+		KaijuServer._think(pet, now, 0.15)
+	end
+	check(flat(pet.Root.Position - center2).Magnitude < 15, "A kaiju stuck far off wasn't redeployed beside you: " .. tostring(flat(pet.Root.Position - center2).Magnitude))
+	check(drew("Deploy"), "Redeployed with no deploy flash")
+end)()
+
 -- The Outpost for fifteen minutes ---------------------------------------------------------------------------
 
 -- A miner at work out at the Edge (critters come for the noise), the wild
