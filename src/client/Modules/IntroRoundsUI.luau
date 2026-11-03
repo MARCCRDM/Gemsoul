@@ -1047,11 +1047,12 @@ local function show(event)
 			-- (one way on: the next event, the first dungeon: HUNT BOUNTY.
 			-- Not the lobby: that opens once it's cleared.)
 			choosing = true
-			ui.WellCaption.Text = Lang.translate("NEXT EVENT  ·  HUNT BOUNTY")
+			-- (one row in the well: kept short so it fits)
+			ui.WellCaption.Text = Lang.translate("HUNT BOUNTY")
 			ui.WellCaption.TextSize = 10
 			ui.WellMain.Text = "BOMBARDIRO DRAGO"
 			ui.WellMain:SetAttribute("NoTranslate", true) -- (a name)
-			ui.WellNote.Text = Lang.translate("The first dungeon's boss  ·  Level 2")
+			ui.WellNote.Text = Lang.translate("LEVEL 2 BOSS")
 			ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
 			placeButtons(false, false)
 		else
