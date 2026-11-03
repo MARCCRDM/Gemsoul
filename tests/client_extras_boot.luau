@@ -495,6 +495,26 @@ do
 	services.UserInputService.InputBegan:Fire({ KeyCode = Enum.KeyCode.Return })
 	task.wait(0.2)
 	check(hunted == "Go" and gui:FindFirstChild("FirstBoss") == nil, "Enter didn't take them to the hunt")
+	-- The hunt with the starter roll still owed (a first win from before it
+	-- was rolled there): the kaiju roll first, then the window.
+	do
+		local profile = GemClient.Profile
+		local was = { profile.Kaiju, profile.KaijuRolled }
+		profile.Kaiju, profile.KaijuRolled = { List = {}, Next = 1 }, nil
+		local rolledBefore = kaijuRolled
+		local huntDone = false
+		task.spawn(function()
+			Finale.hunt()
+			huntDone = true
+		end)
+		task.wait(2)
+		check(kaijuRolled == rolledBefore + 1, "The hunt let them into the dungeon without their kaiju")
+		check(gui:FindFirstChild("FirstBoss") ~= nil, "No hunt window after the kaiju roll")
+		services.UserInputService.InputBegan:Fire({ KeyCode = Enum.KeyCode.Return })
+		task.wait(0.3)
+		check(huntDone, "The hunt didn't go on to the gate")
+		profile.Kaiju, profile.KaijuRolled = was[1], was[2]
+	end
 	-- After the lobby's intro: RECOMMENDED, FINISH YOUR INTRO FIGHTS (5 left).
 	roundStateAnswer = { Ok = true, Message = "", View = { Won = 1, Count = 6, Done = false } }
 	Finale.FinishFor = 0.4

@@ -897,6 +897,25 @@ function IntroFinale.hunt()
 		return
 	end
 	hunting = true
+	-- (Never into the dungeon without a kaiju: a starter roll still owed,
+	-- a first win from before it was rolled there or a roll cut short,
+	-- plays first.)
+	if GemClient.Profile and Kaiju.rollsOwed(GemClient.Profile) > 0 then
+		step("Kaiju")
+		banner("YOUR KAIJU TEAM", "They fight beside you in the dungeon")
+		local rolled = false
+		task.spawn(function()
+			require(script.Parent.KaijuRoll).play(function()
+				rolled = true
+			end)
+		end)
+		local started = os.clock()
+		while not rolled and os.clock() - started < 150 do
+			task.wait(0.2)
+		end
+		banner(nil)
+		task.wait(1.5) -- (they come out round you)
+	end
 	step("Invite")
 	local ok = pcall(invite, true)
 	if ok then
