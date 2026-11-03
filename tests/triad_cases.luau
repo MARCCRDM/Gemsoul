@@ -50,10 +50,10 @@ local Roller = load("GemRoller")
 local Actions = load("CombatActions")
 
 -- The matrix: 4 elements x 3 lanes x 5 moves, plus each element's showcase
--- defenses (a barrier and an escape) and the 12 intro moves, every one
--- defined once.
+-- defenses (a barrier and an escape), the 12 intro moves and Frost's
+-- starter-only Glacier Dome, every one defined once.
 local all, seen = Traits.all(), {}
-check(#all == 78, "The matrix holds 78 moves, found " .. #all)
+check(#all == 79, "The matrix holds 79 moves, found " .. #all)
 for _, id in all do
 	check(not seen[id], id .. " sits in the matrix twice")
 	seen[id] = true
@@ -79,7 +79,7 @@ for _, id in all do
 end
 -- The intro pools: two moves per key per element, all of that element and
 -- key, made to be seen: no plain shield, every defense a wall, ring,
--- pillar, decoy or slick.
+-- pillar, dome, decoy or slick.
 for element, lanes in Traits.Intro do
 	for lane, ids in lanes do
 		check(#ids == 2, element .. " " .. lane .. " needs two intro moves")
@@ -89,7 +89,7 @@ for element, lanes in Traits.Intro do
 			local move = Traits.Moves[id]
 			check(move.Absorb == nil, id .. " is a shield: not for the intro")
 			if lane == "Defense" then
-				check(move.Wall or move.Ring or move.Pillar or move.Decoy or move.Slick, id .. " puts nothing into the world")
+				check(move.Wall or move.Ring or move.Pillar or move.Dome or move.Decoy or move.Slick, id .. " puts nothing into the world")
 				check(Traits.Showcase[id] ~= nil, id .. " has no showcase role")
 			end
 		end
@@ -153,6 +153,7 @@ local R_DRAWINGS = {
 	R_RingOfFire = "function TriadVfx.ring(",
 	R_FrozenWall = '\tif kind == "Ice" then',
 	R_IcePillar = "function TriadVfx.pillar(",
+	R_GlacierDome = "function TriadVfx.dome(",
 	R_TeslaFence = '\telseif kind == "Tesla" then',
 	R_HoloDecoy = "function TriadVfx.decoy(",
 	R_SporeWall = '\telseif kind == "Spore" then',
@@ -219,6 +220,33 @@ local recut = Traits.reElement({ Defense = "R_HoloDecoy" }, "Shock", "Fire")
 check(recut.Defense == "R_RingOfFire", "An escape stays an escape on a recut")
 recut = Traits.reElement({ Defense = "R_FireWall" }, "Fire", "Poison")
 check(recut.Defense == "R_SporeWall", "A barrier stays a barrier on a recut")
+-- Glacier Dome: the Frost kit's escape, from the kit only. Mined and
+-- seeded stones never get it, a recut never lands on it, and a starter
+-- stone still carrying Ice Pillar is moved over to it.
+check(table.find(Traits.Intro.Frost.Defense, "R_GlacierDome") and not table.find(Traits.Intro.Frost.Defense, "R_IcePillar"), "The Frost kit still gives Ice Pillar")
+check((Traits.odds("Frost", "Defense").R_GlacierDome or 0) == 0, "Glacier Dome can be rolled")
+do
+	local rng = { v = 0 }
+	function rng:NextNumber()
+		self.v = (self.v + 0.0137) % 1
+		return self.v
+	end
+	for n = 1, 600 do
+		check(Traits.roll(rng, "Frost").Defense ~= "R_GlacierDome", "A mined Frost stone rolled Glacier Dome")
+		check(Traits.traitsOf({ Id = "dome-" .. n, Element = "Frost" }).Defense ~= "R_GlacierDome", "A seeded Frost stone got Glacier Dome")
+	end
+end
+check(Traits.reElement({ Defense = "R_RingOfFire" }, "Fire", "Frost").Defense == "R_IcePillar", "A recut landed on the starter-only Glacier Dome")
+check(Traits.reElement({ Defense = "R_GlacierDome" }, "Frost", "Fire").Defense == "R_RingOfFire", "Glacier Dome isn't an escape on a recut")
+do
+	local kit = { Id = "k", Element = "Frost", CutMethod = "Starter", Traits = { Offense = "Q_FrostChakram", Ability = "E_Hailstorm", Defense = "R_IcePillar" } }
+	local mined = { Id = "m", Element = "Frost", Traits = { Defense = "R_IcePillar" } }
+	check(Traits.upgradeStarter(kit) and kit.Traits.Defense == "R_GlacierDome", "A starter Ice Pillar wasn't moved over to Glacier Dome")
+	check(not Traits.upgradeStarter(mined) and mined.Traits.Defense == "R_IcePillar", "A mined Ice Pillar was changed")
+	check(Traits.traitsOf(kit).Defense == "R_GlacierDome", "A starter stone's saved Glacier Dome isn't kept")
+end
+local dome = Traits.stats("R_GlacierDome", { Tier = "Legendary" })
+check(dome.Dome and dome.Dome.Absorb >= 60 and dome.Dome.Freeze == 1, "A Legendary Glacier Dome's numbers")
 recut = Traits.reElement({ Defense = "R_Grounding" }, "Shock", "Frost")
 check(recut.Defense == "R_FrostRiposte", "A plain move keeps its slot on a recut")
 
@@ -329,4 +357,4 @@ check(not Tech.canSocket({ Id = "plain" }, "E", loadout), "A gem with no element
 local recut = Roller.setElement({ Element = "Fire", Surge = "EmberLance", Traits = { Offense = "Q_FurnaceCrescent", Ability = "E_EmberLance", Defense = "R_PhoenixMantle" } }, "Frost")
 check(recut.Traits.Offense == "Q_GlacierFan" and recut.Traits.Defense == "R_FrostRiposte", "Recut keeps trait slots")
 
-print("PASS: " .. checks .. " triad checks (78 moves, intro pools and looks, rolls, sockets, stats, casting)")
+print("PASS: " .. checks .. " triad checks (79 moves, intro pools and looks, rolls, sockets, stats, casting)")

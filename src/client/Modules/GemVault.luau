@@ -330,6 +330,16 @@ local function drawTree(parent: Frame, gem)
 		local soul = type(gem.Soul) == "table" and gem.Soul.Kind == "Kaiju"
 		local ids = ((if soul then Traits.SoulMoves else Traits.Matrix)[gem.Element] or {})[lane] or {}
 		local odds = Traits.odds(gem.Element, lane)
+		-- (a starter-only move isn't one this stone could roll: shown only on the stone that has it)
+		if not soul then
+			local rollable = {}
+			for _, id in ids do
+				if (odds[id] or 0) > 0 or id == traits[lane] then
+					table.insert(rollable, id)
+				end
+			end
+			ids = rollable
+		end
 		if soul then
 			odds = {}
 			for _, id in ids do

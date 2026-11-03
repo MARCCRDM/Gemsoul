@@ -190,6 +190,21 @@ check(ha.Health == 1000, "A sword reached you on the Ice Pillar")
 settle(3) -- (2.5s from when the cast lands)
 check(st2.Triad.Pillar == nil, "The Ice Pillar didn't shatter")
 check((foe.SlowUntil or 0) > now and (foe.Slow or 0) > 0, "The shatter didn't slow the foe")
+-- Glacier Dome (the Frost starter kit's, in Ice Pillar's place): the dome
+-- soaks a sword, then bursts in ice spikes: the foe hit, frozen and slowed.
+st2, foe = defense("Frost", "R_GlacierDome")
+check(cast("R"), "Glacier Dome was rejected")
+settle(0.4)
+check(st2.Triad.Dome ~= nil and (st2.Shield or 0) > 0, "Glacier Dome didn't close over you")
+foe.NextAttack = 0
+CombatServer._attack(b, ra.Position, false)
+settle(0.2)
+check(ha.Health == 1000, "A sword got through the Glacier Dome")
+local foeBefore = hb.Health
+settle(3.2) -- (3s from when the cast lands)
+check(st2.Triad.Dome == nil and (st2.Shield or 0) == 0, "The Glacier Dome didn't burst")
+check(hb.Health < foeBefore, "The dome's ice spikes didn't hit the foe")
+check((foe.SlowUntil or 0) > now and (foe.Slow or 0) > 0, "The dome's burst didn't slow the foe")
 -- Ring of Fire: crossing the ring burns.
 st2, foe = defense("Fire", "R_RingOfFire")
 rb.Position = ra.Position + Vector3.new(0, 0, -7)

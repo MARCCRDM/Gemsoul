@@ -198,6 +198,7 @@ local triadEffects = {
 	-- The showcase defenses.
 	RingOfFire = entry("Ring of Fire", "Thermal", "⭕", THERMAL, false, "Whoever crosses your ring of flame burns and is thrown back."),
 	IcePillar = entry("Ice Pillar", "Cryo", "🗻", CRYO, false, "Up on the ice: out of reach of swords."),
+	GlacierDome = entry("Glacier Dome", "Cryo", "❄", CRYO, false, "Under the ice: it soaks the blows, then bursts."),
 	TeslaFence = entry("Tesla Fence", "Ion", "⚡", ION, false, "Your fence stops bolts and stuns whoever crosses."),
 	HoloDecoy = entry("Hologram Decoy", "Ion", "👤", ION, false, "Your decoy bursts when a foe gets close."),
 	SporeWall = entry("Spore Wall", "Corrosive", "🌫", CORROSIVE, false, "Your fog wall stops bolts and poisons whoever walks through."),
@@ -235,6 +236,7 @@ Status.Order = {
 	"FireWall",
 	"RingOfFire",
 	"IcePillar",
+	"GlacierDome",
 	"TeslaFence",
 	"HoloDecoy",
 	"SporeWall",

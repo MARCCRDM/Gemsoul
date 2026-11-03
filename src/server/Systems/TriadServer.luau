@@ -696,6 +696,16 @@ function TriadServer.applySelf(player, k, st, definition, aim, now)
 			definition.Element
 		)
 	end
+	if definition.Dome then
+		-- Glacier Dome: an ice dome over you soaks Absorb for Time, then (or
+		-- the moment it's broken: TriadServer.absorbed) bursts in a ring of
+		-- ice spikes (the tick).
+		local dome = definition.Dome
+		st.Shield = math.max(st.Shield, dome.Absorb)
+		st.ShieldUntil = math.max(st.ShieldUntil, now + dome.Time)
+		t.Dome = { Until = now + dome.Time, Rider = dome, Definition = definition }
+		api.fx("TriadDome", player, dome.Radius, dome.Time, definition.Element)
+	end
 	if definition.Pillar then
 		-- Ice Pillar: a real column of ice under you (you stand on it);
 		-- swords can't reach you up there (TriadServer.incoming).
@@ -818,7 +828,7 @@ function TriadServer.applySelf(player, k, st, definition, aim, now)
 		t.Mantle = { Share = definition.Mantle.Share, Until = now + definition.Mantle.Time }
 		aura("Mantle", definition.Mantle.Time)
 	end
-	local placed = definition.Wall or definition.Pillar or definition.Ring or definition.Decoy or definition.Slick
+	local placed = definition.Wall or definition.Pillar or definition.Dome or definition.Ring or definition.Decoy or definition.Slick
 	if not definition.Damage and not placed then
 		api.fx("TechField", player, tint)
 	end
@@ -1259,6 +1269,10 @@ function TriadServer.absorbed(player, st, root, now)
 	if t.IonShield then
 		t.IonShield.LastHit = now
 	end
+	-- (Glacier Dome broken: it bursts now, on the next tick.)
+	if t.Dome and st.Shield <= 0 then
+		t.Dome.Until = math.min(t.Dome.Until, now)
+	end
 	local bulwark = t.Bulwark
 	if bulwark and st.Shield <= 0 then
 		t.Bulwark = nil
@@ -1463,6 +1477,35 @@ function TriadServer.tick(player, k, st, now, humanoid, root)
 							api.applyCC(target, wall.Stun, "Shocked")
 						end
 					end
+				end
+			end
+		end
+	end
+	local dome = t.Dome
+	if dome and now >= dome.Until then
+		-- The dome bursts: a ring of ice spikes round you. Everyone in it is
+		-- hit, frozen and slowed.
+		t.Dome = nil
+		local rider = dome.Rider
+		st.Shield = 0
+		api.fx("TriadDomeBurst", player, root.Position, rider.Radius, "Frost")
+		local spikes = {
+			Name = dome.Definition.Name,
+			Resource = "Charge",
+			Triad = true,
+			Element = "Frost",
+			Damage = rider.Damage,
+			Gem = dome.Definition.Gem,
+			RarityScaled = true,
+			Crit = 0,
+		}
+		for _, target in api.targets(player) do
+			local offset = (target.Root.Position - root.Position) * Vector3.new(1, 0, 1)
+			if offset.Magnitude <= rider.Radius and api.targetAllowed(player, target) then
+				api.hit(player, k, target, spikes, 1)
+				api.slow(target, rider.Slow, rider.SlowTime)
+				if rider.Freeze then
+					api.applyCC(target, rider.Freeze, "Frozen")
 				end
 			end
 		end
@@ -1779,6 +1822,9 @@ function TriadServer.statuses(st, now, add)
 	end
 	if t.Pillar then
 		add("IcePillar", t.Pillar.Until)
+	end
+	if t.Dome then
+		add("GlacierDome", t.Dome.Until)
 	end
 	for _, zone in t.Zones do
 		local name = ({ Ring = "RingOfFire", Decoy = "HoloDecoy", Slick = "AcidSlick" })[zone.Kind]

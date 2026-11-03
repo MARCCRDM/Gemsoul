@@ -2682,6 +2682,12 @@ end
 function handlers.TriadPillar(who, floor, height, seconds, element)
 	TriadVfx.pillar(who, floor, height, seconds, element)
 end
+function handlers.TriadDome(who, radius, seconds, element)
+	TriadVfx.dome(who, radius, seconds, element)
+end
+function handlers.TriadDomeBurst(who, center, radius, element)
+	TriadVfx.domeBurst(who, center, radius, element)
+end
 function handlers.TriadRing(who, radius, seconds, element)
 	TriadVfx.ring(who, radius, seconds, element)
 end

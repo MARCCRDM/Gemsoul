@@ -74,7 +74,7 @@ GemTraits.Matrix = {
 	Frost = {
 		Offense = { "Q_FrostNeedle", "Q_GlacierFan", "Q_ShatterCrown", "Q_PermafrostSpire", "Q_CryoEdge", "Q_FrostChakram" },
 		Ability = { "E_CryoLance", "E_CryoStream", "E_AbsoluteZero", "E_GlacierRetreat", "E_WintersHold", "E_Hailstorm" },
-		Defense = { "R_FrozenWall", "R_IceArmor", "R_ColdResolve", "R_GlacialBulwark", "R_FrostRiposte", "R_IcePillar" },
+		Defense = { "R_FrozenWall", "R_IceArmor", "R_ColdResolve", "R_GlacialBulwark", "R_FrostRiposte", "R_IcePillar", "R_GlacierDome" },
 	},
 	Shock = {
 		Offense = { "Q_ArcNeedle", "Q_CircuitCleave", "Q_Railstorm", "Q_StaticBrand", "Q_OverchargeStrike", "Q_ThunderDash", "Q_Skybreaker" },
@@ -650,6 +650,21 @@ M.R_IcePillar = {
 		Pillar = { Height = 9, Time = 2.5, Radius = 8, Slow = 0.5, SlowTime = 2, Freeze = 0.6 },
 	},
 }
+-- Glacier Dome: a Frost starter kit's escape (in Ice Pillar's place: GemTraits.
+-- Intro, IntroReplaced). Only ever from the starter kit (StarterOnly: mined
+-- stones never roll it). An ice dome closes over you and soaks Absorb for
+-- Time; then (or the moment it's broken) it bursts in a ring of ice spikes:
+-- Damage to everyone within Radius, frozen Freeze, slowed Slow for SlowTime.
+M.R_GlacierDome = {
+	Name = "Glacier Dome", Element = "Frost", Lane = R, Cost = 24, Cooldown = 14, Showcase = true, StarterOnly = true,
+	Dome = { Absorb = 60, Time = 3, Radius = 9, Damage = 0.5, Slow = 0.5, SlowTime = 2, Freeze = 0.6 },
+	Animation = "Wall", IconSource = "CryoShield",
+	Description = "An ice dome closes over you and soaks 60 damage for 3s, then bursts in a ring of ice spikes: 50% damage, frozen 0.6s and slowed 50% for everyone near you.",
+	Flourish = {
+		Text = "The spikes freeze for 1s.",
+		Dome = { Absorb = 60, Time = 3, Radius = 9, Damage = 0.5, Slow = 0.5, SlowTime = 2, Freeze = 1 },
+	},
+}
 M.R_TeslaFence = {
 	Name = "Tesla Fence", Element = "Shock", Lane = R, Cost = 24, Cooldown = 14, Showcase = true,
 	Wall = { Kind = "Tesla", Time = 3, Width = 10, Distance = 5, Stun = 0.6 },
@@ -777,7 +792,7 @@ M.E_Maneater = {
 	Flourish = { Text = "You heal 25% of the damage.", Leech = 0.25 },
 }
 
--- The intro's Q and E moves the old pools gave (and their place in the new
+-- The intro's moves the old pools gave (and their place in the new
 -- ones): starter stones that still carry one are moved over
 -- (GemTraits.upgradeStarter).
 GemTraits.IntroReplaced = {
@@ -787,6 +802,8 @@ GemTraits.IntroReplaced = {
 	E_ChainLightning = "E_StormCall", E_ThunderPylon = "E_IonCannon",
 	Q_CausticDart = "Q_ViperLash", Q_VitriolSweep = "Q_ToxicFlask",
 	E_ToxicCloud = "E_ToxicTide", E_LeechBloom = "E_Maneater",
+	-- (and the Frost kit's R: Ice Pillar -> Glacier Dome)
+	R_IcePillar = "R_GlacierDome",
 }
 
 GemTraits.Moves = M
@@ -803,7 +820,7 @@ GemTraits.Intro = {
 	Frost = {
 		Offense = { "Q_FrostChakram", "Q_PermafrostSpire" },
 		Ability = { "E_AbsoluteZero", "E_Hailstorm" },
-		Defense = { "R_FrozenWall", "R_IcePillar" },
+		Defense = { "R_FrozenWall", "R_GlacierDome" },
 	},
 	Shock = {
 		Offense = { "Q_ThunderDash", "Q_Skybreaker" },
@@ -849,6 +866,9 @@ end
 
 local function weightOf(id: string): number
 	local move = M[id]
+	if move and move.StarterOnly then
+		return 0 -- (only ever from the starter kit)
+	end
 	return if move and move.Rare then GemTraits.SignatureWeight else 1
 end
 
@@ -876,6 +896,11 @@ local function pickWeighted(ids: { string }, roll: number): string
 		at -= weightOf(id)
 		if at < 0 then
 			return id
+		end
+	end
+	for i = #ids, 1, -1 do
+		if weightOf(ids[i]) > 0 then
+			return ids[i]
 		end
 	end
 	return ids[#ids]
@@ -1123,6 +1148,7 @@ function GemTraits.stats(id: string, gem, normalized: boolean?)
 		d.Puddle.Poison = scaleTable(d.Puddle.Poison, potency, { "Power" })
 	end
 	d.Hail = longer(d.Hail, stretch, { "Time" })
+	d.Dome = longer(scaleTable(d.Dome, potency, { "Absorb", "Damage" }), stretch, { "Time" })
 	d.EndBurst = scaleTable(d.EndBurst, potency, { "Damage" })
 	d.Empower = scaleTable(d.Empower, potency, { "Power", "Steal", "Bonus" })
 	if d.Empower and d.Empower.Poison then
@@ -1265,6 +1291,7 @@ end
 GemTraits.Showcase = {
 	R_FireWall = "Barrier", R_FrozenWall = "Barrier", R_TeslaFence = "Barrier", R_SporeWall = "Barrier",
 	R_RingOfFire = "Escape", R_IcePillar = "Escape", R_HoloDecoy = "Escape", R_AcidSlick = "Escape",
+	R_GlacierDome = "Escape",
 }
 function GemTraits.reElement(traits, from: string, to: string)
 	if type(traits) ~= "table" or not GemTraits.Matrix[from] or not GemTraits.Matrix[to] then
@@ -1276,7 +1303,9 @@ function GemTraits.reElement(traits, from: string, to: string)
 		local role = GemTraits.Showcase[id]
 		if role and target then
 			for _, other in target do
-				if GemTraits.Showcase[other] == role then
+				-- (never onto a starter-only move: it comes only from the kit)
+				local starterOnly = M[other] and M[other].StarterOnly
+				if GemTraits.Showcase[other] == role and not starterOnly then
 					out[lane] = other
 				end
 			end

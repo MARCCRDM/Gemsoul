@@ -1382,6 +1382,123 @@ function TriadVfx.pillar(who: Player, floor: Vector3, height: number, seconds: n
 	end)
 end
 
+-- Glacier Dome: an ice dome closes over the caster and rides with them (the
+-- server's shield soaks the blows), then bursts: TriadVfx.domeBurst.
+TriadVfx.DomeSize = 10 -- studs across
+function TriadVfx.dome(who: Player, radius: number, seconds: number, element: string?)
+	local root = rootOf(who)
+	if not root then
+		return
+	end
+	local color = colorOf(element)
+	local k = FxSize.get()
+	local size = TriadVfx.DomeSize * k
+	local feet = -2.9 * k
+	-- (it follows the body: the dome's centre at their feet, so its top half shows)
+	local f = follow(root, seconds + 0.2, "GlacierDome", function(self, age)
+		local pulse = 1 + 0.02 * math.sin(age * 6)
+		for i, entry in self.Parts do
+			if i <= 2 and age > 0.3 then
+				local base = if i == 1 then size else size * 0.9
+				entry.Part.Size = Vector3.one * base * pulse
+			end
+		end
+	end)
+	f.Scale = 1
+	local shell = glass(Vector3.one * 0.5, root.CFrame, ICE, 0.55)
+	shell.Shape = Enum.PartType.Ball
+	shell.Material = Enum.Material.Glass
+	hold(f, shell, CFrame.new(0, feet, 0))
+	tween(shell, 0.3, { Size = Vector3.one * size }, Enum.EasingStyle.Back)
+	local inner = part(Vector3.one * 0.5, root.CFrame, WHITE, 0.82, Enum.PartType.Ball, Enum.Material.ForceField)
+	hold(f, inner, CFrame.new(0, feet, 0))
+	tween(inner, 0.3, { Size = Vector3.one * size * 0.9 }, Enum.EasingStyle.Back)
+	light(inner, DEEP_ICE, 3, size * 1.6)
+	-- Crystals ringing its foot, leaning out.
+	for i = 1, 12 do
+		local a = i / 12 * math.pi * 2
+		local tall = (1.6 + (i % 3) * 0.8) * k
+		local spike = glass(Vector3.new(0.7, 0.2, 0.7) * k, root.CFrame, if i % 2 == 0 then DEEP_ICE else ICE, 0.15)
+		spike.Material = Enum.Material.Ice
+		local at = CFrame.new(math.cos(a) * size / 2, feet + tall / 2, math.sin(a) * size / 2)
+			* CFrame.Angles(math.sin(a) * 0.45, 0, -math.cos(a) * 0.45)
+		hold(f, spike, at)
+		task.delay(0.1 + i * 0.015, function()
+			tween(spike, 0.15, { Size = Vector3.new(0.7 * k, tall, 0.7 * k) }, Enum.EasingStyle.Back)
+		end)
+	end
+	-- Frost drifting down inside it.
+	if not busy() then
+		local attachment = Instance.new("Attachment")
+		attachment.Parent = inner
+		emitter(attachment, WHITE, 18, { Size = 0.18, Speed = 1, Life = 1.2, Spread = 180, Acceleration = Vector3.new(0, -2, 0), Light = 0.5 })
+	end
+	local ground = floorUnder(root.Position)
+	FX.halo(ground + Vector3.new(0, 0.15, 0), ICE, 2 * k, size * 1.3, 0.45, nil, 0.3)
+	FX.rays(ground + Vector3.new(0, 1, 0), ICE, 14, size * 0.8, 0.35, true)
+	FX.motes(ground + Vector3.new(0, 1.5, 0), ICE, 16, size * 0.6, 12, 0.3, 1)
+	FX.dust(ground, Color3.fromRGB(205, 228, 245), size * 0.6, 0.8, 10)
+	CombatFx.flash(ground + Vector3.new(0, 3, 0), DEEP_ICE, 8, size * 2.5, 0.35)
+	ringAt(ground, 2 * k, color, 0.1, 0.35, size / (2 * k))
+	if CombatFx.nearMe(ground, 30) then
+		CombatFx.shake(0.3, 0.2)
+	end
+	CombatSound.play("Freeze", root.Position, { Volume = 1 })
+	CombatSound.play("Shield", root.Position, { Volume = 0.6, Pitch = 0.8 })
+end
+
+-- Glacier Dome bursting: the dome shatters and a ring of ice spikes erupts
+-- out to `radius`, one after another round it.
+function TriadVfx.domeBurst(who: Player, center: Vector3, radius: number, element: string?)
+	local root = rootOf(who)
+	if root then
+		stopFollow(root, "GlacierDome")
+	end
+	local color = colorOf(element)
+	local k = FxSize.get()
+	local floor = floorUnder(center)
+	local count = 16
+	for i = 1, count do
+		local a = i / count * math.pi * 2 + math.random() * 0.15
+		local out = Vector3.new(math.cos(a), 0, math.sin(a))
+		local tall = (2.4 + math.random() * 1.6) * k
+		local from = floor + out * 1.5 * k
+		local to = floor + out * radius * (0.75 + math.random() * 0.2)
+		local spike = glass(Vector3.new(0.9, 0.3, 0.9) * k, CFrame.new(from), if i % 2 == 0 then DEEP_ICE else ICE, 0.1)
+		spike.Material = Enum.Material.Ice
+		local lean = CFrame.Angles(out.Z * 0.5, 0, -out.X * 0.5)
+		task.delay(i % 4 * 0.02, function()
+			tween(spike, 0.16, { Size = Vector3.new(0.9 * k, tall, 0.9 * k), CFrame = CFrame.new(to + Vector3.new(0, tall / 2, 0)) * lean }, Enum.EasingStyle.Back)
+			task.delay(0.55, function()
+				fade(spike, 0.3, { Size = Vector3.new(0.3 * k, tall * 0.3, 0.3 * k), CFrame = CFrame.new(to) * lean })
+			end)
+		end)
+	end
+	-- The shell flying apart.
+	for n = 1, 10 do
+		local at = floor + Vector3.new((math.random() - 0.5) * 6, 1 + math.random() * 4, (math.random() - 0.5) * 6) * k
+		local chunk = glass(Vector3.new(0.8, 0.9, 0.6) * k, CFrame.new(at) * CFrame.Angles(math.random() * 6, math.random() * 6, 0), if n % 2 == 0 then DEEP_ICE else WHITE, 0.2)
+		local away = (at - floor) * Vector3.new(1, 0, 1)
+		away = if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)
+		fade(chunk, 0.5, { CFrame = CFrame.new(at + away * 5 * k - Vector3.new(0, 1.5, 0)) * CFrame.Angles(math.random() * 6, 0, math.random() * 6) }, Enum.EasingStyle.Quad)
+	end
+	ringAt(floor, 2 * k, color, 0.05, 0.45, radius / k)
+	ringAt(floor + Vector3.new(0, 0.03, 0), k, WHITE, 0.2, 0.35, radius * 1.15 / k)
+	CombatFx.burst(floor + Vector3.new(0, 2, 0), ICE, "Shards", 2)
+	CombatFx.flash(floor + Vector3.new(0, 2, 0), ICE, 10, radius * 3, 0.4)
+	FX.rays(floor + Vector3.new(0, 1, 0), ICE, 18, radius * 1.2, 0.4, true)
+	FX.halo(floor + Vector3.new(0, 0.1, 0), ICE, 3 * k, radius * 2.4, 0.45, nil, 0.25)
+	FX.column(floor, ICE, 2, 14, 0.4)
+	FX.motes(floor + Vector3.new(0, 1, 0), ICE, 22, radius, 14, 0.3, 1)
+	FX.dust(floor, Color3.fromRGB(205, 228, 245), radius, 0.8, 12)
+	if CombatFx.nearMe(floor, 40) then
+		CombatFx.shake(0.55, 0.3)
+	end
+	CombatSound.play("GuardBreak", floor, { Volume = 0.9, Pitch = 1.15 })
+	CombatSound.play("Blast", floor, { Volume = 0.7, Pitch = 1.3 })
+	CombatSound.play("Freeze", floor, { Volume = 0.9 })
+end
+
 -- Ring of Fire: a wheel of flame that turns around the caster as they move.
 function TriadVfx.ring(who: Player, radius: number, seconds: number, element: string?)
 	local root = rootOf(who)
