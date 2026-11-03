@@ -385,6 +385,9 @@ function IntroRoundsServer.dungeonCleared(player: Player)
 	profile.IntroDungeonCleared = true
 	markFinale(player)
 	pcall(Analytics.event, player, "IntroDungeonCleared")
+	pcall(function()
+		require(script.Parent.Journey).reach(player, "Cleared the first dungeon")
+	end)
 	return true
 end
 local finaleCritters = {} :: { [Player]: { any } }
@@ -412,6 +415,11 @@ end
 local function finale(player: Player, step: any, name: any)
 	if step == "Step" then
 		player:SetAttribute("IntroFinaleStep", if FINALE_STEPS[name] then name else nil)
+		if FINALE_STEPS[name] and name ~= "Away" and name ~= "Over" then
+			pcall(function()
+				require(script.Parent.Journey).reach(player, "Lobby intro " .. string.lower(name))
+			end)
+		end
 		return reply(true, "")
 	end
 	local profile = PlayerData.get(player) :: any
@@ -618,6 +626,9 @@ function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 		event.Coins = IntroRounds.SetCoins
 	end
 	Analytics.event(player, "IntroRound", round, slot, piece.Rarity, if done then "Done" else "Won")
+	pcall(function()
+		require(script.Parent.Journey).reach(player, if done then "Intro rounds all won" else string.format("Round %d won", round))
+	end)
 	event.View = IntroRounds.view(state)
 	-- (the card's one way on: HUNT BOUNTY, while the first dungeon's owed)
 	event.Hunt = IntroRoundsServer.huntNext(profile, state) or nil
@@ -637,6 +648,9 @@ function IntroRoundsServer.lost(player: Player): boolean
 	local round = IntroRounds.round(state)
 	IntroRounds.lost(state)
 	Analytics.event(player, "IntroRound", round, IntroRounds.slot(round), "Lost", "Lost")
+	pcall(function()
+		require(script.Parent.Journey).reach(player, string.format("Round %d lost", round))
+	end)
 	player:SetAttribute("IntroRounds", true)
 	player:SetAttribute("IntroRoundFight", nil)
 	Remotes.Social:FireClient(player, "IntroRound", { Phase = "Lost", Round = round, View = IntroRounds.view(state) })
@@ -654,6 +668,12 @@ local function nextRound(player: Player)
 	end
 	if player:GetAttribute("MatchId") or player:GetAttribute("DuelQueue") then
 		return reply(false, "You're already in a match.")
+	end
+	-- (CONTINUE ROUNDS on the card instead of HUNT BOUNTY: the journey's fork)
+	if IntroRoundsServer.huntNext(PlayerData.get(player), state) then
+		pcall(function()
+			require(script.Parent.Journey).reach(player, string.format("Kept fighting after round %d", state.Won))
+		end)
 	end
 	-- (back to the rounds after a step out: held in them again)
 	if state.Paused then
@@ -749,6 +769,9 @@ function IntroRoundsServer.choose(player: Player, which: any)
 	markFinale(player)
 	markLeft(player)
 	pcall(Analytics.event, player, "IntroChoice", state.Won, which)
+	pcall(function()
+		require(script.Parent.Journey).reach(player, "Chose HUNT BOUNTY")
+	end)
 	local out = leaveRounds(player)
 	out.Choice = which
 	return out

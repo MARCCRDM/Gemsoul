@@ -84,6 +84,7 @@ function DevAccounts.start()
 	started = true
 	require(script.Parent.Analytics).excluded = DevAccounts.excluded
 	require(script.Parent.Funnel).excluded = DevAccounts.excluded
+	require(script.Parent.Journey).excluded = DevAccounts.excluded
 	require(script.Parent.Telemetry).excluded = DevAccounts.excluded
 end
 

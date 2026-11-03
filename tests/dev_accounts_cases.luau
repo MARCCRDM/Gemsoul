@@ -86,8 +86,11 @@ local Telemetry = load("/src/server/Systems/Telemetry.luau", "Telemetry", { Play
 -- (what the log keeps: Telemetry.here)
 local Analytics = load("/src/server/Systems/Analytics.luau", "Analytics", {})
 local Funnel = load("/src/server/Systems/Funnel.luau", "Funnel", { PlayerData = PlayerData, Remotes = {} })
+local Journey = load("/src/server/Systems/Journey.luau", "Journey", {})
 local DevAccounts = load("/src/server/Systems/DevAccounts.luau", "DevAccounts", { PlayerData = PlayerData })
 DevAccounts.start()
+-- (the first session's journey leaves them out too: Server.Journey)
+check(Journey.excluded == DevAccounts.excluded, "Dev accounts aren't left out of the journey")
 
 -- Who's left out.
 check(DevAccounts.excluded(players[OWNER]) and DevAccounts.excluded(OWNER), "An Owner counts")

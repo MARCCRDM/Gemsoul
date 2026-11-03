@@ -78,6 +78,15 @@ function Funnel.reach(player: Player, name: string): boolean
 		return false
 	end
 	done[name] = true
+	-- (and the first session's journey: Server.Journey)
+	pcall(function()
+		local Journey = require(script.Parent.Journey)
+		if name == "Joined" then
+			Journey.start(player)
+		else
+			Journey.reach(player, name)
+		end
+	end)
 	if Funnel.excluded(player) then
 		return true -- (a dev account: reached, not counted: Server.DevAccounts)
 	end

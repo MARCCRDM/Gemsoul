@@ -279,6 +279,11 @@ end
 local function home(player: Player, text: string?)
 	local run = runOf[player]
 	runOf[player] = nil
+	if run then
+		pcall(function()
+			require(script.Parent.Journey).reach(player, if run.Won then "Back from a dungeon won" else "Back from a dungeon not won")
+		end)
+	end
 	for _, key in CLEAR do
 		player:SetAttribute(key, nil)
 	end
@@ -1142,6 +1147,9 @@ local function join(run, player: Player)
 	local intro = false
 	pcall(function()
 		intro = require(script.Parent.IntroRoundsServer).owesDungeon(player)
+	end)
+	pcall(function()
+		require(script.Parent.Journey).reach(player, if intro then "Entered the first dungeon" else "Entered a dungeon")
 	end)
 	if intro then
 		local ok, joined = pcall(KaijuServer.ensureStarter, player)

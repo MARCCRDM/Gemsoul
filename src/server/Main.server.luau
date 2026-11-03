@@ -65,6 +65,8 @@ else
 end
 -- The onboarding funnel (analytics) listens for loads, so it starts first.
 require(script.Parent.Systems.Funnel).start()
+-- A new player's first session as a journey (Systems/Journey: Creator Dashboard > Journeys).
+require(script.Parent.Systems.Journey).listen()
 -- Coins, feature events and the Store funnel (Creator Dashboard > Analytics).
 require(script.Parent.Systems.Analytics).start(
 	require(script.Parent.Systems.Remotes).Funnel,

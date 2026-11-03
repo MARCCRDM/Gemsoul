@@ -25,6 +25,28 @@ Each server saves its own rows under `ev/<UTC day>/<hour>/<server>` every 5
 minutes and when it shuts down. Studio writes to `SagaTelemetry_Studio`
 instead, so tests never mix with real data.
 
+## Journeys: a new player's first session (Creator Dashboard)
+
+`Server/Systems/Journey.luau` sends Roblox journey events
+(`AnalyticsService:LogJourneyEvent`) for the session a player joins in as
+new: one journey, **First session**, one session id each, every node once.
+Creator Dashboard > Analytics > Journeys draws them as a Sankey of the paths
+players take. Its nodes:
+
+- the onboarding steps (Joined, Element, Kit, First fight, Lobby, First rock,
+  First gem, Socketed, Surge ready, Second duel)
+- `Round N won` / `Round N lost` / `Intro rounds all won`
+- `Chose HUNT BOUNTY` or `Kept fighting after round N`
+- `Starter kaiju roll`, `Bounty kaiju roll`
+- `Entered the first dungeon`, `Cleared the first dungeon`,
+  `Back from a dungeon won` / `not won`
+- `Lobby intro mine` / `gems` / `minions` / `kaiju` / `invite`
+- `Left the game`, last, with where they were (custom field 1) and how long
+  they'd played (custom field 2)
+
+Dev and test accounts are left out, as below. Journeys only fill in from a
+published game, and the chart can take up to a day to show.
+
 ## Dev and test accounts are left out
 
 Nothing from these accounts goes to Roblox's Analytics (funnels, custom

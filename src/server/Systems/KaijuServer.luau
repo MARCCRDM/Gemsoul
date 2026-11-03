@@ -719,6 +719,11 @@ end
 local function claimRoll(player: Player): { any }
 	local profile = PlayerData.get(player)
 	local roll = profile and prepareRoll(profile)
+	if roll then
+		pcall(function()
+			require(script.Parent.Journey).reach(player, if roll.Boss then "Bounty kaiju roll" else "Starter kaiju roll")
+		end)
+	end
 	if not profile or not roll then
 		return {}
 	end
