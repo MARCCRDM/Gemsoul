@@ -54,6 +54,58 @@ local chunk = luau.load(source:sub(from, to + 4) .. "return Duelist", {
 })
 chunk()
 
+-- A REAL rival kit (Duelist's rollLoadout, rolled like a new player's
+-- starter kit): with the Q/E/R triad on its stones sit in the sword, chest
+-- and shield, none in the retired surge sockets. Its three surges are made
+-- from those stones: each one there, a showcase move, cast as itself.
+do
+	local shared = setmetatable({}, { __index = function(_, k) return k end })
+	local services = { ReplicatedStorage = { Shared = shared } }
+	local function serverModule(name)
+		local env = setmetatable({
+			game = { GetService = function(_, n) return services[n] or setmetatable({}, { __index = function() return function() end end }) end },
+			script = { Parent = setmetatable({}, { __index = function(_, k) return k end }) },
+			require = function(m) return load(m) end,
+			Color3 = roblox.Color3, Vector3 = roblox.Vector3,
+		}, { __index = _G })
+		return luau.load(fs.readFile(ROOT .. "/src/server/Systems/" .. name .. ".luau"), { debugName = name, environment = env })()
+	end
+	local at = source:find("local idCounter = 0", 1, true)
+	local rollAt = source:find("local function rollLoadout(rng: Random)", 1, true)
+	local rollEnd = source:find("\nend\n", rollAt, true)
+	check(at and rollAt and rollEnd and at < rollAt, "Duelist's rollLoadout isn't where expected")
+	local roll = luau.load("local idCounter = 0\n" .. source:sub(rollAt, rollEnd + 4) .. "return rollLoadout", {
+		debugName = "rollLoadout",
+		environment = setmetatable({
+			Classes = load("Classes"), Slots = load("EquipmentSlots"), GearRolls = load("GearRolls"),
+			Lottery = load("StarterLottery"), GemRoller = load("GemRoller"), GemGenerator = serverModule("GemGenerator"),
+		}, { __index = _G }),
+	})()
+	local seed = 11
+	local rng = {}
+	function rng:NextNumber(a, b)
+		seed = (seed * 1103515245 + 12345) % 2147483648
+		local u = (seed // 65536) / 32768
+		return if a then a + (b - a) * u else u
+	end
+	function rng:NextInteger(a, b)
+		return math.clamp(a + math.floor(self:NextNumber() * (b - a + 1)), a, b)
+	end
+	for n = 1, 40 do
+		local kit = roll(rng)
+		if n == 1 then
+			check(kit.Surge1Gem == nil and kit.Surge2Gem == nil and kit.Surge3Gem == nil, "A rolled rival kit has surge-socket stones after all (this test's premise)")
+		end
+		local set = Duelist.showcaseSurges(kit, function(m) return rng:NextInteger(1, m) end)
+		check(#set == 3, "A real rival kit got " .. #set .. " showcase surges, not 3")
+		for slot = 1, 3 do
+			local gem = kit["Surge" .. slot .. "Gem"]
+			check(gem and Kaiju.AbilityPlans[gem.Surge] and Tech.surgeOf(gem) == gem.Surge, "A real rival kit's surge " .. slot .. " isn't a showcase move")
+			check((Tech.surgeStats(gem) or {}).Name ~= nil, "A real rival kit's surge " .. slot .. " has no numbers")
+		end
+	end
+end
+
 -- Every mix of elements on the three surge gems, every pick.
 local elements = { "Fire", "Frost", "Shock", "Poison" }
 -- (a seeded pick: lune has no Random)
@@ -103,14 +155,15 @@ for _, element in elements do
 	end
 end
 -- No surge gems (the tutorial's bare rival): nothing changes.
-check(#Duelist.showcaseSurges({}, function() return 1 end) == 0, "Surges out of nothing")
+-- No stones at all: still three, made in some element.
+check(#Duelist.showcaseSurges({}, function() return 1 end) == 3, "A rival with no stones got no surges")
 
 -- Wired: an intro round's rival, or the very first fight's.
 do
 	local at = source:find("function spawnRival", 1, true)
 	local body = source:sub(at, source:find("\nend\n", at, true))
 	check(
-		body:find("if introRound or (not raid and not encounter and session == \"Training\" and duelsPlayed(owner) == 0) then", 1, true) ~= nil
+		body:find("if not fastTutorial and (introRound or (not raid and not encounter and session == \"Training\" and duelsPlayed(owner) == 0)) then", 1, true) ~= nil
 			and body:find("Duelist.showcaseSurges(loadout", 1, true) ~= nil,
 		"Intro rivals aren't given the showcase moves"
 	)

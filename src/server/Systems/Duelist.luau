@@ -162,6 +162,28 @@ Duelist.ShowcasePower = 0.75
 function Duelist.showcaseSurges(loadout, pick: (number) -> number): { string }
 	local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 	local set = {}
+	-- (With the Q/E/R triad on, a rolled kit has no surge-socket stones: they
+	-- were retired, its stones are in the sword, chest and shield. Its three
+	-- surges are made from those, Q from the sword's, E from the chest's and
+	-- the shield's, each in that stone's element and rarity. Without this the
+	-- rival had no surges at all.)
+	local elements = { "Fire", "Frost", "Shock", "Poison" }
+	local from = { loadout.WeaponGem, loadout.ArmorGem, loadout.ShieldGem }
+	for slot = 1, 3 do
+		if not loadout["Surge" .. slot .. "Gem"] then
+			local base = from[slot] or loadout.HelmetGem or loadout.BootsGem or loadout.GlovesGem
+			loadout["Surge" .. slot .. "Gem"] = {
+				Id = string.format("%s-surge%d", tostring(base and base.Id or "rival"), slot),
+				Element = if base and base.Element then base.Element else elements[math.clamp(pick(#elements), 1, #elements)],
+				Tier = if base and base.Tier then base.Tier else "Uncommon",
+				Size = base and base.Size or 5,
+				Clarity = base and base.Clarity or 5,
+				Cut = base and base.Cut or 5,
+				SurgeTier = 1,
+				SurgeRank = 1,
+			}
+		end
+	end
 	for slot = 1, 3 do
 		local gem = loadout["Surge" .. slot .. "Gem"]
 		local lanes = gem and GemTraits.Intro[gem.Element]
@@ -2480,7 +2502,8 @@ function spawnRival(owner: Player, raid, encounter)
 	-- the starter kit's showcase moves, as the player's do: a leap or a
 	-- strike on Q (GemTraits.Intro's Offense), the big storms, cannons and
 	-- blasts on E and R (its Ability), each in its own surge gem's element.
-	if introRound or (not raid and not encounter and session == "Training" and duelsPlayed(owner) == 0) then
+	-- (not the scripted tutorial fight: its bare rival keeps to the lesson)
+	if not fastTutorial and (introRound or (not raid and not encounter and session == "Training" and duelsPlayed(owner) == 0)) then
 		Duelist.showcaseSurges(loadout, function(n)
 			return rng:NextInteger(1, n)
 		end)
