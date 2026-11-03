@@ -27,7 +27,7 @@
 	              and its Magma Golem (Server.MeteorGolemServer.soon: its
 	              own cinematic and fight)
 
-	Every line shows on screen and is read out (VoiceOver). Any step that
+	Every line shows on screen (nothing is read out). Any step that
 	can't happen (no rock near, no roll owed) is passed over.
 
 	  IntroFinale.start()   once (Lobby.client)
@@ -43,7 +43,6 @@ local UserInputService = game:GetService("UserInputService")
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
 local GemClient = require(script.Parent.GemClient)
 local UiKit = require(script.Parent.UiKit)
-local VoiceOver = require(script.Parent.VoiceOver)
 
 local IntroFinale = {}
 
@@ -220,7 +219,6 @@ local function mine()
 		end)
 	end
 	banner("HIT THE ROCK", "Swing your pick at it: click, or tap")
-	VoiceOver.say(IntroFinale.Lines.Mine)
 	-- The arrows always lead to the rock nearest you now (a rock mined out or
 	-- one nearer as you walk: the way follows).
 	local GroundGuide = nil
@@ -350,11 +348,9 @@ local function gems()
 	ok.Activated:Connect(function()
 		done = true
 	end)
-	VoiceOver.say(IntroFinale.Lines.Gems)
 	answer({ ok }, function()
 		return if done then "Ok" else nil
 	end, "Ok", "Ok", IntroFinale.GemsFor, shade)
-	VoiceOver.stop()
 	shade:Destroy()
 end
 
@@ -412,7 +408,6 @@ local function minions(): boolean
 	local cap = Instance.new("UITextSizeConstraint")
 	cap.MaxTextSize = 26
 	cap.Parent = caption
-	VoiceOver.say(IntroFinale.Lines.Minions)
 	-- Till every minion's through and landed (and the line's had its time).
 	local started = os.clock()
 	local deployed = tonumber(result.Deployed) or 0
@@ -461,7 +456,6 @@ local function kaiju(fight: boolean?)
 	end
 	GemClient.request("IntroFinale", "Fight")
 	banner("YOUR KAIJU DEFEND YOU", "Train and protect them, and they'll protect you")
-	VoiceOver.say(IntroFinale.Lines.Fight)
 	local started = os.clock()
 	while os.clock() - started < IntroFinale.FightFor do
 		task.wait(2)
@@ -640,11 +634,9 @@ local function invite(hunt: boolean?)
 	end
 	if hunt then
 		button(if keysOnly then "HUNT BOUNTY  [ENTER]" else "HUNT BOUNTY", 18, W_CARD - 36, true, "Go")
-		VoiceOver.say(IntroFinale.Lines.Hunt)
 	else
 		button("LATER", 18, 150, false, "Later")
 		button(if keysOnly then "ENTER DUNGEON  [ENTER]" else "ENTER DUNGEON", 180, W_CARD - 198, true, "Go")
-		VoiceOver.say(IntroFinale.Lines.Invite)
 	end
 	-- (Enter takes you in; left alone, LATER: the Bounty Board has it. The
 	-- hunt waits for them: no LATER.)
@@ -654,7 +646,6 @@ local function invite(hunt: boolean?)
 	if not choice then
 		choice = "Later"
 	end
-	VoiceOver.stop()
 	closed = true
 	shade:Destroy()
 	if not hunt then
@@ -664,7 +655,13 @@ local function invite(hunt: boolean?)
 	end
 	if choice == "Go" then
 		pcall(function()
-			require(script.Parent.RiftClient).openGate("Bounty")
+			local Rift = require(script.Parent.RiftClient)
+			-- (HUNT BOUNTY: straight into Bombardiro Drago's Rift, no board
+			-- to pick from and close; the board only if that can't be done)
+			local inside = hunt and Rift.enterBounty("Drago")
+			if not inside then
+				Rift.openGate("Bounty")
+			end
 		end)
 	end
 	return choice
@@ -743,11 +740,9 @@ local function recommend()
 	end
 	button("LATER", 24, 130, false, "Later")
 	button(if keysOnly then "CONTINUE FIGHTS  [ENTER]" else "CONTINUE FIGHTS", 166, 270, true, "Go")
-	VoiceOver.say(IntroFinale.Lines.Finish)
 	choice = answer(buttons, function()
 		return choice
 	end, "Go", "Later", IntroFinale.FinishFor, shade)
-	VoiceOver.stop()
 	shade:Destroy()
 	if choice == "Go" then
 		local result = GemClient.request("IntroRoundNext")
@@ -775,7 +770,6 @@ local function run()
 		if IntroFinale.dungeonDone() and GemClient.Profile and Kaiju.rollsOwed(GemClient.Profile) == 0 and Kaiju.bossRollsOwed(GemClient.Profile) > 0 then
 			step("Kaiju")
 			banner("BOUNTY CLAIMED", "Your reward: a new kaiju")
-			VoiceOver.say(IntroFinale.Lines.Reward)
 			local rolled = false
 			task.spawn(function()
 				require(script.Parent.KaijuRoll).play(function()
@@ -813,7 +807,6 @@ local function run()
 	local done = GemClient.request("IntroFinale", "Done")
 	if not going then
 		banner("WELL DONE, MINER", "The Outpost is yours")
-		VoiceOver.say(IntroFinale.Lines.Done)
 		task.wait(3)
 		banner(nil)
 	end
@@ -917,12 +910,7 @@ function IntroFinale.hunt()
 		task.wait(1.5) -- (they come out round you)
 	end
 	step("Invite")
-	local ok = pcall(invite, true)
-	if ok then
-		pcall(function()
-			require(script.Parent.RiftClient).openGate("Bounty")
-		end)
-	end
+	pcall(invite, true) -- (HUNT BOUNTY takes them in: invite)
 	heldUntil = os.clock() + IntroFinale.HuntAgain -- (the gate's lobby opens: huntDue waits on it)
 	hunting = false
 end

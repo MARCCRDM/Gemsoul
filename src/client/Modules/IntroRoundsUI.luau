@@ -47,6 +47,8 @@ local player = Players.LocalPlayer
 IntroRoundsUI.AutoNext = 5 -- seconds before the next round starts by itself (in the Arena)
 
 local W, H, PAD = 460, 496, 22 -- (px: the card, before scaling)
+local ONE_ROW = 48 -- (one row of buttons: the card that much shorter, no gap)
+local cardH = H -- (the card's height now: H, or H - ONE_ROW)
 local HERO_Y = 104 -- (the piece's centre)
 local TRACK_Y = 262 -- (the set's nodes' centres)
 local WELL_Y = 318
@@ -173,8 +175,8 @@ end
 local function fit()
 	local screen = gui.AbsoluteSize
 	if screen.X > 0 and screen.Y > 0 then
-		local s = math.min(1, (screen.X - 24) / W, (screen.Y - 24) / H)
-		local room, at = UiKit.clearTopbar(screen, Vector2.new(W, H) * s)
+		local s = math.min(1, (screen.X - 24) / W, (screen.Y - 24) / cardH)
+		local room, at = UiKit.clearTopbar(screen, Vector2.new(W, cardH) * s)
 		fitScale = s * room
 		scale.Scale = fitScale
 		panel.Position = at
@@ -409,8 +411,11 @@ end
 local function placeButtons(withLeave: boolean, withDungeon: boolean)
 	local full = W - PAD * 2
 	local half = (full - 10) / 2
-	local y2 = H - PAD - 48
-	local y1 = if withLeave or withDungeon then y2 - 8 - 52 else H - PAD - 52
+	-- (one button: the card ends under it, no empty band above it)
+	cardH = if withLeave or withDungeon then H else H - ONE_ROW
+	panel.Size = UDim2.fromOffset(W, cardH)
+	local y2 = cardH - PAD - 48
+	local y1 = if withLeave or withDungeon then y2 - 8 - 52 else cardH - PAD - 52
 	ui.Go.Position, ui.Go.Size = UDim2.fromOffset(PAD, y1), UDim2.fromOffset(full, 52)
 	ui.Leave.Visible, ui.Dungeon.Visible = withLeave, withDungeon
 	if withLeave and withDungeon then
@@ -912,8 +917,15 @@ local function choose(which: string)
 		local result = GemClient.request("IntroRoundChoose", which)
 		busy = false
 		if not (result and result.Ok) then
-			UiKit.toast(Lang.translate(result and result.Message or "Couldn't leave the rounds."), RED)
+			-- (never left standing on nothing: their next round instead)
+			local again = GemClient.request("IntroRoundNext")
+			if not (again and again.Ok) then
+				UiKit.toast(Lang.translate(result and result.Message or "Couldn't leave the rounds."), RED)
+			end
 			return
+		end
+		if result.Choice ~= "Boss" then
+			return -- (the first dungeon's done: the server put on their next round)
 		end
 		-- (the bounty's window, then its gate: Client IntroFinale)
 		pcall(function()
@@ -1043,7 +1055,7 @@ local function show(event)
 			ui.WellNote.Text = Lang.translate("Tung Tung Tung Sahur waits")
 			ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
 			placeButtons(true, false)
-		elseif (view.Won or event.Round or 0) >= IntroRounds.ChoiceAfter and player:GetAttribute("IntroFinale") ~= "Mines" then
+		elseif event.Hunt == true then
 			-- (one way on: the next event, the first dungeon: HUNT BOUNTY.
 			-- Not the lobby: that opens once it's cleared.)
 			choosing = true
@@ -1104,10 +1116,10 @@ function IntroRoundsUI.start()
 	end
 	started = true
 	build()
+	-- (Clicks always work, and Enter too: the card frees the mouse while
+	-- it's up, Modal, so a locked camera never leaves its button dead.)
+	ui.Go.Modal = true
 	ui.Go.Activated:Connect(function()
-		if keysOnly() then
-			return -- (a computer: Enter, so nobody's stuck freeing the mouse)
-		end
 		IntroRoundsUI.next()
 	end)
 	-- On a computer the card is played from the keyboard (its key caps say
@@ -1144,7 +1156,7 @@ function IntroRoundsUI.start()
 		Font = Enum.Font.GothamBlack,
 		TextSize = 13,
 		TextColor3 = Color3.fromRGB(255, 244, 220),
-		Text = "ENTER ↵",
+		Text = "ENTER",
 		ZIndex = 6,
 		Visible = not UiKit.touchOnly(),
 	}, ui.Go)
@@ -1160,9 +1172,6 @@ function IntroRoundsUI.start()
 		end
 	end)
 	ui.Dungeon.Activated:Connect(function()
-		if keysOnly() then
-			return
-		end
 		if choosing then
 			choose("Boss")
 			return
@@ -1170,9 +1179,6 @@ function IntroRoundsUI.start()
 		IntroRoundsUI.toDungeon()
 	end)
 	ui.Leave.Activated:Connect(function()
-		if keysOnly() then
-			return
-		end
 		if choosing then
 			return -- (no way to the lobby before the first dungeon: its button's hidden)
 		end

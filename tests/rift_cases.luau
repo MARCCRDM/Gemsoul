@@ -1125,6 +1125,13 @@ do
 		local body = joinAt and joinEnd and server:sub(joinAt, joinEnd) or ""
 		check(body:find("owesDungeon(player)", 1, true) ~= nil and body:find("KaijuServer.ensureStarter", 1, true) ~= nil and body:find("KaijuServer.deployTeam", 1, true) ~= nil, "Into the first dungeon without kaiju is still possible")
 		check(body:find("KaijuServer.restoreAll, player", 1, true) ~= nil, "Into the first dungeon with its kaiju still knocked out")
+		-- HUNT BOUNTY goes straight in to Bombardiro Drago (no board to pick
+		-- from and close, coming back every few seconds).
+		local riftClient = fs.readFile(ROOT .. "/src/client/Modules/RiftClient.luau")
+		local finale = fs.readFile(ROOT .. "/src/client/Modules/IntroFinale.luau")
+		check(riftClient:find('GemClient.request, "RiftEnter", "Bounty", bossId, false', 1, true) ~= nil, "No straight way into a bounty's Rift")
+		check(finale:find('hunt and Rift.enterBounty("Drago")', 1, true) ~= nil, "HUNT BOUNTY doesn't take them straight in")
+		check(RiftRun.Ladders.Fire[1] == "Drago", "Drago isn't open to a new miner (first on its ladder)")
 		local clearAt = server:find("local function cleared(run, room: number)", 1, true)
 		local clearEnd = clearAt and server:find("\nend\n", clearAt, true)
 		local clearBody = clearAt and clearEnd and server:sub(clearAt, clearEnd) or ""

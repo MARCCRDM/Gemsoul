@@ -185,7 +185,7 @@ function IntroRoundsServer.unstick(player: Player, now: number): string?
 	local since = stuckSince[player] or now
 	stuckSince[player] = since
 	local state = IntroRounds.state(profile)
-	local choosing = left > 0 and state ~= nil and state.Won >= IntroRounds.ChoiceAfter
+	local choosing = left > 0 and IntroRoundsServer.huntNext(profile, state)
 	local wait = if left == 0
 		then IntroRoundsServer.DoneOutAfter
 		elseif choosing then IntroRoundsServer.ChoiceWait
@@ -598,6 +598,8 @@ function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 	end
 	Analytics.event(player, "IntroRound", round, slot, piece.Rarity, if done then "Done" else "Won")
 	event.View = IntroRounds.view(state)
+	-- (the card's one way on: HUNT BOUNTY, while the first dungeon's owed)
+	event.Hunt = IntroRoundsServer.huntNext(profile, state) or nil
 	player:SetAttribute("IntroRounds", if done then nil else true)
 	player:SetAttribute("IntroRoundFight", nil)
 	PlayerData.sync(player)
@@ -690,6 +692,19 @@ end
 -- (The only way on is the first dungeon: HUNT BOUNTY. The lobby opens once
 -- it's cleared: IntroRoundsServer.dungeonCleared.)
 local CHOICES = { Boss = true }
+-- Whether a win's card sends them to the first dungeon (HUNT BOUNTY): won a
+-- round, rounds still to go, and the first dungeon not cleared yet (not
+-- begun: IntroFinale nil, or owed: "Dungeon"). Once it's cleared ("Mines",
+-- "Done") a win's card is the next round, as it always was.
+function IntroRoundsServer.huntNext(profile: any, state: any): boolean
+	if not profile or not state or profile.IntroDungeonCleared then
+		return false
+	end
+	if state.Won < IntroRounds.ChoiceAfter or state.Won >= IntroRounds.Count then
+		return false
+	end
+	return profile.IntroFinale == nil or profile.IntroFinale == "Dungeon"
+end
 function IntroRoundsServer.choose(player: Player, which: any)
 	local state, profile = stateOf(player)
 	if not state or not CHOICES[which] then
@@ -700,6 +715,11 @@ function IntroRoundsServer.choose(player: Player, which: any)
 	end
 	if state.Won >= IntroRounds.Count then
 		return leaveRounds(player)
+	end
+	if not IntroRoundsServer.huntNext(profile, state) then
+		-- (the first dungeon's behind them: never out of the rounds for it
+		-- again; their next round instead)
+		return IntroRoundsServer._next(player)
 	end
 	state.Paused = true
 	if (profile :: any).IntroFinale == nil then

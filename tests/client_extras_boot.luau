@@ -188,7 +188,7 @@ local strip = {}
 for i = 1, 28 do
 	strip[i] = { Name = if i == 24 then "Cryo-Edge Saber" else "Blade " .. i, Rarity = if i % 5 == 0 then "Rare" else "Uncommon" }
 end
-social:Fire("IntroRound", { Phase = "Won", Round = 1, Piece = { Slot = "Weapon", Name = "Cryo-Edge Saber", Rarity = "Uncommon", Id = "w1" }, Reel = strip, ReelLand = 24, Gem = { Name = "Ember" }, View = IntroRounds.view(state) })
+social:Fire("IntroRound", { Phase = "Won", Round = 1, Piece = { Slot = "Weapon", Name = "Cryo-Edge Saber", Rarity = "Uncommon", Id = "w1" }, Reel = strip, ReelLand = 24, Gem = { Name = "Ember" }, View = IntroRounds.view(state), Hunt = true })
 task.wait(2.5)
 do -- (mid-roll: the strip's up, every piece on it, the marker over it)
 	local card = playerGui:FindFirstChild("IntroRounds")
@@ -225,7 +225,23 @@ do
 	check(boss, "The card doesn't show the bounty's boss")
 	check(not (leave and leave.Visible), "A way to the lobby before the first dungeon")
 	check(not (dungeon and dungeon.Visible), "A second way on beside HUNT BOUNTY")
+	check(go.Modal == true, "HUNT BOUNTY can't be clicked with the camera locked")
 	attrs.CombatSession = nil
+end
+-- The first dungeon cleared (the server sends no Hunt): a later win's card is
+-- the next round, never HUNT BOUNTY again.
+do
+	attrs.CombatSession = "Training"
+	local later = IntroRounds.state({ Funnel = {} })
+	for _ = 1, 3 do IntroRounds.won(later, "Uncommon") end
+	social:Fire("IntroRound", { Phase = "Won", Round = 3, Piece = { Slot = "Armor", Name = "Rig", Rarity = "Uncommon" }, View = IntroRounds.view(later) })
+	task.wait(1.5 + load(clientRef.IntroRoundsUI).RollSeconds + 1)
+	local card = playerGui:FindFirstChild("IntroRounds")
+	local go = card and card:FindFirstChild("Next", true)
+	check(go and go.Visible and string.find(go.Text, "HUNT BOUNTY", 1, true) == nil, "HUNT BOUNTY again after the first dungeon: " .. tostring(go and go.Text))
+	check(string.find(go.Text, "CONTINUE INTRO ROUNDS", 1, true) ~= nil, "A later win isn't the next round: " .. tostring(go.Text))
+	attrs.CombatSession = nil
+	task.wait(2)
 end
 load(clientRef.IntroRoundsUI).AutoNext = 1 -- (the loss's card on its way before the set's: a round between them in the game)
 social:Fire("IntroRound", { Phase = "Lost", Round = 2, View = IntroRounds.view(state) })

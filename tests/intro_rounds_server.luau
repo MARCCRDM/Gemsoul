@@ -328,5 +328,27 @@ do
 	-- (the rest of the set, from the lobby: held in it again)
 	pcall(Server._next, player)
 	check(profile.IntroRounds.Paused == nil and Server.held(player) and attributes.IntroRoundsLeft == IntroRounds.Count - 1, "Back to the rounds but not held in them")
+	-- After the dungeon: a win's card is the next round (no Hunt), and an old
+	-- card's HUNT BOUNTY puts on their next round, never out of the rounds.
+	local state = profile.IntroRounds
+	check(not Server.huntNext(profile, state), "HUNT BOUNTY again after the first dungeon (Mines)")
+	profile.IntroFinale = "Done"
+	check(not Server.huntNext(profile, state), "HUNT BOUNTY again after the first dungeon (Done)")
+	local realNext = Server._next
+	local pausedBefore, nexted = state.Paused, 0
+	Server._next = function()
+		nexted += 1
+		return { Ok = true, Message = "Round" }
+	end
+	local again = Server.choose(player, "Boss")
+	check(again.Ok and again.Choice ~= "Boss" and nexted == 1, "An old HUNT BOUNTY didn't put on their next round after the dungeon")
+	check(state.Paused == pausedBefore and Server.held(player), "An old HUNT BOUNTY took them out of the rounds after the dungeon")
+	Server._next = realNext
+	-- Not cleared yet: HUNT BOUNTY (not begun, or owed), and never on the set's last.
+	check(Server.huntNext({ IntroFinale = nil }, { Won = 1 }) and Server.huntNext({ IntroFinale = "Dungeon" }, { Won = 3 }), "No HUNT BOUNTY while the first dungeon's owed")
+	check(not Server.huntNext({ IntroFinale = nil }, { Won = 0 }) and not Server.huntNext({ IntroFinale = nil }, { Won = IntroRounds.Count }), "HUNT BOUNTY before a win, or on the set's last")
+	check(not Server.huntNext({ IntroFinale = "Dungeon", IntroDungeonCleared = true }, { Won = 2 }), "HUNT BOUNTY with the dungeon cleared")
+	-- (an old save that finished the lobby's intro before the dungeon came first)
+	check(not Server.huntNext({ IntroFinale = "Done" }, { Won = 2 }), "HUNT BOUNTY for an older save")
 end
 print(string.format("PASS: %d intro rounds server checks", checks))

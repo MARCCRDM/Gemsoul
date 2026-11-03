@@ -865,6 +865,22 @@ function RiftClient.gateOpen(): boolean
 	return gateCard ~= nil and gateCard.Parent ~= nil
 end
 
+-- Straight into a bounty boss's Rift, alone, no lobby (a new miner's HUNT
+-- BOUNTY: Client IntroFinale). Returns whether they're in; if not, why.
+function RiftClient.enterBounty(bossId: string): (boolean, string?)
+	if player:GetAttribute("RiftRun") then
+		return true
+	end
+	local clear = crossing(true)
+	task.wait(0.25)
+	local ok, result = pcall(GemClient.request, "RiftEnter", "Bounty", bossId, false)
+	clear()
+	if ok and type(result) == "table" and result.Ok then
+		return true
+	end
+	return false, if ok and type(result) == "table" then result.Message else nil
+end
+
 function RiftClient.openGate(vein: any, at: Vector3?)
 	if gateCard and gateCard.Parent or player:GetAttribute("RiftRun") then
 		return
