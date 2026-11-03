@@ -1117,6 +1117,14 @@ do
 	-- the boss the kaiju are called back and come out again on a revive.
 	check(client:find('Name = "Backup"', 1, true) ~= nil and client:find("RiftClient.openBackup", 1, true) ~= nil, "No BACKUP on the strip")
 	check(server:find("KaijuServer.recallTeam(player)", 1, true) ~= nil and server:find("KaijuServer.deployTeam(player)", 1, true) ~= nil, "The kaiju aren't called back and out again")
+	-- A new miner's first dungeon: never in without kaiju (an owed starter
+	-- team given on the way in, a recalled team out again).
+	do
+		local joinAt = server:find("local function join(run, player: Player)", 1, true)
+		local joinEnd = joinAt and server:find("\nend\n", joinAt, true)
+		local body = joinAt and joinEnd and server:sub(joinAt, joinEnd) or ""
+		check(body:find("owesDungeon(player)", 1, true) ~= nil and body:find("KaijuServer.ensureStarter", 1, true) ~= nil and body:find("KaijuServer.deployTeam", 1, true) ~= nil, "Into the first dungeon without kaiju is still possible")
+	end
 	-- The boss takes turns on the kaiju too (Shared.Aggro's turns, each
 	-- kaiju's own threat: KaijuServer.strike; Duelist's PetTarget).
 	local duelist = fs.readFile(ROOT .. "/src/server/Systems/Duelist.luau")

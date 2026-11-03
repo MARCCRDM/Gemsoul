@@ -3723,6 +3723,19 @@ local function yourTeam()
 	check(Kaiju.count(profiles[b].Kaiju) == 0 and Kaiju.rollsOwed(profiles[b]) == 3, "Given the roll at once")
 	KaijuServer._upkeep(b, now + 600)
 	check(Kaiju.count(profiles[b].Kaiju) == 0 and Kaiju.rollsOwed(profiles[b]) == 3, "An owed roll was handed out without Wren")
+	-- Going into the first dungeon with it still owed (Server.RiftServer):
+	-- the starter team given there and then, the whole of it, once.
+	do
+		local saved = table.clone(profiles[b])
+		saved.Kaiju = { List = {}, Next = profiles[b].Kaiju.Next or 1 }
+		local real = profiles[b]
+		profiles[b] = saved
+		check(KaijuServer.ensureStarter(b) == Kaiju.StarterTeam, "Going into the first dungeon, the owed starter team wasn't given")
+		check(Kaiju.count(profiles[b].Kaiju) == Kaiju.StarterTeam and Kaiju.rollsOwed(profiles[b]) == 0, "The starter team isn't theirs")
+		check(#Kaiju.teamIds(profiles[b].Kaiju) >= 1, "The starter team given isn't their team")
+		check(KaijuServer.ensureStarter(b) == 0 and Kaiju.count(profiles[b].Kaiju) == Kaiju.StarterTeam, "The starter team was given twice")
+		profiles[b] = real
+	end
 	local rolled = registered.KaijuRoll(b)
 	check(rolled.Ok and #rolled.Rolls == 3, "Wren's roll didn't come up")
 	check(registered.KaijuRollClaim(b).Ok, "Wren's roll couldn't be claimed")

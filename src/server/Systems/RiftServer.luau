@@ -1124,6 +1124,20 @@ local function join(run, player: Player)
 	if root then
 		root.AssemblyLinearVelocity = Vector3.zero
 	end
+	-- A new miner's first dungeon (HUNT BOUNTY): never in without their
+	-- kaiju. A starter roll still owed is given now, and a team called back
+	-- comes out (they follow them in).
+	local intro = false
+	pcall(function()
+		intro = require(script.Parent.IntroRoundsServer).owesDungeon(player)
+	end)
+	if intro then
+		local ok, joined = pcall(KaijuServer.ensureStarter, player)
+		if ok and joined > 0 then
+			notify(player, "Your starter kaiju team is with you: they fight beside you in here.")
+		end
+		pcall(KaijuServer.deployTeam, player)
+	end
 	-- (In there you fight: your combat kit comes out, till you swap it for
 	-- your pick for the healing crystals.)
 	SparServer.riftKit(player, true)

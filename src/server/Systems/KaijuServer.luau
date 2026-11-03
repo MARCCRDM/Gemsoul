@@ -2727,6 +2727,21 @@ local function setAutoHeal(player: Player, on: any)
 end
 
 -- The starter roll owed, made now if it wasn't: what the reveal shows.
+-- The starter team, given here and now if it's still owed (no roll screen):
+-- for a new miner going into the first dungeon (Server.RiftServer), who
+-- must never go in without kaiju. Returns how many joined.
+function KaijuServer.ensureStarter(player: Player): number
+	local profile = PlayerData.get(player)
+	if not profile or Kaiju.rollsOwed(profile) <= 0 then
+		return 0
+	end
+	local roll = prepareRoll(profile)
+	if not roll or roll.Boss then
+		return 0
+	end
+	return #claimRoll(player)
+end
+
 local function rollRequest(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile then
