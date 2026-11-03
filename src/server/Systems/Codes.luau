@@ -40,11 +40,11 @@ Codes.List = {
 		Note = "Free Thunderclap storm pickaxe skin for players (limited: 100)",
 	},
 	STORM = {
-		-- The Thunder Aura promo: the aura and the STORMBORN title, 100 only.
-		-- (The Stormcaller Wings, BackStormwings, are kept for a later code.)
-		Reward = { Cosmetics = { "AuraThunder", "TitleStormborn" } },
+		-- The Thunder Aura promo, 100 only. (The Stormcaller Wings,
+		-- BackStormwings, are kept for a later code.)
+		Reward = { Cosmetics = { "AuraThunder" } },
 		Limit = 100,
-		Note = "Thunder Aura + STORMBORN title for players (limited: 100)",
+		Note = "Thunder Aura for players (limited: 100)",
 	},
 	BRIGHTSTEEL = {
 		-- The Brightsteel promo video: a Brightsteel on a random Legendary

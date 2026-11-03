@@ -1716,13 +1716,15 @@ local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
 local AURAS: { [string]: (Instance, Model, BasePart, Color3) -> () } = {}
 
--- Thunder Aura (a promo code's): blue sparks crackle all over you, arcs of
--- current jump round your body, and you land from a jump in a flash of
--- lightning (the shell's ThunderArc "Aura": Client ThunderArcs).
+-- Thunder Aura (a promo code's): a cyan aura rising off you like flame,
+-- blue sparks and bigger crackles all over, a light that flickers with it;
+-- arcs of current jump off your limbs and across you, lightning strikes
+-- beside you now and then, and you land from a jump in a strike (the
+-- shell's ThunderArc "Aura": Client ThunderArcs).
 AURAS.Thunder = function(folder, _character, torso, glow)
 	local shell = Instance.new("Part")
 	shell.Name = "Aura"
-	shell.Size = Vector3.new(3.2, 5.2, 2)
+	shell.Size = Vector3.new(3.4, 5.4, 2.2)
 	shell.Transparency = 1
 	shell.CanCollide, shell.CanQuery, shell.CanTouch, shell.Massless = false, false, false, true
 	shell.CastShadow = false
@@ -1733,28 +1735,40 @@ AURAS.Thunder = function(folder, _character, torso, glow)
 	shell:SetAttribute("ThunderArc", "Aura")
 	CollectionService:AddTag(shell, Tags.ThunderArc)
 	local white = Color3.fromRGB(235, 248, 255)
-	-- { name, rate, size, lifetime, speed }: quick sparks, and now and then a
-	-- bigger crackle.
-	for _, spec in { { "Sparks", 22, 0.3, NumberRange.new(0.1, 0.28), NumberRange.new(3, 7) }, { "Crackle", 5, 0.75, NumberRange.new(0.06, 0.12), NumberRange.new(0, 0.5) } } do
+	local deep = Color3.fromRGB(30, 120, 255)
+	-- { name, texture, rate, size, lifetime, speed, rise, transparency, shape style, locked }
+	for _, spec in {
+		-- the aura itself: cyan flame licking up off the whole body
+		{ "Aura", FIRE_TEXTURE, 34, 1.7, NumberRange.new(0.35, 0.65), NumberRange.new(1.5, 3), 7, 0.35, Enum.ParticleEmitterShapeStyle.Volume, false },
+		-- quick sparks spitting off it
+		{ "Sparks", SPARK_TEXTURE, 65, 0.45, NumberRange.new(0.12, 0.3), NumberRange.new(5, 10), 0, 0, Enum.ParticleEmitterShapeStyle.Surface, true },
+		-- and now and then a bigger crackle
+		{ "Crackle", SPARK_TEXTURE, 16, 1.3, NumberRange.new(0.05, 0.11), NumberRange.new(0, 0.5), 0, 0, Enum.ParticleEmitterShapeStyle.Surface, true },
+	} do
 		local emitter = Instance.new("ParticleEmitter")
 		emitter.Name = spec[1]
-		emitter.Texture = SPARK_TEXTURE
-		emitter.Color = ColorSequence.new(white, glow)
-		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, spec[3]), NumberSequenceKeypoint.new(1, 0) })
-		emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
-		emitter.Lifetime = spec[4]
-		emitter.Speed = spec[5]
-		emitter.Rate = spec[2]
-		emitter.SpreadAngle = Vector2.new(180, 180)
+		emitter.Texture = spec[2]
+		emitter.Color = if spec[1] == "Aura" then ColorSequence.new(glow, deep) else ColorSequence.new(white, glow)
+		emitter.Size = if spec[1] == "Aura"
+			then NumberSequence.new({ NumberSequenceKeypoint.new(0, spec[4] * 0.6), NumberSequenceKeypoint.new(0.4, spec[4]), NumberSequenceKeypoint.new(1, 0) })
+			else NumberSequence.new({ NumberSequenceKeypoint.new(0, spec[4]), NumberSequenceKeypoint.new(1, 0) })
+		emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, spec[8]), NumberSequenceKeypoint.new(1, 1) })
+		emitter.Lifetime = spec[5]
+		emitter.Speed = spec[6]
+		emitter.Acceleration = Vector3.new(0, spec[7], 0)
+		emitter.Rate = spec[3]
+		emitter.SpreadAngle = if spec[1] == "Aura" then Vector2.new(25, 25) else Vector2.new(180, 180)
+		emitter.EmissionDirection = Enum.NormalId.Top
 		emitter.LightEmission = 1
-		emitter.LockedToPart = true
+		emitter.LightInfluence = 0
+		emitter.LockedToPart = spec[10]
 		emitter.Shape = Enum.ParticleEmitterShape.Box
-		emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+		emitter.ShapeStyle = spec[9]
 		emitter.Parent = shell
 	end
 	local light = Instance.new("PointLight")
 	light.Name = "AuraLight"
-	light.Color, light.Range, light.Brightness, light.Shadows = glow, 9, 1.1, false
+	light.Color, light.Range, light.Brightness, light.Shadows = glow, 14, 2.4, false
 	light.Parent = shell
 	shell.Parent = folder
 end

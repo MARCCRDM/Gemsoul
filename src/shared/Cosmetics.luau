@@ -301,16 +301,6 @@ Cosmetics.List = {
 		Exclusive = "Code",
 		How = "Redeem a promo code.",
 	},
-	TitleStormborn = {
-		Id = "TitleStormborn",
-		Kind = "Title",
-		Name = "STORMBORN",
-		Description = "Over your head, in storm blue, for everyone to see. Came with the Thunder Aura.",
-		Rarity = "UltraRare",
-		Color = Color3.fromRGB(80, 200, 255),
-		Exclusive = "Code",
-		How = "Redeem a promo code.",
-	},
 	BackStandard = {
 		Id = "BackStandard",
 		Kind = "Back",

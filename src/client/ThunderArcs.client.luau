@@ -7,9 +7,11 @@
 	The Stormcaller Wings crackle too (Server Equipment tags their storm
 	core "WingCore" and their spark tips "Wing"), and worn with the pick,
 	current jumps from it to the wings.
-	A Thunder Aura (Server Equipment's shell round the body, "Aura"): arcs
-	jump off its wearer's limbs, and they land from a jump in a strike of
-	lightning with current running out along the ground.
+	A Thunder Aura (Server Equipment's shell round the body, "Aura"): thick
+	arcs jump off its wearer's limbs and across the body several times a
+	second, its light flickering with them; every few seconds lightning
+	strikes the ground beside them; and they land from a jump in a strike
+	of lightning with current running out along the ground.
 	Purely local: nothing replicates.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -19,11 +21,14 @@ local Tags = require(ReplicatedStorage.Shared.Tags)
 local CombatVfx = require(script.Parent.Modules.CombatVfx)
 
 local VOLT = Color3.fromRGB(80, 200, 255)
+local BRIGHT = Color3.fromRGB(225, 245, 255)
 local NEAR = 120 -- studs from the camera: further off, no arcs
 local EVERY = { 0.35, 1.1 } -- seconds between one pick's arcs
 local STRIKE_AGAIN = 60 -- seconds before a pick's arrival strikes again
 local WING_EVERY = { 0.5, 1.4 } -- seconds between the Stormcaller Wings' arcs
-local AURA_EVERY = { 0.25, 0.7 } -- seconds between a Thunder Aura's arcs round its wearer
+local AURA_EVERY = { 0.07, 0.2 } -- seconds between a Thunder Aura's arcs round its wearer
+local AURA_STRIKE = { 5, 9 } -- seconds between the lightning that strikes beside its wearer
+local nextStrike: { [BasePart]: number } = {}
 local LAND_AGAIN = 1.2 -- seconds: a Thunder Aura's landing strike at most this often
 local LAND_FALL = 18 -- studs/s falling (or more) for a landing to strike
 local SET_ARC = 0.35 -- with the wings on too: how often a pick's arc goes to them
@@ -178,6 +183,7 @@ for _, part in CollectionService:GetTagged(Tags.ThunderArc) do
 end
 CollectionService:GetInstanceRemovedSignal(Tags.ThunderArc):Connect(function(part)
 	nextArc[part :: BasePart] = nil
+	nextStrike[part :: BasePart] = nil
 end)
 
 task.spawn(function()
@@ -209,18 +215,47 @@ task.spawn(function()
 					end
 				end
 			elseif part:IsA("BasePart") and part:GetAttribute("ThunderArc") == "Aura" and part:IsDescendantOf(workspace) and near(part, NEAR) then
-				-- A Thunder Aura: current jumps off a limb into the air round it.
+				-- A Thunder Aura: thick arcs of current off its wearer's limbs,
+				-- now and then right across the body, its light flickering
+				-- with them; and every few seconds lightning strikes beside them.
 				local due = nextArc[part]
 				if not due then
 					nextArc[part] = now + rng:NextNumber(AURA_EVERY[1], AURA_EVERY[2])
+					nextStrike[part] = now + rng:NextNumber(1, 3)
 				elseif now >= due then
 					nextArc[part] = now + rng:NextNumber(AURA_EVERY[1], AURA_EVERY[2])
-					local limbs = bodyOf(wearer(part))
+					local owner = wearer(part)
+					local limbs = bodyOf(owner)
 					if #limbs > 0 then
-						local limb = limbs[rng:NextInteger(1, #limbs)]
-						local from = limb.Position + rng:NextUnitVector() * 0.4
-						local to = from + rng:NextUnitVector() * rng:NextNumber(1.2, 2.4)
-						pcall(CombatVfx.arc, from, to, VOLT, 0.04)
+						for _ = 1, rng:NextInteger(1, 2) do
+							local limb = limbs[rng:NextInteger(1, #limbs)]
+							local from = limb.Position + rng:NextUnitVector() * 0.5
+							if rng:NextNumber() < 0.3 and #limbs > 1 then
+								local other = limbs[rng:NextInteger(1, #limbs)]
+								pcall(CombatVfx.arc, from, other.Position + rng:NextUnitVector() * 0.5, BRIGHT, 0.12)
+							else
+								local to = from + rng:NextUnitVector() * rng:NextNumber(1.6, 3.4)
+								pcall(CombatVfx.arc, from, to, VOLT, rng:NextNumber(0.08, 0.15))
+							end
+						end
+					end
+					local light = part:FindFirstChild("AuraLight")
+					if light and light:IsA("PointLight") then
+						light.Brightness = rng:NextNumber(1.2, 4)
+					end
+					if now >= (nextStrike[part] or math.huge) then
+						nextStrike[part] = now + rng:NextNumber(AURA_STRIKE[1], AURA_STRIKE[2])
+						local root = owner and owner:FindFirstChild("HumanoidRootPart") :: BasePart?
+						if root and near(root, 90) then
+							local side = rng:NextUnitVector() * Vector3.new(1, 0, 1)
+							side = if side.Magnitude > 0.1 then side.Unit else Vector3.new(1, 0, 0)
+							local ground = root.Position - Vector3.new(0, 2.8, 0) + side * rng:NextNumber(3.5, 6)
+							pcall(CombatVfx.lightning, ground + Vector3.new(rng:NextNumber(-2, 2), 24, rng:NextNumber(-2, 2)), ground, VOLT)
+							for _ = 1, 3 do
+								local out = ground + (rng:NextUnitVector() * Vector3.new(1, 0, 1)) * rng:NextNumber(2, 3.5)
+								pcall(CombatVfx.arc, ground + Vector3.new(0, 0.1, 0), out + Vector3.new(0, 0.1, 0), VOLT, 0.08)
+							end
+						end
 					end
 				end
 			elseif part:IsA("BasePart") and part:GetAttribute("ThunderArc") == "WingCore" and shows(part) and near(part, NEAR) then

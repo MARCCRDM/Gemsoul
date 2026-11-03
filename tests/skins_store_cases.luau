@@ -753,12 +753,14 @@ local again = handlers.RedeemCode(thePlayer, "THUNDER")
 check(again.Ok and profile.Cosmetics.Owned.PickThunderclap, "Typing a used code didn't give back the look it gives")
 clock += 3
 check(not handlers.RedeemCode(thePlayer, "THUNDER").Ok, "A used code with nothing missing redeemed again")
--- STORM: the Thunder Aura and the STORMBORN title, both owned and on;
--- limited to 100. (The Stormcaller Wings stay in the game for a later one.)
+-- STORM: the Thunder Aura, owned and on; limited to 100; no title with it.
+-- (The Stormcaller Wings stay in the game for a later one.)
 clock += 3
+local titleBefore = profile.Cosmetics.Title
 local storm = handlers.RedeemCode(thePlayer, "storm")
-check(storm.Ok and profile.Cosmetics.Owned.AuraThunder and profile.Cosmetics.Owned.TitleStormborn, "STORM didn't give the Thunder Aura and the STORMBORN title")
-check(profile.Cosmetics.Aura == "AuraThunder" and profile.Cosmetics.Title == "TitleStormborn", "The Thunder Aura or the title weren't put on")
+check(storm.Ok and profile.Cosmetics.Owned.AuraThunder, "STORM didn't give the Thunder Aura")
+check(profile.Cosmetics.Aura == "AuraThunder", "The Thunder Aura wasn't put on")
+check(profile.Cosmetics.Title == titleBefore and Cosmetics.get("TitleStormborn") == nil, "STORM still comes with the STORMBORN title")
 check(not profile.Cosmetics.Owned.BackStormwings, "STORM still gives the Stormcaller Wings")
 check(stubs.Codes.List.STORM.Limit == 100, "STORM isn't limited to 100")
 check(stubs.Codes.List.BRIGHTSTEEL and stubs.Codes.List.BRIGHTSTEEL.Reward.KaijuSale == "PromoBrightsteel" and stubs.Codes.List.BRIGHTSTEEL.Limit == 100, "BRIGHTSTEEL isn't the promo Brightsteel, 100 only")
