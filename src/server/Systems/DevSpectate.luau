@@ -5,6 +5,8 @@
 	they move (the Owner's ReplicationFocus follows them).
 
 	  "DevSpectate", userId?   start watching that player (nil: stop)
+	  "DevSpectateJoin"        into the dungeon (a Rift run) they're in,
+	                           beside them; the watching ends
 
 	Owners only (Config.Playtest.Owners, checked here on every request).
 	Watching changes nothing for the one watched, and they aren't told.
@@ -58,6 +60,27 @@ function DevSpectate.request(owner: Player, userId: any)
 	return Shop.reply(true, "Watching " .. target.DisplayName .. ".")
 end
 
+-- JOIN: into the dungeon the one watched is in (a Rift run: Server.
+-- RiftServer.devJoin), the watching over.
+function DevSpectate.join(owner: Player)
+	if not DevAlerts.owner(owner.UserId) then
+		return Shop.reply(false, "Joining is for the game's owners.")
+	end
+	local target = watching[owner]
+	if not target or not target.Parent then
+		return Shop.reply(false, "Watch someone first.")
+	end
+	if target:GetAttribute("RiftRun") == nil then
+		return Shop.reply(false, target.DisplayName .. " isn't in a dungeon.")
+	end
+	local ok, message = require(script.Parent.RiftServer).devJoin(owner, target)
+	if ok then
+		watching[owner] = nil
+		focus(owner)
+	end
+	return Shop.reply(ok, message)
+end
+
 local started = false
 function DevSpectate.start()
 	if started then
@@ -65,6 +88,7 @@ function DevSpectate.start()
 	end
 	started = true
 	Shop.register("DevSpectate", DevSpectate.request)
+	Shop.register("DevSpectateJoin", DevSpectate.join)
 	-- When each player joined (server time), for the watcher's timer.
 	local function stamp(player: Player)
 		if player:GetAttribute("JoinedAt") == nil then

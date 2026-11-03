@@ -549,6 +549,21 @@ do
 
 	local target: Player? = nil
 	local saved = nil
+	-- JOIN: beside the banner while the one watched is in a dungeon (a Rift
+	-- run): into it with them (Server.DevSpectate, "DevSpectateJoin").
+	local joinButton = Instance.new("TextButton")
+	joinButton.Name = "WatchJoin"
+	joinButton.AnchorPoint = Vector2.new(0, 0)
+	joinButton.Position = UDim2.new(0.5, 266, 0, 6)
+	joinButton.Size = UDim2.fromOffset(120, 30)
+	joinButton.BackgroundColor3 = Color3.fromRGB(255, 196, 64)
+	joinButton.TextColor3 = Color3.fromRGB(20, 16, 8)
+	joinButton.Font = Enum.Font.GothamBlack
+	joinButton.TextSize = 14
+	joinButton.Text = "JOIN DUNGEON"
+	joinButton.Visible = false
+	joinButton.Parent = gui
+	corner(joinButton, 6)
 	local function others(): { Player }
 		local list = {}
 		for _, other in Players:GetPlayers() do
@@ -569,6 +584,8 @@ do
 			table.insert(bits, "in a match")
 		elseif other:GetAttribute("DungeonId") then
 			table.insert(bits, "in a dungeon, room " .. tostring(other:GetAttribute("DungeonRoom") or 1))
+		elseif other:GetAttribute("RiftRun") then
+			table.insert(bits, "in a dungeon (the Rift)")
 		elseif session then
 			table.insert(bits, "in the Arena (" .. tostring(session) .. ")")
 		elseif other:GetAttribute("Outpost") then
@@ -601,6 +618,7 @@ do
 		end
 		target = nil
 		banner.Visible = false
+		joinButton.Visible = false
 		game:GetService("RunService"):UnbindFromRenderStep("DevWatch")
 		pcall(function()
 			request:InvokeServer("DevSpectate", nil)
@@ -633,6 +651,7 @@ do
 				stop()
 				return
 			end
+			joinButton.Visible = target:GetAttribute("RiftRun") ~= nil and player:GetAttribute("RiftRun") ~= target:GetAttribute("RiftRun")
 			local humanoid = target.Character and target.Character:FindFirstChildOfClass("Humanoid")
 			if humanoid then
 				player.CameraMode = Enum.CameraMode.Classic
@@ -658,6 +677,26 @@ do
 		end
 		watch(nextOne)
 	end
+	local joining = false
+	joinButton.Activated:Connect(function()
+		if joining or not target then
+			return
+		end
+		joining = true
+		joinButton.Text = "…"
+		local ok, result = pcall(function()
+			return request:InvokeServer("DevSpectateJoin")
+		end)
+		joining = false
+		joinButton.Text = "JOIN DUNGEON"
+		if ok and result and result.Ok then
+			-- (in with them: the camera's yours again)
+			stop()
+			status.Text = result.Message
+		else
+			status.Text = if ok and result then result.Message else "Couldn't join them."
+		end
+	end)
 	for i, item in { { "PREV", -1 }, { "NEXT", 1 }, { "STOP", 0 } } do
 		local b = Instance.new("TextButton")
 		b.Name = "Watch" .. item[1]

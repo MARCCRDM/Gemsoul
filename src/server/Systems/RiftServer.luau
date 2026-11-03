@@ -1735,6 +1735,32 @@ RiftServer.bountyAt = function(): BasePart?
 	return nil
 end
 
+-- DEV > WATCH's JOIN (Server.DevSpectate, Owners only): into the Rift run
+-- `target` is on, beside them (in at the cave they've got to), however
+-- full it is. Returns whether, and why not.
+function RiftServer.devJoin(owner: Player, target: Player): (boolean, string)
+	local run = runOf[target]
+	if not run or run.Done then
+		return false, "They're not in a Rift run."
+	end
+	if runOf[owner] == run then
+		return false, "You're in their run already."
+	end
+	local why = problem(owner)
+	if why then
+		return false, why
+	end
+	join(run, owner)
+	-- (beside them, not at the run's start)
+	local theirs, mine = rootOf(target), rootOf(owner)
+	if theirs and mine and owner.Character then
+		owner.Character:PivotTo(theirs.CFrame * CFrame.new(4, 0, 2))
+		mine.AssemblyLinearVelocity = Vector3.zero
+	end
+	run.Reached[owner] = run.Reached[target] or run.Reached[owner]
+	return true, "In " .. target.DisplayName .. "'s Rift run."
+end
+
 function RiftServer.runOf(player: Player)
 	return runOf[player]
 end
