@@ -46,7 +46,15 @@ Codes.List = {
 		Limit = 100,
 		Note = "Thunder Aura + STORMBORN title for players (limited: 100)",
 	},
-	TRISKULL = {
+	BRIGHTSTEEL = {
+		-- The Brightsteel promo video: a Brightsteel on a random Legendary
+		-- roll (Shared.Kaiju.Sale.PromoBrightsteel), 100 only, for two weeks.
+		Reward = { KaijuSale = "PromoBrightsteel" },
+		Limit = 100,
+		Expires = os.time({ year = 2026, month = 11, day = 17, hour = 23, min = 59 }),
+		Note = "Legendary Brightsteel kaiju promo, random roll (limited: 100, ends 17 Nov 2026)",
+	},
+
 		-- The Triskull promo video: a Legendary Triskull, 100 only, for two weeks.
 		Reward = { KaijuSale = "Promo" },
 		Limit = 100,

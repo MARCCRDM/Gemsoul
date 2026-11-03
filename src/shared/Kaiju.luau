@@ -2256,12 +2256,23 @@ Kaiju.Sale = {
 	-- element's gold, its Gemsoul a Legendary holding the element's best Q,
 	-- E and R; never sold.
 	Promo = {
+		Promo = true,
 		Name = "Legendary Triskull",
 		Species = "Triskull",
 		Element = "Shock",
 		Rarity = "Legendary",
 		Best = "All",
 		TraitFloor = 9,
+	},
+	-- Another promo code's (Server Codes: BRIGHTSTEEL): a Brightsteel on a
+	-- random Legendary roll: its Gemsoul always Legendary, its element
+	-- (Elements: one at random), moves and traits all rolled.
+	PromoBrightsteel = {
+		Promo = true,
+		Name = "Legendary Brightsteel",
+		Species = "Brightsteel",
+		Elements = { "Fire", "Frost", "Shock", "Poison" },
+		Rarity = "Legendary",
 	},
 	Showcase = {
 		{ Species = "Emberjaw", Element = "Fire" },

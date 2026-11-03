@@ -7449,6 +7449,36 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 	for _, name in Kaiju.Traits.Names do
 		check(promo == nil or promo.Traits[name] >= Kaiju.Sale.Promo.TraitFloor, "The promo Triskull has a poor trait")
 	end
+	-- BRIGHTSTEEL's: a Brightsteel on a random Legendary roll: always a
+	-- Legendary Gemsoul, its element any of the four.
+	local seenElements = {}
+	for _ = 1, 3 do
+		local was = {}
+		for _, record in roster.List do
+			was[record] = true
+		end
+		check(KaijuServer.saleGrant(d, "PromoBrightsteel"), "The promo Brightsteel wasn't given")
+		local got
+		for _, record in roster.List do
+			if not was[record] then
+				got = record
+			end
+		end
+		check(got ~= nil and got.Species == "Brightsteel" and got.Soul and got.Soul.Tier == "Legendary", "The promo kaiju isn't a Brightsteel with a Legendary Gemsoul")
+		if got then
+			check(table.find(Kaiju.Sale.PromoBrightsteel.Elements, got.Element) ~= nil, "The promo Brightsteel's element isn't one of its four")
+			seenElements[got.Element] = true
+		end
+	end
+	-- (and the element really is any of the four: each turns up within a few
+	-- hundred rolls of the same pick the grant makes)
+	local pickRng = Random.new(3)
+	local picked = {}
+	for _ = 1, 400 do
+		local list = Kaiju.Sale.PromoBrightsteel.Elements
+		picked[list[pickRng:NextInteger(1, #list)]] = true
+	end
+	check(picked.Fire and picked.Frost and picked.Shock and picked.Poison, "The promo Brightsteel can't be every element")
 	-- The rare roll plays on the roll screen: one of the rarest batch, its
 	-- traits at least the floor, taken from the rare rolls (not boss rolls).
 	local bossBefore = profiles[d].KaijuBossRolls or 0

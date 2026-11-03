@@ -2840,12 +2840,15 @@ function KaijuServer.saleGrant(player: Player, which: string): (boolean, { strin
 			string.format("%s join your kaiju. Swap them into a team from YOUR KAIJU.", table.concat(names, ", "))
 		)
 		return true, names
-	elseif which == "Promo" then
-		-- A promo code's kaiju (Sale.Promo): one, its Gemsoul Legendary with
-		-- its element's best moves; into your reserves past a full roster.
-		local sale = Kaiju.Sale.Promo
+	elseif Kaiju.Sale[which] and Kaiju.Sale[which].Promo then
+		-- A promo code's kaiju (Sale.Promo, Sale.PromoBrightsteel): one, its
+		-- Gemsoul Legendary (with its element's best moves, if the sale says
+		-- so; its element one of Elements at random, if it lists them); into
+		-- your reserves past a full roster.
+		local sale = Kaiju.Sale[which]
 		local random = Gems.random()
-		local soul = Kaiju.rollSoul(random, sale.Element, {
+		local element = sale.Element or sale.Elements[random:NextInteger(1, #sale.Elements)]
+		local soul = Kaiju.rollSoul(random, element, {
 			Id = PlayerData.newGemId(),
 			Time = os.time(),
 			Species = sale.Species,
