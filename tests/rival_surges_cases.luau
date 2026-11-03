@@ -117,5 +117,10 @@ do
 	-- (before its surges are read off the gems)
 	check(body:find("Duelist.showcaseSurges(loadout", 1, true) < body:find('loadout["Surge" .. slot .. "Gem"]', 1, true), "Set after its surges were read")
 end
+-- And it casts them: whenever one's ready and you're in reach (close in
+-- too), never held back for Charge, a little apart and a little softer.
+check(source:find("loadout.Showcase = true", 1, true) ~= nil and source:find("Showcase = loadout.Showcase == true", 1, true) ~= nil, "An intro rival isn't marked to show its surges off")
+check(source:find("if duel.Showcase and choice ~= \"Stagger\" and choice ~= \"Surge\" and now >= duel.NextSurge and distance <= Brain.SurgeRange then", 1, true) ~= nil, "An intro rival still only surges from range")
+check(source:find("if duel.Showcase then\n\t\t\tcost = 0", 1, true) ~= nil, "An intro rival's surges are held back for Charge")
 print(string.format("PASS: %d intro rival surge checks (a Q and two E's of the starter kit's showcase moves, each cast as itself)", checks))
 process.exit(0)

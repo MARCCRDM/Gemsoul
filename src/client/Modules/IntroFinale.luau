@@ -70,6 +70,7 @@ IntroFinale.GemsFor = 30 -- seconds the gems window waits for OK before it moves
 IntroFinale.InviteFor = 45 -- and the first dungeon's window (then: LATER)
 IntroFinale.InviteAfter = 3 -- seconds after the kaiju's first fight before it's asked
 IntroFinale.HuntAgain = 6 -- seconds after the HUNT BOUNTY window before it can come again (the gate's up by then)
+IntroFinale.HuntLater = 180 -- seconds it stays away after LATER (or X, Esc): the Bounty Board and PLAY have it meanwhile
 IntroFinale.FinishFor = 40 -- seconds the "finish your intro fights" window waits (then: LATER)
 
 local player = Players.LocalPlayer
@@ -483,7 +484,7 @@ function IntroFinale.rewards(hunt: boolean?)
 		{ Icon = "●", Value = tostring(if hunt then IntroRounds.FirstDungeonCoins else RiftRun.rewardCoins(RiftRun.Rooms)), Label = "COINS", Color = Color3.fromRGB(255, 206, 92) },
 		{ Icon = "◆", Value = "UNCOMMON+", Label = "BOSS CACHE GEAR", Color = Color3.fromRGB(110, 224, 140) },
 		{ Icon = "▲", Value = "+1", Label = "NEW KAIJU", Color = Color3.fromRGB(150, 200, 255) },
-		{ Icon = "✦", Value = "GEMS", Label = "IN EVERY CAVE", Color = Color3.fromRGB(94, 206, 221) },
+		{ Icon = "◆", Value = "GEMS", Label = "IN EVERY CAVE", Color = Color3.fromRGB(94, 206, 221) },
 	}, RiftRun.Reward.Exp
 end
 local W_CARD, H_CARD = 620, 470
@@ -616,6 +617,26 @@ local function invite(hunt: boolean?)
 	local choice = nil
 	local buttons = {}
 	local keysOnly = UserInputService.KeyboardEnabled and not UserInputService.TouchEnabled
+	local closeX = Instance.new("TextButton")
+	closeX.Name = "Close"
+	closeX.AnchorPoint = Vector2.new(1, 0)
+	closeX.Position, closeX.Size = UDim2.new(1, -10, 0, 10), UDim2.fromOffset(34, 34)
+	closeX.BackgroundColor3 = Color3.fromRGB(52, 40, 40)
+	closeX.Font, closeX.TextSize, closeX.TextColor3 = Enum.Font.GothamBlack, 18, Color3.fromRGB(230, 220, 216)
+	closeX.Text = "X"
+	closeX.ZIndex = 5
+	closeX.Parent = card
+	UiKit.round(closeX, 10)
+	closeX:SetAttribute("UiSound", "Click")
+	closeX.Activated:Connect(function()
+		choice = "Later"
+	end)
+	table.insert(buttons, closeX)
+	local escape = UserInputService.InputBegan:Connect(function(input, typing)
+		if not typing and (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB) then
+			choice = "Later"
+		end
+	end)
 	local function button(label: string, x: number, w: number, primary: boolean, pick: string)
 		local b = Instance.new("TextButton")
 		b.Name = pick
@@ -633,7 +654,10 @@ local function invite(hunt: boolean?)
 		table.insert(buttons, b)
 	end
 	if hunt then
-		button(if keysOnly then "HUNT BOUNTY  [ENTER]" else "HUNT BOUNTY", 18, W_CARD - 36, true, "Go")
+		-- (HUNT BOUNTY, and a way out: LATER, the corner's X or Esc; it's
+		-- back in a while, and the Bounty Board has it any time)
+		button(if keysOnly then "LATER  [ESC]" else "LATER", 18, 150, false, "Later")
+		button(if keysOnly then "HUNT BOUNTY  [ENTER]" else "HUNT BOUNTY", 180, W_CARD - 198, true, "Go")
 	else
 		button("LATER", 18, 150, false, "Later")
 		button(if keysOnly then "ENTER DUNGEON  [ENTER]" else "ENTER DUNGEON", 180, W_CARD - 198, true, "Go")
@@ -646,6 +670,7 @@ local function invite(hunt: boolean?)
 	if not choice then
 		choice = "Later"
 	end
+	escape:Disconnect()
 	closed = true
 	shade:Destroy()
 	if not hunt then
@@ -885,6 +910,7 @@ local function huntDue(): boolean
 	return not busy and root() ~= nil
 end
 local hunting = false
+local direct = false -- (HUNT BOUNTY pressed on the rounds' card: straight in, no window: offerBoss)
 function IntroFinale.hunt()
 	if hunting then
 		return
@@ -910,17 +936,33 @@ function IntroFinale.hunt()
 		task.wait(1.5) -- (they come out round you)
 	end
 	step("Invite")
-	pcall(invite, true) -- (HUNT BOUNTY takes them in: invite)
-	heldUntil = os.clock() + IntroFinale.HuntAgain -- (the gate's lobby opens: huntDue waits on it)
+	local inside = false
+	if direct then
+		-- (chosen on the rounds' card, which showed the bounty: straight in)
+		direct = false
+		local ok, went = pcall(function()
+			return require(script.Parent.RiftClient).enterBounty(IntroFinale.Boss)
+		end)
+		inside = ok and went == true
+	end
+	local picked = nil
+	if not inside then
+		local ok, answer = pcall(invite, true) -- (HUNT BOUNTY takes them in: invite)
+		picked = ok and answer or nil
+	end
+	heldUntil = os.clock() + (if picked == "Later" then IntroFinale.HuntLater else IntroFinale.HuntAgain) -- (the gate's lobby opens: huntDue waits on it)
 	hunting = false
 end
 
 -- FIRST BOSS on the rounds' card (Client IntroRoundsUI): once they're out
 -- in the Outpost, the first boss's window (TAKE HIM ON: the Bounty Board's
 -- gate). The mines and the kaiju wait till that's done with.
-function IntroFinale.offerBoss()
-	-- (the hunt's loop shows it as soon as they're out in the Outpost: huntDue)
+-- `straight`: HUNT BOUNTY pressed on the rounds' card (it showed the
+-- bounty): in as soon as they're out in the Outpost, no window first.
+function IntroFinale.offerBoss(straight: boolean?)
+	-- (the hunt's loop takes it as soon as they're out in the Outpost: huntDue)
 	heldUntil = 0
+	direct = straight == true
 end
 
 local started = false

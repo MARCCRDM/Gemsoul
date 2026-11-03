@@ -48,7 +48,9 @@ IntroRoundsUI.AutoNext = 5 -- seconds before the next round starts by itself (in
 
 local W, H, PAD = 460, 496, 22 -- (px: the card, before scaling)
 local ONE_ROW = 48 -- (one row of buttons: the card that much shorter, no gap)
-local cardH = H -- (the card's height now: H, or H - ONE_ROW)
+local cardH = H -- (the card's height now: H, or H - ONE_ROW, and BOUNTY_EXTRA more for the bounty)
+local BOUNTY_H = 150 -- (the bounty's panel, in the well's place)
+local BOUNTY_EXTRA = BOUNTY_H - 40
 local HERO_Y = 104 -- (the piece's centre)
 local TRACK_Y = 262 -- (the set's nodes' centres)
 local WELL_Y = 318
@@ -94,6 +96,11 @@ local busy = false
 local fitScale = 1
 local pending = 0 -- (cards on their way: an event in, its card not up yet)
 local queued = {} -- (the intro dungeon's cards waiting their turn: its boss pays three at once)
+-- (Declared up here: IntroRoundsUI.next, above where they're set, reads them.
+-- Declared further down, next() saw a global that was never set, and HUNT
+-- BOUNTY started the next round instead.)
+local choosing = false -- the card's ways on: HUNT BOUNTY or CONTINUE ROUNDS
+local choose: (string) -> ()
 
 local function words(parent: Instance, size: number, color: Color3, font: Enum.Font): TextLabel
 	return new("TextLabel", {
@@ -341,6 +348,59 @@ local function build()
 	-- Who's next (or the reward), in a well.
 	local well = new("Frame", { Position = UDim2.fromOffset(PAD, WELL_Y), Size = UDim2.fromOffset(W - PAD * 2, 40) }, panel)
 	Gilt.well(well)
+	ui.Well = well
+	-- The bounty (HUNT BOUNTY's card): its boss turning in a window, who
+	-- and what it is, and what beating it pays. In the well's place.
+	local bounty = new("Frame", {
+		Name = "Bounty",
+		Position = UDim2.fromOffset(PAD, WELL_Y),
+		Size = UDim2.fromOffset(W - PAD * 2, BOUNTY_H),
+		Visible = false,
+	}, panel)
+	Gilt.well(bounty)
+	local stroke = new("UIStroke", { Color = Color3.fromRGB(255, 110, 80), Thickness = 1.5, Transparency = 0.35 }, bounty)
+	stroke.Name = "Edge"
+	local view = new("ViewportFrame", {
+		Name = "Boss",
+		Position = UDim2.fromOffset(8, 8),
+		Size = UDim2.fromOffset(124, BOUNTY_H - 16),
+		BackgroundColor3 = Color3.fromRGB(40, 16, 14),
+		Ambient = Color3.fromRGB(150, 120, 110),
+		LightColor = Color3.fromRGB(255, 220, 200),
+	}, bounty)
+	UiKit.round(view, 10)
+	local camera = new("Camera", { FieldOfView = 34 }, view)
+	view.CurrentCamera = camera
+	ui.BountyView, ui.BountyCamera = view, camera
+	local x0, wide = 146, W - PAD * 2 - 146 - 12
+	local function label(name: string, text: string, y: number, h: number, size: number, color: Color3, font: Enum.Font)
+		local l = words(bounty, size, color, font)
+		l.Name = name
+		l.Text = text
+		l.TextXAlignment = Enum.TextXAlignment.Left
+		l.Position, l.Size = UDim2.fromOffset(x0, y), UDim2.fromOffset(wide, h)
+		return l
+	end
+	label("Caption", Lang.translate("NEXT EVENT  ·  HUNT BOUNTY"), 12, 14, 11, Color3.fromRGB(255, 150, 120), BLACK)
+	label("BossName", "BOMBARDIRO DRAGO", 30, 26, 21, GOLD, BLACK):SetAttribute("NoTranslate", true)
+	label("What", Lang.translate("Level 2 boss  ·  your first dungeon  ·  your kaiju fight with you"), 58, 28, 10, FADED, BOLD).TextWrapped = true
+	label("Pays", Lang.translate("BEAT IT FOR"), 92, 12, 9, DUSK, BOLD)
+	local pays = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(x0, 106), Size = UDim2.fromOffset(wide, 30) }, bounty)
+	row(pays, Enum.HorizontalAlignment.Left, 6)
+	for i, r in {
+		{ string.format("● %d", IntroRounds.FirstDungeonCoins or 1000), Color3.fromRGB(255, 206, 92) },
+		{ Lang.translate("◆ BOSS GEAR"), Color3.fromRGB(110, 224, 140) },
+		{ Lang.translate("▲ NEW KAIJU"), Color3.fromRGB(150, 200, 255) },
+	} do
+		local chip = new("Frame", { Size = UDim2.fromOffset(math.floor((wide - 12) / 3), 26), LayoutOrder = i, BackgroundColor3 = Color3.fromRGB(14, 10, 14), BackgroundTransparency = 0.2 }, pays)
+		UiKit.round(chip, 7)
+		new("UIStroke", { Color = r[2], Thickness = 1, Transparency = 0.4 }, chip)
+		local t = words(chip, 10, r[2], BLACK)
+		t.Text = r[1]
+		t.Size = UDim2.fromScale(1, 1)
+		t.TextXAlignment = Enum.TextXAlignment.Center
+	end
+	ui.Bounty = bounty
 	local left = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0) }, well)
 	row(left, Enum.HorizontalAlignment.Left, 10)
 	ui.WellCaption = fitted(left, 10, GOLD, BLACK, 1)
@@ -408,11 +468,11 @@ end
 
 -- The buttons: the main one across, then the lobby and the first dungeon
 -- side by side (or whichever shows, across).
-local function placeButtons(withLeave: boolean, withDungeon: boolean)
+local function placeButtons(withLeave: boolean, withDungeon: boolean, extra: number?)
 	local full = W - PAD * 2
 	local half = (full - 10) / 2
 	-- (one button: the card ends under it, no empty band above it)
-	cardH = if withLeave or withDungeon then H else H - ONE_ROW
+	cardH = (if withLeave or withDungeon then H else H - ONE_ROW) + (extra or 0)
 	panel.Size = UDim2.fromOffset(W, cardH)
 	local y2 = cardH - PAD - 48
 	local y1 = if withLeave or withDungeon then y2 - 8 - 52 else cardH - PAD - 52
@@ -885,6 +945,16 @@ function IntroRoundsUI.next()
 	end)
 end
 
+-- CONTINUE ROUNDS (beside HUNT BOUNTY): the next 1v1 instead of the
+-- dungeon for now. Every win's card offers the bounty again.
+function IntroRoundsUI.continueRounds()
+	if busy or not current or not choosing then
+		return
+	end
+	choosing = false
+	IntroRoundsUI.next()
+end
+
 local function leave()
 	if busy then
 		return
@@ -902,12 +972,11 @@ end
 -- the first dungeon (Bombardiro Drago's window, then the gate: Client
 -- IntroFinale). The lobby opens once it's cleared; the rest of the set
 -- waits for PLAY (recommended after the lobby's intro).
-local choosing = false
 -- A computer (a keyboard, not a touch screen): the card's keys, not clicks.
 local function keysOnly(): boolean
 	return UserInputService.KeyboardEnabled and not UiKit.touchOnly()
 end
-local function choose(which: string)
+function choose(which: string)
 	if busy then
 		return
 	end
@@ -927,9 +996,10 @@ local function choose(which: string)
 		if result.Choice ~= "Boss" then
 			return -- (the first dungeon's done: the server put on their next round)
 		end
-		-- (the bounty's window, then its gate: Client IntroFinale)
+		-- (straight into the bounty's Rift once they're out in the Outpost:
+		-- Client IntroFinale; this card was its window)
 		pcall(function()
-			require(script.Parent.IntroFinale).offerBoss()
+			require(script.Parent.IntroFinale).offerBoss(true)
 		end)
 	end)
 end
@@ -953,6 +1023,38 @@ function IntroRoundsUI.toDungeon()
 		busy = false
 		if not ok then
 			warn("[IntroRounds] first dungeon: " .. tostring(problem))
+		end
+	end)
+end
+
+-- The bounty's boss in its window, turning while the card's up (its figure:
+-- ReplicatedStorage.RiftPortraits, maybe still on its way from the server).
+IntroRoundsUI.BountyBoss = "Drago"
+local function bountyBoss(mine: number)
+	local view, camera = ui.BountyView, ui.BountyCamera
+	if not view then
+		return
+	end
+	task.spawn(function()
+		local body = view:FindFirstChildWhichIsA("Model")
+		if not body then
+			local folder = ReplicatedStorage:WaitForChild("RiftPortraits", 10)
+			local source = folder and folder:WaitForChild(IntroRoundsUI.BountyBoss, 10)
+			if not (source and source:IsA("Model")) or mine ~= shown then
+				return
+			end
+			body = source:Clone()
+			body:PivotTo(CFrame.new())
+			body.Parent = view
+		end
+		local _, size = body:GetBoundingBox()
+		local reach = math.max(size.X, size.Y, size.Z)
+		local spin = 0
+		while mine == shown and gui.Enabled and ui.Bounty.Visible do
+			spin += 0.02
+			local at = CFrame.Angles(0, math.rad(200) + math.sin(spin) * 0.5, 0) * Vector3.new(0, size.Y * 0.08, reach * 1.7)
+			camera.CFrame = CFrame.lookAt(at, Vector3.new(0, 0, 0))
+			task.wait(1 / 30)
 		end
 	end)
 end
@@ -986,6 +1088,7 @@ local function show(event)
 	ui.Extra.Text = ""
 	ui.Go:SetAttribute("Auto", nil)
 	choosing = false
+	ui.Bounty.Visible, ui.Well.Visible = false, true
 	if ui.Key1 then
 		ui.Key1.Visible, ui.Key2.Visible = false, false
 		ui.EnterKey.Visible = keysOnly()
@@ -1059,20 +1162,21 @@ local function show(event)
 			-- (one way on: the next event, the first dungeon: HUNT BOUNTY.
 			-- Not the lobby: that opens once it's cleared.)
 			choosing = true
-			-- (one row in the well: kept short so it fits)
-			ui.WellCaption.Text = Lang.translate("HUNT BOUNTY")
-			ui.WellCaption.TextSize = 10
-			ui.WellMain.Text = "BOMBARDIRO DRAGO"
-			ui.WellMain:SetAttribute("NoTranslate", true) -- (a name)
-			ui.WellNote.Text = Lang.translate("LEVEL 2 BOSS")
+			-- (the bounty in the well's place: its boss, what it pays)
+			ui.Well.Visible, ui.Bounty.Visible = false, true
+			bountyBoss(mine)
 			ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
-			placeButtons(false, false)
+			-- HUNT BOUNTY (Enter), and under it CONTINUE ROUNDS: the next 1v1
+			-- instead (no lobby before the first dungeon).
+			ui.Leave.Text = Lang.translate("CONTINUE ROUNDS")
+			ui.LeaveSub.Text = string.format(Lang.translate("Round %d of %d  ·  your next fight"), (event.Round or 1) + 1, view.Count)
+			placeButtons(true, false, BOUNTY_EXTRA)
 		else
 			nextUp("NEXT", nextRival)
 			placeButtons(false, false)
 		end
 		if ui.Key1 then
-			ui.Key1.Visible, ui.Key2.Visible = false, false
+			ui.Key1.Visible, ui.Key2.Visible = choosing and keysOnly(), false
 		end
 		if event.Gem then
 			ui.Extra.Text = Lang.translate(string.format(if event.Auto and (event.Auto.Gems or 0) > 0 then "+ %s gem, socketed for you" else "+ %s gem, in your pouch", event.Gem.Name))
@@ -1169,6 +1273,8 @@ function IntroRoundsUI.start()
 		local k = input.KeyCode
 		if k == Enum.KeyCode.Return or k == Enum.KeyCode.KeypadEnter or k == Enum.KeyCode.ButtonA then
 			IntroRoundsUI.next()
+		elseif choosing and (k == Enum.KeyCode.One or k == Enum.KeyCode.KeypadOne or k == Enum.KeyCode.ButtonX) then
+			IntroRoundsUI.continueRounds()
 		end
 	end)
 	ui.Dungeon.Activated:Connect(function()
@@ -1180,7 +1286,8 @@ function IntroRoundsUI.start()
 	end)
 	ui.Leave.Activated:Connect(function()
 		if choosing then
-			return -- (no way to the lobby before the first dungeon: its button's hidden)
+			IntroRoundsUI.continueRounds() -- (CONTINUE ROUNDS beside HUNT BOUNTY)
+			return
 		end
 		if current and current.View and current.View.Done then
 			-- (the set's done: GO TO LOBBY beside TO THE FIRST DUNGEON)

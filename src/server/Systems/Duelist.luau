@@ -154,6 +154,11 @@ end
 -- rival: see its spawn): slot 1 a Q from its gem element's Offense, slots 2
 -- and 3 an E from its Ability, only moves cast as themselves
 -- (Kaiju.AbilityPlans). `pick(n)` picks 1..n. Returns the ids set.
+-- An intro rival casts them whenever one's ready (duel.Showcase), at least
+-- ShowcaseGap seconds apart, at ShowcasePower of their damage (a new
+-- player sees the moves without being flattened by them).
+Duelist.ShowcaseGap = 4
+Duelist.ShowcasePower = 0.75
 function Duelist.showcaseSurges(loadout, pick: (number) -> number): { string }
 	local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 	local set = {}
@@ -771,7 +776,7 @@ function showSurge(enemy, duel, surge, target: BasePart, damage: number)
 		Size = 1,
 		Element = surge.Element,
 		Ability = surge.Plan,
-		Damage = damage * (surge.Power or 1),
+		Damage = damage * (surge.Power or 1) * (if duel.Showcase then Duelist.ShowcasePower else 1),
 		Body = enemy.Root,
 		Humanoid = enemy.Humanoid,
 		Foes = function(center: Vector3, radius: number)
@@ -806,7 +811,8 @@ function castSurge(enemy, duel, surge, now: number, target: BasePart)
 	local color = GemConfig.ElementColors[surge.Element] or P_GOLD
 	surge.Next = now + surge.Cooldown
 	-- A short gap after any surge, so it doesn't fire all three at once.
-	duel.NextSurge = math.max(nextSurgeTime(duel, now), now + 2.5)
+	-- (an intro rival's: a little longer between them, so they're seen, not spammed)
+	duel.NextSurge = math.max(nextSurgeTime(duel, now), now + (if duel.Showcase then Duelist.ShowcaseGap else 2.5))
 	model:SetAttribute("SurgeReadyAt" .. surge.Slot, workspace:GetServerTimeNow() + surge.Cooldown)
 	model:SetAttribute("SurgeCastAt" .. surge.Slot, workspace:GetServerTimeNow())
 	setStance(duel, "Surge")
@@ -2089,6 +2095,16 @@ local function think(enemy, now: number)
 			end
 		end
 	end
+	-- An intro rival (duel.Showcase) shows its moves off: whenever one's
+	-- ready and you're in reach, it casts it, close in or not.
+	if duel.Showcase and choice ~= "Stagger" and choice ~= "Surge" and now >= duel.NextSurge and distance <= Brain.SurgeRange then
+		for _, surge in duel.Surges do
+			if now >= surge.Next then
+				choice = "Surge"
+				break
+			end
+		end
+	end
 	-- Like a player, it reaches for a maneuver (1, 2, 3) when one fits.
 	local move = (Tech.ManeuversEnabled or duel.Dungeon or duel.Raid)
 		and choice ~= "Stagger"
@@ -2180,6 +2196,9 @@ local function think(enemy, now: number)
 		local surge = if silenced then nil else Brain.pickSurge(duel.Surges, now, distance, view)
 		-- A held beam bills a quarter-second at a time, as a player's.
 		local cost = if surge and surge.Cast == "Channel" and not surge.Prepaid then (surge.Cost or 0) * 0.25 else surge and surge.Cost or 0
+		if duel.Showcase then
+			cost = 0 -- (an intro rival's moves are on show: never held back for Charge)
+		end
 		if surge and duel.Charge < cost then
 			surge = nil -- not enough Charge, like a player
 		end
@@ -2465,6 +2484,7 @@ function spawnRival(owner: Player, raid, encounter)
 		Duelist.showcaseSurges(loadout, function(n)
 			return rng:NextInteger(1, n)
 		end)
+		loadout.Showcase = true -- (and it casts them: duel.Showcase)
 	end
 	-- Across the floor from the player, facing them.
 	local away = flat(center - root.Position)
@@ -2664,6 +2684,7 @@ function spawnRival(owner: Player, raid, encounter)
 		-- Its own Stamina and Charge, by the same rules as yours.
 		Stamina = Tech.Resources.Stamina.Max,
 		Charge = Tech.chargeStart(Tech.Resources.Charge.Max),
+		Showcase = loadout.Showcase == true, -- (an intro rival: casts its showcase surges whenever one's ready)
 		ResourceAt = os.clock(),
 		StaminaRestUntil = 0,
 		Action = nil,

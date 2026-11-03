@@ -223,9 +223,38 @@ do
 		end
 	end
 	check(boss, "The card doesn't show the bounty's boss")
-	check(not (leave and leave.Visible), "A way to the lobby before the first dungeon")
-	check(not (dungeon and dungeon.Visible), "A second way on beside HUNT BOUNTY")
+	-- (the bounty on show: its boss in a window, what it pays; and beside
+	-- HUNT BOUNTY, CONTINUE ROUNDS: the next 1v1. Still no lobby.)
+	local bounty = card:FindFirstChild("Bounty", true)
+	check(bounty and bounty.Visible and bounty:FindFirstChild("Boss"), "The bounty isn't on show on the card")
+	check(leave and leave.Visible and leave.Text == "CONTINUE ROUNDS", "No CONTINUE ROUNDS beside HUNT BOUNTY: " .. tostring(leave and leave.Text))
+	check(not (dungeon and dungeon.Visible), "A third way on beside HUNT BOUNTY")
 	check(go.Modal == true, "HUNT BOUNTY can't be clicked with the camera locked")
+	-- CONTINUE ROUNDS: the next round, not the dungeon.
+	local before = #requests
+	load(clientRef.IntroRoundsUI).continueRounds()
+	task.wait(0.2)
+	local asked = {}
+	for i = before + 1, #requests do
+		asked[requests[i][1]] = requests[i][2] or true
+	end
+	check(asked.IntroRoundNext and not asked.IntroRoundChoose, "CONTINUE ROUNDS didn't start the next round")
+	-- The next win's card offers the bounty again: HUNT BOUNTY (Enter, or a
+	-- click: both are next()) goes to the dungeon, never the next round.
+	local again = IntroRounds.state({ Funnel = {} })
+	IntroRounds.won(again, "Uncommon")
+	IntroRounds.won(again, "Uncommon")
+	social:Fire("IntroRound", { Phase = "Won", Round = 2, Piece = { Slot = "Shield", Name = "Shield", Rarity = "Uncommon" }, View = IntroRounds.view(again), Hunt = true })
+	task.wait(1.5 + load(clientRef.IntroRoundsUI).RollSeconds + 1)
+	check(card:FindFirstChild("Next", true).Text == "HUNT BOUNTY", "The next win's card doesn't offer the bounty again")
+	before = #requests
+	load(clientRef.IntroRoundsUI).next()
+	task.wait(0.2)
+	asked = {}
+	for i = before + 1, #requests do
+		asked[requests[i][1]] = requests[i][2] or true
+	end
+	check(asked.IntroRoundChoose == "Boss" and not asked.IntroRoundNext, "HUNT BOUNTY didn't go to the dungeon (it started the next round)")
 	attrs.CombatSession = nil
 end
 -- The first dungeon cleared (the server sends no Hunt): a later win's card is
@@ -493,7 +522,8 @@ do
 	local hcard = gui:FindFirstChild("Card", true)
 	local heading = hcard and hcard:FindFirstChild("Heading", true)
 	check(heading ~= nil and string.find(heading.Text, "HUNT BOUNTY", 1, true) ~= nil, "The hunt's window isn't NEXT EVENT · HUNT BOUNTY")
-	check(hcard and hcard:FindFirstChild("Later", true) == nil, "A LATER on the first dungeon's hunt")
+	-- (and a way out of it: LATER and the corner's X)
+	check(hcard and hcard:FindFirstChild("Later", true) ~= nil and hcard:FindFirstChild("Close", true) ~= nil, "No way out of the hunt's window (LATER, X)")
 	local goHunt = hcard and hcard:FindFirstChild("Go", true)
 	check(goHunt ~= nil and string.find(goHunt.Text, "HUNT BOUNTY", 1, true) ~= nil, "No HUNT BOUNTY button")
 	-- (its prize: the first dungeon's purse and a new kaiju)
