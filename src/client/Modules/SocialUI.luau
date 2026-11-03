@@ -2204,7 +2204,15 @@ remotes:WaitForChild("Social").OnClientEvent:Connect(function(kind: string, a: a
 		SocialUI.close()
 		showFaceoff(a)
 	elseif kind == "Fight" then
-		UiKit.toast("FIGHT!", P.Gold)
+		-- (the announcer's FIGHT!, big in the middle: Modules.FightDrama)
+		local shown = pcall(function()
+			local drama = require(script.Parent.FightDrama)
+			drama.call("FIGHT!", { Color = P.Gold, Rank = 4, Hold = 0.9 })
+			drama.fight()
+		end)
+		if not shown then
+			UiKit.toast("FIGHT!", P.Gold)
+		end
 	elseif kind == "Round" then
 		if a.Phase == "Pivot" then
 			showPivot(a)

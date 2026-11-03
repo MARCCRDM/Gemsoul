@@ -36,6 +36,9 @@ local TriadVfx = require(script.Parent.Modules.TriadVfx)
 local MoveVfx = require(script.Parent.Modules.MoveVfx)
 local BladeTrails = require(script.Parent.Modules.BladeTrails)
 local CombatSound = require(script.Parent.Modules.CombatSound)
+-- (the fight's drama: announcer, K.O., low health, rivals' voices; no
+-- local of its own: this script's at Luau's 200-local limit)
+require(script.Parent.Modules.FightDrama).start()
 local FxSize = require(script.Parent.Modules.FxSize)
 local MatchupUI = require(script.Parent.Modules.MatchupUI)
 local StatusEffects = require(ReplicatedStorage.Shared.StatusEffects)
@@ -1502,6 +1505,7 @@ RunService.RenderStepped:Connect(function(dt)
 	-- The lock stays on through menus and a free cursor; only its camera pull pauses.
 	TargetLock.setActive(fight)
 	TargetLock.setPaused(CombatGuide.isOpen() or AugmentTreeUI.isOpen())
+	require(script.Parent.Modules.FightDrama).setFight(fight)
 	-- (no LEAVE in a new miner's intro rounds: all six first)
 	leave.Visible = ArenaScene.isActive()
 		and not (player:GetAttribute("IntroRoundsLeft") and player:GetAttribute("CombatSession") == "Training")
@@ -2227,6 +2231,7 @@ function handlers.Combo(name)
 	end
 end
 function handlers.HighBlock()
+	require(script.Parent.Modules.FightDrama).parry()
 	hint.Text, feedbackUntil = "HIGH BLOCK - COUNTER!", os.clock() + 1
 	CombatSound.play("Parry")
 	local root = rootPart()
@@ -2346,6 +2351,7 @@ function handlers.Contact(contacts, info)
 		return
 	end
 	local feel = own.SwordFeel.tune(info, own.Cut.Side)
+	require(script.Parent.Modules.FightDrama).contact(info)
 	local blocked = info.Blocked == true
 	local color = GemConfig.ElementColors[info.Element] or Color3.fromRGB(255, 236, 200)
 	FirstPerson.contact(feel.Stop, feel.Strength, blocked, function()

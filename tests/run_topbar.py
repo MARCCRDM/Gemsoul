@@ -21,6 +21,9 @@ COVERS = {
     "src/client/Modules/RiftClient.luau": "the crossing into the Rift: a dark fade, the centred title and solo warning, no buttons (its gate card, strip and down window keep the inset)",
     "src/client/Modules/KaijuPitClient.luau": "the stairs to the Kaiju Arena: a dark fade and the centred title, no buttons (the pad card keeps the inset)",
     "src/client/Modules/MeteorGolemFx.luau": "the Meteor Golem's entrance: letterbox bars and its centred name, no buttons",
+    "src/client/Modules/IntroFinale.luau": "the intro's finale: the minions' letterbox bars, a banner under the strip (70 px down) and centred windows",
+    "src/client/Modules/FirstDungeonUI.luau": "the Rot Beachhead's loading slides: full-screen art and centred words, no buttons up top",
+    "src/client/Modules/FightDrama.luau": "the fight's callouts (a third of the way down, centred) and the K.O.'s full-screen flash, no buttons",
 }
 HELPERS = ("UiKit.clearTopbar", "UiKit.topbar", "UiKit.onTopbar", "UiKit.reserveTopbar")
 OVER_STRIP = re.compile(r"IgnoreGuiInset\s*=\s*true|ScreenInsets\s*=\s*Enum\.ScreenInsets\.None")
