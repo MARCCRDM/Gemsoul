@@ -54,7 +54,7 @@ Codes.List = {
 		Expires = os.time({ year = 2026, month = 11, day = 17, hour = 23, min = 59 }),
 		Note = "Legendary Brightsteel kaiju promo, random roll (limited: 100, ends 17 Nov 2026)",
 	},
-
+	TRISKULL = {
 		-- The Triskull promo video: a Legendary Triskull, 100 only, for two weeks.
 		Reward = { KaijuSale = "Promo" },
 		Limit = 100,
