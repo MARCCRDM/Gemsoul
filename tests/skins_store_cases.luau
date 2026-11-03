@@ -765,6 +765,7 @@ check(not profile.Cosmetics.Owned.BackStormwings, "STORM still gives the Stormca
 check(stubs.Codes.List.STORM.Limit == 100, "STORM isn't limited to 100")
 check(stubs.Codes.List.BRIGHTSTEEL and stubs.Codes.List.BRIGHTSTEEL.Reward.KaijuSale == "PromoBrightsteel" and stubs.Codes.List.BRIGHTSTEEL.Limit == 100, "BRIGHTSTEEL isn't the promo Brightsteel, 100 only")
 check(stubs.Codes.List.TRISKULL and stubs.Codes.List.TRISKULL.Reward.KaijuSale == "Promo", "TRISKULL went missing")
+check(stubs.Codes.List.STEAMHIDE and stubs.Codes.List.STEAMHIDE.Reward.KaijuSale == "PromoSteamhide" and stubs.Codes.List.STEAMHIDE.Limit == 100, "STEAMHIDE isn't the promo Steamhide, 100 only")
 check(stubs.Codes.allowed({ For = { "kingreen113" } }, { Name = "KINGREEN113", DisplayName = "x" }), "A gift by username")
 check(stubs.Codes.allowed({ For = { 42 } }, { UserId = 42 }) and not stubs.Codes.allowed({ For = { 42 } }, { UserId = 7 }), "A gift by UserId")
 local Bundle = Store.bundle("ReaperHarvest")

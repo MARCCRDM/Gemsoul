@@ -7470,6 +7470,21 @@ check(Kaiju.Scale.Guardian > Kaiju.Scale.Wild and Kaiju.Scale.Wild > Kaiju.Scale
 			seenElements[got.Element] = true
 		end
 	end
+	-- STEAMHIDE's: a Fire Steamhide, its Gemsoul Legendary.
+	do
+		local was = {}
+		for _, record in roster.List do
+			was[record] = true
+		end
+		check(KaijuServer.saleGrant(d, "PromoSteamhide"), "The promo Steamhide wasn't given")
+		local got
+		for _, record in roster.List do
+			if not was[record] then
+				got = record
+			end
+		end
+		check(got ~= nil and got.Species == "Steamhide" and got.Element == "Fire" and got.Soul and got.Soul.Tier == "Legendary", "The promo kaiju isn't a Fire Steamhide with a Legendary Gemsoul")
+	end
 	-- (and the element really is any of the four: each turns up within a few
 	-- hundred rolls of the same pick the grant makes)
 	local pickRng = Random.new(3)

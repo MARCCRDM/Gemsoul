@@ -2274,6 +2274,16 @@ Kaiju.Sale = {
 		Elements = { "Fire", "Frost", "Shock", "Poison" },
 		Rarity = "Legendary",
 	},
+	-- Another (Server Codes: STEAMHIDE): a Steamhide in Fire on a random
+	-- Legendary roll: its Gemsoul always Legendary, its moves and traits
+	-- rolled.
+	PromoSteamhide = {
+		Promo = true,
+		Name = "Legendary Fire Steamhide",
+		Species = "Steamhide",
+		Element = "Fire",
+		Rarity = "Legendary",
+	},
 	Showcase = {
 		{ Species = "Emberjaw", Element = "Fire" },
 		{ Species = "Razorclaw", Element = "Frost" },
