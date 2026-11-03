@@ -971,6 +971,9 @@ Kaiju.Infuse = {
 -- "KaijuRevive" product, Shared.Store: every one of yours that's down) or
 -- a Revive coupon (Shared.Coupons).
 Kaiju.Revive = { Base = 60, PerLevel = 8, Health = 0.15, Bought = 0.5 }
+-- A new miner's first dungeon (the HUNT BOUNTY): one knocked out is back in
+-- FirstDungeon seconds, at full health, so the team stays in the fight.
+Kaiju.Revive.FirstDungeon = 10
 
 -- How long one knocked out at its level stays down.
 function Kaiju.reviveSeconds(record): number

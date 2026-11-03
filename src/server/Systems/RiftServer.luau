@@ -655,6 +655,18 @@ local function cleared(run, room: number)
 	RiftWorld.openGate(run.World.Gates[room])
 	caches(run, RiftRun.cacheLuck(room))
 	run.Room = room + 1
+	-- A new miner's first dungeon: each cave cleared has their kaiju back,
+	-- whole, for the next.
+	for _, member in run.Members do
+		local owed = false
+		pcall(function()
+			owed = require(script.Parent.IntroRoundsServer).owesDungeon(member)
+		end)
+		if owed and not run.Fallen[member] then
+			pcall(KaijuServer.restoreAll, member)
+			pcall(KaijuServer.deployTeam, member)
+		end
+	end
 	if room < RiftRun.Rooms then
 		announce(run, "Cave cleared. The fire's down: on to the next.")
 	else
@@ -1136,6 +1148,9 @@ local function join(run, player: Player)
 		if ok and joined > 0 then
 			notify(player, "Your starter kaiju team is with you: they fight beside you in here.")
 		end
+		-- (Any knocked out on the way here, in the intro's fights, come in
+		-- on their feet and at full health.)
+		pcall(KaijuServer.restoreAll, player)
 		pcall(KaijuServer.deployTeam, player)
 	end
 	-- (In there you fight: your combat kit comes out, till you swap it for

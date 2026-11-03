@@ -1134,6 +1134,30 @@ local function healthAndInfusing()
 	pet = KaijuServer.pets()[a]
 	check(pet and pet.Record == record, "Revived, it didn't come out")
 	check(KaijuServer.reviveAll(a) == 0, "reviveAll counted one that wasn't down")
+	-- A new miner's first dungeon (in the Rift, the intro's dungeon still
+	-- owed): knocked out, it's back in Revive.FirstDungeon seconds, whole.
+	do
+		local owed = true
+		server.IntroRoundsServer = { owesDungeon = function() return owed end }
+		check(not KaijuServer._firstDungeon(a), "Out of the Rift counted as the first dungeon")
+		a:SetAttribute("RiftRun", "R1")
+		check(KaijuServer._firstDungeon(a), "The first dungeon not seen")
+		check(Kaiju.Revive.FirstDungeon <= 15, "Down too long in the first dungeon")
+		KaijuServer.hurt(pet, 1e6, nil, nil)
+		check(record.Down and record.DownUntil == 1700000000 + math.floor(now) + Kaiju.Revive.FirstDungeon, "Not a quick revive in the first dungeon")
+		now += Kaiju.Revive.FirstDungeon + 1
+		table.clear(notes)
+		KaijuServer._upkeep(a, now)
+		local _, most = Kaiju.health(record)
+		check(not record.Down and record.Health == most, "Not back whole in the first dungeon")
+		check(noted(a, "back in the fight"), "Not told it's back in the fight")
+		pet = KaijuServer.pets()[a]
+		check(pet and pet.Record == record, "Back, it didn't come out in the first dungeon")
+		owed = false
+		check(not KaijuServer._firstDungeon(a), "A later dungeon counted as the first")
+		a:SetAttribute("RiftRun", nil)
+		server.IntroRoundsServer = nil
+	end
 	for _, gem in table.clone(profiles[a].Gems) do
 		PlayerData.removeGem(a, gem.Id)
 	end

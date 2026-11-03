@@ -1124,6 +1124,11 @@ do
 		local joinEnd = joinAt and server:find("\nend\n", joinAt, true)
 		local body = joinAt and joinEnd and server:sub(joinAt, joinEnd) or ""
 		check(body:find("owesDungeon(player)", 1, true) ~= nil and body:find("KaijuServer.ensureStarter", 1, true) ~= nil and body:find("KaijuServer.deployTeam", 1, true) ~= nil, "Into the first dungeon without kaiju is still possible")
+		check(body:find("KaijuServer.restoreAll, player", 1, true) ~= nil, "Into the first dungeon with its kaiju still knocked out")
+		local clearAt = server:find("local function cleared(run, room: number)", 1, true)
+		local clearEnd = clearAt and server:find("\nend\n", clearAt, true)
+		local clearBody = clearAt and clearEnd and server:sub(clearAt, clearEnd) or ""
+		check(clearBody:find("owesDungeon(member)", 1, true) ~= nil and clearBody:find("KaijuServer.restoreAll, member", 1, true) ~= nil, "A cave cleared in the first dungeon doesn't bring the kaiju back")
 	end
 	-- The boss takes turns on the kaiju too (Shared.Aggro's turns, each
 	-- kaiju's own threat: KaijuServer.strike; Duelist's PetTarget).

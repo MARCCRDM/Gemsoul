@@ -738,6 +738,19 @@ local function claimRoll(player: Player): { any }
 	return added
 end
 
+-- In a new miner's first dungeon (the HUNT BOUNTY: in the Rift, the intro's
+-- dungeon still owed): kaiju knocked out are back quickly, at full health.
+local function firstDungeon(player: Player): boolean
+	if player:GetAttribute("RiftRun") == nil then
+		return false
+	end
+	local ok, owed = pcall(function()
+		return require(script.Parent.IntroRoundsServer).owesDungeon(player)
+	end)
+	return ok and owed == true
+end
+KaijuServer._firstDungeon = firstDungeon
+
 -- One knocked out back on its feet: its revive time up, weak (at
 -- Kaiju.Revive.Health of its health, to be healed with gems), or bought
 -- (at Revive.Bought).
@@ -808,9 +821,16 @@ local function upkeep(player: Player, now: number)
 	-- Knocked out and its time is up: back by itself (at home too). (Not one
 	-- knocked out in a battle: that's put back after it.)
 	local woke = nil
+	local quick = nil
 	for _, record in (roster and roster.List) or {} do
 		if record.Down and not record.BattleKeep and Kaiju.reviveIn(record, os.time()) <= 0 then
 			wake(record)
+			if quick == nil then
+				quick = firstDungeon(player)
+			end
+			if quick then
+				record.Health = select(2, Kaiju.health(record))
+			end
 			woke = woke or {}
 			table.insert(woke, Kaiju.nameOf(record))
 		end
@@ -820,7 +840,9 @@ local function upkeep(player: Player, now: number)
 		Remotes.Notify:FireClient(
 			player,
 			string.format(
-				"%s is back on its feet, but weak: heal with gems before the next fight.",
+				if quick
+					then "%s is back on its feet: back in the fight!"
+					else "%s is back on its feet, but weak: heal with gems before the next fight.",
 				table.concat(woke, ", ")
 			)
 		)
@@ -1129,7 +1151,7 @@ local function knockOut(pet: Pet)
 	if profile and profile.Kaiju then
 		Kaiju.setTeam(profile.Kaiju, Kaiju.teamIds(profile.Kaiju))
 	end
-	local wait = Kaiju.reviveSeconds(record)
+	local wait = if firstDungeon(player) then Kaiju.Revive.FirstDungeon else Kaiju.reviveSeconds(record)
 	record.Down, record.Health, record.DownUntil = true, 0, os.time() + wait
 	PlayerData.sync(player)
 	-- Out of a battle quietly: it's back as it was once the battle's over.
