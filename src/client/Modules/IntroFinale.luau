@@ -53,8 +53,8 @@ IntroFinale.Lines = {
 	Minions = "These are rot minions. They still try to steal your gems. Your kaijus are trained to fight and defend you.",
 	Fight = "Your kaijus will defend you. Train and protect them, and they will protect you.",
 	Invite = "You're ready for your first dungeon. Its boss is Bombardiro Drago. Beat him for coins, gear, gems and a new kaiju. Want to go?",
-	Hunt = "Your next event: hunt the bounty. Bombardiro Drago waits at the end of your first dungeon. Beat him to win your starter kaiju team, a thousand coins, gear and gems.",
-	Reward = "Bounty claimed! Your reward: your starter kaiju team.",
+	Hunt = "Your next event: hunt the bounty. Bombardiro Drago waits at the end of your first dungeon. Beat him for a thousand coins, gear, gems and a new kaiju.",
+	Reward = "Bounty claimed! Your reward: a new kaiju.",
 	Finish = "Recommended: finish your intro fights. Each one wins you another piece of your gear set.",
 	Done = "Well done, miner. Welcome to the Outpost.",
 }
@@ -478,19 +478,17 @@ end
 -- on the board. What you'd win shows as tiles (the real numbers: a boss
 -- run's coins and kaiju EXP, Shared.RiftRun; its cache, Shared.BossLoot's
 -- threat I floor; a kaiju roll for every boss beaten). HUNT BOUNTY's (the
--- first dungeon): IntroRounds.FirstDungeonCoins, and the starter kaiju team.
+-- first dungeon): IntroRounds.FirstDungeonCoins.
 IntroFinale.Boss = "Drago" -- (its figure: ReplicatedStorage.RiftPortraits)
 -- `hunt`: the first dungeon (HUNT BOUNTY): its own purse (IntroRounds.
--- FirstDungeonCoins) and the starter kaiju team as its prize.
+-- FirstDungeonCoins).
 function IntroFinale.rewards(hunt: boolean?)
 	local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
 	local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
 	return {
 		{ Icon = "●", Value = tostring(if hunt then IntroRounds.FirstDungeonCoins else RiftRun.rewardCoins(RiftRun.Rooms)), Label = "COINS", Color = Color3.fromRGB(255, 206, 92) },
 		{ Icon = "◆", Value = "UNCOMMON+", Label = "BOSS CACHE GEAR", Color = Color3.fromRGB(110, 224, 140) },
-		if hunt
-			then { Icon = "▲", Value = tostring(Kaiju.StarterTeam), Label = "STARTER KAIJU", Color = Color3.fromRGB(150, 200, 255) }
-			else { Icon = "▲", Value = "+1", Label = "NEW KAIJU", Color = Color3.fromRGB(150, 200, 255) },
+		{ Icon = "▲", Value = "+1", Label = "NEW KAIJU", Color = Color3.fromRGB(150, 200, 255) },
 		{ Icon = "✦", Value = "GEMS", Label = "IN EVERY CAVE", Color = Color3.fromRGB(94, 206, 221) },
 	}, RiftRun.Reward.Exp
 end
@@ -593,7 +591,7 @@ local function invite(hunt: boolean?)
 	text(card, if hunt then "NEXT EVENT  ·  HUNT BOUNTY" else "READY FOR YOUR FIRST DUNGEON?", x0, 26, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold).Name = "Heading"
 	text(card, "BOMBARDIRO DRAGO", x0, 48, W_CARD - x0 - 20, 70, 34, GOLD, Enum.Font.GothamBlack).Name = "BossName"
 	text(card, "Its boss  ·  Level 2  ·  built to beat solo", x0, 122, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(220, 200, 196), Enum.Font.GothamMedium)
-	text(card, if hunt then "Your first dungeon. Four caves, then the boss. Beat him to win your starter kaiju team. The Outpost opens once he's down." else "Your kaiju fight beside you. Four caves, then the boss.", x0, 150, W_CARD - x0 - 20, if hunt then 60 else 40, 14, Color3.fromRGB(190, 176, 172), Enum.Font.GothamMedium)
+	text(card, if hunt then "Your first dungeon. Four caves, then the boss. Your kaiju fight beside you. The Outpost opens once he's down." else "Your kaiju fight beside you. Four caves, then the boss.", x0, 150, W_CARD - x0 - 20, if hunt then 60 else 40, 14, Color3.fromRGB(190, 176, 172), Enum.Font.GothamMedium)
 	-- What you'd win: a tile each.
 	local rewards, exp = IntroFinale.rewards(hunt)
 	text(card, "POTENTIAL REWARDS", 18, 268, 300, 18, 13, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold)
@@ -772,13 +770,22 @@ local function run()
 	end
 	running = true
 	local ok, problem = pcall(function()
-		-- The first dungeon's prize first: the starter kaiju team (owed till
-		-- now: not rolled after the first win any more).
-		if IntroFinale.dungeonDone() and GemClient.Profile and Kaiju.rollsOwed(GemClient.Profile) > 0 then
+		-- The first dungeon's prize first: a new kaiju (the boss's roll,
+		-- Kaiju.bossRollsOwed), rolled as soon as they're back.
+		if IntroFinale.dungeonDone() and GemClient.Profile and Kaiju.rollsOwed(GemClient.Profile) == 0 and Kaiju.bossRollsOwed(GemClient.Profile) > 0 then
 			step("Kaiju")
-			banner("BOUNTY CLAIMED", "Your reward: your starter kaiju team")
+			banner("BOUNTY CLAIMED", "Your reward: a new kaiju")
 			VoiceOver.say(IntroFinale.Lines.Reward)
-			kaiju(false)
+			local rolled = false
+			task.spawn(function()
+				require(script.Parent.KaijuRoll).play(function()
+					rolled = true
+				end)
+			end)
+			local started = os.clock()
+			while not rolled and os.clock() - started < 120 do
+				task.wait(0.2)
+			end
 			banner(nil)
 		end
 		step("Mine")

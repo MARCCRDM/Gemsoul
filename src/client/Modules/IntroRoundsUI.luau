@@ -1214,10 +1214,10 @@ function IntroRoundsUI.start()
 			-- (after a queued match's result card, which has the screen for EndPause)
 			pending += 1
 			task.delay(if inArena() then 1.2 else 4.5, function()
-				-- (The starter kaiju aren't rolled here any more: they're the
-				-- first dungeon's reward, Client IntroFinale. Only the dungeon
-				-- path, IntroRounds.stage, still rolls them before its dungeon.)
-				if false and event.Phase == "Won" and event.Where == nil and (event.Round or 0) == IntroRounds.ChoiceAfter then
+				-- The first fight won: their kaiju first (the starter roll, if
+				-- it's owed), then the card and HUNT BOUNTY: they take them
+				-- into the first dungeon.
+				if event.Phase == "Won" and event.Where == nil and (event.Round or 0) == IntroRounds.ChoiceAfter then
 					local owed = false
 					pcall(function()
 						owed = require(ReplicatedStorage.Shared.Kaiju).rollsOwed(GemClient.Profile) > 0
