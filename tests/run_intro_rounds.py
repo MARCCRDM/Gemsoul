@@ -7,3 +7,4 @@ if not lune:
     raise SystemExit('run_intro_rounds needs lune (https://github.com/lune-org/lune) on PATH')
 subprocess.run([lune, 'run', str(ROOT / 'tests/intro_rounds_cases.luau'), str(ROOT)], check=True)
 subprocess.run([lune, 'run', str(ROOT / 'tests/intro_rounds_server.luau'), str(ROOT)], check=True)
+subprocess.run([lune, 'run', str(ROOT / 'tests/rival_surges_cases.luau'), str(ROOT)], check=True)

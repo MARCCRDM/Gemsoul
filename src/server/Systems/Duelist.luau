@@ -150,6 +150,32 @@ local function rating(ratings, stat: string): number
 	return if r then r.Base + r.Bonus else 0
 end
 
+-- The starter kit's showcase moves on a rival's three surge gems (an intro
+-- rival: see its spawn): slot 1 a Q from its gem element's Offense, slots 2
+-- and 3 an E from its Ability, only moves cast as themselves
+-- (Kaiju.AbilityPlans). `pick(n)` picks 1..n. Returns the ids set.
+function Duelist.showcaseSurges(loadout, pick: (number) -> number): { string }
+	local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
+	local set = {}
+	for slot = 1, 3 do
+		local gem = loadout["Surge" .. slot .. "Gem"]
+		local lanes = gem and GemTraits.Intro[gem.Element]
+		if lanes then
+			local options = {}
+			for _, id in (if slot == 1 then lanes.Offense else lanes.Ability) do
+				if KaijuShared.AbilityPlans[id] and not table.find(set, id) then
+					table.insert(options, id)
+				end
+			end
+			if #options > 0 then
+				gem.Surge = options[math.clamp(pick(#options), 1, #options)]
+				table.insert(set, gem.Surge)
+			end
+		end
+	end
+	return set
+end
+
 -- A random loadout, rolled the way a new player's starter kit is.
 local function rollLoadout(rng: Random)
 	local class = Classes.get("Warrior")
@@ -2430,6 +2456,15 @@ function spawnRival(owner: Player, raid, encounter)
 		loadout.RoundLooks = IntroRounds.looks(introRound)
 	else
 		introRound = nil
+	end
+	-- A new miner's intro rivals (its rounds, and the very first fight) cast
+	-- the starter kit's showcase moves, as the player's do: a leap or a
+	-- strike on Q (GemTraits.Intro's Offense), the big storms, cannons and
+	-- blasts on E and R (its Ability), each in its own surge gem's element.
+	if introRound or (not raid and not encounter and session == "Training" and duelsPlayed(owner) == 0) then
+		Duelist.showcaseSurges(loadout, function(n)
+			return rng:NextInteger(1, n)
+		end)
 	end
 	-- Across the floor from the player, facing them.
 	local away = flat(center - root.Position)
