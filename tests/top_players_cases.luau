@@ -15,11 +15,15 @@ local function player(id, name, display)
 end
 local everyone = { player(11738957136, "Devvolver"), player(222, "VolverDev"), player(333, "kingreen113"), player(444, "trox111") }
 local removedKeys, written = {}, {}
+local failReads = false -- (the data store's budget spent: every read fails)
 local function store(board)
 	return {
 		SetAsync = function(_, key, value) written[board .. ":" .. key] = value end,
 		RemoveAsync = function(_, key) removedKeys[board .. ":" .. key] = true end,
 		GetSortedAsync = function()
+			if failReads then
+				error("DataStore request was added to queue. If request queue fills, further requests will be dropped.")
+			end
 			return { GetCurrentPage = function()
 				return { { key = "11738957136", value = 260 }, { key = "333", value = 527 }, { key = "222", value = 16 }, { key = "444", value = 3 } }
 			end }
@@ -49,13 +53,27 @@ local stubs = {
 	Shop = { register = function(name, fn) registered[name] = fn end, reply = function(ok, msg, extra) extra = extra or {}; extra.Ok = ok; return extra end },
 }
 local waits = 0
+local firstBoards, firstWritten = nil, nil
+local Top
 local env = setmetatable({
 	game = { GetService = function(_, name) return services[name] end },
 	script = { Parent = { PlayerData = "PlayerData", Shop = "Shop" } },
 	require = function(name) return stubs[name] end,
-	task = { spawn = function(fn) fn() end, wait = function() waits += 1; if waits > 0 then error("stop") end end },
+	-- (each wait between refreshes: the first, a busy server's data store
+	-- hiccup and nothing changed since; then the loop's stopped)
+	task = { spawn = function(fn) fn() end, wait = function()
+		waits += 1
+		if waits == 1 then
+			firstBoards = table.clone(Top.board("Mined"))
+			failReads = true
+			firstWritten = table.clone(written)
+			table.clear(written)
+			return
+		end
+		error("stop")
+	end },
 }, { __index = _G })
-local Top = luau.load(fs.readFile(ROOT .. "/src/server/Systems/TopPlayers.luau"), { debugName = "TopPlayers", environment = env })()
+Top = luau.load(fs.readFile(ROOT .. "/src/server/Systems/TopPlayers.luau"), { debugName = "TopPlayers", environment = env })()
 
 check(Top.hidden(11738957136, "whoever"), "The owner's UserId isn't hidden")
 check(Top.hidden(222, "volverdev") and Top.hidden(nil, "DEVVOLVER"), "VolverDev or Devvolver by name isn't hidden")
@@ -69,5 +87,11 @@ for _, row in mined do
 end
 check(#mined == 2 and mined[1].Name == "kingreen113" and mined[2].Name == "trox111", "The boards still show the game's accounts: " .. table.concat(names, ", "))
 check(removedKeys["T_Top_Mined:11738957136"] and removedKeys["T_Top_Mined:222"], "The hidden accounts' rows weren't taken off the store")
-check(written["T_Top_Mined:333"] ~= nil and written["T_Top_Mined:11738957136"] == nil and written["T_Top_Mined:222"] == nil, "A hidden account's score was written")
-print(string.format("PASS: %d leaderboard checks (the game's own accounts kept off every board)", checks))
+check(firstWritten["T_Top_Mined:333"] ~= nil and firstWritten["T_Top_Mined:11738957136"] == nil and firstWritten["T_Top_Mined:222"] == nil, "A hidden account's score was written")
+-- A refresh that fails after a good one: the global boards stay up (never
+-- this server's players only), and the scores that didn't change aren't
+-- written again.
+check(firstBoards and #firstBoards == 2, "The first refresh didn't read the global boards")
+check(Top.isGlobal() and #mined == 2 and Top.board("Mined")[1].Name == "kingreen113", "A failed refresh dropped the global boards")
+check(next(written) == nil, "Scores that hadn't changed were written again")
+print(string.format("PASS: %d leaderboard checks (the game's own accounts kept off every board; the global boards kept through a failed refresh; only changes written)", checks))

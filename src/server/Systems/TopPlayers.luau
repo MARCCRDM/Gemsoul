@@ -58,7 +58,13 @@ end
 
 local stores: { [string]: OrderedDataStore } = {}
 local cache: { [string]: { { Name: string, Value: number } } } = {}
+-- The global boards: once read, they stay up through a refresh that fails
+-- (a data store hiccup, its budget spent on a busy server) and are retried
+-- next time; only a server that's never read them (e.g. Studio) ranks its
+-- own players instead.
 local global = false
+local everRead = false
+local written: { [number]: { [string]: number } } = {} -- [userId][board] = the score last written (only changes are written)
 local names: { [number]: string } = {}
 local removed: { [number]: boolean } = {} -- hidden accounts already taken off, this server
 
@@ -142,10 +148,18 @@ local function refresh()
 			end
 			continue
 		end
-		local s = scores(player)
-		if s then
+		local got, s = pcall(scores, player)
+		if got and s then
+			local last = written[player.UserId] or {}
+			written[player.UserId] = last
 			for _, board in BOARDS do
-				pcall(stores[board].SetAsync, stores[board], tostring(player.UserId), math.floor(s[board]))
+				local value = math.floor(tonumber(s[board]) or 0)
+				if last[board] ~= value then
+					local ok = pcall(stores[board].SetAsync, stores[board], tostring(player.UserId), value)
+					if ok then
+						last[board] = value
+					end
+				end
 			end
 		end
 	end
@@ -165,11 +179,13 @@ local function refresh()
 			cache[board] = rows
 		end
 	end
-	-- No access to the global boards (e.g. Studio): rank this server instead.
-	if not anyRead then
-		global = false
+	if anyRead then
+		everRead = true
+	elseif not everRead then
+		-- (never read them yet: this server's players meanwhile; tried again next time)
 		localBoards()
 	end
+	-- (a failed read after a good one: the last boards stay up)
 end
 
 -- A board's top rows ({ Name, Value, UserId }), best first (e.g. for the
@@ -181,9 +197,14 @@ function TopPlayers.board(name: string)
 	return cache[name] or {}
 end
 
+-- Whether the global boards have been read (else they're this server's).
+function TopPlayers.everRead(): boolean
+	return everRead
+end
+
 -- Whether the boards are every server's (else this server's players).
 function TopPlayers.isGlobal(): boolean
-	return global
+	return global and everRead
 end
 
 function TopPlayers.start()
@@ -200,16 +221,21 @@ function TopPlayers.start()
 		if not global then
 			localBoards()
 		end
-		return Shop.reply(true, "", { Global = global, Boards = cache })
+		return Shop.reply(true, "", { Global = global and everRead, Boards = cache })
 	end)
 	task.spawn(function()
 		while true do
-			local ok = pcall(refresh)
+			-- (a refresh that fails is just tried again: never given up on
+			-- for the rest of the server's life)
+			local ok, problem = pcall(refresh)
 			if not ok then
-				global = false
+				warn("[TopPlayers] refresh failed, trying again next time:", problem)
 			end
 			task.wait(REFRESH_SECONDS)
 		end
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		written[player.UserId] = nil
 	end)
 end
 
