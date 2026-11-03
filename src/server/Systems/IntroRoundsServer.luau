@@ -390,7 +390,25 @@ end
 local finaleCritters = {} :: { [Player]: { any } }
 local finaleLoose = {} :: { [Player]: boolean } -- (the kaiju are out: the minions let go)
 -- The steps the client says it's on (for the DEV spectator: IntroFinaleStep).
-local FINALE_STEPS = { Mine = true, Gems = true, Minions = true, Kaiju = true, Invite = true, Over = true }
+local FINALE_STEPS = { Mine = true, Gems = true, Minions = true, Kaiju = true, Invite = true, Over = true, Away = true }
+-- In a fight (a 1v1, the Arena, a queue, the Rift): the lobby's intro waits,
+-- never brings its minions in there.
+local function busyElsewhere(player: Player): boolean
+	return player:GetAttribute("CombatSession") ~= nil
+		or player:GetAttribute("MatchId") ~= nil
+		or player:GetAttribute("DuelQueue") ~= nil
+		or player:GetAttribute("RiftRun") ~= nil
+end
+IntroRoundsServer.busyElsewhere = busyElsewhere
+-- The finale's minions gone (they went into a fight: they'll come again
+-- when the lobby's intro does).
+function IntroRoundsServer.clearCritters(player: Player)
+	local list = finaleCritters[player]
+	finaleCritters[player], finaleLoose[player] = nil, nil
+	for _, enemy in list or {} do
+		pcall(require(script.Parent.Enemies).remove, enemy)
+	end
+end
 local function finale(player: Player, step: any, name: any)
 	if step == "Step" then
 		player:SetAttribute("IntroFinaleStep", if FINALE_STEPS[name] then name else nil)
@@ -399,6 +417,9 @@ local function finale(player: Player, step: any, name: any)
 	local profile = PlayerData.get(player) :: any
 	if not profile or profile.IntroFinale ~= "Mines" then
 		return reply(false, "Nothing to do here.")
+	end
+	if (step == "Critters" or step == "Fight") and busyElsewhere(player) then
+		return reply(false, "Not in the middle of a fight.")
 	end
 	if step == "Critters" then
 		-- Three rift portals tearing open ahead of them (FrontierServer's,
@@ -748,6 +769,14 @@ function IntroRoundsServer.start()
 	-- (A new miner's reel pictures, built soon after they join: ready for
 	-- their first fight's roll.)
 	local function arrived(player: Player)
+		-- (into a fight with the lobby's intro mid-way: its minions go)
+		for _, key in { "MatchId", "CombatSession", "RiftRun" } do
+			player:GetAttributeChangedSignal(key):Connect(function()
+				if player:GetAttribute(key) ~= nil and finaleCritters[player] then
+					IntroRoundsServer.clearCritters(player)
+				end
+			end)
+		end
 		task.delay(10, function()
 			if player.Parent and IntroRoundsServer.eligible(player) then
 				IntroRoundsServer.warm(player)

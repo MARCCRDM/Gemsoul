@@ -355,6 +355,18 @@ local function gems()
 	shade:Destroy()
 end
 
+-- Off in a fight (a 1v1, the Arena, a queue, the Rift): the lobby's intro
+-- stops where it is and picks up from that step once they're back.
+local AWAY = "[IntroFinale] away in a fight"
+local function away(): boolean
+	return player:GetAttribute("CombatSession") ~= nil
+		or player:GetAttribute("MatchId") ~= nil
+		or player:GetAttribute("DuelQueue") ~= nil
+		or player:GetAttribute("RiftRun") ~= nil
+end
+IntroFinale._away = away
+local stepsDone: { [string]: boolean } = {} -- (this visit: steps already through)
+
 -- 3. The rot minions, in a cinematic -----------------------------------------------------------------------
 local function minions(): boolean
 	local result = GemClient.request("IntroFinale", "Critters")
@@ -413,7 +425,7 @@ local function minions(): boolean
 	local started = os.clock()
 	local deployed = tonumber(result.Deployed) or 0
 	while os.clock() - started < IntroFinale.CinematicSeconds or workspace:GetServerTimeNow() < deployed do
-		if os.clock() - started > 20 then
+		if os.clock() - started > 20 or away() then
 			break
 		end
 		task.wait(0.1)
@@ -458,7 +470,7 @@ local function kaiju(fight: boolean?)
 	GemClient.request("IntroFinale", "Fight")
 	banner("YOUR KAIJU DEFEND YOU", "Train and protect them, and they'll protect you")
 	local started = os.clock()
-	while os.clock() - started < IntroFinale.FightFor do
+	while os.clock() - started < IntroFinale.FightFor and not away() do
 		task.wait(2)
 		local left = GemClient.request("IntroFinale", "Left")
 		if left and left.Ok and (left.Left or 0) <= 0 then
@@ -807,16 +819,37 @@ local function run()
 			end
 			banner(nil)
 		end
-		step("Mine")
-		mine()
-		step("Gems")
-		gems()
-		step("Minions")
-		local came = minions()
-		step("Kaiju")
+		local function stage(name: string, fn: () -> any): any
+			if away() then
+				error(AWAY, 0)
+			end
+			if stepsDone[name] then
+				return true
+			end
+			step(name)
+			local result = fn()
+			if away() then
+				error(AWAY, 0) -- (cut short by a fight: this step again later)
+			end
+			stepsDone[name] = true
+			return result
+		end
+		stage("Mine", mine)
+		stage("Gems", gems)
+		local came = stage("Minions", minions)
 		-- (the kaiju roll, even if the minions didn't come: nobody's left without one)
-		kaiju(came)
+		stage("Kaiju", function()
+			kaiju(came)
+		end)
 	end)
+	if not ok and problem == AWAY then
+		-- Into a fight: stop here, banners down; on from this step once
+		-- they're back in the Outpost (due).
+		banner(nil)
+		step("Away")
+		running = false
+		return
+	end
 	if not ok then
 		warn("[IntroFinale] " .. tostring(problem))
 	end
@@ -870,7 +903,7 @@ local function due(): boolean
 	if player:GetAttribute("IntroFinale") ~= "Mines" or player:GetAttribute("Outpost") ~= true then
 		return false
 	end
-	if player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil then
+	if away() then
 		return false
 	end
 	if os.clock() < heldUntil or player:GetAttribute("RiftRun") ~= nil or gateUp() then

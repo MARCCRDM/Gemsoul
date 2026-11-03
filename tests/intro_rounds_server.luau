@@ -351,4 +351,15 @@ do
 	-- (an old save that finished the lobby's intro before the dungeon came first)
 	check(not Server.huntNext({ IntroFinale = "Done" }, { Won = 2 }), "HUNT BOUNTY for an older save")
 end
+-- The lobby's intro never brings its minions into a fight: in a 1v1, the
+-- Arena, a queue or the Rift, it waits.
+do
+	for _, key in { "CombatSession", "MatchId", "DuelQueue", "RiftRun" } do
+		attributes[key] = "x"
+		check(Server.busyElsewhere(player), "In a fight (" .. key .. "), the lobby's intro could go on")
+		attributes[key] = nil
+	end
+	check(not Server.busyElsewhere(player), "Out in the Outpost, the lobby's intro is held back")
+	Server.clearCritters(player) -- (none out: nothing to do, no error)
+end
 print(string.format("PASS: %d intro rounds server checks", checks))
