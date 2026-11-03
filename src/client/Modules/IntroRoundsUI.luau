@@ -947,12 +947,41 @@ end
 
 -- CONTINUE ROUNDS (beside HUNT BOUNTY): the next 1v1 instead of the
 -- dungeon for now. Every win's card offers the bounty again.
+-- Their kaiju team first if the starter roll's still owed (it plays once
+-- they've picked a way on, never straight after the win), then the round.
+IntroRoundsUI.RollWait = 150 -- seconds the next round waits on the roll, at most
 function IntroRoundsUI.continueRounds()
 	if busy or not current or not choosing then
 		return
 	end
 	choosing = false
-	IntroRoundsUI.next()
+	local owed = false
+	pcall(function()
+		owed = require(ReplicatedStorage.Shared.Kaiju).rollsOwed(GemClient.Profile) > 0
+	end)
+	if not owed then
+		IntroRoundsUI.next()
+		return
+	end
+	busy = true
+	hide()
+	task.spawn(function()
+		local rolled = false
+		local ok = pcall(function()
+			require(script.Parent.KaijuRoll).play(function()
+				rolled = true
+			end)
+		end)
+		local started = os.clock()
+		while ok and not rolled and os.clock() - started < IntroRoundsUI.RollWait do
+			task.wait(0.2)
+		end
+		local result = GemClient.request("IntroRoundNext")
+		busy = false
+		if not (result and result.Ok) then
+			UiKit.toast(Lang.translate(result and result.Message or "Couldn't start the round."), RED)
+		end
+	end)
 end
 
 local function leave()
@@ -1327,27 +1356,9 @@ function IntroRoundsUI.start()
 			-- (after a queued match's result card, which has the screen for EndPause)
 			pending += 1
 			task.delay(if inArena() then 1.2 else 4.5, function()
-				-- The first fight won: their kaiju first (the starter roll, if
-				-- it's owed), then the card and HUNT BOUNTY: they take them
-				-- into the first dungeon.
-				if event.Phase == "Won" and event.Where == nil and (event.Round or 0) == IntroRounds.ChoiceAfter then
-					local owed = false
-					pcall(function()
-						owed = require(ReplicatedStorage.Shared.Kaiju).rollsOwed(GemClient.Profile) > 0
-					end)
-					if owed then
-						local rolled = false
-						local ok = pcall(function()
-							require(script.Parent.KaijuRoll).play(function()
-								rolled = true
-							end)
-						end)
-						local started = os.clock()
-						while ok and not rolled and os.clock() - started < 150 do
-							task.wait(0.2)
-						end
-					end
-				end
+				-- (The starter kaiju roll isn't here: it plays once they've picked
+				-- a way on, CONTINUE ROUNDS (continueRounds) or HUNT BOUNTY, out
+				-- in the Outpost before the dungeon: Client IntroFinale.hunt.)
 				pending -= 1
 				show(event)
 			end)

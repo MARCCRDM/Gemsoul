@@ -212,7 +212,7 @@ do
 	-- (the first fight won: one way on, HUNT BOUNTY, with its boss; no lobby,
 	-- no countdown taking it for them)
 	local go, leave, dungeon = card:FindFirstChild("Next", true), card:FindFirstChild("Leave", true), card:FindFirstChild("Dungeon", true)
-	check(kaijuRolled == 1, "The first win didn't roll their kaiju before the card (they take them into the dungeon)")
+	check(kaijuRolled == 0, "The kaiju roll played straight after the first win (it waits for their pick)")
 	check(go and go.Text == "HUNT BOUNTY" and go.Visible, "No HUNT BOUNTY after the first win: " .. tostring(go and go.Text))
 	local goSub = go and go:FindFirstChild("Sub")
 	check(goSub and string.find(goSub.Text, "Bombardiro Drago", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) == nil, "HUNT BOUNTY's boss, or a countdown on it: " .. tostring(goSub and goSub.Text))
@@ -230,14 +230,16 @@ do
 	check(leave and leave.Visible and leave.Text == "CONTINUE ROUNDS", "No CONTINUE ROUNDS beside HUNT BOUNTY: " .. tostring(leave and leave.Text))
 	check(not (dungeon and dungeon.Visible), "A third way on beside HUNT BOUNTY")
 	check(go.Modal == true, "HUNT BOUNTY can't be clicked with the camera locked")
-	-- CONTINUE ROUNDS: the next round, not the dungeon.
+	-- CONTINUE ROUNDS: their kaiju team first (the starter roll, owed), then
+	-- the next round, not the dungeon.
 	local before = #requests
 	load(clientRef.IntroRoundsUI).continueRounds()
-	task.wait(0.2)
+	task.wait(0.5)
 	local asked = {}
 	for i = before + 1, #requests do
 		asked[requests[i][1]] = requests[i][2] or true
 	end
+	check(kaijuRolled == 1, "CONTINUE ROUNDS didn't roll their kaiju first")
 	check(asked.IntroRoundNext and not asked.IntroRoundChoose, "CONTINUE ROUNDS didn't start the next round")
 	-- The next win's card offers the bounty again: HUNT BOUNTY (Enter, or a
 	-- click: both are next()) goes to the dungeon, never the next round.
