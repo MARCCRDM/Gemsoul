@@ -40,8 +40,13 @@ local small = Instance.new("Part")
 small.Size = Vector3.new(2, 2, 1)
 local big = Instance.new("Part")
 big.Size = Vector3.new(8, 8, 8)
-check(math.abs(FightSpacing.gap(small) - 2.6) < 1e-6, "Wrong gap between two bodies")
-check(FightSpacing.gap(big) > 5, "A big body didn't keep you further off")
+check(math.abs(FightSpacing.gap(small) - 1.4) < 1e-6, "Wrong gap between two bodies: " .. FightSpacing.gap(small))
+check(FightSpacing.gap(small) <= 1.6, "An invisible wall out in front of an ordinary foe")
+check(FightSpacing.gap(big) > 4, "A big body didn't keep you further off")
+-- (a root box wider than it's deep: measured by its narrow side, no wall out at its widest)
+local wide = Instance.new("Part")
+wide.Size = Vector3.new(6, 2, 1.6)
+check(FightSpacing.gap(wide) < 2, "A wide root box kept you far off: " .. FightSpacing.gap(wide))
 
 -- The server: JumpPower 0 in a fight, back to normal after.
 local services = {

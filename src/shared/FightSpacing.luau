@@ -16,7 +16,7 @@
 ]]
 local FightSpacing = {}
 
-FightSpacing.Radius = 1.3 -- a body's half-width, about the shoulders
+FightSpacing.Radius = 0.9 -- your body's share of the gap: close enough to trade blows face to face
 FightSpacing.Range = 14 -- bodies further off are left alone
 
 function FightSpacing.inFight(player: Player): boolean
@@ -25,10 +25,13 @@ function FightSpacing.inFight(player: Player): boolean
 		or player:GetAttribute("Spar") == true
 end
 
--- A bigger body (a raid boss) keeps you further off.
+-- A bigger body (a raid boss) keeps you further off. Measured by its
+-- narrower side (a root box is often wider than the creature you see, and
+-- its widest side made an invisible wall well out from it).
+FightSpacing.Least = 0.5 -- the other body's share, at the least
 function FightSpacing.gap(otherRoot: BasePart): number
 	local size = otherRoot.Size
-	return FightSpacing.Radius + math.max(FightSpacing.Radius, math.max(size.X, size.Z) / 2 + 0.3)
+	return FightSpacing.Radius + math.max(FightSpacing.Least, math.min(size.X, size.Z) / 2)
 end
 
 function FightSpacing.push(mine: Vector3, other: Vector3, gap: number, facing: Vector3?): Vector3
