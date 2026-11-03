@@ -212,7 +212,7 @@ do
 	-- (the first fight won: one way on, HUNT BOUNTY, with its boss; no lobby,
 	-- no countdown taking it for them)
 	local go, leave, dungeon = card:FindFirstChild("Next", true), card:FindFirstChild("Leave", true), card:FindFirstChild("Dungeon", true)
-	check(kaijuRolled == 1, "The first win didn't roll their kaiju before the card")
+	check(kaijuRolled == 0, "The first win rolled their kaiju (they're the first dungeon's reward now)")
 	check(go and go.Text == "HUNT BOUNTY" and go.Visible, "No HUNT BOUNTY after the first win: " .. tostring(go and go.Text))
 	local goSub = go and go:FindFirstChild("Sub")
 	check(goSub and string.find(goSub.Text, "Bombardiro Drago", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) == nil, "HUNT BOUNTY's boss, or a countdown on it: " .. tostring(goSub and goSub.Text))
@@ -480,6 +480,16 @@ do
 	check(hcard and hcard:FindFirstChild("Later", true) == nil, "A LATER on the first dungeon's hunt")
 	local goHunt = hcard and hcard:FindFirstChild("Go", true)
 	check(goHunt ~= nil and string.find(goHunt.Text, "HUNT BOUNTY", 1, true) ~= nil, "No HUNT BOUNTY button")
+	-- (its prize: the first dungeon's purse and the starter kaiju team)
+	local IR = load(sharedRef.IntroRounds)
+	local seen = {}
+	for _, d in hcard:GetDescendants() do
+		if d:IsA("TextLabel") then
+			seen[d.Text] = true
+		end
+	end
+	check(seen[tostring(IR.FirstDungeonCoins)] and IR.FirstDungeonCoins == 1000, "The hunt's coins tile isn't 1000")
+	check(seen["STARTER KAIJU"] and seen["3"], "The hunt's kaiju tile isn't the starter kaiju team (3)")
 	task.wait(0.6)
 	check(hunted == nil and gui:FindFirstChild("FirstBoss") ~= nil, "The hunt's window went by itself")
 	services.UserInputService.InputBegan:Fire({ KeyCode = Enum.KeyCode.Return })

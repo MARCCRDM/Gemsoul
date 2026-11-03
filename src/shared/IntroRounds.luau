@@ -53,6 +53,10 @@ IntroRounds.GemAfter = 3 -- this round's win also gives a gem (socket it: Shared
 -- of the set waits for PLAY) or FIRST BOSS (Bombardiro Drago). Before it,
 -- the first fight has to be won (Server IntroRoundsServer.choose).
 IntroRounds.ChoiceAfter = 1
+-- The first dungeon (HUNT BOUNTY) cleared: its coins (Server.RiftServer's
+-- victory, in place of a run's usual) and the starter kaiju team after it
+-- (Client IntroFinale: the lobby's intro opens with their roll).
+IntroRounds.FirstDungeonCoins = 1000
 
 -- The ladder: who you fight each round, how hard they hit (of a full Arena
 -- rival's damage), how fast they swing (their swing gap, times the rules'),

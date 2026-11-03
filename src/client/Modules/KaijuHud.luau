@@ -3607,7 +3607,9 @@ local function refresh()
 	end
 	heroUi.BossOwedSeen = owed
 	local caches = require(script.Parent.StreakRewards)
+	-- (and not in a new miner's intro: its starter roll and steps first)
 	if not heroUi.BossRolling and inOutpost and not blocked and not menu and owed > 0
+		and player:GetAttribute("IntroFinale") == nil
 		and not LoadingFlow.active() and os.clock() >= (heroUi.BossRollAt or 0)
 		and not caches.isOpen() and not caches.pending() then
 		heroUi.BossRolling = true

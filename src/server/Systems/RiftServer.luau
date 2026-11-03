@@ -124,6 +124,7 @@ local BossLoot = require(ReplicatedStorage.Shared.BossLoot)
 local Frontier = require(ReplicatedStorage.Shared.Frontier)
 local Outpost = require(ReplicatedStorage.Shared.Outpost)
 local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
 local DungeonRules = require(ReplicatedStorage.Shared.DungeonRules)
 local Spar = require(ReplicatedStorage.Shared.Spar)
 local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
@@ -734,14 +735,20 @@ victory = function(run)
 			run.Fallen[player] = nil
 			standUp(player)
 		end
-		PlayerData.addCoins(player, coins, "Rift")
+		-- (a new miner's first dungeon, HUNT BOUNTY: its own purse)
+		local owed = false
+		pcall(function()
+			owed = require(script.Parent.IntroRoundsServer).owesDungeon(player)
+		end)
+		local pay = if owed then IntroRounds.FirstDungeonCoins else coins
+		PlayerData.addCoins(player, pay, "Rift")
 		KaijuServer.reward(player, RiftRun.Reward.Exp)
 		local xp = Progress.won(player, "RiftBoss", bossLevel, "SlayBrute")
 		local swings = Restores.give(player, SwingRestore.Dungeon)
 		pcall(PlayerData.training, player, "Boss")
 		notify(
 			player,
-			string.format("%s is beaten! +%d coins, +%d XP", run.Boss.Name, coins, xp)
+			string.format("%s is beaten! +%d coins, +%d XP", run.Boss.Name, pay, xp)
 				.. (if swings > 0 then string.format(", +%d swings", swings) else "")
 				.. ". The way home is open."
 		)

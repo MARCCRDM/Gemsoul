@@ -372,6 +372,10 @@ end
 -- The first dungeon owed (profile.IntroFinale "Dungeon": the HUNT BOUNTY
 -- window, Client IntroFinale, holds them to it) cleared: a Rift boss beaten
 -- (Server.RiftServer's recordWin). The lobby's intro is next ("Mines").
+function IntroRoundsServer.owesDungeon(player: Player): boolean
+	local profile = PlayerData.get(player) :: any
+	return profile ~= nil and profile.IntroFinale == "Dungeon"
+end
 function IntroRoundsServer.dungeonCleared(player: Player)
 	local profile = PlayerData.get(player) :: any
 	if not profile or profile.IntroFinale ~= "Dungeon" then
