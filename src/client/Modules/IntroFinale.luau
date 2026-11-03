@@ -18,11 +18,14 @@
 	              loose ("Fight") and the kaiju engage: "Your kaijus will
 	              defend you. Train and protect them, and they will protect
 	              you."
-	  4½. Meteor  a little after the minions, the meteor and its Magma Golem
-	              (Server.MeteorGolemServer.soon: its own cinematic and fight)
-	  5. Invite   a window: your first boss, Bombardiro Drago, its rewards,
-	              GO (the Bounty Board on it) or LATER
-	  6. Done     the lobby's yours
+	  5. Invite   a few seconds after the kaiju's fight, a window: your first
+	              dungeon? Its boss (Bombardiro Drago, turning in a
+	              viewport), what you'd win as tiles (coins, boss cache
+	              gear, a new kaiju, gems, kaiju EXP), ENTER DUNGEON (its
+	              gate, the Bounty Board on it) or LATER
+	  6. Done     the lobby's yours; then, if they didn't go, the meteor
+	              and its Magma Golem (Server.MeteorGolemServer.soon: its
+	              own cinematic and fight)
 
 	Every line shows on screen and is read out (VoiceOver). Any step that
 	can't happen (no rock near, no roll owed) is passed over.
@@ -49,7 +52,7 @@ IntroFinale.Lines = {
 	Gems = "Mining digs up gems. Put a gem in your gear to enchant it: each one gives you a move on Q, E or R. Better gems hide further out.",
 	Minions = "These are rot minions. They still try to steal your gems. Your kaijus are trained to fight and defend you.",
 	Fight = "Your kaijus will defend you. Train and protect them, and they will protect you.",
-	Invite = "You're ready for your first boss: Bombardiro Drago. Take him on from the Bounty Board.",
+	Invite = "You're ready for your first dungeon. Its boss is Bombardiro Drago. Beat him for coins, gear, gems and a new kaiju. Want to go?",
 	Done = "Well done, miner. Welcome to the Outpost.",
 }
 IntroFinale.Commons = { Field = true, Common = true } -- (the plain rocks: IntroGuide's)
@@ -62,7 +65,8 @@ IntroFinale.CinematicSeconds = 7 -- at least (till every minion's landed)
 IntroFinale.MeteorWait = 25 -- seconds the first boss's window waits for the meteor to come
 IntroFinale.GolemFor = 6 * 60 -- and for its golem's fight
 IntroFinale.GemsFor = 30 -- seconds the gems window waits for OK before it moves on by itself
-IntroFinale.InviteFor = 45 -- and the first boss's window (then: LATER)
+IntroFinale.InviteFor = 45 -- and the first dungeon's window (then: LATER)
+IntroFinale.InviteAfter = 3 -- seconds after the kaiju's first fight before it's asked
 
 local player = Players.LocalPlayer
 local GOLD = Color3.fromRGB(240, 186, 92)
@@ -463,12 +467,56 @@ local function kaiju(fight: boolean?)
 	end
 end
 
--- 5. Your first boss ----------------------------------------------------------------------------------------
-IntroFinale.Rewards = {
-	{ "◆", "A boss cache: a Helmet piece, Uncommon or better", Color3.fromRGB(255, 196, 90) },
-	{ "✦", "Gems for your gear", Color3.fromRGB(94, 206, 221) },
-	{ "▲", "A new kaiju: one for every boss you beat", Color3.fromRGB(150, 230, 120) },
-}
+-- 5. Your first dungeon -------------------------------------------------------------------------------------
+-- Asked right after the first mining and the kaiju's first fight: GO takes
+-- you to the dungeon's gate (the Bounty Board on its boss), LATER leaves it
+-- on the board. What you'd win shows as tiles (the real numbers: a boss
+-- run's coins and kaiju EXP, Shared.RiftRun; its cache, Shared.BossLoot's
+-- threat I floor; a kaiju roll for every boss beaten).
+IntroFinale.Boss = "Drago" -- (its figure: ReplicatedStorage.RiftPortraits)
+function IntroFinale.rewards()
+	local RiftRun = require(ReplicatedStorage.Shared.RiftRun)
+	return {
+		{ Icon = "●", Value = tostring(RiftRun.rewardCoins(RiftRun.Rooms)), Label = "COINS", Color = Color3.fromRGB(255, 206, 92) },
+		{ Icon = "◆", Value = "UNCOMMON+", Label = "BOSS CACHE GEAR", Color = Color3.fromRGB(110, 224, 140) },
+		{ Icon = "▲", Value = "+1", Label = "NEW KAIJU", Color = Color3.fromRGB(150, 200, 255) },
+		{ Icon = "✦", Value = "GEMS", Label = "IN EVERY CAVE", Color = Color3.fromRGB(94, 206, 221) },
+	}, RiftRun.Reward.Exp
+end
+local W_CARD, H_CARD = 620, 470
+local function bossView(card: Frame)
+	local view = Instance.new("ViewportFrame")
+	view.Name = "Boss"
+	view.Position, view.Size = UDim2.fromOffset(18, 18), UDim2.fromOffset(196, 236)
+	view.BackgroundColor3 = Color3.fromRGB(40, 16, 14)
+	view.Ambient, view.LightColor = Color3.fromRGB(150, 120, 110), Color3.fromRGB(255, 220, 200)
+	view.Parent = card
+	UiKit.round(view, 14)
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 34
+	camera.Parent = view
+	view.CurrentCamera = camera
+	-- (its figure may still be on its way from the server: put in when it comes)
+	task.spawn(function()
+		local folder = ReplicatedStorage:WaitForChild("RiftPortraits", 10)
+		local source = folder and folder:WaitForChild(IntroFinale.Boss, 10)
+		if not (source and source:IsA("Model")) or not view.Parent then
+			return
+		end
+		local body = source:Clone()
+		body:PivotTo(CFrame.new())
+		body.Parent = view
+		local _, size = body:GetBoundingBox()
+		local reach = math.max(size.X, size.Y, size.Z)
+		local spin = 0
+		while view.Parent do
+			spin += 0.02
+			local at = CFrame.Angles(0, math.rad(200) + math.sin(spin) * 0.5, 0) * Vector3.new(0, size.Y * 0.08, reach * 1.7)
+			camera.CFrame = CFrame.lookAt(at, Vector3.new(0, 0, 0))
+			task.wait(1 / 30)
+		end
+	end)
+end
 local function invite()
 	local shade = Instance.new("TextButton")
 	shade.Name = "FirstBoss"
@@ -480,9 +528,10 @@ local function invite()
 	shade.Parent = screen()
 	TweenService:Create(shade, TweenInfo.new(0.3), { BackgroundTransparency = 0.45 }):Play()
 	local card = Instance.new("Frame")
+	card.Name = "Card"
 	card.AnchorPoint = Vector2.new(0.5, 0.5)
 	card.Position = UDim2.fromScale(0.5, 0.5)
-	card.Size = UDim2.fromOffset(480, 360)
+	card.Size = UDim2.fromOffset(W_CARD, H_CARD)
 	card.BackgroundColor3 = Color3.fromRGB(26, 14, 14)
 	card.Parent = shade
 	UiKit.round(card, 18)
@@ -497,7 +546,23 @@ local function invite()
 	scale.Scale = 0.85
 	scale.Parent = card
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-	local function text(value: string, x: number, y: number, w: number, h: number, size: number, color: Color3, font: Enum.Font, center: boolean?)
+	-- (a phone: the card fits the screen)
+	local camera = workspace.CurrentCamera
+	if camera then
+		local fit = math.min(1, (camera.ViewportSize.X - 24) / W_CARD, (camera.ViewportSize.Y - 24) / H_CARD)
+		local fitScale = Instance.new("UIScale")
+		fitScale.Name = "Fit"
+		fitScale.Scale = fit
+		local holder = Instance.new("Frame")
+		holder.BackgroundTransparency = 1
+		holder.AnchorPoint = Vector2.new(0.5, 0.5)
+		holder.Position = UDim2.fromScale(0.5, 0.5)
+		holder.Size = UDim2.fromOffset(W_CARD, H_CARD)
+		holder.Parent = shade
+		fitScale.Parent = holder
+		card.Parent = holder
+	end
+	local function text(parent: Instance, value: string, x: number, y: number, w: number, h: number, size: number, color: Color3, font: Enum.Font, center: boolean?)
 		local t = Instance.new("TextLabel")
 		t.BackgroundTransparency = 1
 		t.Position, t.Size = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h)
@@ -505,24 +570,50 @@ local function invite()
 		t.TextWrapped = true
 		t.TextXAlignment = if center then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
 		t.Text = value
-		t.Parent = card
+		t.Parent = parent
 		return t
 	end
-	text("YOUR FIRST BOSS", 0, 20, 480, 18, 14, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold, true)
-	text("BOMBARDIRO DRAGO", 0, 40, 480, 36, 32, GOLD, Enum.Font.GothamBlack, true)
-	text("Level 2  ·  Recommended solo  ·  in the Ashfall", 0, 78, 480, 18, 14, Color3.fromRGB(220, 200, 196), Enum.Font.GothamMedium, true)
-	text("REWARDS", 30, 112, 420, 18, 13, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold)
-	for i, row in IntroFinale.Rewards do
-		local y = 134 + (i - 1) * 40
-		text(row[1], 30, y, 28, 34, 22, row[3], Enum.Font.GothamBlack)
-		text(row[2], 66, y, 386, 34, 16, Color3.fromRGB(236, 238, 244), Enum.Font.GothamMedium)
+	local closed = false
+	bossView(card)
+	local x0 = 234
+	text(card, "READY FOR YOUR FIRST DUNGEON?", x0, 26, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold)
+	text(card, "BOMBARDIRO DRAGO", x0, 48, W_CARD - x0 - 20, 70, 34, GOLD, Enum.Font.GothamBlack).Name = "BossName"
+	text(card, "Its boss  ·  Level 2  ·  built to beat solo", x0, 122, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(220, 200, 196), Enum.Font.GothamMedium)
+	text(card, "Your kaiju fight beside you. Four caves, then the boss.", x0, 150, W_CARD - x0 - 20, 40, 14, Color3.fromRGB(190, 176, 172), Enum.Font.GothamMedium)
+	-- What you'd win: a tile each.
+	local rewards, exp = IntroFinale.rewards()
+	text(card, "POTENTIAL REWARDS", 18, 268, 300, 18, 13, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold)
+	text(card, string.format("+ %d kaiju EXP", exp), W_CARD - 218, 268, 200, 18, 13, Color3.fromRGB(150, 200, 255), Enum.Font.GothamBold).TextXAlignment = Enum.TextXAlignment.Right
+	local tileW = (W_CARD - 36 - 3 * 10) / 4
+	for i, r in rewards do
+		local tile = Instance.new("Frame")
+		tile.Name = "Reward" .. i
+		tile.Position, tile.Size = UDim2.fromOffset(18 + (i - 1) * (tileW + 10), 292), UDim2.fromOffset(tileW, 96)
+		tile.BackgroundColor3 = Color3.fromRGB(14, 10, 14)
+		tile.BackgroundTransparency = 0.15
+		tile.Parent = card
+		UiKit.round(tile, 12)
+		local rim = Instance.new("UIStroke")
+		rim.Color, rim.Thickness, rim.Transparency = r.Color, 1.5, 0.35
+		rim.Parent = tile
+		text(tile, r.Icon, 0, 6, tileW, 30, 26, r.Color, Enum.Font.GothamBlack, true)
+		text(tile, r.Value, 4, 38, tileW - 8, 24, if #r.Value > 6 then 16 else 22, Color3.fromRGB(246, 246, 250), Enum.Font.GothamBlack, true)
+		text(tile, r.Label, 4, 64, tileW - 8, 26, 11, Color3.fromRGB(200, 196, 204), Enum.Font.GothamBold, true)
+		-- (in one after another)
+		tile.BackgroundTransparency = 1
+		task.delay(0.25 + i * 0.12, function()
+			if not closed then
+				TweenService:Create(tile, TweenInfo.new(0.25), { BackgroundTransparency = 0.15 }):Play()
+			end
+		end)
 	end
 	local choice = nil
 	local buttons = {}
+	local keysOnly = UserInputService.KeyboardEnabled and not UserInputService.TouchEnabled
 	local function button(label: string, x: number, w: number, primary: boolean, pick: string)
 		local b = Instance.new("TextButton")
 		b.Name = pick
-		b.Position, b.Size = UDim2.fromOffset(x, 290), UDim2.fromOffset(w, 50)
+		b.Position, b.Size = UDim2.fromOffset(x, 402), UDim2.fromOffset(w, 52)
 		b.BackgroundColor3 = if primary then GOLD else Color3.fromRGB(52, 40, 40)
 		b.Font, b.TextSize = Enum.Font.GothamBlack, if primary then 20 else 16
 		b.TextColor3 = if primary then INK else Color3.fromRGB(220, 210, 206)
@@ -535,10 +626,10 @@ local function invite()
 		end)
 		table.insert(buttons, b)
 	end
-	button("LATER", 30, 130, false, "Later")
-	button("TAKE HIM ON", 176, 274, true, "Go")
+	button("LATER", 18, 150, false, "Later")
+	button(if keysOnly then "ENTER DUNGEON  [ENTER]" else "ENTER DUNGEON", 180, W_CARD - 198, true, "Go")
 	VoiceOver.say(IntroFinale.Lines.Invite)
-	-- (Enter takes him on; left alone, LATER: the Bounty Board has him)
+	-- (Enter takes you in; left alone, LATER: the Bounty Board has it)
 	choice = answer(buttons, function()
 		return choice
 	end, "Go", "Later", IntroFinale.InviteFor, shade)
@@ -546,13 +637,20 @@ local function invite()
 		choice = "Later"
 	end
 	VoiceOver.stop()
+	closed = true
 	shade:Destroy()
+	pcall(function()
+		GemClient.request("IntroFinale", "Invite", choice)
+	end)
 	if choice == "Go" then
 		pcall(function()
 			require(script.Parent.RiftClient).openGate("Bounty")
 		end)
 	end
+	return choice
 end
+
+IntroFinale._invite = invite -- (tests)
 
 local running = false
 local function run()
@@ -574,14 +672,22 @@ local function run()
 	if not ok then
 		warn("[IntroFinale] " .. tostring(problem))
 	end
+	-- Shortly after the first mining and the kaiju's first fight: your
+	-- first dungeon? (GO: off to its gate; the meteor waits till you're back.)
+	task.wait(IntroFinale.InviteAfter)
+	step("Invite")
+	local okInvite, picked = pcall(invite)
+	local going = okInvite and picked == "Go"
 	local done = GemClient.request("IntroFinale", "Done")
-	banner("WELL DONE, MINER", "The Outpost is yours")
-	VoiceOver.say(IntroFinale.Lines.Done)
-	task.wait(3)
-	banner(nil)
+	if not going then
+		banner("WELL DONE, MINER", "The Outpost is yours")
+		VoiceOver.say(IntroFinale.Lines.Done)
+		task.wait(3)
+		banner(nil)
+	end
 	-- A little after, the meteor (its Magma Golem: Server.MeteorGolemServer):
 	-- its fight first, then the first boss's window.
-	if done and done.Meteor then
+	if done and done.Meteor and not going then
 		local started = os.clock()
 		while player:GetAttribute("MeteorGolem") == nil and os.clock() - started < IntroFinale.MeteorWait do
 			task.wait(0.5)
@@ -590,10 +696,7 @@ local function run()
 		while player:GetAttribute("MeteorGolem") ~= nil and os.clock() - started < IntroFinale.GolemFor do
 			task.wait(1)
 		end
-		task.wait(2)
 	end
-	step("Invite")
-	pcall(invite)
 	step("Over")
 	running = false
 end

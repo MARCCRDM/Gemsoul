@@ -105,6 +105,7 @@ local services = {
 	SoundService = soundService,
 	StarterGui = { SetCore = function() end },
 	Debris = { AddItem = function() end },
+	CollectionService = { GetTagged = function() return {} end, HasTag = function() return false end, GetInstanceAddedSignal = function() return signal() end },
 	LocalizationService = { RobloxLocaleId = "en-us" },
 }
 local game = { GetService = function(_, n) return services[n] or error("no service " .. n) end }
@@ -407,5 +408,54 @@ do
 	check(down ~= nil and down:FindFirstChild("Intro", true) == nil, "Back to the intro fights offered with none left")
 	check(down:FindFirstChild("Lobby", true) ~= nil, "No GO TO LOBBY with the intro done")
 end
-print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win (its three ways on), a loss and a set, SETTINGS opens, ANALYTICS draws every range, the dungeon path's cards, the Rot Beachhead's screens and knock-down card)", checks))
+-- The first dungeon's window (IntroFinale), right after the kaiju's first
+-- fight: its boss, what you'd win as tiles, ENTER DUNGEON or LATER; left
+-- alone, LATER, and the answer goes to the server.
+do
+	local Finale = load(clientRef.IntroFinale)
+	check(Finale.InviteAfter <= 5, "The first dungeon isn't asked shortly after the kaiju's fight")
+	Finale.InviteFor = 0.4
+	local before = #requests
+	local picked = nil
+	task.spawn(function()
+		picked = Finale._invite()
+	end)
+	task.wait(0.15)
+	local gui = playerGui:FindFirstChild("IntroFinale")
+	local card = gui and gui:FindFirstChild("Card", true)
+	check(card ~= nil, "No first dungeon window")
+	if card then
+		local name = card:FindFirstChild("BossName", true)
+		check(name ~= nil and name.Text == "BOMBARDIRO DRAGO", "The window doesn't name its boss")
+		local tiles = 0
+		for i = 1, 6 do
+			if card:FindFirstChild("Reward" .. i, true) then
+				tiles += 1
+			end
+		end
+		check(tiles == 4, "Not four reward tiles: " .. tiles)
+		local coins = card:FindFirstChild("Reward1", true)
+		local RiftRun = load(sharedRef.RiftRun)
+		local shown = false
+		for _, d in coins:GetDescendants() do
+			if d:IsA("TextLabel") and d.Text == tostring(RiftRun.rewardCoins(RiftRun.Rooms)) then
+				shown = true
+			end
+		end
+		check(shown, "The coins tile doesn't show what a boss run pays")
+		check(card:FindFirstChild("Boss", true) ~= nil, "No boss figure on the window")
+		local go = card:FindFirstChild("Go", true)
+		check(go ~= nil and string.find(go.Text, "ENTER DUNGEON", 1, true) ~= nil, "No ENTER DUNGEON")
+		check(card:FindFirstChild("Later", true) ~= nil, "No LATER")
+	end
+	task.wait(0.6)
+	check(picked == "Later", "Left alone, the window wasn't LATER: " .. tostring(picked))
+	local told = false
+	for i = before + 1, #requests do
+		told = told or (requests[i][1] == "IntroFinale" and requests[i][2] == "Invite" and requests[i][3] == "Later")
+	end
+	check(told, "The answer wasn't sent to the server")
+	check(gui:FindFirstChild("FirstBoss") == nil, "The window stayed up")
+end
+print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win (its three ways on), a loss and a set, SETTINGS opens, ANALYTICS draws every range, the dungeon path's cards, the Rot Beachhead's screens and knock-down card, the first dungeon's window)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)

@@ -466,6 +466,11 @@ local function finale(player: Player, step: any, name: any)
 			end
 		end
 		return reply(true, "", { Left = left })
+	elseif step == "Invite" then
+		-- Their answer to the first dungeon's window, for the funnel.
+		local choice = if name == "Go" then "Go" else "Later"
+		pcall(Analytics.event, player, "IntroDungeonInvite", choice)
+		return reply(true, "")
 	elseif step == "Done" then
 		profile.IntroFinale = "Done"
 		for _, enemy in finaleCritters[player] or {} do

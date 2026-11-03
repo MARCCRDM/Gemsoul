@@ -198,6 +198,18 @@ check(Server.finale(player, "Nonsense").Ok == false, "An unknown finale step wen
 check(Server.finale(player, "Step", "Gems").Ok and attributes.IntroFinaleStep == "Gems", "The finale's step isn't shown")
 Server.finale(player, "Step", "Hax")
 check(attributes.IntroFinaleStep == nil, "Any word went up as the finale's step")
+-- The first dungeon's window: their answer goes to Analytics (anything but Go is Later).
+local function lastEvent(name)
+	for i = #events, 1, -1 do
+		if events[i][1] == name then
+			return events[i]
+		end
+	end
+	return nil
+end
+check(Server.finale(player, "Invite", "Go").Ok and lastEvent("IntroDungeonInvite")[2] == "Go", "ENTER DUNGEON wasn't sent to Analytics")
+check(Server.finale(player, "Invite", "Hax").Ok and lastEvent("IntroDungeonInvite")[2] == "Later", "Any answer went to Analytics as itself")
+check(profile.IntroFinale == "Mines", "Answering the dungeon's window ended the finale")
 check(Server.finale(player, "Done").Ok and profile.IntroFinale == "Done" and attributes.IntroFinale == nil, "The finale didn't finish")
 check(Server.finale(player, "Done").Ok == false, "The finale finished twice")
 -- (the dungeon detour's off for everyone, the Owners too)
