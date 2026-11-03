@@ -53,6 +53,8 @@ IntroFinale.Lines = {
 	Minions = "These are rot minions. They still try to steal your gems. Your kaijus are trained to fight and defend you.",
 	Fight = "Your kaijus will defend you. Train and protect them, and they will protect you.",
 	Invite = "You're ready for your first dungeon. Its boss is Bombardiro Drago. Beat him for coins, gear, gems and a new kaiju. Want to go?",
+	Hunt = "Your next event: hunt the bounty. Bombardiro Drago waits at the end of your first dungeon. Beat him for coins, gear, gems and a new kaiju.",
+	Finish = "Recommended: finish your intro fights. Each one wins you another piece of your gear set.",
 	Done = "Well done, miner. Welcome to the Outpost.",
 }
 IntroFinale.Commons = { Field = true, Common = true } -- (the plain rocks: IntroGuide's)
@@ -67,6 +69,8 @@ IntroFinale.GolemFor = 6 * 60 -- and for its golem's fight
 IntroFinale.GemsFor = 30 -- seconds the gems window waits for OK before it moves on by itself
 IntroFinale.InviteFor = 45 -- and the first dungeon's window (then: LATER)
 IntroFinale.InviteAfter = 3 -- seconds after the kaiju's first fight before it's asked
+IntroFinale.HuntAgain = 6 -- seconds after the HUNT BOUNTY window before it can come again (the gate's up by then)
+IntroFinale.FinishFor = 40 -- seconds the "finish your intro fights" window waits (then: LATER)
 
 local player = Players.LocalPlayer
 local GOLD = Color3.fromRGB(240, 186, 92)
@@ -517,7 +521,10 @@ local function bossView(card: Frame)
 		end
 	end)
 end
-local function invite()
+-- `hunt`: the first dungeon's owed (IntroFinale "Dungeon"): NEXT EVENT ·
+-- HUNT BOUNTY, one button, no LATER and no clock (the lobby opens once it's
+-- cleared).
+local function invite(hunt: boolean?)
 	local shade = Instance.new("TextButton")
 	shade.Name = "FirstBoss"
 	shade.AutoButtonColor = false
@@ -576,10 +583,10 @@ local function invite()
 	local closed = false
 	bossView(card)
 	local x0 = 234
-	text(card, "READY FOR YOUR FIRST DUNGEON?", x0, 26, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold)
+	text(card, if hunt then "NEXT EVENT  ·  HUNT BOUNTY" else "READY FOR YOUR FIRST DUNGEON?", x0, 26, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold).Name = "Heading"
 	text(card, "BOMBARDIRO DRAGO", x0, 48, W_CARD - x0 - 20, 70, 34, GOLD, Enum.Font.GothamBlack).Name = "BossName"
 	text(card, "Its boss  ·  Level 2  ·  built to beat solo", x0, 122, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(220, 200, 196), Enum.Font.GothamMedium)
-	text(card, "Your kaiju fight beside you. Four caves, then the boss.", x0, 150, W_CARD - x0 - 20, 40, 14, Color3.fromRGB(190, 176, 172), Enum.Font.GothamMedium)
+	text(card, if hunt then "Your first dungeon. Four caves, then the boss. Your kaiju fight beside you. The Outpost opens once he's down." else "Your kaiju fight beside you. Four caves, then the boss.", x0, 150, W_CARD - x0 - 20, if hunt then 60 else 40, 14, Color3.fromRGB(190, 176, 172), Enum.Font.GothamMedium)
 	-- What you'd win: a tile each.
 	local rewards, exp = IntroFinale.rewards()
 	text(card, "POTENTIAL REWARDS", 18, 268, 300, 18, 13, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold)
@@ -626,22 +633,30 @@ local function invite()
 		end)
 		table.insert(buttons, b)
 	end
-	button("LATER", 18, 150, false, "Later")
-	button(if keysOnly then "ENTER DUNGEON  [ENTER]" else "ENTER DUNGEON", 180, W_CARD - 198, true, "Go")
-	VoiceOver.say(IntroFinale.Lines.Invite)
-	-- (Enter takes you in; left alone, LATER: the Bounty Board has it)
+	if hunt then
+		button(if keysOnly then "HUNT BOUNTY  [ENTER]" else "HUNT BOUNTY", 18, W_CARD - 36, true, "Go")
+		VoiceOver.say(IntroFinale.Lines.Hunt)
+	else
+		button("LATER", 18, 150, false, "Later")
+		button(if keysOnly then "ENTER DUNGEON  [ENTER]" else "ENTER DUNGEON", 180, W_CARD - 198, true, "Go")
+		VoiceOver.say(IntroFinale.Lines.Invite)
+	end
+	-- (Enter takes you in; left alone, LATER: the Bounty Board has it. The
+	-- hunt waits for them: no LATER.)
 	choice = answer(buttons, function()
 		return choice
-	end, "Go", "Later", IntroFinale.InviteFor, shade)
+	end, "Go", if hunt then "Go" else "Later", if hunt then math.huge else IntroFinale.InviteFor, shade)
 	if not choice then
 		choice = "Later"
 	end
 	VoiceOver.stop()
 	closed = true
 	shade:Destroy()
-	pcall(function()
-		GemClient.request("IntroFinale", "Invite", choice)
-	end)
+	if not hunt then
+		pcall(function()
+			GemClient.request("IntroFinale", "Invite", choice)
+		end)
+	end
 	if choice == "Go" then
 		pcall(function()
 			require(script.Parent.RiftClient).openGate("Bounty")
@@ -650,7 +665,98 @@ local function invite()
 	return choice
 end
 
+-- The first dungeon done? (Server.IntroRoundsServer.dungeonCleared)
+function IntroFinale.dungeonDone(): boolean
+	return player:GetAttribute("IntroDungeonCleared") == true
+end
+
+-- 7. Recommended: the intro fights left (the rest of the gear set): CONTINUE
+-- FIGHTS (PLAY's own: IntroRoundNext, into the Arena) or LATER.
+local function recommend()
+	local state = GemClient.request("IntroRoundState")
+	local view = state and state.Ok and state.View
+	if type(view) ~= "table" or view.Done then
+		return nil
+	end
+	local left = (view.Count or 6) - (view.Won or 0)
+	local shade = Instance.new("TextButton")
+	shade.Name = "FinishFights"
+	shade.AutoButtonColor = false
+	shade.Text = ""
+	shade.Size = UDim2.fromScale(1, 1)
+	shade.BackgroundColor3 = Color3.new(0, 0, 0)
+	shade.BackgroundTransparency = 0.5
+	shade.Parent = screen()
+	local card = Instance.new("Frame")
+	card.Name = "Card"
+	card.AnchorPoint = Vector2.new(0.5, 0.5)
+	card.Position = UDim2.fromScale(0.5, 0.5)
+	card.Size = UDim2.fromOffset(460, 250)
+	card.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
+	card.Parent = shade
+	UiKit.round(card, 18)
+	local edge = Instance.new("UIStroke")
+	edge.Color, edge.Thickness = GOLD, 2
+	edge.Parent = card
+	local camera = workspace.CurrentCamera
+	if camera then
+		local fit = Instance.new("UIScale")
+		fit.Scale = math.min(1, (camera.ViewportSize.X - 24) / 460, (camera.ViewportSize.Y - 24) / 250)
+		fit.Parent = card
+	end
+	local function text(value: string, y: number, h: number, size: number, color: Color3, font: Enum.Font)
+		local t = Instance.new("TextLabel")
+		t.BackgroundTransparency = 1
+		t.Position, t.Size = UDim2.fromOffset(24, y), UDim2.fromOffset(412, h)
+		t.Font, t.TextSize, t.TextColor3 = font, size, color
+		t.TextWrapped = true
+		t.Text = value
+		t.Parent = card
+		return t
+	end
+	text("RECOMMENDED", 20, 18, 13, GOLD, Enum.Font.GothamBold)
+	text("FINISH YOUR INTRO FIGHTS", 42, 34, 26, Color3.fromRGB(246, 246, 250), Enum.Font.GothamBlack)
+	text(string.format("%d left  ·  each one wins another piece of your gear set", left), 80, 40, 15, Color3.fromRGB(200, 204, 216), Enum.Font.GothamMedium).Name = "Left"
+	local choice = nil
+	local buttons = {}
+	local keysOnly = UserInputService.KeyboardEnabled and not UserInputService.TouchEnabled
+	local function button(label: string, x: number, w: number, primary: boolean, pick: string)
+		local b = Instance.new("TextButton")
+		b.Name = pick
+		b.Position, b.Size = UDim2.fromOffset(x, 172), UDim2.fromOffset(w, 52)
+		b.BackgroundColor3 = if primary then GOLD else Color3.fromRGB(44, 48, 62)
+		b.Font, b.TextSize = Enum.Font.GothamBlack, if primary then 18 else 15
+		b.TextColor3 = if primary then INK else Color3.fromRGB(214, 216, 226)
+		b.Text = label
+		b.Parent = card
+		UiKit.round(b, 12)
+		b:SetAttribute("UiSound", "Click")
+		b.Activated:Connect(function()
+			choice = pick
+		end)
+		table.insert(buttons, b)
+	end
+	button("LATER", 24, 130, false, "Later")
+	button(if keysOnly then "CONTINUE FIGHTS  [ENTER]" else "CONTINUE FIGHTS", 166, 270, true, "Go")
+	VoiceOver.say(IntroFinale.Lines.Finish)
+	choice = answer(buttons, function()
+		return choice
+	end, "Go", "Later", IntroFinale.FinishFor, shade)
+	VoiceOver.stop()
+	shade:Destroy()
+	if choice == "Go" then
+		local result = GemClient.request("IntroRoundNext")
+		if not (result and result.Ok) then
+			UiKit.toast(result and result.Message or "PLAY carries on your intro fights.", GOLD)
+		end
+	end
+	return choice
+end
+
 IntroFinale._invite = invite -- (tests)
+IntroFinale._recommend = function()
+	return recommend()
+end
 
 local running = false
 local function run()
@@ -672,12 +778,15 @@ local function run()
 	if not ok then
 		warn("[IntroFinale] " .. tostring(problem))
 	end
-	-- Shortly after the first mining and the kaiju's first fight: your
-	-- first dungeon? (GO: off to its gate; the meteor waits till you're back.)
-	task.wait(IntroFinale.InviteAfter)
-	step("Invite")
-	local okInvite, picked = pcall(invite)
-	local going = okInvite and picked == "Go"
+	-- (The first dungeon comes before the lobby's intro now: HUNT BOUNTY.
+	-- Only an older save that came out here first is asked about it.)
+	local going = false
+	if not IntroFinale.dungeonDone() then
+		task.wait(IntroFinale.InviteAfter)
+		step("Invite")
+		local okInvite, picked = pcall(invite)
+		going = okInvite and picked == "Go"
+	end
 	local done = GemClient.request("IntroFinale", "Done")
 	if not going then
 		banner("WELL DONE, MINER", "The Outpost is yours")
@@ -696,6 +805,10 @@ local function run()
 		while player:GetAttribute("MeteorGolem") ~= nil and os.clock() - started < IntroFinale.GolemFor do
 			task.wait(1)
 		end
+	end
+	-- Recommended next: the rest of the intro fights (if any are left).
+	if not going then
+		pcall(recommend)
 	end
 	step("Over")
 	running = false
@@ -736,20 +849,48 @@ local function ready(): boolean
 end
 IntroFinale.WaitAtMost = 20 -- seconds it waits for a screen still up (a card, a loading screen) when it's due
 
+-- While the first dungeon's owed (IntroFinale "Dungeon"): the HUNT BOUNTY
+-- window, then the Bounty Board's gate; again after a trip that didn't
+-- beat the boss, till it's down (Server.RiftServer: IntroRoundsServer.dungeonCleared).
+local function huntDue(): boolean
+	if player:GetAttribute("IntroFinale") ~= "Dungeon" or player:GetAttribute("Outpost") ~= true then
+		return false
+	end
+	if player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("MatchId") ~= nil then
+		return false
+	end
+	if os.clock() < heldUntil or player:GetAttribute("RiftRun") ~= nil or gateUp() then
+		return false
+	end
+	local busy = false
+	pcall(function()
+		busy = require(script.Parent.LoadingFlow).active() or require(script.Parent.IntroRoundsUI).busy() or require(script.Parent.KaijuRoll).showing()
+	end)
+	return not busy and root() ~= nil
+end
+local hunting = false
+function IntroFinale.hunt()
+	if hunting then
+		return
+	end
+	hunting = true
+	step("Invite")
+	local ok = pcall(invite, true)
+	if ok then
+		pcall(function()
+			require(script.Parent.RiftClient).openGate("Bounty")
+		end)
+	end
+	heldUntil = os.clock() + IntroFinale.HuntAgain -- (the gate's lobby opens: huntDue waits on it)
+	hunting = false
+end
+
 -- FIRST BOSS on the rounds' card (Client IntroRoundsUI): once they're out
 -- in the Outpost, the first boss's window (TAKE HIM ON: the Bounty Board's
 -- gate). The mines and the kaiju wait till that's done with.
 function IntroFinale.offerBoss()
-	heldUntil = os.clock() + 30
-	task.spawn(function()
-		local waited = 0
-		while waited < 15 and (player:GetAttribute("Outpost") ~= true or player:GetAttribute("CombatSession") ~= nil) do
-			waited += task.wait(0.25)
-		end
-		task.wait(0.6)
-		pcall(invite)
-		heldUntil = os.clock() + 3 -- (the gate's lobby opens: due() waits on it)
-	end)
+	-- (the hunt's loop shows it as soon as they're out in the Outpost: huntDue)
+	heldUntil = 0
 end
 
 local started = false
@@ -762,8 +903,13 @@ function IntroFinale.start()
 		local dueSince: number? = nil
 		while true do
 			task.wait(0.5)
-			if running then
+			if running or hunting then
 				dueSince = nil
+			elseif huntDue() then
+				task.wait(0.8) -- (a beat in the Outpost first)
+				if huntDue() then
+					IntroFinale.hunt()
+				end
 			elseif ready() then
 				task.wait(1) -- (a beat in the Outpost first)
 				if ready() then

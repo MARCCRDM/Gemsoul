@@ -116,6 +116,7 @@ local requests = {}
 local drawnPiece = nil
 local analyticsAnswer = nil -- (set below, once the shared modules load)
 local dungeonAnswer = nil -- (the Rot Beachhead's reply, when it's not a plain Ok)
+local roundStateAnswer = nil -- (IntroRoundState's reply, for the lobby's "finish your fights")
 local GemClient = {
 	Profile = { Intro = { Done = true }, Funnel = {}, TrainingRewards = { Counts = {} }, Settings = { Music = 0.4, MusicOn = false } },
 	Changed = signal(),
@@ -130,6 +131,8 @@ local GemClient = {
 			attrs.CombatSession = nil
 		elseif action == "FirstDungeon" and dungeonAnswer then
 			return dungeonAnswer
+		elseif action == "IntroRoundState" and roundStateAnswer then
+			return roundStateAnswer
 		end
 		return { Ok = true, Message = "" }
 	end,
@@ -206,14 +209,22 @@ do
 	local piece = card and card:FindFirstChild("Piece", true)
 	check(drawnPiece and drawnPiece[2] == "Weapon" and drawnPiece[3] == "w1", "The won piece wasn't drawn in 3D")
 	check(piece ~= nil and piece:IsA("ViewportFrame"), "No 3D piece on the card")
-	-- (the first fight won: three ways on, the rounds first; no countdown taking it for them)
+	-- (the first fight won: one way on, HUNT BOUNTY, with its boss; no lobby,
+	-- no countdown taking it for them)
 	local go, leave, dungeon = card:FindFirstChild("Next", true), card:FindFirstChild("Leave", true), card:FindFirstChild("Dungeon", true)
 	check(kaijuRolled == 1, "The first win didn't roll their kaiju before the card")
-	check(go and go.Text == "CONTINUE ROUNDS" and go.Visible, "No CONTINUE ROUNDS")
+	check(go and go.Text == "HUNT BOUNTY" and go.Visible, "No HUNT BOUNTY after the first win: " .. tostring(go and go.Text))
 	local goSub = go and go:FindFirstChild("Sub")
-	check(goSub and string.find(goSub.Text, "Round 2 of 6", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) == nil, "CONTINUE ROUNDS' round, or a countdown on a choice: " .. tostring(goSub and goSub.Text))
-	check(leave and leave.Visible and leave.Text == "EXPLORE THE OUTPOST", "No EXPLORE THE OUTPOST after the first win")
-	check(dungeon and dungeon.Visible and dungeon.Text == "FIRST BOSS", "No FIRST BOSS after the first win")
+	check(goSub and string.find(goSub.Text, "Bombardiro Drago", 1, true) ~= nil and string.find(goSub.Text, "starts in", 1, true) == nil, "HUNT BOUNTY's boss, or a countdown on it: " .. tostring(goSub and goSub.Text))
+	local boss = false
+	for _, d in card:GetDescendants() do
+		if d:IsA("TextLabel") and d.Text == "BOMBARDIRO DRAGO" and d.Visible then
+			boss = true
+		end
+	end
+	check(boss, "The card doesn't show the bounty's boss")
+	check(not (leave and leave.Visible), "A way to the lobby before the first dungeon")
+	check(not (dungeon and dungeon.Visible), "A second way on beside HUNT BOUNTY")
 	attrs.CombatSession = nil
 end
 load(clientRef.IntroRoundsUI).AutoNext = 1 -- (the loss's card on its way before the set's: a round between them in the game)
@@ -456,6 +467,54 @@ do
 	end
 	check(told, "The answer wasn't sent to the server")
 	check(gui:FindFirstChild("FirstBoss") == nil, "The window stayed up")
+	-- The first dungeon owed (HUNT BOUNTY): NEXT EVENT, one button, no LATER;
+	-- it waits for them (Enter takes them in).
+	local hunted = nil
+	task.spawn(function()
+		hunted = Finale._invite(true)
+	end)
+	task.wait(0.15)
+	local hcard = gui:FindFirstChild("Card", true)
+	local heading = hcard and hcard:FindFirstChild("Heading", true)
+	check(heading ~= nil and string.find(heading.Text, "HUNT BOUNTY", 1, true) ~= nil, "The hunt's window isn't NEXT EVENT · HUNT BOUNTY")
+	check(hcard and hcard:FindFirstChild("Later", true) == nil, "A LATER on the first dungeon's hunt")
+	local goHunt = hcard and hcard:FindFirstChild("Go", true)
+	check(goHunt ~= nil and string.find(goHunt.Text, "HUNT BOUNTY", 1, true) ~= nil, "No HUNT BOUNTY button")
+	task.wait(0.6)
+	check(hunted == nil and gui:FindFirstChild("FirstBoss") ~= nil, "The hunt's window went by itself")
+	services.UserInputService.InputBegan:Fire({ KeyCode = Enum.KeyCode.Return })
+	task.wait(0.2)
+	check(hunted == "Go" and gui:FindFirstChild("FirstBoss") == nil, "Enter didn't take them to the hunt")
+	-- After the lobby's intro: RECOMMENDED, FINISH YOUR INTRO FIGHTS (5 left).
+	roundStateAnswer = { Ok = true, Message = "", View = { Won = 1, Count = 6, Done = false } }
+	Finale.FinishFor = 0.4
+	local finish = nil
+	task.spawn(function()
+		finish = Finale._recommend()
+	end)
+	task.wait(0.15)
+	local fcard = gui:FindFirstChild("FinishFights")
+	local left = fcard and fcard:FindFirstChild("Left", true)
+	check(left ~= nil and string.find(left.Text, "5 left", 1, true) ~= nil, "No FINISH YOUR INTRO FIGHTS (5 left)")
+	check(fcard:FindFirstChild("Later", true) ~= nil and fcard:FindFirstChild("Go", true) ~= nil, "No LATER or CONTINUE FIGHTS")
+	task.wait(0.6)
+	check(finish == "Later" and gui:FindFirstChild("FinishFights") == nil, "Left alone, it wasn't LATER")
+	local beforeGo = #requests
+	task.spawn(function()
+		finish = Finale._recommend()
+	end)
+	task.wait(0.15)
+	services.UserInputService.InputBegan:Fire({ KeyCode = Enum.KeyCode.Return })
+	task.wait(0.2)
+	local resumed = false
+	for i = beforeGo + 1, #requests do
+		resumed = resumed or requests[i][1] == "IntroRoundNext"
+	end
+	check(finish == "Go" and resumed, "CONTINUE FIGHTS didn't take them back to the rounds")
+	-- (the set done: nothing to recommend)
+	roundStateAnswer = { Ok = true, Message = "", View = { Won = 6, Count = 6, Done = true } }
+	check(Finale._recommend() == nil and gui:FindFirstChild("FinishFights") == nil, "Recommended fights with the set done")
+	roundStateAnswer = nil
 end
-print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win (its three ways on), a loss and a set, SETTINGS opens, ANALYTICS draws every range, the dungeon path's cards, the Rot Beachhead's screens and knock-down card, the first dungeon's window)", checks))
+print(string.format("PASS: %d client extras boot checks (they start, the rounds' card shows a win (HUNT BOUNTY, its one way on), a loss and a set, SETTINGS opens, ANALYTICS draws every range, the dungeon path's cards, the Rot Beachhead's screens and knock-down card, the first dungeon's window, the hunt, finish your fights)", checks))
 process.exit(0) -- (their loops, a button's shine, never end on their own)

@@ -823,6 +823,11 @@ function IntroRoundsUI.next()
 		end
 		return
 	end
+	-- The only way on after the first win: HUNT BOUNTY (the first dungeon).
+	if choosing then
+		choose("Boss")
+		return
+	end
 	-- The dungeon path's last 1v1 won: the kaiju roll, then the dungeon.
 	if current.Next == "Dungeon" then
 		IntroRoundsUI.toDungeon()
@@ -888,10 +893,10 @@ local function leave()
 	end)
 end
 
--- After a win (IntroRounds.ChoiceAfter on), the card's two lower buttons
--- are the ways out for now: EXPLORE THE OUTPOST (the mines, the gems, the
--- minions, the kaiju roll: Client IntroFinale) and FIRST BOSS (Bombardiro
--- Drago's window, then the gate). The rest of the set waits for PLAY.
+-- After the first win (IntroRounds.ChoiceAfter), one way on: HUNT BOUNTY,
+-- the first dungeon (Bombardiro Drago's window, then the gate: Client
+-- IntroFinale). The lobby opens once it's cleared; the rest of the set
+-- waits for PLAY (recommended after the lobby's intro).
 local choosing = false
 -- A computer (a keyboard, not a touch screen): the card's keys, not clicks.
 local function keysOnly(): boolean
@@ -910,12 +915,10 @@ local function choose(which: string)
 			UiKit.toast(Lang.translate(result and result.Message or "Couldn't leave the rounds."), RED)
 			return
 		end
-		UiKit.toast(Lang.translate("Your intro rounds wait for you: PLAY carries on."), GOLD)
-		if which == "Boss" then
-			pcall(function()
-				require(script.Parent.IntroFinale).offerBoss()
-			end)
-		end
+		-- (the bounty's window, then its gate: Client IntroFinale)
+		pcall(function()
+			require(script.Parent.IntroFinale).offerBoss()
+		end)
 	end)
 end
 
@@ -1040,22 +1043,23 @@ local function show(event)
 			ui.WellNote.Text = Lang.translate("Tung Tung Tung Sahur waits")
 			ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
 			placeButtons(true, false)
-		elseif (view.Won or event.Round or 0) >= IntroRounds.ChoiceAfter then
-			-- (three ways on: the rounds, the Outpost, the first boss)
-			nextUp("NEXT", nextRival)
+		elseif (view.Won or event.Round or 0) >= IntroRounds.ChoiceAfter and player:GetAttribute("IntroFinale") ~= "Mines" then
+			-- (one way on: the next event, the first dungeon: HUNT BOUNTY.
+			-- Not the lobby: that opens once it's cleared.)
 			choosing = true
-			ui.Leave.Text = Lang.translate("EXPLORE THE OUTPOST")
-			ui.LeaveSub.Text = Lang.translate("Mines · gems · your kaiju")
-			ui.Dungeon.Text = Lang.translate("FIRST BOSS")
-			ui.DungeonSub.Text = Lang.translate("Bombardiro Drago")
-			tintDungeon(EMBER)
-			placeButtons(true, true)
+			ui.WellCaption.Text = Lang.translate("NEXT EVENT  ·  HUNT BOUNTY")
+			ui.WellCaption.TextSize = 10
+			ui.WellMain.Text = "BOMBARDIRO DRAGO"
+			ui.WellMain:SetAttribute("NoTranslate", true) -- (a name)
+			ui.WellNote.Text = Lang.translate("The first dungeon's boss  ·  Level 2")
+			ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
+			placeButtons(false, false)
 		else
 			nextUp("NEXT", nextRival)
 			placeButtons(false, false)
 		end
 		if ui.Key1 then
-			ui.Key1.Visible, ui.Key2.Visible = choosing and keysOnly(), choosing and keysOnly()
+			ui.Key1.Visible, ui.Key2.Visible = false, false
 		end
 		if event.Gem then
 			ui.Extra.Text = Lang.translate(string.format(if event.Auto and (event.Auto.Gems or 0) > 0 then "+ %s gem, socketed for you" else "+ %s gem, in your pouch", event.Gem.Name))
@@ -1067,9 +1071,9 @@ local function show(event)
 			if event.Next == "Dungeon" then
 				countdown("CONTINUE", Lang.translate("Your kaiju, then the dungeon"), mine)
 			elseif choosing then
-				-- (a choice to make: no countdown taking it for them)
-				ui.Go.Text = Lang.translate("CONTINUE ROUNDS")
-				ui.GoSub.Text = string.format(Lang.translate("Round %d of %d · next gear piece"), event.Round + 1, view.Count)
+				-- (no countdown taking it for them)
+				ui.Go.Text = Lang.translate("HUNT BOUNTY")
+				ui.GoSub.Text = Lang.translate("Your first dungeon: Bombardiro Drago")
 			else
 				countdown("CONTINUE INTRO ROUNDS", string.format(Lang.translate("Round %d of %d"), event.Round + 1, view.Count), mine)
 			end
@@ -1152,10 +1156,6 @@ function IntroRoundsUI.start()
 		local k = input.KeyCode
 		if k == Enum.KeyCode.Return or k == Enum.KeyCode.KeypadEnter or k == Enum.KeyCode.ButtonA then
 			IntroRoundsUI.next()
-		elseif choosing and (k == Enum.KeyCode.One or k == Enum.KeyCode.KeypadOne or k == Enum.KeyCode.ButtonX) then
-			choose("Outpost")
-		elseif choosing and (k == Enum.KeyCode.Two or k == Enum.KeyCode.KeypadTwo or k == Enum.KeyCode.ButtonY) then
-			choose("Boss")
 		end
 	end)
 	ui.Dungeon.Activated:Connect(function()
@@ -1173,8 +1173,7 @@ function IntroRoundsUI.start()
 			return
 		end
 		if choosing then
-			choose("Outpost")
-			return
+			return -- (no way to the lobby before the first dungeon: its button's hidden)
 		end
 		if current and current.View and current.View.Done then
 			-- (the set's done: GO TO LOBBY beside TO THE FIRST DUNGEON)

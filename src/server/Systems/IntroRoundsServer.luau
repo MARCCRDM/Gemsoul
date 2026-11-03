@@ -174,7 +174,7 @@ function IntroRoundsServer.unstick(player: Player, now: number): string?
 	local left = IntroRoundsServer.left(player)
 	if left == 0 then
 		-- (the set's done: CONTINUE should have taken them out)
-		if profile.IntroFinale ~= "Mines" then
+		if profile.IntroFinale ~= "Mines" and profile.IntroFinale ~= "Dungeon" then
 			stuckSince[player] = nil
 			return nil
 		end
@@ -364,7 +364,24 @@ IntroRoundsServer.Critters = {
 }
 local function markFinale(player: Player)
 	local profile = PlayerData.get(player) :: any
-	player:SetAttribute("IntroFinale", if profile and profile.IntroFinale == "Mines" then "Mines" else nil)
+	local stage = profile and profile.IntroFinale
+	player:SetAttribute("IntroFinale", if stage == "Mines" or stage == "Dungeon" then stage else nil)
+	-- (the lobby's intro doesn't ask about the first dungeon once it's done)
+	player:SetAttribute("IntroDungeonCleared", if profile and profile.IntroDungeonCleared then true else nil)
+end
+-- The first dungeon owed (profile.IntroFinale "Dungeon": the HUNT BOUNTY
+-- window, Client IntroFinale, holds them to it) cleared: a Rift boss beaten
+-- (Server.RiftServer's recordWin). The lobby's intro is next ("Mines").
+function IntroRoundsServer.dungeonCleared(player: Player)
+	local profile = PlayerData.get(player) :: any
+	if not profile or profile.IntroFinale ~= "Dungeon" then
+		return false
+	end
+	profile.IntroFinale = "Mines"
+	profile.IntroDungeonCleared = true
+	markFinale(player)
+	pcall(Analytics.event, player, "IntroDungeonCleared")
+	return true
 end
 local finaleCritters = {} :: { [Player]: { any } }
 local finaleLoose = {} :: { [Player]: boolean } -- (the kaiju are out: the minions let go)
@@ -539,8 +556,8 @@ function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 	state.Pieces[slot] = { Name = piece.Name, Rarity = piece.Rarity }
 	markLeft(player)
 	if state.Won >= IntroRounds.Count and (profile :: any).IntroFinale == nil then
-		-- (the set's done: the mines and the kaiju next)
-		(profile :: any).IntroFinale = "Mines"
+		-- (the set's done: the first dungeon next, then the mines and the kaiju)
+		(profile :: any).IntroFinale = "Dungeon"
 		markFinale(player)
 	end
 	local event = { Phase = "Won", Round = round, Piece = piece, Where = where, More = more }
@@ -666,7 +683,9 @@ end
 -- minions and the kaiju roll: IntroFinale) or to the first boss ("Boss":
 -- the Bounty Board's Bombardiro Drago, then the mines when they're back).
 -- The rest of the set waits: CONTINUE ROUNDS or PLAY takes it up again.
-local CHOICES = { Outpost = true, Boss = true }
+-- (The only way on is the first dungeon: HUNT BOUNTY. The lobby opens once
+-- it's cleared: IntroRoundsServer.dungeonCleared.)
+local CHOICES = { Boss = true }
 function IntroRoundsServer.choose(player: Player, which: any)
 	local state, profile = stateOf(player)
 	if not state or not CHOICES[which] then
@@ -680,7 +699,7 @@ function IntroRoundsServer.choose(player: Player, which: any)
 	end
 	state.Paused = true
 	if (profile :: any).IntroFinale == nil then
-		(profile :: any).IntroFinale = "Mines"
+		(profile :: any).IntroFinale = "Dungeon"
 	end
 	markFinale(player)
 	markLeft(player)

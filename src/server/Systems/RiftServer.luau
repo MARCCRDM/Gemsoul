@@ -699,6 +699,10 @@ local function recordWin(run)
 		local first = (beaten[run.Boss.Id] or 0) == 0
 		beaten[run.Boss.Id] = (beaten[run.Boss.Id] or 0) + 1
 		Analytics.event(player, "BossDefeated", #run.Members, run.Boss.Id, "Rift", run.Element)
+		-- (a new miner's first dungeon done: the lobby's theirs now)
+		pcall(function()
+			require(script.Parent.IntroRoundsServer).dungeonCleared(player)
+		end)
 		PlayerData.training(player, "RiftBoss")
 		if first and nextUp then
 			notify(player, string.format("Unlocked: %s, next on this Rift's ladder.", nextUp.Name))

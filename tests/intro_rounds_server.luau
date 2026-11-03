@@ -190,9 +190,14 @@ for round = 1, IntroRounds.Count do
 		check(attributes.IntroFinale == nil and profile.IntroFinale == nil, "The finale came before the set's done")
 	end
 end
--- The set done: free to leave, and the finale (the mines, the minions, the kaiju) to do.
+-- The set done: free to leave, and the first dungeon owed before the lobby's intro.
 check(Server.left(player) == 0 and attributes.IntroRoundsLeft == nil, "Still held in the rounds after the set")
-check(profile.IntroFinale == "Mines" and attributes.IntroFinale == "Mines", "No finale after the set")
+check(profile.IntroFinale == "Dungeon" and attributes.IntroFinale == "Dungeon", "The first dungeon isn't owed after the set")
+check(Server.finale(player, "Done").Ok == false and profile.IntroFinale == "Dungeon", "The lobby's intro finished before the first dungeon")
+-- A Rift boss beaten: the lobby's intro (the mines, the minions, the kaiju) is next.
+check(Server.dungeonCleared(player) and profile.IntroFinale == "Mines" and attributes.IntroFinale == "Mines", "Clearing the first dungeon didn't open the lobby's intro")
+check(attributes.IntroDungeonCleared == true, "The lobby's intro would ask about a dungeon already done")
+check(not Server.dungeonCleared(player) and profile.IntroFinale == "Mines", "A second boss beaten moved the intro on again")
 check(Server.finale(player, "Nonsense").Ok == false, "An unknown finale step went through")
 -- (the step it's on, for the DEV spectator; only the finale's own steps)
 check(Server.finale(player, "Step", "Gems").Ok and attributes.IntroFinaleStep == "Gems", "The finale's step isn't shown")
@@ -302,23 +307,24 @@ do
 	Server._next, Server._leave = realNext, realLeave
 end
 
--- The card after the first win: three ways on. EXPLORE THE OUTPOST or FIRST
--- BOSS step out of the rounds for now (no longer held, the mines' finale
--- open to them); CONTINUE or PLAY takes them up again.
+-- The card after the first win: one way on, HUNT BOUNTY (the first
+-- dungeon). Not the lobby: that opens once the dungeon's cleared. The rest
+-- of the set waits (PLAY, or the lobby's recommendation, takes it up again).
 do
 	profile = newProfile({})
-	check(not Server.choose(player, "Outpost").Ok, "Stepped out before winning a fight")
+	check(not Server.choose(player, "Boss").Ok, "Stepped out before winning a fight")
 	Server.won(player)
 	check(attributes.IntroRoundsLeft == IntroRounds.Count - 1 and Server.held(player), "Not held in the rounds after the first win")
 	check(not Server.choose(player, "Hax").Ok, "A way out that isn't one")
-	local out = Server.choose(player, "Outpost")
-	check(out.Ok and out.Choice == "Outpost", "EXPLORE THE OUTPOST didn't take them out")
+	check(not Server.choose(player, "Outpost").Ok and Server.held(player), "Went to the lobby before the first dungeon")
+	local out = Server.choose(player, "Boss")
+	check(out.Ok and out.Choice == "Boss", "HUNT BOUNTY didn't take them out")
 	check(profile.IntroRounds.Paused == true and not Server.held(player) and attributes.IntroRoundsLeft == nil, "Still held after stepping out")
-	check(profile.IntroFinale == "Mines" and attributes.IntroFinale == "Mines", "The mines and the kaiju aren't open to them")
+	check(profile.IntroFinale == "Dungeon" and attributes.IntroFinale == "Dungeon", "The first dungeon isn't owed")
 	check(Server.left(player) == IntroRounds.Count - 1, "Stepping out lost them their rounds")
-	-- (back to the rounds: held again)
+	check(Server.dungeonCleared(player) and profile.IntroFinale == "Mines", "Clearing it didn't open the lobby's intro")
+	-- (the rest of the set, from the lobby: held in it again)
 	pcall(Server._next, player)
 	check(profile.IntroRounds.Paused == nil and Server.held(player) and attributes.IntroRoundsLeft == IntroRounds.Count - 1, "Back to the rounds but not held in them")
-	check(Server.choose(player, "Boss").Ok and not Server.held(player), "FIRST BOSS didn't take them out")
 end
 print(string.format("PASS: %d intro rounds server checks", checks))
