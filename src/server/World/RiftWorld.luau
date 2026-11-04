@@ -22,7 +22,7 @@
 	charged vines, static spires, blades, bog pools, a rotting grove). No
 	two bosses' trips are built alike.
 
-	  RiftWorld.build(id, origin, rng, realm?) -> {
+	  RiftWorld.build(id, origin, rng, realm?, caves?, noWayBack?) -> {
 	      Folder, Origin (CFrame: the landing's middle, on its floor),
 	      Start (CFrame: where you land, facing the way in),
 	      Landing ({ Center, Radius, Size }),
@@ -30,7 +30,8 @@
 	      Boss ({ Center, Radius, Size }),
 	      Gates ({ Model }: cave n's wall of fire, on the way out of it;
 	          its "Into" attribute a spot a little way into the next cave),
-	      Exit (BasePart: the way home in the landing, its prompt "RiftExit"),
+	      Exit (BasePart: the way home in the landing, its prompt "RiftExit";
+	            nil with noWayBack),
 	      Home (Model: the way home in the throne cave, shut till it's beaten),
 	  }
 	  RiftWorld.inside(area, position, margin?)   on that cave's floor
@@ -857,7 +858,7 @@ local kit = {
 	P = P,
 }
 
-function RiftWorld.build(id: string, origin: CFrame, rng, realm, caves: number?)
+function RiftWorld.build(id: string, origin: CFrame, rng, realm, caves: number?, noWayBack: boolean?)
 	P = realm or RiftRealms.Default
 	kit.P = P
 	if not Styles then
@@ -900,11 +901,16 @@ function RiftWorld.build(id: string, origin: CFrame, rng, realm, caves: number?)
 			gates[i - 1]:SetAttribute("Into", to + dir * 8)
 		end
 	end
-	-- The landing: the way home stood against its back wall, facing in.
+	-- The landing: the way home stood against its back wall, facing in
+	-- (none with `noWayBack`: a new miner's first dungeon, the boss or bust).
 	local landing = centers[1]
 	local ahead = flat(centers[2] - landing).Unit
 	local back = landing - ahead * (RiftWorld.Landing / 2 - 3)
-	local _, exit = wayHome(folder, face(back, ahead), true)
+	local exit: BasePart? = nil
+	if not noWayBack then
+		local _, opening = wayHome(folder, face(back, ahead), true)
+		exit = opening
+	end
 	-- The throne cave: the throne at its far end, the way home beside it.
 	local last = #centers
 	local bossAt = centers[last]

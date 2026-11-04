@@ -389,7 +389,8 @@ task.spawn(function()
 				if queued and queued.Ok then
 					UiKit.toast("Searching ranked 1v1 while you mine. Cancel anytime.", GOLD)
 					break
-				elseif queued and (queued.Message == "Auto queue is off." or queued.Message == "Finish your intro rounds first.") then
+				elseif queued and (queued.Message == "Auto queue is off." or queued.Message == "Finish your intro rounds first."
+					or queued.Message == "Finish your first mine and the critters first.") then
 					break
 				end
 				task.wait(2)

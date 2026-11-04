@@ -1420,7 +1420,9 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 			first = bounty and require(script.Parent.IntroRoundsServer).owesDungeon(player)
 		end)
 		local caves = if first then RiftRun.FirstRooms else RiftRun.Rooms
-		local ok, world = pcall(RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id), caves)
+		-- (and no way home in its landing: only the throne cave's, once the
+		-- boss is down)
+		local ok, world = pcall(RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id), caves, first)
 		if not ok then
 			warn("[Rift] build failed:", world)
 			return reply(false, "The gate won't open just now. Try again in a moment.")
@@ -1619,7 +1621,14 @@ local function leave(player: Player)
 	end
 	local root = rootOf(player)
 	local near = false
-	for _, opening in { run.World.Exit, if run.Won then run.World.Home:FindFirstChild("Opening") else nil } do
+	local ways = {}
+	if run.World.Exit then
+		table.insert(ways, run.World.Exit)
+	end
+	if run.Won then
+		table.insert(ways, run.World.Home:FindFirstChild("Opening"))
+	end
+	for _, opening in ways do
 		if root and opening and (root.Position - opening.Position).Magnitude <= RiftServer.Reach then
 			near = true
 		end

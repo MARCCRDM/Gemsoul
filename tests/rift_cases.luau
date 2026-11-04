@@ -925,7 +925,7 @@ do
 		check(client:find("\"" .. key .. "\"", 1, true) ~= nil or client:find("air." .. key, 1, true) ~= nil, "The client ignores the realm's " .. key)
 	end
 	local server = fs.readFile(ROOT .. "/src/server/Systems/RiftServer.luau")
-	check(server:find('RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id), caves)', 1, true) ~= nil, "The server doesn't build the boss's realm")
+	check(server:find('RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id), caves', 1, true) ~= nil, "The server doesn't build the boss's realm")
 	check(server:find('"RiftRealm"', 1, true) ~= nil, "Runners aren't told their realm")
 end
 -- Two trips side by side never meet (RiftServer's slots).
@@ -940,6 +940,19 @@ do
 	local toBoss = (first.Boss.Center - first.Start.Position) * Vector3.new(1, 0, 1)
 	check(ahead:Dot(toBoss.Unit) > 0.9, "The way in doesn't face the boss's cave")
 	first.Folder:Destroy()
+	-- (and, built as the server builds a new miner's, no way home in its
+	-- landing: only the throne cave's, after the boss)
+	local bare = RiftWorld.build("T0b", origin * CFrame.new(-4000, 0, -6000), Random.new(5), nil, RiftRun.FirstRooms, true)
+	local ways = 0
+	for _, d in bare.Folder:GetChildren() do
+		if d.Name == "WayHome" then
+			ways += 1
+		end
+	end
+	check(bare.Exit == nil and ways == 1 and bare.Home ~= nil, "The first dungeon's landing still has its way home")
+	bare.Folder:Destroy()
+	local rs = fs.readFile(ROOT .. "/src/server/Systems/RiftServer.luau")
+	check(rs:find("RiftRealms.of(boss and boss.Id), caves, first)", 1, true) ~= nil, "The server builds a new miner's first dungeon with a way home in the landing")
 end
 local other = RiftWorld.build("T2", origin * CFrame.new(-2000, 0, 0), Random.new(4))
 for _, a in { other.Landing, other.Boss, table.unpack(other.Rooms) } do

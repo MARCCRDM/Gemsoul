@@ -1104,6 +1104,24 @@ do
 	check(Duels.matchOf(newbie) == nil, "A new miner mid-intro was matched")
 	handlers.DuelCancel(vet)
 	profiles[newbie].IntroRounds.Won = 6
+	-- Rounds done, but the first dungeon or the lobby's intro (the first
+	-- rock, the critters) still to do: no search, no calls yet.
+	for _, stage in { "Dungeon", "Mines" } do
+		profiles[newbie].IntroFinale = stage
+		newbie:SetAttribute("IntroFinale", stage)
+		local held = handlers.DuelReturnQueue(newbie)
+		check(not held.Ok and held.Message == Duels.FinaleMessage, "Auto-queued before the lobby's intro (" .. stage .. ")")
+	end
+	check(handlers.DuelQueue(vet, "1v1").Ok, "The veteran couldn't queue again")
+	advance(AutoQueue.CallAfter + 0.5)
+	check(last(newbie, "FillIn") == nil, "A new miner before the lobby's intro was invited into a 1v1")
+	handlers.DuelCancel(vet)
+	-- The lobby's intro done: the search starts by itself.
+	profiles[newbie].IntroFinale = "Done"
+	newbie:SetAttribute("IntroFinale", nil)
+	advance(Duels.AfterFinale + 1)
+	check(newbie:GetAttribute("DuelQueue") == "1v1", "No search once the lobby's intro was done")
+	handlers.DuelCancel(newbie)
 	check(handlers.DuelReturnQueue(newbie).Ok, "A new miner whose set's done can't auto-queue")
 	handlers.DuelCancel(newbie)
 	print("PASS: new miners mid-intro kept out of real players' matches (auto queue, fill-in calls)")

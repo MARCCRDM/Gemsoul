@@ -1283,6 +1283,16 @@ Duels.IntroMessage = "Finish your intro rounds first."
 local function inIntro(player: Player): boolean
 	return IntroRounds.eligible(PlayerData.get(player))
 end
+-- After the rounds, the first dungeon and then the lobby's intro (the first
+-- rock, the critters: Server.IntroRoundsServer's finale) still to do: no
+-- auto queue and no fill-in calls till it's done; then the search starts
+-- by itself (Duels.AfterFinale seconds on).
+Duels.FinaleMessage = "Finish your first mine and the critters first."
+Duels.AfterFinale = 4
+local function inFinale(player: Player): boolean
+	local profile = PlayerData.get(player) :: any
+	return profile ~= nil and (profile.IntroFinale == "Dungeon" or profile.IntroFinale == "Mines")
+end
 
 -- Auto queue: everyone with it on (the default) searches ranked 1v1 while
 -- they're in the lobby, without being asked (arriving there, and back from
@@ -1291,6 +1301,7 @@ end
 local function autoReturn(player: Player)
 	if entryOf(player) then return reply(true, "Already searching.") end
 	if inIntro(player) then return reply(false, Duels.IntroMessage) end
+	if inFinale(player) then return reply(false, Duels.FinaleMessage) end
 	local ready = AutoQueue.ready(function(name) return player:GetAttribute(name) end, false)
 	if not ready or busy(player) then return reply(false, "Return to the lobby first.") end
 	local record = Duels.record(player)
@@ -1309,7 +1320,7 @@ end
 local function onCall(entry)
 	local manual = {}
 	for _, other in Players:GetPlayers() do
-		if not table.find(entry.Players, other) and not busy(other) and not inIntro(other) and AutoQueue.settled(arrived[other], os.clock()) then
+		if not table.find(entry.Players, other) and not busy(other) and not inIntro(other) and not inFinale(other) and AutoQueue.settled(arrived[other], os.clock()) then
 			local ok = AutoQueue.ready(function(name)
 				return other:GetAttribute(name)
 			end, entryOf(other) ~= nil)
@@ -1808,6 +1819,25 @@ function Duels.start()
 			player:GetAttributeChangedSignal(attribute):Connect(returned)
 		end
 		player.CharacterAdded:Connect(function() task.delay(1, returned) end)
+		-- The lobby's intro done (its IntroFinale attribute gone): searching
+		-- from here on (a few tries: it may still be wrapping up).
+		player:GetAttributeChangedSignal("IntroFinale"):Connect(function()
+			if player:GetAttribute("IntroFinale") ~= nil or inFinale(player) or inIntro(player) then
+				return
+			end
+			task.delay(Duels.AfterFinale, function()
+				for _ = 1, 6 do
+					if not player.Parent or entryOf(player) or player:GetAttribute("MatchId") then
+						return
+					end
+					local result = autoReturn(player)
+					if result.Ok or result.Message == "Auto queue is off." then
+						return
+					end
+					task.wait(2)
+				end
+			end)
+		end)
 		-- Leaving the Arena session (the Leave button, walking out, respawning)
 		-- forfeits a duel in progress.
 		player:GetAttributeChangedSignal("CombatSession"):Connect(function()
