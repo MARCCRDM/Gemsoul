@@ -1186,11 +1186,20 @@ function choose(which: string)
 		while player:GetAttribute("CombatSession") ~= nil and os.clock() - started < 6 do
 			task.wait(0.1)
 		end
+		-- (still under the cover: a second try if the gate's slow to open,
+		-- before the Outpost's way round)
 		local inside = false
-		pcall(function()
-			local IntroFinale = require(script.Parent.IntroFinale)
-			inside = require(script.Parent.RiftClient).enterBounty(IntroFinale.Boss) == true
-		end)
+		for try = 1, 2 do
+			pcall(function()
+				local IntroFinale = require(script.Parent.IntroFinale)
+				inside = require(script.Parent.RiftClient).enterBounty(IntroFinale.Boss) == true
+			end)
+			if inside then
+				break
+			elseif try == 1 then
+				task.wait(1)
+			end
+		end
 		if not inside then
 			release()
 			-- (the gate wouldn't open: the bounty's window in the Outpost, as before)

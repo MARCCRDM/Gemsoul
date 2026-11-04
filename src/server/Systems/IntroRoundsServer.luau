@@ -786,6 +786,29 @@ local function leaveRounds(player: Player)
 	end
 	return reply(true, "Back to the Outpost.")
 end
+-- HUNT BOUNTY's way out: off the Arena where they stand (never the lobby's
+-- spawn first), then into the Outpost behind the loading screen, as the
+-- Rift's gate only opens from there (RiftServer: problem). The client goes
+-- on through the gate under the same cover (Client IntroRoundsUI.choose).
+local function huntOut(player: Player)
+	if IntroRoundsServer.held(player) then
+		return reply(false, "Finish your intro rounds first.")
+	end
+	player:SetAttribute("IntroRounds", nil)
+	player:SetAttribute("IntroRoundFight", nil)
+	if player:GetAttribute("CombatSession") ~= nil then
+		require(script.Parent.ArenaSessions).leave(player, true)
+	end
+	if player:GetAttribute("Outpost") ~= true then
+		local ok, why = pcall(function()
+			return require(script.Parent.OutpostServer)._enter(player)
+		end)
+		if not ok then
+			warn("[IntroRounds] into the Outpost for HUNT BOUNTY: " .. tostring(why))
+		end
+	end
+	return reply(true, "Into the Rift.")
+end
 -- The card after a win (from IntroRounds.ChoiceAfter wins on): out of the
 -- rounds for now, to the Outpost ("Outpost": the mines, the gems, the
 -- minions and the kaiju roll: IntroFinale) or to the first boss ("Boss":
@@ -848,7 +871,7 @@ function IntroRoundsServer.choose(player: Player, which: any)
 		require(script.Parent.Journey).reach(player, "Chose HUNT BOUNTY")
 		require(script.Parent.Funnel).reach(player, "Hunt bounty")
 	end)
-	local out = leaveRounds(player)
+	local out = huntOut(player)
 	out.Choice = which
 	return out
 end

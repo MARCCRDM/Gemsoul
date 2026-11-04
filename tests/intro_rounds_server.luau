@@ -95,8 +95,10 @@ local stubs = {
 	-- (the next round: into the Arena, its rival in)
 	ArenaSessions = {
 		enterTraining = function() attributes.CombatSession = "Training" return { Ok = true } end,
-		leave = function() attributes.CombatSession = nil return { Ok = true } end,
+		leave = function(_, stay) attributes.CombatSession = nil; attributes.LeftStaying = stay return { Ok = true } end,
 	},
+	-- (HUNT BOUNTY: into the Outpost behind the cover, the gate's side)
+	OutpostServer = { _enter = function() attributes.Outpost = true return { Ok = true } end },
 	Duelist = { spawnRound = function() return true end },
 	GemGenerator = { generate = function(_, _, spec) return { Id = spec.Id, Element = "Fire", Tier = spec.Rarity, Size = 5, Clarity = 5, Cut = 5 } end },
 }
@@ -368,6 +370,8 @@ do
 	check(Server._hunt(player).Ok, "HUNT BOUNTY refused at round " .. must)
 	local out = Server.choose(player, "Boss")
 	check(out.Ok and out.Choice == "Boss", "HUNT BOUNTY didn't take them out")
+	check(attributes.CombatSession == nil and attributes.LeftStaying == true, "HUNT BOUNTY went by the lobby's spawn")
+	check(attributes.Outpost == true, "HUNT BOUNTY left them outside the Outpost: the gate won't open")
 	check(not Server.held(player) and attributes.IntroRoundsLeft == nil, "Still held in the rounds after HUNT BOUNTY")
 	check(Server.left(player) == IntroRounds.Count - must, "The rounds left went with HUNT BOUNTY")
 	check(attributes.IntroFinale == "Dungeon" and Server.owesDungeon(player), "The Rift wouldn't pay the first dungeon's purse")
