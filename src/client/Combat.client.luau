@@ -1298,6 +1298,36 @@ tabKey.Button.Activated:Connect(function()
 	cursorFree = false
 	FirstPerson.setCursorFree(false)
 end)
+-- A friend request (Roblox's own pop-up, top right): the mouse is let go at
+-- once so it can be clicked (the locked combat view held it in the middle,
+-- and players who didn't know Tab couldn't answer it), with a word on where
+-- it is. Locked again by itself a while later, unless they're in a window.
+do
+	local FRIEND_FREE_FOR = 30 -- seconds
+	local friendFreedAt = 0
+	player.FriendStatusChanged:Connect(function(other: Player, status: Enum.FriendStatus)
+		if status ~= Enum.FriendStatus.FriendRequestReceived then
+			return
+		end
+		if not cursorFree then
+			cancel()
+			cursorFree = true
+			FirstPerson.setCursorFree(true)
+		end
+		local stamp = os.clock()
+		friendFreedAt = stamp
+		UiKit.toast(
+			string.format("%s sent you a friend request! Accept it at the top right. (Tab locks your aim again.)", other.DisplayName),
+			P.Gold
+		)
+		task.delay(FRIEND_FREE_FOR, function()
+			if friendFreedAt == stamp and cursorFree and not CombatGuide.isOpen() and not AugmentTreeUI.isOpen() then
+				cursorFree = false
+				FirstPerson.setCursorFree(false)
+			end
+		end)
+	end)
+end -- (in a block: this script is at Roblox's 200 locals)
 -- Switch between the targets close around you (within TargetLockRules.SwitchRange).
 ContextActionService:BindActionAtPriority("SwitchTarget", function(_, state)
 	if not canFight() or UserInputService:GetFocusedTextBox() then

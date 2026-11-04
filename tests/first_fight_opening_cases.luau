@@ -267,5 +267,14 @@ player:SetAttribute("FirstFight", true)
 step(8)
 check(#said == 2, "The opening played twice")
 
+-- A friend request lets the mouse go (the combat view held it in the middle:
+-- Roblox's pop-up couldn't be clicked without knowing Tab), and says where.
+do
+	local combat = fs.readFile(ROOT .. "/src/client/Combat.client.luau")
+	local at = combat:find("player.FriendStatusChanged:Connect", 1, true)
+	local body = at and combat:sub(at, combat:find("\nend %-%- ", at) or #combat) or ""
+	check(body:find("Enum.FriendStatus.FriendRequestReceived", 1, true) and body:find("FirstPerson.setCursorFree(true)", 1, true) and body:find("UiKit.toast(", 1, true), "A friend request leaves the mouse locked")
+end
+
 print(string.format("PASS: %d first fight opening checks (the welcome, then the controls' line with arrows on Q/E/R, then ATTACK/BLOCK/DODGE)", checks))
 process.exit(0)
