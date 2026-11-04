@@ -228,6 +228,7 @@ local function loadMenu()
 			Color3 = roblox.Color3,
 			Enum = roblox.Enum,
 			NumberSequence = roblox.NumberSequence,
+			ColorSequence = roblox.ColorSequence,
 			NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
 			TweenInfo = { new = function() return {} end },
 			__absSize = function()

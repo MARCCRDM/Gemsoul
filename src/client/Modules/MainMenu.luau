@@ -63,17 +63,17 @@ local BAD = Color3.fromRGB(255, 120, 110)
 local LAYOUTS = {
 	Desk = {
 		W = 1600, H = 900, Top = 110, Bottom = 790, Side = 100, Gap = 40, Inset = 60,
-		Logo = 300, LogoTop = -20, PlayTop = 300, Play = 92, PlayText = 34, Caption = 16,
-		Grid = 56, GridGap = 16, GridText = 21, Foot = 14,
-		Pad = 14, ArtShare = 0.55, Tag = 16, Title = 36, Line = 19, Button = 46, ButtonText = 18,
-		Dot = 12, Radius = 20, PageTitle = 28, PageText = 18, PageHead = 22,
+		Header = 290, PlayTop = 312, Play = 92, PlayText = 36, Caption = 16,
+		Grid = 62, GridGap = 16, GridText = 21, Foot = 14,
+		Pad = 18, ArtShare = 0.575, ArtScale = Enum.ScaleType.Crop, Tag = 16, Title = 38, Line = 20,
+		Button = 52, ButtonText = 19, Dot = 12, Radius = 22, PageTitle = 28, PageText = 18, PageHead = 22,
 	},
 	Phone = {
 		W = 844, H = 390, Top = 30, Bottom = 360, Side = 44, Gap = 16, Inset = 20,
-		Logo = 120, LogoTop = -10, PlayTop = 100, Play = 52, PlayText = 22, Caption = 11,
-		Grid = 36, GridGap = 8, GridText = 14, Foot = 11,
-		Pad = 8, ArtShare = 0.5, Tag = 11, Title = 20, Line = 12, Button = 30, ButtonText = 12,
-		Dot = 9, Radius = 14, PageTitle = 18, PageText = 12, PageHead = 14,
+		Header = 124, PlayTop = 132, Play = 46, PlayText = 22, Caption = 11,
+		Grid = 34, GridGap = 8, GridText = 14, Foot = 11,
+		Pad = 10, ArtShare = 0.5, ArtScale = Enum.ScaleType.Fit, Tag = 11, Title = 20, Line = 13,
+		Button = 32, ButtonText = 13, Dot = 9, Radius = 14, PageTitle = 18, PageText = 12, PageHead = 14,
 	},
 }
 MainMenu.Layouts = LAYOUTS
@@ -91,7 +91,13 @@ local function round(object: GuiObject, radius: number)
 	UiKit.round(object, radius)
 end
 local function stroke(object: GuiObject, color: Color3, thickness: number, transparency: number?)
-	return new("UIStroke", { Color = color, Thickness = thickness, Transparency = transparency or 0 }, object)
+	-- (on its edge: a UIStroke on a text button outlines its words otherwise)
+	return new("UIStroke", {
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Color = color,
+		Thickness = thickness,
+		Transparency = transparency or 0,
+	}, object)
 end
 local function label(parent: Instance, text: string, size: number, color: Color3, font: Enum.Font?, props: { [string]: any }?): TextLabel
 	local l = new("TextLabel", {
@@ -275,7 +281,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		p.TagBack.BackgroundColor3 = banner.TagColor
 		p.Title.Text = banner.Title
 		p.Line.Text = if drawn == "Phone" then banner.Short or banner.Line else banner.Line
-		p.Line.TextColor3 = DIM
+		p.Line.TextColor3 = Color3.fromRGB(196, 202, 216)
 		-- (several codes: a button for each; else the banner's own button)
 		local codes = Content.codesOf(banner, os.time())
 		local several = #codes > 1
@@ -322,22 +328,44 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 				ZIndex = 20,
 			}, root)
 			round(f, L.Radius)
-			stroke(f, GOLD, 2, 0.75)
+			stroke(f, GOLD, 1.5, 0.6)
+			new("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new(Color3.fromRGB(30, 34, 52), Color3.fromRGB(14, 16, 26)),
+			}, f)
+			return f
+		end
+		-- A dark fade over the bottom of `parent`'s top picture, into the panel.
+		local function fade(parent: GuiObject, share: number)
+			local f = new("Frame", {
+				Name = "Fade",
+				AnchorPoint = Vector2.new(0, 1),
+				Position = UDim2.fromScale(0, 1),
+				Size = UDim2.fromScale(1, share),
+				BackgroundColor3 = Color3.fromRGB(18, 21, 33),
+				ZIndex = 24,
+			}, parent)
+			new("UIGradient", {
+				Rotation = 90,
+				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }),
+			}, f)
 			return f
 		end
 
 		-- Left: logo, PLAY, the four, the version and SETTINGS.
 		local left = panel(L.Side, "Menu")
-		new("ImageLabel", {
+		-- The logo across the top, its starfield the panel's header.
+		local logo = new("ImageLabel", {
 			Name = "Logo",
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.new(0.5, 0, 0, L.LogoTop),
-			Size = UDim2.fromOffset(L.Logo, L.Logo),
-			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, L.Header),
+			BackgroundColor3 = Color3.fromRGB(12, 11, 23),
 			Image = "rbxassetid://" .. MainMenu.LogoId,
 			ResampleMode = Enum.ResamplerMode.Pixelated,
+			ScaleType = Enum.ScaleType.Crop,
 			ZIndex = 21,
 		}, left)
+		round(logo, L.Radius)
+		fade(logo, 0.35)
 		local inner = colW - 2 * L.Inset
 		local play = new("TextButton", {
 			Name = "Play",
@@ -371,16 +399,18 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		end)
 		playButton = play
 		if not UserInputService.TouchEnabled or UserInputService.KeyboardEnabled then
-			local key = label(play, "ENTER", math.floor(L.Foot * 0.9), INK, Enum.Font.GothamBold, {
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -10, 0, 8),
-				Size = UDim2.fromOffset(60, L.Foot + 6),
+			local key = label(play, "ENTER", L.Foot, GOLD, Enum.Font.GothamBlack, {
+				Name = "Key",
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -18, 0.5, -3),
+				Size = UDim2.fromOffset(L.Foot * 5.4, L.Foot + 14),
+				BackgroundColor3 = INK,
+				BackgroundTransparency = 0.15,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextYAlignment = Enum.TextYAlignment.Center,
 				ZIndex = 23,
 			})
-			round(key, 5)
-			stroke(key, INK, 1, 0.3)
+			round(key, 8)
 		end
 		local captionText = "Into the Outpost"
 		label(left, captionText, L.Caption, DIM, Enum.Font.GothamMedium, {
@@ -398,7 +428,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 				Name = entry[2],
 				Position = UDim2.fromOffset(L.Inset + col * (bw + L.GridGap), gridTop + row * (L.Grid + L.GridGap)),
 				Size = UDim2.fromOffset(bw, L.Grid),
-				BackgroundColor3 = BUTTON,
+				BackgroundColor3 = Color3.fromRGB(32, 37, 56),
 				AutoButtonColor = true,
 				Font = Enum.Font.GothamBlack,
 				Text = entry[1],
@@ -407,7 +437,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 				ZIndex = 22,
 			}, left)
 			round(b, 12)
-			stroke(b, EDGE, 2)
+			stroke(b, EDGE, 1.5, 0.2)
 			b:SetAttribute("UiSound", "Open")
 			b.Activated:Connect(function()
 				menu.page(entry[2])
@@ -454,13 +484,13 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		local artH = math.floor(height * L.ArtShare)
 		local art = new("Frame", {
 			Name = "Art",
-			Position = UDim2.fromOffset(L.Pad, L.Pad),
-			Size = UDim2.new(1, -2 * L.Pad, 0, artH),
+			Size = UDim2.new(1, 0, 0, artH),
 			BackgroundColor3 = Color3.fromRGB(16, 18, 30),
 			ClipsDescendants = true,
 			ZIndex = 21,
 		}, slide)
-		round(art, L.Radius - 6)
+		round(art, L.Radius)
+		fade(art, 0.22)
 		local fallback = new("Frame", { Name = "Fallback", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 21 }, art)
 		local glow = new("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -489,7 +519,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			Name = "Picture",
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
-			ScaleType = Enum.ScaleType.Fit, -- (whole: a phone's box is wider than the pictures)
+			ScaleType = L.ArtScale, -- (whole on a phone: its box is wider than the pictures)
 			ZIndex = 23,
 		}, art)
 		local tagBack = new("Frame", {
@@ -512,7 +542,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			local arrow = new("TextButton", {
 				Name = if step < 0 then "Back" else "Next",
 				AnchorPoint = Vector2.new(side, 0.5),
-				Position = UDim2.new(side, if step < 0 then L.Pad + 6 else -L.Pad - 6, 0, L.Pad + artH / 2),
+				Position = UDim2.new(side, if step < 0 then L.Pad else -L.Pad, 0, artH / 2),
 				Size = UDim2.fromOffset(math.floor(L.Title * 0.75), math.floor(L.Title * 1.4)),
 				BackgroundColor3 = INK,
 				BackgroundTransparency = 0.25,
@@ -528,8 +558,8 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 				show(current + step)
 			end)
 		end
-		local textTop = L.Pad + artH + math.floor(L.Title * 0.6)
-		local textLeft = L.Pad + 14
+		local textTop = artH + math.floor(L.Title * 0.35)
+		local textLeft = L.Pad + 10
 		local title = label(slide, "", L.Title, TEXT, Enum.Font.GothamBlack, {
 			Name = "Title",
 			Position = UDim2.fromOffset(textLeft, textTop),
@@ -539,7 +569,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			ZIndex = 22,
 		})
-		local line = label(slide, "", L.Line, DIM, Enum.Font.GothamMedium, {
+		local line = label(slide, "", L.Line, Color3.fromRGB(196, 202, 216), Enum.Font.GothamMedium, {
 			Name = "Line",
 			Position = UDim2.fromOffset(textLeft, textTop + L.Title + 14),
 			Size = UDim2.new(1, -2 * textLeft, 0, L.Line * 3 + 8),
@@ -550,15 +580,14 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			Name = "Action",
 			Position = UDim2.fromOffset(textLeft, bottom),
 			Size = UDim2.fromOffset(L.Button * 4, L.Button),
-			BackgroundColor3 = PANEL,
+			BackgroundColor3 = GOLD,
 			Font = Enum.Font.GothamBlack,
 			Text = "",
 			TextSize = L.ButtonText,
-			TextColor3 = GOLD,
+			TextColor3 = INK,
 			ZIndex = 22,
 		}, slide)
-		round(button, 10)
-		stroke(button, GOLD, 2)
+		round(button, 12)
 		button.Activated:Connect(function()
 			act(banners[current])
 		end)
