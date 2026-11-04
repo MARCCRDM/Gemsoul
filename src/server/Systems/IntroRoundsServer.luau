@@ -167,16 +167,21 @@ IntroRoundsServer._rivalUp = rivalUp
 -- One look at `player` (the watch's): moves them on if they're stuck in
 -- the intro's Arena. `since` remembers since when; returns what it did.
 local stuckSince = {} :: { [Player]: number }
+-- (the set won in this Arena visit: out by itself if nothing takes them,
+-- whatever's next; later practice is never cut short)
+local setDone = {} :: { [Player]: boolean }
+IntroRoundsServer._setDone = setDone
 function IntroRoundsServer.unstick(player: Player, now: number): string?
 	local profile = PlayerData.get(player) :: any
 	if not profile or player:GetAttribute("CombatSession") ~= "Training" then
 		stuckSince[player] = nil
+		setDone[player] = nil
 		return nil
 	end
 	local left = IntroRoundsServer.left(player)
 	if left == 0 then
 		-- (the set's done: HUNT BOUNTY or CONTINUE should have taken them out)
-		if profile.IntroFinale ~= "Mines" and profile.IntroFinale ~= "Dungeon" then
+		if profile.IntroFinale ~= "Mines" and profile.IntroFinale ~= "Dungeon" and not setDone[player] then
 			stuckSince[player] = nil
 			return nil
 		end
@@ -197,6 +202,7 @@ function IntroRoundsServer.unstick(player: Player, now: number): string?
 	end
 	stuckSince[player] = nil
 	if left == 0 then
+		setDone[player] = nil
 		IntroRoundsServer._leave(player)
 		return "Out"
 	end
@@ -672,6 +678,7 @@ function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 	end
 	local done = state.Won >= IntroRounds.Count
 	if done then
+		setDone[player] = true
 		PlayerData.addCoins(player, IntroRounds.SetCoins, "Tutorial")
 		event.Coins = IntroRounds.SetCoins
 	end
@@ -883,6 +890,7 @@ function IntroRoundsServer.start()
 	Players.PlayerRemoving:Connect(function(player)
 		warming[player] = nil
 		huntPending[player] = nil
+		setDone[player] = nil
 	end)
 	require(script.Parent.Duelist).IntroRounds = IntroRoundsServer
 	Shop.register("IntroRoundNext", nextRound)

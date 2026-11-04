@@ -324,8 +324,13 @@ do
 	profile.IntroFinale = "Mines"
 	check(Server.unstick(player, 500) == nil, "Taken out the moment the set was done (the card's CONTINUE first)")
 	check(Server.unstick(player, 500 + Server.DoneOutAfter + 1) == "Out" and leaves == 1, "Left in the Arena after the set")
-	-- Practice after the intro: never moved.
+	-- The set just won after the lobby's intro (the first dungeon taken at
+	-- round 3, the rest finished later): out by itself all the same.
 	profile.IntroFinale = "Done"
+	Server._setDone[player] = true
+	check(Server.unstick(player, 600) == nil, "Taken out the moment the late set was done")
+	check(Server.unstick(player, 600 + Server.DoneOutAfter + 1) == "Out" and leaves == 2, "Stuck in the Arena after finishing the set late")
+	-- Practice after the intro: never moved.
 	check(Server.unstick(player, 1000) == nil and Server.unstick(player, 2000) == nil, "A veteran's practice was cut short")
 	attributes.CombatSession = nil
 	check(Server.unstick(player, 3000) == nil, "Moved someone not in the Arena")
