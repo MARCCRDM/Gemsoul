@@ -262,11 +262,14 @@ local GemClient = {
 }
 -- The narrator: the starter roll's line ("These are your kaiju..."), how
 -- long it takes (0: none here, as when it's already been read).
-local narrated, narrationSeconds = {}, 0
+local narrated, narrationSeconds, voiced = {}, 0, true
 local Narration = {
 	play = function(name)
 		table.insert(narrated, name)
 		return narrationSeconds
+	end,
+	voiced = function()
+		return voiced
 	end,
 }
 local stubs = {
@@ -637,6 +640,24 @@ for _ = 1, 120 do
 	end
 end
 check(spunDown and reelAt() ~= still, "The reels didn't spin once the narration was done")
+-- With no voice uploaded yet (only its words show): no wait, they spin at once.
+table.clear(frames)
+table.clear(delayed)
+table.clear(tweens)
+table.clear(narrated)
+voiced = false
+root:FindFirstChild("KaijuRoll"):Destroy()
+local KaijuRoll5 = loadRoll()
+KaijuRoll5.play(function() end)
+gui = root:FindFirstChild("KaijuRoll")
+cards = cardsOf(gui)
+check(narrated[1] == "KaijuTeam", "The line's words didn't show")
+still = reelAt()
+step(1)
+check(reelAt() ~= still, "The reels sat still waiting on a voice that isn't there")
+step(4)
+check(landed(cards[1]) and landed(cards[3]), "The kaiju didn't land by themselves without the voice")
+voiced = true
 narrationSeconds = 0
 -- (A boss's roll and a test roll have no narration.)
 do

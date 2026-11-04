@@ -12,6 +12,7 @@
 	                                    long it takes (0: already read)
 	  Narration.say(name)               the same, and waits till it's done
 	  Narration.stop()
+	  Narration.voiced(name) -> bool     its voice is uploaded (Ids)
 
 	Roblox only plays uploaded audio: tools/upload_audio.py uploads the
 	files and writes each id below. Until a line's id is set, only its
@@ -124,6 +125,11 @@ function Narration.play(name: string): number
 		end
 	end)
 	return seconds
+end
+
+-- Whether `name` has its voice uploaded (else only its words show).
+function Narration.voiced(name: string): boolean
+	return (Narration.Ids[name] or 0) ~= 0
 end
 
 -- Reads it and waits till it's done (or something else cuts it off).

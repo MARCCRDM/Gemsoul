@@ -1039,7 +1039,10 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 	local hold = 0
 	if not preview and not boss and not rare then
 		local ok, seconds = pcall(Narration.play, "KaijuTeam")
-		hold = if ok and type(seconds) == "number" then seconds else 0
+		-- (held still only while the voice speaks: with no voice uploaded
+		-- yet, just its words show and the reels spin at once)
+		local voiced = pcall(Narration.voiced, "KaijuTeam") and Narration.voiced("KaijuTeam")
+		hold = if ok and voiced and type(seconds) == "number" then seconds else 0
 	end
 	-- All three spin; the first stops, then the next, then the last, each on
 	-- yours, which lands and lets its E move out.
