@@ -28,6 +28,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -108,6 +109,19 @@ local function label(parent: Instance, text: string, size: number, color: Color3
 	end
 	return l
 end
+
+-- How wide `text` is in `font` at `size` (buttons are sized to their words
+-- by hand: AutomaticSize on a padded TextButton came out zero wide).
+local function widthOf(text: string, size: number, font: Enum.Font): number
+	local ok, bounds = pcall(function()
+		return TextService:GetTextSize(text, size, font, Vector2.new(2000, 200))
+	end)
+	if ok and typeof(bounds) == "Vector2" then
+		return math.ceil(bounds.X)
+	end
+	return math.ceil(#text * size * 0.68)
+end
+MainMenu.widthOf = widthOf
 
 -- A banner's tag: its live one (the DEV desk lit) or its own.
 local function tagOf(banner): string
@@ -255,7 +269,9 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		p.Fallback.Visible = id == 0
 		p.FallbackWord.Text = banner.Tag
 		p.FallbackGlow.BackgroundColor3 = banner.TagColor
+		local L = LAYOUTS[drawn or "Desk"]
 		p.Tag.Text = tagOf(banner)
+		p.TagBack.Size = UDim2.fromOffset(widthOf(p.Tag.Text, L.Tag, Enum.Font.GothamBlack) + 26, L.Tag + 14)
 		p.TagBack.BackgroundColor3 = banner.TagColor
 		p.Title.Text = banner.Title
 		p.Line.Text = if drawn == "Phone" then banner.Short or banner.Line else banner.Line
@@ -265,9 +281,11 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		local several = #codes > 1
 		p.Button.Visible = not several
 		p.Button.Text = string.upper(banner.Button or "") .. "  ›"
+		p.Button.Size = UDim2.fromOffset(widthOf(p.Button.Text, L.ButtonText, Enum.Font.GothamBlack) + 48, L.Button)
 		for i, chip in p.Chips do
 			chip.Visible = several and codes[i] ~= nil
 			chip.Text = codes[i] or ""
+			chip.Size = UDim2.fromOffset(widthOf(chip.Text, L.ButtonText, Enum.Font.GothamBlack) + 30, L.Button)
 		end
 		for i, dot in p.Dots do
 			dot.Visible = i <= #banners
@@ -477,17 +495,15 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		local tagBack = new("Frame", {
 			Name = "Tag",
 			Position = UDim2.fromOffset(L.Pad + 14, L.Pad + 14),
-			Size = UDim2.fromOffset(0, L.Tag + 14),
-			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromOffset(100, L.Tag + 14),
 			BackgroundColor3 = GOLD,
 			ZIndex = 24,
 		}, slide)
 		round(tagBack, 8)
-		new("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, tagBack)
 		local tag = label(tagBack, "", L.Tag, INK, Enum.Font.GothamBlack, {
-			Size = UDim2.fromScale(0, 1),
-			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromScale(1, 1),
 			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 25,
 		})
@@ -533,8 +549,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		local button = new("TextButton", {
 			Name = "Action",
 			Position = UDim2.fromOffset(textLeft, bottom),
-			Size = UDim2.fromOffset(0, L.Button),
-			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromOffset(L.Button * 4, L.Button),
 			BackgroundColor3 = PANEL,
 			Font = Enum.Font.GothamBlack,
 			Text = "",
@@ -544,7 +559,6 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		}, slide)
 		round(button, 10)
 		stroke(button, GOLD, 2)
-		new("UIPadding", { PaddingLeft = UDim.new(0, 22), PaddingRight = UDim.new(0, 22) }, button)
 		button.Activated:Connect(function()
 			act(banners[current])
 		end)
@@ -566,8 +580,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		for i = 1, 3 do
 			local chip = new("TextButton", {
 				Name = "Code" .. i,
-				Size = UDim2.fromOffset(0, L.Button),
-				AutomaticSize = Enum.AutomaticSize.X,
+				Size = UDim2.fromOffset(L.Button * 3, L.Button),
 				BackgroundColor3 = GOLD,
 				Font = Enum.Font.GothamBlack,
 				Text = "",
@@ -577,7 +590,6 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 				ZIndex = 23,
 			}, chipRow)
 			round(chip, 10)
-			new("UIPadding", { PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14) }, chip)
 			chip.Activated:Connect(function()
 				if chip.Text ~= "" then
 					redeem(chip.Text)

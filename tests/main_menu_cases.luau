@@ -332,7 +332,9 @@ check(not find(slide, "Action").Visible, "One button for a banner of three codes
 for i, code in { "TRISKULL", "BRIGHTSTEEL", "STEAMHIDE" } do
 	local chip = find(slide, "Code" .. i)
 	check(chip.Visible and chip.Text == code, "No button for code " .. code)
+	check(chip.Size.X.Offset >= #code * 10, "Code " .. code .. "'s button squashed")
 end
+check(not fs.readFile(ROOT .. "/src/client/Modules/MainMenu.luau"):find("AutomaticSize = Enum.AutomaticSize.X", 1, true), "A button still sized by AutomaticSize")
 check(find(slide, "Fallback").Visible, "No stand-in while its picture isn't uploaded")
 replies.RedeemCode = function(code)
 	return { Ok = true, Message = "Code " .. code .. ": Legendary Triskull (#7 of 100)" }
@@ -417,6 +419,10 @@ menu.page(nil)
 menu.show(4)
 check(find(slide, "Title").Text == "HUNT THE BOSSES", "Not the bounty banner")
 table.clear(after)
+-- (each button as wide as its words: never squashed to nothing)
+local hunt = find(slide, "Action")
+check(hunt.Size.X.Offset >= 80 and hunt.AutomaticSize == roblox.Enum.AutomaticSize.None, "HUNT's button isn't sized to its words: " .. hunt.Size.X.Offset)
+check(find(slide, "Tag").Size.X.Offset >= 60, "The tag isn't sized to its words")
 fire(find(slide, "Action"), "Activated")
 check(played == 3 and after[1] == "Board:Bounty", "HUNT didn't go in and open the bounty board")
 menu.show(5)
