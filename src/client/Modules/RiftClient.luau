@@ -2100,7 +2100,52 @@ local function tick()
 end
 
 local toldFirst = false -- (the first dungeon's line: said once)
-RiftClient.FirstLineAfter = 1.5 -- (seconds in, for the crossing to clear)
+RiftClient.FirstLineAfter = 0.6 -- (seconds after the screen's clear, before the line)
+RiftClient.FirstHoldMax = 15 -- (seconds held still, at most)
+
+-- The player's movement on or off (Roblox's PlayerModule controls).
+local function controlsOn(on: boolean)
+	pcall(function()
+		local scripts = player:FindFirstChild("PlayerScripts")
+		local module = scripts and scripts:FindFirstChild("PlayerModule")
+		local controls = module and require(module):GetControls()
+		if controls then
+			if on then
+				controls:Enable()
+			else
+				controls:Disable()
+			end
+		end
+	end)
+end
+
+-- The first dungeon's arrival: wait till they can see (the loading screen
+-- and the crossing gone), then the narrator's line with them held still in
+-- the landing (no walking into the boss mid-line), then free to go.
+function RiftClient.firstArrival()
+	local started = os.clock()
+	pcall(function()
+		require(script.Parent.LoadingFlow).waitClear(30)
+	end)
+	while cover and cover.Parent and os.clock() - started < 30 do
+		task.wait(0.1)
+	end
+	task.wait(RiftClient.FirstLineAfter)
+	if player:GetAttribute("RiftRun") == nil then
+		return
+	end
+	controlsOn(false)
+	local done = false
+	task.spawn(function()
+		pcall(Narration.say, "FirstDungeon")
+		done = true
+	end)
+	local held = os.clock()
+	while not done and os.clock() - held < RiftClient.FirstHoldMax and player:GetAttribute("RiftRun") ~= nil do
+		task.wait(0.1)
+	end
+	controlsOn(true)
+end
 local function changed()
 	local now = player:GetAttribute("RiftRun") ~= nil
 	if now and not inside then
@@ -2128,15 +2173,13 @@ local function changed()
 	if inside then
 		refreshStrip()
 		refreshDown()
-		-- A new miner's first dungeon (no caves: RiftRun.FirstRooms): the
-		-- narrator, once the crossing's cleared, on what these monsters are.
+		-- A new miner's first dungeon (no caves: RiftRun.FirstRooms): first
+		-- in (the loading screen and the crossing gone), standing in the
+		-- landing; then the narrator, on what these monsters are, held still
+		-- till it's done; then the walk into the boss's room.
 		if player:GetAttribute("RiftRooms") == RiftRun.FirstRooms and RiftRun.FirstRooms < RiftRun.Rooms and not toldFirst then
 			toldFirst = true
-			task.delay(RiftClient.FirstLineAfter, function()
-				if player:GetAttribute("RiftRun") ~= nil then
-					pcall(Narration.play, "FirstDungeon")
-				end
-			end)
+			task.spawn(RiftClient.firstArrival)
 		end
 	end
 end

@@ -1177,7 +1177,15 @@ do
 		check(riftClient:find('Rooms = player:GetAttribute("RiftRooms") or RiftRun.Rooms', 1, true) ~= nil, "The strip doesn't read the run's caves")
 		-- And the narrator, once in: what these monsters are.
 		check(riftClient:find('player:GetAttribute("RiftRooms") == RiftRun.FirstRooms and RiftRun.FirstRooms < RiftRun.Rooms and not toldFirst', 1, true) ~= nil
-			and riftClient:find('pcall(Narration.play, "FirstDungeon")', 1, true) ~= nil, "No narration on arriving in the first dungeon")
+			and riftClient:find("task.spawn(RiftClient.firstArrival)", 1, true) ~= nil, "No narration on arriving in the first dungeon")
+		-- (once they can see, held still in the landing till it's said)
+		local arrival = riftClient:find("function RiftClient.firstArrival()", 1, true)
+		local body = arrival and riftClient:sub(arrival, riftClient:find("\nend\n", arrival, true)) or ""
+		local clear = body:find("waitClear", 1, true)
+		local hold = body:find("controlsOn(false)", 1, true)
+		local say = body:find('pcall(Narration.say, "FirstDungeon")', 1, true)
+		local free = body:find("controlsOn(true)", 1, true)
+		check(clear and hold and say and free and clear < hold and hold < say and say < free, "The first dungeon's line plays under the loading screen, or with them free to walk into the boss")
 	end
 	-- The boss takes turns on the kaiju too (Shared.Aggro's turns, each
 	-- kaiju's own threat: KaijuServer.strike; Duelist's PetTarget).
