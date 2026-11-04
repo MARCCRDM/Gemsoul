@@ -25,12 +25,10 @@ local MainMenuContent = {}
 
 -- Roblox ids of the uploaded pictures (assets/images/menu). 0 = not uploaded yet.
 MainMenuContent.Images = {
-	KaijuCodes = 0, -- kaiju_codes.png
-	DevBooth = 0, -- dev_booth.png
-	Updates = 0, -- updates.png
-	Bounty = 0, -- bounty.png
-	Ranked = 0, -- ranked.png
-	Pickaxe = 0, -- pickaxe_code.png
+	KaijuCodes = 129194255262205, -- kaiju_codes.png
+	DevBooth = 137948280938606, -- dev_booth.png
+	Updates = 75634600141967, -- updates.png
+	Pickaxe = 109495894337355, -- pickaxe_code.png
 }
 
 local GOLD = Color3.fromRGB(255, 202, 91)
@@ -77,26 +75,6 @@ MainMenuContent.Banners = {
 		Short = "Kaiju team · Bounty hunts · Glacier Dome · Thunder Aura",
 		Button = "SEE ALL UPDATES",
 		Action = { Kind = "Page", Page = "Updates" },
-	},
-	{
-		Id = "Bounty",
-		Tag = "BOUNTY",
-		TagColor = Color3.fromRGB(120, 230, 140),
-		Title = "HUNT THE BOSSES",
-		Line = "Ten bosses behind the Rift Gates. Beat them for boss caches and new kaiju.",
-		Short = "Ten bosses behind the Rift Gates. Boss caches and new kaiju.",
-		Button = "HUNT",
-		Action = { Kind = "Bounty" },
-	},
-	{
-		Id = "Ranked",
-		Tag = "RANKED",
-		TagColor = GOLD,
-		Title = "CLIMB 1V1 RANKED",
-		Line = "Win duels, climb the ranks and unlock the reward track.",
-		Short = "Win duels, climb the ranks, unlock the reward track.",
-		Button = "PLAY RANKED",
-		Action = { Kind = "Ranked" },
 	},
 	{
 		Id = "Pickaxe",

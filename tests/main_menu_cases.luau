@@ -132,8 +132,11 @@ local desk = {
 	GetAttribute = function(_, name)
 		return if name == "DevOnline" then deskOnline else nil
 	end,
-	IsA = function()
-		return false
+	IsA = function(_, class)
+		return class == "Model"
+	end,
+	GetPivot = function()
+		return roblox.CFrame.new(10, 0, 10)
 	end,
 	FindFirstChildWhichIsA = function()
 		return nil
@@ -335,7 +338,11 @@ for i, code in { "TRISKULL", "BRIGHTSTEEL", "STEAMHIDE" } do
 	check(chip.Size.X.Offset >= #code * 10, "Code " .. code .. "'s button squashed")
 end
 check(not fs.readFile(ROOT .. "/src/client/Modules/MainMenu.luau"):find("AutomaticSize = Enum.AutomaticSize.X", 1, true), "A button still sized by AutomaticSize")
-check(find(slide, "Fallback").Visible, "No stand-in while its picture isn't uploaded")
+-- (its uploaded picture, no stand-in)
+check(find(slide, "Picture").Image == "rbxassetid://" .. Content.Images.KaijuCodes and not find(slide, "Fallback").Visible, "The banner's picture isn't shown")
+for _, b in Content.Banners do
+	check((Content.Images[b.Id] or 0) ~= 0, "No picture uploaded for " .. b.Id)
+end
 replies.RedeemCode = function(code)
 	return { Ok = true, Message = "Code " .. code .. ": Legendary Triskull (#7 of 100)" }
 end
@@ -416,27 +423,27 @@ check(played == 1, "PLAY didn't go in")
 inputBegan:Fire({ KeyCode = roblox.Enum.KeyCode.Return }, false)
 check(played == 2, "Enter didn't go in")
 menu.page(nil)
+check(#menu.banners == 4, "Not the four banners: " .. #menu.banners)
 menu.show(4)
-check(find(slide, "Title").Text == "HUNT THE BOSSES", "Not the bounty banner")
-table.clear(after)
+check(find(slide, "Title").Text == "FREE THUNDERCLAP PICKAXE", "Not the pickaxe banner")
 -- (each button as wide as its words: never squashed to nothing)
-local hunt = find(slide, "Action")
-check(hunt.Size.X.Offset >= 80 and hunt.AutomaticSize == roblox.Enum.AutomaticSize.None, "HUNT's button isn't sized to its words: " .. hunt.Size.X.Offset)
-check(find(slide, "Tag").Size.X.Offset >= 60, "The tag isn't sized to its words")
-fire(find(slide, "Action"), "Activated")
-check(played == 3 and after[1] == "Board:Bounty", "HUNT didn't go in and open the bounty board")
-menu.show(5)
-fire(find(slide, "Action"), "Activated")
-check(played == 4 and after[2] == "Picker", "PLAY RANKED didn't go in and open the picker")
+local redeemButton = find(slide, "Action")
+check(redeemButton.Visible and redeemButton.Size.X.Offset >= 120 and redeemButton.AutomaticSize == roblox.Enum.AutomaticSize.None, "REDEEM THUNDER's button isn't sized to its words: " .. redeemButton.Size.X.Offset)
+check(find(slide, "Tag").Size.X.Offset >= 50, "The tag isn't sized to its words")
+replies.RedeemCode = { Ok = true, Message = "Code THUNDER: Thunderclap (#3 of 100)" }
+fire(redeemButton, "Activated")
+last = requests[#requests]
+check(last[1] == "RedeemCode" and last[2] == "THUNDER" and played == 2, "REDEEM THUNDER didn't redeem it there and then")
+-- GO TO THE BOOTH: in, then the arrows to the DEV desk.
+table.clear(after)
 menu.show(2)
 fire(find(slide, "Action"), "Activated")
-check(after[3] == "Guide:MenuBooth" or after[3] == nil, "GO TO THE BOOTH did something else")
--- (still in the intro: in, nothing opened over it)
+check(played == 3 and after[1] == "Guide:MenuBooth", "GO TO THE BOOTH didn't go in and lead to the booth")
+-- (still in the intro: in, nothing over it)
 GemClient.Profile = { Intro = { Done = false } }
 table.clear(after)
-menu.show(4)
 fire(find(slide, "Action"), "Activated")
-check(#after == 0, "The bounty board opened in the middle of the intro")
+check(played == 4 and #after == 0, "The booth's arrows came up in the middle of the intro")
 
 -- A phone: drawn again in its own layout.
 SCREEN = Vector2.new(844, 390)
