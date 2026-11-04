@@ -65,6 +65,7 @@ else
 end
 -- The onboarding funnel (analytics) listens for loads, so it starts first.
 require(script.Parent.Systems.Funnel).start()
+require(game:GetService("ReplicatedStorage").Shared.VoiceVolume).start() -- (voice chat louder, fading gently; the client runs it too)
 -- A new player's first session as a journey (Systems/Journey: Creator Dashboard > Journeys).
 require(script.Parent.Systems.Journey).listen()
 -- Coins, feature events and the Store funnel (Creator Dashboard > Analytics).

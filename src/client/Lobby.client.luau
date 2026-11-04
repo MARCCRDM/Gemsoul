@@ -43,6 +43,9 @@ GemClient.Changed:Connect(LoadingFlow.progress)
 SparKit.start()
 -- Robbed while down: what the critters took (RobReport).
 require(script.Parent.Modules.RobReport).start()
+pcall(function() -- (voice chat louder, fading gently: Shared.VoiceVolume, the server runs it too)
+	require(game:GetService("ReplicatedStorage").Shared.VoiceVolume).start()
+end)
 -- The quarry's edge, for now: a dome that says the expansion's coming.
 require(script.Parent.Modules.EdgeDome).start()
 
