@@ -83,6 +83,12 @@ do
 	check(w and client:find("ownControls(false)", w, true), "Watching leaves the watcher's own controls on")
 	check(st and client:find("ownControls(true)", st, true) and client:find("controls:Disable()", 1, true) and client:find("controls:Enable()", 1, true), "Stopping doesn't give the watcher their controls back")
 	check(client:find('SetAttribute("DevWatching"', 1, true) ~= nil, "Nothing tells the fight view someone's being watched")
+	-- VIEW: behind them or through their eyes; their eyes is a scripted camera
+	-- on their head (where they face), never the watcher's mouse, their head
+	-- hidden on the watcher's screen only, and put back after.
+	check(client:find('"VIEW: THEIR EYES"', 1, true) and client:find('"VIEW: BEHIND"', 1, true), "No choice of view while watching")
+	check(client:find("Enum.CameraType.Scriptable", 1, true) and client:find("head.CFrame * CFrame.new(", 1, true), "Their eyes isn't a camera on their head")
+	check(client:find("LocalTransparencyModifier = 1", 1, true) and st and client:find("unveil()", st, true), "Their head stays in the way, or stays hidden after")
 	local combat = fs.readFile(ROOT .. "/src/client/Combat.client.luau")
 	check(combat:find('and not player:GetAttribute("DevWatching")', 1, true) ~= nil, "The fight view stays on while watching someone")
 end

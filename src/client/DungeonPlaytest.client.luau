@@ -518,10 +518,11 @@ task.spawn(function()
 	end
 end)
 
--- WATCH (Owners only: Server.DevSpectate checks it): the camera behind
--- another player in this server, third person, to see what they do. PREV /
--- NEXT go through who's here, STOP brings the camera back. A line at the
--- top says who and where they are.
+-- WATCH (Owners only: Server.DevSpectate checks it): the camera on another
+-- player in this server, to see what they do: behind them, or through their
+-- eyes (VIEW). Only a camera: your own controls are off while watching, and
+-- nothing you press moves them. PREV / NEXT go through who's here, STOP
+-- brings the camera back. A line at the top says who and where they are.
 do
 	local caption = Instance.new("TextLabel")
 	caption.Size = UDim2.fromOffset(96, 26)
@@ -564,6 +565,49 @@ do
 	joinButton.Visible = false
 	joinButton.Parent = gui
 	corner(joinButton, 6)
+	-- VIEW: BEHIND them (third person) or THEIR EYES (first person, looking
+	-- where their character looks). Either way it's only a camera: your
+	-- mouse and keys never steer it, nor them.
+	local pov = "Behind"
+	local povButton = Instance.new("TextButton")
+	povButton.Name = "WatchView"
+	povButton.AnchorPoint = Vector2.new(1, 0)
+	povButton.Position = UDim2.new(0.5, -266, 0, 6)
+	povButton.Size = UDim2.fromOffset(150, 30)
+	povButton.BackgroundColor3 = Color3.fromRGB(36, 48, 70)
+	povButton.TextColor3 = Color3.fromRGB(236, 240, 248)
+	povButton.Font = Enum.Font.GothamBlack
+	povButton.TextSize = 13
+	povButton.Text = "VIEW: BEHIND"
+	povButton.Visible = false
+	povButton.Parent = gui
+	corner(povButton, 6)
+	-- (their head and what's on it, hidden on your screen only, in their eyes)
+	local veiled: { [BasePart]: boolean } = {}
+	local function unveil()
+		for part in veiled do
+			if part.Parent then
+				part.LocalTransparencyModifier = 0
+			end
+		end
+		table.clear(veiled)
+	end
+	local function veil(character: Model)
+		local head = character:FindFirstChild("Head")
+		if head and head:IsA("BasePart") then
+			head.LocalTransparencyModifier = 1
+			veiled[head] = true
+		end
+		for _, accessory in character:GetChildren() do
+			if accessory:IsA("Accessory") then
+				local handle = accessory:FindFirstChild("Handle")
+				if handle and handle:IsA("BasePart") then
+					handle.LocalTransparencyModifier = 1
+					veiled[handle] = true
+				end
+			end
+		end
+	end
 	local function others(): { Player }
 		local list = {}
 		for _, other in Players:GetPlayers() do
@@ -632,8 +676,11 @@ do
 		end
 		target = nil
 		ownControls(true)
+		unveil()
+		camera.CameraType = Enum.CameraType.Custom
 		banner.Visible = false
 		joinButton.Visible = false
+		povButton.Visible = false
 		game:GetService("RunService"):UnbindFromRenderStep("DevWatch")
 		pcall(function()
 			request:InvokeServer("DevSpectate", nil)
@@ -659,18 +706,30 @@ do
 		saved = saved or { player.CameraMode, player.CameraMaxZoomDistance, player.CameraMinZoomDistance }
 		target = other
 		ownControls(false)
+		unveil()
 		banner.Visible = true
+		povButton.Visible = true
 		status.Text = result.Message
 		-- (each frame: other scenes set the camera too; this one wins while watching)
-		game:GetService("RunService"):BindToRenderStep("DevWatch", Enum.RenderPriority.Camera.Value - 2, function()
+		game:GetService("RunService"):BindToRenderStep("DevWatch", Enum.RenderPriority.Camera.Value + 5, function(dt)
 			if not target or not target.Parent then
 				stop()
 				return
 			end
 			joinButton.Visible = target:GetAttribute("RiftRun") ~= nil and player:GetAttribute("RiftRun") ~= target:GetAttribute("RiftRun")
-			local humanoid = target.Character and target.Character:FindFirstChildOfClass("Humanoid")
-			if humanoid then
-				player.CameraMode = Enum.CameraMode.Classic
+			local character = target.Character
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			local head = character and character:FindFirstChild("Head")
+			player.CameraMode = Enum.CameraMode.Classic
+			if pov == "Eyes" and head and head:IsA("BasePart") then
+				-- (from just in front of their eyes, the way their head faces;
+				-- smoothed, so their steps don't shake it)
+				veil(character)
+				camera.CameraType = Enum.CameraType.Scriptable
+				local goal = head.CFrame * CFrame.new(0, 0.25, -0.7)
+				camera.CFrame = camera.CFrame:Lerp(goal, math.min(1, dt * 14))
+			elseif humanoid then
+				unveil()
 				player.CameraMaxZoomDistance = 45
 				player.CameraMinZoomDistance = 6
 				camera.CameraType = Enum.CameraType.Custom
@@ -680,6 +739,13 @@ do
 			end
 		end)
 	end
+	povButton.Activated:Connect(function()
+		pov = if pov == "Behind" then "Eyes" else "Behind"
+		povButton.Text = if pov == "Eyes" then "VIEW: THEIR EYES" else "VIEW: BEHIND"
+		if pov == "Behind" then
+			unveil()
+		end
+	end)
 	local function step(by: number)
 		local list = others()
 		if #list == 0 then
