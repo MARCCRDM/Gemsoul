@@ -103,6 +103,7 @@ end
 local pointing: string? = nil -- (the set of arrows up: "Abilities" / "Combat")
 local narrating = false -- (the hints wait while the narrator speaks)
 local opened = false
+local OPEN_WAIT = 25 -- seconds the opening waits for the fight to be in view, at most
 
 -- Round 1's opening: the welcome, then the controls with the arrows.
 local function opening()
@@ -112,6 +113,25 @@ local function opening()
 	opened = true
 	narrating = true
 	gui.Enabled, shown = false, nil
+	-- Not under the loading screen or the drop: once the fight's in view,
+	-- its HUD up (the sparring rival's or another new miner's, a matched
+	-- first fight: the same opening). At most OpenWait seconds.
+	local waited = os.clock()
+	while os.clock() - waited < OPEN_WAIT do
+		local hud = player.PlayerGui:FindFirstChild("CombatHud")
+		local inView = player:GetAttribute("IntroCover") == nil
+			and player:GetAttribute("ArenaDropUntil") == nil
+			and hud ~= nil
+			and (not hud:IsA("ScreenGui") or hud.Enabled)
+		if inView or player:GetAttribute("FirstFight") ~= true then
+			break
+		end
+		task.wait(0.1)
+	end
+	if player:GetAttribute("FirstFight") ~= true then
+		narrating = false
+		return
+	end
 	pcall(Narration.say, "TrainingBegins")
 	if player:GetAttribute("FirstFight") == true then
 		local ok, seconds = pcall(Narration.play, "Controls")

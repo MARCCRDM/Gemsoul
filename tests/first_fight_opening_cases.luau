@@ -236,9 +236,15 @@ end
 step(1)
 check(#said == 0 and up() == "", "The opening played before the first fight")
 
--- Round 1 starts.
+-- Round 1 starts, the drop still on (a matched first fight is marked at
+-- the match, before its drop): the welcome waits till the fight's in view.
+player:SetAttribute("ArenaDropUntil", 99)
 player:SetAttribute("FirstFight", true)
-check(said[1] and said[1].Name == "TrainingBegins", "The welcome wasn't first")
+step(2)
+check(#said == 0, "The welcome played under the drop")
+player:SetAttribute("ArenaDropUntil", nil)
+step(0.1)
+check(said[1] and said[1].Name == "TrainingBegins", "The welcome wasn't first once the fight was in view")
 step(1)
 check(#said == 1 and up() == "", "The controls came before the welcome was done")
 check(not ringGui.Enabled, "A hint ring over the welcome")
