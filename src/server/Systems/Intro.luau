@@ -147,7 +147,6 @@ local function prepareLottery(player: Player, style, element)
 		end
 	end
 	PlayerData.sync(player)
-	Funnel.reach(player, "Element")
 	return reply(true, "Your chosen starter kit is ready!", { Lottery = reward })
 end
 local function quickStart(player: Player)

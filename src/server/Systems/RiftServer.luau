@@ -572,6 +572,14 @@ local function summonBoss(run)
 		return
 	end
 	run.Summoning = true
+	-- (a new miner's first dungeon: its boss, a funnel step: Server.Funnel)
+	for _, member in run.Members do
+		pcall(function()
+			if require(script.Parent.IntroRoundsServer).owesDungeon(member) then
+				require(script.Parent.Funnel).reach(member, "Dungeon boss")
+			end
+		end)
+	end
 	local arena = run.World.Boss
 	local at = arena.Center + Vector3.new(0, 0.5, 0)
 	announce(run, string.format("The ground splits open. %s is coming through!", run.Boss.Name))
@@ -1150,6 +1158,9 @@ local function join(run, player: Player)
 	end)
 	pcall(function()
 		require(script.Parent.Journey).reach(player, if intro then "Entered the first dungeon" else "Entered a dungeon")
+		if intro then
+			require(script.Parent.Funnel).reach(player, "Dungeon entered")
+		end
 	end)
 	if intro then
 		local ok, joined = pcall(KaijuServer.ensureStarter, player)

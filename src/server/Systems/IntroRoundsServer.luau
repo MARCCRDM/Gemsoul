@@ -387,6 +387,7 @@ function IntroRoundsServer.dungeonCleared(player: Player)
 	pcall(Analytics.event, player, "IntroDungeonCleared")
 	pcall(function()
 		require(script.Parent.Journey).reach(player, "Cleared the first dungeon")
+		require(script.Parent.Funnel).reach(player, "Dungeon cleared")
 	end)
 	return true
 end
@@ -628,6 +629,9 @@ function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 	Analytics.event(player, "IntroRound", round, slot, piece.Rarity, if done then "Done" else "Won")
 	pcall(function()
 		require(script.Parent.Journey).reach(player, if done then "Intro rounds all won" else string.format("Round %d won", round))
+		if round == 1 then
+			require(script.Parent.Funnel).reach(player, "Round 1 won")
+		end
 	end)
 	event.View = IntroRounds.view(state)
 	-- (the card's one way on: HUNT BOUNTY, while the first dungeon's owed)
@@ -771,6 +775,7 @@ function IntroRoundsServer.choose(player: Player, which: any)
 	pcall(Analytics.event, player, "IntroChoice", state.Won, which)
 	pcall(function()
 		require(script.Parent.Journey).reach(player, "Chose HUNT BOUNTY")
+		require(script.Parent.Funnel).reach(player, "Hunt bounty")
 	end)
 	local out = leaveRounds(player)
 	out.Choice = which

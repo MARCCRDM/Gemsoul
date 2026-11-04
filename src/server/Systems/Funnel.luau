@@ -3,17 +3,23 @@
 	session (Creator Dashboard > Analytics > Funnels > Onboarding). Each step
 	is logged once per account, in this order:
 
-	   1 Joined        a new account's profile loaded
-	   2 Style         picked a fighting style (the picker says so)
-	   3 Element       picked an element: the starter kit is rolled
-	   4 Kit           the kit is on, after the reveal
-	   5 First fight   the first fight is over (won, lost or left)
-	   6 Lobby         arrived in the Outpost lobby after it
-	   7 First rock    broke a rock
-	   8 First gem     a rock dropped a gem
-	   9 Socketed      put a gem in a gear socket
-	  10 Surge ready   put a gem in Q, E or R
-	  11 Second duel   played another duel after the first fight
+	   1 Joined           a new account's profile loaded
+	   2 Kit              the starter kit is on, after the move reveal
+	   3 First fight      intro round 1 is over (won, lost or left)
+	   4 Round 1 won      won it (Server.IntroRoundsServer)
+	   5 Hunt bounty      pressed HUNT BOUNTY on the rounds' card
+	   6 Dungeon entered  in the first dungeon (Server.RiftServer)
+	   7 Dungeon boss     its boss came for them
+	   8 Dungeon cleared  the boss is down
+	   9 Lobby            in the Outpost lobby after the first dungeon
+	  10 First rock       broke a rock
+	  11 First gem        a rock dropped a gem
+	  12 Socketed         put a gem in a gear socket
+	  13 Second duel      played another duel after the first fight
+
+	(Until 2026-11-04 the steps were Joined, Style, Element, Kit, First
+	fight, Lobby, First rock, First gem, Socketed, Surge ready, Second duel:
+	read the dashboard from that day on for these.)
 
 	Only accounts that join as new players are counted: profile.Funnel is
 	made on their first load, and holds the steps already logged, so a
@@ -32,25 +38,27 @@ local Funnel = {}
 
 Funnel.Steps = {
 	"Joined",
-	"Style",
-	"Element",
 	"Kit",
 	"First fight",
+	"Round 1 won",
+	"Hunt bounty",
+	"Dungeon entered",
+	"Dungeon boss",
+	"Dungeon cleared",
 	"Lobby",
 	"First rock",
 	"First gem",
 	"Socketed",
-	"Surge ready",
 	"Second duel",
 }
 local stepOf: { [string]: number } = {}
 for i, name in Funnel.Steps do
 	stepOf[name] = i
 end
--- Steps the client may report: only what happens in its own menus.
-Funnel.FromClient = { Style = true }
+-- Steps the client may report: only what happens in its own menus (none now).
+Funnel.FromClient = {}
 -- Tasks events (PlayerData.training) that are funnel steps.
-Funnel.FromTraining = { Mine = "First rock", MineGem = "First gem", Enchant = "Socketed", EquipSurge = "Surge ready" }
+Funnel.FromTraining = { Mine = "First rock", MineGem = "First gem", Enchant = "Socketed" }
 
 -- Accounts left out of the numbers (Server.DevAccounts sets it).
 Funnel.excluded = function(_player: Player): boolean
@@ -73,8 +81,9 @@ function Funnel.reach(player: Player, name: string): boolean
 	if not step or not done or done[name] then
 		return false
 	end
-	-- The lobby counts once the first fight is behind them.
-	if name == "Lobby" and not done["First fight"] then
+	-- The lobby counts once the first dungeon is behind them (on the way
+	-- into it they pass through the Outpost under the loading screen).
+	if name == "Lobby" and not done["Dungeon cleared"] then
 		return false
 	end
 	done[name] = true

@@ -10,7 +10,7 @@ import report  # noqa: E402
 
 DAY = 86400
 START = int(datetime(2026, 11, 1, tzinfo=timezone.utc).timestamp())
-STEPS = ['Joined', 'Style', 'Element', 'Kit', 'First fight', 'Lobby', 'First rock', 'First gem', 'Socketed', 'Surge ready', 'Second duel']
+STEPS = ['Joined', 'Kit', 'First fight', 'Round 1 won', 'Hunt bounty', 'Dungeon entered', 'Dungeon boss', 'Dungeon cleared', 'Lobby', 'First rock', 'First gem', 'Socketed', 'Second duel']
 
 
 def write(dir_, server, hour_t, rows):
@@ -25,7 +25,8 @@ def exact(dir_):
     for u in (1, 2):
         rows += [[START + 60, u, 'session_start', 0, 'new', 'US', None], [START + 660, u, 'session_end', 600, 3, 100, 80]]
         rows += [[START + 70, u, 'onboarding', 1, 'Joined', None, None]]
-    rows += [[START + 80, 1, 'onboarding', 2, 'Style', None, None]]
+    rows += [[START + 80, 1, 'onboarding', 2, 'Kit', None, None]]
+    rows += [[START + 81, 2, 'onboarding', 2, 'Style', None, None]]  # (the old list's step 2: not counted)
     rows += [[START + 90, 1, 'Purchase', 99, 'Coins10k', 'Robux', None], [START + 95, 2, 'Purchase', 1, 'Old', None, None]]
     rows += [[START + 100, 1, 'coins', 250, 'Duel', 'Gameplay', None], [START + 101, 1, 'coins', -50, 'Store', 'Shop', None]]
     rows += [[START + 102, 1, 'IntroRound', 1, 'Weapon', 'Rare', 'Won'], [START + 103, 2, 'IntroRound', 1, 'Weapon', 'Lost', 'Lost']]

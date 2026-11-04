@@ -1205,6 +1205,11 @@ do
 	for _, words in { "WELL DONE, MINER", "NICE HIT!", "BOUNTY CLAIMED", "YOUR KAIJU TEAM", "YOUR KAIJU DEFEND YOU" } do
 		check(finale:find(words, 1, true) == nil, "Still a praise card: " .. words)
 	end
+	-- The onboarding funnel's dungeon steps (Server.Funnel), reported where
+	-- they happen.
+	local rounds = fs.readFile(ROOT .. "/src/server/Systems/IntroRoundsServer.luau")
+	check(rounds:find('Funnel).reach(player, "Round 1 won")', 1, true) and rounds:find('Funnel).reach(player, "Hunt bounty")', 1, true) and rounds:find('Funnel).reach(player, "Dungeon cleared")', 1, true), "The rounds don't report their funnel steps")
+	check(server:find('Funnel).reach(player, "Dungeon entered")', 1, true) and server:find('Funnel).reach(member, "Dungeon boss")', 1, true), "The first dungeon doesn't report its funnel steps")
 	local intro = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
 	local p = intro:find("local function proceed()", 1, true)
 	local proceed = intro:sub(p, intro:find("\n\tend\n", p, true))

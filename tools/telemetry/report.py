@@ -17,6 +17,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
 
+
+# The onboarding funnel's steps, in order (Server.Funnel.Steps).
+FUNNEL_STEPS = ['Joined', 'Kit', 'First fight', 'Round 1 won', 'Hunt bounty', 'Dungeon entered', 'Dungeon boss',
+                'Dungeon cleared', 'Lobby', 'First rock', 'First gem', 'Socketed', 'Second duel']
+
 def day_of(t):
     return datetime.fromtimestamp(t, timezone.utc).strftime('%Y-%m-%d')
 
@@ -122,8 +127,12 @@ def build(rows, demo=False):
         elif e == 'device':
             devices[r['a'] or 'unknown'].add(r['u'])
         elif e == 'onboarding' and isinstance(r['v'], (int, float)):
-            funnel_users[int(r['v'])].add(r['u'])
-            funnel_names[int(r['v'])] = r['a']
+            # (today's steps only: before 2026-11-04 the same numbers had other
+            # names, Server.Funnel's old list)
+            step = int(r['v'])
+            if 1 <= step <= len(FUNNEL_STEPS) and r['a'] == FUNNEL_STEPS[step - 1]:
+                funnel_users[step].add(r['u'])
+                funnel_names[step] = r['a']
         elif e == 'IntroRound' and isinstance(r['v'], (int, float)):
             rd = rounds[int(r['v'])]
             rd['slot'] = r['a'] or rd['slot']

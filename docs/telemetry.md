@@ -33,8 +33,9 @@ new: one journey, **First session**, one session id each, every node once.
 Creator Dashboard > Analytics > Journeys draws them as a Sankey of the paths
 players take. Its nodes:
 
-- the onboarding steps (Joined, Element, Kit, First fight, Lobby, First rock,
-  First gem, Socketed, Surge ready, Second duel)
+- the onboarding steps (Joined, Kit, First fight, Round 1 won, Hunt bounty,
+  Dungeon entered, Dungeon boss, Dungeon cleared, Lobby, First rock, First
+  gem, Socketed, Second duel; from 2026-11-04, the first dungeon's steps in)
 - `Round N won` / `Round N lost` / `Intro rounds all won`
 - `Chose HUNT BOUNTY` or `Kept fighting after round N`
 - `Starter kaiju roll`, `Bounty kaiju roll`
