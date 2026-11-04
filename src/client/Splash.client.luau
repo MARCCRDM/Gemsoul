@@ -3,10 +3,11 @@
 	title art (assets/images/saga_title.png):
 	  1. the intro: the art zooms gently out of the dark over the theme
 	     song's build; the drop hits with a white flash and a punch;
-	  2. the title: the art floats gently, a glint sweeps across it now and
-	     then, stars twinkle around it, the song carries on from the drop, and
-	     "CLICK TO ENTER" blinks until you click, tap or press a key.
-	A click during the intro jumps straight to the title. Everything else
+	  2. the main menu (Modules/MainMenu), a moment after the drop: PLAY,
+	     GUIDE, UPDATES, FEEDBACK, CREDITS and the banners, over the stars,
+	     the song carrying on. PLAY (or Enter) goes in.
+	A click during the intro jumps straight to the menu. A new miner (the
+	fast start) never sees it: the drop, then straight in. Everything else
 	(the launch intro, the dashboard, the background music) waits until you
 	enter.
 
@@ -23,9 +24,10 @@ local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
 local Music = require(script.Parent.Modules.Music)
 
 local IMAGE_ID = 123729911771910 -- saga_title.png
-local LENGTH = 9.9 -- seconds of intro: six bars of the song
+local LENGTH = 9.9 -- seconds of intro: six bars of the song (the menu comes at MENU_AT)
 local BAR = 4 * 60 / 144.94
 local DROP = BAR -- the drop lands one bar in
+local MENU_AT = DROP + 0.8 -- the main menu, a moment after the drop
 -- The title loop is fight_theme (bars 81-97); the intro ends at bar 86.
 local TITLE_LOOP_FROM = 5 * BAR
 local BACKGROUND = Color3.fromRGB(12, 11, 23) -- the art's own edge colour
@@ -217,8 +219,12 @@ local function drop()
 	startLoop()
 end
 
--- The title: the art stays, the song carries on, CLICK TO ENTER blinks.
-local function showTitle(fromSkip: boolean)
+-- The title: the main menu over the stars (the art's in its panel now), the
+-- song carrying on. `quick`: a new miner on the way straight in, no menu.
+local menu = nil
+local enter: () -> ()
+local quickStart: boolean? = nil -- (a new miner going straight in: nil till the save's read)
+local function showTitle(fromSkip: boolean, quick: boolean?)
 	if phase ~= "Intro" then
 		return
 	end
@@ -240,44 +246,41 @@ local function showTitle(fromSkip: boolean)
 			TweenService:Create(titleMusic, TweenInfo.new(1.2), { Volume = 0.5 }):Play()
 		end
 	end
-	local prompt = Instance.new("TextLabel")
-	prompt.AnchorPoint = Vector2.new(0.5, 0)
-	prompt.Position = UDim2.fromScale(0.5, 0.8)
-	prompt.Size = UDim2.fromOffset(600, 40)
-	prompt.BackgroundTransparency = 1
-	prompt.Font = Enum.Font.Arcade
-	prompt.TextSize = 34
-	prompt.TextColor3 = GOLD
-	prompt.TextStrokeColor3 = Color3.fromRGB(59, 27, 109)
-	prompt.TextStrokeTransparency = 0
-	prompt.Text = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-		then "TAP TO ENTER"
-		else "CLICK TO ENTER"
-	prompt.ZIndex = 10
-	prompt.Parent = back
-	IronUi.animate(prompt, function(t)
-		-- A classic arcade blink: a soft pulse with a hard off-beat.
-		local pulse = 0.5 + 0.5 * math.sin(t * 4)
-		prompt.TextTransparency = if pulse < 0.12 then 1 else 0.25 * (1 - pulse)
+	if quick then
+		return
+	end
+	-- (the big art out, the menu with the logo in)
+	if art:IsA("ImageLabel") then
+		TweenService:Create(art, TweenInfo.new(0.3), { ImageTransparency = 1 }):Play()
+	end
+	task.delay(0.3, function()
+		stage.Visible = false
 	end)
-	local credit = Instance.new("TextLabel")
-	credit.AnchorPoint = Vector2.new(0.5, 1)
-	credit.Position = UDim2.new(0.5, 0, 1, -18)
-	credit.Size = UDim2.fromOffset(600, 16)
-	credit.BackgroundTransparency = 1
-	credit.Font = Enum.Font.Gotham
-	credit.TextSize = 12
-	credit.TextColor3 = Color3.fromRGB(110, 114, 150)
-	credit.Text = "© SAGA MINERS"
-	credit.ZIndex = 10
-	credit.Parent = back
+	local ok, built = pcall(function()
+		return require(script.Parent.Modules.MainMenu).build(back, {
+			OnPlay = function()
+				enter()
+			end,
+		})
+	end)
+	if ok then
+		menu = built
+	else
+		-- (no menu: the old way in, a tap anywhere)
+		warn("[Splash] main menu failed: " .. tostring(built))
+		stage.Visible = true
+		if art:IsA("ImageLabel") then
+			art.ImageTransparency = 0
+		end
+		gui:SetAttribute("NoMenu", true)
+	end
 end
 
 -- In: the title hands over to the loading screen (LoadingFlow), which
 -- stays up until the game behind it is ready: the starter intro, or you
 -- standing in the Outpost. (Fading the title away showed the menu and the
 -- world half built behind it.)
-local function enter()
+function enter()
 	if phase ~= "Title" then
 		return
 	end
@@ -291,11 +294,15 @@ local function enter()
 	LoadingFlow.hold("Title", { FadeIn = 0.5, Destination = LoadingFlow.home })
 	task.spawn(function()
 		LoadingFlow.waitCovered(1.5)
+		if menu then
+			menu.destroy()
+		end
 		gui:Destroy()
 	end)
 end
 
--- Clicks, taps and keys: skip the intro, then enter.
+-- Clicks, taps and keys: skip the intro to the menu (the menu has PLAY;
+-- with no menu, a tap goes in).
 UserInputService.InputBegan:Connect(function(input)
 	if phase == "Done" or LoadingFlow.active() then
 		return
@@ -308,8 +315,8 @@ UserInputService.InputBegan:Connect(function(input)
 		or t == Enum.UserInputType.Gamepad1
 	then
 		if phase == "Intro" then
-			showTitle(true)
-		else
+			showTitle(true, quickStart == true)
+		elseif gui:GetAttribute("NoMenu") then
 			enter()
 		end
 	end
@@ -331,12 +338,16 @@ task.delay(DROP, function()
 		drop()
 	end
 end)
-task.delay(LENGTH, function()
-	showTitle(false)
+-- The menu, a moment after the drop (a new miner's on the way straight
+-- in instead: below).
+task.delay(MENU_AT, function()
+	if quickStart == false or not require(ReplicatedStorage.Shared.FastStart).Enabled then
+		showTitle(true)
+	end
 end)
 
 -- A first-time player (the fast start, Shared.FastStart): the drop, the
--- title for a moment, then straight in: no waiting, no click.
+-- title for a moment, then straight in: no menu, no waiting, no click.
 local started = os.clock()
 task.spawn(function()
 	if not require(ReplicatedStorage.Shared.FastStart).Enabled then
@@ -349,11 +360,16 @@ task.spawn(function()
 	end
 	local intro = GemClient.Profile and GemClient.Profile.Intro
 	if not intro or intro.Done then
+		quickStart = false
+		if phase == "Intro" and os.clock() - started >= MENU_AT then
+			showTitle(true)
+		end
 		return
 	end
+	quickStart = true
 	task.wait(math.max(0, started + DROP + 0.3 - os.clock()))
 	if phase == "Intro" then
-		showTitle(true)
+		showTitle(true, true)
 	end
 	task.wait(1.2)
 	enter()

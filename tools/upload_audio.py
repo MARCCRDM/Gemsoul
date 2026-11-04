@@ -17,7 +17,10 @@ It uploads, in this order (most important first):
   assets/sounds/lottery/*     -> src/client/Modules/LotterySound.luau
   assets/sounds/narration/*   -> src/client/Modules/Narration.luau
   assets/sounds/*.mp3         -> src/client/Modules/UiSound.luau
-then replaces the matching "Name = 0, -- file.mp3" (or .ogg) lines with the new ids.
+  assets/images/menu/*.png    -> src/shared/MainMenuContent.luau (the main menu's banners)
+then replaces the matching "Name = 0, -- file.mp3" (or .ogg, .png) lines with the new ids.
+Pictures go up as Decals; if a banner shows blank in game, upload that .png in
+Studio's Asset Manager instead and paste its image id into the line by hand.
 
 Roblox limits how many audio files an account can upload a month (fewer
 for accounts that aren't ID-verified). Ids already uploaded are remembered
@@ -44,7 +47,9 @@ GROUPS = [
     ("assets/sounds/lottery", "src/client/Modules/LotterySound.luau"),
     ("assets/sounds/narration", "src/client/Modules/Narration.luau"),
     ("assets/sounds", "src/client/Modules/UiSound.luau"),
+    ("assets/images/menu", "src/shared/MainMenuContent.luau"),
 ]
+EXTENSIONS = (".mp3", ".ogg", ".png")
 API = "https://apis.roblox.com/assets/v1"
 
 
@@ -78,10 +83,11 @@ def call(url, key, data=None, content_type=None):
 
 def upload(path, key, user):
     name = os.path.splitext(os.path.basename(path))[0].replace("_", " ").title()
+    picture = path.endswith(".png")
     payload = {
-        "assetType": "Audio",
-        "displayName": f"Brainrot Crusaders {name}"[:50],
-        "description": "Game audio for Brainrot Crusaders.",
+        "assetType": "Decal" if picture else "Audio",
+        "displayName": (f"Saga Miners {name}" if picture else f"Brainrot Crusaders {name}")[:50],
+        "description": "Main menu picture for Saga Miners." if picture else "Game audio for Brainrot Crusaders.",
         "creationContext": {"creator": {"userId": str(user)}},
     }
     with open(path, "rb") as f:
@@ -90,7 +96,7 @@ def upload(path, key, user):
             "fileContent",
             os.path.basename(path),
             f.read(),
-            mimetypes.guess_type(path)[0] or "audio/mpeg",
+            mimetypes.guess_type(path)[0] or ("image/png" if picture else "audio/mpeg"),
         )
     operation = call(f"{API}/assets", key, body, ctype)
     path_ = operation.get("path") or ("operations/" + operation.get("operationId", ""))
@@ -143,7 +149,7 @@ def main():
             continue
         ids = {}
         for name in sorted(os.listdir(directory)):
-            if not name.endswith((".mp3", ".ogg")) or name.startswith("_"):
+            if not name.endswith(EXTENSIONS) or name.startswith("_"):
                 continue
             rel = f"{folder}/{name}"
             if rel in known and not args.force:
