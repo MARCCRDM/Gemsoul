@@ -1307,7 +1307,9 @@ end)
 do
 	local FRIEND_FREE_FOR = 30 -- seconds
 	local friendFreedAt = 0
-	player.FriendStatusChanged:Connect(function(other: Player, status: Enum.FriendStatus)
+	-- (pcall: if Roblox ever refuses this event here, the fight carries on
+	-- without it; never the whole combat script stopped on this line)
+	pcall(function() player.FriendStatusChanged:Connect(function(other: Player, status: Enum.FriendStatus)
 		if status ~= Enum.FriendStatus.FriendRequestReceived then
 			return
 		end
@@ -1328,11 +1330,11 @@ do
 				FirstPerson.setCursorFree(false)
 			end
 		end)
-	end)
+	end) end)
 end -- (in a block: this script is at Roblox's 200 locals)
 -- The dim's ESC / ENTER / SPACE buttons, and Roblox's menu opening over it
 -- (Escape): back to the fight view (Client FirstPersonCombat).
-FirstPerson.onBack(function()
+pcall(FirstPerson.onBack, function()
 	if cursorFree and not CombatGuide.isOpen() and not AugmentTreeUI.isOpen() then
 		cursorFree = false
 		FirstPerson.setCursorFree(false)
