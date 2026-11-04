@@ -8,6 +8,11 @@ check(player.CameraMode == "First" and player.CameraMaxZoomDistance == 0.5, "Cam
 check(camera.FieldOfView == 75 and bound ~= nil, "View not bound after camera")
 View.start()
 check(bindCount == 1, "Repeated entry bound twice")
+-- Something puts the camera back in third person mid-fight (the Outpost's
+-- camera on a respawn): the next frame's start puts first person back.
+player.CameraMode, player.CameraMinZoomDistance, player.CameraMaxZoomDistance = "Classic", 6, 40
+View.start()
+check(player.CameraMode == "First" and player.CameraMaxZoomDistance == 0.5 and bindCount == 1, "A fight stayed in third person")
 bound()
 check(part.LocalTransparencyModifier == 1, "Body obstructs camera")
 check(input.MouseBehavior == "Locked" and not input.MouseIconEnabled, "Mouse not captured")

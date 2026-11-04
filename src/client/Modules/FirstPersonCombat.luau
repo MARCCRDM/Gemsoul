@@ -894,6 +894,13 @@ end
 function View.start()
 	shownParts, nextShownCheck = -1, 0
 	if saved then
+		-- Already on: but anything that put the camera back in third person
+		-- meanwhile (the Outpost's camera on a respawn or an arrival) is
+		-- undone, every frame of the fight: never a fight seen from behind.
+		if player.CameraMode ~= Enum.CameraMode.LockFirstPerson or player.CameraMaxZoomDistance > 0.5 then
+			player.CameraMinZoomDistance, player.CameraMaxZoomDistance = 0.5, 0.5
+			player.CameraMode = Enum.CameraMode.LockFirstPerson
+		end
 		return
 	end
 	local camera = workspace.CurrentCamera
