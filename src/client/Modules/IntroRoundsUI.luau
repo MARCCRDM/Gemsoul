@@ -997,7 +997,7 @@ local function leave()
 	end)
 end
 
--- After the first win (IntroRounds.ChoiceAfter), one way on: HUNT BOUNTY,
+-- After the sixth win (IntroRounds.ChoiceAfter), one way on: HUNT BOUNTY,
 -- the first dungeon (Bombardiro Drago's window, then the gate: Client
 -- IntroFinale). The lobby opens once it's cleared; the rest of the set
 -- waits for PLAY (recommended after the lobby's intro).
@@ -1217,6 +1217,21 @@ local function show(event)
 		-- (no way out mid-set: all six rounds first)
 		placeButtons(false, false)
 		task.spawn(countdown, "TRY AGAIN", Lang.translate("Easier this time"), mine)
+	elseif view.Done and event.Hunt == true then
+		-- All six won: the first dungeon next (then the lobby). One way on,
+		-- HUNT BOUNTY: the kaiju roll, then straight in (choose).
+		kicker("STARTER SET COMPLETE", GOLD)
+		choosing = true
+		ui.Well.Visible, ui.Bounty.Visible = false, true
+		bountyBoss(mine)
+		ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
+		ui.Go.Text = Lang.translate("HUNT BOUNTY")
+		ui.GoSub.Text = Lang.translate("Your first dungeon: Bombardiro Drago")
+		placeButtons(false, false, BOUNTY_EXTRA)
+		if ui.Key1 then
+			ui.Key1.Visible, ui.Key2.Visible = false, false
+		end
+		task.spawn(reel, event.Piece, mine)
 	elseif view.Done then
 		kicker("STARTER SET COMPLETE", GOLD)
 		ui.WellCaption.Text = string.format("+%d", event.Coins or IntroRounds.SetCoins)

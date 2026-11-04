@@ -173,7 +173,7 @@ function IntroRoundsServer.unstick(player: Player, now: number): string?
 	end
 	local left = IntroRoundsServer.left(player)
 	if left == 0 then
-		-- (the set's done: CONTINUE should have taken them out)
+		-- (the set's done: HUNT BOUNTY or CONTINUE should have taken them out)
 		if profile.IntroFinale ~= "Mines" and profile.IntroFinale ~= "Dungeon" then
 			stuckSince[player] = nil
 			return nil
@@ -185,10 +185,10 @@ function IntroRoundsServer.unstick(player: Player, now: number): string?
 	local since = stuckSince[player] or now
 	stuckSince[player] = since
 	local state = IntroRounds.state(profile)
-	local choosing = left > 0 and IntroRoundsServer.huntNext(profile, state)
-	local wait = if left == 0
-		then IntroRoundsServer.DoneOutAfter
-		elseif choosing then IntroRoundsServer.ChoiceWait
+	local choosing = IntroRoundsServer.huntNext(profile, state)
+	local wait = if choosing
+		then IntroRoundsServer.ChoiceWait
+		elseif left == 0 then IntroRoundsServer.DoneOutAfter
 		else IntroRoundsServer.StuckAfter
 	if now - since < wait then
 		return nil
@@ -745,7 +745,8 @@ function IntroRoundsServer.huntNext(profile: any, state: any): boolean
 	if not profile or not state or profile.IntroDungeonCleared then
 		return false
 	end
-	if state.Won < IntroRounds.ChoiceAfter or state.Won >= IntroRounds.Count then
+	-- (all six rounds first: then the dungeon, then the lobby)
+	if state.Won < IntroRounds.ChoiceAfter then
 		return false
 	end
 	return profile.IntroFinale == nil or profile.IntroFinale == "Dungeon"
@@ -756,14 +757,14 @@ function IntroRoundsServer.choose(player: Player, which: any)
 		return reply(false, "Pick a way on.")
 	end
 	if state.Won < IntroRounds.ChoiceAfter then
-		return reply(false, "Win your first fight first.")
-	end
-	if state.Won >= IntroRounds.Count then
-		return leaveRounds(player)
+		return reply(false, "Win all your intro rounds first.")
 	end
 	if not IntroRoundsServer.huntNext(profile, state) then
-		-- (the first dungeon's behind them: never out of the rounds for it
-		-- again; their next round instead)
+		-- (the first dungeon's behind them: out to the lobby, or their next
+		-- round if any are left)
+		if state.Won >= IntroRounds.Count then
+			return leaveRounds(player)
+		end
 		return IntroRoundsServer._next(player)
 	end
 	state.Paused = true

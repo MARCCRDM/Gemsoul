@@ -48,11 +48,10 @@ IntroRounds.SetCoins = 500 -- the whole set won
 IntroRounds.Duels = 2 -- on the dungeon path, the 1v1 rounds before the dungeon
 IntroRounds.RoomPieces = 1 -- the dungeon's first room cleared: this many pieces (the boss: the rest)
 IntroRounds.GemAfter = 3 -- this round's win also gives a gem (socket it: Shared.FirstSteps)
--- From this many wins on, the card after a win offers three ways on:
--- CONTINUE ROUNDS, EXPLORE THE OUTPOST (the mines, the kaiju roll: the rest
--- of the set waits for PLAY) or FIRST BOSS (Bombardiro Drago). Before it,
--- the first fight has to be won (Server IntroRoundsServer.choose).
-IntroRounds.ChoiceAfter = 1
+-- The first dungeon (HUNT BOUNTY) once this many rounds are won: the whole
+-- set first, then the dungeon, then the lobby (Server IntroRoundsServer.
+-- huntNext / choose).
+IntroRounds.ChoiceAfter = IntroRounds.Count
 -- The first dungeon (HUNT BOUNTY) cleared: its coins (Server.RiftServer's
 -- victory, in place of a run's usual), and a new kaiju (the boss's roll:
 -- Client IntroFinale opens the lobby's intro with it).

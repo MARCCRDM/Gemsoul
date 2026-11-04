@@ -307,49 +307,41 @@ do
 	Server._next, Server._leave = realNext, realLeave
 end
 
--- The card after the first win: one way on, HUNT BOUNTY (the first
--- dungeon). Not the lobby: that opens once the dungeon's cleared. The rest
--- of the set waits (PLAY, or the lobby's recommendation, takes it up again).
+-- All six rounds first, then the first dungeon (HUNT BOUNTY), then the
+-- lobby: no way out of the rounds before the set's done.
 do
 	profile = newProfile({})
 	check(not Server.choose(player, "Boss").Ok, "Stepped out before winning a fight")
-	Server.won(player)
-	check(attributes.IntroRoundsLeft == IntroRounds.Count - 1 and Server.held(player), "Not held in the rounds after the first win")
+	for won = 1, IntroRounds.Count - 1 do
+		Server.won(player)
+		check(not Server.huntNext(profile, profile.IntroRounds), "HUNT BOUNTY after round " .. won .. " of " .. IntroRounds.Count)
+		check(attributes.IntroRoundsLeft == IntroRounds.Count - won and Server.held(player), "Not held in the rounds after win " .. won)
+	end
+	local early = Server.choose(player, "Boss")
+	check(not early.Ok and early.Choice == nil and Server.held(player), "An early HUNT BOUNTY took them out mid-set")
 	check(not Server.choose(player, "Hax").Ok, "A way out that isn't one")
-	check(not Server.choose(player, "Outpost").Ok and Server.held(player), "Went to the lobby before the first dungeon")
+	-- The sixth win: the dungeon owed, its card HUNT BOUNTY.
+	Server.won(player)
+	check(Server.left(player) == 0 and profile.IntroFinale == "Dungeon", "The set done, but the first dungeon isn't owed")
+	check(Server.huntNext(profile, profile.IntroRounds), "No HUNT BOUNTY after all six rounds")
 	local out = Server.choose(player, "Boss")
 	check(out.Ok and out.Choice == "Boss", "HUNT BOUNTY didn't take them out")
-	check(profile.IntroRounds.Paused == true and not Server.held(player) and attributes.IntroRoundsLeft == nil, "Still held after stepping out")
-	check(profile.IntroFinale == "Dungeon" and attributes.IntroFinale == "Dungeon", "The first dungeon isn't owed")
-	check(Server.owesDungeon(player), "The Rift wouldn't pay the first dungeon's purse")
-	check(Server.left(player) == IntroRounds.Count - 1, "Stepping out lost them their rounds")
+	check(not Server.held(player) and attributes.IntroRoundsLeft == nil, "Still held after the set and HUNT BOUNTY")
+	check(attributes.IntroFinale == "Dungeon" and Server.owesDungeon(player), "The Rift wouldn't pay the first dungeon's purse")
 	check(Server.dungeonCleared(player) and profile.IntroFinale == "Mines", "Clearing it didn't open the lobby's intro")
 	check(not Server.owesDungeon(player), "The first dungeon's purse paid twice")
-	-- (the rest of the set, from the lobby: held in it again)
-	pcall(Server._next, player)
-	check(profile.IntroRounds.Paused == nil and Server.held(player) and attributes.IntroRoundsLeft == IntroRounds.Count - 1, "Back to the rounds but not held in them")
-	-- After the dungeon: a win's card is the next round (no Hunt), and an old
-	-- card's HUNT BOUNTY puts on their next round, never out of the rounds.
+	-- After the dungeon: never HUNT BOUNTY again; an old card's goes to the lobby.
 	local state = profile.IntroRounds
 	check(not Server.huntNext(profile, state), "HUNT BOUNTY again after the first dungeon (Mines)")
 	profile.IntroFinale = "Done"
 	check(not Server.huntNext(profile, state), "HUNT BOUNTY again after the first dungeon (Done)")
-	local realNext = Server._next
-	local pausedBefore, nexted = state.Paused, 0
-	Server._next = function()
-		nexted += 1
-		return { Ok = true, Message = "Round" }
-	end
 	local again = Server.choose(player, "Boss")
-	check(again.Ok and again.Choice ~= "Boss" and nexted == 1, "An old HUNT BOUNTY didn't put on their next round after the dungeon")
-	check(state.Paused == pausedBefore and Server.held(player), "An old HUNT BOUNTY took them out of the rounds after the dungeon")
-	Server._next = realNext
-	-- Not cleared yet: HUNT BOUNTY (not begun, or owed), and never on the set's last.
-	check(Server.huntNext({ IntroFinale = nil }, { Won = 1 }) and Server.huntNext({ IntroFinale = "Dungeon" }, { Won = 3 }), "No HUNT BOUNTY while the first dungeon's owed")
-	check(not Server.huntNext({ IntroFinale = nil }, { Won = 0 }) and not Server.huntNext({ IntroFinale = nil }, { Won = IntroRounds.Count }), "HUNT BOUNTY before a win, or on the set's last")
-	check(not Server.huntNext({ IntroFinale = "Dungeon", IntroDungeonCleared = true }, { Won = 2 }), "HUNT BOUNTY with the dungeon cleared")
-	-- (an old save that finished the lobby's intro before the dungeon came first)
-	check(not Server.huntNext({ IntroFinale = "Done" }, { Won = 2 }), "HUNT BOUNTY for an older save")
+	check(again.Ok and again.Choice ~= "Boss", "An old HUNT BOUNTY after the dungeon didn't just go to the lobby")
+	-- The rule itself: only once the set's won, while the dungeon's owed.
+	check(Server.huntNext({ IntroFinale = nil }, { Won = IntroRounds.Count }) and Server.huntNext({ IntroFinale = "Dungeon" }, { Won = IntroRounds.Count }), "No HUNT BOUNTY once the set's won")
+	check(not Server.huntNext({ IntroFinale = nil }, { Won = 1 }) and not Server.huntNext({ IntroFinale = "Dungeon" }, { Won = 3 }), "HUNT BOUNTY mid-set")
+	check(not Server.huntNext({ IntroFinale = "Dungeon", IntroDungeonCleared = true }, { Won = IntroRounds.Count }), "HUNT BOUNTY with the dungeon cleared")
+	check(not Server.huntNext({ IntroFinale = "Done" }, { Won = IntroRounds.Count }), "HUNT BOUNTY for an older save")
 end
 -- The lobby's intro never brings its minions into a fight: in a 1v1, the
 -- Arena, a queue or the Rift, it waits.

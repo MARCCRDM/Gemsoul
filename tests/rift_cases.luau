@@ -1201,6 +1201,9 @@ do
 	local gate = body:find("enterBounty(IntroFinale.Boss)", 1, true)
 	check(roll and cover and leave and gate and roll < cover and cover < leave and leave < gate, "HUNT BOUNTY shows the lobby before the dungeon")
 	check(body:find('player:GetAttribute("RiftRun") ~= nil', 1, true) ~= nil, "The cover doesn't stay till they're in the Rift")
+	-- (the card that offers it: after the sixth win, the set complete)
+	local doneAt = ui:find("elseif view.Done and event.Hunt == true then", 1, true)
+	check(doneAt ~= nil and ui:find('ui.Go.Text = Lang.translate("HUNT BOUNTY")', doneAt, true) ~= nil, "The set's done card doesn't offer HUNT BOUNTY")
 	local finale = fs.readFile(ROOT .. "/src/client/Modules/IntroFinale.luau")
 	for _, words in { "WELL DONE, MINER", "NICE HIT!", "BOUNTY CLAIMED", "YOUR KAIJU TEAM", "YOUR KAIJU DEFEND YOU" } do
 		check(finale:find(words, 1, true) == nil, "Still a praise card: " .. words)
