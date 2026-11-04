@@ -28,10 +28,10 @@ local Narration = {}
 
 -- Roblox ids of the uploaded files. 0 = not uploaded yet.
 Narration.Ids = {
-	TrainingBegins = 0, -- training_begins.mp3
-	Controls = 0, -- controls.mp3
-	FirstDungeon = 0, -- first_dungeon.mp3
-	KaijuTeam = 0, -- kaiju_team.mp3
+	TrainingBegins = 133370977482071, -- training_begins.mp3
+	Controls = 89929747424764, -- controls.mp3
+	FirstDungeon = 125560006550856, -- first_dungeon.mp3
+	KaijuTeam = 133613092362157, -- kaiju_team.mp3
 }
 Narration.Lines = {
 	TrainingBegins = "Welcome, Miner. Your training begins now.",

@@ -1,8 +1,16 @@
 {
+  "Capt Hunchines - Imminent DAY1 instr 5.mp3 (Arena)": "129649283919546",
+  "assets/images/menu/dev_booth.png": 137948280938606,
+  "assets/images/menu/kaiju_codes.png": 129194255262205,
+  "assets/images/menu/pickaxe_code.png": 109495894337355,
+  "assets/images/menu/updates.png": 75634600141967,
   "assets/music/dungeon_theme.ogg": "75260701190300",
   "assets/music/fight_theme.ogg": "83708484138750",
   "assets/music/intro_sting.ogg": "74920383589616",
   "assets/music/menu_theme.ogg": "82248033426754",
   "assets/music/outpost_theme.ogg": "71113976425409",
-  "Capt Hunchines - Imminent DAY1 instr 5.mp3 (Arena)": "129649283919546"
+  "assets/sounds/narration/controls.mp3": 89929747424764,
+  "assets/sounds/narration/first_dungeon.mp3": 125560006550856,
+  "assets/sounds/narration/kaiju_team.mp3": 133613092362157,
+  "assets/sounds/narration/training_begins.mp3": 133370977482071
 }
