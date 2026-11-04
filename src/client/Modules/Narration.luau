@@ -32,7 +32,7 @@ Narration.Ids = {
 	Controls = 89929747424764, -- controls.mp3
 	FirstDungeon = 125560006550856, -- first_dungeon.mp3
 	KaijuTeam = 133613092362157, -- kaiju_team.mp3
-	RotMinions = 0, -- rot_minions.mp3
+	RotMinions = 71254270011218, -- rot_minions.mp3
 }
 Narration.Lines = {
 	TrainingBegins = "Welcome, Miner. Your training begins now.",
