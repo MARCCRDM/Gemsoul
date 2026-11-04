@@ -3,7 +3,7 @@
 	Shared.RiftRun's): the critters' own side, built for one trip and gone
 	with it. A pathway of caves on the pathway dungeon's grid
 	(RiftRun.layout): the landing (and the way home) first, then
-	RiftRun.Rooms caves, then the throne cave, joined by passages. Every
+	RiftRun.Rooms caves (or `caves`: none, the first dungeon's), then the throne cave, joined by passages. Every
 	cave and passage is walled in rock too tall to climb, its floor solid
 	from wall to wall: there's nowhere to fall. The walls break into
 	jagged crowns and overhanging ledges, arches of rock span the passages
@@ -857,7 +857,7 @@ local kit = {
 	P = P,
 }
 
-function RiftWorld.build(id: string, origin: CFrame, rng, realm)
+function RiftWorld.build(id: string, origin: CFrame, rng, realm, caves: number?)
 	P = realm or RiftRealms.Default
 	kit.P = P
 	if not Styles then
@@ -870,7 +870,7 @@ function RiftWorld.build(id: string, origin: CFrame, rng, realm)
 	folder:SetAttribute("RealmName", P.Name)
 	folder.Parent = workspace
 	local base = origin.Position
-	local cells = RiftRun.layout(rng)
+	local cells = RiftRun.layout(rng, caves)
 	local spacing = RiftWorld.Spacing
 	local centers, sizes = {}, {}
 	for i, cell in cells do
@@ -941,7 +941,7 @@ function RiftWorld.build(id: string, origin: CFrame, rng, realm)
 	}
 	FallenMiners.scatter(folder, bossAt, RiftWorld.Throne - 8, FallenMiners.Count.Throne, rng, remains)
 	local rooms = {}
-	for room = 1, RiftRun.Rooms do
+	for room = 1, caves or RiftRun.Rooms do
 		rooms[room] = { Center = centers[room + 1], Radius = RiftWorld.Cave / 2 + 4, Size = RiftWorld.Cave }
 	end
 	return {

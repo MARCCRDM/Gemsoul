@@ -27,6 +27,7 @@ s+='local kaijuRestored = {}\nlocal KaijuServer={restoreAll=function(p) kaijuRes
 s+='-- (the Rot Beachhead: its knock-down, its fighters healed, its scenery)\n'
 s+='Remotes.CombatFx={FireAllClients=function() end}\nlocal healedDungeons={}\nDuelist.healDungeon=function(id) healedDungeons[id]=(healedDungeons[id] or 0)+1 end\nWorld.dressBeachhead=function() end\n'
 s+='CombatServer.onDungeonLethal=function(hook) dungeonLethal=hook end\nPlayerData.selectMiner=function(p,index) return MinerRoster.switch(profiles[p],index) end\n'
+s+=module('SpawnFacing','src/server/Systems/SpawnFacing.luau')
 s+=module('Dungeon','src/server/Systems/Dungeons.luau')
 s+=read('tests/dungeon_cases.luau')
 s+=read('tests/miner_dungeon_cases.luau')

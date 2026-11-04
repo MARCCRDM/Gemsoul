@@ -22,6 +22,7 @@ local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
+local SpawnFacing = require(script.Parent.SpawnFacing)
 
 local reply = Shop.reply
 
@@ -84,7 +85,8 @@ local function start(player: Player)
 			member:RequestStreamAroundAsync(spot)
 		end)
 		if character then
-			character:PivotTo(CFrame.lookAt(spot, center + Vector3.new(0, 4, 0)))
+			-- (Facing in, the camera behind them: Server.SpawnFacing.)
+			SpawnFacing.place(member, SpawnFacing.toward(spot, center))
 			local protection = Instance.new("ForceField")
 			protection.Visible = false
 			protection.Parent = character

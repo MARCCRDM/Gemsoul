@@ -260,7 +260,17 @@ local GemClient = {
 		return { Ok = false }
 	end,
 }
+-- The narrator: the starter roll's line ("These are your kaiju..."), how
+-- long it takes (0: none here, as when it's already been read).
+local narrated, narrationSeconds = {}, 0
+local Narration = {
+	play = function(name)
+		table.insert(narrated, name)
+		return narrationSeconds
+	end,
+}
 local stubs = {
+	Narration = Narration,
 	IronUi = IronUi,
 	UiKit = UiKit,
 	LotterySound = LotterySound,
@@ -580,6 +590,59 @@ check(
 	"A phone's card still says what it's like"
 )
 check(landed(cards[1]) and landed(cards[3]), "A phone's kaiju didn't land")
+
+-- The starter roll: the narrator introduces the kaiju, the reels held
+-- still till the line's done, then they spin as ever ----------------------------------------------
+check(narrated[1] == "KaijuTeam", "The starter roll had no narration: " .. tostring(narrated[1]))
+table.clear(frames)
+table.clear(delayed)
+table.clear(tweens)
+table.clear(narrated)
+camera.ViewportSize = Vector2.new(1366, 768)
+narrationSeconds = 7.7
+-- (The phone's roll, left up above, out of the way.)
+root:FindFirstChild("KaijuRoll"):Destroy()
+local KaijuRoll4 = loadRoll()
+KaijuRoll4.play(function() end)
+gui = root:FindFirstChild("KaijuRoll")
+cards = cardsOf(gui)
+check(narrated[1] == "KaijuTeam" and #narrated == 1, "The starter roll's line wasn't read once")
+local function reelAt()
+	local at = {}
+	for _, card in cards do
+		-- (the reel's strip: the tallest frame in its window)
+		local tallest
+		for _, d in find(card, "ReelWindow")[1]:GetDescendants() do
+			if d:IsA("Frame") and (not tallest or d.Size.Y.Offset > tallest.Size.Y.Offset) then
+				tallest = d
+			end
+		end
+		table.insert(at, tallest.Position.Y.Offset)
+	end
+	return table.concat(at, ",")
+end
+local still = reelAt()
+step(7)
+check(reelAt() == still, "The reels spun before the narration was done")
+for _, card in cards do
+	check(not landed(card), "A kaiju landed during the narration")
+end
+step(0.05)
+local spunDown = false
+for _ = 1, 120 do
+	step(0.05)
+	if landed(cards[1]) and landed(cards[2]) and landed(cards[3]) then
+		spunDown = true
+		break
+	end
+end
+check(spunDown and reelAt() ~= still, "The reels didn't spin once the narration was done")
+narrationSeconds = 0
+-- (A boss's roll and a test roll have no narration.)
+do
+	local source = fs.readFile(ROOT .. "/src/client/Modules/KaijuRoll.luau")
+	check(source:find("if not preview and not boss and not rare then", 1, true) ~= nil, "A boss or test roll gets the starter narration")
+end
 
 -- A boss's kaiju roll waits: for the boss's fall to play out, then for its
 -- cache's gear roll (never under it, nor before it opens), then straight on.

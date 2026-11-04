@@ -15,6 +15,7 @@ It uploads, in this order (most important first):
   assets/music/*.mp3          -> src/client/Modules/Music.luau
   assets/sounds/combat/*.mp3  -> src/client/Modules/CombatSound.luau
   assets/sounds/lottery/*     -> src/client/Modules/LotterySound.luau
+  assets/sounds/narration/*   -> src/client/Modules/Narration.luau
   assets/sounds/*.mp3         -> src/client/Modules/UiSound.luau
 then replaces the matching "Name = 0, -- file.mp3" (or .ogg) lines with the new ids.
 
@@ -41,6 +42,7 @@ GROUPS = [
     ("assets/music", "src/client/Modules/Music.luau"),
     ("assets/sounds/combat", "src/client/Modules/CombatSound.luau"),
     ("assets/sounds/lottery", "src/client/Modules/LotterySound.luau"),
+    ("assets/sounds/narration", "src/client/Modules/Narration.luau"),
     ("assets/sounds", "src/client/Modules/UiSound.luau"),
 ]
 API = "https://apis.roblox.com/assets/v1"

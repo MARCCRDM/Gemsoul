@@ -72,6 +72,7 @@ local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
 local MobileLayout = require(script.Parent.MobileLayout)
+local Narration = require(script.Parent.Narration)
 
 local RiftClient = {}
 
@@ -1701,19 +1702,19 @@ function RiftClient.stripText(state): (string, string)
 		where = "BOSS DOWN"
 	elseif state.Won then
 		where = string.format("BOSS DOWN  ·  HOME IN %d:%02d", state.ExitIn // 60, state.ExitIn % 60)
-	elseif (state.Room or 1) > RiftRun.Rooms then
+	elseif (state.Room or 1) > (state.Rooms or RiftRun.Rooms) then
 		where = string.format("THRONE CAVE  ·  %s", string.upper(state.Boss or "?"))
 			.. (if state.BossLevel then string.format("  ·  LV %d", state.BossLevel) else "")
 	elseif (state.Left or 0) > 0 then
 		where = string.format(
 			"CAVE %d OF %d  ·  %d FOE%s LEFT",
 			state.Room,
-			RiftRun.Rooms,
+			state.Rooms or RiftRun.Rooms,
 			state.Left,
 			if state.Left == 1 then "" else "S"
 		)
 	else
-		where = string.format("CAVE %d OF %d", state.Room or 1, RiftRun.Rooms)
+		where = string.format("CAVE %d OF %d", state.Room or 1, state.Rooms or RiftRun.Rooms)
 	end
 	local who = if (state.Runners or 1) <= 1 then "ALONE" else string.format("%d IN", state.Runners)
 	return where, string.format("FOUND %d  ·  %s", state.Found or 0, who)
@@ -1723,6 +1724,7 @@ local function stateOf()
 	local exit = player:GetAttribute("RiftExitAt")
 	return {
 		Room = player:GetAttribute("RiftRoom") or 1,
+		Rooms = player:GetAttribute("RiftRooms") or RiftRun.Rooms, -- (caves before the boss's: none in the first dungeon)
 		Left = player:GetAttribute("RiftLeft") or 0,
 		Boss = player:GetAttribute("RiftBoss"),
 		BossLevel = player:GetAttribute("RiftBossLevel"),
@@ -1734,6 +1736,7 @@ local function stateOf()
 end
 
 local pips: { Frame } = {}
+local pipLeft = 104 -- (the first pip's spot)
 local whereLabel: TextLabel? = nil
 local tallyLabel: TextLabel? = nil
 
@@ -1757,12 +1760,13 @@ local function buildStrip()
 	tag.Position, tag.Size = UDim2.fromOffset(12, 5), UDim2.fromOffset(80, 14)
 	-- The caves as pips, the throne's a bigger one: lit up to where you are.
 	table.clear(pips)
+	pipLeft = if small then 92 else 104
 	for i = 1, RiftRun.Rooms + 1 do
 		local throne = i > RiftRun.Rooms
 		local size = if throne then 10 else 7
 		local pip = new("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0, (if small then 92 else 104) + (i - 1) * 15, 0, 12),
+			Position = UDim2.new(0, pipLeft + (i - 1) * 15, 0, 12),
 			Size = UDim2.fromOffset(size, size),
 			Rotation = 45,
 			BackgroundColor3 = P.Slot,
@@ -1809,8 +1813,16 @@ local function refreshStrip()
 	(whereLabel :: TextLabel).Text = where;
 	(tallyLabel :: TextLabel).Text = tally
 	for i, pip in pips do
-		local done = i < state.Room or state.Won
-		local here = i == state.Room and not state.Won
+		-- (A run with fewer caves, the first dungeon's: just the throne's pip,
+		-- moved up to the first spot.)
+		local cave = i <= RiftRun.Rooms
+		local slot = if cave then i else state.Rooms + 1
+		pip.Visible = not cave or i <= state.Rooms
+		if not cave then
+			pip.Position = UDim2.new(0, pipLeft + (slot - 1) * 15, 0, 12)
+		end
+		local done = slot < state.Room or state.Won
+		local here = slot == state.Room and not state.Won
 		pip.BackgroundColor3 = if done then EMBER elseif here then WARN else P.Slot
 		pip.BackgroundTransparency = if here or done then 0 else 0.2
 	end
@@ -2087,6 +2099,8 @@ local function tick()
 	end)
 end
 
+local toldFirst = false -- (the first dungeon's line: said once)
+RiftClient.FirstLineAfter = 1.5 -- (seconds in, for the crossing to clear)
 local function changed()
 	local now = player:GetAttribute("RiftRun") ~= nil
 	if now and not inside then
@@ -2114,6 +2128,16 @@ local function changed()
 	if inside then
 		refreshStrip()
 		refreshDown()
+		-- A new miner's first dungeon (no caves: RiftRun.FirstRooms): the
+		-- narrator, once the crossing's cleared, on what these monsters are.
+		if player:GetAttribute("RiftRooms") == RiftRun.FirstRooms and RiftRun.FirstRooms < RiftRun.Rooms and not toldFirst then
+			toldFirst = true
+			task.delay(RiftClient.FirstLineAfter, function()
+				if player:GetAttribute("RiftRun") ~= nil then
+					pcall(Narration.play, "FirstDungeon")
+				end
+			end)
+		end
 	end
 end
 
@@ -2127,6 +2151,7 @@ function RiftClient.start()
 		{
 			"RiftRun",
 			"RiftRoom",
+			"RiftRooms",
 			"RiftLeft",
 			"RiftBoss",
 			"RiftFound",

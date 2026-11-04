@@ -37,6 +37,7 @@ local CardFX = require(script.Parent.ElementCardFX)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local LotterySound = require(script.Parent.LotterySound)
+local Narration = require(script.Parent.Narration)
 local SurgeIcons = require(script.Parent.SurgeIcons)
 local UiKit = require(script.Parent.UiKit)
 
@@ -1033,11 +1034,18 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 		end)
 	)
 
+	-- The starter roll (a new miner's first kaiju): the narrator introduces
+	-- them first, the reels held still till the line is done.
+	local hold = 0
+	if not preview and not boss and not rare then
+		local ok, seconds = pcall(Narration.play, "KaijuTeam")
+		hold = if ok and type(seconds) == "number" then seconds else 0
+	end
 	-- All three spin; the first stops, then the next, then the last, each on
 	-- yours, which lands and lets its E move out.
 	for index, item in cards do
 		local spin = 1.2 + (index - 1) * 0.7
-		task.delay(0.4, function()
+		task.delay(0.4 + hold, function()
 			if gui == screen and item.Phase == "Sealed" then
 				item.Spinning = true
 				-- Runs just past yours, then springs back onto it.
@@ -1059,7 +1067,7 @@ function KaijuRoll.play(after: (() -> ())?, preview: boolean?)
 				end)
 			end
 		end)
-		local openAt = 0.4 + spin + 0.18
+		local openAt = 0.4 + hold + spin + 0.18
 		task.delay(openAt, function()
 			if gui == screen then
 				item.open(false)

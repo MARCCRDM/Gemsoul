@@ -454,6 +454,14 @@ for _ = 1, 300 do
 	end
 end
 
+-- A new miner's first dungeon (RiftRun.FirstRooms): no caves, the landing
+-- then the throne cave, next to it.
+check(RiftRun.FirstRooms == 0, "The first dungeon has caves before its boss")
+for _ = 1, 50 do
+	local cells = RiftRun.layout(layoutRng, RiftRun.FirstRooms)
+	check(#cells == 2 and cells[2].X == 0 and cells[2].Z == 1, "The first dungeon isn't the landing then the throne")
+end
+
 -- The world ---------------------------------------------------------------------------------------------------
 
 local RiftWorld = load("RiftWorld")
@@ -917,10 +925,22 @@ do
 		check(client:find("\"" .. key .. "\"", 1, true) ~= nil or client:find("air." .. key, 1, true) ~= nil, "The client ignores the realm's " .. key)
 	end
 	local server = fs.readFile(ROOT .. "/src/server/Systems/RiftServer.luau")
-	check(server:find('RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id)', 1, true) ~= nil, "The server doesn't build the boss's realm")
+	check(server:find('RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id), caves)', 1, true) ~= nil, "The server doesn't build the boss's realm")
 	check(server:find('"RiftRealm"', 1, true) ~= nil, "Runners aren't told their realm")
 end
 -- Two trips side by side never meet (RiftServer's slots).
+-- The first dungeon's world: the landing, a passage, the throne cave; no
+-- caves, no walls of fire, the boss's cave straight on from the way in.
+do
+	local first = RiftWorld.build("T0", origin * CFrame.new(-4000, 0, -4000), Random.new(5), nil, RiftRun.FirstRooms)
+	check(#first.Rooms == 0 and next(first.Gates) == nil, "The first dungeon has caves or walls of fire")
+	local gap = (first.Boss.Center - first.Landing.Center).Magnitude
+	check(math.abs(gap - RiftWorld.Spacing) < 1, "The throne cave isn't next to the landing: " .. gap)
+	local ahead = first.Start.LookVector
+	local toBoss = (first.Boss.Center - first.Start.Position) * Vector3.new(1, 0, 1)
+	check(ahead:Dot(toBoss.Unit) > 0.9, "The way in doesn't face the boss's cave")
+	first.Folder:Destroy()
+end
 local other = RiftWorld.build("T2", origin * CFrame.new(-2000, 0, 0), Random.new(4))
 for _, a in { other.Landing, other.Boss, table.unpack(other.Rooms) } do
 	for _, b in { world.Landing, world.Boss, table.unpack(world.Rooms) } do
@@ -1136,6 +1156,28 @@ do
 		local clearEnd = clearAt and server:find("\nend\n", clearAt, true)
 		local clearBody = clearAt and clearEnd and server:sub(clearAt, clearEnd) or ""
 		check(clearBody:find("owesDungeon(member)", 1, true) ~= nil and clearBody:find("KaijuServer.restoreAll, member", 1, true) ~= nil, "A cave cleared in the first dungeon doesn't bring the kaiju back")
+		-- Its run: two caves only (RiftRun.FirstRooms), the boss's level set
+		-- from the start, every check of the way on the run's own count.
+		check(server:find("first = bounty and require(script.Parent.IntroRoundsServer).owesDungeon(player)", 1, true) ~= nil
+			and server:find("local caves = if first then RiftRun.FirstRooms else RiftRun.Rooms", 1, true) ~= nil
+			and server:find("Rooms = caves,", 1, true) ~= nil, "The first dungeon isn't built with its two caves")
+		check(server:find("if run.Rooms == 0 then", 1, true) ~= nil, "No boss level for a run with no caves")
+		for _, line in { "run.Room <= RiftRun.Rooms", "reached > RiftRun.Rooms", "run.Room > RiftRun.Rooms", "math.clamp(run.Room - 1, 0, RiftRun.Rooms)" } do
+			check(server:find(line, 1, true) == nil, "Still on the usual cave count: " .. line)
+		end
+		check(server:find('player:SetAttribute("RiftRooms", run.Rooms)', 1, true) ~= nil, "The client isn't told the run's caves")
+		-- The strip: the first dungeon's straight to the throne cave.
+		local at = riftClient:find("function RiftClient.stripText", 1, true)
+		local stripText = luau.load(riftClient:sub(at, riftClient:find("\nend\n", at, true) + 4) .. "return RiftClient.stripText", {
+			debugName = "stripText",
+			environment = setmetatable({ RiftClient = {}, RiftRun = RiftRun }, { __index = _G }),
+		})()
+		check(stripText({ Room = 1, Rooms = 0, Boss = "Bombardiro Drago" }):find("THRONE CAVE", 1, true) == 1, "The first dungeon's strip doesn't say the throne cave")
+		check(stripText({ Room = 1, Left = 2 }):find("CAVE 1 OF " .. RiftRun.Rooms, 1, true) == 1, "A usual run's strip lost its caves")
+		check(riftClient:find('Rooms = player:GetAttribute("RiftRooms") or RiftRun.Rooms', 1, true) ~= nil, "The strip doesn't read the run's caves")
+		-- And the narrator, once in: what these monsters are.
+		check(riftClient:find('player:GetAttribute("RiftRooms") == RiftRun.FirstRooms and RiftRun.FirstRooms < RiftRun.Rooms and not toldFirst', 1, true) ~= nil
+			and riftClient:find('pcall(Narration.play, "FirstDungeon")', 1, true) ~= nil, "No narration on arriving in the first dungeon")
 	end
 	-- The boss takes turns on the kaiju too (Shared.Aggro's turns, each
 	-- kaiju's own threat: KaijuServer.strike; Duelist's PetTarget).

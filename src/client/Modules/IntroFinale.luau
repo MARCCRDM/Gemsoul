@@ -496,7 +496,10 @@ function IntroFinale.rewards(hunt: boolean?)
 		{ Icon = "●", Value = tostring(if hunt then IntroRounds.FirstDungeonCoins else RiftRun.rewardCoins(RiftRun.Rooms)), Label = "COINS", Color = Color3.fromRGB(255, 206, 92) },
 		{ Icon = "◆", Value = "UNCOMMON+", Label = "BOSS CACHE GEAR", Color = Color3.fromRGB(110, 224, 140) },
 		{ Icon = "▲", Value = "+1", Label = "NEW KAIJU", Color = Color3.fromRGB(150, 200, 255) },
-		{ Icon = "◆", Value = "GEMS", Label = "IN EVERY CAVE", Color = Color3.fromRGB(94, 206, 221) },
+		-- (The first dungeon has no caves, straight to the boss: its gem.)
+		if hunt
+			then { Icon = "◆", Value = "GEM", Label = "FROM THE BOSS", Color = Color3.fromRGB(94, 206, 221) }
+			else { Icon = "◆", Value = "GEMS", Label = "IN EVERY CAVE", Color = Color3.fromRGB(94, 206, 221) },
 	}, RiftRun.Reward.Exp
 end
 local W_CARD, H_CARD = 620, 470
@@ -598,7 +601,7 @@ local function invite(hunt: boolean?)
 	text(card, if hunt then "NEXT EVENT  ·  HUNT BOUNTY" else "READY FOR YOUR FIRST DUNGEON?", x0, 26, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold).Name = "Heading"
 	text(card, "BOMBARDIRO DRAGO", x0, 48, W_CARD - x0 - 20, 70, 34, GOLD, Enum.Font.GothamBlack).Name = "BossName"
 	text(card, "Its boss  ·  Level 2  ·  built to beat solo", x0, 122, W_CARD - x0 - 20, 18, 14, Color3.fromRGB(220, 200, 196), Enum.Font.GothamMedium)
-	text(card, if hunt then "Your first dungeon. Four caves, then the boss. Your kaiju fight beside you. The Outpost opens once he's down." else "Your kaiju fight beside you. Four caves, then the boss.", x0, 150, W_CARD - x0 - 20, if hunt then 60 else 40, 14, Color3.fromRGB(190, 176, 172), Enum.Font.GothamMedium)
+	text(card, if hunt then "Your first dungeon. Straight to the boss. Your kaiju fight beside you. The Outpost opens once he's down." else "Your kaiju fight beside you. Four caves, then the boss.", x0, 150, W_CARD - x0 - 20, if hunt then 60 else 40, 14, Color3.fromRGB(190, 176, 172), Enum.Font.GothamMedium)
 	-- What you'd win: a tile each.
 	local rewards, exp = IntroFinale.rewards(hunt)
 	text(card, "POTENTIAL REWARDS", 18, 268, 300, 18, 13, Color3.fromRGB(255, 150, 120), Enum.Font.GothamBold)

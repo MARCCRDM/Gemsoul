@@ -11,6 +11,12 @@
 	  Heavy   while its guard is up, until you throw a heavy
 	  Q E R   when you can afford each move, until you use it
 
+	It opens with the narrator (Modules.Narration): "Welcome, Miner. Your
+	training begins now.", then the controls' line, a bobbing arrow over each
+	button it names: the Q / E / R moves ("Use your abilities to cast."),
+	then ATTACK, BLOCK and DODGE ("Swing, block and dodge..."). The hints
+	wait till it's done.
+
 	The partner's wind-ups and guard come from the attributes the server sets
 	on it (ActionKind, ActionName, ActionStart, ActionAt, GuardUntil); what
 	you did, from yours (ActionKind / ActionName on your character, Blocking
@@ -27,6 +33,7 @@ end
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
+local Narration = require(script.Parent.Modules.Narration)
 local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
@@ -63,6 +70,73 @@ local function findTarget(id: string): GuiObject?
 		end
 	end
 	return nil
+end
+
+-- The opening's arrows: one over each button the narrator names, bobbing.
+local ARROWS = {
+	Abilities = { "Q", "E", "R" },
+	Combat = { "Swing", "Block", "Dodge" },
+}
+-- (When in the controls' line each set shows: its words' times, seconds.)
+local ARROW_TIMES = { { "Abilities", 0, 2.2 }, { "Combat", 2.2, 6.4 } }
+local arrowGui = UiKit.gui("FirstFightArrows", 10)
+arrowGui.Enabled = false
+local arrows: { [string]: TextLabel } = {}
+for _, ids in ARROWS do
+	for _, id in ids do
+		arrows[id] = new("TextLabel", {
+			Name = "Arrow" .. id,
+			AnchorPoint = Vector2.new(0.5, 1),
+			BackgroundTransparency = 1,
+			Size = UDim2.fromOffset(44, 44),
+			Font = Enum.Font.GothamBlack,
+			Text = "▼",
+			TextColor3 = GOLD,
+			TextScaled = true,
+			TextStrokeColor3 = Color3.fromRGB(20, 14, 6),
+			TextStrokeTransparency = 0.2,
+			Visible = false,
+			ZIndex = 20,
+		}, arrowGui)
+	end
+end
+local pointing: string? = nil -- (the set of arrows up: "Abilities" / "Combat")
+local narrating = false -- (the hints wait while the narrator speaks)
+local opened = false
+
+-- Round 1's opening: the welcome, then the controls with the arrows.
+local function opening()
+	if opened then
+		return
+	end
+	opened = true
+	narrating = true
+	gui.Enabled, shown = false, nil
+	pcall(Narration.say, "TrainingBegins")
+	if player:GetAttribute("FirstFight") == true then
+		local ok, seconds = pcall(Narration.play, "Controls")
+		if ok and type(seconds) == "number" and seconds > 0 then
+			local started = os.clock()
+			arrowGui.Enabled = true
+			while player:GetAttribute("FirstFight") == true do
+				local t = os.clock() - started
+				local now = nil
+				for _, span in ARROW_TIMES do
+					if t >= span[2] and t < span[3] then
+						now = span[1]
+					end
+				end
+				if not now and t >= ARROW_TIMES[#ARROW_TIMES][3] then
+					break
+				end
+				pointing = now
+				task.wait(0.05)
+			end
+		end
+	end
+	pointing = nil
+	arrowGui.Enabled = false
+	narrating = false
 end
 
 -- Your Q / E / R moves: name, cost and what pays for it.
@@ -162,6 +236,35 @@ local function show(id: string)
 	gui.Enabled = true
 end
 
+-- Every frame of the opening: each arrow over its button, bobbing.
+local arrowTargets: { [string]: GuiObject? } = {}
+local arrowsLooked = 0
+RunService.RenderStepped:Connect(function()
+	if not arrowGui.Enabled then
+		return
+	end
+	local now = os.clock()
+	if now - arrowsLooked > 0.5 then
+		arrowsLooked = now
+		for id in arrows do
+			arrowTargets[id] = findTarget(id)
+		end
+	end
+	local bob = math.abs(math.sin(now * 5)) * 10
+	for set, ids in ARROWS do
+		for _, id in ids do
+			local arrow, button = arrows[id], arrowTargets[id]
+			if set == pointing and button and button.Parent and button.Visible then
+				local top = button.AbsolutePosition + Vector2.new(button.AbsoluteSize.X / 2, 0)
+				arrow.Position = UDim2.fromOffset(top.X, top.Y - 4 - bob)
+				arrow.Visible = true
+			else
+				arrow.Visible = false
+			end
+		end
+	end
+end)
+
 -- Every frame while a hint is up: the ring round its button, breathing.
 RunService.RenderStepped:Connect(function()
 	if not gui.Enabled then
@@ -194,7 +297,7 @@ RunService.Heartbeat:Connect(function()
 		return
 	end
 	nextTick = now + 0.1
-	if player:GetAttribute("FirstFight") ~= true or FastStart.finished(done) then
+	if player:GetAttribute("FirstFight") ~= true or FastStart.finished(done) or narrating then
 		gui.Enabled, shown = false, nil
 		return
 	end
@@ -237,3 +340,12 @@ RunService.Heartbeat:Connect(function()
 		gui.Enabled, shown = false, nil
 	end
 end)
+
+-- Round 1 starts (the server marks your first fight): the opening.
+local function begin()
+	if player:GetAttribute("FirstFight") == true then
+		task.spawn(opening)
+	end
+end
+player:GetAttributeChangedSignal("FirstFight"):Connect(begin)
+begin()

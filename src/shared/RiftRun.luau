@@ -73,6 +73,9 @@ local Kaiju = require(script.Parent.Kaiju)
 local RiftRun = {}
 
 RiftRun.Rooms = 4
+-- A new miner's first dungeon (HUNT BOUNTY): no caves, the landing then the
+-- boss's cave straight off.
+RiftRun.FirstRooms = 0
 RiftRun.Party = 4
 RiftRun.Foes = { 3, 4, 4, 5 }
 RiftRun.PerRunner = 1
@@ -401,16 +404,16 @@ function RiftRun.solo(runners: number, boss: any?): boolean
 	return runners <= 1 and not DungeonRules.starter(boss)
 end
 
--- The way through: Rooms + 2 cells on a grid ({ X, Z }), the landing first
+-- The way through: Rooms (or `caves`) + 2 cells on a grid ({ X, Z }), the landing first
 -- and the throne cave last, each the next one's neighbour, and never one
 -- beside an earlier one but its own (the pathway dungeon's rule: the path
 -- doesn't touch itself). The first step is always +Z, so the landing faces
 -- the way in.
 local STEPS = { { 0, 1 }, { 1, 0 }, { -1, 0 }, { 0, -1 } }
-function RiftRun.layout(rng): { { X: number, Z: number } }
+function RiftRun.layout(rng, caves: number?): { { X: number, Z: number } }
 	local cells = { { X = 0, Z = 0 } }
 	local used = { ["0:0"] = true }
-	for i = 2, RiftRun.Rooms + 2 do
+	for i = 2, (caves or RiftRun.Rooms) + 2 do
 		local previous = cells[i - 1]
 		local free = {}
 		for _, d in if i == 2 then { STEPS[1] } else STEPS do

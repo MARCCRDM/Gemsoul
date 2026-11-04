@@ -19,12 +19,20 @@ end
 vmt.__index = function(v, key)
 	if key == "Magnitude" then
 		return math.sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z)
+	elseif key == "Unit" then
+		local m = math.sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z)
+		return if m > 0 then Vector3.new(v.X / m, v.Y / m, v.Z / m) else Vector3.new(0, 0, 0)
 	end
 	return nil
 end
+Vector3.zero = Vector3.new(0, 0, 0)
 local CFrame = {
+	-- (a facing: where it is, what it looks at, and its look; Server.SpawnFacing)
 	lookAt = function(at, target)
-		return { Position = at, Target = target }
+		return { Position = at, Target = target, LookVector = (target - at).Unit }
+	end,
+	new = function(at)
+		return { Position = at, LookVector = Vector3.new(0, 0, -1) }
 	end,
 }
 local function typeof(v)

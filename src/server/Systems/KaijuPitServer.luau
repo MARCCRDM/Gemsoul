@@ -63,6 +63,7 @@ local KaijuServer = require(script.Parent.KaijuServer)
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
 local Shop = require(script.Parent.Shop)
+local SpawnFacing = require(script.Parent.SpawnFacing)
 local Vendors = require(ReplicatedStorage.Shared.Vendors)
 local Builder = require(script.Parent.Parent.World.Builder)
 local KaijuPitWorld = require(script.Parent.Parent.World.KaijuPitWorld)
@@ -151,11 +152,8 @@ local function moveTo(player: Player, cframe: CFrame)
 	if not character then
 		return
 	end
-	character:PivotTo(cframe)
-	local root = rootOf(player)
-	if root then
-		root.AssemblyLinearVelocity = Vector3.zero
-	end
+	-- (Facing its way, the camera behind them: Server.SpawnFacing.)
+	SpawnFacing.place(player, cframe)
 end
 
 local function settle(player: Player, down: boolean)

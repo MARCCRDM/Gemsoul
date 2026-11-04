@@ -133,6 +133,7 @@ local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local Store = require(ReplicatedStorage.Shared.Store)
 local RiftWorld = require(script.Parent.Parent.World.RiftWorld)
 local Analytics = require(script.Parent.Analytics)
+local SpawnFacing = require(script.Parent.SpawnFacing)
 local ArenaStreaks = require(script.Parent.ArenaStreaks)
 local Duelist = require(script.Parent.Duelist)
 local Dungeons = require(script.Parent.Dungeons)
@@ -207,8 +208,9 @@ local function show(run)
 		player:SetAttribute("RiftRoom", run.Room)
 		player:SetAttribute("RiftLeft", left)
 		player:SetAttribute("RiftRunners", #run.Members)
-		player:SetAttribute("RiftBoss", if run.Room > RiftRun.Rooms then run.Boss.Name else nil)
-		player:SetAttribute("RiftBossLevel", if run.Room > RiftRun.Rooms then run.BossLevel else nil)
+		player:SetAttribute("RiftRooms", run.Rooms)
+		player:SetAttribute("RiftBoss", if run.Room > run.Rooms then run.Boss.Name else nil)
+		player:SetAttribute("RiftBossLevel", if run.Room > run.Rooms then run.BossLevel else nil)
 		player:SetAttribute("RiftFound", #(run.Found[player] or {}))
 		player:SetAttribute("RiftWon", run.Won or nil)
 		player:SetAttribute("RiftExitAt", run.ExitServer)
@@ -222,6 +224,7 @@ local CLEAR = {
 	"RiftLeft",
 	"RiftBoss",
 	"RiftBossLevel",
+	"RiftRooms",
 	"RiftFound",
 	"RiftRunners",
 	"RiftWon",
@@ -420,7 +423,7 @@ local function spawnFighter(run, at: Vector3, spec, tier: number, boss: boolean?
 	end
 	local enemy = Duelist.spawnDungeon(members, run.Id, {
 		Rift = true,
-		Room = math.min(run.Room, RiftRun.Rooms + 1),
+		Room = if run.Room > run.Rooms then RiftRun.Rooms + 1 else run.Room,
 		GearTier = tier,
 		Center = at,
 		Spot = at + Vector3.new(0, if boss then 7 else 4, 0),
@@ -672,7 +675,7 @@ local function cleared(run, room: number)
 			pcall(KaijuServer.deployTeam, member)
 		end
 	end
-	if room < RiftRun.Rooms then
+	if room < run.Rooms then
 		announce(run, "Cave cleared. The fire's down: on to the next.")
 	else
 		-- (The boss's level, for its adds and the strip: whoever's in now.)
@@ -798,7 +801,7 @@ end
 checkClear = function(run)
 	if
 		not run.Done
-		and run.Room <= RiftRun.Rooms
+		and run.Room <= run.Rooms
 		and run.Spawned[run.Room]
 		and run.Coming == 0
 		and next(run.Foes) == nil
@@ -904,7 +907,7 @@ local function riftRobbers(run, player: Player, count: number, robbery)
 	end
 	local here = root.Position
 	local area = areaAt(run, here)
-	local level = RiftRun.level(levelsOf(run), math.clamp(run.Room, 1, RiftRun.Rooms), run.Boss)
+	local level = RiftRun.level(levelsOf(run), math.clamp(run.Room, 1, math.max(1, run.Rooms)), run.Boss)
 	local band = if run.Room >= 3 then "Edge" else "Fringe"
 	for i, spot in Frontier.robSpots(here, count, run.Rng) do
 		local at = onFloor(area, spot, 6)
@@ -1039,7 +1042,7 @@ local function checkpoint(run, player: Player, root: BasePart)
 		end
 	end
 	if RiftWorld.inside(world.Boss, root.Position, 2) then
-		reached = RiftRun.Rooms + 1
+		reached = run.Rooms + 1
 	end
 	run.Reached[player] = reached
 	return reached
@@ -1073,7 +1076,7 @@ local function step(now: number)
 				continue
 			end
 			if humanoid.Health <= 0 or Spar.isDown(player) then
-				if run.Room > RiftRun.Rooms and not run.Won and humanoid.Health > 0 then
+				if run.Room > run.Rooms and not run.Won and humanoid.Health > 0 then
 					fallAtBoss(run, player)
 				else
 					robbed(run, player)
@@ -1083,7 +1086,7 @@ local function step(now: number)
 			-- (Walled in, nobody falls; through the floor somehow, back in the
 			-- last cave reached.)
 			if root.Position.Y < floor - RiftRun.Fall.Below then
-				local back = if reached > RiftRun.Rooms
+				local back = if reached > run.Rooms
 					then run.World.Boss.Center
 					elseif reached > 0 then run.World.Rooms[reached].Center
 					else run.World.Start.Position
@@ -1091,10 +1094,10 @@ local function step(now: number)
 				root.AssemblyLinearVelocity = Vector3.zero
 			end
 			-- A cave's pack comes up once someone walks into it.
-			if run.Room <= RiftRun.Rooms and reached >= run.Room then
+			if run.Room <= run.Rooms and reached >= run.Room then
 				spawnRoom(run, run.Room)
 			end
-			if reached > RiftRun.Rooms and run.Room > RiftRun.Rooms then
+			if reached > run.Rooms and run.Room > run.Rooms then
 				summonBoss(run)
 			end
 		end
@@ -1126,21 +1129,18 @@ local function join(run, player: Player)
 	table.insert(run.Members, player)
 	runOf[player] = run
 	run.Found[player] = run.Found[player] or {}
-	local cleared = math.clamp(run.Room - 1, 0, RiftRun.Rooms)
+	local cleared = math.clamp(run.Room - 1, 0, run.Rooms)
 	run.Reached[player] = cleared
 	player:SetAttribute("RiftRun", run.Id)
 	player:SetAttribute("RiftRealm", run.World.Folder:GetAttribute("Realm"))
 	local spot = run.World.Start * CFrame.new((#run.Members - 1) * 3 - 4.5, 0, 0)
 	if cleared > 0 then
 		local here = run.World.Rooms[cleared].Center + Vector3.new((#run.Members - 1) * 3 - 4.5, 3, 0)
-		local onward = if cleared < RiftRun.Rooms then run.World.Rooms[cleared + 1].Center else run.World.Boss.Center
+		local onward = if cleared < run.Rooms then run.World.Rooms[cleared + 1].Center else run.World.Boss.Center
 		spot = CFrame.lookAt(here, Vector3.new(onward.X, here.Y, onward.Z))
 	end
-	player.Character:PivotTo(spot)
-	local root = rootOf(player)
-	if root then
-		root.AssemblyLinearVelocity = Vector3.zero
-	end
+	-- (Facing the way on, the camera behind them: Server.SpawnFacing.)
+	SpawnFacing.place(player, spot)
 	-- A new miner's first dungeon (HUNT BOUNTY): never in without their
 	-- kaiju. A starter roll still owed is given now, and a team called back
 	-- comes out (they follow them in).
@@ -1183,11 +1183,7 @@ local function join(run, player: Player)
 			revive(run, other, player.DisplayName .. " came through the gate: you're back on your feet, kaiju and all, in the cave before the boss.")
 			local root = rootOf(player)
 			if root and other.Character then
-				other.Character:PivotTo(root.CFrame * CFrame.new(4, 0, 0))
-				local theirs = rootOf(other)
-				if theirs then
-					theirs.AssemblyLinearVelocity = Vector3.zero
-				end
+				SpawnFacing.place(other, root.CFrame * CFrame.new(4, 0, 0))
 				KaijuServer.deployTeam(other)
 			end
 			run.Reached[other] = cleared
@@ -1406,7 +1402,14 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 		local id = string.format("R%d", nextId)
 		local rng = Random.new()
 		local origin = CFrame.new(RiftServer.Origin + Vector3.new(-(slot - 1) * RiftServer.SlotGap, 0, 0))
-		local ok, world = pcall(RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id))
+		-- A new miner's first dungeon (HUNT BOUNTY): two caves only, the
+		-- landing and the boss's (RiftRun.FirstRooms), straight to it.
+		local first = false
+		pcall(function()
+			first = bounty and require(script.Parent.IntroRoundsServer).owesDungeon(player)
+		end)
+		local caves = if first then RiftRun.FirstRooms else RiftRun.Rooms
+		local ok, world = pcall(RiftWorld.build, id, origin, rng, RiftRealms.of(boss and boss.Id), caves)
 		if not ok then
 			warn("[Rift] build failed:", world)
 			return reply(false, "The gate won't open just now. Try again in a moment.")
@@ -1417,6 +1420,7 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 			World = world,
 			Rng = rng,
 			Members = {},
+			Rooms = caves, -- (its caves before the boss's)
 			Room = 1,
 			Foes = {},
 			Coming = 0, -- (foes on their way through their tears)
@@ -1459,6 +1463,11 @@ local function enter(player: Player, vein: any, bossId: any, together: any)
 					end
 				end
 			end
+		end
+		if run.Rooms == 0 then
+			-- (No caves to clear first: the boss's level now, whoever's in.)
+			run.BossLevel = RiftRun.bossLevel(levelsOf(run), run.Boss)
+			show(run)
 		end
 	else
 		join(run, player)
@@ -1577,7 +1586,7 @@ local function inviteContext(player: Player, wanted: any)
 			Boss = run.Boss.Name,
 			BossId = run.Boss.Id,
 			Element = run.Boss.Element or run.Element,
-			Cave = math.clamp(run.Room - 1, 0, RiftRun.Rooms),
+			Cave = math.clamp(run.Room - 1, 0, run.Rooms),
 		}
 	end
 	local bossId = type(wanted) == "table" and wanted.Rift
@@ -1777,8 +1786,7 @@ function RiftServer.devJoin(owner: Player, target: Player): (boolean, string)
 	-- (beside them, not at the run's start)
 	local theirs, mine = rootOf(target), rootOf(owner)
 	if theirs and mine and owner.Character then
-		owner.Character:PivotTo(theirs.CFrame * CFrame.new(4, 0, 2))
-		mine.AssemblyLinearVelocity = Vector3.zero
+		SpawnFacing.place(owner, theirs.CFrame * CFrame.new(4, 0, 2))
 	end
 	run.Reached[owner] = run.Reached[target] or run.Reached[owner]
 	return true, "In " .. target.DisplayName .. "'s Rift run."
