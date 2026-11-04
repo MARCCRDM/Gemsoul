@@ -17,6 +17,21 @@ local ArenaSessions = {}
 ArenaSessions.onDungeonLeave = nil
 ArenaSessions.onEnter = nil :: ((Player, boolean) -> ())?
 ArenaSessions.onLeave = nil :: ((Player) -> ())?
+-- Set by Systems/Duels: true while `player` is in a Ranked 1v1 still being
+-- fought (no LEAVE out of it).
+ArenaSessions.holdIn = nil :: ((Player) -> boolean)?
+ArenaSessions.HoldMessage = "No leaving a ranked match: fight it out."
+-- A duel's fighter off the floor (backed through the wall, knocked or
+-- dashed out) is put back on it, this far in from the edge, instead of the
+-- session ending (which forfeits the duel).
+ArenaSessions.PullIn = 4
+-- Where an off-the-floor fighter at `position` goes back to: straight in,
+-- PullIn studs inside the edge of the floor round `center`. Pure.
+function ArenaSessions.pullSpot(center: Vector3, radius: number, position: Vector3): Vector3
+	local offset = Vector3.new(position.X - center.X, 0, position.Z - center.Z)
+	local inward = if offset.Magnitude > 0.1 then offset.Unit else Vector3.new(0, 0, 1)
+	return center + inward * math.max(0, radius - ArenaSessions.PullIn) + Vector3.new(0, 4, 0)
+end
 local busy = {}
 local function enter(player, pvp)
 	if busy[player] or player:GetAttribute("CombatSession") then
@@ -150,6 +165,9 @@ function ArenaSessions.start()
 		if player:GetAttribute("IntroRoundsLeft") and player:GetAttribute("CombatSession") == "Training" then
 			return Shop.reply(false, "Finish your intro rounds first.")
 		end
+		if ArenaSessions.holdIn and ArenaSessions.holdIn(player) then
+			return Shop.reply(false, ArenaSessions.HoldMessage)
+		end
 		return leave(player)
 	end)
 	local function watch(player)
@@ -177,7 +195,26 @@ function ArenaSessions.start()
 			ArenaSessions.onLeave(player)
 		end
 	end)
+	-- Back onto the floor: straight in from where they are, PullIn studs
+	-- inside its edge, facing the way they were, and still.
+	local function pullBack(player: Player, root: BasePart)
+		local center = Combat.arenaCenter(player)
+		local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+		local radius = landmarks and landmarks:GetAttribute("ArenaRadius")
+		if not center or type(radius) ~= "number" then
+			return false
+		end
+		local at = ArenaSessions.pullSpot(center, radius, root.Position)
+		local ok = pcall(function()
+			player.Character:PivotTo(CFrame.new(at) * root.CFrame.Rotation)
+			root.AssemblyLinearVelocity = Vector3.zero
+		end)
+		return ok
+	end
+	ArenaSessions.pullBack = pullBack
 	-- Leaving the floor ends PvP eligibility; re-entry requires an explicit session.
+	-- (Not a duel's: its fighters are put back on it. LEAVE, a knock-out or a
+	-- respawn are the ways out of a duel.)
 	local timer = 0
 	game:GetService("RunService").Heartbeat:Connect(function(dt)
 		timer += dt
@@ -193,7 +230,15 @@ function ArenaSessions.start()
 				and not player:GetAttribute("DungeonId")
 				and not Combat.inArena(root.Position)
 			then
-				leave(player)
+				if
+					not (
+						player:GetAttribute("CombatSession") == "Duel"
+						and player:GetAttribute("MatchId")
+						and pullBack(player, root :: BasePart)
+					)
+				then
+					leave(player)
+				end
 			end
 		end
 	end)

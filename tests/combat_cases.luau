@@ -334,6 +334,22 @@ check(registered.ArenaTraining(a).Ok and not a:GetAttribute("PvPEnabled") and a:
 check(not registered.ArenaPvP(a).Ok,"Switched sessions without leaving")
 check(registered.ArenaLeave(a).Ok and a:GetAttribute("CombatSession")==nil,"Arena leave failed")
 check(registered.ArenaPvP(a).Ok and a:GetAttribute("PvPEnabled") and a:GetAttribute("CombatSession")=="PvP","PvP entry flags")
+do
+ -- A Ranked 1v1 under way (Duels.holdIn): no LEAVE out of it.
+ ArenaSessions.holdIn=function(p) return p==a end
+ local held=registered.ArenaLeave(a)
+ check(not held.Ok and held.Message==ArenaSessions.HoldMessage and a:GetAttribute("CombatSession")=="PvP","Left a ranked match under way")
+ ArenaSessions.holdIn=nil
+ -- Off the floor in a duel: put back on it, PullIn studs inside the edge.
+ local spot=ArenaSessions.pullSpot(arena,30,arena+Vector3.new(36,0,0))
+ local off=(spot-arena)*Vector3.new(1,0,1)
+ check(math.abs(off.Magnitude-(30-ArenaSessions.PullIn))<0.01 and off.Unit:Dot(Vector3.new(1,0,0))>0.99,"Not pulled straight back in")
+ local root=a.Character:FindFirstChild("HumanoidRootPart")
+ local saved=root.Position
+ root.Position=arena+Vector3.new(36,0,0)
+ check(ArenaSessions.pullBack(a,root),"No pull back")
+ root.Position=saved
+end
 Players.PlayerAdded.Fire(c)
 Players.PlayerAdded.Fire(b)
 b.CharacterAdded.Fire()

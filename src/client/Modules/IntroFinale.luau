@@ -416,13 +416,19 @@ local function minions(): boolean
 	caption.Text = IntroFinale.Lines.Minions
 	caption.ZIndex = 3
 	caption.Parent = screen()
+	-- (read out too: Client Modules/Narration's RotMinions, its own caption off)
+	local voiced = 0
+	pcall(function()
+		voiced = require(script.Parent.Narration).play("RotMinions", true)
+	end)
 	local cap = Instance.new("UITextSizeConstraint")
 	cap.MaxTextSize = 26
 	cap.Parent = caption
 	-- Till every minion's through and landed (and the line's had its time).
 	local started = os.clock()
 	local deployed = tonumber(result.Deployed) or 0
-	while os.clock() - started < IntroFinale.CinematicSeconds or workspace:GetServerTimeNow() < deployed do
+	local hold = math.max(IntroFinale.CinematicSeconds, voiced + 0.3)
+	while os.clock() - started < hold or workspace:GetServerTimeNow() < deployed do
 		if os.clock() - started > 20 or away() then
 			break
 		end

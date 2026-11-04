@@ -1756,6 +1756,12 @@ end
 function Duels.start()
 	Shop.register("DuelQueue", join)
 	Shop.register("DuelReturnQueue", autoReturn)
+	-- A Ranked 1v1 under way: no LEAVE out of it (Server.ArenaSessions; its
+	-- floor holds them in too).
+	ArenaSessions.holdIn = function(player: Player): boolean
+		local match = matchOf[player]
+		return match ~= nil and match.Ranked == true and match.State ~= "Done"
+	end
 	Shop.register("DuelCancel", function(player)
 		if not dequeue(player, player.DisplayName .. " left the duel queue.") then
 			return reply(false, "You're not in a queue.")

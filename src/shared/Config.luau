@@ -109,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.27 · 2026-11-04 no landing portal in the first dungeon; ranked after the lobby intro",
+		Build = "1.28 · 2026-11-04 set bonus gem, better piece roll, ranked walls hold, minions voiced",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error

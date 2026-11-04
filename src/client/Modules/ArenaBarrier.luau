@@ -30,6 +30,11 @@ ArenaBarrier.Panels = 40
 ArenaBarrier.Thick = 1.2
 ArenaBarrier.Color = Color3.fromRGB(110, 210, 255)
 ArenaBarrier.Near = 10 -- studs: a panel this close lights up
+-- Through it anyway (a dash or a knock-back past the field): put back
+-- inside, Back studs in from the floor's edge. Only this close past it:
+-- further is the server's own move (LEAVE, back to the Outpost).
+ArenaBarrier.Hold = 12
+ArenaBarrier.Back = 1.5
 ArenaBarrier.DoorHeight = 17 -- studs: up to the gate's lintel (World/Zones/Arena: WALL_HEIGHT - 3)
 ArenaBarrier.Door = { Stone = Color3.fromRGB(29, 58, 100), Seam = Color3.fromRGB(118, 215, 245), Band = Color3.fromRGB(225, 185, 107) }
 
@@ -150,6 +155,7 @@ local function build()
 	end
 	pcall(door, f, center, radius)
 	f:SetAttribute("Center", center)
+	f:SetAttribute("Radius", radius)
 	f.Parent = workspace
 	folder = f
 end
@@ -176,7 +182,22 @@ local function wanted(): boolean
 		return false
 	end
 	local offset = root.Position - center
-	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= radius + 1 and math.abs(offset.Y) < 30
+	-- (up already: kept up a little past the edge, so the hold below can
+	-- put them back)
+	local reach = radius + (if folder then ArenaBarrier.Hold else 1)
+	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= reach and math.abs(offset.Y) < 30
+end
+
+-- Past the field's inner face but not far (ArenaBarrier.Hold): where to put
+-- them back (nil: where they are is fine). Pure.
+function ArenaBarrier.held(position: Vector3, center: Vector3, radius: number): Vector3?
+	local offset = Vector3.new(position.X - center.X, 0, position.Z - center.Z)
+	local distance = offset.Magnitude
+	if distance <= radius + ArenaBarrier.Gap - ArenaBarrier.Thick / 2 or distance > radius + ArenaBarrier.Hold then
+		return nil
+	end
+	local inward = offset.Unit * (radius - ArenaBarrier.Back)
+	return Vector3.new(center.X + inward.X, position.Y, center.Z + inward.Z)
 end
 
 local started = false
@@ -199,6 +220,14 @@ function ArenaBarrier.start()
 		-- Lit where you come near it.
 		if folder then
 			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			local center, radius = folder:GetAttribute("Center"), folder:GetAttribute("Radius")
+			if root and typeof(center) == "Vector3" and type(radius) == "number" then
+				local back = ArenaBarrier.held(root.Position, center, radius)
+				if back then
+					root.CFrame = CFrame.new(back) * root.CFrame.Rotation
+					root.AssemblyLinearVelocity = Vector3.zero
+				end
+			end
 			if root then
 				for _, p in panels do
 					local d = (Vector3.new(p.Position.X, root.Position.Y, p.Position.Z) - root.Position).Magnitude

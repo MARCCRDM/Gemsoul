@@ -178,6 +178,17 @@ for _, name in { "FirstStepsCoach", "IntroRoundsUI", "ArenaBarrier", "SettingsUI
 	check(ok, name .. " didn't start: " .. tostring(problem))
 end
 task.wait(0.1)
+-- The Arena's barrier: through it (a dash, a knock-back), put straight back
+-- inside; up against it, or far off (the server's own move), left alone.
+do
+	local ArenaBarrier = load(clientRef.ArenaBarrier)
+	local Vector3 = roblox.Vector3
+	local c, r = Vector3.new(100, 5, 100), 30
+	check(ArenaBarrier.held(c + Vector3.new(r, 0, 0), c, r) == nil, "Held back while up against the barrier")
+	local back = ArenaBarrier.held(c + Vector3.new(0, 0, -(r + 3)), c, r)
+	check(back ~= nil and math.abs((back - c).Magnitude - (r - ArenaBarrier.Back)) < 0.01 and back.Z < c.Z, "Not put back inside after going through the barrier")
+	check(ArenaBarrier.held(c + Vector3.new(r + ArenaBarrier.Hold + 5, 0, 0), c, r) == nil, "Pulled back from far off (the server's own move)")
+end
 -- The intro rounds' card: a win, a loss, the whole set.
 local IntroRounds = load(sharedRef.IntroRounds)
 local state = IntroRounds.state({ Funnel = {} })
@@ -203,7 +214,7 @@ do -- (mid-roll: the strip's up, every piece on it, the marker over it)
 	check(roll ~= nil and roll.Visible and marker ~= nil and marker.Visible, "The items' roll isn't spinning on the card")
 	check(tiles == 28, "The roll's strip has " .. tiles .. " pieces, not 28")
 end
-task.wait(3.2)
+task.wait(load(clientRef.IntroRoundsUI).RollSeconds + 1.6) -- (the spin, its glide onto yours, the pause)
 do
 	local card = playerGui:FindFirstChild("IntroRounds")
 	local piece = card and card:FindFirstChild("Piece", true)
@@ -271,6 +282,11 @@ do
 	local go = card and card:FindFirstChild("Next", true)
 	check(go and go.Visible and string.find(go.Text, "HUNT BOUNTY", 1, true) == nil, "HUNT BOUNTY again after the first dungeon: " .. tostring(go and go.Text))
 	check(string.find(go.Text, "CONTINUE INTRO ROUNDS", 1, true) ~= nil, "A later win isn't the next round: " .. tostring(go.Text))
+	-- (the SET BONUS strip: what all six pay, three of them won)
+	local bonus = card:FindFirstChild("SetBonus", true)
+	check(bonus and bonus.Visible and bonus:FindFirstChild("Count").Text == "3/6", "No SET BONUS strip on a round's card")
+	check(bonus:FindFirstChild("Pip3").BackgroundColor3 ~= bonus:FindFirstChild("Pip4").BackgroundColor3, "The bonus's pips don't show the rounds won")
+	check(bonus.Position.Y.Offset < go.Position.Y.Offset, "The SET BONUS strip is under the button")
 	attrs.CombatSession = nil
 	task.wait(2)
 end
@@ -278,9 +294,16 @@ load(clientRef.IntroRoundsUI).AutoNext = 1 -- (the loss's card on its way before
 social:Fire("IntroRound", { Phase = "Lost", Round = 2, View = IntroRounds.view(state) })
 task.wait(2)
 for _ = 2, 6 do IntroRounds.won(state, "Rare") end
-social:Fire("IntroRound", { Phase = "Won", Round = 6, Piece = { Slot = "Helmet", Name = "Helm", Rarity = "Rare" }, Coins = 500, View = IntroRounds.view(state) })
+social:Fire("IntroRound", { Phase = "Won", Round = 6, Piece = { Slot = "Helmet", Name = "Helm", Rarity = "Rare" }, Coins = 500, View = IntroRounds.view(state), SetGem = { Name = "Toxic Neon Emerald", Tier = "UltraRare", Element = "Poison", Socketed = false } })
 task.wait(2.5)
 local card = playerGui:FindFirstChild("IntroRounds")
+do -- (the set bonus: the gem revealed once the last piece has landed: out of
+	-- the Arena the card's up 4.5 s after its event, then the piece's quick reel)
+	task.wait(5)
+	local bonus = card:FindFirstChild("SetBonus", true)
+	check(bonus and bonus.Visible and bonus:FindFirstChild("Title").Text == "Toxic Neon Emerald", "The set bonus gem wasn't revealed: " .. tostring(bonus and bonus:FindFirstChild("Title").Text))
+	check(string.find(bonus:FindFirstChild("What").Text, "ULTRA-RARE", 1, true) ~= nil and not bonus:FindFirstChild("Mark").Visible, "The revealed gem's rarity isn't shown")
+end
 check(card ~= nil and card.Enabled, "The intro rounds' card isn't up")
 check(load(clientRef.IntroRoundsUI).busy(), "The set's card is up, but it doesn't hold back what comes after it")
 do -- (the set done: CONTINUE, out to the mines; the first dungeon's off for now, an owner's too)

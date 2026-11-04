@@ -32,6 +32,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local GearRolls = require(ReplicatedStorage.Shared.GearRolls)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
 local Lang = require(ReplicatedStorage.Shared.Lang)
 local GemClient = require(script.Parent.GemClient)
@@ -55,8 +56,11 @@ local HERO_Y = 104 -- (the piece's centre)
 local TRACK_Y = 262 -- (the set's nodes' centres)
 local WELL_Y = 318
 local NODE = 34
+local BONUS_H = 66 -- (the SET BONUS strip, over the well)
+local BONUS_EXTRA = BONUS_H + 10
+local VIOLET = Color3.fromRGB(196, 160, 255) -- (the set bonus's)
 local TILE_W, TILE_H, TILE_GAP = 84, 108, 8 -- (the roll's strip)
-IntroRoundsUI.RollSeconds = 3.2 -- the strip's spin, fast to stopped
+IntroRoundsUI.RollSeconds = 3.6 -- the strip's spin, fast to stopped
 
 local GOLD, INK, FADED, DUSK = Gilt.Gold, Gilt.Ink, Gilt.Faded, Gilt.Dusk
 local STEEL = Gilt.Brass
@@ -401,6 +405,67 @@ local function build()
 		t.TextXAlignment = Enum.TextXAlignment.Center
 	end
 	ui.Bounty = bounty
+	-- The set bonus (Shared.IntroRounds.SetGem): what winning all six pays
+	-- and how close you are; on the last card, the gem itself.
+	local bonus = new("Frame", {
+		Name = "SetBonus",
+		Position = UDim2.fromOffset(PAD, WELL_Y),
+		Size = UDim2.fromOffset(W - PAD * 2, BONUS_H),
+		BackgroundColor3 = Color3.fromRGB(20, 14, 38),
+		BackgroundTransparency = 0.08,
+		Visible = false,
+	}, panel)
+	UiKit.round(bonus, 8)
+	new("UIStroke", { Color = VIOLET, Thickness = 1.5, Transparency = 0.25 }, bonus)
+	-- (the stone: a cut gem's diamond, a "?" on it till it's yours)
+	local stone = new("Frame", {
+		Name = "Stone",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(34, BONUS_H / 2),
+		Size = UDim2.fromOffset(28, 28),
+		Rotation = 45,
+		BackgroundColor3 = Color3.fromRGB(52, 44, 86),
+	}, bonus)
+	UiKit.round(stone, 5)
+	new("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 150, 150)),
+	}, stone)
+	local stoneEdge = new("UIStroke", { Color = Color3.fromRGB(220, 200, 255), Thickness = 1.5, Transparency = 0.3 }, stone)
+	local mark = words(bonus, 17, Color3.fromRGB(230, 214, 255), BLACK)
+	mark.Name = "Mark"
+	mark.Text = "?"
+	mark.AnchorPoint = Vector2.new(0.5, 0.5)
+	mark.Position = UDim2.fromOffset(34, BONUS_H / 2)
+	mark.Size = UDim2.fromOffset(28, 28)
+	mark.ZIndex = 3
+	local function bonusLabel(name: string, y: number, h: number, size: number, color: Color3, font: Enum.Font)
+		local l = words(bonus, size, color, font)
+		l.Name = name
+		l.TextXAlignment = Enum.TextXAlignment.Left
+		l.Position, l.Size = UDim2.fromOffset(62, y), UDim2.fromOffset(W - PAD * 2 - 62 - 104, h)
+		return l
+	end
+	local caption = bonusLabel("Caption", 9, 12, 10, VIOLET, BLACK)
+	local title = bonusLabel("Title", 22, 20, 16, INK, BLACK)
+	title:SetAttribute("NoTranslate", true)
+	local what = bonusLabel("What", 43, 14, 10, FADED, BOLD)
+	what.RichText = true
+	local count = words(bonus, 16, GOLD, BLACK)
+	count.Name = "Count"
+	count.TextXAlignment = Enum.TextXAlignment.Right
+	count.Position, count.Size = UDim2.new(1, -104, 0, 12), UDim2.fromOffset(92, 20)
+	local pips = {}
+	for i = 1, IntroRounds.Count do
+		pips[i] = new("Frame", {
+			Name = "Pip" .. i,
+			Position = UDim2.new(1, -104 + (i - 1) * 15.5, 0, 40),
+			Size = UDim2.fromOffset(12, 6),
+			BackgroundColor3 = Color3.fromRGB(52, 58, 84),
+		}, bonus)
+		UiKit.round(pips[i], 3)
+	end
+	ui.Bonus = { Frame = bonus, Stone = stone, StoneEdge = stoneEdge, Mark = mark, Caption = caption, Title = title, What = what, Count = count, Pips = pips }
 	local left = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0) }, well)
 	row(left, Enum.HorizontalAlignment.Left, 10)
 	ui.WellCaption = fitted(left, 10, GOLD, BLACK, 1)
@@ -573,7 +638,7 @@ local function showModel(piece, mine: number)
 			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(112, 112),
+			Size = UDim2.fromOffset(84, 84), -- (inside the ring: 92 across)
 			Ambient = Color3.fromRGB(190, 186, 200),
 			LightColor = Color3.new(1, 1, 1),
 			LightDirection = Vector3.new(-0.4, -0.8, -0.6),
@@ -721,7 +786,30 @@ local function rollTile(i: number, entry, slot: string)
 	rarity.Text = Lang.translate(string.upper(entry.Rarity or ""))
 	rarity.Position = UDim2.fromOffset(5, 92)
 	rarity.Size = UDim2.new(1, -10, 0, 10)
+	-- (the one under the marker swells as it passes; once it's stopped, the
+	-- others dim)
+	new("UIScale", { Name = "Zoom", Scale = 1 }, tile)
+	local dim = new("Frame", {
+		Name = "Dim",
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 9,
+	}, tile)
+	UiKit.round(dim, 8)
 	return tile
+end
+
+-- Each tile's size by how near the marker it is (`at`: how far the strip's
+-- run, `step`: one tile and its gap): the one under it largest.
+local function zoomTiles(tiles, at: number, step: number)
+	for i, tile in tiles do
+		local zoom = tile:FindFirstChild("Zoom") :: UIScale?
+		if zoom then
+			local off = math.abs((i - 1) * step - at) / step
+			zoom.Scale = 0.88 + 0.22 * math.max(0, 1 - off)
+		end
+	end
 end
 
 -- The roll: the strip runs past the marker, fast then slowing (each piece
@@ -736,6 +824,13 @@ local function spin(piece, list, land: number, mine: number): boolean
 	end
 	ui.Hero.Visible = false
 	ui.Strip.Visible, ui.Marker.Visible = true, true
+	for _, d in ui.Marker:GetDescendants() do
+		if d:IsA("UIStroke") then
+			d.Color = GOLD
+		elseif d:IsA("Frame") and d.BackgroundTransparency < 1 then
+			d.BackgroundColor3 = GOLD
+		end
+	end
 	local step = TILE_W + TILE_GAP
 	local centre = (W - PAD * 2) / 2 - TILE_W / 2
 	-- (it starts a few pieces in, and lands a touch off the middle of its tile)
@@ -767,6 +862,7 @@ local function spin(piece, list, land: number, mine: number): boolean
 		local eased = 1 - (1 - t) ^ 4
 		local at = from + (to - from) * eased
 		ui.Track.Position = UDim2.fromOffset(centre - at, 0)
+		zoomTiles(tiles, at, step)
 		local index = math.clamp(math.floor(at / step + 0.5) + 1, 1, #list)
 		if index ~= last then
 			last = index
@@ -780,23 +876,56 @@ local function spin(piece, list, land: number, mine: number): boolean
 		end
 		task.wait()
 	end
-	-- (settles dead centre on yours, which lights up)
+	-- (glides the last bit to dead centre on yours, which lights up)
+	local settle = TweenInfo.new(0.32, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+	TweenService:Create(ui.Track, settle, { Position = UDim2.fromOffset(centre - (land - 1) * step, 0) }):Play()
+	local glideFrom, glideAt = to, os.clock()
+	while os.clock() - glideAt < 0.32 do
+		if mine ~= shown then
+			return false
+		end
+		local k = math.clamp((os.clock() - glideAt) / 0.32, 0, 1)
+		zoomTiles(tiles, glideFrom + ((land - 1) * step - glideFrom) * math.sin(k * math.pi / 2), step)
+		task.wait()
+	end
 	ui.Track.Position = UDim2.fromOffset(centre - (land - 1) * step, 0)
 	local won = tiles[land]
 	if won then
+		local color = rarityColor(list[land].Rarity)
 		local edge = won:FindFirstChildOfClass("UIStroke")
 		if edge then
 			edge.Thickness, edge.Transparency = 3, 0
 		end
-		-- (it pops, and its glow flares)
-		local pop = new("UIScale", { Scale = 1 }, won)
-		TweenService:Create(pop, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1.12 }):Play()
+		-- (the rest dim; it pops, flashes, and its glow flares; the marker
+		-- takes its colour)
+		for i, tile in tiles do
+			local dim = tile:FindFirstChild("Dim")
+			if i ~= land and dim then
+				TweenService:Create(dim, TweenInfo.new(0.25), { BackgroundTransparency = 0.45 }):Play()
+			end
+		end
+		local zoom = won:FindFirstChild("Zoom")
+		if zoom then
+			zoom.Scale = 1
+			TweenService:Create(zoom, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1.16 }):Play()
+		end
+		local flash = new("Frame", { Name = "Flash", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.15, Size = UDim2.fromScale(1, 1), ZIndex = 10 }, won)
+		UiKit.round(flash, 8)
+		TweenService:Create(flash, TweenInfo.new(0.45), { BackgroundTransparency = 1 }):Play()
 		local halo = won:FindFirstChild("Art") and won.Art:FindFirstChild("Halo")
 		if halo then
-			TweenService:Create(halo, TweenInfo.new(0.3), { BackgroundTransparency = 0.1, Size = UDim2.fromOffset(70, 70) }):Play()
+			TweenService:Create(halo, TweenInfo.new(0.3), { BackgroundTransparency = 0.1, Size = UDim2.fromOffset(74, 74) }):Play()
 		end
+		for _, d in ui.Marker:GetDescendants() do
+			if d:IsA("UIStroke") then
+				d.Color = color
+			elseif d:IsA("Frame") and d.BackgroundTransparency < 1 then
+				d.BackgroundColor3 = color
+			end
+		end
+		UiSound.play("Equip")
 	end
-	task.wait(0.75)
+	task.wait(0.85)
 	if mine ~= shown then
 		return false
 	end
@@ -838,6 +967,15 @@ local function reel(piece, mine: number)
 	end
 	drawPiece(piece)
 	task.spawn(showModel, piece, mine)
+	-- (it pops in, and its glow breathes out)
+	local pop = ui.Hero:FindFirstChild("Pop") :: UIScale?
+	if not pop then
+		pop = new("UIScale", { Name = "Pop", Scale = 1 }, ui.Hero)
+	end
+	pop.Scale = 0.55
+	TweenService:Create(pop, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	ui.Glow[1].BackgroundTransparency = 0.6
+	TweenService:Create(ui.Glow[1], TweenInfo.new(0.9), { BackgroundTransparency = 0.93 }):Play()
 	UiSound.play(if piece.Rarity == "Rare" then "Reward" else "Equip")
 	scale.Scale = fitScale * 1.04
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = fitScale }):Play()
@@ -1141,6 +1279,55 @@ local function bountyBoss(mine: number)
 end
 
 -- Who's next, and the piece beating them wins.
+-- The SET BONUS strip up, over the well (or the bounty): `won` of the six
+-- so far. How much taller the card gets for it.
+local function tierText(tier: string?): string
+	local label = string.upper(Lang.translate(GemConfig.TierLabels[tier or ""] or tier or ""))
+	return string.format('<font color="%s">%s</font>', hex(GemConfig.TierColors[tier or ""] or VIOLET), label)
+end
+local function setBonus(won: number): number
+	local b = ui.Bonus
+	b.Frame.Visible = true
+	b.Stone.BackgroundColor3 = Color3.fromRGB(52, 44, 86)
+	b.Stone.Size = UDim2.fromOffset(28, 28)
+	b.StoneEdge.Color = Color3.fromRGB(220, 200, 255)
+	b.Mark.Visible = true
+	b.Caption.Text = Lang.translate("SET BONUS  ·  WIN ALL 6")
+	b.Title.Text = Lang.translate("A MYSTERY GEM")
+	b.Title.TextColor3 = INK
+	b.What.Text = tierText("Rare") .. "  " .. Lang.translate("or") .. "  " .. tierText("UltraRare")
+	b.Count.Visible = true
+	b.Count.Text = string.format("%d/%d", won, IntroRounds.Count)
+	for i, pip in b.Pips do
+		pip.Visible = true
+		pip.BackgroundColor3 = if i <= won then GOLD else Color3.fromRGB(52, 58, 84)
+	end
+	ui.Well.Position = UDim2.fromOffset(PAD, WELL_Y + BONUS_EXTRA)
+	ui.Bounty.Position = UDim2.fromOffset(PAD, WELL_Y + BONUS_EXTRA)
+	return BONUS_EXTRA
+end
+-- The gem itself (the server's event.SetGem): it pops in, its name in its
+-- rarity's colour, where it went.
+local function revealGem(gem)
+	local b = ui.Bonus
+	local tierColor = GemConfig.TierColors[gem.Tier] or VIOLET
+	b.Mark.Visible = false
+	b.Count.Visible = false
+	for _, pip in b.Pips do
+		pip.Visible = false
+	end
+	b.Stone.BackgroundColor3 = if typeof(gem.Color) == "Color3" then gem.Color else tierColor
+	b.StoneEdge.Color = tierColor
+	b.Caption.Text = Lang.translate("SET BONUS UNLOCKED")
+	b.Title.Text = tostring(gem.Name or "")
+	b.Title.TextColor3 = tierColor
+	b.What.Text = tierText(gem.Tier) .. "  " .. string.upper(string.format(Lang.translate("%s gem"), tostring(gem.Element or ""))) .. "  ·  "
+		.. Lang.translate(if gem.Socketed then "SOCKETED FOR YOU" else "IN YOUR GEMS")
+	b.Stone.Size = UDim2.fromOffset(12, 12)
+	TweenService:Create(b.Stone, TweenInfo.new(0.45, Enum.EasingStyle.Back), { Size = UDim2.fromOffset(32, 32) }):Play()
+	UiSound.play("Reward")
+end
+
 local function nextUp(caption: string, rival)
 	ui.WellCaption.Text = Lang.translate(caption)
 	ui.WellCaption.TextSize = 10
@@ -1170,6 +1357,21 @@ local function show(event)
 	ui.Go:SetAttribute("Auto", nil)
 	choosing = false
 	ui.Bounty.Visible, ui.Well.Visible = false, true
+	ui.Bonus.Frame.Visible = false
+	ui.Well.Position = UDim2.fromOffset(PAD, WELL_Y)
+	ui.Bounty.Position = UDim2.fromOffset(PAD, WELL_Y)
+	-- (the set bonus: its progress on every card till it's won, then the gem)
+	local bonus = 0
+	if event.SetGem then
+		bonus = setBonus(IntroRounds.Count)
+	elseif not view.Done then
+		bonus = setBonus(view.Won or 0)
+	end
+	local function andReveal()
+		if event.SetGem then
+			revealGem(event.SetGem)
+		end
+	end
 	if ui.Key1 then
 		ui.Key1.Visible, ui.Key2.Visible = false, false
 		ui.EnterKey.Visible = keysOnly()
@@ -1202,11 +1404,16 @@ local function show(event)
 		ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
 		ui.Go.Text = Lang.translate(if (event.More or 0) > 0 then "NEXT PIECE" elseif view.Done then "TO THE LOBBY" else "ON TO THE BOSS")
 		ui.GoSub.Text = Lang.translate(if (event.More or 0) > 0 then "Roll it" elseif view.Done then "Your set's complete" else "Follow the beam to the nest")
-		placeButtons(false, false)
+		placeButtons(false, false, bonus)
 		if event.Gem then
 			ui.Extra.Text = Lang.translate(string.format(if event.Auto and (event.Auto.Gems or 0) > 0 then "+ %s gem, socketed for you" else "+ %s gem, in your pouch", event.Gem.Name))
 		end
-		task.spawn(reel, event.Piece, mine)
+		task.spawn(function()
+			reel(event.Piece, mine)
+			if mine == shown then
+				andReveal()
+			end
+		end)
 	elseif event.Phase == "Lost" then
 		kicker(string.format("ROUND %d OF %d  ·  KNOCKED DOWN", event.Round, view.Count), RED)
 		hero(nextRival.Slot, LOCKED, true)
@@ -1215,7 +1422,7 @@ local function show(event)
 		ui.Sub.Text = Lang.translate("Your next try at this round is easier")
 		nextUp("REMATCH", nextRival)
 		-- (no way out mid-set: all six rounds first)
-		placeButtons(false, false)
+		placeButtons(false, false, bonus)
 		task.spawn(countdown, "TRY AGAIN", Lang.translate("Easier this time"), mine)
 	elseif view.Done and event.Hunt == true then
 		-- All six won: the first dungeon next (then the lobby). One way on,
@@ -1227,11 +1434,16 @@ local function show(event)
 		ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
 		ui.Go.Text = Lang.translate("HUNT BOUNTY")
 		ui.GoSub.Text = Lang.translate("Your first dungeon: Bombardiro Drago")
-		placeButtons(false, false, BOUNTY_EXTRA)
+		placeButtons(false, false, BOUNTY_EXTRA + bonus)
 		if ui.Key1 then
 			ui.Key1.Visible, ui.Key2.Visible = false, false
 		end
-		task.spawn(reel, event.Piece, mine)
+		task.spawn(function()
+			reel(event.Piece, mine)
+			if mine == shown then
+				andReveal()
+			end
+		end)
 	elseif view.Done then
 		kicker("STARTER SET COMPLETE", GOLD)
 		ui.WellCaption.Text = string.format("+%d", event.Coins or IntroRounds.SetCoins)
@@ -1242,8 +1454,13 @@ local function show(event)
 		-- (on to the intro's finale: the mines, then your kaiju: Client IntroFinale)
 		ui.Go.Text = Lang.translate("CONTINUE")
 		ui.GoSub.Text = Lang.translate("Out to the mines")
-		placeButtons(false, false)
-		task.spawn(reel, event.Piece, mine)
+		placeButtons(false, false, bonus)
+		task.spawn(function()
+			reel(event.Piece, mine)
+			if mine == shown then
+				andReveal()
+			end
+		end)
 	else
 		kicker(string.format("ROUND %d OF %d  WON", event.Round, view.Count), GOLD)
 		if event.Next == "Dungeon" then
@@ -1253,7 +1470,7 @@ local function show(event)
 			ui.WellMain.Text = Lang.translate("Your kaiju, then the dungeon")
 			ui.WellNote.Text = Lang.translate("Tung Tung Tung Sahur waits")
 			ui.Prize.Visible, ui.PrizeIcon.Visible = false, false
-			placeButtons(true, false)
+			placeButtons(true, false, bonus)
 		elseif event.Hunt == true then
 			-- (one way on: the next event, the first dungeon: HUNT BOUNTY.
 			-- Not the lobby: that opens once it's cleared.)
@@ -1266,10 +1483,10 @@ local function show(event)
 			-- instead (no lobby before the first dungeon).
 			ui.Leave.Text = Lang.translate("CONTINUE ROUNDS")
 			ui.LeaveSub.Text = string.format(Lang.translate("Round %d of %d  ·  your next fight"), (event.Round or 1) + 1, view.Count)
-			placeButtons(true, false, BOUNTY_EXTRA)
+			placeButtons(true, false, BOUNTY_EXTRA + bonus)
 		else
 			nextUp("NEXT", nextRival)
-			placeButtons(false, false)
+			placeButtons(false, false, bonus)
 		end
 		if ui.Key1 then
 			ui.Key1.Visible, ui.Key2.Visible = choosing and keysOnly(), false

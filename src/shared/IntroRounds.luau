@@ -17,7 +17,8 @@
 	Pure, for the server (Server.IntroRoundsServer, Server.Duelist), the
 	client (Client.IntroRoundsUI) and tests.
 
-	  IntroRounds.Count, Order, Rivals, RareChance, SetCoins, GemAfter
+	  IntroRounds.Count, Order, Rivals, RareChance, SetCoins, GemAfter, SetGem
+	  IntroRounds.setGemTier(r) -> "Rare" | "UltraRare"   the set bonus's (r: 0..1)
 	  IntroRounds.state(profile) -> state?      (made for eligible accounts)
 	  IntroRounds.eligible(profile) -> bool     rounds left to win
 	  IntroRounds.round(state) -> number        the round being fought (1..Count)
@@ -56,6 +57,24 @@ IntroRounds.ChoiceAfter = IntroRounds.Count
 -- victory, in place of a run's usual), and a new kaiju (the boss's roll:
 -- Client IntroFinale opens the lobby's intro with it).
 IntroRounds.FirstDungeonCoins = 1000
+-- The set bonus: all six won, a mystery gem (any element), Rare or
+-- Ultra-Rare by these odds; once an account. The round cards show it
+-- coming (Client IntroRoundsUI's SET BONUS strip), the last one reveals it.
+IntroRounds.SetGem = {
+	{ Tier = "Rare", Chance = 0.75 },
+	{ Tier = "UltraRare", Chance = 0.25 },
+}
+-- The set bonus's rarity for a roll `r` (0..1).
+function IntroRounds.setGemTier(r: number): string
+	local at = 0
+	for _, entry in IntroRounds.SetGem do
+		at += entry.Chance
+		if r < at then
+			return entry.Tier
+		end
+	end
+	return IntroRounds.SetGem[#IntroRounds.SetGem].Tier
+end
 
 -- The ladder: who you fight each round, how hard they hit (of a full Arena
 -- rival's damage), how fast they swing (their swing gap, times the rules'),

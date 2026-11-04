@@ -190,6 +190,25 @@ for round = 1, IntroRounds.Count do
 		check(attributes.IntroFinale == nil and profile.IntroFinale == nil, "The finale came before the set's done")
 	end
 end
+-- The set bonus: on the last card, a gem, Rare or Ultra-Rare, once.
+do
+	local last = nil
+	for _, f in fired do
+		if type(f[2]) == "table" and type(f[2].View) == "table" and f[2].View.Done then
+			last = f[2]
+		end
+	end
+	local gem = last and last.SetGem
+	check(gem ~= nil and (gem.Tier == "Rare" or gem.Tier == "UltraRare") and type(gem.Name) == "string", "No set bonus gem on the last card")
+	check(profile.IntroSetGem ~= nil, "The set bonus isn't marked as given")
+	local bonuses = 0
+	for _, f in fired do
+		if type(f[2]) == "table" and f[2].SetGem then
+			bonuses += 1
+		end
+	end
+	check(bonuses == 1, "The set bonus came " .. bonuses .. " times")
+end
 -- The set done: free to leave, and the first dungeon owed before the lobby's intro.
 check(Server.left(player) == 0 and attributes.IntroRoundsLeft == nil, "Still held in the rounds after the set")
 check(profile.IntroFinale == "Dungeon" and attributes.IntroFinale == "Dungeon", "The first dungeon isn't owed after the set")

@@ -8,7 +8,7 @@
 	  "FirstDungeon"    arriving in the first dungeon
 	  "KaijuTeam"       the starter kaiju roll (the spin waits for it)
 
-	  Narration.play(name) -> seconds   reads it (once a visit), returns how
+	  Narration.play(name, quiet?) -> seconds   reads it (once a visit), returns how
 	                                    long it takes (0: already read)
 	  Narration.say(name)               the same, and waits till it's done
 	  Narration.stop()
@@ -32,15 +32,17 @@ Narration.Ids = {
 	Controls = 89929747424764, -- controls.mp3
 	FirstDungeon = 125560006550856, -- first_dungeon.mp3
 	KaijuTeam = 133613092362157, -- kaiju_team.mp3
+	RotMinions = 0, -- rot_minions.mp3
 }
 Narration.Lines = {
 	TrainingBegins = "Welcome, Miner. Your training begins now.",
 	Controls = "Use your abilities to cast. Swing, block and dodge with your combat buttons.",
 	FirstDungeon = "Miner... we don't know what these monsters are. But they come from a different dimension. And they are stealing our resources, and destroying our worlds.",
 	KaijuTeam = "These are your kaiju. These powerful beasts will defend you, at all times. Train them... and heal them with gemsouls.",
+	RotMinions = "These are rot minions. They still try to steal your gems. Your kaijus are trained to fight and defend you.",
 }
 -- How long each one plays (seconds, the files' lengths).
-Narration.Seconds = { TrainingBegins = 3.5, Controls = 5.9, FirstDungeon = 9.7, KaijuTeam = 7.7 }
+Narration.Seconds = { TrainingBegins = 3.5, Controls = 5.9, FirstDungeon = 9.7, KaijuTeam = 7.7, RotMinions = 7.5 }
 Narration.Volume = 1.2
 
 local played: { [string]: boolean } = {}
@@ -96,7 +98,8 @@ function Narration.stop()
 	caption(nil)
 end
 
-function Narration.play(name: string): number
+-- (`quiet`: its voice only, where the scene has its own caption)
+function Narration.play(name: string, quiet: boolean?): number
 	local text = Narration.Lines[name]
 	if not text or played[name] then
 		return 0
@@ -118,7 +121,9 @@ function Narration.play(name: string): number
 			sound = s
 		end)
 	end
-	caption(text)
+	if not quiet then
+		caption(text)
+	end
 	task.delay(seconds + 0.4, function()
 		if mine == shown then
 			Narration.stop()

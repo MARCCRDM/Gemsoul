@@ -113,4 +113,20 @@ do
 	check(R.stage(nil, true) == "Done", "No state: done")
 end
 
+-- The set bonus's odds: Rare three times in four, Ultra-Rare the rest, never
+-- anything else.
+do
+	check(R.setGemTier(0) == "Rare" and R.setGemTier(0.749) == "Rare", "Low rolls aren't Rare")
+	check(R.setGemTier(0.75) == "UltraRare" and R.setGemTier(0.9999) == "UltraRare", "High rolls aren't Ultra-Rare")
+	local ultra, n = 0, 20000
+	math.randomseed(7)
+	for _ = 1, n do
+		local tier = R.setGemTier(math.random())
+		check(tier == "Rare" or tier == "UltraRare", "The set bonus rolled " .. tier)
+		if tier == "UltraRare" then
+			ultra += 1
+		end
+	end
+	check(math.abs(ultra / n - 0.25) < 0.02, "Ultra-Rare came " .. ultra / n .. " of the time")
+end
 print(string.format("PASS: %d intro rounds checks", checks))

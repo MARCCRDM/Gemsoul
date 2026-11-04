@@ -570,6 +570,44 @@ function IntroRoundsServer.dungeonWon(player: Player, where: string): number
 	return paid
 end
 
+-- The set bonus into their gems (Shared.IntroRounds.SetGem's odds): the gem,
+-- or nil if it couldn't be given.
+function IntroRoundsServer.setGem(profile): any
+	local GemGenerator = require(script.Parent.GemGenerator)
+	local ok, gem = pcall(GemGenerator.generate, rng, "MiningStore", {
+		Id = PlayerData.newGemId(),
+		Time = os.time(),
+		Rarity = IntroRounds.setGemTier(rng:NextNumber()),
+	})
+	if not ok or not gem or not Market.give(profile, { Kind = "Gem", Gem = gem }, math.huge, true) then
+		warn("[IntroRounds] couldn't give the set bonus gem: " .. tostring(gem))
+		return nil
+	end
+	profile.IntroSetGem = gem.Id
+	return gem
+end
+-- What the card shows of it: its name, rarity, element, colour, and
+-- whether the best build put it in a socket.
+function IntroRoundsServer.setGemView(profile, gem)
+	local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+	local socketed = false
+	for key, held in (profile.Character or {}) do
+		if type(key) == "string" and string.sub(key, -3) == "Gem" then
+			if held == gem.Id or (type(held) == "table" and held.Id == gem.Id) then
+				socketed = true
+			end
+		end
+	end
+	local shade = GemConfig.shade(gem)
+	return {
+		Name = GemConfig.displayName(gem),
+		Tier = gem.Tier,
+		Element = GemConfig.elementName(gem.Element),
+		Color = shade and shade.Color or nil,
+		Socketed = socketed,
+	}
+end
+
 function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 	local state, profile = stateOf(player)
 	if not state or state.Won >= IntroRounds.Count then
@@ -614,8 +652,17 @@ function IntroRoundsServer.won(player: Player, where: string?, more: number?)
 			event.Gem = { Name = GemConfig.displayName(gem), Element = gem.Element }
 		end
 	end
+	-- All six: the set bonus, a mystery gem, Rare or Ultra-Rare (once an
+	-- account: IntroSetGem), before the best build so it can go in.
+	local setGem = nil
+	if state.Won >= IntroRounds.Count and not (profile :: any).IntroSetGem then
+		setGem = IntroRoundsServer.setGem(profile)
+	end
 	-- Then their best build on, gems and all (no trip to the Inventory).
 	local ok, pieces, gems = pcall(IntroRoundsServer.bestBuild, player, profile)
+	if setGem then
+		event.SetGem = IntroRoundsServer.setGemView(profile, setGem)
+	end
 	if ok and (pieces > 0 or gems > 0) then
 		event.Auto = { Pieces = pieces, Gems = gems }
 	elseif not ok then
