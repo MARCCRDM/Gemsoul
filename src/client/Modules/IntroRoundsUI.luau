@@ -1005,6 +1005,12 @@ end
 local function keysOnly(): boolean
 	return UserInputService.KeyboardEnabled and not UiKit.touchOnly()
 end
+-- HUNT BOUNTY, straight from the Arena into the dungeon: never the lobby
+-- in between. The starter kaiju roll first, here (it owes them a team: the
+-- narrator introduces them, Client KaijuRoll), then the loading screen goes
+-- up and stays till they're inside the Rift; out of the rounds and through
+-- the gate behind it (RiftClient.enterBounty).
+IntroRoundsUI.HuntCover = 25 -- seconds, at most, behind the cover
 function choose(which: string)
 	if busy then
 		return
@@ -1012,9 +1018,42 @@ function choose(which: string)
 	busy = true
 	hide()
 	task.spawn(function()
+		local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+		if GemClient.Profile and Kaiju.rollsOwed(GemClient.Profile) > 0 then
+			local rolled = false
+			pcall(function()
+				require(script.Parent.KaijuRoll).play(function()
+					rolled = true
+				end)
+			end)
+			local started = os.clock()
+			while not rolled and os.clock() - started < IntroRoundsUI.RollWait do
+				task.wait(0.2)
+			end
+		end
+		-- The cover, from now till they're in (or it's given up on).
+		local gaveUp = false
+		local hold = nil
+		pcall(function()
+			hold = require(script.Parent.LoadingFlow).hold("Hunt", {
+				Instant = true,
+				Status = "Into the Rift",
+				Max = IntroRoundsUI.HuntCover,
+				Until = function()
+					return gaveUp or player:GetAttribute("RiftRun") ~= nil
+				end,
+			})
+		end)
+		local function release()
+			gaveUp = true
+			if hold and hold.cancel then
+				pcall(hold.cancel)
+			end
+		end
 		local result = GemClient.request("IntroRoundChoose", which)
 		busy = false
 		if not (result and result.Ok) then
+			release()
 			-- (never left standing on nothing: their next round instead)
 			local again = GemClient.request("IntroRoundNext")
 			if not (again and again.Ok) then
@@ -1023,13 +1062,26 @@ function choose(which: string)
 			return
 		end
 		if result.Choice ~= "Boss" then
+			release()
 			return -- (the first dungeon's done: the server put on their next round)
 		end
-		-- (straight into the bounty's Rift once they're out in the Outpost:
-		-- Client IntroFinale; this card was its window)
+		-- Out of the Arena (behind the cover), then through the gate.
+		local started = os.clock()
+		while player:GetAttribute("CombatSession") ~= nil and os.clock() - started < 6 do
+			task.wait(0.1)
+		end
+		local inside = false
 		pcall(function()
-			require(script.Parent.IntroFinale).offerBoss(true)
+			local IntroFinale = require(script.Parent.IntroFinale)
+			inside = require(script.Parent.RiftClient).enterBounty(IntroFinale.Boss) == true
 		end)
+		if not inside then
+			release()
+			-- (the gate wouldn't open: the bounty's window in the Outpost, as before)
+			pcall(function()
+				require(script.Parent.IntroFinale).offerBoss(true)
+			end)
+		end
 	end)
 end
 

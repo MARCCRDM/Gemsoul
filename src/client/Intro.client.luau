@@ -2247,7 +2247,19 @@ local function revealMoves(kit, after)
 		end
 		done = true
 		live:Disconnect()
-		shade:Destroy()
+		if FastStart.Pick then
+			shade:Destroy()
+		else
+			-- (No picker: the shade stays, plain, as the cover till the
+			-- intro closes. Taken away, the old style picker under it showed
+			-- for a moment while the loadout was equipped.)
+			for _, child in shade:GetChildren() do
+				if child:IsA("GuiObject") then
+					child.Visible = false
+				end
+			end
+			shade.BackgroundTransparency = 0
+		end
 		after()
 	end
 	local fill = frame(track, {

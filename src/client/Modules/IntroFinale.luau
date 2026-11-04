@@ -278,8 +278,6 @@ local function mine()
 	if GroundGuide then
 		pcall(GroundGuide.clear, "IntroFinale")
 	end
-	banner("NICE HIT!", "That's how you mine")
-	task.wait(1.4)
 	banner(nil)
 end
 
@@ -468,7 +466,6 @@ local function kaiju(fight: boolean?)
 		return
 	end
 	GemClient.request("IntroFinale", "Fight")
-	banner("YOUR KAIJU DEFEND YOU", "Train and protect them, and they'll protect you")
 	local started = os.clock()
 	while os.clock() - started < IntroFinale.FightFor and not away() do
 		task.wait(2)
@@ -809,7 +806,6 @@ local function run()
 		-- Kaiju.bossRollsOwed), rolled as soon as they're back.
 		if IntroFinale.dungeonDone() and GemClient.Profile and Kaiju.rollsOwed(GemClient.Profile) == 0 and Kaiju.bossRollsOwed(GemClient.Profile) > 0 then
 			step("Kaiju")
-			banner("BOUNTY CLAIMED", "Your reward: a new kaiju")
 			local rolled = false
 			task.spawn(function()
 				require(script.Parent.KaijuRoll).play(function()
@@ -867,8 +863,6 @@ local function run()
 	end
 	local done = GemClient.request("IntroFinale", "Done")
 	if not going then
-		banner("WELL DONE, MINER", "The Outpost is yours")
-		task.wait(3)
 		banner(nil)
 	end
 	-- A little after, the meteor (its Magma Golem: Server.MeteorGolemServer):
@@ -957,7 +951,6 @@ function IntroFinale.hunt()
 	-- plays first.)
 	if GemClient.Profile and Kaiju.rollsOwed(GemClient.Profile) > 0 then
 		step("Kaiju")
-		banner("YOUR KAIJU TEAM", "They fight beside you in the dungeon")
 		local rolled = false
 		task.spawn(function()
 			require(script.Parent.KaijuRoll).play(function()

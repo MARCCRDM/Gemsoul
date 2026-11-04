@@ -1187,6 +1187,30 @@ do
 	check(kaiju:find("Aggro.add(e.Threat, e.ThreatAt, pet, dealt, now)", 1, true) ~= nil, "A kaiju's blows aren't its own threat")
 end
 
+-- HUNT BOUNTY from the rounds' card: the kaiju roll, then the loading
+-- screen up from before they leave the Arena till they're in the Rift (never
+-- the lobby in between); no praise cards over the intro; the old armor
+-- picker never shows through the intro's cover.
+do
+	local ui = fs.readFile(ROOT .. "/src/client/Modules/IntroRoundsUI.luau")
+	local at = ui:find("function choose(which: string)", 1, true)
+	local body = ui:sub(at, ui:find("\nend\n", at, true))
+	local roll = body:find("KaijuRoll", 1, true)
+	local cover = body:find('LoadingFlow).hold("Hunt"', 1, true)
+	local leave = body:find('GemClient.request("IntroRoundChoose", which)', 1, true)
+	local gate = body:find("enterBounty(IntroFinale.Boss)", 1, true)
+	check(roll and cover and leave and gate and roll < cover and cover < leave and leave < gate, "HUNT BOUNTY shows the lobby before the dungeon")
+	check(body:find('player:GetAttribute("RiftRun") ~= nil', 1, true) ~= nil, "The cover doesn't stay till they're in the Rift")
+	local finale = fs.readFile(ROOT .. "/src/client/Modules/IntroFinale.luau")
+	for _, words in { "WELL DONE, MINER", "NICE HIT!", "BOUNTY CLAIMED", "YOUR KAIJU TEAM", "YOUR KAIJU DEFEND YOU" } do
+		check(finale:find(words, 1, true) == nil, "Still a praise card: " .. words)
+	end
+	local intro = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
+	local p = intro:find("local function proceed()", 1, true)
+	local proceed = intro:sub(p, intro:find("\n\tend\n", p, true))
+	check(proceed:find("if FastStart.Pick then\n\t\t\tshade:Destroy()", 1, true) ~= nil, "The intro's cover comes off over the old armor picker")
+end
+
 print(
 	string.format(
 		"PASS: %d Rift checks (packs and fighters, levels, the ten bosses, first bosses, element tips and the bosses' bite, falling, RESTORE, rewards, the way, the world: walled caves, floor all the way, walls of fire and where they lead, ways home, the sky, healing crystals, the fallen, each boss's realm; the KIT OUT bar under the strip; the gate's lobby, ADJUST ARMOR and invites that take you in; the down card's backup list; %d parts a trip)",
