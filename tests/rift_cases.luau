@@ -1213,6 +1213,15 @@ do
 	local rounds = fs.readFile(ROOT .. "/src/server/Systems/IntroRoundsServer.luau")
 	check(rounds:find('Funnel).reach(player, "Round 1 won")', 1, true) and rounds:find('Funnel).reach(player, "Hunt bounty")', 1, true) and rounds:find('Funnel).reach(player, "Dungeon cleared")', 1, true), "The rounds don't report their funnel steps")
 	check(server:find('Funnel).reach(player, "Dungeon entered")', 1, true) and server:find('Funnel).reach(member, "Dungeon boss")', 1, true), "The first dungeon doesn't report its funnel steps")
+	-- A fight is never seen from behind: the arrival camera backs off while
+	-- the first-person view has it, and the view puts itself back each frame.
+	local third = fs.readFile(ROOT .. "/src/client/Modules/ThirdPerson.luau")
+	check(third:find("or player.CameraMode == Enum.CameraMode.LockFirstPerson", 1, true) ~= nil, "The arrival camera can pull a fight back into third person")
+	-- The starter kaiju roll waits for all six rounds (Server.KaijuServer).
+	local kaijuServer = fs.readFile(ROOT .. "/src/server/Systems/KaijuServer.luau")
+	local held = kaijuServer:find("function KaijuServer.starterHeld", 1, true)
+	local roll = kaijuServer:find("local function rollRequest", 1, true)
+	check(held and roll and kaijuServer:find("KaijuServer.starterHeld(player, profile)", roll, true) and kaijuServer:sub(held, roll):find(".left(player)", 1, true), "The starter roll isn't held till the six rounds are won")
 	local intro = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
 	local p = intro:find("local function proceed()", 1, true)
 	local proceed = intro:sub(p, intro:find("\n\tend\n", p, true))

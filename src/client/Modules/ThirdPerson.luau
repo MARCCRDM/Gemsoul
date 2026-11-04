@@ -53,7 +53,14 @@ function ThirdPerson.enter(destination: CFrame?)
 		-- (A fight has the camera: an Arena session, or a spar in the lobby
 		-- with the kit out. Pulled back to third person under the spar's
 		-- first-person view, the mouse stayed locked to the middle.)
-		if not saved or player:GetAttribute("CombatSession") ~= nil or player:GetAttribute("Spar") == true then
+		if
+			not saved
+			or player:GetAttribute("CombatSession") ~= nil
+			or player:GetAttribute("Spar") == true
+			-- (the fight's first-person view has the camera: never pulled back
+			-- behind it, as on a rejoin straight into the intro's Arena)
+			or player.CameraMode == Enum.CameraMode.LockFirstPerson
+		then
 			-- (Its hold on the zoom goes too, unless the fight's view has the
 			-- camera now: kept, it came back after the fight as the closest
 			-- you could zoom.)

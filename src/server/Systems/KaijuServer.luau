@@ -2833,10 +2833,32 @@ function KaijuServer.ensureStarter(player: Player): number
 	return #claimRoll(player)
 end
 
+-- Whether `player`'s starter roll waits: it's owed, and intro rounds are
+-- still to win (an older save past its first dungeon isn't held).
+function KaijuServer.starterHeld(player: Player, profile: any): boolean
+	if (profile :: any).IntroDungeonCleared then
+		return false
+	end
+	if Kaiju.rollsOwed(profile) == 0 then
+		return false -- (no starter roll owed: a boss or rare roll isn't held)
+	end
+	local ok, left = pcall(function()
+		return require(script.Parent.IntroRoundsServer).left(player)
+	end)
+	return ok and type(left) == "number" and left > 0
+end
+
 local function rollRequest(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return reply(false, "Your profile is still loading.")
+	end
+	-- A new miner's starter roll waits for all six intro rounds (then HUNT
+	-- BOUNTY plays it, before the first dungeon): never mid-set, whatever
+	-- asks for it (a rejoin, a card, the Kennel). Boss and rare rolls aren't
+	-- held; nor an older save whose first dungeon's already behind it.
+	if KaijuServer.starterHeld(player, profile) then
+		return reply(true, "", { Rolls = {}, Held = true })
 	end
 	local roll = prepareRoll(profile)
 	if not roll then
