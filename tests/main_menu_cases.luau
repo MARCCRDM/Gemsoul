@@ -320,11 +320,17 @@ local played = 0
 local menu = MainMenu.build(parent, { OnPlay = function() played += 1 end })
 local root = menu.Root
 check(root and root.Name == "MainMenu", "No menu")
--- Two matching panels.
+-- A title screen, no boxes: the night across it, the banner's art big on
+-- the right (melting into it), the logo, PLAY and the list on the left.
 local left, right = find(root, "Menu"), find(root, "Slides")
-check(left and right and left.Size == right.Size and left.Position.Y.Offset == right.Position.Y.Offset, "The two panels don't match")
-check(right.Position.X.Offset - (left.Position.X.Offset + left.Size.X.Offset) == 40, "The panels' gap isn't even")
-for _, id in { "Play", "Guide", "Updates", "Feedback", "Credits", "Settings", "Logo" } do
+check(left and right and find(root, "Sky") ~= nil, "No night sky behind the menu")
+local artFrame = find(right, "Art")
+check(artFrame and artFrame.Size.X.Offset >= 900 and artFrame.Position.X.Offset > find(left, "Play").Position.X.Offset, "The banner's art isn't big on the right")
+check(find(artFrame, "Picture"):FindFirstChildOfClass("UIGradient") ~= nil and find(artFrame, "Fade") ~= nil, "The art doesn't melt into the night")
+check(find(left, "Logo").ImageRectSize.X > 0, "The logo isn't cut out of the title art")
+check(find(left, "PlayLip") ~= nil and find(left, "Shine") ~= nil, "PLAY isn't the gold plate")
+check(find(root, "Panel") == nil, "Still boxed panels")
+for _, id in { "Play", "Guide", "Updates", "Feedback", "Credits", "Settings", "Logo", "News" } do
 	check(find(left, id) ~= nil, "No " .. id .. " on the left")
 end
 check(find(left, "Version").Text == "v1.10", "No version along the bottom")
@@ -403,7 +409,7 @@ check(slide.Visible and not page.Visible, "BACK didn't go back to the banners")
 fire(find(left, "Guide"), "Activated")
 check(texts(page):find("CONTROLS", 1, true) and texts(page):find("Space: dodge", 1, true), "GUIDE has no controls")
 fire(find(left, "Credits"), "Activated")
-check(texts(page):find("CREDITS", 1, true) and texts(page):find("THANK YOU", 1, true), "No CREDITS")
+check(texts(page):find("CREDITS", 1, true) and texts(page):find("Devvolver / Cpthunchies", 1, true) and texts(page):find("come say hi", 1, true), "No CREDITS")
 fire(find(left, "Feedback"), "Activated")
 local words = find(page, "Words")
 check(words and words:IsA("TextBox"), "FEEDBACK has nowhere to write")

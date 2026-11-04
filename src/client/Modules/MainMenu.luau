@@ -1,13 +1,16 @@
 --[[
 	The main menu, on the title screen (Client Splash) once its intro has
-	played: two matching panels side by side.
+	played: a console game's title screen, no boxes. A night sky across it;
 
-	  left    the logo, PLAY (Enter / A too), then GUIDE, UPDATES, FEEDBACK
-	          and CREDITS, the version and SETTINGS along the bottom
+	  left    the logo, PLAY (a gold plate: Enter / A too), then a list:
+	          GUIDE, UPDATES, FEEDBACK, CREDITS, each with a gem and a hint,
+	          lit under the mouse
 	  right   the banners (Shared.MainMenuContent), one at a time, on by
 	          themselves every SlideSeconds (held a while after a touch):
-	          its picture, tag, words and button, arrows and dots; or a page
-	          (GUIDE, UPDATES, FEEDBACK, CREDITS) with a BACK
+	          its picture big, melting into the night, its tag, title, words
+	          and button over its foot, bars and arrows; or a page (GUIDE,
+	          UPDATES, FEEDBACK, CREDITS) in a glass panel, with a BACK
+	  bottom  what's new, the version and SETTINGS
 
 	A banner's button: a code redeemed there and then (its answer where its
 	words were), a page, or (Bounty, Ranked, Booth) in, and then the bounty
@@ -59,23 +62,31 @@ local FAINT = Color3.fromRGB(120, 126, 140)
 local GOOD = Color3.fromRGB(96, 236, 170)
 local BAD = Color3.fromRGB(255, 120, 110)
 
--- The two layouts, in their own pixels (scaled to fit).
+-- The two layouts, in their own pixels (scaled to fit): a title screen,
+-- the featured banner's art filling the right and melting into the stars,
+-- the logo, PLAY and a list down the left, a strip along the bottom.
 local LAYOUTS = {
 	Desk = {
-		W = 1600, H = 900, Top = 110, Bottom = 790, Side = 100, Gap = 40, Inset = 60,
-		Header = 290, PlayTop = 312, Play = 92, PlayText = 36, Caption = 16,
-		Grid = 62, GridGap = 16, GridText = 21, Foot = 14,
-		Pad = 18, ArtShare = 0.575, ArtScale = Enum.ScaleType.Crop, Tag = 16, Title = 38, Line = 20,
-		Button = 52, ButtonText = 19, Dot = 12, Radius = 22, PageTitle = 28, PageText = 18, PageHead = 22,
+		W = 1600, H = 900,
+		LeftX = 80, LogoY = 40, LogoW = 560, PlayY = 318, PlayW = 520, Play = 104, PlayText = 52, Caption = 15,
+		ListY = 470, Row = 58, RowGap = 6, RowText = 30, Hint = 16, Foot = 14, StripY = 852,
+		ArtX = 560, ArtY = 30, ArtW = 1040, ArtH = 640,
+		WordsX = 700, TagY = 548, Title = 46, Line = 20, ActY = 726, Button = 52, ButtonText = 19, Dot = 12, Tag = 16,
+		PageX = 700, PageY = 70, PageW = 840, PageH = 740,
+		Pad = 18, Radius = 18, PageTitle = 28, PageText = 18, PageHead = 22,
 	},
 	Phone = {
-		W = 844, H = 390, Top = 30, Bottom = 360, Side = 44, Gap = 16, Inset = 20,
-		Header = 124, PlayTop = 132, Play = 46, PlayText = 22, Caption = 11,
-		Grid = 34, GridGap = 8, GridText = 14, Foot = 11,
-		Pad = 10, ArtShare = 0.5, ArtScale = Enum.ScaleType.Fit, Tag = 11, Title = 20, Line = 13,
-		Button = 32, ButtonText = 13, Dot = 9, Radius = 14, PageTitle = 18, PageText = 12, PageHead = 14,
+		W = 844, H = 390,
+		LeftX = 22, LogoY = 8, LogoW = 250, PlayY = 106, PlayW = 280, Play = 52, PlayText = 26, Caption = 10,
+		ListY = 174, Row = 34, RowGap = 4, RowText = 17, Hint = 10, Foot = 11, StripY = 372,
+		ArtX = 300, ArtY = 0, ArtW = 544, ArtH = 300,
+		WordsX = 330, TagY = 176, Title = 22, Line = 12, ActY = 300, Button = 34, ButtonText = 13, Dot = 9, Tag = 11,
+		PageX = 320, PageY = 10, PageW = 504, PageH = 356,
+		Pad = 10, Radius = 12, PageTitle = 18, PageText = 12, PageHead = 14,
 	},
 }
+-- (the logo's part of the title art: its words, without the sky around them)
+MainMenu.LogoRect = { 55, 330, 880, 335 }
 MainMenu.Layouts = LAYOUTS
 
 -- Which layout a screen `screen` big gets, and how far it's scaled.
@@ -300,13 +311,16 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			dot.Visible = i <= #banners
 			dot.BackgroundColor3 = if i == current then GOLD else EDGE
 		end
+		if p.Lay then
+			p.Lay()
+		end
 		-- (a soft fade in)
 		p.Picture.ImageTransparency = 1
 		TweenService:Create(p.Picture, TweenInfo.new(0.35), { ImageTransparency = 0 }):Play()
 	end
 	menu.show = show
 
-	-- The left panel and the right one's frame, for the current layout.
+	-- The title screen, for the current layout.
 	draw = function()
 		local screen = parent.AbsoluteSize
 		local name, scale = MainMenu.layout(screen, UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
@@ -316,148 +330,462 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		end
 		drawn = name
 		local L = LAYOUTS[name]
+		local phone = name == "Phone"
 		IronUi.clear(root) -- (keeps the UIScale)
 		root.Size = UDim2.fromOffset(L.W, L.H)
 		table.clear(slideParts)
-		local colW = math.floor((L.W - 2 * L.Side - L.Gap) / 2)
-		local height = L.Bottom - L.Top
-		local function panel(x: number, nameOf: string): Frame
-			local f = new("Frame", {
-				Name = nameOf,
-				Position = UDim2.fromOffset(x, L.Top),
-				Size = UDim2.fromOffset(colW, height),
-				BackgroundColor3 = PANEL,
-				BackgroundTransparency = 0.08,
-				ZIndex = 20,
-			}, root)
-			round(f, L.Radius)
-			stroke(f, GOLD, 1.5, 0.6)
+		-- A soft glow: a circle fading out from its middle.
+		local function glow(parentOf: Instance, x: number, y: number, r: number, color: Color3, strength: number, z: number)
+			local g = new("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(x, y),
+				Size = UDim2.fromOffset(r * 2, r * 2),
+				BackgroundColor3 = color,
+				BackgroundTransparency = 1 - strength,
+				ZIndex = z,
+			}, parentOf)
+			round(g, r)
 			new("UIGradient", {
-				Rotation = 90,
-				Color = ColorSequence.new(Color3.fromRGB(30, 34, 52), Color3.fromRGB(14, 16, 26)),
-			}, f)
-			return f
+				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }),
+			}, g)
+			return g
 		end
-		-- A dark fade over the bottom of `parent`'s top picture, into the panel.
-		local function fade(parent: GuiObject, share: number)
-			local f = new("Frame", {
-				Name = "Fade",
-				AnchorPoint = Vector2.new(0, 1),
-				Position = UDim2.fromScale(0, 1),
-				Size = UDim2.fromScale(1, share),
-				BackgroundColor3 = Color3.fromRGB(18, 21, 33),
-				ZIndex = 24,
-			}, parent)
-			new("UIGradient", {
-				Rotation = 90,
-				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }),
-			}, f)
-			return f
+		-- A pixel-cut plate: a body, a darker lip under it, a light band on
+		-- top (the logo's look, not a web button's).
+		local function plate(parentOf: Instance, nameOf: string, x: number, y: number, w: number, h: number, face: Color3, z: number): TextButton
+			local lip = new("Frame", {
+				Name = nameOf .. "Lip",
+				Position = UDim2.fromOffset(x, y + math.max(4, math.floor(h * 0.09))),
+				Size = UDim2.fromOffset(w, h),
+				BackgroundColor3 = face:Lerp(Color3.new(0, 0, 0), 0.42),
+				ZIndex = z,
+			}, parentOf)
+			round(lip, 4)
+			local b = new("TextButton", {
+				Name = nameOf,
+				Position = UDim2.fromOffset(x, y),
+				Size = UDim2.fromOffset(w, h),
+				BackgroundColor3 = face,
+				AutoButtonColor = true,
+				Text = "",
+				ZIndex = z + 1,
+			}, parentOf)
+			round(b, 4)
+			local band = new("Frame", {
+				Name = "Band",
+				Position = UDim2.fromOffset(6, 5),
+				Size = UDim2.new(1, -12, 0.4, -5),
+				BackgroundColor3 = face:Lerp(Color3.new(1, 1, 1), 0.38),
+				BackgroundTransparency = 0.62, -- (light: a button's own words show through it)
+				ZIndex = z + 1,
+			}, b)
+			round(band, 3)
+			return b
 		end
 
-		-- Left: logo, PLAY, the four, the version and SETTINGS.
-		local left = panel(L.Side, "Menu")
-		-- The logo across the top, its starfield the panel's header.
-		local logo = new("ImageLabel", {
-			Name = "Logo",
-			Size = UDim2.new(1, 0, 0, L.Header),
-			BackgroundColor3 = Color3.fromRGB(12, 11, 23),
-			Image = "rbxassetid://" .. MainMenu.LogoId,
-			ResampleMode = Enum.ResamplerMode.Pixelated,
-			ScaleType = Enum.ScaleType.Crop,
+		-- The night: deep blue into violet, a few nebulae, pixel stars.
+		local sky = new("Frame", {
+			Name = "Sky",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			ZIndex = 20,
+		}, root)
+		new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.fromRGB(12, 12, 32), Color3.fromRGB(22, 14, 40)),
+		}, sky)
+		for _, n in { { 0.18, 0.2, 0.3, Color3.fromRGB(60, 70, 150) }, { 0.55, 0.85, 0.36, Color3.fromRGB(90, 46, 140) }, { 0.85, 0.15, 0.3, Color3.fromRGB(44, 66, 150) } } do
+			glow(sky, L.W * n[1], L.H * n[2], math.floor(L.W * n[3]), n[4], 0.45, 20)
+		end
+		-- (the same stars every time: a little generator of its own)
+		local seed = 7
+		local function nextNumber(): number
+			seed = (seed * 1103515245 + 12345) % 2147483648
+			return seed / 2147483648
+		end
+		for i = 1, if phone then 70 else 120 do
+			local size = if nextNumber() < 0.8 then 2 else 3
+			new("Frame", {
+				Name = "Star",
+				Position = UDim2.fromOffset(math.floor(nextNumber() * L.W), math.floor(nextNumber() * L.H)),
+				Size = UDim2.fromOffset(size, size),
+				BackgroundColor3 = if i % 3 == 0 then Color3.fromRGB(150, 220, 255) else Color3.new(1, 1, 1),
+				BackgroundTransparency = 0.15 + nextNumber() * 0.6,
+				BorderSizePixel = 0,
+				ZIndex = 20,
+			}, sky)
+		end
+
+		-- Right: the featured banner, its art big, its words over it, and the
+		-- pages in a glass panel in its place.
+		local right = new("Frame", { Name = "Slides", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 21 }, root)
+		local slide = new("Frame", { Name = "Slide", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 21 }, right)
+		slideFrame = slide
+		local art = new("Frame", {
+			Name = "Art",
+			Position = UDim2.fromOffset(L.ArtX, L.ArtY),
+			Size = UDim2.fromOffset(L.ArtW, L.ArtH),
+			BackgroundTransparency = 1,
 			ZIndex = 21,
-		}, left)
-		round(logo, L.Radius)
-		fade(logo, 0.35)
-		local inner = colW - 2 * L.Inset
-		local play = new("TextButton", {
-			Name = "Play",
-			Position = UDim2.fromOffset(L.Inset, L.PlayTop),
-			Size = UDim2.fromOffset(inner, L.Play),
+		}, slide)
+		local halo = glow(art, L.ArtW * 0.55, L.ArtH * 0.45, math.floor(L.ArtH * 0.62), GOLD, 0.25, 21)
+		local fallback = new("Frame", { Name = "Fallback", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 21 }, art)
+		local word = label(fallback, "", L.Title * 2, TEXT, Enum.Font.GothamBlack, {
+			Size = UDim2.fromScale(1, 0.8),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			TextTransparency = 0.82,
+			ZIndex = 22,
+		})
+		local picture = new("ImageLabel", {
+			Name = "Picture",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			ScaleType = Enum.ScaleType.Crop,
+			ZIndex = 23,
+		}, art)
+		-- (melting into the night on its left and along its bottom)
+		new("UIGradient", {
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.32, 0),
+				NumberSequenceKeypoint.new(1, 0),
+			}),
+		}, picture)
+		local floor = new("Frame", {
+			Name = "Fade",
+			AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.fromScale(0, 1),
+			Size = UDim2.fromScale(1, 0.42),
+			BackgroundColor3 = Color3.fromRGB(20, 14, 38),
+			ZIndex = 24,
+		}, art)
+		new("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }),
+		}, floor)
+		-- The words, over the picture's foot.
+		local tagBack = new("Frame", {
+			Name = "Tag",
+			Position = UDim2.fromOffset(L.WordsX, L.TagY),
+			Size = UDim2.fromOffset(100, L.Tag + 14),
 			BackgroundColor3 = GOLD,
-			AutoButtonColor = true,
-			Font = Enum.Font.GothamBlack,
-			Text = "PLAY",
-			TextSize = L.PlayText,
-			TextColor3 = INK,
+			ZIndex = 26,
+		}, slide)
+		round(tagBack, 999)
+		local tag = label(tagBack, "", L.Tag, INK, Enum.Font.GothamBlack, {
+			Size = UDim2.fromScale(1, 1),
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 27,
+		})
+		local wordsW = L.W - L.WordsX - L.Pad * 2
+		local title = label(slide, "", L.Title, TEXT, Enum.Font.GothamBlack, {
+			Name = "Title",
+			Position = UDim2.fromOffset(L.WordsX, L.TagY + L.Tag + 24),
+			Size = UDim2.fromOffset(wordsW, L.Title + 8),
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			ZIndex = 26,
+		})
+		new("UIStroke", { Color = Color3.fromRGB(8, 6, 18), Thickness = if phone then 1.5 else 2.5, Transparency = 0.25 }, title)
+		local line = label(slide, "", L.Line, Color3.fromRGB(214, 218, 232), Enum.Font.GothamMedium, {
+			Name = "Line",
+			Position = UDim2.fromOffset(L.WordsX, L.TagY + L.Tag + 34 + L.Title),
+			Size = UDim2.fromOffset(wordsW, L.Line * 2 + 8),
+			ZIndex = 26,
+		})
+		new("UIStroke", { Color = Color3.fromRGB(8, 6, 18), Thickness = 1, Transparency = 0.5 }, line)
+		local button = plate(slide, "Action", L.WordsX, L.ActY, L.Button * 4, L.Button, GOLD, 26)
+		button.Font = Enum.Font.GothamBlack
+		button.TextSize = L.ButtonText
+		button.TextColor3 = INK
+		button.Activated:Connect(function()
+			act(banners[current])
+		end)
+		IronUi.juice(button, 1.04, 0.96)
+		-- (a code each, when a banner has several: gold plates, side by side)
+		local chips = {}
+		local chipX = L.WordsX
+		for i = 1, 3 do
+			local chip = plate(slide, "Code" .. i, chipX, L.ActY, L.Button * 3, L.Button, GOLD, 26)
+			chip.Font = Enum.Font.GothamBlack
+			chip.TextSize = L.ButtonText
+			chip.TextColor3 = INK
+			chip.Visible = false
+			local lip = slide:FindFirstChild("Code" .. i .. "Lip")
+			chip:GetPropertyChangedSignal("Visible"):Connect(function()
+				if lip then
+					lip.Visible = chip.Visible
+				end
+			end)
+			chip.Activated:Connect(function()
+				if chip.Text ~= "" then
+					redeem(chip.Text)
+				end
+			end)
+			IronUi.juice(chip, 1.04, 0.96)
+			chips[i] = chip
+		end
+		-- (the chips laid side by side as wide as their codes; the lips follow)
+		local function layChips()
+			local x = L.WordsX
+			for i, chip in chips do
+				chip.Position = UDim2.fromOffset(x, L.ActY)
+				local lip = slide:FindFirstChild("Code" .. i .. "Lip")
+				if lip then
+					lip.Position = UDim2.fromOffset(x, L.ActY + math.max(4, math.floor(L.Button * 0.09)))
+					lip.Size = chip.Size
+					lip.Visible = chip.Visible
+				end
+				if chip.Visible then
+					x += chip.Size.X.Offset + 12
+				end
+			end
+			local actionLip = slide:FindFirstChild("ActionLip")
+			if actionLip then
+				actionLip.Size = button.Size
+				actionLip.Visible = button.Visible
+			end
+		end
+		-- The bars (one a banner, the lit one gold) and the arrows as plates.
+		local dots = {}
+		local barY = L.ActY + L.Button + (if phone then 14 else 26)
+		for i = 1, 8 do
+			local dot = new("TextButton", {
+				Name = "Dot" .. i,
+				Position = UDim2.fromOffset(L.WordsX + (i - 1) * (L.Dot * 5), barY),
+				Size = UDim2.fromOffset(L.Dot * 4, math.max(4, math.floor(L.Dot * 0.5))),
+				BackgroundColor3 = EDGE,
+				Text = "",
+				ZIndex = 26,
+			}, slide)
+			round(dot, 4)
+			dot.Activated:Connect(function()
+				hold()
+				show(i)
+			end)
+			dots[i] = dot
+		end
+		for side, step in { [0] = -1, [1] = 1 } do
+			local size = L.Button
+			local arrow = plate(slide, if step < 0 then "Back" else "Next", L.W - L.Pad * 2 - (2 - side) * (size + 10), barY - size / 2 - 2, size, size, Color3.fromRGB(46, 50, 76), 26)
+			arrow.Font = Enum.Font.GothamBlack
+			arrow.Text = if step < 0 then "‹" else "›"
+			arrow.TextSize = math.floor(size * 0.7)
+			arrow.TextColor3 = TEXT
+			arrow.Activated:Connect(function()
+				hold()
+				show(current + step)
+			end)
+		end
+		slideParts = {
+			Picture = picture, Fallback = fallback, FallbackWord = word, FallbackGlow = halo,
+			Tag = tag, TagBack = tagBack, Title = title, Line = line, Button = button,
+			Chips = chips, Dots = dots, Lay = layChips,
+		}
+
+		-- Left: the logo, PLAY, the list.
+		local left = new("Frame", { Name = "Menu", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 22 }, root)
+		-- (a shade behind it, so the words read over the stars and the art)
+		local shade = new("Frame", {
+			Name = "Shade",
+			Size = UDim2.new(0, L.LeftX + L.PlayW + 160, 1, 0),
+			BackgroundColor3 = Color3.fromRGB(8, 8, 20),
 			ZIndex = 22,
 		}, left)
-		round(play, 14)
-		local lip = new("Frame", {
-			AnchorPoint = Vector2.new(0, 1),
-			Position = UDim2.new(0, 0, 1, 0),
-			Size = UDim2.new(1, 0, 0, 8),
-			BackgroundColor3 = GOLD_DARK,
-			ZIndex = 21,
+		new("UIGradient", {
+			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(0.7, 0.55), NumberSequenceKeypoint.new(1, 1) }),
+		}, shade)
+		local rect = MainMenu.LogoRect
+		local logoH = math.floor(L.LogoW * rect[4] / rect[3])
+		local logo = new("ImageLabel", {
+			Name = "Logo",
+			Position = UDim2.fromOffset(L.LeftX, L.LogoY),
+			Size = UDim2.fromOffset(L.LogoW, logoH),
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://" .. MainMenu.LogoId,
+			ImageRectOffset = Vector2.new(rect[1], rect[2]),
+			ImageRectSize = Vector2.new(rect[3], rect[4]),
+			ResampleMode = Enum.ResamplerMode.Pixelated,
+			ScaleType = Enum.ScaleType.Fit,
+			ZIndex = 23,
+		}, left)
+		-- PLAY: the big gold plate, a shine across it now and then.
+		local play = plate(left, "Play", L.LeftX, L.PlayY, L.PlayW, L.Play, Color3.fromRGB(255, 186, 58), 23)
+		play.ClipsDescendants = true
+		label(play, "▶  PLAY", L.PlayText, INK, Enum.Font.GothamBlack, {
+			Name = "Words",
+			Position = UDim2.fromOffset(math.floor(L.Play * 0.36), 0),
+			Size = UDim2.new(1, 0, 0.78, 0),
+			TextWrapped = false,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 26,
+		})
+		label(play, "INTO THE OUTPOST", L.Caption, Color3.fromRGB(110, 60, 10), Enum.Font.GothamBold, {
+			Name = "Caption",
+			Position = UDim2.new(0, math.floor(L.Play * 0.4), 1, -(L.Caption + math.floor(L.Play * 0.14))),
+			Size = UDim2.new(0.6, 0, 0, L.Caption + 4),
+			TextWrapped = false,
+			ZIndex = 26,
+		})
+		local shine = new("Frame", {
+			Name = "Shine",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(-0.2, 0, 0.5, 0),
+			Size = UDim2.new(0, math.floor(L.Play * 0.42), 2, 0),
+			Rotation = 24,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.6,
+			BorderSizePixel = 0,
+			ZIndex = 25,
 		}, play)
-		round(lip, 6)
+		IronUi.animate(shine, function(t)
+			local k = (t % 3.2) / 0.9
+			shine.Position = UDim2.new(-0.2 + math.min(1, k) * 1.4, 0, 0.5, 0)
+		end)
 		play:SetAttribute("UiSound", "Open")
 		play.Activated:Connect(function()
 			onPlay()
 		end)
 		IronUi.juice(play, 1.03, 0.97)
-		-- (a slow breath, so the eye finds it)
-		IronUi.animate(play, function(t)
-			play.BackgroundColor3 = GOLD:Lerp(Color3.fromRGB(255, 226, 150), (math.sin(t * 2.4) + 1) / 2 * 0.35)
-		end)
 		playButton = play
 		if not UserInputService.TouchEnabled or UserInputService.KeyboardEnabled then
-			local key = label(play, "ENTER", L.Foot, GOLD, Enum.Font.GothamBlack, {
+			local key = label(play, "ENTER", L.Foot + 4, Color3.fromRGB(255, 236, 200), Enum.Font.GothamBlack, {
 				Name = "Key",
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -18, 0.5, -3),
-				Size = UDim2.fromOffset(L.Foot * 5.4, L.Foot + 14),
-				BackgroundColor3 = INK,
+				Position = UDim2.new(1, -22, 0.5, -2),
+				Size = UDim2.fromOffset((L.Foot + 4) * 5.2, L.Foot + 22),
+				BackgroundColor3 = Color3.fromRGB(90, 44, 6),
 				BackgroundTransparency = 0.15,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextYAlignment = Enum.TextYAlignment.Center,
-				ZIndex = 23,
+				ZIndex = 26,
 			})
-			round(key, 8)
+			round(key, 6)
 		end
-		local captionText = "Into the Outpost"
-		label(left, captionText, L.Caption, DIM, Enum.Font.GothamMedium, {
-			Name = "Caption",
-			Position = UDim2.fromOffset(0, L.PlayTop + L.Play + 8),
-			Size = UDim2.new(1, 0, 0, L.Caption + 4),
-			TextXAlignment = Enum.TextXAlignment.Center,
-			ZIndex = 21,
-		})
-		local gridTop = L.PlayTop + L.Play + L.Caption + 24
-		local bw = math.floor((inner - L.GridGap) / 2)
+		-- The list: a gem, the word, a hint; lit under the mouse (or its page open).
+		local rows = {}
+		local function light()
+			for id, row in rows do
+				local on = row.Hover or openPage == id
+				row.Bar.Visible = on
+				row.Gem.BackgroundColor3 = if on then GOLD else Color3.fromRGB(110, 120, 150)
+				row.Button.TextColor3 = if on then TEXT else Color3.fromRGB(210, 212, 226)
+			end
+		end
+		menu.light = light
+		local hints = { Guide = "How to play", Updates = "What's new", Feedback = "A bug or an idea", Credits = "" }
 		for i, entry in { { "GUIDE", "Guide" }, { "UPDATES", "Updates" }, { "FEEDBACK", "Feedback" }, { "CREDITS", "Credits" } } do
-			local col, row = (i - 1) % 2, (i - 1) // 2
+			local y = L.ListY + (i - 1) * (L.Row + L.RowGap)
+			local bar = new("Frame", {
+				Name = "Lit",
+				Position = UDim2.fromOffset(L.LeftX, y),
+				Size = UDim2.fromOffset(L.PlayW, L.Row),
+				BackgroundColor3 = GOLD,
+				BackgroundTransparency = 0.6,
+				Visible = false,
+				ZIndex = 23,
+			}, left)
+			new("UIGradient", {
+				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }),
+			}, bar)
+			new("Frame", { Name = "Edge", Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = GOLD, ZIndex = 24 }, bar)
+			local gem = new("Frame", {
+				Name = "Gem",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(L.LeftX + math.floor(L.Row * 0.5), y + L.Row / 2),
+				Size = UDim2.fromOffset(math.floor(L.RowText * 0.55), math.floor(L.RowText * 0.55)),
+				Rotation = 45,
+				BackgroundColor3 = Color3.fromRGB(110, 120, 150),
+				ZIndex = 24,
+			}, left)
 			local b = new("TextButton", {
 				Name = entry[2],
-				Position = UDim2.fromOffset(L.Inset + col * (bw + L.GridGap), gridTop + row * (L.Grid + L.GridGap)),
-				Size = UDim2.fromOffset(bw, L.Grid),
-				BackgroundColor3 = Color3.fromRGB(32, 37, 56),
-				AutoButtonColor = true,
+				Position = UDim2.fromOffset(L.LeftX + L.Row, y),
+				Size = UDim2.fromOffset(L.PlayW - L.Row, L.Row),
+				BackgroundTransparency = 1,
 				Font = Enum.Font.GothamBlack,
 				Text = entry[1],
-				TextSize = L.GridText,
-				TextColor3 = TEXT,
-				ZIndex = 22,
+				TextSize = L.RowText,
+				TextColor3 = Color3.fromRGB(210, 212, 226),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ZIndex = 24,
 			}, left)
-			round(b, 12)
-			stroke(b, EDGE, 1.5, 0.2)
+			if hints[entry[2]] ~= "" and not phone then
+				label(left, hints[entry[2]], L.Hint, FAINT, Enum.Font.GothamMedium, {
+					Name = "Hint",
+					Position = UDim2.fromOffset(L.LeftX + L.Row + widthOf(entry[1], L.RowText, Enum.Font.GothamBlack) + 16, y),
+					Size = UDim2.fromOffset(240, L.Row),
+					TextWrapped = false,
+					TextYAlignment = Enum.TextYAlignment.Center,
+					ZIndex = 24,
+				})
+			end
 			b:SetAttribute("UiSound", "Open")
 			b.Activated:Connect(function()
 				menu.page(entry[2])
 			end)
-			IronUi.juice(b, 1.03, 0.97)
+			local row = { Bar = bar, Gem = gem, Button = b, Hover = false }
+			rows[entry[2]] = row
+			pcall(function()
+				b.MouseEnter:Connect(function()
+					row.Hover = true
+					light()
+				end)
+				b.MouseLeave:Connect(function()
+					row.Hover = false
+					light()
+				end)
+			end)
 		end
-		local foot = height - L.Foot - 26
-		label(left, Content.version(Config.Playtest and Config.Playtest.Build), L.Foot, FAINT, Enum.Font.GothamMedium, {
+		-- The strip along the bottom: what's new, the version, SETTINGS.
+		new("Frame", {
+			Name = "Rule",
+			Position = UDim2.fromOffset(L.LeftX, L.StripY - 18),
+			Size = UDim2.fromOffset(L.W - 2 * L.LeftX, 1),
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.85,
+			BorderSizePixel = 0,
+			ZIndex = 24,
+		}, left)
+		if not phone then
+			local news = {}
+			for _, update in Content.Updates do
+				for _, text in update.Lines do
+					if #news < 4 then
+						table.insert(news, (string.gsub(text, "[%.:].*$", "")))
+					end
+				end
+			end
+			label(left, "NEW", L.Foot, GOLD, Enum.Font.GothamBlack, {
+				Name = "New",
+				Position = UDim2.fromOffset(L.LeftX, L.StripY - 8),
+				Size = UDim2.fromOffset(44, L.Foot + 4),
+				ZIndex = 24,
+			})
+			label(left, table.concat(news, "   ◆   "), L.Foot, DIM, Enum.Font.GothamMedium, {
+				Name = "News",
+				Position = UDim2.fromOffset(L.LeftX + 50, L.StripY - 8),
+				Size = UDim2.fromOffset(L.W - 2 * L.LeftX - 320, L.Foot + 4),
+				TextWrapped = false,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				ZIndex = 24,
+			})
+		end
+		label(left, Content.version(Config.Playtest and Config.Playtest.Build), L.Foot, DIM, Enum.Font.GothamBold, {
 			Name = "Version",
-			Position = UDim2.fromOffset(L.Inset, foot),
-			Size = UDim2.fromOffset(inner / 2, L.Foot + 4),
-			ZIndex = 21,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.fromOffset(L.W - L.LeftX - 130, L.StripY - 8),
+			Size = UDim2.fromOffset(80, L.Foot + 4),
+			TextXAlignment = Enum.TextXAlignment.Right,
+			ZIndex = 24,
 		})
 		local settings = new("TextButton", {
 			Name = "Settings",
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.fromOffset(L.Inset + inner, foot - 6),
+			Position = UDim2.fromOffset(L.W - L.LeftX, L.StripY - 14),
 			Size = UDim2.fromOffset(110, L.Foot + 16),
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamBold,
@@ -465,7 +793,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			TextSize = L.Foot,
 			TextColor3 = DIM,
 			TextXAlignment = Enum.TextXAlignment.Right,
-			ZIndex = 22,
+			ZIndex = 24,
 		}, left)
 		settings.Activated:Connect(function()
 			pcall(function()
@@ -479,191 +807,18 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			end)
 		end)
 
-		-- Right: the banners, and the pages in their place.
-		local right = panel(L.Side + colW + L.Gap, "Slides")
-		right.ClipsDescendants = true
-		local slide = new("Frame", { Name = "Slide", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 21 }, right)
-		slideFrame = slide
-		local artH = math.floor(height * L.ArtShare)
-		local art = new("Frame", {
-			Name = "Art",
-			Size = UDim2.new(1, 0, 0, artH),
-			BackgroundColor3 = Color3.fromRGB(16, 18, 30),
-			ClipsDescendants = true,
+		-- A page: a glass panel over the art.
+		local page = new("Frame", {
+			Name = "Page",
+			Position = UDim2.fromOffset(L.PageX, L.PageY),
+			Size = UDim2.fromOffset(L.PageW, L.PageH),
+			BackgroundColor3 = Color3.fromRGB(14, 14, 30),
+			BackgroundTransparency = 0.08,
+			Visible = false,
 			ZIndex = 21,
-		}, slide)
-		round(art, L.Radius)
-		fade(art, 0.22)
-		local fallback = new("Frame", { Name = "Fallback", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 21 }, art)
-		local glow = new("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.55),
-			Size = UDim2.fromScale(1.2, 1.4),
-			BackgroundColor3 = GOLD,
-			BackgroundTransparency = 0.55,
-			ZIndex = 21,
-		}, fallback)
-		new("UIGradient", {
-			Transparency = NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 1),
-				NumberSequenceKeypoint.new(0.5, 0.2),
-				NumberSequenceKeypoint.new(1, 1),
-			}),
-			Rotation = 90,
-		}, glow)
-		local word = label(fallback, "", L.Title * 2, TEXT, Enum.Font.GothamBlack, {
-			Size = UDim2.fromScale(1, 1),
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextYAlignment = Enum.TextYAlignment.Center,
-			TextTransparency = 0.82,
-			ZIndex = 22,
-		})
-		local picture = new("ImageLabel", {
-			Name = "Picture",
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 1),
-			ScaleType = L.ArtScale, -- (whole on a phone: its box is wider than the pictures)
-			ZIndex = 23,
-		}, art)
-		local tagBack = new("Frame", {
-			Name = "Tag",
-			Position = UDim2.fromOffset(L.Pad + 14, L.Pad + 14),
-			Size = UDim2.fromOffset(100, L.Tag + 14),
-			BackgroundColor3 = GOLD,
-			ZIndex = 24,
-		}, slide)
-		round(tagBack, 8)
-		local tag = label(tagBack, "", L.Tag, INK, Enum.Font.GothamBlack, {
-			Size = UDim2.fromScale(1, 1),
-			TextWrapped = false,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextYAlignment = Enum.TextYAlignment.Center,
-			ZIndex = 25,
-		})
-		-- (the arrows, over the picture's sides)
-		for side, step in { [0] = -1, [1] = 1 } do
-			local arrow = new("TextButton", {
-				Name = if step < 0 then "Back" else "Next",
-				AnchorPoint = Vector2.new(side, 0.5),
-				Position = UDim2.new(side, if step < 0 then L.Pad else -L.Pad, 0, artH / 2),
-				Size = UDim2.fromOffset(math.floor(L.Title * 0.75), math.floor(L.Title * 1.4)),
-				BackgroundColor3 = INK,
-				BackgroundTransparency = 0.25,
-				Font = Enum.Font.GothamBlack,
-				Text = if step < 0 then "‹" else "›",
-				TextSize = math.floor(L.Title * 0.9),
-				TextColor3 = TEXT,
-				ZIndex = 26,
-			}, slide)
-			round(arrow, 8)
-			arrow.Activated:Connect(function()
-				hold()
-				show(current + step)
-			end)
-		end
-		local textTop = artH + math.floor(L.Title * 0.35)
-		local textLeft = L.Pad + 10
-		local title = label(slide, "", L.Title, TEXT, Enum.Font.GothamBlack, {
-			Name = "Title",
-			Position = UDim2.fromOffset(textLeft, textTop),
-			Size = UDim2.new(1, -2 * textLeft, 0, L.Title + 6),
-			TextWrapped = false,
-			TextScaled = false,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			ZIndex = 22,
-		})
-		local line = label(slide, "", L.Line, Color3.fromRGB(196, 202, 216), Enum.Font.GothamMedium, {
-			Name = "Line",
-			Position = UDim2.fromOffset(textLeft, textTop + L.Title + 14),
-			Size = UDim2.new(1, -2 * textLeft, 0, L.Line * 3 + 8),
-			ZIndex = 22,
-		})
-		local bottom = height - L.Pad - 14 - L.Button
-		local button = new("TextButton", {
-			Name = "Action",
-			Position = UDim2.fromOffset(textLeft, bottom),
-			Size = UDim2.fromOffset(L.Button * 4, L.Button),
-			BackgroundColor3 = GOLD,
-			Font = Enum.Font.GothamBlack,
-			Text = "",
-			TextSize = L.ButtonText,
-			TextColor3 = INK,
-			ZIndex = 22,
-		}, slide)
-		round(button, 12)
-		button.Activated:Connect(function()
-			act(banners[current])
-		end)
-		IronUi.juice(button, 1.03, 0.97)
-		-- (a code each, when a banner has several)
-		local chips = {}
-		local chipRow = new("Frame", {
-			Name = "Codes",
-			Position = UDim2.fromOffset(textLeft, bottom),
-			Size = UDim2.new(1, -2 * textLeft - 5 * (L.Dot + 12), 0, L.Button),
-			BackgroundTransparency = 1,
-			ZIndex = 22,
-		}, slide)
-		new("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			Padding = UDim.new(0, 10),
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-		}, chipRow)
-		for i = 1, 3 do
-			local chip = new("TextButton", {
-				Name = "Code" .. i,
-				Size = UDim2.fromOffset(L.Button * 3, L.Button),
-				BackgroundColor3 = GOLD,
-				Font = Enum.Font.GothamBlack,
-				Text = "",
-				TextSize = L.ButtonText,
-				TextColor3 = INK,
-				Visible = false,
-				ZIndex = 23,
-			}, chipRow)
-			round(chip, 10)
-			chip.Activated:Connect(function()
-				if chip.Text ~= "" then
-					redeem(chip.Text)
-				end
-			end)
-			chips[i] = chip
-		end
-		local dots = {}
-		for i = 1, 8 do
-			local dot = new("TextButton", {
-				Name = "Dot" .. i,
-				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -(L.Pad + 14) - (8 - i) * (L.Dot + 12), 0, bottom + L.Button / 2),
-				Size = UDim2.fromOffset(L.Dot, L.Dot),
-				BackgroundColor3 = EDGE,
-				Text = "",
-				ZIndex = 22,
-			}, slide)
-			round(dot, L.Dot)
-			dot.Activated:Connect(function()
-				hold()
-				show(i)
-			end)
-			dots[i] = dot
-		end
-		-- (the dots in use, packed to the right)
-		local function packDots()
-			local n = math.min(#banners, #dots)
-			for i, dot in dots do
-				local k = n - i
-				dot.Position = UDim2.new(1, -(L.Pad + 14) - k * (L.Dot + 12), 0, bottom + L.Button / 2)
-			end
-		end
-		packDots()
-		slideParts = {
-			Picture = picture, Fallback = fallback, FallbackWord = word, FallbackGlow = glow,
-			Tag = tag, TagBack = tagBack, Title = title, Line = line, Button = button,
-			Chips = chips, Dots = dots,
-		}
-
-		-- A page in the banners' place: its title, BACK, and what's on it.
-		local page = new("Frame", { Name = "Page", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 21 }, right)
+		}, right)
+		round(page, L.Radius)
+		stroke(page, GOLD, 1.5, 0.5)
 		pageFrame = page
 		show(current)
 		if openPage then
@@ -671,6 +826,7 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			openPage = nil
 			menu.page(again)
 		end
+		light()
 	end
 
 	-- The pages ------------------------------------------------------------
@@ -829,6 +985,9 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		openPage = name
 		slideFrame.Visible = name == nil
 		page.Visible = name ~= nil
+		if menu.light then
+			menu.light()
+		end
 		if not name then
 			show(current)
 			return

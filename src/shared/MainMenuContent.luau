@@ -183,10 +183,11 @@ MainMenuContent.Updates = {
 }
 
 MainMenuContent.Credits = {
-	{ Title = "SAGA MINERS", Lines = { "Made by the Saga Miners team." } },
-	{ Title = "NARRATION", Lines = { "George, voiced with Kokoro TTS." } },
-	{ Title = "BUILT WITH", Lines = { "Roblox Studio, Rojo and Luau." } },
-	{ Title = "THANK YOU", Lines = { "Every miner who plays, reports a bug or sends an idea." } },
+	{ Title = "MADE BY MARC", Lines = { "Developed and designed by Marc (Devvolver / Cpthunchies)." } },
+	{
+		Title = "HEY MINERS!",
+		Lines = { "I hope you love playing Saga Miners as much as I love making it. If you see me in a lobby, come say hi!" },
+	},
 }
 
 -- The banners up at `now`: those not past their end, in order.
