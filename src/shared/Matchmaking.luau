@@ -14,7 +14,10 @@
 	  Matchmaking.playsRounds(mode, kind)  does this match play rounds?
 	  Matchmaking.roundsOver(wins, played)  the match winner, "Draw" or nil
 	  Matchmaking.pair(entries, now)  pairs queue entries ({ Rating, Since,
-	                              Size }), longest-waiting first
+	                              Size }), longest-waiting first: any two
+	                              searching meet, the closest rating preferred
+	  Matchmaking.CrossAfter      seconds a lone 1v1 Ranked and a lone 1v1
+	                              Casual search wait before they meet (Casual)
 	  Matchmaking.ReadySeconds    a pairing's MATCH READY window: everyone in it
 	                              joins, or nobody fights (Systems/Duels)
 	  Matchmaking.lane(slot, team, index, size)  where a fighter stands in a
@@ -42,6 +45,12 @@ Matchmaking.Modes = {
 	-- never by the PLAY menu; one fight on even stats.
 	["intro"] = { Name = "First Fight", Size = 1, Kind = "FirstFight", Intro = true },
 }
+-- A lone 1v1 Ranked search and a lone 1v1 Casual one: after this long each,
+-- they meet anyway, as a Casual match (unrated: nobody's rating is put on
+-- a match they didn't queue for).
+Matchmaking.CrossAfter = 5
+Matchmaking.CrossModes = { "1v1", "casual" }
+Matchmaking.CrossMode = "casual"
 Matchmaking.StartRating = 1000
 Matchmaking.K = 32
 Matchmaking.Countdown = 4 -- seconds: shielded, facing off
@@ -221,7 +230,9 @@ function Matchmaking.window(seconds: number): number
 end
 
 -- Returns { { i, j } } index pairs into `entries`. The longest-waiting entry
--- takes the closest rating inside the wider of the two windows.
+-- takes the closest rating: inside the wider of the two windows if anyone
+-- is, and otherwise whoever's nearest. Two searching always meet: a match
+-- now beats a closer one later (a quiet server never leaves them waiting).
 function Matchmaking.pair(entries, now: number)
 	local order = {}
 	for i in entries do
@@ -239,8 +250,10 @@ function Matchmaking.pair(entries, now: number)
 					local window =
 						math.max(Matchmaking.window(now - entries[i].Since), Matchmaking.window(now - entries[j].Since))
 					local distance = math.abs(entries[i].Rating - entries[j].Rating)
-					if distance <= window and distance < gap then
-						best, gap = j, distance
+					-- (outside every window: still a match, behind any inside one)
+					local score = if distance <= window then distance else 1e6 + distance
+					if score < gap then
+						best, gap = j, score
 					end
 				end
 			end

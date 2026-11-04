@@ -1743,6 +1743,38 @@ function Duels.pairUp()
 			end
 		end
 	end
+	Duels.crossPair()
+end
+
+-- A lone 1v1 Ranked search and a lone 1v1 Casual one, each waiting
+-- Matchmaking.CrossAfter with nobody in their own queue: they meet anyway,
+-- as Casual (unrated), MATCH READY as always.
+function Duels.crossPair()
+	local now = os.clock()
+	local lone = {}
+	for _, mode in Matchmaking.CrossModes do
+		for _, entry in queue do
+			if
+				entry.Mode == mode
+				and entry.Size == 1
+				and not entry.Check
+				and not (entry.Hold and now < entry.Hold)
+				and now - entry.Since >= Matchmaking.CrossAfter
+				and (lone[mode] == nil or entry.Since < lone[mode].Since)
+			then
+				lone[mode] = entry
+			end
+		end
+	end
+	local a, b = lone[Matchmaking.CrossModes[1]], lone[Matchmaking.CrossModes[2]]
+	if not (a and b) or not freeSlot() or lanesFree() <= 0 then
+		return
+	end
+	local mode = Matchmaking.CrossMode
+	local kind = Matchmaking.Modes[mode].Kind
+	openCheck(mode, { { Players = a.Players, Entry = a }, { Players = b.Players, Entry = b } }, function()
+		return startMatch(mode, { table.clone(a.Players), table.clone(b.Players) }, PvPRules.profile(kind), { Called = {} })
+	end, nil, {})
 end
 
 -- Challenges -----------------------------------------------------------------

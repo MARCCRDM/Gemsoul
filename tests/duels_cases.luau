@@ -41,6 +41,17 @@ check(
 	#Matchmaking.pair({ entries[1], { Rating = 1500, Since = 0, Size = 1 } }, 20) == 1,
 	"A long wait never widened the window"
 )
+-- Two searching always meet, however far apart, at once.
+check(
+	#Matchmaking.pair({ { Rating = 1000, Since = 0, Size = 1 }, { Rating = 2400, Since = 0, Size = 1 } }, 0) == 1,
+	"Two searching left waiting over a rating gap"
+)
+do
+	-- (one inside the window still beats one outside it)
+	local three = { { Rating = 1000, Since = 0, Size = 1 }, { Rating = 3000, Since = 1, Size = 1 }, { Rating = 1080, Since = 2, Size = 1 } }
+	local p = Matchmaking.pair(three, 2)
+	check(#p == 1 and p[1][2] == 3, "Skipped the close rating for a far one")
+end
 local function stub(attrs)
 	return {
 		GetAttribute = function(_, k)
@@ -854,7 +865,8 @@ do
 		not AutoQueue.settled(nil, 100) and AutoQueue.settled(0, AutoQueue.Settle) and not AutoQueue.settled(0, AutoQueue.Settle - 1),
 		"Settled after logging in"
 	)
-	check(AutoQueue.holdUntil(5, 7) == 5 + AutoQueue.Settle and AutoQueue.holdUntil(nil, 7) == 7 + AutoQueue.Settle, "An auto search's hold")
+	check(AutoQueue.holdUntil(5, 7) == 5 + AutoQueue.SearchHold and AutoQueue.holdUntil(nil, 7) == 7 + AutoQueue.SearchHold, "An auto search's hold")
+	check(AutoQueue.SearchHold <= 5, "An auto search held too long after arriving")
 	local lia, max = makePlayer(51, "Lia"), makePlayer(52, "Max")
 	lobby(lia, 4)
 	check(handlers.DuelQueue(ivy, "casual").Ok, "Ivy not queued")
@@ -1128,6 +1140,22 @@ do
 	check(last(a, "MatchReady") and last(b, "MatchReady"), "Two auto-queued players weren't asked MATCH READY")
 	joinAll()
 	check(Duels.matchOf(a) ~= nil and Duels.matchOf(a) == Duels.matchOf(b), "Two auto-queued players weren't paired")
+	-- A lone Ranked search and a lone Casual one meet as Casual, after a moment.
+	do
+		local r, c2 = makePlayer(91, "RankedLone"), makePlayer(92, "CasualLone")
+		for _, p in { r, c2 } do
+			p:SetAttribute("Outpost", true)
+		end
+		check(handlers.DuelQueue(r, "1v1").Ok and handlers.DuelQueue(c2, "casual").Ok, "Couldn't queue Ranked and Casual")
+		Duels.pairUp()
+		check(last(r, "MatchReady") == nil, "Ranked met Casual before its own queue had a moment")
+		advance(Matchmaking.CrossAfter + 0.5)
+		Duels.pairUp()
+		check(last(r, "MatchReady") and last(c2, "MatchReady"), "A lone Ranked and a lone Casual search never met")
+		joinAll()
+		local m = Duels.matchOf(r)
+		check(m ~= nil and m == Duels.matchOf(c2) and m.Mode == "casual", "Ranked and Casual didn't fight a Casual match")
+	end
 	-- Off: no search; switching it off leaves the queue, on joins it.
 	local c = makePlayer(83, "QuietMiner")
 	c:SetAttribute("Outpost", true)

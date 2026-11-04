@@ -57,6 +57,7 @@ AutoQueue.CallAfter = 8 -- seconds a 1v1 queue waits before the lobby is called
 AutoQueue.AskSeconds = 15 -- how long a fill-in offer stands
 AutoQueue.FillBonus = 20 -- first-fight join bonus; other fill-ins retain the win bonus
 AutoQueue.Settle = 20 -- seconds after you first reach the lobby before you're asked to join anything
+AutoQueue.SearchHold = 5 -- seconds after you first reach the lobby before your auto search can be matched
 AutoQueue.CarryFor = 60 -- seconds a taken-down fill-in card's bonus waits for that same queue
 AutoQueue.Intro = {
 	-- On: a first fight waits a moment (BotAfter) for another new miner in
@@ -121,7 +122,7 @@ end
 
 -- When an auto search started now may first be asked MATCH READY.
 function AutoQueue.holdUntil(arrivedAt: number?, now: number): number
-	return (arrivedAt or now) + AutoQueue.Settle
+	return (arrivedAt or now) + AutoQueue.SearchHold
 end
 
 -- Where an intro search is after `waited` seconds alone.
