@@ -77,7 +77,9 @@ Dungeon.Bosses = {
 		Moves = { "FlameBreath", "TailSweep", "FirebombDive" },
 		Threat = 1,
 		Loot = "Helmets",
-		Starter = { Level = 2, Health = 0.6, Foes = 1, Damage = 0.65, Adds = 2 },
+		-- (the intro's first dungeon boss: a little softer than the other
+		-- first boss, Chimpanzini)
+		Starter = { Level = 2, Health = 0.45, Foes = 1, Damage = 0.5, Adds = 2 },
 	},
 	{
 		Id = "Paperotti",
