@@ -342,7 +342,11 @@ local function release(match)
 					member.Character:SetAttribute("RoundKO", nil)
 				end
 				if member:GetAttribute("CombatSession") == "Duel" then
-					ArenaSessions.leave(member)
+					-- (a new miner in the intro, after a first fight: out of the
+					-- duel where they stand, their round's card up; CONTINUE or
+					-- REMATCH from here, never a trip to the Outpost first)
+					local stay = match.Intro and IntroRounds.eligible(PlayerData.get(member))
+					ArenaSessions.leave(member, stay)
 				end
 				local humanoid = alive(member)
 				if humanoid then
@@ -583,15 +587,19 @@ function finish(match, winner: number?, reason: string)
 				-- step on this), and the Outpost is next.
 				if match.FirstFighters[member] then
 					member:SetAttribute("FirstFight", nil)
-					-- (And the floor arrows walk them through it: a mech, a
-					-- few rocks, out to the outskirts. Client IntroGuide.)
-					member:SetAttribute("IntroGuide", true)
-					Remotes.Notify:FireClient(
-						member,
-						if won
-							then string.format("You beat %s! Welcome to the Saga Outpost.", names[if t == 1 then 2 else 1])
-							else "A hard first fight. Welcome to the Saga Outpost: gear up and come back."
-					)
+					-- (An account from before the intro rounds: the floor arrows
+					-- walk them through the Outpost: a mech, a few rocks, out to
+					-- the outskirts, Client IntroGuide. A new miner's next step
+					-- is their round's card, in the Arena: never the Outpost's.)
+					if not IntroRounds.eligible(PlayerData.get(member)) then
+						member:SetAttribute("IntroGuide", true)
+						Remotes.Notify:FireClient(
+							member,
+							if won
+								then string.format("You beat %s! Welcome to the Saga Outpost.", names[if t == 1 then 2 else 1])
+								else "A hard first fight. Welcome to the Saga Outpost: gear up and come back."
+						)
+					end
 				end
 			end
 		end
@@ -1007,7 +1015,25 @@ end
 -- round goes to the other side. Between rounds, nothing lands.
 local function lethal(player: Player, humanoid: Humanoid): boolean
 	local match = matchOf[player]
-	if not match or not match.Rounds or match.State == "Done" then
+	if not match or match.State == "Done" then
+		return false
+	end
+	-- A first fight (the intro's, two new miners): nobody dies in it. The
+	-- loser's knocked out where they stand (blown apart, as in a Ranked
+	-- round) and the fight's over; no respawn back in the lobby, no
+	-- loading in the middle of their first minutes.
+	if match.Intro and not match.Rounds then
+		if match.State == "Fight" then
+			humanoid.Health = 1
+			local character = player.Character
+			if character then
+				character:SetAttribute("RoundKO", true)
+			end
+			task.defer(knockOut, match, player, "Defeated")
+		end
+		return true
+	end
+	if not match.Rounds then
 		return false
 	end
 	if match.State == "Fight" then

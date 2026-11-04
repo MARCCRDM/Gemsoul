@@ -87,7 +87,9 @@ local function enter(player, pvp)
 			else "Training Arena: a sparring partner steps in. Player damage is off."
 	)
 end
-local function leave(player)
+-- (`stay`: out of the session where they stand, no trip back: a new
+-- miner after a first fight, their round's card up)
+local function leave(player, stay: boolean?)
 	if player.Character then
 		ArenaDrop.cancel(player.Character)
 	end
@@ -133,6 +135,9 @@ local function leave(player)
 				character:SetAttribute(name, nil)
 			end
 		end)
+	end
+	if stay then
+		return Shop.reply(true, "")
 	end
 	local spawn = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 	-- Came from the Saga Outpost (a duel challenged there): back to it.

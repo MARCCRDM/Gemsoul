@@ -999,12 +999,30 @@ do
 	-- fight between them; going on with the rounds takes the offer off.
 	do
 		local r1, r2 = makePlayer(45, "Rin"), makePlayer(46, "Sol")
+		-- (new miners, their intro rounds ahead of them)
+		for _, p in { r1, r2 } do
+			profiles[p].Funnel = {}
+			profiles[p].IntroRounds = { Won = 0, Losses = 0, Pieces = {} }
+		end
 		check(handlers.IntroQueue(r1).Ok and handlers.IntroQueue(r2).Ok, "Rin and Sol couldn't queue their first fight")
 		advance(0.25)
 		local first = Duels.matchOf(r1)
 		check(first and Duels.matchOf(r2) == first, "Rin and Sol weren't paired")
 		advance(Matchmaking.Countdown)
 		lethalBlow(r2)
+		-- Nobody dies in a first fight: knocked out where they stand, no
+		-- respawn in the lobby; and a new miner's next step is their round's
+		-- card, not the old walk through the Outpost.
+		check(r2.Humanoid.Health > 0 and r2.Character:GetAttribute("RoundKO") == true, "The first fight's loser died (a respawn in the lobby)")
+		check(r1:GetAttribute("IntroGuide") == nil and r2:GetAttribute("IntroGuide") == nil, "New miners mid-intro were sent on the Outpost's walk")
+		local welcomed = false
+		for _, who in { r1, r2 } do
+			local note = last(who, "Notify")
+			if note and string.find(tostring(note[2]), "Welcome to the Saga Outpost", 1, true) then
+				welcomed = true
+			end
+		end
+		check(not welcomed, "New miners mid-intro were welcomed to the Outpost after their first fight")
 		check(first.State == "Done" and r1:GetAttribute("IntroRematch") == "Sol" and r2:GetAttribute("IntroRematch") == "Rin", "No REMATCH on offer after two new miners' first fight")
 		local asked = handlers.IntroRematch(r1)
 		check(asked.Ok and asked.Waiting and Duels.matchOf(r1) == first, "One asking started the rematch")
@@ -1012,6 +1030,7 @@ do
 		local both = handlers.IntroRematch(r2)
 		check(both.Ok and both.Started, "Both asking didn't start the rematch")
 		advance(Matchmaking.EndPause)
+		check(r1.LeftStaying and r2.LeftStaying, "New miners were sent back to the Outpost after their first fight")
 		respawn(r1, r2)
 		advance(1)
 		local again = Duels.matchOf(r1)

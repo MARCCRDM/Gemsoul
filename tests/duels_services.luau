@@ -308,7 +308,8 @@ end
 -- The sparring rival's session (the intro queue's fallback): each entry, recorded.
 local trainingEntered = {}
 local ArenaSessions = {
-	leave = function(p)
+	leave = function(p, stay)
+		p.LeftStaying = stay == true -- (out where they stand: a new miner after a first fight)
 		p:SetAttribute("CombatSession", nil)
 		p:SetAttribute("PvPEnabled", false)
 	end,
