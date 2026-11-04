@@ -72,4 +72,18 @@ riftAnswer = { true, "In Kun's Rift run." }
 local result = Spectate.join(owner)
 check(result.Ok and joined[1] == owner and joined[2] == other, "JOIN didn't put the owner into their run")
 check(not Spectate.join(owner).Ok, "Still watching after joining")
+-- Watching never looks like taking them over: the watcher's own fight view
+-- (first person, which would sit them in the other's head) and their own
+-- controls stand down while watching, and come back after (Client
+-- DungeonPlaytest's WATCH, Client Combat).
+do
+	local client = fs.readFile(ROOT .. "/src/client/DungeonPlaytest.client.luau")
+	local w = client:find("local function watch(other: Player)", 1, true)
+	local st = client:find("local function stop()", 1, true)
+	check(w and client:find("ownControls(false)", w, true), "Watching leaves the watcher's own controls on")
+	check(st and client:find("ownControls(true)", st, true) and client:find("controls:Disable()", 1, true) and client:find("controls:Enable()", 1, true), "Stopping doesn't give the watcher their controls back")
+	check(client:find('SetAttribute("DevWatching"', 1, true) ~= nil, "Nothing tells the fight view someone's being watched")
+	local combat = fs.readFile(ROOT .. "/src/client/Combat.client.luau")
+	check(combat:find('and not player:GetAttribute("DevWatching")', 1, true) ~= nil, "The fight view stays on while watching someone")
+end
 print(string.format("PASS: %d dev spectate checks (JOIN: owners only, someone watched, in a dungeon, the Rift's word passed on, the watching over)", checks))

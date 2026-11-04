@@ -612,11 +612,26 @@ do
 		return table.concat(bits, " · ")
 	end
 	local camera = workspace.CurrentCamera
+	-- (while watching: your own character stands still, your keys move
+	-- nothing, and the fight view stands down: Client Combat's DevWatching)
+	local function ownControls(on: boolean)
+		player:SetAttribute("DevWatching", if on then nil else true)
+		pcall(function()
+			local module = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule", 5) :: any)
+			local controls = module:GetControls()
+			if on then
+				controls:Enable()
+			else
+				controls:Disable()
+			end
+		end)
+	end
 	local function stop()
 		if not target then
 			return
 		end
 		target = nil
+		ownControls(true)
 		banner.Visible = false
 		joinButton.Visible = false
 		game:GetService("RunService"):UnbindFromRenderStep("DevWatch")
@@ -643,6 +658,7 @@ do
 		end
 		saved = saved or { player.CameraMode, player.CameraMaxZoomDistance, player.CameraMinZoomDistance }
 		target = other
+		ownControls(false)
 		banner.Visible = true
 		status.Text = result.Message
 		-- (each frame: other scenes set the camera too; this one wins while watching)

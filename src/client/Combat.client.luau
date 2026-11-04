@@ -1544,7 +1544,11 @@ local shown = {
 RunService.RenderStepped:Connect(function(dt)
 	-- The combat HUD never draws over the menu dashboard.
 	local dashboard = player.PlayerGui:FindFirstChild("Dashboard")
-	local fight = canFight() == true and not (dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled)
+	-- (nor while an Owner watches someone: DEV > WATCH, its own camera behind
+	-- them; the fight view would put them inside the other's head)
+	local fight = canFight() == true
+		and not (dashboard and dashboard:IsA("ScreenGui") and dashboard.Enabled)
+		and not player:GetAttribute("DevWatching")
 	gui.Enabled = fight
 	damageGui.Enabled = fight
 	-- The lock stays on through menus and a free cursor; only its camera pull pauses.
