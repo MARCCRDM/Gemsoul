@@ -682,6 +682,7 @@ do
 		joinButton.Visible = false
 		povButton.Visible = false
 		game:GetService("RunService"):UnbindFromRenderStep("DevWatch")
+		game:GetService("RunService"):UnbindFromRenderStep("DevWatchEyes")
 		pcall(function()
 			request:InvokeServer("DevSpectate", nil)
 		end)
@@ -703,15 +704,28 @@ do
 			status.Text = if ok and result then result.Message else "Couldn't watch them."
 			return
 		end
-		saved = saved or { player.CameraMode, player.CameraMaxZoomDistance, player.CameraMinZoomDistance }
+		-- (how the camera was, to put back on STOP: never the fight view's
+		-- first-person lock, which came back as a camera stuck zoomed in)
+		if not saved then
+			if player.CameraMode == Enum.CameraMode.LockFirstPerson or player.CameraMaxZoomDistance < 2 then
+				saved = { Enum.CameraMode.Classic, 40, 6 }
+			else
+				saved = { player.CameraMode, player.CameraMaxZoomDistance, player.CameraMinZoomDistance }
+			end
+		end
 		target = other
 		ownControls(false)
 		unveil()
 		banner.Visible = true
 		povButton.Visible = true
 		status.Text = result.Message
-		-- (each frame: other scenes set the camera too; this one wins while watching)
-		game:GetService("RunService"):BindToRenderStep("DevWatch", Enum.RenderPriority.Camera.Value + 5, function(dt)
+		-- (each frame, before Roblox's camera moves: other scenes set the
+		-- camera too (an arrival, a respawn); this one wins while watching.
+		-- The mouse stays free: VIEW, PREV, NEXT and STOP are clicked.)
+		local RunService = game:GetService("RunService")
+		RunService:UnbindFromRenderStep("DevWatch")
+		RunService:UnbindFromRenderStep("DevWatchEyes")
+		RunService:BindToRenderStep("DevWatch", Enum.RenderPriority.Camera.Value - 2, function()
 			if not target or not target.Parent then
 				stop()
 				return
@@ -719,15 +733,12 @@ do
 			joinButton.Visible = target:GetAttribute("RiftRun") ~= nil and player:GetAttribute("RiftRun") ~= target:GetAttribute("RiftRun")
 			local character = target.Character
 			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-			local head = character and character:FindFirstChild("Head")
+			local UserInputService = game:GetService("UserInputService")
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			UserInputService.MouseIconEnabled = true
 			player.CameraMode = Enum.CameraMode.Classic
-			if pov == "Eyes" and head and head:IsA("BasePart") then
-				-- (from just in front of their eyes, the way their head faces;
-				-- smoothed, so their steps don't shake it)
-				veil(character)
+			if pov == "Eyes" then
 				camera.CameraType = Enum.CameraType.Scriptable
-				local goal = head.CFrame * CFrame.new(0, 0.25, -0.7)
-				camera.CFrame = camera.CFrame:Lerp(goal, math.min(1, dt * 14))
 			elseif humanoid then
 				unveil()
 				player.CameraMaxZoomDistance = 45
@@ -736,6 +747,22 @@ do
 				if camera.CameraSubject ~= humanoid then
 					camera.CameraSubject = humanoid
 				end
+			end
+		end)
+		-- (their eyes: after every other camera this frame)
+		RunService:BindToRenderStep("DevWatchEyes", Enum.RenderPriority.Last.Value, function(dt)
+			if pov ~= "Eyes" or not target then
+				return
+			end
+			local character = target.Character
+			local head = character and character:FindFirstChild("Head")
+			if head and head:IsA("BasePart") then
+				-- (from just in front of their eyes, the way their head faces;
+				-- smoothed, so their steps don't shake it)
+				veil(character)
+				camera.CameraType = Enum.CameraType.Scriptable
+				local goal = head.CFrame * CFrame.new(0, 0.25, -0.7)
+				camera.CFrame = camera.CFrame:Lerp(goal, math.min(1, dt * 14))
 			end
 		end)
 	end

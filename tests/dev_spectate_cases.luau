@@ -89,6 +89,14 @@ do
 	check(client:find('"VIEW: THEIR EYES"', 1, true) and client:find('"VIEW: BEHIND"', 1, true), "No choice of view while watching")
 	check(client:find("Enum.CameraType.Scriptable", 1, true) and client:find("head.CFrame * CFrame.new(", 1, true), "Their eyes isn't a camera on their head")
 	check(client:find("LocalTransparencyModifier = 1", 1, true) and st and client:find("unveil()", st, true), "Their head stays in the way, or stays hidden after")
+	-- STOP never puts back the fight view's first-person lock (a camera stuck
+	-- zoomed in after), the mouse is free while watching, and nothing else
+	-- pulls the camera away (Client ThirdPerson's arrival stands down).
+	check(client:find("if player.CameraMode == Enum.CameraMode.LockFirstPerson or player.CameraMaxZoomDistance < 2 then", 1, true) ~= nil, "STOP can put back the fight's first-person lock")
+	check(client:find("UserInputService.MouseBehavior = Enum.MouseBehavior.Default", w, true) ~= nil, "The mouse can stay locked while watching")
+	check(client:find('UnbindFromRenderStep("DevWatchEyes")', st, true) ~= nil, "Their eyes' camera outlives STOP")
+	local third = fs.readFile(ROOT .. "/src/client/Modules/ThirdPerson.luau")
+	check(third:find('player:GetAttribute("DevWatching") == true', 1, true) ~= nil, "The arrival camera pulls the view off the one watched")
 	local combat = fs.readFile(ROOT .. "/src/client/Combat.client.luau")
 	check(combat:find('and not player:GetAttribute("DevWatching")', 1, true) ~= nil, "The fight view stays on while watching someone")
 end

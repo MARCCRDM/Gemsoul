@@ -60,6 +60,8 @@ function ThirdPerson.enter(destination: CFrame?)
 			-- (the fight's first-person view has the camera: never pulled back
 			-- behind it, as on a rejoin straight into the intro's Arena)
 			or player.CameraMode == Enum.CameraMode.LockFirstPerson
+			-- (an Owner watching someone: DEV > WATCH has the camera)
+			or player:GetAttribute("DevWatching") == true
 		then
 			-- (Its hold on the zoom goes too, unless the fight's view has the
 			-- camera now: kept, it came back after the fight as the closest
