@@ -1216,7 +1216,7 @@ local function toggleTree()
 	CombatGuide.close()
 	AugmentTreeUI.toggle()
 	cursorFree = AugmentTreeUI.isOpen()
-	FirstPerson.setCursorFree(cursorFree)
+	FirstPerson.setCursorFree(cursorFree, true)
 end
 ContextActionService:BindActionAtPriority("CombatAugmentTree", function(_, state)
 	if not canFight() then
@@ -1272,8 +1272,10 @@ UserInputService.InputEnded:Connect(function(obj)
 		setBlock(false)
 	end
 end)
+-- Tab or Enter: the mouse free (the screen dims and says how back), or the
+-- fight view again.
 ContextActionService:BindActionAtPriority("CombatCursor", function(_, state)
-	if not canFight() then
+	if not canFight() or UserInputService:GetFocusedTextBox() then
 		return Enum.ContextActionResult.Pass
 	end
 	if state == Enum.UserInputState.Begin then
@@ -1288,7 +1290,7 @@ ContextActionService:BindActionAtPriority("CombatCursor", function(_, state)
 		FirstPerson.setCursorFree(cursorFree)
 	end
 	return Enum.ContextActionResult.Sink
-end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Tab)
+end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Tab, Enum.KeyCode.Return, Enum.KeyCode.KeypadEnter)
 tabKey.Button.Activated:Connect(function()
 	if not cursorFree then
 		return
@@ -1328,6 +1330,14 @@ do
 		end)
 	end)
 end -- (in a block: this script is at Roblox's 200 locals)
+-- The dim's ESC / ENTER / SPACE buttons, and Roblox's menu opening over it
+-- (Escape): back to the fight view (Client FirstPersonCombat).
+FirstPerson.onBack(function()
+	if cursorFree and not CombatGuide.isOpen() and not AugmentTreeUI.isOpen() then
+		cursorFree = false
+		FirstPerson.setCursorFree(false)
+	end
+end)
 -- Switch between the targets close around you (within TargetLockRules.SwitchRange).
 ContextActionService:BindActionAtPriority("SwitchTarget", function(_, state)
 	if not canFight() or UserInputService:GetFocusedTextBox() then
@@ -1354,7 +1364,13 @@ ContextActionService:BindActionAtPriority("UniversalDodge", function(_, state)
 		return Enum.ContextActionResult.Pass
 	end
 	if state == Enum.UserInputState.Begin then
-		dodge()
+		-- (the mouse free, no window up: Space is back to the fight, not a dodge)
+		if cursorFree and not CombatGuide.isOpen() and not AugmentTreeUI.isOpen() then
+			cursorFree = false
+			FirstPerson.setCursorFree(false)
+		else
+			dodge()
+		end
 	end
 	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 10, Enum.KeyCode.Space)
@@ -1568,7 +1584,7 @@ RunService.RenderStepped:Connect(function(dt)
 		end)()
 	if guideOpen ~= guideWasOpen then
 		cursorFree = guideOpen
-		FirstPerson.setCursorFree(cursorFree)
+		FirstPerson.setCursorFree(cursorFree, true) -- (a window has the mouse: no dim)
 	end
 	guideWasOpen = guideOpen
 	if not shown.Active then

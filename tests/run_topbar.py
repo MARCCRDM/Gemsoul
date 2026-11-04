@@ -23,6 +23,7 @@ COVERS = {
     "src/client/Modules/MeteorGolemFx.luau": "the Meteor Golem's entrance: letterbox bars and its centred name, no buttons",
     "src/client/Modules/IntroFinale.luau": "the intro's finale: the minions' letterbox bars, a banner under the strip (70 px down) and centred windows",
     "src/client/Modules/FirstDungeonUI.luau": "the Rot Beachhead's loading slides: full-screen art and centred words, no buttons up top",
+    "src/client/Modules/FirstPersonCombat.luau": "the MOUSE FREE dim: a full-screen shade, its words and key buttons centred, nothing up top",
 }
 HELPERS = ("UiKit.clearTopbar", "UiKit.topbar", "UiKit.onTopbar", "UiKit.reserveTopbar")
 OVER_STRIP = re.compile(r"IgnoreGuiInset\s*=\s*true|ScreenInsets\s*=\s*Enum\.ScreenInsets\.None")

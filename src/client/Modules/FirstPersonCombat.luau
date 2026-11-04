@@ -580,8 +580,187 @@ function View.cast(duration, color, animation)
 	orb.Parent = workspace.CurrentCamera
 	castOrb = orb
 end
-function View.setCursorFree(value)
+-- The mouse let go of in the fight view (Tab, Enter, a friend request): the
+-- screen dims, MOUSE FREE pops in, and three keys show how to go back, each
+-- one a button too: ESC, ENTER and SPACE (Tab works as well). `plain`: one
+-- of the game's windows has the mouse (the guide, the tree): no dim.
+-- Escape is Roblox's own (its menu): pressed, the menu opens and the fight
+-- view comes back as it closes.
+View.Dim = 0.22 -- (the shade's transparency: 0 is black)
+local dimmed = false
+local dimGui: ScreenGui? = nil
+local dimShown = false
+local dimParts: { [string]: any } = {}
+local onBack: (() -> ())? = nil
+local function back()
+	if onBack then
+		onBack()
+	end
+end
+-- What going back does (Client Combat: the fight view, the mouse locked).
+function View.onBack(fn: () -> ())
+	onBack = fn
+end
+local function dimScreen(): ScreenGui
+	if dimGui and dimGui.Parent then
+		return dimGui
+	end
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "MouseFree"
+	gui.DisplayOrder = 2 -- (under the game's windows, over the world)
+	gui.IgnoreGuiInset = true
+	gui.ResetOnSpawn = false
+	gui.Enabled = false
+	local shade = Instance.new("Frame")
+	shade.Name = "Shade"
+	shade.Size = UDim2.fromScale(1, 1)
+	shade.BackgroundColor3 = Color3.new(0, 0, 0)
+	shade.BackgroundTransparency = 1
+	shade.BorderSizePixel = 0
+	shade.Active = false
+	shade.Parent = gui
+	local panel = Instance.new("Frame")
+	panel.Name = "Panel"
+	panel.AnchorPoint = Vector2.new(0.5, 0.5)
+	panel.Position = UDim2.fromScale(0.5, 0.46)
+	panel.Size = UDim2.fromOffset(560, 230)
+	panel.BackgroundTransparency = 1
+	panel.Parent = shade
+	local pop = Instance.new("UIScale")
+	pop.Parent = panel
+	local function line(name: string, text: string, size: number, y: number, font: Enum.Font)
+		local l = Instance.new("TextLabel")
+		l.Name = name
+		l.AnchorPoint = Vector2.new(0.5, 0)
+		l.Position = UDim2.new(0.5, 0, 0, y)
+		l.Size = UDim2.new(1, 0, 0, size + 8)
+		l.BackgroundTransparency = 1
+		l.Font = font
+		l.Text = text
+		l.TextSize = size
+		l.TextColor3 = Color3.new(1, 1, 1)
+		l.TextTransparency = 1
+		l.Parent = panel
+		return l
+	end
+	local title = line("Title", "MOUSE FREE", 46, 0, Enum.Font.GothamBlack)
+	local sub = line("Back", "Press one to go back to the fight", 20, 62, Enum.Font.GothamBold)
+	-- The three keys, each a button: ESC, ENTER and a wide SPACE.
+	local keys = {}
+	local row = { { "Esc", "ESC", 92 }, { "Enter", "ENTER", 132 }, { "Space", "SPACE", 220 } }
+	local gap = 18
+	local total = -gap
+	for _, k in row do
+		total += k[3] + gap
+	end
+	local x = -total / 2
+	for i, k in row do
+		local key = Instance.new("TextButton")
+		key.Name = k[1]
+		key.AnchorPoint = Vector2.new(0, 0)
+		key.Position = UDim2.new(0.5, x, 0, 120)
+		key.Size = UDim2.fromOffset(k[3], 58)
+		key.BackgroundColor3 = Color3.new(1, 1, 1)
+		key.BackgroundTransparency = 1
+		key.AutoButtonColor = true
+		key.Font = Enum.Font.GothamBlack
+		key.Text = k[2]
+		key.TextSize = 20
+		key.TextColor3 = Color3.fromRGB(14, 16, 24)
+		key.TextTransparency = 1
+		key.Parent = panel
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 10)
+		corner.Parent = key
+		-- (the key's lower edge, like a real key cap)
+		local lip = Instance.new("Frame")
+		lip.Name = "Lip"
+		lip.AnchorPoint = Vector2.new(0, 1)
+		lip.Position = UDim2.new(0, 0, 1, 6)
+		lip.Size = UDim2.new(1, 0, 0, 14)
+		lip.BackgroundColor3 = Color3.fromRGB(150, 156, 170)
+		lip.BackgroundTransparency = 1
+		lip.BorderSizePixel = 0
+		lip.ZIndex = 0
+		lip.Parent = key
+		local lipCorner = corner:Clone()
+		lipCorner.Parent = lip
+		local scale = Instance.new("UIScale")
+		scale.Parent = key
+		key.Activated:Connect(back)
+		keys[i] = { Button = key, Lip = lip, Scale = scale }
+		x += k[3] + gap
+	end
+	local tab = line("Tab", "(TAB works too)", 15, 196, Enum.Font.GothamMedium)
+	dimParts = { Shade = shade, Pop = pop, Title = title, Sub = sub, Keys = keys, Tab = tab }
+	-- Escape opens Roblox's menu: the fight view comes back behind it.
+	pcall(function()
+		game:GetService("GuiService").MenuOpened:Connect(function()
+			if dimShown then
+				back()
+			end
+		end)
+	end)
+	gui.Parent = player:WaitForChild("PlayerGui")
+	dimGui = gui
+	return gui
+end
+-- In: the shade fades up, the words pop in, the keys drop in one by one.
+-- Out: all of it fades away.
+local TweenService = game:GetService("TweenService")
+local function showDim(on: boolean)
+	if on == dimShown then
+		return
+	end
+	dimShown = on
+	local gui = dimScreen()
+	local p = dimParts
+	local fast = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	if on then
+		gui.Enabled = true
+		p.Shade.BackgroundTransparency = 1
+		TweenService:Create(p.Shade, TweenInfo.new(0.25), { BackgroundTransparency = View.Dim }):Play()
+		p.Pop.Scale = 0.85
+		TweenService:Create(p.Pop, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		for _, l in { p.Title, p.Sub, p.Tab } do
+			l.TextTransparency = 1
+			TweenService:Create(l, TweenInfo.new(0.25), { TextTransparency = if l == p.Tab then 0.35 else 0 }):Play()
+		end
+		for i, k in p.Keys do
+			k.Button.BackgroundTransparency, k.Button.TextTransparency, k.Lip.BackgroundTransparency = 1, 1, 1
+			k.Scale.Scale = 0.6
+			task.delay(0.08 * i, function()
+				if not dimShown then
+					return
+				end
+				TweenService:Create(k.Button, fast, { BackgroundTransparency = 0, TextTransparency = 0 }):Play()
+				TweenService:Create(k.Lip, fast, { BackgroundTransparency = 0 }):Play()
+				TweenService:Create(k.Scale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+			end)
+		end
+	else
+		TweenService:Create(p.Shade, fast, { BackgroundTransparency = 1 }):Play()
+		for _, l in { p.Title, p.Sub, p.Tab } do
+			TweenService:Create(l, fast, { TextTransparency = 1 }):Play()
+		end
+		for _, k in p.Keys do
+			TweenService:Create(k.Button, fast, { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
+			TweenService:Create(k.Lip, fast, { BackgroundTransparency = 1 }):Play()
+		end
+		task.delay(0.2, function()
+			if not dimShown and dimGui then
+				dimGui.Enabled = false
+			end
+		end)
+	end
+end
+function View.setCursorFree(value, plain: boolean?)
 	cursorFree = value
+	dimmed = value == true and plain ~= true
+end
+-- (the dim's state, for tests: whether it'd show)
+function View.dimmed(): boolean
+	return dimmed
 end
 
 -- How far the camera is from what it looks at, and how far it looks up or
@@ -699,6 +878,11 @@ function View.stop()
 	end
 	table.clear(hidden)
 	cursorFree, raised, charge = false, 0, 0
+	dimmed = false
+	if dimShown then
+		pcall(showDim, false)
+		dimShown = false
+	end
 	if castOrb then
 		castOrb:Destroy()
 		castOrb = nil
@@ -778,6 +962,23 @@ function View.start()
 				then Enum.MouseBehavior.Default
 				else Enum.MouseBehavior.LockCenter
 			UserInputService.MouseIconEnabled = cursorFree
+		end
+		local dim = cursorFree and dimmed and UserInputService.MouseEnabled
+		if dim ~= dimShown then
+			local ok, problem = pcall(showDim, dim)
+			if not ok then
+				dimShown = dim -- (never tried again every frame)
+				warn("[FirstPerson] the mouse-free dim: " .. tostring(problem))
+			end
+		end
+		-- (a slow breath on the keys while it's up)
+		if dimShown and dimParts.Keys then
+			local breath = 1 + math.sin(os.clock() * 3) * 0.03
+			for _, k in dimParts.Keys do
+				if k.Scale.Scale > 0.95 then
+					k.Scale.Scale = breath
+				end
+			end
 		end
 		local equipment = character and character:FindFirstChild("GemsoulGear")
 		-- The server hides and shows gear by its transparency, not by adding or
