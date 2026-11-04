@@ -241,8 +241,8 @@ do
 	check(leave and leave.Visible and leave.Text == "CONTINUE ROUNDS", "No CONTINUE ROUNDS beside HUNT BOUNTY: " .. tostring(leave and leave.Text))
 	check(not (dungeon and dungeon.Visible), "A third way on beside HUNT BOUNTY")
 	check(go.Modal == true, "HUNT BOUNTY can't be clicked with the camera locked")
-	-- CONTINUE ROUNDS: their kaiju team first (the starter roll, owed), then
-	-- the next round, not the dungeon.
+	-- CONTINUE ROUNDS: the next round, not the dungeon (and not the starter
+	-- kaiju roll: it plays before the dungeon, with HUNT BOUNTY).
 	local before = #requests
 	load(clientRef.IntroRoundsUI).continueRounds()
 	task.wait(0.5)
@@ -250,7 +250,7 @@ do
 	for i = before + 1, #requests do
 		asked[requests[i][1]] = requests[i][2] or true
 	end
-	check(kaijuRolled == 1, "CONTINUE ROUNDS didn't roll their kaiju first")
+	check(kaijuRolled == 0, "CONTINUE ROUNDS rolled their kaiju mid-rounds")
 	check(asked.IntroRoundNext and not asked.IntroRoundChoose, "CONTINUE ROUNDS didn't start the next round")
 	-- The next win's card offers the bounty again: HUNT BOUNTY (Enter, or a
 	-- click: both are next()) goes to the dungeon, never the next round.
@@ -268,7 +268,28 @@ do
 		asked[requests[i][1]] = requests[i][2] or true
 	end
 	check(asked.IntroRoundChoose == "Boss" and not asked.IntroRoundNext, "HUNT BOUNTY didn't go to the dungeon (it started the next round)")
+	check(asked.IntroRoundHunt ~= nil, "HUNT BOUNTY didn't free the starter kaiju roll to play before the dungeon")
 	attrs.CombatSession = nil
+end
+-- Two new miners' first fight over (Server.Duels' IntroRematch): REMATCH
+-- beside the way on, gone once the offer is.
+do
+	attrs.CombatSession = nil
+	attrs.IntroRematch = "Sol"
+	local fought = IntroRounds.state({ Funnel = {} })
+	IntroRounds.won(fought, "Uncommon")
+	social:Fire("IntroRound", { Phase = "Won", Round = 1, Piece = { Slot = "Weapon", Name = "Blade", Rarity = "Uncommon" }, View = IntroRounds.view(fought) })
+	task.wait(7)
+	local card = playerGui:FindFirstChild("IntroRounds")
+	local again = card and card:FindFirstChild("Dungeon", true)
+	check(again and again.Visible and string.find(again.Text, "REMATCH", 1, true) ~= nil, "No REMATCH on the card after two new miners' first fight: " .. tostring(again and again.Text))
+	check(card:FindFirstChild("Next", true).Visible, "No way on beside REMATCH")
+	attrs.IntroRematch = nil
+	if attrSignals.IntroRematch then
+		attrSignals.IntroRematch:Fire()
+	end
+	task.wait(0.1)
+	check(not again.Visible, "REMATCH stayed after the offer went")
 end
 -- The first dungeon cleared (the server sends no Hunt): a later win's card is
 -- the next round, never HUNT BOUNTY again.

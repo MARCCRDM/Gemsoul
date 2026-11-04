@@ -49,6 +49,8 @@ local reply = Shop.reply
 local IntroRoundsServer = {}
 
 local rng = Random.new()
+-- (HUNT BOUNTY picked, the kaiju roll first: IntroRoundsServer.huntPending)
+local huntPending = {} :: { [Player]: boolean }
 local TIER = { Uncommon = 2, Rare = 3 }
 
 -- The pieces a round can pay: `slot`'s gear at `rarity`, rollable. The sword
@@ -726,6 +728,7 @@ local function nextRound(player: Player)
 			require(script.Parent.Journey).reach(player, string.format("Kept fighting after round %d", state.Won))
 		end)
 	end
+	huntPending[player] = nil -- (CONTINUE ROUNDS after all)
 	-- (back to the rounds after a step out: held in them again)
 	if state.Paused then
 		state.Paused = nil
@@ -792,11 +795,24 @@ function IntroRoundsServer.huntNext(profile: any, state: any): boolean
 	if not profile or not state or profile.IntroDungeonCleared then
 		return false
 	end
-	-- (all six rounds first: then the dungeon, then the lobby)
+	-- (the first ChoiceAfter rounds a must: then the dungeon's on offer)
 	if state.Won < IntroRounds.ChoiceAfter then
 		return false
 	end
 	return profile.IntroFinale == nil or profile.IntroFinale == "Dungeon"
+end
+-- HUNT BOUNTY picked on the card: the starter kaiju roll may play now (it
+-- comes before the dungeon: KaijuServer.starterHeld), then choose.
+function IntroRoundsServer.huntPending(player: Player): boolean
+	return huntPending[player] == true
+end
+local function hunt(player: Player)
+	local state, profile = stateOf(player)
+	if not state or not IntroRoundsServer.huntNext(profile, state) then
+		return reply(false, "The first dungeon isn't open to you yet.")
+	end
+	huntPending[player] = true
+	return reply(true, "")
 end
 function IntroRoundsServer.choose(player: Player, which: any)
 	local state, profile = stateOf(player)
@@ -833,6 +849,7 @@ IntroRoundsServer.choiceAfter = IntroRounds.ChoiceAfter
 
 -- (the watch's ways on: IntroRoundsServer.unstick)
 IntroRoundsServer._next, IntroRoundsServer._leave = nextRound, leaveRounds
+IntroRoundsServer._hunt = hunt
 
 local started = false
 function IntroRoundsServer.start()
@@ -865,11 +882,13 @@ function IntroRoundsServer.start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		warming[player] = nil
+		huntPending[player] = nil
 	end)
 	require(script.Parent.Duelist).IntroRounds = IntroRoundsServer
 	Shop.register("IntroRoundNext", nextRound)
 	Shop.register("IntroRoundLeave", leaveRounds)
 	Shop.register("IntroRoundChoose", IntroRoundsServer.choose)
+	Shop.register("IntroRoundHunt", hunt)
 	Shop.register("IntroFinale", finale)
 	-- Coming back mid-intro: straight back into their next round (they
 	-- don't get the lobby till the six are won); the finale if it's to do.

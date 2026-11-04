@@ -2833,8 +2833,9 @@ function KaijuServer.ensureStarter(player: Player): number
 	return #claimRoll(player)
 end
 
--- Whether `player`'s starter roll waits: it's owed, and intro rounds are
--- still to win (an older save past its first dungeon isn't held).
+-- Whether `player`'s starter roll waits: it's owed, and they're held in
+-- the intro rounds (not after HUNT BOUNTY; an older save past its first
+-- dungeon isn't held).
 function KaijuServer.starterHeld(player: Player, profile: any): boolean
 	if (profile :: any).IntroDungeonCleared then
 		return false
@@ -2842,10 +2843,13 @@ function KaijuServer.starterHeld(player: Player, profile: any): boolean
 	if Kaiju.rollsOwed(profile) == 0 then
 		return false -- (no starter roll owed: a boss or rare roll isn't held)
 	end
-	local ok, left = pcall(function()
-		return require(script.Parent.IntroRoundsServer).left(player)
+	-- (held while they're in the rounds; not once they've picked HUNT
+	-- BOUNTY, or stepped out to the dungeon: it plays before it)
+	local ok, held = pcall(function()
+		local Rounds = require(script.Parent.IntroRoundsServer)
+		return Rounds.held(player) and not Rounds.huntPending(player)
 	end)
-	return ok and type(left) == "number" and left > 0
+	return ok and held == true
 end
 
 local function rollRequest(player: Player)

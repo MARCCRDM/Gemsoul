@@ -6,9 +6,11 @@
 	  Socket   put that gem in your gear (its button does it: EQUIP BEST)
 	  Surge    put a gem in Q, E or R, when one would be stronger there
 	           (its button does it: UPGRADE SURGES)
-	  Duel     play another duel, to feel what the gems do (PLAY); while
-	           their intro set isn't won (Shared.IntroRounds), WIN YOUR
-	           INTRO SET instead (FIGHT: the next round)
+	  Duel     play another duel, to feel what the gems do (PLAY)
+
+	While their intro set isn't won (Shared.IntroRounds: they took the first
+	dungeon after round 3), FINISH YOUR INTRO FIGHTS comes first (FIGHT:
+	the next round).
 
 	These are the onboarding funnel's steps 7 to 11 (Server.Funnel), where
 	new players were dropping: half of those who found a gem never socketed
@@ -59,8 +61,8 @@ FirstSteps.Steps = {
 -- back to the Arena for the next round.
 FirstSteps.Rounds = {
 	Id = "Rounds",
-	Title = "WIN YOUR INTRO SET",
-	Line = "Round {1} of {2}: a new piece of gear every win.",
+	Title = "FINISH YOUR INTRO FIGHTS",
+	Line = "Round {1} of {2}: a new piece every win, a mystery gem for all six.",
 	Button = "FIGHT",
 }
 
@@ -89,6 +91,11 @@ function FirstSteps.current(view)
 	if not view or not view.New or not view.IntroDone or (view.Dueled and not view.RoundsLeft) then
 		return nil, 0, total
 	end
+	-- (intro fights left, the first dungeon taken first: finishing them
+	-- comes first, the gear set and its bonus gem: Shared.IntroRounds)
+	if view.RoundsLeft then
+		return FirstSteps.Rounds, 1, total
+	end
 	if not view.Mined then
 		return FirstSteps.Steps[1], 1, total
 	end
@@ -97,9 +104,6 @@ function FirstSteps.current(view)
 	end
 	if not view.Surged and view.SurgeOpen then
 		return FirstSteps.Steps[3], 3, total
-	end
-	if view.RoundsLeft then
-		return FirstSteps.Rounds, 4, total
 	end
 	return FirstSteps.Steps[4], 4, total
 end

@@ -104,6 +104,7 @@ local queued = {} -- (the intro dungeon's cards waiting their turn: its boss pay
 -- Declared further down, next() saw a global that was never set, and HUNT
 -- BOUNTY started the next round instead.)
 local choosing = false -- the card's ways on: HUNT BOUNTY or CONTINUE ROUNDS
+local rematchWith: string? = nil -- REMATCH on the card: the other new miner's name (Server.Duels' IntroRematch)
 local choose: (string) -> ()
 
 local function words(parent: Instance, size: number, color: Color3, font: Enum.Font): TextLabel
@@ -533,7 +534,9 @@ end
 
 -- The buttons: the main one across, then the lobby and the first dungeon
 -- side by side (or whichever shows, across).
+local lastExtra = 0 -- (placeButtons' last `extra`: REMATCH re-lays the buttons with it)
 local function placeButtons(withLeave: boolean, withDungeon: boolean, extra: number?)
+	lastExtra = extra or 0
 	local full = W - PAD * 2
 	local half = (full - 10) / 2
 	-- (one button: the card ends under it, no empty band above it)
@@ -1084,42 +1087,15 @@ function IntroRoundsUI.next()
 end
 
 -- CONTINUE ROUNDS (beside HUNT BOUNTY): the next 1v1 instead of the
--- dungeon for now. Every win's card offers the bounty again.
--- Their kaiju team first if the starter roll's still owed (it plays once
--- they've picked a way on, never straight after the win), then the round.
-IntroRoundsUI.RollWait = 150 -- seconds the next round waits on the roll, at most
+-- dungeon for now. Every win's card offers the bounty again. (The starter
+-- kaiju roll waits: it plays before the dungeon, choose.)
+IntroRoundsUI.RollWait = 150 -- seconds HUNT BOUNTY waits on the kaiju roll, at most
 function IntroRoundsUI.continueRounds()
 	if busy or not current or not choosing then
 		return
 	end
 	choosing = false
-	local owed = false
-	pcall(function()
-		owed = require(ReplicatedStorage.Shared.Kaiju).rollsOwed(GemClient.Profile) > 0
-	end)
-	if not owed then
-		IntroRoundsUI.next()
-		return
-	end
-	busy = true
-	hide()
-	task.spawn(function()
-		local rolled = false
-		local ok = pcall(function()
-			require(script.Parent.KaijuRoll).play(function()
-				rolled = true
-			end)
-		end)
-		local started = os.clock()
-		while ok and not rolled and os.clock() - started < IntroRoundsUI.RollWait do
-			task.wait(0.2)
-		end
-		local result = GemClient.request("IntroRoundNext")
-		busy = false
-		if not (result and result.Ok) then
-			UiKit.toast(Lang.translate(result and result.Message or "Couldn't start the round."), RED)
-		end
-	end)
+	IntroRoundsUI.next()
 end
 
 local function leave()
@@ -1157,6 +1133,8 @@ function choose(which: string)
 	hide()
 	task.spawn(function()
 		local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+		-- (the server lets the starter roll play now: before the dungeon)
+		pcall(GemClient.request, "IntroRoundHunt")
 		if GemClient.Profile and Kaiju.rollsOwed(GemClient.Profile) > 0 then
 			local rolled = false
 			pcall(function()
@@ -1356,6 +1334,7 @@ local function show(event)
 	ui.Extra.Text = ""
 	ui.Go:SetAttribute("Auto", nil)
 	choosing = false
+	rematchWith = nil
 	ui.Bounty.Visible, ui.Well.Visible = false, true
 	ui.Bonus.Frame.Visible = false
 	ui.Well.Position = UDim2.fromOffset(PAD, WELL_Y)
@@ -1509,9 +1488,49 @@ local function show(event)
 			end
 		end)
 	end
+	-- After a first fight between two new miners: REMATCH beside the way
+	-- on (Server.Duels' IntroRematch), while it stands.
+	local foe = player:GetAttribute("IntroRematch")
+	if type(foe) == "string" and event.Where ~= "Dungeon" and (event.Phase == "Won" or event.Phase == "Lost") then
+		rematchWith = foe
+		ui.Dungeon.Text = Lang.translate("REMATCH")
+		ui.DungeonSub.Text = string.format(Lang.translate("vs %s"), foe)
+		tintDungeon(EMBER)
+		placeButtons(ui.Leave.Visible, true, lastExtra)
+		if ui.Key2 then
+			ui.Key2.Visible = keysOnly()
+		end
+	end
 	fit()
 	scale.Scale = fitScale * 0.9
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = fitScale }):Play()
+end
+
+-- REMATCH: asks the server; both asking, the fight's on (the card goes as
+-- it starts), else it waits on the other.
+function IntroRoundsUI.rematch()
+	if busy or not rematchWith then
+		return
+	end
+	busy = true
+	ui.DungeonSub.Text = Lang.translate("…")
+	task.spawn(function()
+		local result = GemClient.request("IntroRematch")
+		busy = false
+		if result and result.Ok and result.Started then
+			hide()
+		elseif result and result.Ok then
+			ui.DungeonSub.Text = string.format(Lang.translate("Waiting for %s…"), rematchWith or "")
+		else
+			UiKit.toast(Lang.translate(result and result.Message or "The rematch has passed."), RED)
+			rematchWith = nil
+			if gui.Enabled then
+				ui.Dungeon.Visible = false
+				placeButtons(ui.Leave.Visible, false, lastExtra)
+				fit()
+			end
+		end
+	end)
 end
 
 function IntroRoundsUI.busy(): boolean
@@ -1588,9 +1607,35 @@ function IntroRoundsUI.start()
 			IntroRoundsUI.next()
 		elseif choosing and (k == Enum.KeyCode.One or k == Enum.KeyCode.KeypadOne or k == Enum.KeyCode.ButtonX) then
 			IntroRoundsUI.continueRounds()
+		elseif rematchWith and (k == Enum.KeyCode.Two or k == Enum.KeyCode.KeypadTwo or k == Enum.KeyCode.ButtonY) then
+			IntroRoundsUI.rematch()
+		end
+	end)
+	-- The rematch on (either asked last): the card goes. Its offer gone (the
+	-- other went on with their rounds, or it ran out): REMATCH goes.
+	player:GetAttributeChangedSignal("MatchId"):Connect(function()
+		if player:GetAttribute("MatchId") ~= nil and gui.Enabled and rematchWith then
+			hide()
+		end
+	end)
+	player:GetAttributeChangedSignal("IntroRematch"):Connect(function()
+		if player:GetAttribute("IntroRematch") == nil and rematchWith then
+			rematchWith = nil
+			if gui.Enabled then
+				ui.Dungeon.Visible = false
+				if ui.Key2 then
+					ui.Key2.Visible = false
+				end
+				placeButtons(ui.Leave.Visible, false, lastExtra)
+				fit()
+			end
 		end
 	end)
 	ui.Dungeon.Activated:Connect(function()
+		if rematchWith then
+			IntroRoundsUI.rematch()
+			return
+		end
 		if choosing then
 			choose("Boss")
 			return

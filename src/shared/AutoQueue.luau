@@ -23,13 +23,15 @@
 	same queue is who you're then matched with, the card's bonus comes with
 	you (you're called in for it).
 
-	A new player's first fight is a queue of its own ("intro"). On a quiet
+	A new player's first fight is a queue of its own ("intro"). Alone in the
 	server (fewer than Intro.Populated players) it's the sparring rival at
-	once, no search. On a busy one:
+	once, no search. Otherwise:
 
 	  two new players          paired at once, each in their first fight
-	                           (hints pop up as they go, Shared.FastStart)
-	  one, after Intro.CallAfter   eligible lobby players are invited
+	                           (hints pop up as they go, Shared.FastStart);
+	                           after it, REMATCH or on with the intro rounds
+	  one, after Intro.CallAfter   eligible lobby players are invited (off:
+	                           never)
 	  one, after Intro.BotAfter    the sparring rival steps in
 
 	Pure: the server (Systems/Duels) applies it, the client shows it, tests
@@ -57,13 +59,15 @@ AutoQueue.FillBonus = 20 -- first-fight join bonus; other fill-ins retain the wi
 AutoQueue.Settle = 20 -- seconds after you first reach the lobby before you're asked to join anything
 AutoQueue.CarryFor = 60 -- seconds a taken-down fill-in card's bonus waits for that same queue
 AutoQueue.Intro = {
-	-- Off: a first fight never looks for real players: the rival bot at once,
-	-- straight after the roll and the kit, and the intro rounds after it
-	-- (Shared.IntroRounds). On: a busy server's first fight searches first.
-	Search = false,
-	Populated = 6, -- players in the server before a first fight looks for real ones (fewer: the rival at once)
-	CallAfter = 4, -- seconds alone before lobby invitations
-	BotAfter = 10, -- seconds alone before the sparring rival steps in
+	-- On: a first fight waits a moment (BotAfter) for another new miner in
+	-- theirs (Roblox often sends two in together): two of them are paired,
+	-- and after it each can ask for a REMATCH or go on with the intro rounds
+	-- (Server.Duels' IntroRematch). Nobody else: the rival bot. Off: the
+	-- rival bot at once.
+	Search = true,
+	Populated = 2, -- players in the server before a first fight looks for another (alone: the rival at once)
+	CallAfter = math.huge, -- seconds alone before lobby invitations (never: new miners meet new miners)
+	BotAfter = 8, -- seconds alone before the sparring rival steps in
 }
 AutoQueue.IntroMode = "intro"
 

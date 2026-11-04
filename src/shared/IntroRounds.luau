@@ -49,10 +49,11 @@ IntroRounds.SetCoins = 500 -- the whole set won
 IntroRounds.Duels = 2 -- on the dungeon path, the 1v1 rounds before the dungeon
 IntroRounds.RoomPieces = 1 -- the dungeon's first room cleared: this many pieces (the boss: the rest)
 IntroRounds.GemAfter = 3 -- this round's win also gives a gem (socket it: Shared.FirstSteps)
--- The first dungeon (HUNT BOUNTY) once this many rounds are won: the whole
--- set first, then the dungeon, then the lobby (Server IntroRoundsServer.
--- huntNext / choose).
-IntroRounds.ChoiceAfter = IntroRounds.Count
+-- The first dungeon (HUNT BOUNTY) on offer once this many rounds are won:
+-- these first, then each win's card offers it beside CONTINUE ROUNDS (the
+-- rest of the set waits for them: NEXT STEP's FIGHT). Server
+-- IntroRoundsServer.huntNext / choose.
+IntroRounds.ChoiceAfter = 3
 -- The first dungeon (HUNT BOUNTY) cleared: its coins (Server.RiftServer's
 -- victory, in place of a run's usual), and a new kaiju (the boss's roll:
 -- Client IntroFinale opens the lobby's intro with it).

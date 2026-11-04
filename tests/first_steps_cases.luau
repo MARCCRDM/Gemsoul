@@ -68,13 +68,18 @@ check(id(profile({ Mine = 1, Enchant = 1, EquipSurge = 1 }, {}), { Duels = 2 }) 
 check(id(profile({}, { ["Second duel"] = true }), open) == nil, "Still coaching after the funnel's Second duel")
 check(id(profile({ Mine = 1, Enchant = 1, EquipSurge = 1 }, {}), { Duels = 1 }) == "Duel", "One duel (the first fight) ended it")
 
--- While their intro set isn't won, the last step sends them back for it
--- (and it's not over at two duels).
+-- While their intro set isn't won (the first dungeon taken after round 3),
+-- finishing it comes first, whatever else is left (and it's not over at two
+-- duels): its button, FIGHT, is the way back to it.
 local rounds = profile({ Mine = 1, Enchant = 1, EquipSurge = 1 }, {})
-rounds.IntroRounds = { Won = 2, Losses = 0, Pieces = {} }
+rounds.IntroRounds = { Won = 3, Losses = 0, Pieces = {} }
 local step, index = FirstSteps.current(FirstSteps.view(rounds, { Duels = 3 }))
-check(step and step.Id == "Rounds" and index == 4, "Didn't send them back for their intro set")
-check(FirstSteps.view(rounds).Round == 3, "The round to win isn't the next one")
+check(step and step.Id == "Rounds" and index == 1 and step.Button == "FIGHT", "Didn't send them back for their intro set")
+check(FirstSteps.view(rounds).Round == 4, "The round to win isn't the next one")
+local fresh = profile({}, {})
+fresh.IntroRounds = { Won = 3, Losses = 0, Pieces = {} }
+check(FirstSteps.current(FirstSteps.view(fresh, open)).Id == "Rounds", "Finishing the intro fights isn't first")
+check(string.find(FirstSteps.Rounds.Line, "gem", 1, true) ~= nil, "The step doesn't say what all six pay")
 rounds.IntroRounds.Won = IntroRounds.Count
 check(FirstSteps.current(FirstSteps.view(rounds, { Duels = 3 })) == nil, "Still coaching once the set's won and they've dueled")
 

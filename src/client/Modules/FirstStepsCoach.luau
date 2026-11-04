@@ -168,6 +168,11 @@ local function refresh()
 	end
 	local step, index, total = current()
 	local show = step ~= nil and hud and not covered and not dismissed and not picking
+	-- (FINISH YOUR INTRO FIGHTS waits while the first dungeon or the lobby's
+	-- intro is still on: Client IntroFinale)
+	if step and step.Id == "Rounds" and player:GetAttribute("IntroFinale") ~= nil then
+		show = false
+	end
 	if step then
 		kicker.Text = Lang.format("NEXT STEP  ·  {1} / {2}", index, total)
 		title.Text = Lang.translate(step.Title)
@@ -251,6 +256,7 @@ function FirstStepsCoach.start()
 	GemClient.Changed:Connect(refresh)
 	UpgradeHints.Changed:Connect(refresh)
 	player:GetAttributeChangedSignal("DuelsPlayed"):Connect(refresh)
+	player:GetAttributeChangedSignal("IntroFinale"):Connect(refresh)
 	UiKit.watchCovers(function(on)
 		covered = on
 		refresh()

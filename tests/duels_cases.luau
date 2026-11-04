@@ -667,13 +667,11 @@ do
 	end
 	check(AutoQueue.setting(nil) == true and AutoQueue.setting({}) == true, "Auto queue isn't on by default")
 	check(AutoQueue.setting({ AutoQueue = false }) == false, "Switching auto queue off didn't stick")
-	check(
-		AutoQueue.introPhase(0) == "Search"
-			and AutoQueue.introPhase(AutoQueue.Intro.CallAfter) == "Call"
-			and AutoQueue.introPhase(AutoQueue.Intro.BotAfter) == "Bot",
-		"Intro phases"
-	)
-	check(AutoQueue.Intro.CallAfter < AutoQueue.Intro.BotAfter, "The bot comes before the lobby is called")
+	-- A first fight waits a moment for another new miner (two often join
+	-- together), never calls the lobby, then the rival.
+	check(AutoQueue.Intro.Search == true and AutoQueue.Intro.Populated <= 2 and AutoQueue.Intro.BotAfter >= 5 and AutoQueue.Intro.BotAfter <= 10, "A first fight doesn't wait a moment for another new miner")
+	check(AutoQueue.introPhase(0) == "Search" and AutoQueue.introPhase(AutoQueue.Intro.BotAfter) == "Bot", "Intro phases")
+	check(AutoQueue.introPhase(AutoQueue.Intro.BotAfter - 0.1) == "Search", "The lobby is called into a new miner's first fight")
 	local picked = AutoQueue.pick({ { Rating = 1300, Name = "a" }, { Rating = 1040, Name = "b" }, { Rating = 900, Name = "c" } }, 1000)
 	check(picked and picked.Name == "b", "The closest rating wasn't picked")
 	check(AutoQueue.pick({}, 1000) == nil, "An empty lobby picked someone")
@@ -921,7 +919,7 @@ do
 		alone:SetAttribute("CombatSession", nil)
 		AutoQueue.Intro.Populated = populated
 	end
-	-- Search off (the default): the rival at once, however busy the server.
+	-- Search off: the rival at once, however busy the server.
 	do
 		local was = AutoQueue.Intro.Search
 		AutoQueue.Intro.Search = false
@@ -933,6 +931,28 @@ do
 		check(busy:GetAttribute("DuelQueue") == nil, "Search off: the first fight still searched")
 		busy:SetAttribute("CombatSession", nil)
 		AutoQueue.Intro.Search = was
+	end
+	-- No other new miner in the server (everyone's fought before): the rival
+	-- at once, no waiting.
+	do
+		local saved = {}
+		for _, other in Players:GetPlayers() do
+			local record = Duels.record(other)
+			if record then
+				saved[record] = record.Played
+				record.Played = math.max(1, record.Played or 0)
+			end
+		end
+		local lone = makePlayer(47, "Ula")
+		local before = #trainingEntered
+		local answer = handlers.IntroQueue(lone)
+		check(answer.Ok and answer.Bot and #trainingEntered == before + 1, "A new miner waited with no other new miner around")
+		check(lone:GetAttribute("DuelQueue") == nil, "A lone new miner searched")
+		lone:SetAttribute("CombatSession", nil)
+		Duels.record(lone).Played = 1
+		for record, played in saved do
+			record.Played = played
+		end
 	end
 	-- (What follows is a busy server with Search on: first fights look for real players.)
 	local searchWas = AutoQueue.Intro.Search
@@ -975,7 +995,48 @@ do
 	check(new1:GetAttribute("DuelQueue") == "casual" and last(new1, "Queue")[2].Mode == "casual" and not last(new1, "Queue")[2].Intro, "No Casual queue state after the intro")
 	check(handlers.DuelCancel(new1).Ok and new1:GetAttribute("DuelQueue") == nil, "Couldn't leave the Casual queue")
 
-	-- Alone: a lobby player on call is pulled in after Intro.CallAfter -------------
+	-- Two new miners' first fight over: REMATCH (both asking) is another
+	-- fight between them; going on with the rounds takes the offer off.
+	do
+		local r1, r2 = makePlayer(45, "Rin"), makePlayer(46, "Sol")
+		check(handlers.IntroQueue(r1).Ok and handlers.IntroQueue(r2).Ok, "Rin and Sol couldn't queue their first fight")
+		advance(0.25)
+		local first = Duels.matchOf(r1)
+		check(first and Duels.matchOf(r2) == first, "Rin and Sol weren't paired")
+		advance(Matchmaking.Countdown)
+		lethalBlow(r2)
+		check(first.State == "Done" and r1:GetAttribute("IntroRematch") == "Sol" and r2:GetAttribute("IntroRematch") == "Rin", "No REMATCH on offer after two new miners' first fight")
+		local asked = handlers.IntroRematch(r1)
+		check(asked.Ok and asked.Waiting and Duels.matchOf(r1) == first, "One asking started the rematch")
+		check(string.find(last(r2, "Notify")[2], "wants a rematch", 1, true), "Sol wasn't told Rin wants a rematch")
+		local both = handlers.IntroRematch(r2)
+		check(both.Ok and both.Started, "Both asking didn't start the rematch")
+		advance(Matchmaking.EndPause)
+		respawn(r1, r2)
+		advance(1)
+		local again = Duels.matchOf(r1)
+		check(again and again ~= first and Duels.matchOf(r2) == again and again.Intro, "The rematch didn't start")
+		check(r1:GetAttribute("IntroRematch") == nil and r2:GetAttribute("IntroRematch") == nil, "The offer stayed up into the rematch")
+		advance(Matchmaking.Countdown)
+		lethalBlow(r1)
+		check(r1:GetAttribute("IntroRematch") == "Sol", "No REMATCH after the rematch")
+		advance(Matchmaking.EndPause)
+		respawn(r1, r2)
+		-- Sol asks; Rin goes on with the intro rounds: the offer's off, Sol told.
+		check(handlers.IntroRematch(r2).Waiting, "Sol couldn't ask again")
+		r1:SetAttribute("CombatSession", "Training")
+		check(r1:GetAttribute("IntroRematch") == nil and r2:GetAttribute("IntroRematch") == nil, "Going on with the rounds left the rematch up")
+		check(string.find(last(r2, "Notify")[2], "went on with their intro rounds", 1, true), "Sol wasn't told Rin went on")
+		check(not handlers.IntroRematch(r2).Ok, "A rematch after the other went on")
+		r1:SetAttribute("CombatSession", nil)
+		Duels.record(r1).Played, Duels.record(r2).Played = math.max(1, Duels.record(r1).Played or 0), math.max(1, Duels.record(r2).Played or 0)
+	end
+
+	-- Alone: a lobby player on call is pulled in after Intro.CallAfter (when
+	-- the lobby's called at all: off by default) -------------------------------
+	local callWas = AutoQueue.Intro.CallAfter
+	AutoQueue.Intro.CallAfter = 4
+	makePlayer(50, "Vee") -- (another new miner in the server, still loading: the first fights below search)
 	local new3 = makePlayer(43, "Pax")
 	lobby(kim)
 	check(handlers.IntroQueue(new3).Ok, "Pax isn't in the intro queue")
@@ -1019,6 +1080,7 @@ do
 	new4:SetAttribute("CombatSession", nil)
 	AutoQueue.Intro.Populated = populatedWas
 	AutoQueue.Intro.Search = searchWas
+	AutoQueue.Intro.CallAfter = callWas
 
 	-- Nobody is called while the Arena's lanes are full: the entry waits.
 	print("PASS: " .. (checks - before) .. " lobby invitation checks (explicit consent, muted invites, expiry, decline, forged requests, a moment after logging in, one card at a time, the bonus carried over, upfront intro bonus, no duplicate payment, normal PvP rewards unchanged, bot fallback)")

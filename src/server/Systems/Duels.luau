@@ -360,6 +360,53 @@ local function release(match)
 	matches[match.Id] = nil
 end
 
+-- After a first fight between two new miners (Shared.AutoQueue.Intro):
+-- each can ask for a REMATCH ("IntroRematch": both asking, another fight
+-- between them) or go on with their intro rounds (into the Arena: the
+-- offer's off, and the other's told). IntroRematch on each: the other's
+-- name, while it stands (Duels.RematchFor seconds).
+Duels.RematchFor = 45
+Duels.RematchTries = 30 -- (half a second apart: the loser's respawn)
+local Rematch = { Offers = {} :: { [Player]: any } }
+function Rematch.clear(player: Player, tell: string?)
+	local offer = Rematch.Offers[player]
+	if not offer then
+		return
+	end
+	Rematch.Offers[player] = nil
+	if player.Parent then
+		player:SetAttribute("IntroRematch", nil)
+	end
+	local foe = offer.Foe
+	local theirs = Rematch.Offers[foe]
+	if theirs and theirs.Foe == player then
+		Rematch.Offers[foe] = nil
+		if foe.Parent then
+			foe:SetAttribute("IntroRematch", nil)
+			if tell and theirs.Wants then
+				Remotes.Notify:FireClient(foe, tell)
+			end
+		end
+	end
+end
+function Rematch.offer(a: Player, b: Player)
+	local untilAt = os.clock() + Duels.RematchFor
+	Rematch.Offers[a] = { Foe = b, Until = untilAt }
+	Rematch.Offers[b] = { Foe = a, Until = untilAt }
+	a:SetAttribute("IntroRematch", b.DisplayName)
+	b:SetAttribute("IntroRematch", a.DisplayName)
+	task.delay(Duels.RematchFor, function()
+		local offer = Rematch.Offers[a]
+		if offer and offer.Until == untilAt then
+			Rematch.clear(a)
+		end
+	end)
+end
+function Duels.rematchOf(player: Player): Player?
+	local offer = Rematch.Offers[player]
+	return offer and offer.Foe or nil
+end
+
 -- The match is over: `winner` is the winning team (nil: a draw).
 function finish(match, winner: number?, reason: string)
 	if match.State == "Done" then
@@ -385,6 +432,24 @@ function finish(match, winner: number?, reason: string)
 			sum += Progress.levelOf(member)
 		end
 		levels[t] = if #team > 0 then sum / #team else 1
+	end
+	-- (two new miners' first fight: a REMATCH on offer, before the cards)
+	do
+		local a, b = match.Teams[1] and match.Teams[1][1], match.Teams[2] and match.Teams[2][1]
+		if
+			match.Intro
+			and winner ~= nil
+			and #match.Teams[1] == 1
+			and #match.Teams[2] == 1
+			and a
+			and b
+			and a.Parent
+			and b.Parent
+			and not match.Called[a]
+			and not match.Called[b]
+		then
+			Rematch.offer(a, b)
+		end
 	end
 	for t, team in match.Teams do
 		local won = winner == t
@@ -1264,8 +1329,18 @@ local function introJoin(player: Player)
 	if reason then
 		return reply(false, subject(player, player, reason))
 	end
-	-- A quiet server: the sparring rival at once (no search, no waiting).
-	if not AutoQueue.introSearches(#Players:GetPlayers()) then
+	-- Alone, or no other new miner here (one just in, still loading,
+	-- counts): the sparring rival at once (no search, no waiting).
+	local another = false
+	for _, other in Players:GetPlayers() do
+		if other ~= player then
+			local theirs = Duels.record(other)
+			if not theirs or ((theirs :: any).Played or 0) == 0 then
+				another = true
+			end
+		end
+	end
+	if not AutoQueue.introSearches(#Players:GetPlayers()) or not another then
 		local result = ArenaSessions.enterTraining(player)
 		if result and result.Ok == false then
 			return result
@@ -1338,6 +1413,57 @@ local function rulesFor(mode: string)
 	local spec = Matchmaking.Modes[mode]
 	return PvPRules.profile(spec and spec.Kind or "Ranked")
 end
+
+-- REMATCH (after two new miners' first fight): both asking, they fight
+-- again (once the last one's let them go: a few tries).
+function Rematch.request(player: Player)
+	local offer = Rematch.Offers[player]
+	local foe = offer and offer.Foe
+	if not offer or os.clock() > offer.Until or not foe.Parent then
+		Rematch.clear(player)
+		return reply(false, "The rematch has passed.")
+	end
+	local theirs = Rematch.Offers[foe]
+	if not theirs or theirs.Foe ~= player then
+		Rematch.clear(player)
+		return reply(false, foe.DisplayName .. " went on with their intro.")
+	end
+	offer.Wants = true
+	if not theirs.Wants then
+		Remotes.Notify:FireClient(foe, player.DisplayName .. " wants a rematch! Press REMATCH to fight again.")
+		return reply(true, "Waiting for " .. foe.DisplayName .. "…", { Waiting = true })
+	end
+	Rematch.clear(player)
+	-- (the last fight lets them go, the loser back on their feet: a few
+	-- tries, half a second apart)
+	local WAIT = { ["is already in a duel"] = true, ["isn't ready"] = true, ["is still loading"] = true }
+	local function try(n: number)
+		if not (player.Parent and foe.Parent) then
+			return
+		end
+		local who = if busy(player) then player else foe
+		local reason = busy(who)
+		if not reason then
+			dequeue(player)
+			dequeue(foe)
+			local ok, problem = startMatch(AutoQueue.IntroMode, { { foe }, { player } }, rulesFor(AutoQueue.IntroMode), { Intro = true })
+			if not ok then
+				for _, p in { player, foe } do
+					Remotes.Notify:FireClient(p, problem or "The rematch couldn't start.")
+				end
+			end
+		elseif WAIT[reason] and n < Duels.RematchTries then
+			task.delay(0.5, try, n + 1)
+		else
+			for _, p in { player, foe } do
+				Remotes.Notify:FireClient(p, "The rematch couldn't start: " .. subject(who, p, reason))
+			end
+		end
+	end
+	try(1)
+	return reply(true, "Rematch!", { Started = true })
+end
+
 
 -- `called` steps into `entry`'s match from the lobby.
 local function fillWith(entry, called: Player): (boolean, string?)
@@ -1775,6 +1901,7 @@ function Duels.start()
 	Shop.register("DuelFill", fillRespond)
 	Shop.register("DuelReady", readyRespond)
 	Shop.register("IntroQueue", introJoin)
+	Shop.register("IntroRematch", Rematch.request)
 	CombatServer.onLethal(lethal)
 	Shop.register("DuelLeave", function(player)
 		local match = matchOf[player]
@@ -1846,6 +1973,12 @@ function Duels.start()
 		end)
 		-- Leaving the Arena session (the Leave button, walking out, respawning)
 		-- forfeits a duel in progress.
+		-- (on with their intro rounds, in the Arena: the rematch is off)
+		player:GetAttributeChangedSignal("CombatSession"):Connect(function()
+			if player:GetAttribute("CombatSession") == "Training" and Rematch.Offers[player] then
+				Rematch.clear(player, player.DisplayName .. " went on with their intro rounds.")
+			end
+		end)
 		player:GetAttributeChangedSignal("CombatSession"):Connect(function()
 			local match = matchOf[player]
 			if match and match.State ~= "Done" and player:GetAttribute("CombatSession") ~= "Duel" then
@@ -1869,6 +2002,9 @@ function Duels.start()
 	for _, player in Players:GetPlayers() do
 		watch(player)
 	end
+	Players.PlayerRemoving:Connect(function(player)
+		Rematch.clear(player, player.DisplayName .. " left.")
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		dequeue(player, player.DisplayName .. " left the game, so your party left the duel queue.")
 		arrived[player], carried[player] = nil, nil

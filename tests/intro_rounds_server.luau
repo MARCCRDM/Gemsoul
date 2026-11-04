@@ -92,6 +92,12 @@ local stubs = {
 	Forge = { counted = function() end },
 	-- (the reel's pictures: IntroRoundsServer.warm)
 	Equipment = { groupPreviews = function(_, group, items) table.insert(warmed, { group, items }) return true end },
+	-- (the next round: into the Arena, its rival in)
+	ArenaSessions = {
+		enterTraining = function() attributes.CombatSession = "Training" return { Ok = true } end,
+		leave = function() attributes.CombatSession = nil return { Ok = true } end,
+	},
+	Duelist = { spawnRound = function() return true end },
 	GemGenerator = { generate = function(_, _, spec) return { Id = spec.Id, Element = "Fire", Tier = spec.Rarity, Size = 5, Clarity = 5, Cut = 5 } end },
 }
 local names = setmetatable({}, { __index = function(_, k) return k end })
@@ -326,41 +332,59 @@ do
 	Server._next, Server._leave = realNext, realLeave
 end
 
--- All six rounds first, then the first dungeon (HUNT BOUNTY), then the
--- lobby: no way out of the rounds before the set's done.
+-- The first ChoiceAfter (3) rounds a must; from then on each win's card
+-- offers the first dungeon (HUNT BOUNTY) beside CONTINUE ROUNDS. Taken, the
+-- rest of the set waits (NEXT STEP's FIGHT), and the starter kaiju roll
+-- plays before the dungeon (never mid-rounds).
 do
+	local must = IntroRounds.ChoiceAfter
+	check(must == 3, "The rounds before the dungeon's offered aren't 3: " .. tostring(must))
 	profile = newProfile({})
 	check(not Server.choose(player, "Boss").Ok, "Stepped out before winning a fight")
-	for won = 1, IntroRounds.Count - 1 do
+	check(not Server.huntPending(player), "The kaiju roll free before HUNT BOUNTY")
+	for won = 1, must - 1 do
 		Server.won(player)
-		check(not Server.huntNext(profile, profile.IntroRounds), "HUNT BOUNTY after round " .. won .. " of " .. IntroRounds.Count)
+		check(not Server.huntNext(profile, profile.IntroRounds), "HUNT BOUNTY after round " .. won)
 		check(attributes.IntroRoundsLeft == IntroRounds.Count - won and Server.held(player), "Not held in the rounds after win " .. won)
 	end
 	local early = Server.choose(player, "Boss")
-	check(not early.Ok and early.Choice == nil and Server.held(player), "An early HUNT BOUNTY took them out mid-set")
+	check(not early.Ok and early.Choice == nil and Server.held(player), "An early HUNT BOUNTY took them out before round " .. must)
 	check(not Server.choose(player, "Hax").Ok, "A way out that isn't one")
-	-- The sixth win: the dungeon owed, its card HUNT BOUNTY.
+	-- Round 3 won: HUNT BOUNTY on the card (CONTINUE ROUNDS beside it).
 	Server.won(player)
-	check(Server.left(player) == 0 and profile.IntroFinale == "Dungeon", "The set done, but the first dungeon isn't owed")
-	check(Server.huntNext(profile, profile.IntroRounds), "No HUNT BOUNTY after all six rounds")
+	check(Server.huntNext(profile, profile.IntroRounds), "No HUNT BOUNTY after round " .. must)
+	check(Server.held(player) and not Server.huntPending(player), "Free of the rounds before picking a way on")
+	-- (CONTINUE ROUNDS: the next round, the offer back on the next win's card)
+	local hunted = Server._hunt(player)
+	check(hunted.Ok and Server.huntPending(player), "HUNT BOUNTY didn't let the kaiju roll play")
+	Server._next(player)
+	check(not Server.huntPending(player), "CONTINUE ROUNDS left the kaiju roll free mid-rounds")
+	-- HUNT BOUNTY: out of the rounds, the rest waiting.
+	check(Server._hunt(player).Ok, "HUNT BOUNTY refused at round " .. must)
 	local out = Server.choose(player, "Boss")
 	check(out.Ok and out.Choice == "Boss", "HUNT BOUNTY didn't take them out")
-	check(not Server.held(player) and attributes.IntroRoundsLeft == nil, "Still held after the set and HUNT BOUNTY")
+	check(not Server.held(player) and attributes.IntroRoundsLeft == nil, "Still held in the rounds after HUNT BOUNTY")
+	check(Server.left(player) == IntroRounds.Count - must, "The rounds left went with HUNT BOUNTY")
 	check(attributes.IntroFinale == "Dungeon" and Server.owesDungeon(player), "The Rift wouldn't pay the first dungeon's purse")
 	check(Server.dungeonCleared(player) and profile.IntroFinale == "Mines", "Clearing it didn't open the lobby's intro")
 	check(not Server.owesDungeon(player), "The first dungeon's purse paid twice")
-	-- After the dungeon: never HUNT BOUNTY again; an old card's goes to the lobby.
+	-- After the dungeon: never HUNT BOUNTY again; FIGHT finishes the set.
 	local state = profile.IntroRounds
 	check(not Server.huntNext(profile, state), "HUNT BOUNTY again after the first dungeon (Mines)")
 	profile.IntroFinale = "Done"
 	check(not Server.huntNext(profile, state), "HUNT BOUNTY again after the first dungeon (Done)")
-	local again = Server.choose(player, "Boss")
-	check(again.Ok and again.Choice ~= "Boss", "An old HUNT BOUNTY after the dungeon didn't just go to the lobby")
-	-- The rule itself: only once the set's won, while the dungeon's owed.
-	check(Server.huntNext({ IntroFinale = nil }, { Won = IntroRounds.Count }) and Server.huntNext({ IntroFinale = "Dungeon" }, { Won = IntroRounds.Count }), "No HUNT BOUNTY once the set's won")
-	check(not Server.huntNext({ IntroFinale = nil }, { Won = 1 }) and not Server.huntNext({ IntroFinale = "Dungeon" }, { Won = 3 }), "HUNT BOUNTY mid-set")
+	Server._next(player)
+	check(Server.held(player) and attributes.IntroRoundsLeft == IntroRounds.Count - must, "Back to the rounds, but not held in them")
+	for _ = must + 1, IntroRounds.Count do
+		Server.won(player)
+	end
+	check(Server.left(player) == 0 and profile.IntroFinale == "Done", "Finishing the set after the dungeon owed it again")
+	-- The rule itself: from round 3, while the dungeon's owed.
+	check(Server.huntNext({ IntroFinale = nil }, { Won = must }) and Server.huntNext({ IntroFinale = "Dungeon" }, { Won = IntroRounds.Count }), "No HUNT BOUNTY from round " .. must)
+	check(not Server.huntNext({ IntroFinale = nil }, { Won = 1 }) and not Server.huntNext({ IntroFinale = "Dungeon" }, { Won = must - 1 }), "HUNT BOUNTY before round " .. must)
 	check(not Server.huntNext({ IntroFinale = "Dungeon", IntroDungeonCleared = true }, { Won = IntroRounds.Count }), "HUNT BOUNTY with the dungeon cleared")
 	check(not Server.huntNext({ IntroFinale = "Done" }, { Won = IntroRounds.Count }), "HUNT BOUNTY for an older save")
+	attributes.CombatSession = nil
 end
 -- The lobby's intro never brings its minions into a fight: in a 1v1, the
 -- Arena, a queue or the Rift, it waits.

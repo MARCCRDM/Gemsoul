@@ -1238,11 +1238,13 @@ do
 	-- the first-person view has it, and the view puts itself back each frame.
 	local third = fs.readFile(ROOT .. "/src/client/Modules/ThirdPerson.luau")
 	check(third:find("or player.CameraMode == Enum.CameraMode.LockFirstPerson", 1, true) ~= nil, "The arrival camera can pull a fight back into third person")
-	-- The starter kaiju roll waits for all six rounds (Server.KaijuServer).
+	-- The starter kaiju roll waits while they're held in the rounds; HUNT
+	-- BOUNTY picked, it plays before the dungeon (Server.KaijuServer).
 	local kaijuServer = fs.readFile(ROOT .. "/src/server/Systems/KaijuServer.luau")
 	local held = kaijuServer:find("function KaijuServer.starterHeld", 1, true)
 	local roll = kaijuServer:find("local function rollRequest", 1, true)
-	check(held and roll and kaijuServer:find("KaijuServer.starterHeld(player, profile)", roll, true) and kaijuServer:sub(held, roll):find(".left(player)", 1, true), "The starter roll isn't held till the six rounds are won")
+	local rule = held and roll and kaijuServer:sub(held, roll) or ""
+	check(held and roll and kaijuServer:find("KaijuServer.starterHeld(player, profile)", roll, true) and rule:find(".held(player)", 1, true) and rule:find(".huntPending(player)", 1, true), "The starter roll isn't held while they're in the rounds")
 	local intro = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
 	local p = intro:find("local function proceed()", 1, true)
 	local proceed = intro:sub(p, intro:find("\n\tend\n", p, true))
