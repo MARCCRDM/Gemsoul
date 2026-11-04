@@ -341,6 +341,8 @@ end
 check(not fs.readFile(ROOT .. "/src/client/Modules/MainMenu.luau"):find("AutomaticSize = Enum.AutomaticSize.X", 1, true), "A button still sized by AutomaticSize")
 -- (its uploaded picture, no stand-in)
 check(find(slide, "Picture").Image == "rbxassetid://" .. Content.Images.KaijuCodes and not find(slide, "Fallback").Visible, "The banner's picture isn't shown")
+-- (cropped above the code names baked into its bottom: the buttons say them)
+check(find(slide, "Picture").ImageRectSize.Y == Content.Crops.KaijuCodes[4] and Content.Crops.KaijuCodes[4] < 500, "The codes banner's picture shows its baked-in code names")
 for _, b in Content.Banners do
 	check((Content.Images[b.Id] or 0) ~= 0, "No picture uploaded for " .. b.Id)
 end

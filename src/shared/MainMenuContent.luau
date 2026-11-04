@@ -31,6 +31,13 @@ MainMenuContent.Images = {
 	Pickaxe = 109495894337355, -- pickaxe_code.png
 }
 
+-- The part of a picture to show, in its pixels: { X, Y, Width, Height }
+-- (none: all of it). KaijuCodes: above the code names baked into its
+-- bottom (the banner's buttons say them).
+MainMenuContent.Crops = {
+	KaijuCodes = { 0, 0, 1024, 488 },
+}
+
 local GOLD = Color3.fromRGB(255, 202, 91)
 local EMBER = Color3.fromRGB(255, 140, 70)
 

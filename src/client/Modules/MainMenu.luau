@@ -272,6 +272,9 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		end
 		local id = Content.Images[banner.Id] or 0
 		p.Picture.Image = if id ~= 0 then "rbxassetid://" .. id else ""
+		local crop = Content.Crops and Content.Crops[banner.Id]
+		p.Picture.ImageRectOffset = if crop then Vector2.new(crop[1], crop[2]) else Vector2.zero
+		p.Picture.ImageRectSize = if crop then Vector2.new(crop[3], crop[4]) else Vector2.zero
 		p.Fallback.Visible = id == 0
 		p.FallbackWord.Text = banner.Tag
 		p.FallbackGlow.BackgroundColor3 = banner.TagColor
