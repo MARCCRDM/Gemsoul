@@ -10,7 +10,7 @@ import report  # noqa: E402
 
 DAY = 86400
 START = int(datetime(2026, 11, 1, tzinfo=timezone.utc).timestamp())
-STEPS = ['Joined', 'Kit', 'First fight', 'Round 1 won', 'Hunt bounty', 'Dungeon entered', 'Dungeon boss', 'Dungeon cleared', 'Lobby', 'First rock', 'First gem', 'Socketed', 'Second duel']
+STEPS = ['Joined', 'Kit', 'First fight', 'Round 1 won', 'Second duel', 'Hunt bounty', 'Dungeon entered', 'Dungeon boss', 'Dungeon cleared', 'Lobby', 'First rock', 'First gem', 'Socketed']
 
 
 def write(dir_, server, hour_t, rows):
