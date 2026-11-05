@@ -91,8 +91,7 @@ end
 	              walkway between the tiers and one down from each pad;
 	              no pad within RoadGap degrees of the north road
 	  south       the Arrival Plaza (Plaza: an octagon, the shuttle's pad
-	              in the middle), the ARENA arch past it (the duel queue);
-	              the DUNGEON arch by the walkway to the Market
+	              in the middle)
 	  south-west  the Kaiju Habitat (the Daycare: Shared.Daycare.Pen)
 	  south-east  the Market & Gear: the Shelter (ShelterOffset)
 	  Wall        round it all, open at the four spokes (GateWidth studs)
@@ -125,8 +124,8 @@ Outpost.Settlement = {
 		{ { -131, -92 }, { -100, -40 }, { -98, 30 }, { -62, 92 }, { -26, 128 }, { 0, 164 } },
 		{ { 131, -92 }, { 100, -40 }, { 98, 30 }, { 62, 92 }, { 26, 128 }, { 0, 164 } },
 		{ { 0, -160 }, { -6, -96 }, { 0, -44 }, { 0, 44 }, { 0, 100 }, { 0, 164 } },
-		-- (and from the plaza out to the Kaiju Habitat, the Intro Ring and the
-		-- Market's side ramp, past the DUNGEON arch)
+		-- (and from the plaza out to the Kaiju Habitat, the south-west and the
+		-- Market's side ramp)
 		{ { -36, 204 }, { -128, 168 }, { -196, 104 } },
 		{ { -36, 212 }, { -95, 204 }, { -150, 196 } },
 		{ { 36, 210 }, { 80, 238 }, { 122, 280 } },
@@ -141,8 +140,6 @@ Outpost.Settlement = {
 	Doorstep = { R = { 196, 206, 214 } }, -- (rocks between the inner pads: Outpost.doorstepSpots)
 	Daycare = { Angle = 160, R = 255 },
 	Market = { Angle = 40, R = 255 },
-	Arena = { Angle = 90, R = 244 }, -- (the Grand Arena's way in, off the plaza)
-	Dungeon = { Angle = 74.05, R = 262 }, -- (by the walkway to the Market)
 	Enchanter = { Angle = 62, R = 150 },
 }
 function Outpost.place(angle: number, r: number): Vector3

@@ -1122,9 +1122,7 @@ function OutpostServer.start()
 			{ stations.Market, "Market", "Open the Market", "PLAYER MARKET" },
 			{ bounty.Counter, "Bounty", "Bounty Board", "BOUNTY OFFICE" },
 			{ duel.Counter, "Duels", "Find a duel", "BRUTUS'S DUELS" },
-			-- (the settlement's Arena and Dungeon gates and the Enchanter: Shared.Outpost.Settlement)
-			{ site.Gates and site.Gates.Arena, "Duels", "Enter the Arena", "ARENA GATE" },
-			{ site.Gates and site.Gates.Dungeon, "Bounty", "Hunt a bounty", "DUNGEON GATE" },
+			-- (the settlement's Enchanter: Shared.Outpost.Settlement)
 			{ site.Enchanter, "Enchanter", "Enchant your gear", "ENCHANTER" },
 		}
 	do

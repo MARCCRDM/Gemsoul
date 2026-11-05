@@ -2595,7 +2595,7 @@ end
 -- A secret: something hidden with a prompt-able part named "Secret".
 -- The settlement (Shared.Outpost.Settlement): the mining field with Arena
 -- Row in its middle (the rings are Server.PrivateArenas'), the ring road round it, the pod pads on
--- their terraces, the Arrival Plaza with the Arena and Dungeon gates past it, the
+-- their terraces, the Arrival Plaza, the
 -- Enchanter at the field's edge and the wall round it all. Returns what the
 -- server hooks up (Pads, Gates, Enchanter, Heart: the middle), what rocks keep clear of
 -- (KeepOut) and the paths that count as roads (Lines).
@@ -2813,32 +2813,8 @@ local function settlement(parent, at: CFrame, rules, rng)
 		end
 	end
 
-	-- The Arena and Dungeon gates past the Arrival Plaza: an arch each, facing the field, its word
-	-- over the opening and a glowing doorway; the server puts the prompt on
-	-- its Door (Arena: the duel queue; Dungeon: the Bounty Board).
-	local gates = {}
-	for _, spec in
-		{
-			{ "Arena", set.Arena, Color3.fromRGB(255, 120, 70), "ARENA" },
-			{ "Dungeon", set.Dungeon, Color3.fromRGB(190, 110, 255), "DUNGEON" },
-		}
-	do
-		local g = folder(m, spec[1] .. "Arch") -- (not "ArenaGate": the retired duel gate's name)
-		local f = facingIn(rules.place(spec[2].Angle, spec[2].R), 0)
-		for _, side in { -1, 1 } do
-			solid(part(g, f * CFrame.new(side * 9, 9, 0), Vector3.new(4, 18, 5), HULL_DARK, Enum.Material.Metal))
-			part(g, f * CFrame.new(side * 7.1, 8, -2.6), Vector3.new(0.4, 14, 0.4), spec[3], Enum.Material.Neon)
-		end
-		solid(part(g, f * CFrame.new(0, 19, 0), Vector3.new(22, 4, 5), HULL_DARK, Enum.Material.Metal))
-		painted(g, f * CFrame.new(0, 19, -2.6) * CFrame.Angles(0, math.pi, 0), Vector3.new(16, 2.6, 0.2), spec[4])
-		local door = part(g, f * CFrame.new(0, 8, 0.5), Vector3.new(14, 16, 0.6), spec[3], Enum.Material.Neon, nil, { Transparency = 0.45 })
-		door.Name = "Door"
-		door.CanQuery = true
-		light(door, spec[3], 26, 1.6)
-		solid(disc(g, f * CFrame.new(0, 0.2, -10), 14, 0.4, HULL_DARK, Enum.Material.DiamondPlate))
-		gates[spec[1]] = door
-		table.insert(keepOut, { f.Position, 24 })
-	end
+	local gates = {} -- (the Arena and Dungeon arches are gone: duels and bounties are
+	-- Brutus's counter and the Bounty Office's, in the Market)
 
 	-- The Enchanter: a pedestal at the field's edge with a gem over it; set
 	-- gems into your gear there (its prompt opens the Inventory).

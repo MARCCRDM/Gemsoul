@@ -1579,15 +1579,16 @@ do
 		end
 	end
 	check(inField >= 30 and doorstep >= 12, "Too few rocks in the field (" .. inField .. ") or at the doorsteps (" .. doorstep .. ")")
-	-- the gates and the Enchanter, inside the wall, with their prompts
-	for _, part in { site.Gates.Arena, site.Gates.Dungeon, site.Enchanter } do
-		check(part and flatTo(part.CFrame.Position, mid) < set.Wall, "A plaza piece outside the wall")
-		local prompt = part and part:FindFirstChildOfClass("ProximityPrompt")
-		check(prompt ~= nil, (part and part.Parent.Name or "?") .. " has no prompt")
+	-- the Enchanter, inside the wall, with its prompt; no Arena or Dungeon
+	-- arches by the plaza (duels and bounties are the Market's counters')
+	local part = site.Enchanter
+	check(part and flatTo(part.CFrame.Position, mid) < set.Wall, "The Enchanter is outside the wall")
+	check(part:FindFirstChildOfClass("ProximityPrompt") and part:FindFirstChildOfClass("ProximityPrompt"):GetAttribute("PromptKind") == "Enchanter", "The Enchanter has no Enchanter prompt")
+	check(next(site.Gates or {}) == nil, "An Arena or Dungeon arch by the plaza")
+	for kind, counter in { Duels = site.Duel and site.Duel.Counter, Bounty = site.Bounty and site.Bounty.Counter } do
+		local prompt = counter and counter:FindFirstChildOfClass("ProximityPrompt")
+		check(prompt and prompt:GetAttribute("PromptKind") == kind, "Nowhere to open the " .. kind)
 	end
-	check(site.Gates.Arena:FindFirstChildOfClass("ProximityPrompt"):GetAttribute("PromptKind") == "Duels", "The Arena gate doesn't open the duels")
-	check(site.Gates.Dungeon:FindFirstChildOfClass("ProximityPrompt"):GetAttribute("PromptKind") == "Bounty", "The Dungeon gate doesn't open the bounties")
-	check(site.Enchanter:FindFirstChildOfClass("ProximityPrompt"):GetAttribute("PromptKind") == "Enchanter", "The Enchanter has no Enchanter prompt")
 	check(Frontier.Core >= set.Wall, "The safe core stops short of the wall")
 end
 print(
