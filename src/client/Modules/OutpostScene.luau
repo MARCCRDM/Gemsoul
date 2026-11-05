@@ -2278,6 +2278,8 @@ require(script.Parent.PodArrival).start()
 -- MY POD: its door's prompt on your own pod only; the pods' showcase kaiju.
 require(script.Parent.PodUI).start()
 local PodShowcase = require(script.Parent.PodShowcase)
+local DayNight = require(ReplicatedStorage.Shared.DayNight)
+local skySince = math.huge
 -- (The Shelter's frame: the quarry's, lifted onto its legs.)
 local shelterFrame = Rules.shelterFrame() * CFrame.new(0, Rules.ShelterLift, 0)
 RunService.RenderStepped:Connect(function(dt)
@@ -2298,6 +2300,14 @@ RunService.RenderStepped:Connect(function(dt)
 		PodShowcase.step(dt)
 	else
 		PodShowcase.clear()
+	end
+	-- Day and night (Shared.DayNight), a few times a second; not in the
+	-- Rift (its light is its own).
+	skySince += dt
+	if active and skySince >= 0.2 and player:GetAttribute("RiftRun") == nil then
+		skySince = 0
+		local clock = DayNight.clock(workspace:GetServerTimeNow())
+		Scenes.outpostSky(clock, DayNight.daylight(clock))
 	end
 	SkyRift.show(active)
 	ShelterLife.show(active)

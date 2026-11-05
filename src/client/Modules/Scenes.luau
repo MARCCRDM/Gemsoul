@@ -656,6 +656,39 @@ Scenes.OutpostFinish = {
 	Grade = { Contrast = 0.08, Saturation = 0.1, Tint = Color3.fromRGB(250, 252, 255) },
 	Specular = 0.18,
 }
+-- Night at the Outpost (Shared.DayNight): the sun down, stars out, a dark
+-- blue haze; the walkways' and pods' lights carry it.
+Scenes.OutpostNight = {
+	Brightness = 1.4,
+	Ambient = Color3.fromRGB(74, 82, 108),
+	Outdoor = Color3.fromRGB(96, 108, 146),
+	Fog = { Density = 0.3, Color = Color3.fromRGB(44, 54, 84), Decay = Color3.fromRGB(26, 32, 52), Haze = 0.5 },
+}
+-- The Outpost's light now (what Client.FrontierHud tints toward each
+-- biome): its day's until outpostSky says otherwise.
+Scenes.OutpostNow = { Outdoor = Scenes.OutpostFinish.Outdoor, Fog = Scenes.OutpostFinish.Fog.Color, Tint = Scenes.OutpostFinish.Grade.Tint }
+-- The hour (`clock`) and how much daylight there is (`day`, 0..1: Shared.
+-- DayNight.daylight), between the day's finish and the night's. (The outdoor
+-- light and the haze's colour: Client.FrontierHud, from OutpostNow.)
+function Scenes.outpostSky(clock: number, day: number)
+	local d, n = Scenes.OutpostFinish, Scenes.OutpostNight
+	Lighting.ClockTime = clock
+	Lighting.Brightness = n.Brightness + (d.Brightness - n.Brightness) * day
+	Lighting.Ambient = n.Ambient:Lerp(d.Ambient, day)
+	local now = Scenes.OutpostNow
+	now.Outdoor = n.Outdoor:Lerp(d.Outdoor, day)
+	now.Fog = n.Fog.Color:Lerp(d.Fog.Color, day)
+	local fog = Lighting:FindFirstChildOfClass("Atmosphere")
+	if fog then
+		fog.Density = n.Fog.Density + (d.Fog.Density - n.Fog.Density) * day
+		fog.Haze = n.Fog.Haze + (d.Fog.Haze - n.Fog.Haze) * day
+		fog.Decay = n.Fog.Decay:Lerp(d.Fog.Decay, day)
+	end
+	local sky = Lighting:FindFirstChildOfClass("Sky")
+	if sky then
+		sky.StarCount = math.floor(3000 * (1 - day))
+	end
+end
 function Scenes.outpostLighting()
 	local finish = Scenes.OutpostFinish
 	Scenes.spaceLighting()

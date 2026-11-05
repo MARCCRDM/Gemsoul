@@ -94,21 +94,27 @@ end
 
 -- Out in the biomes, the light turns to theirs (a little each quarter
 -- second, so it drifts rather than snaps), from the Outpost's own grade
--- (Scenes.OutpostFinish) and outdoor light (its Outdoor). Not in
+-- and outdoor light, day or night (Scenes.OutpostNow). Not in
 -- the Rift, nor anywhere but the Outpost: their lighting is their own.
 local OUTPOST_AMBIENT = Color3.fromRGB(150, 156, 176)
 local function biomeLight(player: Player)
 	local Lighting = game:GetService("Lighting")
 	local ok, Scenes = pcall(require, script.Parent.Scenes)
-	local tint = if ok and Scenes.OutpostFinish then Scenes.OutpostFinish.Grade.Tint else Color3.fromRGB(248, 250, 255)
-	local haze = if ok and Scenes.OutpostFinish then Scenes.OutpostFinish.Fog.Color else Color3.fromRGB(86, 92, 110)
-	local outdoor = if ok and Scenes.OutpostFinish and Scenes.OutpostFinish.Outdoor then Scenes.OutpostFinish.Outdoor else OUTPOST_AMBIENT
+	-- (the Outpost's light now: day or night, Scenes.outpostSky)
+	local function base(): (Color3, Color3, Color3)
+		local now = ok and Scenes.OutpostNow
+		if now then
+			return now.Tint, now.Outdoor, now.Fog
+		end
+		return Color3.fromRGB(248, 250, 255), OUTPOST_AMBIENT, Color3.fromRGB(86, 92, 110)
+	end
 	task.spawn(function()
 		while true do
 			task.wait(0.25)
 			local character = player.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 			if root and player:GetAttribute("Outpost") == true and player:GetAttribute("RiftRun") == nil then
+				local tint, outdoor, haze = base()
 				local want, ambient, fog =
 					FrontierHud.biomeLight(root.Position - Outpost.Location.Position, tint, outdoor, haze)
 				local grade = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
