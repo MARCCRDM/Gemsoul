@@ -94,8 +94,9 @@ end
 	              walkway between the tiers and one down from each pad;
 	              no pad within RoadGap degrees of the north road
 	  south       the Arrival Plaza (Plaza: an octagon, the shuttle's pad
-	              in the middle), and past it at the south gate the Arena
-	              and the Dungeon side by side
+	              in the middle), the Grand Arena past it (Stages, the ARENA
+	              arch at its way in); the Intro Ring south-west of it; the
+	              DUNGEON arch by the walkway to the Market
 	  south-west  the Kaiju Habitat (the Daycare: Shared.Daycare.Pen)
 	  south-east  the Market & Gear: the Shelter (ShelterOffset)
 	  Wall        round it all, open at the four spokes (GateWidth studs)
@@ -113,15 +114,28 @@ Outpost.Settlement = {
 	Heart = 16,
 	Ring = 160,
 	RingGap = 8,
-	Plaza = { X = 0, Z = 222, Apothem = 58, Apron = { To = 304, Half = 74 } },
+	Plaza = { X = 0, Z = 200, Apothem = 40 },
+	-- Arena Row: arenas built in the open (Server.PrivateArenas copies the
+	-- Arena onto each), stands either side to watch from. Intro and practice
+	-- fights take one when it's free. The Grand Arena faces the plaza, the
+	-- ARENA arch at its way in; the Intro Ring is south-west.
+	-- (in the order fights take them: the Intro Ring first)
+	Stages = {
+		{ Name = "IntroRing", X = -150, Z = 245 },
+		{ Name = "GrandArena", X = 0, Z = 290 },
+	},
+	StageReach = 44, -- studs: an arena's wall and fence, round its middle
+	Stands = { From = 46, Rows = 8, Depth = 3, Rise = 2, Long = 36 }, -- (up to 16: over the arena's wall)
 	-- (x, z points: from the ring round the Heart to the plaza; one in to the Heart)
 	Walks = {
 		{ { -131, -92 }, { -78, -36 }, { -66, 56 }, { -26, 124 }, { 0, 164 } },
 		{ { 131, -92 }, { 78, -36 }, { 66, 56 }, { 26, 124 }, { 0, 164 } },
 		{ { 0, -160 }, { -8, -96 }, { 0, -44 } },
-		-- (and from the plaza out to the Kaiju Habitat and the Market's side ramp)
-		{ { -52, 212 }, { -128, 168 }, { -196, 104 } },
-		{ { 70, 288 }, { 92, 282 }, { 116, 272 } },
+		-- (and from the plaza out to the Kaiju Habitat, the Intro Ring and the
+		-- Market's side ramp, past the DUNGEON arch)
+		{ { -36, 204 }, { -128, 168 }, { -196, 104 } },
+		{ { -36, 212 }, { -95, 204 }, { -150, 196 } },
+		{ { 36, 210 }, { 80, 238 }, { 122, 280 } },
 	},
 	Tiers = {
 		{ R = 245, Count = 25, From = 186, To = 354 },
@@ -133,8 +147,8 @@ Outpost.Settlement = {
 	Doorstep = { R = { 196, 206, 214 } }, -- (rocks between the inner pads: Outpost.doorstepSpots)
 	Daycare = { Angle = 160, R = 255 },
 	Market = { Angle = 40, R = 255 },
-	Arena = { Angle = 99, R = 316 },
-	Dungeon = { Angle = 81, R = 316 },
+	Arena = { Angle = 90, R = 244 }, -- (the Grand Arena's way in, off the plaza)
+	Dungeon = { Angle = 74.05, R = 262 }, -- (by the walkway to the Market)
 	Enchanter = { Angle = 62, R = 150 },
 }
 function Outpost.place(angle: number, r: number): Vector3

@@ -55,10 +55,11 @@ local WHITE = Color3.new(1, 1, 1)
 
 -- Where things are, in the quarry's frame (Server OutpostWorld.build).
 -- (The haul roads are the four spokes, Frontier.Spokes: north, east, south, west.)
--- (From the settlement's ring road out; the south road from behind the Shelter: SouthFrom.)
-QuarryLife.Roads = { From = 179, SouthFrom = 302, To = 524, Step = 20, Side = 8.4, Ring = 420 }
+-- (From the settlement's ring road out; the south road from behind the Grand
+-- Arena: SouthFrom, its lights closer together, SouthStep: it's shorter.)
+QuarryLife.Roads = { From = 179, SouthFrom = 338, To = 524, Step = 20, SouthStep = 12, Side = 8.4, Ring = 420 }
 QuarryLife.Ramps = { { 1, 470 }, { 2, 455 }, { 3, 470 }, { 4, 455 } } -- (road, studs out: the jump ramps, Server OutpostWorld)
-QuarryLife.Pad = V(0, 1.15, 222) -- the shuttle pad's top (in the middle of the Arrival Plaza)
+QuarryLife.Pad = V(0, 1.15, 200) -- the shuttle pad's top (in the middle of the Arrival Plaza)
 QuarryLife.Drop = V(56, 18, -355) -- where the lifter hovers at the north outpost (out past the wall)
 QuarryLife.Cruise = 62 -- the lifter's height between (well over the Shelter's skylight)
 QuarryLife.Flight = 40 -- seconds each way
@@ -95,7 +96,7 @@ function QuarryLife.lights(): { { Position: Vector3, Band: string, Road: number,
 		local a = roadAngle(road)
 		local along, across = V(math.cos(a), 0, math.sin(a)), V(-math.sin(a), 0, math.cos(a))
 		local south = math.abs(math.sin(a) - 1) < 1e-3
-		for out = if south then spec.SouthFrom else spec.From, spec.To, spec.Step do
+		for out = if south then spec.SouthFrom else spec.From, spec.To, if south then spec.SouthStep else spec.Step do
 			local clear = math.abs(out - spec.Ring) > 12
 			for _, ramp in QuarryLife.Ramps do
 				if ramp[1] == road and math.abs(out - ramp[2]) < 18 then

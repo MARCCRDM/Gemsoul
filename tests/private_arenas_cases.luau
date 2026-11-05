@@ -96,4 +96,52 @@ PrivateArenas.release(b)
 PrivateArenas.release(c)
 PrivateArenas.release(c) -- (twice is harmless)
 
-print(string.format("PASS: %d private arena checks (one each, far apart, scenery only, reused)", checks))
+-- Arena Row (Shared.Outpost.Settlement.Stages): copies built for good out in
+-- the open, taken first, the Intro Ring then the Grand Arena; fenced while a
+-- fight's on; then a far copy as before.
+local groundA, groundB = R.Vector3.new(-150, 0, 7245), R.Vector3.new(0, 0, 7290)
+local sa = PrivateArenas.stage("IntroRing", groundA, 43)
+local sb = PrivateArenas.stage("GrandArena", groundB, 43)
+check((sa - (groundA + R.Vector3.new(0, FLOOR.Y, 0))).Magnitude < 1e-3 and (sb - (groundB + R.Vector3.new(0, FLOOR.Y, 0))).Magnitude < 1e-3, "A stage isn't where it was put")
+local ring = workspace.PrivateArenas:FindFirstChild("IntroRing")
+check(ring and ring:GetAttribute("Center") == sa and ring:GetAttribute("Stage") == true, "The Intro Ring isn't a copy with its centre")
+check((ring:FindFirstChild("Floor").CFrame.Position - sa).Magnitude < 1e-3, "The Intro Ring's floor isn't at its centre")
+for _, d in ring:GetDescendants() do
+	check(not d:IsA("ProximityPrompt") and not d:IsA("SpawnLocation") and not d:IsA("Script"), "A stage kept a " .. d.ClassName)
+end
+local fence = ring:FindFirstChild("StageFence")
+check(fence and #fence:GetChildren() == 24, "No fence round the Intro Ring")
+local function closed(stage)
+	for _, p in stage.StageFence:GetChildren() do
+		if not p.CanCollide then
+			return false
+		end
+	end
+	return true
+end
+local function shut(stage)
+	for _, p in stage.StageFence:GetChildren() do
+		if p.CanCollide then
+			return false
+		end
+	end
+	return true
+end
+for _, p in fence:GetChildren() do
+	check(p.Transparency == 1 and math.abs(((p.CFrame.Position - sa) * R.Vector3.new(1, 0, 1)).Magnitude - 43) < 0.1, "A fence panel off its ring")
+end
+check(shut(ring), "The Intro Ring's fenced off with no fight on")
+local d, e, f, g = player(4), player(5), player(6), player(7)
+check(PrivateArenas.claim(d) == sa and d:GetAttribute("ArenaCenter") == sa, "A fight didn't take the Intro Ring")
+check(closed(ring) and ring:GetAttribute("Owner") == 4, "The Intro Ring's open with a fight on")
+check(PrivateArenas.claim(e) == sb, "The next fight didn't take the Grand Arena")
+local cf = PrivateArenas.claim(f)
+check(typeof(cf) == "Vector3" and cf ~= sa and cf ~= sb and (cf - FLOOR).Magnitude > 1000, "With Arena Row full, no far copy")
+PrivateArenas.release(d)
+check(ring.Parent ~= nil and ring:GetAttribute("Owner") == nil and shut(ring), "The Intro Ring wasn't left standing and open")
+check(PrivateArenas.claim(g) == sa, "The Intro Ring wasn't taken again")
+for _, who in { e, f, g } do
+	PrivateArenas.release(who)
+end
+
+print(string.format("PASS: %d private arena checks (one each, far apart, scenery only, reused; Arena Row out in the open, fenced in a fight)", checks))

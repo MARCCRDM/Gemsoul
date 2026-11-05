@@ -147,6 +147,15 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 	local PodServer = require(script.Parent.Systems.PodServer)
 	PodServer.start(OutpostServer.site())
 	OutpostServer.podArrival = PodServer.land
+	-- Arena Row: copies of the Arena out in the open, for fights to take
+	-- (Server.PrivateArenas: Training first, the Intro Ring then the Grand Arena).
+	if Config.CombatEnabled or not Config.MenuOnly then
+		local Outpost = require(game:GetService("ReplicatedStorage").Shared.Outpost)
+		local PrivateArenas = require(script.Parent.Systems.PrivateArenas)
+		for _, spec in Outpost.Settlement.Stages do
+			PrivateArenas.stage(spec.Name, (Outpost.Location * CFrame.new(spec.X, 0, spec.Z)).Position, Outpost.Settlement.StageReach - 1)
+		end
+	end
 	-- The swing refills are Robux products: their swings go on the pick.
 	StoreServer.addSwings = OutpostServer.addSwings
 	-- Swing restores (Shared.SwingRestore): arena streaks, dungeons, coupons.

@@ -20,6 +20,12 @@
 	                                            of their own (nil if there's
 	                                            no Arena to copy)
 	  PrivateArenas.release(player)             their copy, back to the spares
+	  PrivateArenas.stage(name, ground, reach)  a copy built for good at
+	                                            `ground` (Arena Row in the
+	                                            Outpost: Shared.Outpost.
+	                                            Settlement.Stages), out in the
+	                                            open to watch: claimed first,
+	                                            fenced off while a fight's on
 	  PrivateArenas.start()
 ]]
 local Players = game:GetService("Players")
@@ -44,6 +50,8 @@ local STRIP = {
 }
 
 local owned = {} :: { [Player]: Model }
+-- Arena Row's copies: { Model, Center, Fence, Owner }, in the order they're taken.
+local stages = {}
 local spares = {} :: { Model }
 local used = {} :: { [number]: boolean }
 
@@ -106,10 +114,69 @@ local function copy(source: Instance, offset: Vector3): Model
 	return model
 end
 
+-- A fence round a stage's floor, `reach` out: nobody walks into a fight
+-- (or out of one); open between fights.
+local function fenceOf(model: Model, center: Vector3, reach: number): Folder
+	local fence = Instance.new("Folder")
+	fence.Name = "StageFence"
+	local segments = 24
+	for i = 0, segments - 1 do
+		local a = (i + 0.5) / segments * math.pi * 2
+		local p = Instance.new("Part")
+		p.Name = "Fence"
+		p.Anchored, p.CanCollide, p.CanTouch, p.CanQuery = true, false, false, false
+		p.Transparency = 1
+		p.Size = Vector3.new(2 * reach * math.tan(math.pi / segments) + 1, 26, 1)
+		p.CFrame = CFrame.new(center + Vector3.new(math.cos(a) * reach, 12, math.sin(a) * reach))
+			* CFrame.Angles(0, -a + math.pi / 2, 0)
+		p.Parent = fence
+	end
+	fence.Parent = model
+	return fence
+end
+local function fenced(stage, on: boolean)
+	for _, p in stage.Fence:GetChildren() do
+		(p :: BasePart).CanCollide = on
+	end
+end
+
+function PrivateArenas.stage(name: string, ground: Vector3, reach: number): Vector3?
+	local center = floor()
+	local source = workspace:FindFirstChild("CombatArena")
+	if not center or not source then
+		return nil
+	end
+	-- (its floor at the Arena's height over its own ground)
+	local target = Vector3.new(ground.X, ground.Y + center.Y, ground.Z)
+	local ok, model = pcall(copy, source, target - center)
+	if not ok then
+		warn("[PrivateArenas] stage failed:", model)
+		return nil
+	end
+	model.Name = name
+	model:SetAttribute("Center", target)
+	model:SetAttribute("Stage", true)
+	local stage = { Model = model, Center = target, Fence = fenceOf(model, target, reach), Owner = nil :: Player? }
+	model.Parent = folder()
+	table.insert(stages, stage)
+	return target
+end
+
 function PrivateArenas.claim(player: Player): Vector3?
 	local mine = owned[player]
 	if mine and mine.Parent then
 		return mine:GetAttribute("Center")
+	end
+	-- Arena Row first, out in the open, when one's free.
+	for _, stage in stages do
+		if not stage.Owner and stage.Model.Parent then
+			stage.Owner = player
+			stage.Model:SetAttribute("Owner", player.UserId)
+			fenced(stage, true)
+			owned[player] = stage.Model
+			player:SetAttribute("ArenaCenter", stage.Center)
+			return stage.Center
+		end
 	end
 	local center = floor()
 	local source = workspace:FindFirstChild("CombatArena")
@@ -145,6 +212,13 @@ function PrivateArenas.release(player: Player)
 		return
 	end
 	model:SetAttribute("Owner", nil)
+	for _, stage in stages do
+		if stage.Model == model then
+			stage.Owner = nil -- (Arena Row's: stays, open again)
+			fenced(stage, false)
+			return
+		end
+	end
 	if #spares < PrivateArenas.Spare and model.Parent then
 		table.insert(spares, model)
 	else

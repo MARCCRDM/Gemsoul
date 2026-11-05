@@ -109,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.51 · 2026-11-05 Outpost v2 stage 1: the Shelter opens to the sky",
+		Build = "1.52 · 2026-11-05 Outpost v2 stage 2a: Arena Row (intro and practice fights in the open)",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error
