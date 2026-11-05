@@ -878,8 +878,8 @@ function OutpostWorld.veinMarks(parent, at: CFrame, rng, color: Color3?, index: 
 	return model
 end
 
-local NEAR_SPOTS = 52 -- rock spots in the field round the middle (the outcrops lead out from it)
-local NEAR_REACH = 140 -- studs: the field stays inside the core (Shared.Frontier.Core)
+local NEAR_SPOTS = 70 -- rock spots in the field round the middle and at the pods' doorsteps
+local NEAR_REACH = 128 -- studs: the mining field, inside the ring road (Shared.Outpost.Settlement)
 
 -- Two wedges make the triangle a, b, c, `thick` studs through; returns them.
 local function triangle(parent, at, a, b, c, thick: number, color, material): { BasePart }
@@ -1713,7 +1713,7 @@ end
 -- The Kaiju Daycare out on the quarry floor (Shared.Daycare.Pen: its
 -- middle, x and z, and how far round it is kept clear: no rocks, no wild
 -- kaiju, flat ground). Each player's client builds the pen itself.
-local DAYCARE = { X = -70, Z = 102, Clear = 32 }
+local DAYCARE = { X = -240, Z = 87, Clear = 32 } -- (the Kaiju Grounds: Shared.Daycare.Pen)
 local SHELTER = {
 	HalfWidth = 84, -- x, inside
 	HalfDepth = 60, -- z, inside
@@ -2587,6 +2587,181 @@ local function hallDressing(parent, at: CFrame)
 end
 
 -- A secret: something hidden with a prompt-able part named "Secret".
+-- The settlement (Shared.Outpost.Settlement): the Crystal Heart in the
+-- middle of the mining field, the ring road round it, the pod pads on
+-- their terraces, the Arena and Dungeon gates on the Gate Plaza, the
+-- Enchanter at the field's edge and the wall round it all. Returns what the
+-- server hooks up (Pads, Gates, Enchanter, Heart), what rocks keep clear of
+-- (KeepOut) and the paths that count as roads (Lines).
+local HEART = Color3.fromRGB(110, 225, 255)
+local function settlement(parent, at: CFrame, rules, rng)
+	local set = rules.Settlement
+	local m = folder(parent, "Settlement")
+	local keepOut, lines = {}, {}
+	local function world(offset: Vector3): Vector3
+		return (at * CFrame.new(offset.X, 0, offset.Z)).Position
+	end
+	local function facingIn(offset: Vector3, y: number?): CFrame
+		local p = (at * CFrame.new(offset.X, y or 0, offset.Z)).Position
+		local mid = (at * CFrame.new(0, y or 0, 0)).Position
+		return CFrame.lookAt(p, mid)
+	end
+
+	-- The Crystal Heart: a ring of tall crystals round a glowing core, on a
+	-- low rock mound; seen from every pod.
+	local heart = folder(m, "CrystalHeart")
+	solid(disc(heart, at * CFrame.new(0, 1.2, 0), set.Heart, 2.4, Color3.fromRGB(70, 72, 84), Enum.Material.Slate))
+	local core = part(heart, at * CFrame.new(0, 9, 0), Vector3.new(6, 12, 6), HEART, Enum.Material.Neon)
+	core.Name = "Core"
+	light(core, HEART, 60, 2.2)
+	for i = 0, 8 do
+		local a = i / 9 * math.pi * 2
+		local tall = 10 + (i % 3) * 5 + rng:NextNumber(0, 3)
+		local r = 5 + (i % 2) * 3
+		local base = at * CFrame.Angles(0, a, 0) * CFrame.new(0, 2, -r) * CFrame.Angles(math.rad(-14 - (i % 3) * 6), 0, 0)
+		solid(
+			part(
+				heart,
+				base * CFrame.new(0, tall / 2, 0),
+				Vector3.new(2.6, tall, 2.6),
+				HEART:Lerp(Color3.new(1, 1, 1), 0.15),
+				Enum.Material.Glass,
+				nil,
+				{ Transparency = 0.15 }
+			)
+		)
+	end
+	table.insert(keepOut, { at.Position, set.Heart + 10 })
+
+	-- The ring road round the field, open in front of the Shelter's door.
+	local paths = folder(m, "Paths")
+	local segs = 48
+	for i = 0, segs - 1 do
+		local a0, a1 = i / segs * 360, (i + 1) / segs * 360
+		if math.abs((a0 + a1) / 2 - 90) > set.RingGap then
+			local from, to = world(rules.place(a0, set.Ring)), world(rules.place(a1, set.Ring))
+			road(paths, from, to, 14)
+			table.insert(lines, { from, to })
+		end
+	end
+	-- The path between the pod tiers.
+	local tierFrom, tierTo = set.Tiers[1].From, set.Tiers[1].To
+	local steps = 28
+	for i = 0, steps - 1 do
+		local a0 = tierFrom + i / steps * (tierTo - tierFrom)
+		local a1 = tierFrom + (i + 1) / steps * (tierTo - tierFrom)
+		local from, to = world(rules.place(a0, set.Terrace)), world(rules.place(a1, set.Terrace))
+		road(paths, from, to, 8)
+		table.insert(lines, { from, to })
+	end
+
+	-- The pod pads: a landing disc each, hazard-ringed, four lamps, facing
+	-- the Heart (Server.PodServer lands each player's pod on one).
+	local padsFolder = folder(m, "Pads")
+	local pads = {}
+	for index, spot in rules.padSpots() do
+		local frame = facingIn(spot.Offset)
+		local pad = folder(padsFolder, "Pad" .. index)
+		local plate = solid(disc(pad, frame * CFrame.new(0, 0.5, 0), set.Pad, 1, HULL_DARK, Enum.Material.DiamondPlate))
+		plate.Name = "Plate"
+		disc(pad, frame * CFrame.new(0, 1.03, 0), set.Pad - 1.2, 0.08, HAZARD, Enum.Material.SmoothPlastic)
+		disc(pad, frame * CFrame.new(0, 1.08, 0), set.Pad - 2.4, 0.08, HULL_DARK, Enum.Material.DiamondPlate)
+		for k = 0, 3 do
+			local a = k / 4 * math.pi * 2 + math.pi / 4
+			local lamp = part(
+				pad,
+				frame * CFrame.new(math.cos(a) * (set.Pad - 0.6), 1.25, math.sin(a) * (set.Pad - 0.6)),
+				Vector3.new(0.8, 0.5, 0.8),
+				GLOW,
+				Enum.Material.Neon
+			)
+			lamp.Name = "Lamp"
+		end
+		pad:SetAttribute("PadIndex", index)
+		pad:SetAttribute("Tier", spot.Tier)
+		table.insert(pads, { Index = index, Tier = spot.Tier, CFrame = frame * CFrame.new(0, 1.1, 0), Model = pad })
+		table.insert(keepOut, { frame.Position, set.Pad + 6 })
+	end
+
+	-- The wall, open where the spokes run out (a lit pylon each side).
+	local wall = folder(m, "Wall")
+	local gateHalf = math.deg((set.GateWidth / 2) / set.Wall) + 1
+	local pieces = 120
+	for i = 0, pieces - 1 do
+		local a = (i + 0.5) / pieces * 360
+		local open = false
+		for _, g in { 0, 90, 180, 270 } do
+			if math.abs((a - g + 180) % 360 - 180) < gateHalf then
+				open = true
+			end
+		end
+		if not open then
+			local length = 2 * set.Wall * math.tan(math.pi / pieces) + 0.6
+			local f = facingIn(rules.place(a, set.Wall), set.WallHeight / 2)
+			solid(part(wall, f, Vector3.new(length, set.WallHeight, 3), Color3.fromRGB(92, 94, 104), Enum.Material.Concrete))
+			part(wall, f * CFrame.new(0, set.WallHeight / 2 + 0.15, 0), Vector3.new(length, 0.3, 3.2), HAZARD, Enum.Material.SmoothPlastic)
+		end
+	end
+	for _, g in { 0, 90, 180, 270 } do
+		for _, side in { -1, 1 } do
+			local f = facingIn(rules.place(g + side * gateHalf, set.Wall), 0)
+			solid(part(wall, f * CFrame.new(0, 7, 0), Vector3.new(4, 14, 4), HULL_DARK, Enum.Material.Metal))
+			local lamp = part(wall, f * CFrame.new(0, 14.5, 0), Vector3.new(4.2, 1, 4.2), GLOW, Enum.Material.Neon)
+			light(lamp, GLOW, 22, 1.2)
+		end
+	end
+
+	-- The Gate Plaza's two gates: an arch each, facing the field, its word
+	-- over the opening and a glowing doorway; the server puts the prompt on
+	-- its Door (Arena: the duel queue; Dungeon: the Bounty Board).
+	local gates = {}
+	for _, spec in
+		{
+			{ "Arena", set.Arena, Color3.fromRGB(255, 120, 70), "ARENA" },
+			{ "Dungeon", set.Dungeon, Color3.fromRGB(190, 110, 255), "DUNGEON" },
+		}
+	do
+		local g = folder(m, spec[1] .. "Arch") -- (not "ArenaGate": the retired duel gate's name)
+		local f = facingIn(rules.place(spec[2].Angle, spec[2].R), 0)
+		for _, side in { -1, 1 } do
+			solid(part(g, f * CFrame.new(side * 9, 9, 0), Vector3.new(4, 18, 5), HULL_DARK, Enum.Material.Metal))
+			part(g, f * CFrame.new(side * 7.1, 8, -2.6), Vector3.new(0.4, 14, 0.4), spec[3], Enum.Material.Neon)
+		end
+		solid(part(g, f * CFrame.new(0, 19, 0), Vector3.new(22, 4, 5), HULL_DARK, Enum.Material.Metal))
+		painted(g, f * CFrame.new(0, 19, -2.6) * CFrame.Angles(0, math.pi, 0), Vector3.new(16, 2.6, 0.2), spec[4])
+		local door = part(g, f * CFrame.new(0, 8, 0.5), Vector3.new(14, 16, 0.6), spec[3], Enum.Material.Neon, nil, { Transparency = 0.45 })
+		door.Name = "Door"
+		door.CanQuery = true
+		light(door, spec[3], 26, 1.6)
+		solid(disc(g, f * CFrame.new(0, 0.2, -10), 14, 0.4, HULL_DARK, Enum.Material.DiamondPlate))
+		gates[spec[1]] = door
+		table.insert(keepOut, { f.Position, 24 })
+	end
+
+	-- The Enchanter: a pedestal at the field's edge with a gem over it; set
+	-- gems into your gear there (its prompt opens the Inventory).
+	local enchanter = folder(m, "Enchanter")
+	local ef = facingIn(rules.place(set.Enchanter.Angle, set.Enchanter.R), 0)
+	solid(part(enchanter, ef * CFrame.new(0, 2, 0), Vector3.new(6, 4, 6), HULL_DARK, Enum.Material.Metal))
+	part(enchanter, ef * CFrame.new(0, 4.1, 0), Vector3.new(6.4, 0.2, 6.4), HAZARD, Enum.Material.SmoothPlastic)
+	local gem = part(
+		enchanter,
+		ef * CFrame.new(0, 7, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
+		Vector3.new(2.2, 2.2, 2.2),
+		Color3.fromRGB(255, 120, 200),
+		Enum.Material.Neon
+	)
+	gem.Name = "Gem"
+	light(gem, Color3.fromRGB(255, 120, 200), 18, 1.5)
+	local desk = part(enchanter, ef * CFrame.new(0, 3, 0), Vector3.new(6, 6, 6), HULL_DARK, nil, nil, { Transparency = 1 })
+	desk.Name = "Desk"
+	desk.CanQuery = true
+	steelPlate(enchanter, ef * CFrame.new(0, 2.4, -3.15) * CFrame.Angles(0, math.pi, 0), Vector3.new(5.4, 1.4, 0.2), "ENCHANTER")
+	table.insert(keepOut, { ef.Position, 12 })
+
+	return { Pads = pads, Gates = gates, Enchanter = desk, Heart = at, KeepOut = keepOut, Lines = lines }
+end
+
 function OutpostWorld.build(at: CFrame, parent: Instance)
 	local root = Instance.new("Model")
 	root.Name = "SagaOutpost"
@@ -2613,21 +2788,14 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local standing = {} -- (craters and masts out on the floor: the land stays flat round them)
 	for _, c in
 		{
-			{ 130, 40, 11 },
-			{ 95, -20, 8 },
-			{ -110, -40, 7 },
-			{ 48, 150, 12 },
-			{ -110, -50, 10 },
-			{ 200, -260, 24 },
-			{ -230, -150, 18 },
-			{ 170, 220, 16 },
-			{ -330, 80, 20 },
-			{ 300, -40, 14 },
+			-- (out past the settlement's wall, short of the ring road)
 			{ -150, 330, 12 },
-			{ 330, 120, 30 },
-			{ 60, 330, 34 },
-			{ -60, -300, 15 },
+			{ 450, 170, 26 },
 			{ 260, 300, 11 },
+			{ 230, -300, 14 },
+			{ -300, -230, 14 },
+			{ -370, 80, 14 },
+			{ 380, -30, 12 },
 		}
 	do
 		crater(ground, at * CFrame.new(c[1], 0, c[2]), c[3])
@@ -2663,13 +2831,16 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- ramps on them.
 	local roads = folder(root, "Roads")
 	local roadLines = {}
+	local settle = assert(OutpostWorld.Rules, "OutpostWorld needs Shared.Outpost").Settlement
 	for _, a in Frontier.Spokes do
-		local from = (at * CFrame.new(math.cos(a) * 104, 0, math.sin(a) * 104)).Position
+		-- (from the settlement's ring road; the south one from behind the Shelter)
+		local start = if math.abs(a - math.pi / 2) < 0.01 then 316 else settle.Ring + 7
+		local from = (at * CFrame.new(math.cos(a) * start, 0, math.sin(a) * start)).Position
 		local to = (at * CFrame.new(math.cos(a) * (QUARRY - 20), 0, math.sin(a) * (QUARRY - 20))).Position
 		road(roads, from, to, 18)
 		table.insert(roadLines, { from, to })
 	end
-	local ring = 260
+	local ring = 420 -- (the Loop's, out past the settlement's wall)
 	for i = 0, 35 do
 		local a0, a1 = i / 36 * math.pi * 2, (i + 1) / 36 * math.pi * 2
 		local from = (at * CFrame.new(math.cos(a0) * ring, 0, math.sin(a0) * ring)).Position
@@ -2679,7 +2850,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	end
 	local ramps = {}
 	-- (One on each spoke: north, east, south, west.)
-	for i, out in { 345, 215, 330, 200 } do
+	for i, out in { 470, 455, 470, 455 } do
 		local a = Frontier.Spokes[i]
 		local p = (at * CFrame.new(math.cos(a) * out, 0, math.sin(a) * out)).Position
 		local outward = (at * CFrame.new(math.cos(a) * (out + 10), 0, math.sin(a) * (out + 10))).Position
@@ -2689,15 +2860,15 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	end
 	for i = 0, 11 do
 		local a = i / 12 * math.pi * 2 + math.rad(15)
-		mast(roads, at * CFrame.new(math.cos(a) * 275, 0, math.sin(a) * 275), if i % 2 == 0 then SAGA else GLOW)
-		table.insert(standing, { (at * CFrame.new(math.cos(a) * 275, 0, math.sin(a) * 275)).Position, 4 })
+		mast(roads, at * CFrame.new(math.cos(a) * 330, 0, math.sin(a) * 330), if i % 2 == 0 then SAGA else GLOW)
+		table.insert(standing, { (at * CFrame.new(math.cos(a) * 330, 0, math.sin(a) * 330)).Position, 4 })
 	end
 
 	-- The Shelter in the middle, up on its legs: the lobby, the mech
 	-- garage, the stations.
 	local rules = assert(OutpostWorld.Rules, "OutpostWorld needs Shared.Outpost")
 	local lift = rules.ShelterLift
-	local shelterAt = at * CFrame.new(rules.ShelterOffset or Vector3.zero)
+	local shelterAt = at * CFrame.new(rules.ShelterOffset or Vector3.zero) * CFrame.Angles(0, rules.ShelterTurn or 0, 0)
 	local home = shelter(root, shelterAt * CFrame.new(0, lift, 0), rules)
 	local parking = home.Parking
 
@@ -2719,7 +2890,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	part(works, rigAt * CFrame.new(0, 33, 0), Vector3.new(10, 2, 10), HULL_DARK, Enum.Material.Metal)
 	part(works, rigAt * CFrame.new(0, 14, 0), Vector3.new(2, 28, 2), STEEL, Enum.Material.Metal)
 	disc(works, rigAt * CFrame.new(0, 0.15, 0), 9, 0.3, Color3.fromRGB(30, 30, 34), Enum.Material.Slate)
-	for _, c in { { -280, -60 }, { 120, -330 }, { -200, 240 }, { 340, 60 } } do
+	for _, c in { { -400, -60 }, { 140, -390 }, { -200, 240 }, { 390, 60 } } do
 		for k = 0, 2 do
 			part(
 				works,
@@ -2737,9 +2908,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 
 	-- The outpost along the north edge.
 	local base = folder(root, "Outpost")
-	local north = at * CFrame.new(0, 0, -110)
+	local north = at * CFrame.new(0, 0, -375) -- (out past the settlement's north gate)
 	-- Landing pad and shuttle, south-east of the Shelter.
-	local padAt = at * CFrame.new(72, 0, 118)
+	local padAt = at * CFrame.new(rules.place(27, 255)) -- (the Gate Plaza)
 	solid(disc(base, padAt * CFrame.new(0, 0.5, 0), 20, 1, HULL_DARK, Enum.Material.DiamondPlate))
 	disc(base, padAt * CFrame.new(0, 1.05, 0), 16, 0.1, STEEL, Enum.Material.SmoothPlastic)
 	disc(base, padAt * CFrame.new(0, 1.1, 0), 14.6, 0.1, HULL_DARK, Enum.Material.DiamondPlate)
@@ -2877,12 +3048,12 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		local a = i / 8 * math.pi * 2 + 0.2
 		mast(
 			base,
-			at * CFrame.new(math.cos(a) * 130, 0, math.sin(a) * 130) * CFrame.Angles(0, -a + math.rad(90), 0),
+			at * CFrame.new(math.cos(a) * 142, 0, math.sin(a) * 142) * CFrame.Angles(0, -a + math.rad(90), 0),
 			if i % 2 == 0 then Color3.fromRGB(255, 236, 200) else GLOW
 		)
 	end
 	-- A solar array to the north-west, rows of tilted panels.
-	local solar = at * CFrame.new(-150, 0, 40) * CFrame.Angles(0, math.rad(30), 0)
+	local solar = at * CFrame.new(-262, 0, 150) * CFrame.Angles(0, math.rad(30), 0)
 	for row = -2, 2 do
 		for col = -1, 1 do
 			local panelAt = solar * CFrame.new(col * 13, 0, row * 9)
@@ -2907,7 +3078,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	end
 	-- Fuel tanks to the east, with a gantry (clear of the garage's east
 	-- door and of the way down its ramp).
-	local tanks = at * CFrame.new(160, 0, 10)
+	local tanks = at * CFrame.new(205, 0, 34)
 	for i, t in { { -7, 0, 8 }, { 7, 0, 8 }, { 0, 11, 6 } } do
 		local tankAt = tanks * CFrame.new(t[1], 0, t[2])
 		solid(
@@ -2932,7 +3103,6 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		)
 		part(base, tankAt * CFrame.new(0, 12, -t[3] - 0.1), Vector3.new(t[3] * 1.2, 0.6, 0.2), GLOW, Enum.Material.Neon)
 	end
-	tube(base, (tanks * CFrame.new(-7, 2, 0)).Position, (habs[3] * CFrame.new(13, 2, 0)).Position, 0.9, HAZARD)
 	-- A comms dish on a lattice tower by the habitats.
 	local comms = north * CFrame.new(-20, 0, -28)
 	for _, c in { { -2, -2 }, { 2, -2 }, { -2, 2 }, { 2, 2 } } do
@@ -2966,7 +3136,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	)
 	beacon.Name = "Beacon"
 	-- Cargo containers.
-	for i, c in { { -108, 22, 0 }, { 112, 70, 0 } } do
+	for i, c in { { -180, 210, 0 }, { 285, 150, 0 } } do
 		local colors = { HAZARD, Color3.fromRGB(70, 110, 160), Color3.fromRGB(170, 70, 60), STEEL }
 		solid(
 			part(
@@ -2979,7 +3149,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		)
 	end
 	-- Supply crates stacked about.
-	for _, c in { { -50, -70 }, { 54, -66 }, { 100, 30 } } do
+	for _, c in { { 165, 205 }, { -150, 215 }, { 115, 228 } } do
 		for k = 0, 2 do
 			solid(
 				part(
@@ -3004,6 +3174,10 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	devDesk(root, home.Dev)
 	hallDressing(root, home.Hall)
 	local festiveExclusions = harvestPatches(root, at)
+	local town = settlement(root, at, rules, rng)
+	for _, line in town.Lines do
+		table.insert(roadLines, line)
+	end
 	sky(root, at)
 
 	-- Where rocks can grow: across the basin, clear of the buildings.
@@ -3013,18 +3187,22 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ (north * CFrame.new(-70, 0, -18)).Position, 18 },
 		{ (north * CFrame.new(72, 0, -14)).Position, 18 },
 		{ padAt.Position, 40 },
-		{ (at * CFrame.new(-150, 0, 40)).Position, 30 },
-		{ (at * CFrame.new(160, 0, 10)).Position, 24 },
-		{ (at * CFrame.new(-108, 0, 22)).Position, 10 },
+		{ solar.Position, 30 },
+		{ tanks.Position, 24 },
+		{ (at * CFrame.new(-180, 0, 210)).Position, 10 },
+		{ (at * CFrame.new(285, 0, 150)).Position, 10 },
 		{ rigAt.Position, 16 },
 		-- (the container stacks out in the quarry)
-		{ (at * CFrame.new(-280, 0, -56)).Position, 20 },
-		{ (at * CFrame.new(120, 0, -326)).Position, 20 },
+		{ (at * CFrame.new(-400, 0, -56)).Position, 20 },
+		{ (at * CFrame.new(140, 0, -386)).Position, 20 },
 		{ (at * CFrame.new(-200, 0, 244)).Position, 20 },
-		{ (at * CFrame.new(340, 0, 64)).Position, 20 },
+		{ (at * CFrame.new(390, 0, 64)).Position, 20 },
 	}
 	for _, exclusion in festiveExclusions do
 		table.insert(keepOut, exclusion)
+	end
+	for _, k in town.KeepOut do
+		table.insert(keepOut, k)
 	end
 	for _, secret in hidden do
 		table.insert(keepOut, { secret.CFrame.Position, 26 })
@@ -3066,7 +3244,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ -16, 126 }, { 16, 126 }, { -28, 138 }, { 28, 138 },
 		{ -44, 74 }, { 44, 74 }, { -28, 120 }, { 28, 120 }, { -16, 140 }, { 16, 140 },
 		{ -42, 124 } } do
-		table.insert(spots, at * CFrame.new(p[1], 0, p[2]))
+		table.insert(spots, shelterAt * CFrame.new(p[1], 0, p[2]))
 		table.insert(arrivalSpots, #spots)
 	end
 	-- Room for a rock at `p`: off the roads and buildings, `gap` from the rest.
@@ -3075,7 +3253,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			return false
 		end
 		-- (not in the Shelter, nor right up against its walls)
-		local inside = p - shelterAt.Position
+		local inside = shelterAt:PointToObjectSpace(p)
 		if math.abs(inside.X) < home.Box.X and math.abs(inside.Z) < home.Box.Y then
 			return false
 		end
@@ -3178,13 +3356,20 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- Then a field round the middle, where people mine between fights
 	-- (spread evenly by distance, not area). The lane from the pad stays open.
 	local nearSpots = {}
+	for _, offset in rules.doorstepSpots() do
+		local p = (at * CFrame.new(offset.X, 0, offset.Z)).Position
+		if clear(p, 10) then
+			table.insert(spots, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
+			table.insert(nearSpots, #spots)
+		end
+	end
 	local tries = 0
 	while #nearSpots < NEAR_SPOTS and tries < 8000 do
 		tries += 1
 		local a, r = rng:NextNumber(0, math.pi * 2), rng:NextNumber(36, NEAR_REACH)
 		local x, z = math.cos(a) * r, math.sin(a) * r
 		local p = (at * CFrame.new(x, 0, z)).Position
-		if not (math.abs(x) < 10 and z > -60) and clear(p, 12) then
+		if not (math.abs(x) < 16 and z > 40) and clear(p, 12) then
 			table.insert(spots, CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0))
 			table.insert(nearSpots, #spots)
 		end
@@ -3198,7 +3383,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- (Wild kaiju keep out of the Shelter: circles over its floor.)
 	for _, x in { -56, 0, 56 } do
 		for _, z in { -32, 32 } do
-			table.insert(keepOut, { (at * CFrame.new(x, 0, z)).Position, 46 })
+			table.insert(keepOut, { (shelterAt * CFrame.new(x, 0, z)).Position, 46 })
 		end
 	end
 	-- The ground under it all (Shared.Frontier.ground), the land rising only
@@ -3223,8 +3408,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	root.Parent = parent
 	-- Just past the foot of the Shelter's main ramp, facing out to the
 	-- quarry: where the intro's finale starts a new miner (Client IntroFinale).
-	local frontAt = (at * CFrame.new(0, 3, 120)).Position
-	local front = CFrame.lookAt(frontAt, frontAt + at:VectorToWorldSpace(Vector3.new(0, 0, 1)))
+	local frontAt = (shelterAt * CFrame.new(0, 3, 120)).Position
+	local front = CFrame.lookAt(frontAt, frontAt + shelterAt:VectorToWorldSpace(Vector3.new(0, 0, 1)))
 	return {
 		Model = root,
 		Spawn = home.Spawn,
@@ -3247,6 +3432,10 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Zones = zones,
 		FieldSpots = {},
 		Parking = parking,
+		Pads = town.Pads,
+		Gates = town.Gates,
+		Enchanter = town.Enchanter,
+		Heart = town.Heart,
 		Secrets = hidden,
 		KeepOut = keepOut,
 	}

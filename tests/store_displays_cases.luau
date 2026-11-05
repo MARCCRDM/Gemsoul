@@ -126,8 +126,8 @@ World.Rules = Rules
 local quarry = CFrame.new(40, 0, 7000)
 local site = World.build(quarry, R.Instance.new("Folder"))
 -- (The client mounts it in the Shelter's frame, as OutpostScene does: the
--- quarry's, lifted onto the Shelter's legs.)
-local at = quarry * CFrame.new(0, Rules.ShelterLift, 0)
+-- quarry's, moved and turned to where it stands, lifted onto its legs.)
+local at = quarry * CFrame.new(Rules.ShelterOffset) * CFrame.Angles(0, Rules.ShelterTurn, 0) * CFrame.new(0, Rules.ShelterLift, 0)
 local shelter = site.Model:FindFirstChild("Shelter", true)
 check(shelter, "No Shelter")
 local function here(p: Vector3): Vector3

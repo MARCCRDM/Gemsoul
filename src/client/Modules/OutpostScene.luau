@@ -1872,6 +1872,9 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 			prompt:GetAttribute("Vein"),
 			if gate and gate:IsA("BasePart") then gate.Position else nil
 		)
+	elseif kind == "Enchanter" then
+		-- (the settlement's Enchanter: set gems into your gear)
+		require(script.Parent.InventoryUI).open()
 	elseif kind == "Duels" then
 		-- (Brutus's duel counter: the duel queue.)
 		require(script.Parent.SocialUI).open("Arena")

@@ -950,10 +950,10 @@ local b, rootB = makePlayer(2, outpost + Vector3.new(500, 0, 0))
 profiles[a] = { Gems = {}, Coins = 0, Milestones = {}, KaijuSupport = Kaiju.SupportVersion }
 profiles[b] = { Gems = {}, Coins = 0, Milestones = {}, KaijuSupport = Kaiju.SupportVersion }
 KaijuServer.start()
-local keepOut = { { outpost + Vector3.new(-260, 0, 0), 60 } } -- (a building out there)
+local keepOut = { { outpost + Vector3.new(-411, 0, 0), 60 } } -- (a building out there)
 KaijuWilds.start({
 	Spawn = CFrame.new(outpost),
-	Spots = { CFrame.new(outpost + Vector3.new(0, 0, -300)), CFrame.new(outpost + Vector3.new(300, 0, 0)) },
+	Spots = { CFrame.new(outpost + Vector3.new(0, 0, -450)), CFrame.new(outpost + Vector3.new(450, 0, 0)) },
 	KeepOut = keepOut,
 })
 local kaijuFolder = workspaceObject:FindFirstChild("Kaiju")
@@ -1508,7 +1508,7 @@ for i, pack in packs do
 	check(#pack.Members >= 1 and #pack.Members <= Kaiju.Wild.Pack, "A pack of " .. #pack.Members)
 	local out = FrontierRules.distance(pack.Den, outpost)
 	check(out >= FrontierRules.Core + 10 and out <= FrontierRules.Rim - 10, "A den out of the frontier: " .. out)
-	for _, spotAt in { outpost + Vector3.new(0, 0, -300), outpost + Vector3.new(300, 0, 0) } do
+	for _, spotAt in { outpost + Vector3.new(0, 0, -450), outpost + Vector3.new(450, 0, 0) } do
 		check((pack.Den - spotAt).Magnitude >= 7, "A den on a rock")
 	end
 	for j, other in packs do
@@ -2386,7 +2386,7 @@ end
 -- A miner swinging in the core: no rifts, however long, and no noise.
 clearCritters()
 table.clear(playerHits)
-stand(center + Vector3.new(60, 5, 0))
+stand(center + Vector3.new(60, 5, 250))
 swingFor(60, 0.5)
 check(#rifts() == 0 and #critterFor(b) == 0, "A rift opened in the core")
 check(b:GetAttribute("FrontierBand") == "Core", "No band for the HUD")
@@ -2394,7 +2394,7 @@ check((b:GetAttribute("FrontierNoise") or 0) <= Frontier.Noise.Restart + 0.05, "
 check(b:GetAttribute("FrontierAlone") == nil, "Alone in the core")
 -- Back at base: the Shelter's footprint (AtBase: only there does the
 -- lobby heal), not the quarry round it.
-stand(center + Vector3.new(-40, 11, 30))
+stand(center + Vector3.new(-40, 11, 280))
 FrontierServer._step(0.5)
 check(b:GetAttribute("AtBase") == true, "In the Shelter, not at base")
 stand(center + Vector3.new(120, 5, 0))
@@ -2406,7 +2406,7 @@ check(b:GetAttribute("AtBase") == false, "Out in the core's quarry, still at bas
 
 -- Out in the fringe: each swing makes noise (the HUD's ring fills), and
 -- about one in 35 brings a rift, near where they face.
-stand(center + Vector3.new(200, 5, 0))
+stand(center + Vector3.new(375, 5, 0))
 local loudest = 0
 local swings = swingFor(140, 0.4, function()
 	loudest = math.max(loudest, b:GetAttribute("FrontierNoise") or 0)
@@ -2502,7 +2502,7 @@ check(#critterFor(b) <= Frontier.incursion("Fringe", 0.99, nil, true) + Frontier
 -- stirred up, they come higher still, below).
 clearCritters()
 FrontierServer._states[b].Stir = 0
-stand(center + Vector3.new(360, 5, 0))
+stand(center + Vector3.new(474, 5, 0))
 local edgeBug, edgeStir
 swingFor(200, 0.4, function()
 	for _, enemy in critterFor(b) do
@@ -2555,8 +2555,8 @@ swingFor(200, 0.4, function()
 end)
 local leaver = critterFor(b)[1]
 check(leaver ~= nil, "No critter to send home")
-stand(center + Vector3.new(40, 5, 0))
-leaver.Root.CFrame = CFrame.new(center + Vector3.new(200, 5, 0))
+stand(center + Vector3.new(40, 5, 250))
+leaver.Root.CFrame = CFrame.new(center + Vector3.new(375, 5, 0))
 leaver.Home = leaver.Root.Position
 before = #rifts()
 for _ = 1, 20 do
@@ -2572,7 +2572,7 @@ check(#rifts() > 0, "It left without a rift")
 -- A critter drawn by nobody still leaves when there's nobody to fight (it
 -- used to wander home forever).
 clearCritters()
-local stray = KaijuWilds.spawnBug(center + Vector3.new(250, 0, 200), { Band = "Fringe" })
+local stray = KaijuWilds.spawnBug(center + Vector3.new(358, 0, 286), { Band = "Fringe" })
 stray.Home = stray.Root.Position
 for _ = 1, 20 do
 	now += 0.5
@@ -2604,7 +2604,7 @@ local function stirringUp()
 	end
 	clearCritters()
 	state.Stir, state.Noise = 0, 0
-	stand(center + Vector3.new(360, 5, 0))
+	stand(center + Vector3.new(474, 5, 0))
 	swingFor(25, 0.4)
 	check(math.abs(state.Stir - 25 * D.PerSwing.Edge) < 1e-6, "Swings at the edge didn't stir it up: " .. state.Stir)
 	check(b:GetAttribute("FrontierStir") == shownStir(), "The HUD isn't told how stirred up it is")
@@ -2707,7 +2707,7 @@ local function stirringUp()
 	check(b:GetAttribute("FrontierStir") == shownStir(), "The HUD wasn't told it settled")
 	-- Back in the core it settles faster, swinging or not (and swinging
 	-- there stirs nothing).
-	stand(center + Vector3.new(40, 5, 0))
+	stand(center + Vector3.new(40, 5, 250))
 	local was = state.Stir
 	swingFor(10, 0.5)
 	check(math.abs(state.Stir - (was - 5 * D.CoreFade)) < 1e-6, "The core didn't settle it: " .. state.Stir)
@@ -2723,7 +2723,7 @@ stirringUp()
 -- its critters roam round it, and only go for their player once they're near.
 clearCritters()
 table.clear(notes)
-stand(center + Vector3.new(250, 5, 0))
+stand(center + Vector3.new(405, 5, 0))
 FrontierServer._setWanderAt(0)
 now += 0.5
 FrontierServer._step(0.5)
@@ -2787,7 +2787,7 @@ now += 0.5
 FrontierServer._step(0.5)
 FrontierServer._setWanderAt(math.huge)
 check(#FrontierServer._wanders == 1, "No second wandering rift")
-stand(center + Vector3.new(40, 5, 0))
+stand(center + Vector3.new(40, 5, 250))
 now += Frontier.Rift.Hop + 0.1
 runDelayed()
 check(#critterFor(b) == 0 and #FrontierServer._wanders == 0, "A wandering rift let critters out with nobody near")
@@ -2800,7 +2800,7 @@ check(not FrontierServer._pending[b], "Its critters are still on their way")
 ;(function()
 	clearCritters()
 	local E = Frontier.Engaged
-	stand(center + Vector3.new(250, 5, 0))
+	stand(center + Vector3.new(405, 5, 0))
 	local fake = { Alive = true }
 	local wild = { Bug = false, Engaged = {} }
 	KaijuWilds._wilds[fake] = wild
@@ -2872,7 +2872,7 @@ check(
 -- A bug's bite on your kaiju's fresh guard is parried, and the bug reels.
 -- (One that bites: Crocodilo lobs bombs from range instead; its own move and
 -- its dodges held back.)
-local biter = KaijuWilds.spawnBug(center + Vector3.new(330, 0, 0), { Band = "Fringe", Critter = "Sahur" })
+local biter = KaijuWilds.spawnBug(center + Vector3.new(462, 0, 0), { Band = "Fringe", Critter = "Sahur" })
 KaijuWilds._wilds[biter].Prey = nil
 biter.NextMove, biter.NextDodge = math.huge, math.huge
 pet = KaijuServer.pets()[a]
@@ -2965,7 +2965,7 @@ end
 -- used to go on after the blow, too late for the kill's rewards.)
 do
 	roster.Bugs = nil -- (a fresh day)
-	local victim = KaijuWilds.spawnBug(center + Vector3.new(360, 0, 0), { Prey = a, Band = "Edge", Level = 10, Facing = rootA.Position })
+	local victim = KaijuWilds.spawnBug(center + Vector3.new(474, 0, 0), { Prey = a, Band = "Edge", Level = 10, Facing = rootA.Position })
 	victim.DodgeUntil = nil
 	local fighter = KaijuServer.pets()[a]
 	local before, gained = profiles[a].Coins, expOf(Kaiju.active(roster))
@@ -2979,7 +2979,7 @@ end
 
 -- The pick's bonk: a share of a critter's health, yours, back it goes,
 -- reeling; never on a wild kaiju.
-local target = KaijuWilds.spawnBug(center + Vector3.new(300, 0, 40), { Prey = b, Band = "Fringe", Level = 2 })
+local target = KaijuWilds.spawnBug(center + Vector3.new(447, 0, 60), { Prey = b, Band = "Fringe", Level = 2 })
 stand(target.Root.Position + Vector3.new(-4, 0, 0))
 local full = target.Humanoid.Health
 check(KaijuWilds.critterOf(target.Model) == target, "A critter isn't found from its model")
@@ -3070,8 +3070,8 @@ check(keeper.Alive and KaijuWilds._guardian() == guard, "The guardian burrowed o
 table.clear(guard.Engaged)
 guard.Engaged[a] = now - 100
 guard.Swings = 2
-stand(center + Vector3.new(300, 0, 0))
-rootA.CFrame = CFrame.new(center + Vector3.new(-300, 0, 0))
+stand(center + Vector3.new(450, 0, 0))
+rootA.CFrame = CFrame.new(center + Vector3.new(-450, 0, 0))
 keeper.Root.CFrame = CFrame.new(keeper.Home)
 keeper.FoeVictim, keeper.LastSource, keeper.LastPet = nil, nil, nil
 KaijuWilds._brain(keeper, now)
@@ -3433,7 +3433,7 @@ outpostSoak()
 local function riftsOnOpenGround()
 	clearCritters()
 	FrontierServer._setWanderAt(math.huge)
-	local miner = center + Vector3.new(330, 5, 0)
+	local miner = center + Vector3.new(462, 5, 0)
 	stand(miner) -- (facing east, at the stack)
 	local function onStack(p: Vector3): boolean
 		return p.X > miner.X + 12 and p.X < miner.X + 26 and math.abs(p.Z - miner.Z) < 5
@@ -3537,10 +3537,10 @@ local function crittersAndKaiju()
 	clearCritters()
 	pet = KaijuServer.pets()[a]
 	pet.RecallUntil, pet.StunUntil, pet.Plan, pet.IdleSpot = 0, 0, nil, nil
-	local spot = center + Vector3.new(-320, 5, 0)
+	local spot = center + Vector3.new(-458, 5, 0)
 	rootA.CFrame = CFrame.new(spot)
 	pet.Root.CFrame = CFrame.new(spot + Vector3.new(3, 0, 4))
-	stand(center + Vector3.new(320, 5, 0)) -- (b far away)
+	stand(center + Vector3.new(458, 5, 0)) -- (b far away)
 	local critter = KaijuWilds.spawnBug(spot + Vector3.new(14, 0, 0), { Prey = a, Band = "Edge", Level = 9 })
 	check(critter ~= nil, "No critter came")
 	critter.LastAttack = 0
@@ -3881,9 +3881,9 @@ local function teamFights()
 		a:SetAttribute(key, nil)
 	end
 	a:SetAttribute("Outpost", true)
-	local spot = center + Vector3.new(-320, 5, 60)
+	local spot = center + Vector3.new(-452, 5, 85)
 	rootA.CFrame = CFrame.new(spot)
-	stand(center + Vector3.new(320, 5, 0)) -- (b far off)
+	stand(center + Vector3.new(458, 5, 0)) -- (b far off)
 	now += 10
 	KaijuServer._upkeep(a, now)
 	local team = KaijuServer.team(a)
@@ -4901,7 +4901,7 @@ do
 			end
 			p:SetAttribute("Outpost", true)
 		end
-		local spot = center + Vector3.new(-320, 5, 60)
+		local spot = center + Vector3.new(-452, 5, 85)
 		rootA.CFrame = CFrame.new(spot)
 		rootB.CFrame = CFrame.new(spot + Vector3.new(0, 0, 24))
 		now += 10
@@ -5729,14 +5729,14 @@ end)()
 		return false
 	end
 	-- The haul: only gems mined out past the core.
-	stand(center + Vector3.new(60, 5, 0))
+	stand(center + Vector3.new(60, 5, 250))
 	local coreGem = { Id = "core-1", Tier = "Common", Element = "Fire" }
 	table.insert(profile.Gems, coreGem)
 	FrontierServer.mined(b, coreGem)
 	check(FrontierServer._hauls[b] == nil, "A gem mined in the core joined the haul")
 	FrontierServer._raids[b] = nil
 	check(not FrontierServer.raid(b), "A raid in the core")
-	stand(center + Vector3.new(200, 5, 0))
+	stand(center + Vector3.new(375, 5, 0))
 	for i = 1, 4 do
 		local gem = { Id = "haul-" .. i, Tier = if i == 4 then "Rare" else "Common", Element = "Frost" }
 		table.insert(profile.Gems, gem)
@@ -5888,7 +5888,7 @@ end)()
 	-- Back in the core, the haul is safe.
 	b:SetAttribute("SparDown", nil)
 	FrontierServer._hauls[b] = { { Id = "haul-1" } }
-	stand(center + Vector3.new(60, 5, 0))
+	stand(center + Vector3.new(60, 5, 250))
 	FrontierServer._step(0.5)
 	check(FrontierServer._hauls[b] == nil, "The haul wasn't safe back in the core")
 	clearCritters()
@@ -5914,7 +5914,7 @@ end)()
 	b.Character.PrimaryPart = rootB
 	local hB = b.Character:FindFirstChildOfClass("Humanoid")
 	hB.MaxHealth, hB.Health = 100, 1
-	stand(center + Vector3.new(60, 5, 0))
+	stand(center + Vector3.new(60, 5, 250))
 	check(FrontierServer.knockedOut(b) == nil and b:GetAttribute("Robbed") == nil, "Robbed in the core")
 	-- Killed in the core all the same: dead a moment, nothing taken, then
 	-- back at base, whole.
@@ -5931,7 +5931,7 @@ end)()
 	check(hB.Health == hB.MaxHealth, "Killed in the core, not back at base whole")
 	check(b:GetAttribute("Hunt") == nil and b:GetAttribute("Spar") == nil, "Killed in the core, back at base with the kit still out")
 	hB.Health = 1
-	stand(center + Vector3.new(220, 5, 0))
+	stand(center + Vector3.new(387, 5, 0))
 	for i = 1, 2 do
 		local gem = { Id = "rob-" .. i, Tier = "Common", Element = "Frost" }
 		table.insert(profile.Gems, gem)
@@ -6012,7 +6012,7 @@ end)()
 	-- Nothing to take: one comes through, finds nothing, and it's over.
 	clearCritters()
 	FrontierServer._hauls[b] = nil
-	stand(center + Vector3.new(220, 5, 0))
+	stand(center + Vector3.new(387, 5, 0))
 	b:SetAttribute("SparDown", now + 3)
 	local empty = FrontierServer.knockedOut(b)
 	for _ = 1, 20 do
@@ -6266,7 +6266,7 @@ end)()
 		h.MaxHealth, h.Health = 100, 100
 	end
 	a.Character.PrimaryPart, b.Character.PrimaryPart = rootA, rootB
-	rootA.CFrame = CFrame.new(outpost + Vector3.new(-300, 0, 0))
+	rootA.CFrame = CFrame.new(outpost + Vector3.new(-450, 0, 0))
 	local function enter(p, vein)
 		return registered.RiftEnter(p, vein)
 	end
@@ -6807,20 +6807,20 @@ end)()
 	parties[b] = parties[a]
 	now += 1
 	rootA.CFrame = CFrame.new(gate.Position)
-	rootB.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
+	rootB.CFrame = CFrame.new(outpost + Vector3.new(-364, 0, 109))
 	local together = registered.RiftEnter(a, 2, nil, true)
 	check(together.Ok and RiftServer.runOf(b) ~= nil and RiftServer.runOf(b) == RiftServer.runOf(a), "A ready party member wasn't brought in together")
 	check(a:GetAttribute("RiftRunners") == 2 and (rootB.Position - built[#built].Start.Position).Magnitude < 12, "The one brought in isn't on the landing")
 	homeBoth()
 	parties[a].Ready = {}
 	rootA.CFrame = CFrame.new(gate.Position)
-	rootB.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
+	rootB.CFrame = CFrame.new(outpost + Vector3.new(-364, 0, 109))
 	check(registered.RiftEnter(a, 2, nil, true).Ok and RiftServer.runOf(b) == nil, "One who wasn't ready was brought in")
 	check(noted(b, "walk up to any gate, or open the bounty board, to follow"), "One who wasn't ready wasn't told they could follow")
 	homeBoth()
 	parties[a].Ready = { [a] = true }
 	rootB.CFrame = CFrame.new(gate.Position + Vector3.new(-4, 0, 0))
-	rootA.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
+	rootA.CFrame = CFrame.new(outpost + Vector3.new(-364, 0, 109))
 	check(registered.RiftEnter(b, 2, nil, true).Ok and RiftServer.runOf(a) == nil, "A member going in together brought their leader")
 	homeBoth()
 	-- ADJUST ARMOR ("RiftGear"): what setting your armor against a boss's
@@ -6872,7 +6872,7 @@ end)()
 		check(live and live.Live == true and live.BossId == run.Boss.Id and live.Cave == 2, "An invite from the Rift isn't live, or doesn't say how far")
 		parties[a] = { Leader = a, Members = { a, b }, Ready = {} }
 		parties[b] = parties[a]
-		rootB.CFrame = CFrame.new(outpost + Vector3.new(-200, 0, 60))
+		rootB.CFrame = CFrame.new(outpost + Vector3.new(-364, 0, 109))
 		-- (One in the middle of something else is told how to follow, and
 		-- their armor stays as it is.)
 		b:SetAttribute("MatchId", "M1")
@@ -6905,7 +6905,7 @@ end)()
 			return counter
 		end
 		-- (From anywhere in the Outpost: the PLAY menu posts the board too.)
-		rootA.CFrame = CFrame.new(outpost + Vector3.new(-300, 0, 0))
+		rootA.CFrame = CFrame.new(outpost + Vector3.new(-450, 0, 0))
 		local list = Bounties.list()
 		local board = registered.RiftPeek(a, Bounties.Gate)
 		check(board.Ok and board.Bounty == true and #board.Ladders == #list and #list >= 2, "The board doesn't post every biome's ladder")
@@ -6975,12 +6975,12 @@ end)()
 			end
 		end
 		-- (And away from the rock nobody holds, checked below.)
-		return (middle - (outpost + Vector3.new(-250, 0, 0))).Magnitude > 80
+		return (middle - (outpost + Vector3.new(-405, 0, 0))).Magnitude > 80
 	end
 	local middle = nil
 	for i = 0, 35 do
 		local a = i * math.pi * 2 / 36
-		local candidate = outpost + Vector3.new(math.cos(a), 0, math.sin(a)) * 290
+		local candidate = outpost + Vector3.new(math.cos(a), 0, math.sin(a)) * 470
 		if clear(candidate) then
 			middle = candidate
 			break
@@ -7026,8 +7026,8 @@ end)()
 			check(KaijuWilds._packAt(p) == held, "A rock of the seam isn't the pack's")
 			check(KaijuWilds.patchLuck(p) == claim.Luck, "A held rock isn't luckier")
 		end
-		check(KaijuWilds.patchLuck(outpost + Vector3.new(-250, 0, 0)) == 0, "A rock nobody holds is luckier")
-		check(KaijuWilds.rockSwing(outpost + Vector3.new(-250, 0, 0), b) == nil, "A swing far away stirred the pack")
+		check(KaijuWilds.patchLuck(outpost + Vector3.new(-405, 0, 0)) == 0, "A rock nobody holds is luckier")
+		check(KaijuWilds.rockSwing(outpost + Vector3.new(-405, 0, 0), b) == nil, "A swing far away stirred the pack")
 		-- The den stays where it is, whatever the clock says.
 		local leader = held.Members[1]
 		local den = held.Den
@@ -7090,7 +7090,7 @@ end)()
 		now += Kaiju.Wild.Respawn + 1
 		runDelayed()
 		b:SetAttribute("Outpost", nil)
-		stand(center + Vector3.new(300, 0, 0))
+		stand(center + Vector3.new(450, 0, 0))
 	end
 	print("  claimed patches: a pack holds the seam, stirs on the third swing, and its rocks roll luckier")
 end)()
@@ -7277,7 +7277,7 @@ end)()
 -- it for no more than a few seconds.
 ;(function()
 	Kaiju.SlotLevels = { 1, 1, 1 }
-	local home = center + Vector3.new(-233, outpost.Y, -233) -- (out at the Edge, clear of the rest)
+	local home = center + Vector3.new(-330, outpost.Y, -330) -- (out at the Edge, clear of the rest)
 	local d, rootD = makePlayer(5, home)
 	profiles[d] = { Gems = {}, Coins = 0, Milestones = {} }
 	registered.KaijuRoll(d)

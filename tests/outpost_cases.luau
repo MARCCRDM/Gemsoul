@@ -706,8 +706,9 @@ do
 		end
 	end
 	local dialogue = fs.readFile(ROOT .. "/src/client/Dialogue.client.luau")
+	-- (in the Shelter's own frame: it stands south of the field, turned)
 	local function flat(p)
-		local q = p - Rules.Location.Position
+		local q = Rules.shelterFrame():PointToObjectSpace(p)
 		return R.Vector3.new(q.X, 0, q.Z)
 	end
 	local box = site.Shelter.Box
@@ -849,10 +850,10 @@ end
 -- Players arrive inside the Shelter, its mechs parked in the garage.
 do
 	local box = site.Shelter.Box
-	local p = site.Spawn.Position - Rules.Location.Position
+	local p = Rules.shelterFrame():PointToObjectSpace(site.Spawn.Position)
 	check(math.abs(p.X) < box.X and math.abs(p.Z) < box.Y, "Players don't arrive in the Shelter")
 	for _, bay in site.Parking do
-		local q = bay.CFrame.Position - Rules.Location.Position
+		local q = Rules.shelterFrame():PointToObjectSpace(bay.CFrame.Position)
 		check(math.abs(q.X) < box.X and math.abs(q.Z) < box.Y, "A mech bay outside the Shelter's garage")
 	end
 	-- They arrive facing a Mole drill: one parked straight ahead, close.
@@ -1502,6 +1503,65 @@ do
 	check(combat:find("| T Lock On |", 1, true) ~= nil and combat:find("| T Switch Target |", 1, true) ~= nil, "The controls reminder still says X")
 end
 
+-- The settlement (Shared.Outpost.Settlement): fifty pads on two terraces
+-- across the north, none on a road or another pad, inside the wall and out
+-- of the field; the Shelter south of the field facing it; the gates on the
+-- plaza and the Enchanter at the field's edge, each with its prompt; no
+-- rock on a pad, in the Shelter or by the Heart.
+do
+	local set = Rules.Settlement
+	local mid = Rules.Location.Position
+	local function flatTo(a, b)
+		local q = a - b
+		return R.Vector3.new(q.X, 0, q.Z).Magnitude
+	end
+	check(#Rules.padSpots() == 50 and #site.Pads == 50, "Not fifty pads: " .. #site.Pads)
+	for i, pad in site.Pads do
+		local r = flatTo(pad.CFrame.Position, mid)
+		check(r - set.Pad > set.Ring + 7 and r + set.Pad < set.Wall - 2, "Pad " .. i .. " off its terraces")
+		local o = pad.CFrame.Position - mid
+		check(o.Z < 0, "Pad " .. i .. " south of the field (the Shelter's side)")
+		check(math.abs(o.X) > set.Pad + 9, "Pad " .. i .. " on the north road")
+		-- (its facing isn't checked: lune's CFrame.lookAt flips Z, Roblox's doesn't)
+		check(pad.Model and pad.Model:GetAttribute("PadIndex") == pad.Index, "Pad " .. i .. " has no model or index")
+		for j = i + 1, #site.Pads do
+			check(flatTo(pad.CFrame.Position, site.Pads[j].CFrame.Position) >= 2 * set.Pad + 4, "Pads " .. i .. " and " .. j .. " overlap")
+		end
+		for _, spot in site.Spots do
+			check(flatTo(spot.Position, pad.CFrame.Position) > set.Pad + 2, "A rock on pad " .. i)
+		end
+	end
+	-- the Shelter, south, turned to face the field
+	local front = Rules.shelterFrame():VectorToWorldSpace(R.Vector3.new(0, 0, 1))
+	check(Rules.ShelterOffset.Z > set.Field and front.Z < -0.99, "The Shelter isn't south of the field, facing it")
+	for _, spot in site.Spots do
+		local q = Rules.shelterFrame():PointToObjectSpace(spot.Position)
+		check(math.abs(q.X) >= site.Shelter.Box.X or math.abs(q.Z) >= site.Shelter.Box.Y, "A rock inside the Shelter")
+		check(flatTo(spot.Position, mid) > set.Heart + 4, "A rock in the Crystal Heart")
+	end
+	-- the field: rocks round the Heart and at the pods' doorsteps, all in the safe core
+	local inField, doorstep = 0, 0
+	for _, i in site.NearSpots do
+		local r = flatTo(site.Spots[i].Position, mid)
+		check(r < Frontier.Core, "A field rock out past the wall")
+		if r <= set.Field then
+			inField += 1
+		elseif r > set.Ring + 7 then
+			doorstep += 1
+		end
+	end
+	check(inField >= 30 and doorstep >= 12, "Too few rocks in the field (" .. inField .. ") or at the doorsteps (" .. doorstep .. ")")
+	-- the gates and the Enchanter, inside the wall, with their prompts
+	for _, part in { site.Gates.Arena, site.Gates.Dungeon, site.Enchanter } do
+		check(part and flatTo(part.CFrame.Position, mid) < set.Wall, "A plaza piece outside the wall")
+		local prompt = part and part:FindFirstChildOfClass("ProximityPrompt")
+		check(prompt ~= nil, (part and part.Parent.Name or "?") .. " has no prompt")
+	end
+	check(site.Gates.Arena:FindFirstChildOfClass("ProximityPrompt"):GetAttribute("PromptKind") == "Duels", "The Arena gate doesn't open the duels")
+	check(site.Gates.Dungeon:FindFirstChildOfClass("ProximityPrompt"):GetAttribute("PromptKind") == "Bounty", "The Dungeon gate doesn't open the bounties")
+	check(site.Enchanter:FindFirstChildOfClass("ProximityPrompt"):GetAttribute("PromptKind") == "Enchanter", "The Enchanter has no Enchanter prompt")
+	check(Frontier.Core >= set.Wall, "The safe core stops short of the wall")
+end
 print(
 	"PASS: "
 		.. checks

@@ -93,10 +93,10 @@ for _, zone in { "Common", "Fringe", "Edge", "Vein" } do
 end
 local zones = Outpost.Zones
 check(zones.Fringe.Luck == 0.2 and zones.Edge.Luck == 0.4 and zones.Vein.Luck == 0.75, "The luck steps")
-check(Frontier.zoneOf(10) == "Common" and Frontier.zoneOf(200) == "Fringe", "Zones by distance")
-check(Frontier.zoneOf(350) == "Edge" and Frontier.zoneOf(350, true) == "Vein", "The edge and its veins")
+check(Frontier.zoneOf(10) == "Common" and Frontier.zoneOf(400) == "Fringe", "Zones by distance")
+check(Frontier.zoneOf(480) == "Edge" and Frontier.zoneOf(480, true) == "Vein", "The edge and its veins")
 for band, spec in Frontier.Bands do
-	local distance = if band == "Core" then 0 elseif band == "Fringe" then 200 else 350
+	local distance = if band == "Core" then 0 elseif band == "Fringe" then 400 else 480
 	local zone = Outpost.Zones[if band == "Guarded" then "Guarded" else Frontier.zoneOf(distance, band == "Vein")]
 	check(spec.Luck == (zone.Luck or 0), band .. "'s luck isn't its zone's")
 end
@@ -479,7 +479,11 @@ do
 	check(not Frontier.atBase(Vector3.new(120, 0, 0), box), "The core's quarry counted as at base")
 	check(not Frontier.atBase(Vector3.new(300, 0, 0), box), "The fringe counted as at base")
 	check(Frontier.atBase(Vector3.new(100, -150, 70), box), "The Kaiju Arena's hall isn't at base")
-	check(not Frontier.atBase(Vector3.new(220, -150, 0), box), "Deep under the fringe counted as at base")
+	check(not Frontier.atBase(Vector3.new(420, -150, 0), box), "Deep under the fringe counted as at base")
+	-- (the Shelter moved off the middle: its footprint goes with it)
+	local shift = Vector3.new(0, 0, 250)
+	check(Frontier.atBase(Vector3.new(0, 8, 250), box, shift), "The moved Shelter's middle isn't at base")
+	check(not Frontier.atBase(Vector3.new(0, 8, 0), box, shift), "The old spot counted as at base after the move")
 end
 
 -- Critters by band: levels, EXP, coins -----------------------------------------------------------------------
@@ -514,7 +518,7 @@ check(Frontier.Rift.Hop >= 1.5, "Under a second and a half's warning before a cr
 
 -- Where rifts open ----------------------------------------------------------------------------------------
 local center = Vector3.new(0, 0, 7000)
-local player = center + Vector3.new(220, 3, 0)
+local player = center + Vector3.new(420, 3, 0)
 local east = Vector3.new(1, 0, 0)
 for _ = 1, 200 do
 	local spot = Frontier.riftSpot(player, east * 16, center, rng)
@@ -766,10 +770,10 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 	local function at(angle, r)
 		return Vector3.new(math.cos(angle) * r, 0, math.sin(angle) * r)
 	end
-	check(Frontier.biomeAt(at(-math.pi / 4, 250)).Id == "Ashfall", "North-east isn't Ashfall")
-	check(Frontier.biomeAt(at(math.pi / 4, 250)).Id == "Rimefrost", "South-east isn't Rimefrost")
-	check(Frontier.biomeAt(at(3 * math.pi / 4, 250)).Id == "Stormglass", "South-west isn't Stormglass")
-	check(Frontier.biomeAt(at(-3 * math.pi / 4, 250)).Id == "Blightwood", "North-west isn't Blightwood")
+	check(Frontier.biomeAt(at(-math.pi / 4, 450)).Id == "Ashfall", "North-east isn't Ashfall")
+	check(Frontier.biomeAt(at(math.pi / 4, 450)).Id == "Rimefrost", "South-east isn't Rimefrost")
+	check(Frontier.biomeAt(at(3 * math.pi / 4, 450)).Id == "Stormglass", "South-west isn't Stormglass")
+	check(Frontier.biomeAt(at(-3 * math.pi / 4, 450)).Id == "Blightwood", "North-west isn't Blightwood")
 	check(Frontier.biomeAt(at(0.4, Frontier.Core - 1)) == nil and Frontier.biomeAt(Vector3.zero) == nil, "A biome in the core")
 	check(Frontier.biomeAt(at(0.4, Frontier.Core + 1)) ~= nil, "No biome just out of the core")
 	-- The borders: on the spokes at their mouths,
@@ -786,7 +790,7 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 			check(off < math.pi / 4 - 0.15, "Border " .. k .. " swings into a biome's middle")
 		end
 		check(most > math.rad(6), "Border " .. k .. " runs straight down its spoke")
-		swayed[k] = Frontier.border(k, 380) - spoke
+		swayed[k] = Frontier.border(k, 480) - spoke
 	end
 	for k = 2, #swayed do
 		check(math.abs(swayed[k] - swayed[1]) > 0.02, "Borders " .. k .. " and 1 sway alike")
@@ -794,7 +798,7 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 	-- Crossing a border changes biome; on one, the look's an even mix, and
 	-- a seam's width either side it's all one biome's again.
 	for k in Frontier.Spokes do
-		for _, r in { 220, 300, 380 } do
+		for _, r in { 400, 460, 520 } do
 			local b = Frontier.border(k, r)
 			local left, right = Frontier.biomeAt(at(b - 0.03, r)), Frontier.biomeAt(at(b + 0.03, r))
 			check(left ~= right and right == Frontier.Biomes[k], "No change of biome across border " .. k)
@@ -858,7 +862,7 @@ check(lips.Left[3] == lips.Right[3], "A shut tear's lips apart")
 		check(a1 == a2 and b1 == b2 and c1 == c2, "The ground isn't the same twice")
 	end
 	for _, biome in Frontier.Biomes do
-		local weights, inward = Frontier.biomeMix(at(biome.Angle, 300))
+		local weights, inward = Frontier.biomeMix(at(biome.Angle, 460))
 		check(math.abs(weights[table.find(Frontier.Biomes, biome)] - 1) < 1e-6 and inward == 1, biome.Id .. "'s middle isn't all its own")
 	end
 	local _, deep = Frontier.biomeMix(at(1, Frontier.Core - Frontier.Biome.Blend))
@@ -989,12 +993,12 @@ do
 	check(near(inT, tint) and near(inA, ambient) and near(inF, haze), "The core's light and fog aren't the Outpost's")
 	for _, biome in Frontier.Biomes do
 		local t, a, f =
-			FrontierHud.biomeLight(Vector3.new(math.cos(biome.Angle) * 300, 0, math.sin(biome.Angle) * 300), tint, ambient, haze)
+			FrontierHud.biomeLight(Vector3.new(math.cos(biome.Angle) * 460, 0, math.sin(biome.Angle) * 460), tint, ambient, haze)
 		check(near(t, biome.Tint) and near(a, biome.Ambient) and near(f, biome.Fog), biome.Id .. "'s light or fog isn't its own")
 	end
 	local first, second = Frontier.Biomes[1], Frontier.Biomes[2]
-	local b = Frontier.border(2, 300)
-	local t, _, f = FrontierHud.biomeLight(Vector3.new(math.cos(b) * 300, 0, math.sin(b) * 300), tint, ambient, haze)
+	local b = Frontier.border(2, 460)
+	local t, _, f = FrontierHud.biomeLight(Vector3.new(math.cos(b) * 460, 0, math.sin(b) * 460), tint, ambient, haze)
 	check(near(t, first.Tint:Lerp(second.Tint, 0.5)) and near(f, first.Fog:Lerp(second.Fog, 0.5)), "The light across a border isn't half and half")
 end
 for i in Frontier.Disturbance.Stages do
@@ -1033,8 +1037,8 @@ check(FrontierHud.nearest({}, Vector3.zero, 100) == nil, "A sighting with none a
 	local middle = Vector3.new(0, 0, 0)
 	local rng = Random.new(5)
 	for _ = 1, 40 do
-		local from = Vector3.new(220, 3, 10)
-		local player = Vector3.new(215, 3, 10)
+		local from = Vector3.new(420, 3, 10)
+		local player = Vector3.new(415, 3, 10)
 		local spot = Frontier.escapeSpot(from, player, middle, rng)
 		local away = Vector3.new(spot.X - from.X, 0, spot.Z - from.Z)
 		check(away.Magnitude >= Raid.Carry.Away[1] * 0.5, "A snatcher's rift right where it stood")
@@ -1059,7 +1063,7 @@ end)()
 	local rng = Random.new(8)
 	for count = 1, Rob.Crew do
 		for _ = 1, 30 do
-			local at = Vector3.new(200, 3, -40)
+			local at = Vector3.new(400, 3, -40)
 			local spots = Frontier.robSpots(at, count, rng)
 			check(#spots == count, "Not a tear for each robber")
 			for i, spot in spots do

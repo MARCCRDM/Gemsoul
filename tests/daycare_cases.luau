@@ -126,7 +126,7 @@ local flat = Vector3.new(1, 0, 1)
 local function apart(x, z, r)
 	return ((Daycare.Pen.Middle - Vector3.new(x, 0, z)) * flat).Magnitude - Daycare.Pen.Fence - 3 - r
 end
-check(Daycare.Pen.Middle.Magnitude < 150 - Daycare.Pen.Fence, "The pen's past the core (rifts out there)")
+check(Daycare.Pen.Middle.Magnitude < 345 - Daycare.Pen.Fence, "The pen's past the core (rifts out there)")
 check(apart(72, 118, 20) > 0, "The pen's on the landing pad")
 check(apart(-81, 153, 11) > 0, "The pen's in the pumpkin patch")
 check(apart(-56, 75, 4.4) > 0 and apart(-95, 71, 4.4) > 0, "The pen's on one of the Shelter's feet")

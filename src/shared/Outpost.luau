@@ -61,13 +61,90 @@ Outpost.Location = CFrame.new(0, 0, 7000)
 -- frame, Location lifted that far, is where the client mounts its life
 -- (Client.ShelterLife, Client.StoreDisplays).
 Outpost.ShelterLift = 8
--- Where the Shelter stands, from the quarry's middle (studs, on the floor;
--- never turned: its doors stay south, east and west). Everything built
--- round it, the Kaiju Arena's hall under it and its life on the client
--- follow (Outpost.shelterFrame).
-Outpost.ShelterOffset = Vector3.zero
+-- Where the Shelter stands, from the quarry's middle (studs, on the floor),
+-- and how far it's turned (ShelterTurn, radians). Everything built round
+-- it, the Kaiju Arena's hall under it and its life on the client follow
+-- (Outpost.shelterFrame). In the settlement it stands south of the mining
+-- field, turned round so its main door faces the Crystal Heart, the
+-- garage's bays at its back. (A CFrame's Position: no Vector3 needed to
+-- load these rules.)
+Outpost.ShelterOffset = CFrame.new(0, 0, 250).Position
+Outpost.ShelterTurn = math.pi
 function Outpost.shelterFrame(): CFrame
-	return Outpost.Location * CFrame.new(Outpost.ShelterOffset)
+	return Outpost.Location * CFrame.new(Outpost.ShelterOffset) * CFrame.Angles(0, Outpost.ShelterTurn, 0)
+end
+
+--[[
+	The settlement: the crater's middle, walled, safe (Shared.Frontier.Core
+	reaches the wall). Studs from the middle, angles in degrees (0 east, 90
+	south, 270 north), offsets in the quarry's frame (Outpost.Location).
+
+	  middle      the mining field (Field) round the Crystal Heart (Heart)
+	  Ring        the ring road round the field (broken in front of the
+	              Shelter's door: RingGap degrees either side of south)
+	  north       the pod terraces: Tiers of pads (Pad: each pad's radius),
+	              their ramps facing the Heart, a Terrace path between the
+	              tiers; no pad within RoadGap degrees of the north road
+	  south       the Shelter (ShelterOffset)
+	  west        the Kaiju Grounds (the Daycare: Shared.Daycare.Pen)
+	  east        the Gate Plaza: the Arena gate and the Dungeon gate
+	  Wall        round it all, open at the four spokes (GateWidth studs)
+
+	  Outpost.padSpots() -> { { Offset: Vector3, Angle: number, Tier: number } }
+	                     every pad, tier by tier, round from the west
+	  Outpost.doorstepSpots() -> { Vector3 }   rocks at the pods' doorsteps
+	  Outpost.place(angle, r) -> Vector3       an offset from an angle and a radius
+]]
+Outpost.Settlement = {
+	Wall = 345,
+	WallHeight = 7,
+	GateWidth = 30,
+	Field = 135,
+	Heart = 16,
+	Ring = 160,
+	RingGap = 16,
+	Tiers = {
+		{ R = 245, Count = 25, From = 186, To = 354 },
+		{ R = 292, Count = 28, From = 189, To = 351 },
+	},
+	Terrace = 268,
+	Pad = 12,
+	RoadGap = 6,
+	Doorstep = { R = { 196, 206, 214 }, Every = 8.4, From = 192, To = 352 },
+	Daycare = { Angle = 160, R = 255 },
+	Arena = { Angle = 14, R = 318 },
+	Dungeon = { Angle = 40, R = 318 },
+	Enchanter = { Angle = 62, R = 150 },
+}
+function Outpost.place(angle: number, r: number): Vector3
+	local a = math.rad(angle)
+	return Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+end
+function Outpost.padSpots(): { { Offset: Vector3, Angle: number, Tier: number } }
+	local rules = Outpost.Settlement
+	local list = {}
+	for tier, row in rules.Tiers do
+		for i = 0, row.Count - 1 do
+			local angle = row.From + i * (row.To - row.From) / (row.Count - 1)
+			if math.abs(angle - 270) >= rules.RoadGap then
+				table.insert(list, { Offset = Outpost.place(angle, row.R), Angle = angle, Tier = tier })
+			end
+		end
+	end
+	return list
+end
+function Outpost.doorstepSpots(): { Vector3 }
+	local rules = Outpost.Settlement.Doorstep
+	local list, k = {}, 0
+	local angle = rules.From
+	while angle <= rules.To do
+		if math.abs(angle - 270) >= Outpost.Settlement.RoadGap + 2 then
+			k += 1
+			table.insert(list, Outpost.place(angle, rules.R[(k - 1) % #rules.R + 1]))
+		end
+		angle += rules.Every
+	end
+	return list
 end
 Outpost.ShelterRamp = 40
 Outpost.Radius = 550 -- quarry rim; recovery allows the surrounding benches

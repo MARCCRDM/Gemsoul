@@ -136,8 +136,8 @@ end
 
 local Frontier = {}
 
-Frontier.Core = 150 -- studs from the middle: inside, no rifts
-Frontier.EdgeFrom = 300
+Frontier.Core = 345 -- studs from the middle: inside, no rifts (the settlement's wall: Shared.Outpost.Settlement)
+Frontier.EdgeFrom = 440
 Frontier.Rim = 538 -- mining/rift limit, 12 studs inside the 550-stud quarry rim
 Frontier.Safe = 12 -- critters give up on prey this far inside the core
 
@@ -162,7 +162,7 @@ Frontier.RiftColor = RIFT
 
 -- The Loop: four biomes round the core, a quarter of the quarry each,
 -- between the four Spokes (the Crossroads: haul roads due north, east, south
--- and west out of the core; the ring road at 260 runs round through all
+-- and west out of the core; the ring road at 400 runs round through all
 -- four). Going round clockwise from the north-east (Angle: each one's
 -- middle), each is weak to the one before it (Shared.ElementMatchup:
 -- Thermal beats Cryo, Cryo beats Ion, Ion beats Corrosive, Corrosive beats
@@ -269,7 +269,7 @@ Frontier.Ground = {
 	Depth = 8,
 	Sway = { 0.24, 0.12 },
 	Waves = { 1 / 70, 1 / 31 },
-	Calm = { 20, 170 },
+	Calm = { 10, 90 }, -- (the settlement walls the core to 345: the borders sway sooner)
 	Seam = { 14, 40 },
 	Edge = { 24, 12 },
 	Patch = 26,
@@ -295,7 +295,7 @@ Frontier.Ground = {
 -- set alone, Stones of those at the spokes' mouths (Spokes), leading out of
 -- the core.
 Frontier.Outcrop = {
-	From = 100,
+	From = Frontier.Core + 4, -- (just out past the settlement's wall)
 	To = Frontier.Rim - 16,
 	Count = 72,
 	Apart = 36,
@@ -835,7 +835,7 @@ function Frontier.outcrops(rng): ({ any }, { Vector3 })
 			local side = Vector3.new(-out.Z, 0, out.X) * (if (#lone // #spokes) % 2 == 0 then 1 else -1)
 			p = out * rng:NextNumber(Frontier.Core + 5, Frontier.Core + 30) + side * rng:NextNumber(20, 30)
 		else
-			local r = rng:NextNumber(Frontier.Core, o.To)
+			local r = rng:NextNumber(o.From, o.To)
 			local a = rng:NextNumber(0, math.pi * 2)
 			p = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 		end

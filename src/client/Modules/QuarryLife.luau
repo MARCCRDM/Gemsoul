@@ -55,18 +55,20 @@ local WHITE = Color3.new(1, 1, 1)
 
 -- Where things are, in the quarry's frame (Server OutpostWorld.build).
 -- (The haul roads are the four spokes, Frontier.Spokes: north, east, south, west.)
-QuarryLife.Roads = { From = 116, To = 404, Step = 24, Side = 8.4, Ring = 260 }
-QuarryLife.Ramps = { { 1, 345 }, { 2, 215 }, { 3, 330 }, { 4, 200 } } -- (spoke, studs out)
-QuarryLife.Pad = V(72, 1.15, 118) -- the landing pad's top
-QuarryLife.Drop = V(56, 18, -90) -- where the lifter hovers at the north outpost
+-- (From the settlement's ring road out; the south road from behind the Shelter: SouthFrom.)
+QuarryLife.Roads = { From = 179, SouthFrom = 318, To = 524, Step = 20, Side = 8.4, Ring = 420 }
+QuarryLife.Ramps = { { 1, 470 }, { 2, 455 }, { 3, 470 }, { 4, 455 } } -- (road, studs out: the jump ramps, Server OutpostWorld)
+QuarryLife.Pad = V(227.2, 1.15, 115.8) -- the shuttle pad's top (on the Gate Plaza)
+QuarryLife.Drop = V(56, 18, -355) -- where the lifter hovers at the north outpost (out past the wall)
 QuarryLife.Cruise = 62 -- the lifter's height between (well over the Shelter's skylight)
-QuarryLife.Trip = 100 -- seconds, there and back with its rests
+QuarryLife.Flight = 40 -- seconds each way
+QuarryLife.Trip = 140 -- seconds, there and back with its rests
 QuarryLife.Hang = 6.55 -- from the bottom of the container it carries up to its middle
 QuarryLife.Shower = 45 -- seconds between meteor showers
 QuarryLife.Meteors = 5 -- in each
-QuarryLife.Vents = { V(200, 0, -260), V(-330, 0, 80), V(170, 0, 220), V(-150, 0, 330) } -- in craters, clear of the rocks
+QuarryLife.Vents = { V(230, 0, -300), V(-370, 0, 80), V(260, 0, 300), V(-150, 0, 330) } -- in craters, clear of the rocks
 QuarryLife.VentEvery = 26
-QuarryLife.Conveyor = { V(64, 4.9, -124), V(46, 4.9, -112) } -- the rig's conveyor, along its top
+QuarryLife.Conveyor = { V(64, 4.9, -389), V(46, 4.9, -377) } -- the rig's conveyor, along its top
 QuarryLife.Devils = 3
 QuarryLife.Spires = { Count = 0 } -- decorative bench crystals removed
 
@@ -92,7 +94,8 @@ function QuarryLife.lights(): { { Position: Vector3, Band: string, Road: number,
 	for road = 1, #Frontier.Spokes do
 		local a = roadAngle(road)
 		local along, across = V(math.cos(a), 0, math.sin(a)), V(-math.sin(a), 0, math.cos(a))
-		for out = spec.From, spec.To, spec.Step do
+		local south = math.abs(math.sin(a) - 1) < 1e-3
+		for out = if south then spec.SouthFrom else spec.From, spec.To, spec.Step do
 			local clear = math.abs(out - spec.Ring) > 12
 			for _, ramp in QuarryLife.Ramps do
 				if ramp[1] == road and math.abs(out - ramp[2]) < 18 then
@@ -146,33 +149,37 @@ function QuarryLife.lifterAt(t: number): (CFrame, string)
 		local flat = from:Lerp(to, k)
 		return V(flat.X, cruise + math.sin(k * math.pi) * 8, flat.Z)
 	end
-	if s < 10 then
+	-- (Each flight F seconds: the north outpost is out past the settlement's wall.)
+	local F = QuarryLife.Flight
+	local up, out, down, hover, rise = 10, 16, 16 + F, 22 + F, 32 + F
+	local back, home = 38 + F, 38 + 2 * F
+	if s < up then
 		return at(pad, heading), "Resting"
-	elseif s < 16 then
-		local k = smooth((s - 10) / 6)
+	elseif s < out then
+		local k = smooth((s - up) / 6)
 		return at(pad:Lerp(V(pad.X, cruise, pad.Z), k), heading), "Lifting"
-	elseif s < 36 then
-		local u = (s - 16) / 20
+	elseif s < down then
+		local u = (s - out) / F
 		return at(flight(V(pad.X, cruise, pad.Z), V(drop.X, cruise, drop.Z), u), heading, math.sin(u * math.pi) * 0.08),
 			"Flying"
-	elseif s < 42 then
-		local k = smooth((s - 36) / 6)
+	elseif s < hover then
+		local k = smooth((s - down) / 6)
 		return at(V(drop.X, cruise, drop.Z):Lerp(drop, k), heading), "Lowering"
-	elseif s < 52 then
-		return at(drop + V(0, math.sin((s - 42) * 1.3) * 0.4, 0), heading), "Hovering"
-	elseif s < 58 then
-		local k = smooth((s - 52) / 6)
+	elseif s < rise then
+		return at(drop + V(0, math.sin((s - hover) * 1.3) * 0.4, 0), heading), "Hovering"
+	elseif s < back then
+		local k = smooth((s - rise) / 6)
 		return at(drop:Lerp(V(drop.X, cruise, drop.Z), k), heading + math.pi * k), "Rising"
-	elseif s < 78 then
-		local u = (s - 58) / 20
+	elseif s < home then
+		local u = (s - back) / F
 		return at(
 			flight(V(drop.X, cruise, drop.Z), V(pad.X, cruise, pad.Z), u),
 			heading + math.pi,
 			math.sin(u * math.pi) * 0.08
 		),
 			"Flying"
-	elseif s < 84 then
-		local k = smooth((s - 78) / 6)
+	elseif s < home + 6 then
+		local k = smooth((s - home) / 6)
 		return at(V(pad.X, cruise, pad.Z):Lerp(pad, k), heading + math.pi + math.pi * k), "Landing"
 	end
 	return at(pad, heading), "Resting"

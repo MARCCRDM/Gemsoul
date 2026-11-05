@@ -36,21 +36,21 @@ Daycare.Store = { PerHour = 25, Max = 3000 }
 Daycare.Train = { PerHour = 60, PerLevel = 12, Share = 0.15, Cap = 20 }
 Daycare.Modes = { Store = true, Train = true }
 -- The pen, in the quarry's frame (Shared.Outpost.Location): out on the
--- floor south-west of the Shelter's main door, between its legs and the
--- pumpkin patch, inside the core (no rifts), clear of the ramp, the roads
--- and the landing pad (Server.OutpostWorld keeps rocks and wild kaiju out
+-- floor of the Kaiju Grounds, west of the mining field (the settlement:
+-- Shared.Outpost.Settlement), inside the core (no rifts), clear of the roads
+-- and the pods (Server.OutpostWorld keeps rocks and wild kaiju out
 -- of Clear studs round it, and the land flat). Laid out like the Kennel's
 -- Pen (Shared.KaijuKennel) so its residents wander the same way. Its gate
--- faces east (+X, Gate), to the door's ramp; the keeper's desk in front of
+-- faces east (+X, Gate), to the field; the keeper's desk in front of
 -- it (Desk), the barn behind it (Barn).
 Daycare.Pen = {
-	Middle = Vector3.new(-70, 0, 102),
+	Middle = Vector3.new(-240, 0, 87), -- (the Kaiju Grounds: Shared.Outpost.Settlement.Daycare)
 	Inner = 4.5,
 	Outer = 11,
 	Fence = 16,
 	Gate = 0,
-	Desk = Vector3.new(-47, 0, 102),
-	Barn = Vector3.new(-93, 0, 102),
+	Desk = Vector3.new(-217, 0, 87),
+	Barn = Vector3.new(-263, 0, 87),
 	Clear = 32,
 }
 Daycare.Scale = 1 -- its kaiju's size (the Kennel's are 0.75)

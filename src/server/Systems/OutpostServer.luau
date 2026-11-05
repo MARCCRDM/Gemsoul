@@ -1107,6 +1107,10 @@ function OutpostServer.start()
 			{ stations.Market, "Market", "Open the Market", "PLAYER MARKET" },
 			{ bounty.Counter, "Bounty", "Bounty Board", "BOUNTY OFFICE" },
 			{ duel.Counter, "Duels", "Find a duel", "BRUTUS'S DUELS" },
+			-- (the settlement's Gate Plaza and the Enchanter: Shared.Outpost.Settlement)
+			{ site.Gates and site.Gates.Arena, "Duels", "Enter the Arena", "ARENA GATE" },
+			{ site.Gates and site.Gates.Dungeon, "Bounty", "Hunt a bounty", "DUNGEON GATE" },
+			{ site.Enchanter, "Enchanter", "Enchant your gear", "ENCHANTER" },
 		}
 	do
 		if not spec[1] then
