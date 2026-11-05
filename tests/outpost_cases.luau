@@ -954,7 +954,11 @@ local function size(set)
 	return n
 end
 check(size(keys) == 4 and size(pads) == 4, "Two social prompts share a key or gamepad button")
+-- With a pod (Server.PodServer), it's the foot of its ramp you come in at.
+local benPod = site.Spawn * R.CFrame.new(40, 0, 40)
+ben:SetAttribute("PodSpawn", benPod)
 handlers.OutpostEnter(ben)
+check((benRoot.CFrame.Position - benPod.Position).Magnitude < 0.01, "Not brought to their pod's ramp")
 
 -- Pick a rock and stand by it.
 local target

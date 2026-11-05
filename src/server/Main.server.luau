@@ -142,6 +142,8 @@ end
 if Config.Features == nil or Config.Features.Mining ~= false then
 	local OutpostServer = require(script.Parent.Systems.OutpostServer)
 	OutpostServer.start()
+	-- A pod for everyone on the settlement's pads: where you start and come back to.
+	require(script.Parent.Systems.PodServer).start(OutpostServer.site())
 	-- The swing refills are Robux products: their swings go on the pick.
 	StoreServer.addSwings = OutpostServer.addSwings
 	-- Swing restores (Shared.SwingRestore): arena streaks, dungeons, coupons.

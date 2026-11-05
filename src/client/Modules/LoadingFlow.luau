@@ -163,7 +163,10 @@ function LoadingFlow.home(): Vector3?
 		end
 	end
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
-	local spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+	local spawn = player:GetAttribute("PodSpawn") -- (your pod's ramp: Server.PodServer)
+	if typeof(spawn) ~= "CFrame" then
+		spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+	end
 	return if typeof(spawn) == "CFrame" then spawn.Position else nil
 end
 

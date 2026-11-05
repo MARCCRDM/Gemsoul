@@ -890,6 +890,13 @@ function OutpostServer.charge(player: Player): (number, number)
 	return Rules.surveySwings(record(profile).Picks), full
 end
 
+-- Where someone comes into the Outpost and back to it: the foot of their
+-- pod's ramp (Server.PodServer), or the Shelter's spawn without one.
+local function homeOf(player: Player): CFrame
+	local pod = player:GetAttribute("PodSpawn")
+	return if typeof(pod) == "CFrame" then pod else site.Spawn
+end
+
 local function enter(player: Player)
 	if player:GetAttribute("CombatSession") or player:GetAttribute("MatchId") then
 		return reply(false, "Finish your fight first.")
@@ -901,12 +908,16 @@ local function enter(player: Player)
 	if not site or not root or not PlayerData.get(player) then
 		return reply(false, "The Outpost isn't ready yet. Try again in a moment.")
 	end
+	local home = homeOf(player)
 	pcall(function()
-		player:RequestStreamAroundAsync(site.Spawn.Position)
+		player:RequestStreamAroundAsync(home.Position)
 	end)
 	local character = player.Character :: Model
-	-- (A little apart from each other, the Mole drill still straight ahead.)
-	local spawn = site.Spawn * CFrame.new(rng:NextNumber(-3, 3), 0, rng:NextNumber(-3, 3))
+	-- (At your pod's ramp; at the Shelter's spawn a little apart from each
+	-- other, the Mole drill still straight ahead.)
+	local spawn = if home == site.Spawn
+		then site.Spawn * CFrame.new(rng:NextNumber(-3, 3), 0, rng:NextNumber(-3, 3))
+		else home
  local profile = PlayerData.get(player)
  local tutorial = require(ReplicatedStorage.Shared.Tutorial).beat(profile)
  if tutorial and tutorial.Id == "Mine" then
@@ -914,13 +925,13 @@ local function enter(player: Player)
   for _, node in nodes do
    local body = node.Model.PrimaryPart
    if node.Ready and body and not node.ClaimedBy then
-    local d = (body.Position - site.Spawn.Position).Magnitude
+    local d = (body.Position - home.Position).Magnitude
     if d < distance then closest, distance = body, d end
    end
   end
   if closest then
    local rock = closest.Position
-   local direction = Vector3.new(site.Spawn.Position.X-rock.X,0,site.Spawn.Position.Z-rock.Z)
+   local direction = Vector3.new(home.Position.X-rock.X,0,home.Position.Z-rock.Z)
    direction = if direction.Magnitude > 0.1 then direction.Unit else Vector3.new(0,0,1)
    local at = rock + direction * 9
    local params = RaycastParams.new()
@@ -1209,7 +1220,7 @@ function OutpostServer.start()
 			if player:GetAttribute("Outpost") then
 				task.wait(0.5)
 				if player.Character == character and site then
-					character:PivotTo(site.Spawn)
+					character:PivotTo(homeOf(player))
 					refreshKit(player)
 					socialPrompts(player, true)
 				end
@@ -1262,7 +1273,7 @@ function OutpostServer.start()
 						local fell = root.Position.Y < site.Spawn.Position.Y - 120
 						if far or fell then
 							local character = player.Character :: Model
-							character:PivotTo(site.Spawn)
+							character:PivotTo(homeOf(player))
 							root.AssemblyLinearVelocity = Vector3.zero
 						end
 					end

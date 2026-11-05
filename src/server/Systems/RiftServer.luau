@@ -304,7 +304,9 @@ local function home(player: Player, text: string?)
 		if humanoid and humanoid.Health > 0 then
 			humanoid.Health = humanoid.MaxHealth
 			if site and player.Character then
-				player.Character:PivotTo(site.Spawn)
+				-- (back at your pod: Server.PodServer)
+				local pod = player:GetAttribute("PodSpawn")
+				player.Character:PivotTo(if typeof(pod) == "CFrame" then pod else site.Spawn)
 				local root = rootOf(player)
 				if root then
 					root.AssemblyLinearVelocity = Vector3.zero

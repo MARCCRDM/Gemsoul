@@ -2060,7 +2060,10 @@ local function showWorld()
 		camera.CameraSubject = humanoid
 	end
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
-	local spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+	local spawn = player:GetAttribute("PodSpawn") -- (your pod's ramp: Server.PodServer)
+	if typeof(spawn) ~= "CFrame" then
+		spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+	end
 	ThirdPerson.enter(if typeof(spawn) == "CFrame" then spawn else nil)
 	setWalking(true)
 	hud.Enabled = player:GetAttribute("CombatSession") == nil
@@ -2072,7 +2075,12 @@ local function enterScene(result)
 	active = true
 	showWorld()
 	refreshHud()
-	UiKit.toast("Welcome to the Saga Shelter. Head out the door to mine: the rocks grow back.", P.Gold)
+	UiKit.toast(
+		if typeof(player:GetAttribute("PodSpawn")) == "CFrame"
+			then "Welcome home: your pod's landed. Mine round the Crystal Heart: the rocks grow back."
+			else "Welcome to the Saga Shelter. Head out the door to mine: the rocks grow back.",
+		P.Gold
+	)
 end
 
 local function exitScene()
@@ -2102,7 +2110,10 @@ local function goingIn()
 		FadeIn = 0.25,
 		Destination = function()
 			local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
-			local spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+			local spawn = player:GetAttribute("PodSpawn") -- (your pod's ramp)
+			if typeof(spawn) ~= "CFrame" then
+				spawn = landmarks and landmarks:GetAttribute("OutpostSpawn")
+			end
 			return if typeof(spawn) == "CFrame" then spawn.Position else nil
 		end,
 	})

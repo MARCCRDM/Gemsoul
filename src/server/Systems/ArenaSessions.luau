@@ -143,6 +143,11 @@ local function leave(player, stay: boolean?)
 	-- Came from the Saga Outpost (a duel challenged there): back to it.
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
 	local outpost = landmarks and landmarks:GetAttribute("OutpostSpawn")
+	-- (to your pod's ramp: Server.PodServer)
+	local pod = player:GetAttribute("PodSpawn")
+	if typeof(pod) == "CFrame" then
+		outpost = pod
+	end
 	if player.Character then
 		if player:GetAttribute("Outpost") and typeof(outpost) == "CFrame" then
 			player.Character:PivotTo(outpost)
