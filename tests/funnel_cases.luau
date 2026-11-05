@@ -19,8 +19,8 @@ local function stepsFor(player)
 end
 Funnel.start()
 
-check(#Funnel.Steps == 13 and Funnel.Steps[1] == "Joined" and Funnel.Steps[13] == "Second duel", "Funnel steps changed")
-check(table.concat(Funnel.Steps, ",") == "Joined,Kit,First fight,Round 1 won,Hunt bounty,Dungeon entered,Dungeon boss,Dungeon cleared,Lobby,First rock,First gem,Socketed,Second duel", "Not today's intro, in order")
+check(#Funnel.Steps == 13 and Funnel.Steps[1] == "Joined" and Funnel.Steps[5] == "Second duel", "Funnel steps changed")
+check(table.concat(Funnel.Steps, ",") == "Joined,Kit,First fight,Round 1 won,Second duel,Hunt bounty,Dungeon entered,Dungeon boss,Dungeon cleared,Lobby,First rock,First gem,Socketed", "Not today's intro, in order")
 
 -- A new account, all the way through: the kit, round 1, HUNT BOUNTY, the
 -- first dungeon and its boss, then the lobby and the mines.
@@ -47,7 +47,11 @@ new:SetAttribute("DuelsPlayed", 1)
 new:SetAttribute("FirstFight", nil)
 check(profiles[new].Funnel["First fight"], "First fight end not logged")
 check(not profiles[new].Funnel["Second duel"], "The first fight counted as the second duel")
-check(Funnel.reach(new, "Round 1 won") and Funnel.reach(new, "Hunt bounty"), "Round 1 / HUNT BOUNTY refused")
+check(Funnel.reach(new, "Round 1 won"), "Round 1 won refused")
+-- (round 2: the second duel, straight after; HUNT BOUNTY comes from round 3)
+new:SetAttribute("DuelsPlayed", 2)
+check(profiles[new].Funnel["Second duel"], "Round 2 didn't count as the second duel")
+check(Funnel.reach(new, "Hunt bounty"), "HUNT BOUNTY refused")
 -- Through the Outpost on the way into the dungeon (under the loading
 -- screen): not the lobby yet either.
 new:SetAttribute("Outpost", true)
@@ -62,11 +66,10 @@ PlayerData.Trained:Fire(new, "MineGem")
 PlayerData.Trained:Fire(new, "Enchant")
 PlayerData.Trained:Fire(new, "EquipSurge") -- (retired step)
 PlayerData.Trained:Fire(new, "Mine")
-new:SetAttribute("DuelsPlayed", 2)
-new:SetAttribute("DuelsPlayed", 3)
+new:SetAttribute("DuelsPlayed", 3) -- (no step: logged already)
 check(
 	stepsFor(new)
-		== "1:Joined,2:Kit,3:First fight,4:Round 1 won,5:Hunt bounty,6:Dungeon entered,7:Dungeon boss,8:Dungeon cleared,9:Lobby,10:First rock,11:First gem,12:Socketed,13:Second duel",
+		== "1:Joined,2:Kit,3:First fight,4:Round 1 won,5:Second duel,6:Hunt bounty,7:Dungeon entered,8:Dungeon boss,9:Dungeon cleared,10:Lobby,11:First rock,12:First gem,13:Socketed",
 	"Full run wrong: " .. stepsFor(new)
 )
 

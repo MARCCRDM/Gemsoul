@@ -19,8 +19,9 @@ HERE = Path(__file__).resolve().parent
 
 
 # The onboarding funnel's steps, in order (Server.Funnel.Steps).
-FUNNEL_STEPS = ['Joined', 'Kit', 'First fight', 'Round 1 won', 'Hunt bounty', 'Dungeon entered', 'Dungeon boss',
-                'Dungeon cleared', 'Lobby', 'First rock', 'First gem', 'Socketed', 'Second duel']
+# (Second duel moved up to 5th on 2026-11-05: it comes straight after round 1.)
+FUNNEL_STEPS = ['Joined', 'Kit', 'First fight', 'Round 1 won', 'Second duel', 'Hunt bounty', 'Dungeon entered',
+                'Dungeon boss', 'Dungeon cleared', 'Lobby', 'First rock', 'First gem', 'Socketed']
 
 def day_of(t):
     return datetime.fromtimestamp(t, timezone.utc).strftime('%Y-%m-%d')

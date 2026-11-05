@@ -7,19 +7,23 @@
 	   2 Kit              the starter kit is on, after the move reveal
 	   3 First fight      intro round 1 is over (won, lost or left)
 	   4 Round 1 won      won it (Server.IntroRoundsServer)
-	   5 Hunt bounty      pressed HUNT BOUNTY on the rounds' card
-	   6 Dungeon entered  in the first dungeon (Server.RiftServer)
-	   7 Dungeon boss     its boss came for them
-	   8 Dungeon cleared  the boss is down
-	   9 Lobby            in the Outpost lobby after the first dungeon
-	  10 First rock       broke a rock
-	  11 First gem        a rock dropped a gem
-	  12 Socketed         put a gem in a gear socket
-	  13 Second duel      played another duel after the first fight
+	   5 Second duel      played intro round 2 (or another duel)
+	   6 Hunt bounty      pressed HUNT BOUNTY on the rounds' card (from round 3)
+	   7 Dungeon entered  in the first dungeon (Server.RiftServer)
+	   8 Dungeon boss     its boss came for them
+	   9 Dungeon cleared  the boss is down
+	  10 Lobby            in the Outpost lobby after the first dungeon
+	  11 First rock       broke a rock
+	  12 First gem        a rock dropped a gem
+	  13 Socketed         put a gem in a gear socket
 
-	(Until 2026-11-04 the steps were Joined, Style, Element, Kit, First
-	fight, Lobby, First rock, First gem, Socketed, Surge ready, Second duel:
-	read the dashboard from that day on for these.)
+	The order is the order players get there: Roblox counts a player who
+	logs a step for every step before it too, and a step nobody has logged
+	shows with no name. (Second duel was 13th, after Socketed, but comes
+	straight after round 1: everyone jumped to it, and 5 to 12 showed
+	nameless. Read the dashboard from 2026-11-05 for this order; until
+	2026-11-04 the steps were Joined, Style, Element, Kit, First fight,
+	Lobby, First rock, First gem, Socketed, Surge ready, Second duel.)
 
 	Only accounts that join as new players are counted: profile.Funnel is
 	made on their first load, and holds the steps already logged, so a
@@ -41,6 +45,7 @@ Funnel.Steps = {
 	"Kit",
 	"First fight",
 	"Round 1 won",
+	"Second duel",
 	"Hunt bounty",
 	"Dungeon entered",
 	"Dungeon boss",
@@ -49,7 +54,6 @@ Funnel.Steps = {
 	"First rock",
 	"First gem",
 	"Socketed",
-	"Second duel",
 }
 local stepOf: { [string]: number } = {}
 for i, name in Funnel.Steps do
