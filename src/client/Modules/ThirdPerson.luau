@@ -33,6 +33,38 @@ local function cancelReset()
 	RunService:UnbindFromRenderStep(RESET_BIND)
 end
 
+-- Where the camera goes behind someone at `focus` looking along `forward`:
+-- straight behind, `zoom` back and `up` up, unless something's in the way
+-- (behind you at your pod's stair is the pod itself): then round to the
+-- side, a little more each try, until the view's clear.
+function ThirdPerson.clearEye(focus: Vector3, forward: Vector3, zoom: number, up: number, ignore: Instance?): Vector3
+	local function at(yaw: number): Vector3
+		local c, sn = math.cos(math.rad(yaw)), math.sin(math.rad(yaw))
+		local back = Vector3.new(-forward.X * c - forward.Z * sn, 0, forward.X * sn - forward.Z * c)
+		return focus + back * zoom + Vector3.new(0, up, 0)
+	end
+	local ok, params = pcall(function()
+		local p = RaycastParams.new()
+		p.FilterType = Enum.RaycastFilterType.Exclude
+		p.FilterDescendantsInstances = if ignore then { ignore } else {}
+		return p
+	end)
+	if not ok then
+		return at(0)
+	end
+	for _, yaw in { 0, 40, -40, 75, -75, 110, -110 } do
+		local eye = at(yaw)
+		local blocked = false
+		pcall(function()
+			blocked = workspace:Raycast(focus, eye - focus, params) ~= nil
+		end)
+		if not blocked then
+			return eye
+		end
+	end
+	return at(75)
+end
+
 function ThirdPerson.enter(destination: CFrame?)
 	if not saved then
 		saved = { Mode = player.CameraMode, Min = player.CameraMinZoomDistance, Max = player.CameraMaxZoomDistance }
@@ -96,7 +128,7 @@ function ThirdPerson.enter(destination: CFrame?)
 		local forward = Vector3.new(direction.X, 0, direction.Z)
 		forward = if forward.Magnitude > 0.01 then forward.Unit else Vector3.new(0, 0, -1)
 		local focus = root.Position + Vector3.new(0, 2, 0)
-		local eye = focus - forward * zoom + Vector3.new(0, if destination then 8 else 6, 0)
+		local eye = ThirdPerson.clearEye(focus, forward, zoom, if destination then 8 else 6, character)
 		player.CameraMode = Enum.CameraMode.Classic
 		player.CameraMaxZoomDistance = ThirdPerson.MaxZoom
 		player.CameraMinZoomDistance = zoom

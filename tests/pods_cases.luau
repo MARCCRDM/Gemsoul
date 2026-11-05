@@ -464,5 +464,14 @@ local e1, f1 = shotLook(L.Fall + L.Deploy)
 local doors = (padCF * R.CFrame.new(0, 4, 0)).Position
 check((f1 - doors).Magnitude < 0.5, "The camera doesn't end on the doors")
 check(padCF:PointToObjectSpace(e1.Position).Z < -10, "The camera doesn't end in front of the doors")
+-- Handing back: never inside the pod or its stall, and the look runs past you to the field.
+local hand = padCF:PointToObjectSpace(Arrival.endEye(padCF))
+check(math.abs(hand.X) > Pods.Width / 2 + 2 or hand.Z < -(Pods.Hull + Pods.Ramp + 1), "The camera hands back inside the pod")
+check(hand.X < 0, "The camera hands back over the display stall")
+local foot = padCF:PointToObjectSpace(Pods.spawnAt(padCF).Position)
+check(foot.Z < hand.Z, "The camera hands back looking at the pod, not past you to the field")
+-- (and the line from you to it clears the pod's front)
+local t = (-(Pods.Width / 2) - foot.X) / (hand.X - foot.X)
+check(foot.Z + (hand.Z - foot.Z) * t < -Pods.Hull - 0.6, "The pod's corner is between you and the camera")
 
 print("PASS: " .. checks .. " pod checks (pads kept on joining, landing with you inside, touchdown, deploying, out down the stair, the cinematic's shots, failsafe, lift-off)")

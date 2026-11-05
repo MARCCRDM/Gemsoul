@@ -62,6 +62,13 @@ function PodArrival.shot(t: number, pad: CFrame): (CFrame, Vector3)
 	return CFrame.lookAt(eye, focus), focus
 end
 
+-- Where the camera hands back to you: up behind your shoulder, out past
+-- the pod's end (not its stall's), so the view runs past you to the field
+-- and the pod's never in the way.
+function PodArrival.endEye(pad: CFrame): Vector3
+	return (pad * CFrame.new(-14, 10, -3)).Position
+end
+
 local function letterbox(padIndex: number?)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "PodArrival"
@@ -158,13 +165,13 @@ local function film(start: number)
 		camera.CameraType = Enum.CameraType.Scriptable
 		local eye, focus = PodArrival.shot(math.min(t, done), pad)
 		if released then
-			-- (round behind you as you walk down the steps)
+			-- (out to the side of the stair as you walk down it, the pod
+			-- behind you: not behind you, that's inside the pod)
 			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 			if root then
 				local k = ease((os.clock() - released) / PodArrival.Out)
-				local behind = (root.CFrame * CFrame.new(0, 5, 14)).Position
 				local look = root.Position + Vector3.new(0, 2, 0)
-				eye = eye:Lerp(CFrame.lookAt(behind, look), k)
+				eye = eye:Lerp(CFrame.lookAt(PodArrival.endEye(pad), look), k)
 				focus = focus:Lerp(look, k)
 			end
 		end
