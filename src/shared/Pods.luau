@@ -5,9 +5,10 @@
 	they leave. You start at the foot of
 	its ramp, and come back there: a respawn, a duel, the Rift.
 
-	  Pods.choose(pads, taken, near, rng) -> index?
+	  Pods.choose(pads, taken, near, rng, anchor?) -> index?
 	      a free pad: next to a friend's (`near`: their pads) if one has
-	      one, else any free pad on the inner tier, then the outer
+	      one, else the free pad nearest `anchor` (the Shelter), else any
+	      free pad on the inner tier, then the outer
 	  Pods.spawnAt(pad: CFrame) -> CFrame   the foot of the ramp, facing the Heart
 	  Pods.colorFor(userId) -> Color3        the beacon's colour (always the same)
 	  Pods.altitude(t) / Pods.lift(t)       the landing and lift-off, height over the pad
@@ -47,8 +48,9 @@ function Pods.colorFor(userId: number): Color3
 end
 
 -- `pads`: { { Index, Tier, CFrame } }; `taken`: { [index] = anything };
--- `near`: the pads of friends already here.
-function Pods.choose(pads, taken, near: { number }, rng: Random): number?
+-- `near`: the pads of friends already here; `anchor`: where the town is (the
+-- Shelter): with no friend here, the free pad nearest it.
+function Pods.choose(pads, taken, near: { number }, rng: Random, anchor: Vector3?): number?
 	local byIndex = {}
 	for _, pad in pads do
 		byIndex[pad.Index] = pad
@@ -71,7 +73,21 @@ function Pods.choose(pads, taken, near: { number }, rng: Random): number?
 	if best then
 		return best
 	end
-	-- Otherwise any free pad, the inner tier first (closest to the Heart).
+	-- Otherwise the free pad nearest the Shelter.
+	if anchor then
+		for _, pad in pads do
+			if not taken[pad.Index] then
+				local d = (pad.CFrame.Position - anchor).Magnitude
+				if d < bestDistance then
+					best, bestDistance = pad.Index, d
+				end
+			end
+		end
+		if best then
+			return best
+		end
+	end
+	-- Or any free pad, the inner tier first (closest to the Heart).
 	local tier = math.huge
 	for _, pad in pads do
 		if not taken[pad.Index] and pad.Tier < tier then
@@ -90,9 +106,16 @@ function Pods.choose(pads, taken, near: { number }, rng: Random): number?
 	return free[rng:NextInteger(1, #free)]
 end
 
--- The pad's frame faces the Heart (its -Z): the ramp runs out that way.
+-- Where you come in: out along the walkway from your pod's stair, facing
+-- the Heart (the pad's -Z), SpawnOut studs past its foot: the camera behind
+-- you has the pod in view, never inside it.
+Pods.SpawnOut = 18
 function Pods.spawnAt(pad: CFrame): CFrame
-	return pad * CFrame.new(0, 3, -(Pods.Hull + Pods.Ramp + 2))
+	return pad * CFrame.new(0, 3, -(Pods.Hull + Pods.Ramp + 2 + Pods.SpawnOut))
+end
+-- The pad again from where you come in (Pods.spawnAt, backwards).
+function Pods.padFrom(spawn: CFrame): CFrame
+	return spawn * CFrame.new(0, -3, Pods.Hull + Pods.Ramp + 2 + Pods.SpawnOut)
 end
 
 local function smooth(x: number): number

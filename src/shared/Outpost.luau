@@ -61,10 +61,6 @@ Outpost.Location = CFrame.new(0, 0, 7000)
 -- frame, Location lifted that far, is where the client mounts its life
 -- (Client.ShelterLife, Client.StoreDisplays).
 Outpost.ShelterLift = 8
--- Open to the sky: the Shelter's walls, roof and towers are gone; its deck
--- (Market & Gear: the shops, the crew, the gallery, the kennel stage, the
--- mech yard) stands in the open on its legs, its ramps down to the ground.
-Outpost.ShelterOpen = true
 -- Where the Shelter stands, from the quarry's middle (studs, on the floor),
 -- and how far it's turned (ShelterTurn, radians). Everything built round
 -- it, the Kaiju Arena's hall under it and its life on the client follow
@@ -115,17 +111,16 @@ Outpost.Settlement = {
 	Ring = 160,
 	RingGap = 8,
 	Plaza = { X = 0, Z = 200, Apothem = 40 },
-	-- Arena Row: arenas built in the open (Server.PrivateArenas copies the
-	-- Arena onto each), stands either side to watch from. Intro and practice
-	-- fights take one when it's free. The Grand Arena faces the plaza, the
-	-- ARENA arch at its way in; the Intro Ring is south-west.
+	-- Arena Row: open rings on the ground (Server.PrivateArenas builds them:
+	-- no walls, the fight's seen and sees out). Intro and practice fights
+	-- take one when it's free. The Grand Arena by the plaza, the ARENA arch
+	-- at its way in; the Intro Ring south-west.
 	-- (in the order fights take them: the Intro Ring first)
 	Stages = {
 		{ Name = "IntroRing", X = -150, Z = 245 },
 		{ Name = "GrandArena", X = 0, Z = 290 },
 	},
-	StageReach = 44, -- studs: an arena's wall and fence, round its middle
-	Stands = { From = 46, Rows = 8, Depth = 3, Rise = 2, Long = 36 }, -- (up to 16: over the arena's wall)
+	StageReach = 36, -- studs: a ring's kerb, lamps and fence, round its middle
 	-- (x, z points: from the ring round the Heart to the plaza; one in to the Heart)
 	Walks = {
 		{ { -131, -92 }, { -78, -36 }, { -66, 56 }, { -26, 124 }, { 0, 164 } },

@@ -37,6 +37,7 @@ local podOf: { [Player]: { Index: number, Pad: any, Model: Model?, Entry: any } 
 -- Pods on the move: { Model, Rest, Kind ("Land" | "Deploy" | "Lift"), T, ... }
 local moving = {}
 local rng = Random.new()
+local anchor: Vector3? = nil -- (the Shelter: new pods land nearest it)
 local scrapped = setmetatable({}, { __mode = "k" }) -- (pods gone for good)
 
 -- A pod gone for good: its pad free again (unless someone has it already).
@@ -227,6 +228,13 @@ local function build(player: Player, pad): (Model, { any })
 	roar.SoundId = "rbxasset://sounds/action_falling.mp3"
 	roar.Volume, roar.RollOffMaxDistance = 0.7, 260
 	roar.Parent = body
+	-- (its body solid to the camera: Roblox's pulls in in front of it, never
+	-- through it)
+	for _, p in model:GetChildren() do
+		if p:IsA("BasePart") and p.Size.Magnitude > 6 and p.Transparency < 0.5 then
+			p.CanQuery = true
+		end
+	end
 	model:SetAttribute("OwnerId", player.UserId)
 	model.Parent = pad.Model
 	return model, moves
@@ -500,7 +508,7 @@ local function reserve(player: Player)
 			table.insert(near, pod.Index)
 		end
 	end
-	local index = Pods.choose(pads, taken, near, rng)
+	local index = Pods.choose(pads, taken, near, rng, anchor)
 	if not index or podOf[player] then
 		return -- (every pad taken: the Shelter's spawn it is)
 	end
@@ -607,6 +615,7 @@ function PodServer.start(site)
 		return
 	end
 	pads = site.Pads
+	anchor = if site.Spawn then site.Spawn.Position else nil
 	for _, pad in pads do
 		byIndex[pad.Index] = pad
 	end

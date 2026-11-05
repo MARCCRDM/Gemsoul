@@ -47,7 +47,7 @@ R.Instance.new("Script").Parent = arena
 
 local tagged = {}
 local env = setmetatable({
-	Instance = R.Instance, Vector3 = R.Vector3, CFrame = R.CFrame,
+	Instance = R.Instance, Vector3 = R.Vector3, CFrame = R.CFrame, Color3 = R.Color3, Enum = R.Enum,
 	workspace = workspace,
 	warn = function(...) local t = {} for _, v in { ... } do table.insert(t, tostring(v)) end error(table.concat(t, " ")) end,
 	game = { GetService = function(_, name)
@@ -96,16 +96,26 @@ PrivateArenas.release(b)
 PrivateArenas.release(c)
 PrivateArenas.release(c) -- (twice is harmless)
 
--- Arena Row (Shared.Outpost.Settlement.Stages): copies built for good out in
--- the open, taken first, the Intro Ring then the Grand Arena; fenced while a
--- fight's on; then a far copy as before.
+-- Arena Row (Shared.Outpost.Settlement.Stages): open rings on the ground,
+-- built for good, taken first, the Intro Ring then the Grand Arena; fenced
+-- while a fight's on; then a far copy as before.
 local groundA, groundB = R.Vector3.new(-150, 0, 7245), R.Vector3.new(0, 0, 7290)
 local sa = PrivateArenas.stage("IntroRing", groundA, 43)
 local sb = PrivateArenas.stage("GrandArena", groundB, 43)
 check((sa - (groundA + R.Vector3.new(0, FLOOR.Y, 0))).Magnitude < 1e-3 and (sb - (groundB + R.Vector3.new(0, FLOOR.Y, 0))).Magnitude < 1e-3, "A stage isn't where it was put")
 local ring = workspace.PrivateArenas:FindFirstChild("IntroRing")
-check(ring and ring:GetAttribute("Center") == sa and ring:GetAttribute("Stage") == true, "The Intro Ring isn't a copy with its centre")
-check((ring:FindFirstChild("Floor").CFrame.Position - sa).Magnitude < 1e-3, "The Intro Ring's floor isn't at its centre")
+check(ring and ring:GetAttribute("Center") == sa and ring:GetAttribute("Stage") == true, "The Intro Ring isn't a stage with its centre")
+local ringFloor = ring:FindFirstChild("Floor")
+check(ringFloor and ringFloor.CanCollide and math.abs(ringFloor.CFrame.Position.Y + ringFloor.Size.X / 2 - sa.Y) < 1e-3, "The Intro Ring's floor top isn't at its centre")
+check(((ringFloor.CFrame.Position - sa) * R.Vector3.new(1, 0, 1)).Magnitude < 1e-3 and ringFloor.Size.Y / 2 >= 30, "The Intro Ring's floor isn't round its centre, the Arena's width")
+-- (open: nothing standing on it higher than the lamp posts round it, none on the floor)
+for _, p in ring:GetDescendants() do
+	if p:IsA("BasePart") and p.Parent == ring then
+		check(p.CFrame.Position.Y - sa.Y < 6, "Something tall at the Intro Ring: " .. p.Name)
+		local flat = ((p.CFrame.Position - sa) * R.Vector3.new(1, 0, 1)).Magnitude
+		check(not (p.Name == "Post" and flat < 31), "A post on the fight floor")
+	end
+end
 for _, d in ring:GetDescendants() do
 	check(not d:IsA("ProximityPrompt") and not d:IsA("SpawnLocation") and not d:IsA("Script"), "A stage kept a " .. d.ClassName)
 end
@@ -144,4 +154,4 @@ for _, who in { e, f, g } do
 	PrivateArenas.release(who)
 end
 
-print(string.format("PASS: %d private arena checks (one each, far apart, scenery only, reused; Arena Row out in the open, fenced in a fight)", checks))
+print(string.format("PASS: %d private arena checks (one each, far apart, scenery only, reused; Arena Row: open rings on the ground, fenced in a fight)", checks))

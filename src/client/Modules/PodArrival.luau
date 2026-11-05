@@ -125,8 +125,7 @@ local function film(start: number)
 		return
 	end
 	running = true
-	-- (the pad from the foot of its stair: Shared.Pods.spawnAt, backwards)
-	local pad = spawn * CFrame.new(0, -3, Pods.Hull + Pods.Ramp + 2)
+	local pad = Pods.padFrom(spawn)
 	local camera = workspace.CurrentCamera
 	local unbox = letterbox(player:GetAttribute("PodIndex"))
 	local landing = Pods.Landing

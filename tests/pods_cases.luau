@@ -137,7 +137,10 @@ end
 for _, pad in pads do
 	local foot = Pods.spawnAt(pad.CFrame)
 	local fromPad = flat(foot.Position - pad.CFrame.Position)
-	check(fromPad > Pods.Hull + Pods.Ramp and fromPad < Outpost.Settlement.Pad + 6, "The spawn isn't at the foot of the ramp")
+	check(math.abs(fromPad - (Pods.Hull + Pods.Ramp + 2 + Pods.SpawnOut)) < 0.01, "The spawn isn't out along the walkway")
+	-- (the camera behind you, 18 back, stays in front of the pod's stair)
+	check(fromPad - 18 > Pods.Hull + Pods.Ramp, "The camera behind you lands in the pod")
+	check((Pods.padFrom(foot).Position - pad.CFrame.Position).Magnitude < 1e-3, "The pad can't be found from the spawn")
 	check(flat(foot.Position - mid) < flat(pad.CFrame.Position - mid) - Pods.Hull, "The ramp doesn't face the Heart")
 	check(foot.Position.Y > pad.CFrame.Position.Y, "The spawn is under the pad")
 	-- (and you stand facing the Heart)
@@ -180,6 +183,22 @@ for _, pad in pads do
 	taken[pad.Index] = true
 end
 check(Pods.choose(pads, taken, {}, rng) == nil, "A pod with every pad taken")
+-- Nearest the Shelter: with no friend here, the free pad closest to it.
+do
+	local shelter = (at * R.CFrame.new(195, 0, 164)).Position
+	local free = {}
+	local nearest, best = nil, math.huge
+	for _, pad in pads do
+		local d = (pad.CFrame.Position - shelter).Magnitude
+		if d < best then
+			nearest, best = pad.Index, d
+		end
+	end
+	check(Pods.choose(pads, free, {}, rng, shelter) == nearest, "A new pod isn't the nearest the Shelter")
+	free[nearest] = true
+	local second = Pods.choose(pads, free, {}, rng, shelter)
+	check(second ~= nearest and (pads[second].CFrame.Position - shelter).Magnitude >= best, "The next pod isn't the next nearest the Shelter")
+end
 
 -- The server ---------------------------------------------------------------------------------
 local playerList = {}
