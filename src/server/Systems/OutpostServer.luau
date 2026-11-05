@@ -897,7 +897,9 @@ local function homeOf(player: Player): CFrame
 	return if typeof(pod) == "CFrame" then pod else site.Spawn
 end
 
-local function enter(player: Player)
+-- (`opts.NoPod`: in on the way somewhere else, the Rift under the loading
+-- cover: no pod landing yet; it comes down with them when they're home.)
+local function enter(player: Player, opts: any?)
 	if player:GetAttribute("CombatSession") or player:GetAttribute("MatchId") then
 		return reply(false, "Finish your fight first.")
 	end
@@ -945,7 +947,7 @@ local function enter(player: Player)
  character:PivotTo(spawn)
 	player:SetAttribute("Outpost", true)
 	-- The first time in: their pod lands with them inside it (Server.PodServer).
-	if OutpostServer.podArrival then
+	if OutpostServer.podArrival and not (type(opts) == "table" and opts.NoPod == true) then
 		OutpostServer.podArrival(player)
 	end
 	refreshKit(player)

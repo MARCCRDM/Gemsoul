@@ -67,7 +67,8 @@
 	              fallen are back up; the way home opens, and everyone in
 	              gets a boss cache of their own (ArenaStreaks.bossCache:
 	              its gem, Dungeons.bossGem, and six pieces of gear to keep
-	              three of, Shared.BossLoot). RiftRun.Exit seconds on,
+	              three of, Shared.BossLoot; picking from it takes you
+	              home in RiftRun.HomeAfterClaim). RiftRun.Exit seconds on,
 	              everyone's home.
 	  Leaving     "RiftLeave": through a way home you're at (the landing's,
 	              or the throne cave's once it's open), keeping what you found.
@@ -154,6 +155,9 @@ local Shop = require(script.Parent.Shop)
 local SparServer = require(script.Parent.SparServer)
 
 local RiftServer = {}
+-- (Main: the Outpost's pod landing, PodServer.land, for someone home whose
+-- pod isn't down yet)
+RiftServer.podArrival = nil :: ((Player) -> any)?
 
 -- Where the trips are built: far off in the dark, each its own slot.
 RiftServer.Origin = Vector3.new(-9000, 300, -9000)
@@ -310,6 +314,11 @@ local function home(player: Player, text: string?)
 				local root = rootOf(player)
 				if root then
 					root.AssemblyLinearVelocity = Vector3.zero
+				end
+				-- (not down yet, as after a new miner's first dungeon: it lands
+				-- now, with them inside it)
+				if player:GetAttribute("Outpost") == true and RiftServer.podArrival then
+					pcall(RiftServer.podArrival, player)
 				end
 			end
 		end
@@ -1172,6 +1181,12 @@ local function join(run, player: Player)
 		-- (Any knocked out on the way here, in the intro's fights, come in
 		-- on their feet and at full health.)
 		pcall(KaijuServer.restoreAll, player)
+		-- Their HYPERBEAM nearly charged (KaijuBeam.FirstDungeon): a few
+		-- blows and it's ready for the boss.
+		pcall(function()
+			require(script.Parent.KaijuBeamServer).topUp(player, require(ReplicatedStorage.Shared.KaijuBeam).FirstDungeon)
+			notify(player, "Your kaiju's HYPERBEAM is nearly charged: a few more hits, then press Z (the beam button on a phone) at the boss.")
+		end)
 		pcall(KaijuServer.deployTeam, player)
 	end
 	-- (In there you fight: your combat kit comes out, till you swap it for
@@ -1820,6 +1835,18 @@ end
 
 function RiftServer.start(outpost)
 	site = outpost
+	-- The boss's cache picked from: home (to your pod) straight away, not
+	-- on the way home's countdown.
+	ArenaStreaks.onClaimed = function(player: Player, cache)
+		local run = runOf[player]
+		if not (run and run.Won and type(cache) == "table" and cache.Kind == "Boss" and cache.Source == "Rift") then
+			return
+		end
+		task.wait(RiftRun.HomeAfterClaim)
+		if runOf[player] == run then
+			home(player, "Back at base. Well fought.")
+		end
+	end
 	Shop.register("RiftEnter", enter)
 	Shop.register("RiftGear", gear)
 	Party.setInviteContext(inviteContext)

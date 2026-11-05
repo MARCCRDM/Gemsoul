@@ -801,7 +801,9 @@ local function huntOut(player: Player)
 	end
 	if player:GetAttribute("Outpost") ~= true then
 		local ok, why = pcall(function()
-			return require(script.Parent.OutpostServer)._enter(player)
+			-- (no pod landing on the way through: it lands with them in it when
+			-- they're home from the dungeon, Server.RiftServer)
+			return require(script.Parent.OutpostServer)._enter(player, { NoPod = true })
 		end)
 		if not ok then
 			warn("[IntroRounds] into the Outpost for HUNT BOUNTY: " .. tostring(why))

@@ -258,6 +258,10 @@ local function rollBossCache(boss, _gem, source: string?, duel)
 	return cache
 end
 
+-- Told when `player` has claimed a cache (its picks made): (player, cache).
+-- (Server.RiftServer: a Rift boss's cache claimed, home straight away.)
+ArenaStreaks.onClaimed = nil :: ((Player, any) -> ())?
+
 -- `player` beat `boss`: their boss cache, saved with their other caches to
 -- claim whenever they like (the client opens it when it comes in).
 -- `opts.NoKaijuRoll`: the cache alone, no kaiju roll with it.
@@ -524,6 +528,9 @@ function ArenaStreaks.claim(player: Player, cacheId: any, picks: any)
 		end
 	end
 	table.remove(duel.StreakCaches, index)
+	if ArenaStreaks.onClaimed then
+		task.spawn(ArenaStreaks.onClaimed, player, cache)
+	end
 	pcall(GearRolls.ensure, profile, rng)
 	PlayerData.sync(player)
 	-- Every roll's leftovers go up on the Market (a DEV test cache's too).

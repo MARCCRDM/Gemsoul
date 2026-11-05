@@ -98,7 +98,10 @@ RiftRun.Restore = { Coins = 150, Grow = 2 }
 RiftRun.RestoreRobux = { First = 50, Grow = 2, Max = 300 }
 RiftRun.Fallen = 60
 RiftRun.Fall = { Below = 20 }
-RiftRun.Exit = 20
+-- Seconds from the boss going down to home (if you haven't picked from its
+-- cache by then: picking takes you home in HomeAfterClaim).
+RiftRun.Exit = 12
+RiftRun.HomeAfterClaim = 0.6
 -- Every foe comes through a tear of its own: Every seconds apart, each tear
 -- Apart studs or more from the pack's others and Clear from any runner,
 -- inside Share of the cave's radius; it leaps out Hop studs a second at

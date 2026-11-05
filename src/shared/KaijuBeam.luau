@@ -82,6 +82,9 @@
 ]]
 local KaijuBeam = {}
 
+-- A new miner's first dungeon: the HYPERBEAM this much charged as they go in
+-- (a few blows from full, to fire at its boss).
+KaijuBeam.FirstDungeon = 0.9
 KaijuBeam.Charge = {
 	Max = 100,
 	Hit = 0.6, -- a blow of any of theirs that lands

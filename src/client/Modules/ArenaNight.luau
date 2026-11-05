@@ -185,7 +185,9 @@ local function nightfall(mood)
 	end
 	active = true
 	activeMood = mood
-	saved = saved or { ClockTime = Lighting.ClockTime }
+	saved = saved or { ClockTime = Lighting.ClockTime, OutpostSky = Lighting:GetAttribute("OutpostSky") }
+	-- (the Outpost's day and night off while this light's up: Client.Scenes)
+	Lighting:SetAttribute("OutpostSky", false)
 	for instance, goal in targets(mood) do
 		local before = {}
 		for property in goal do
@@ -243,6 +245,7 @@ local function daybreak()
 	end
 	if saved then
 		Lighting.ClockTime = saved.ClockTime
+		Lighting:SetAttribute("OutpostSky", saved.OutpostSky)
 		local sky = Lighting:FindFirstChildOfClass("Sky")
 		if sky and saved.Sky then
 			for property, value in saved.Sky.Props do

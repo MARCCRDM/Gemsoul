@@ -2057,7 +2057,10 @@ local function showWorld()
 		dashboard.Enabled = false
 		hiddenDashboard = dashboard
 	end
-	Scenes.outpostLighting()
+	-- (not over the Rift's own light: back from a fight inside it)
+	if player:GetAttribute("RiftRun") == nil then
+		Scenes.outpostLighting()
+	end
 	local camera = workspace.CurrentCamera
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	camera.CameraType = Enum.CameraType.Custom
@@ -2301,10 +2304,16 @@ RunService.RenderStepped:Connect(function(dt)
 	else
 		PodShowcase.clear()
 	end
-	-- Day and night (Shared.DayNight), a few times a second; not in the
-	-- Rift (its light is its own).
+	-- Day and night (Shared.DayNight), a few times a second, while the
+	-- Outpost's own light is up (Scenes: OutpostSky; never the Rift's, a
+	-- dungeon's or the Arena's).
 	skySince += dt
-	if active and skySince >= 0.2 and player:GetAttribute("RiftRun") == nil then
+	if
+		active
+		and skySince >= 0.2
+		and player:GetAttribute("RiftRun") == nil
+		and game:GetService("Lighting"):GetAttribute("OutpostSky") == true
+	then
 		skySince = 0
 		local clock = DayNight.clock(workspace:GetServerTimeNow())
 		Scenes.outpostSky(clock, DayNight.daylight(clock))

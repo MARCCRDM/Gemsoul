@@ -555,6 +555,14 @@ local function carry(entry, height: number)
 	if not root or not player:GetAttribute("Outpost") then
 		return
 	end
+	-- (taken off somewhere else meanwhile, the Rift or a fight: let go of
+	-- them where they are, the cinematic over)
+	if player:GetAttribute("RiftRun") or player:GetAttribute("CombatSession") or player:GetAttribute("MatchId") then
+		entry.Rider = nil
+		player:SetAttribute("PodLanding", nil)
+		root.Anchored = false
+		return
+	end
 	root.Anchored = true
 	character:PivotTo(CFrame.new(0, height, 0) * entry.Rest * CFrame.new(0, -0.3 * Pods.Scale, 0.8 * Pods.Scale))
 end

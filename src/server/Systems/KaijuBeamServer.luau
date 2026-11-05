@@ -40,6 +40,7 @@
 	time a blast of yours started; nil after).
 
 	  KaijuBeamServer.start()
+	  KaijuBeamServer.topUp(player, share)   the charge up to `share` of full
 	  KaijuBeamServer._fire(player, aim, now) -> reply    (tests)
 	  KaijuBeamServer._step(now)    the blasts under way, one frame (tests)
 	  KaijuBeamServer._charge(dt)   the charge, one tick (tests)
@@ -126,6 +127,16 @@ local function publish(player: Player, team)
 	if player:GetAttribute("KaijuSave") ~= save then
 		player:SetAttribute("KaijuSave", save)
 	end
+end
+
+-- The team's charge brought up to `share` (0..1) of full, if it's under it
+-- (a new miner's first dungeon: Server.RiftServer, KaijuBeam.FirstDungeon).
+function KaijuBeamServer.topUp(player: Player, share: number)
+	local want = KaijuBeam.Charge.Max * math.clamp(share, 0, 1)
+	if chargeOf(player) < want then
+		setCharge(player, want)
+	end
+	publish(player, standing(player))
 end
 
 -- One tick: the HUD's charge. Time adds nothing (it's earned: blows

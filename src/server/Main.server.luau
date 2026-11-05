@@ -300,6 +300,12 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 			StoreServer.riftRestore = RiftServer.restoreBought
 			-- (and Brutus's bounty board: any boss, from his counter)
 			RiftServer.bountyAt = OutpostServer.bountyCounter
+			-- (home from a trip, the pod not down yet: it lands with them in it)
+			RiftServer.podArrival = function(player)
+				if OutpostServer.podArrival then
+					OutpostServer.podArrival(player)
+				end
+			end
 			RiftServer.start(OutpostServer.site())
 			-- The Kaiju Arena, down the Shelter's stairs: rows of courts, a pad
 			-- at each end to wait on, stakes, and every kaiju battle fought there.

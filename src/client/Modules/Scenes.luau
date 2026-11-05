@@ -616,7 +616,19 @@ function Scenes.terraformLighting()
 end
 
 -- Space: a black, starry sky, no haze, cool light that still shows colours.
+-- Whether the Outpost's own light is up (its day and night run only then,
+-- Client.OutpostScene): Lighting's OutpostSky attribute, this client's.
+-- Off whenever another place's light goes up (the Rift's, a dungeon's or
+-- the Arena's: Client.RiftClient, Client.ArenaNight).
+local function outpostSky(on: boolean)
+	pcall(function()
+		Lighting:SetAttribute("OutpostSky", on)
+	end)
+end
+Scenes.markOutpostSky = outpostSky
+
 function Scenes.spaceLighting()
+	outpostSky(false)
 	Lighting.ClockTime = 0
 	Lighting.Brightness = 1.8
 	Lighting.Ambient = Color3.fromRGB(84, 90, 108)
@@ -729,6 +741,7 @@ function Scenes.outpostLighting()
 	if rays then
 		rays.Intensity = 0
 	end
+	outpostSky(true)
 end
 
 return Scenes

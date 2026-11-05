@@ -512,6 +512,24 @@ do
 	Server.kaijuOf = function() return nil end
 end
 
+-- Taken off somewhere else mid-landing (the Rift, a fight): let go where
+-- they are, the cinematic over; the pod lands on its own.
+do
+	local rae, raeRoot = makePlayer(31, "Rae")
+	check(Server.land(rae) == true, "Rae's pod didn't come down")
+	advance(L.Lead + 0.2)
+	check(raeRoot.Anchored and rae:GetAttribute("PodLanding") ~= nil, "Rae isn't riding her pod")
+	rae:SetAttribute("RiftRun", "R1")
+	advance(0.1)
+	check(not raeRoot.Anchored and rae:GetAttribute("PodLanding") == nil, "The pod held on to someone gone into the Rift")
+	local pinned = raeRoot.CFrame
+	advance(L.Fall + L.Deploy + 0.5)
+	check(raeRoot.CFrame == pinned, "The pod pulled them back in")
+	check(podModel(rae):GetAttribute("Landed") == true, "The pod didn't land without its rider")
+	rae:SetAttribute("RiftRun", nil)
+	leave(rae)
+end
+
 -- A friend's pad is beside yours.
 friendsOf[2] = { 1 }
 local ben = makePlayer(2, "Ben")

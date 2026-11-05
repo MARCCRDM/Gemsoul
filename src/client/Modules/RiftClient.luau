@@ -177,6 +177,10 @@ local function effect(kind: string): any
 end
 
 function RiftClient.hellLighting(realm)
+	-- (the Outpost's day and night off: Client.Scenes)
+	pcall(function()
+		Lighting:SetAttribute("OutpostSky", false)
+	end)
 	local hell = RiftClient.lightingFor(realm)
 	Lighting.ClockTime = hell.Clock
 	Lighting.Brightness = hell.Brightness
