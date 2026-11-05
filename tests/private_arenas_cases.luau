@@ -129,18 +129,13 @@ local function closed(stage)
 	end
 	return true
 end
-local function shut(stage)
-	for _, p in stage.StageFence:GetChildren() do
-		if p.CanCollide then
-			return false
-		end
-	end
-	return true
-end
 for _, p in fence:GetChildren() do
-	check(p.Transparency == 1 and math.abs(((p.CFrame.Position - sa) * R.Vector3.new(1, 0, 1)).Magnitude - 43) < 0.1, "A fence panel off its ring")
+	check(math.abs(((p.CFrame.Position - sa) * R.Vector3.new(1, 0, 1)).Magnitude - 43) < 0.1, "A barrier panel off its ring")
+	-- (seen through, solid to walk into, no stop to a camera or a blow)
+	check(p.Material == R.Enum.Material.ForceField and p.Transparency < 1 and p.CanCollide and not p.CanQuery, "A barrier panel isn't a see-through wall")
+	check(p.CFrame.Position.Y - p.Size.Y / 2 <= sa.Y and p.CFrame.Position.Y + p.Size.Y / 2 >= sa.Y + 10, "A barrier panel doesn't stand from the floor up")
 end
-check(shut(ring), "The Intro Ring's fenced off with no fight on")
+check(closed(ring), "The Intro Ring's barrier isn't up with no fight on")
 local d, e, f, g = player(4), player(5), player(6), player(7)
 check(PrivateArenas.claim(d) == sa and d:GetAttribute("ArenaCenter") == sa, "A fight didn't take the Intro Ring")
 check(closed(ring) and ring:GetAttribute("Owner") == 4, "The Intro Ring's open with a fight on")
@@ -148,10 +143,10 @@ check(PrivateArenas.claim(e) == sb, "The next fight didn't take the Grand Arena"
 local cf = PrivateArenas.claim(f)
 check(typeof(cf) == "Vector3" and cf ~= sa and cf ~= sb and (cf - FLOOR).Magnitude > 1000, "With Arena Row full, no far copy")
 PrivateArenas.release(d)
-check(ring.Parent ~= nil and ring:GetAttribute("Owner") == nil and shut(ring), "The Intro Ring wasn't left standing and open")
+check(ring.Parent ~= nil and ring:GetAttribute("Owner") == nil and closed(ring), "The Intro Ring wasn't left standing, its barrier up")
 check(PrivateArenas.claim(g) == sa, "The Intro Ring wasn't taken again")
 for _, who in { e, f, g } do
 	PrivateArenas.release(who)
 end
 
-print(string.format("PASS: %d private arena checks (one each, far apart, scenery only, reused; Arena Row: open rings on the ground, fenced in a fight)", checks))
+print(string.format("PASS: %d private arena checks (one each, far apart, scenery only, reused; Arena Row: open rings on the ground, a see-through barrier always up)", checks))

@@ -26,8 +26,8 @@
 	                                            Settlement.Stages): a floor on
 	                                            the ground, no walls, so the
 	                                            fight's seen and sees out;
-	                                            claimed first, fenced off
-	                                            while a fight's on
+	                                            claimed first; a see-through
+	                                            barrier round it, always up
 	  PrivateArenas.start()
 ]]
 local Players = game:GetService("Players")
@@ -116,9 +116,11 @@ local function copy(source: Instance, offset: Vector3): Model
 	return model
 end
 
--- A fence round a stage's floor, `reach` out: nobody walks into a fight
--- (or out of one); open between fights.
-local function fenceOf(model: Model, center: Vector3, reach: number): Folder
+-- The barrier round a stage's floor, `reach` out: a see-through wall of
+-- force field in the ring's colour, always up: nobody walks in or out (the
+-- fighters are put inside). It stops no camera and no blow (CanQuery off).
+PrivateArenas.BarrierHeight = 14
+local function fenceOf(model: Model, center: Vector3, reach: number, glow: Color3): Folder
 	local fence = Instance.new("Folder")
 	fence.Name = "StageFence"
 	local segments = 24
@@ -126,20 +128,22 @@ local function fenceOf(model: Model, center: Vector3, reach: number): Folder
 		local a = (i + 0.5) / segments * math.pi * 2
 		local p = Instance.new("Part")
 		p.Name = "Fence"
-		p.Anchored, p.CanCollide, p.CanTouch, p.CanQuery = true, false, false, false
-		p.Transparency = 1
-		p.Size = Vector3.new(2 * reach * math.tan(math.pi / segments) + 1, 26, 1)
-		p.CFrame = CFrame.new(center + Vector3.new(math.cos(a) * reach, 12, math.sin(a) * reach))
+		p.Anchored, p.CanCollide, p.CanTouch, p.CanQuery = true, true, false, false
+		p.Material = Enum.Material.ForceField
+		p.Color = glow
+		p.Transparency = 0.2
+		p.CastShadow = false
+		local tall = PrivateArenas.BarrierHeight
+		p.Size = Vector3.new(2 * reach * math.tan(math.pi / segments) + 0.2, tall, 0.6)
+		p.CFrame = CFrame.new(center + Vector3.new(math.cos(a) * reach, tall / 2 - 0.7, math.sin(a) * reach))
 			* CFrame.Angles(0, -a + math.pi / 2, 0)
 		p.Parent = fence
 	end
 	fence.Parent = model
 	return fence
 end
-local function fenced(stage, on: boolean)
-	for _, p in stage.Fence:GetChildren() do
-		(p :: BasePart).CanCollide = on
-	end
+local function fenced(_stage, _on: boolean)
+	-- (the barrier stays up, fight or no fight)
 end
 
 -- An open ring on the ground: the fight floor (as wide as the Arena's), a
@@ -223,7 +227,8 @@ function PrivateArenas.stage(name: string, ground: Vector3, reach: number): Vect
 	end
 	model:SetAttribute("Center", target)
 	model:SetAttribute("Stage", true)
-	local stage = { Model = model, Center = target, Fence = fenceOf(model, target, reach), Owner = nil :: Player? }
+	local glow = PrivateArenas.RingColors[name] or Color3.fromRGB(110, 220, 255)
+	local stage = { Model = model, Center = target, Fence = fenceOf(model, target, reach, glow), Owner = nil :: Player? }
 	model.Parent = folder()
 	table.insert(stages, stage)
 	return target
