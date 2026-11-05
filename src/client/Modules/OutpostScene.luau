@@ -2255,7 +2255,7 @@ FrontierHud.start()
 -- The Rift: a vein's gate, the trip through it (Server.RiftServer).
 require(script.Parent.RiftClient).start()
 -- (The Shelter's frame: the quarry's, lifted onto its legs.)
-local shelterFrame = Rules.Location * CFrame.new(0, Rules.ShelterLift, 0)
+local shelterFrame = Rules.shelterFrame() * CFrame.new(0, Rules.ShelterLift, 0)
 RunService.RenderStepped:Connect(function(dt)
 	-- The rift in the sky, the Shelter's life (the gallery's gems, the
 	-- drones), the Kaiju Kennel's residents, the bounty board on the hall

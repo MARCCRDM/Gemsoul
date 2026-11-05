@@ -951,11 +951,13 @@ end
 -- Whether a spot `offset` from the Outpost's middle is back at base: in the
 -- Shelter's footprint (`box`: its half size, x and z), or down in the hall
 -- under it.
-function Frontier.atBase(offset: Vector3, box: Vector2): boolean
+-- (`shift`: where the Shelter stands from the middle, Shared.Outpost.ShelterOffset)
+function Frontier.atBase(offset: Vector3, box: Vector2, shift: Vector3?): boolean
+	local local_ = offset - (shift or Vector3.zero)
 	if offset.Y < -Frontier.Below then
-		return Vector2.new(offset.X, offset.Z).Magnitude < Frontier.Core
+		return Vector2.new(local_.X, local_.Z).Magnitude < Frontier.Core
 	end
-	return math.abs(offset.X) <= box.X and math.abs(offset.Z) <= box.Y
+	return math.abs(local_.X) <= box.X and math.abs(local_.Z) <= box.Y
 end
 
 -- The chance a swing at the core's rocks brings light critters, for one
@@ -986,7 +988,8 @@ function Frontier.coreSpot(
 	center: Vector3,
 	box: Vector2,
 	rng,
-	usable: ((Vector3) -> boolean)?
+	usable: ((Vector3) -> boolean)?,
+	shift: Vector3?
 ): Vector3?
 	local rules = Frontier.CoreCritters
 	local flat = Vector3.new(facing.X, 0, facing.Z)
@@ -998,7 +1001,7 @@ function Frontier.coreSpot(
 		local spot = position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * reach
 		local offset = spot - center
 		if
-			not Frontier.atBase(Vector3.new(offset.X, 0, offset.Z), box)
+			not Frontier.atBase(Vector3.new(offset.X, 0, offset.Z), box, shift)
 			and Vector2.new(offset.X, offset.Z).Magnitude <= Frontier.Rim
 			and (usable == nil or usable(spot))
 		then

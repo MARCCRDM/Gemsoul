@@ -61,6 +61,14 @@ Outpost.Location = CFrame.new(0, 0, 7000)
 -- frame, Location lifted that far, is where the client mounts its life
 -- (Client.ShelterLife, Client.StoreDisplays).
 Outpost.ShelterLift = 8
+-- Where the Shelter stands, from the quarry's middle (studs, on the floor;
+-- never turned: its doors stay south, east and west). Everything built
+-- round it, the Kaiju Arena's hall under it and its life on the client
+-- follow (Outpost.shelterFrame).
+Outpost.ShelterOffset = Vector3.zero
+function Outpost.shelterFrame(): CFrame
+	return Outpost.Location * CFrame.new(Outpost.ShelterOffset)
+end
 Outpost.ShelterRamp = 40
 Outpost.Radius = 550 -- quarry rim; recovery allows the surrounding benches
 -- Where the world ends for now: the invisible walls round the quarry

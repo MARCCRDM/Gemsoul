@@ -747,7 +747,7 @@ end
 
 function KaijuPitServer.start(site, world)
 	stairs = site and site.Stairs
-	local origin = KaijuPit.origin(Outpost.Location)
+	local origin = KaijuPit.origin(Outpost.shelterFrame())
 	pit = (world or KaijuPitWorld).build(origin, workspace)
 	if pit.Guide and pit.Folder then
 		Builder.vendor(pit.Folder, pit.Guide, "ArenaGuide", Vendors.ArenaGuide)

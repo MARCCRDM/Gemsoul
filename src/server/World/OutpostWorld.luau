@@ -2697,7 +2697,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- garage, the stations.
 	local rules = assert(OutpostWorld.Rules, "OutpostWorld needs Shared.Outpost")
 	local lift = rules.ShelterLift
-	local home = shelter(root, at * CFrame.new(0, lift, 0), rules)
+	local shelterAt = at * CFrame.new(rules.ShelterOffset or Vector3.zero)
+	local home = shelter(root, shelterAt * CFrame.new(0, lift, 0), rules)
 	local parking = home.Parking
 
 	-- Old workings out in the quarry: a second drill rig and container stacks.
@@ -3074,7 +3075,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			return false
 		end
 		-- (not in the Shelter, nor right up against its walls)
-		local inside = p - at.Position
+		local inside = p - shelterAt.Position
 		if math.abs(inside.X) < home.Box.X and math.abs(inside.Z) < home.Box.Y then
 			return false
 		end
