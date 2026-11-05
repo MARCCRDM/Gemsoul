@@ -265,6 +265,10 @@ function LoadingFlow.snapshot(hold: any?, now: number?): Snapshot
 	s.Grounded = grounded(root, humanoid)
 	local camera = workspace.CurrentCamera
 	s.Camera = camera ~= nil and (camera.CFrame.Position - root.Position).Magnitude <= LoadingFlow.CameraRange
+	-- (Riding your pod down: it has you, and Client.PodArrival the camera.)
+	if typeof(player:GetAttribute("PodLanding")) == "number" then
+		s.Arrived, s.Grounded, s.Camera = true, true, true
+	end
 	return s
 end
 

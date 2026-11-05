@@ -8,6 +8,15 @@ local roblox = require("@lune/roblox")
 local process = require("@lune/process")
 local R = roblox
 local ROOT = process.args[1] or "."
+-- (lune's CFrame.lookAt turns the wrong way off the axes: a correct one)
+local FixedCFrame = setmetatable({
+	lookAt = function(pos, target)
+		local f = (target - pos).Unit
+		local r = f:Cross(R.Vector3.new(0, 1, 0))
+		r = if r.Magnitude < 1e-4 then R.Vector3.new(1, 0, 0) else r.Unit
+		return R.CFrame.fromMatrix(pos, r, r:Cross(f), -f)
+	end,
+}, { __index = R.CFrame })
 
 local checks = 0
 local function check(ok, message)
@@ -195,26 +204,41 @@ local Players = {
 	end,
 }
 local replicated = { Shared = { Pods = "Pods" } }
+local moved = {}
+local workspaceRoot = R.Instance.new("Folder")
 local env = setmetatable({
 	game = {
 		GetService = function(_, name)
 			return ({ Players = Players, ReplicatedStorage = replicated, RunService = { Heartbeat = Heartbeat } })[name]
 		end,
 	},
+	workspace = workspaceRoot,
 	Instance = R.Instance,
-	CFrame = R.CFrame,
+	CFrame = FixedCFrame,
 	Vector3 = R.Vector3,
+	Vector2 = R.Vector2,
 	Color3 = R.Color3,
 	UDim2 = R.UDim2,
 	Enum = R.Enum,
+	ColorSequence = R.ColorSequence,
+	NumberSequence = R.NumberSequence,
+	NumberSequenceKeypoint = R.NumberSequenceKeypoint,
+	NumberRange = R.NumberRange,
 	Random = Rand,
 	task = fakeTask,
 	typeof = R.typeof or typeof,
 	require = function(m)
 		return ({ Pods = Pods })[m]
 	end,
+	__now = function()
+		return now
+	end,
+	__moveTo = function(humanoid, at)
+		moved[humanoid.Parent.Name] = at -- (by name: lune's instances aren't the same table twice)
+	end,
 }, { __index = _G })
--- lune's Model has no PivotTo/GetPivot: move every part by the same step.
+-- lune's Model has no PivotTo/GetPivot: move every part by the same step
+-- (a character by its root).
 env.__getPivot = function(model)
 	return model.PrimaryPart.CFrame
 end
@@ -227,21 +251,32 @@ env.__pivot = function(model, cframe)
 	end
 end
 local source = fs.readFile(ROOT .. "/src/server/Systems/PodServer.luau")
+source = string.gsub(source, "workspace:GetServerTimeNow%(%)", "__now()")
+-- (lune's Humanoid has no MoveTo: where they were sent, by character)
+source = string.gsub(source, "humanoid:MoveTo%(", "__moveTo(humanoid, ")
 source = string.gsub(source, "([%w_%.]+):PivotTo%(", "__pivot(%1, ")
 source = string.gsub(source, "([%w_%.]+):GetPivot%(%)", "__getPivot(%1)")
 local Server = luau.load(source, { debugName = "PodServer", environment = env })()
 
 local function makePlayer(id, name)
-	local p = { UserId = id, DisplayName = name, Name = name, Parent = Players, Attributes = {} }
+	local character = R.Instance.new("Model")
+	character.Name = name
+	local root = R.Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Parent = character
+	character.PrimaryPart = root
+	R.Instance.new("Humanoid").Parent = character
+	local p = { UserId = id, DisplayName = name, Name = name, Parent = Players, Attributes = {}, Character = character }
 	function p:GetAttribute(k)
 		return self.Attributes[k]
 	end
 	function p:SetAttribute(k, v)
 		self.Attributes[k] = v
 	end
+	p.Attributes.Outpost = true
 	table.insert(playerList, p)
 	Players.PlayerAdded:Fire(p)
-	return p
+	return p, root
 end
 local function leave(p)
 	table.remove(playerList, table.find(playerList, p))
@@ -260,57 +295,101 @@ local function podModel(p)
 	return index and pads[index].Model:FindFirstChild("Pod")
 end
 local REST = Pods.Base + 2.3 * Pods.Scale -- (the hull's middle over the pad, landed)
-local BEACON = (4.6 + 3.9 - 2.3) * Pods.Scale -- (the beacon over the hull's middle)
 local function hullHeight(p)
 	local model = podModel(p)
 	return model.PrimaryPart.CFrame.Position.Y - pads[p:GetAttribute("PodIndex")].CFrame.Position.Y
 end
+local function local_(p, part)
+	return pads[p:GetAttribute("PodIndex")].CFrame:PointToObjectSpace(part.CFrame.Position)
+end
+local function firstNamed(model, name)
+	local list = {}
+	for _, c in model:GetChildren() do
+		if c.Name == name then
+			table.insert(list, c)
+		end
+	end
+	return list
+end
+local L = Pods.Landing
 
--- Someone already here when it starts gets one too.
+-- Joining keeps a pad (someone already here when it starts too); no pod yet.
 local early = makePlayer(10, "Early")
 Server.start({ Pads = pads })
-check(typeof(early:GetAttribute("PodIndex")) == "number", "A player already here has no pod")
-local ana = makePlayer(1, "Ana")
+check(typeof(early:GetAttribute("PodIndex")) == "number", "A player already here has no pad")
+local ana, anaRoot = makePlayer(1, "Ana")
 local index = ana:GetAttribute("PodIndex")
 check(type(index) == "number" and index ~= early:GetAttribute("PodIndex"), "Two players share a pad")
-check(Server.spawnFor(ana) == Pods.spawnAt(pads[index].CFrame), "No spawn at the pod's ramp")
+check(Server.spawnFor(ana) == Pods.spawnAt(pads[index].CFrame), "No spawn at the pod's stair")
+check(podModel(ana) == nil, "A pod landed before they came into the Outpost")
+
+-- In the Outpost: it lands with them inside, up overhead until the descent starts.
+check(Server.land(ana) == true, "The pod didn't come down")
+check(Server.land(ana) == false, "The pod came down twice")
+check(math.abs(ana:GetAttribute("PodLanding") - (now + L.Lead)) < 1e-6, "No time for the client's cinematic")
 local pod = podModel(ana)
-check(pod and pod.PrimaryPart and pod.PrimaryPart.Name == "Hull", "No pod built on the pad")
+check(pod and pod.PrimaryPart and pod.PrimaryPart.Name == "Hull", "No pod built")
 check(pod:GetAttribute("OwnerId") == ana.UserId, "The pod doesn't say whose it is")
 local plate = pod.PrimaryPart:FindFirstChild("Nameplate")
 check(plate and plate:FindFirstChildOfClass("TextLabel").Text == "Ana", "No nameplate with their name")
 local beacon = pod:FindFirstChild("Beacon")
 check(beacon and beacon.Color == Pods.colorFor(ana.UserId) and beacon:FindFirstChildOfClass("PointLight"), "No beacon in their colour")
+check(hullHeight(ana) > L.Height * 0.99, "The pod doesn't start up in the sky")
+check(pod.Thruster.Transparency < 1, "No thrusters on the way down")
+local function inside()
+	local q = pod.PrimaryPart.CFrame:PointToObjectSpace(anaRoot.CFrame.Position)
+	return anaRoot.Anchored and math.abs(q.X) < Pods.Width / 2 and math.abs(q.Z) < Pods.Hull and math.abs(q.Y) < 3
+end
+check(inside(), "The rider isn't inside the pod")
+-- stowed for the flight: the stair under the doors, the doors shut, the wings folded, the legs up
 local ramp = pod:FindFirstChild("Ramp")
-check(ramp and ramp.CanCollide and pod.PrimaryPart.CanCollide, "You can walk through the pod or fall through its stair")
-check(pads[index].Model:FindFirstChild("Display") == nil, "The display stall is up before the pod has landed")
--- It comes down from on high, the thruster lit, and lands on its pad.
-local h0 = hullHeight(ana)
-check(h0 > Pods.Landing.Height * 0.9, "The pod doesn't start up in the sky")
-check(pod.Thruster.Transparency < 1, "No thruster on the way down")
-advance(Pods.Landing.Fall / 2)
+check(local_(ana, ramp).Z > -Pods.Hull - 1, "The stair is out in flight")
+local leaves = firstNamed(pod, "DoorLeaf")
+check(#leaves == 2 and math.abs(local_(ana, leaves[1]).X) < 1.3, "The doors are open in flight")
+local wings = firstNamed(pod, "Wing")
+check(#wings == 2 and math.abs(local_(ana, wings[1]).X) < Pods.Width / 2, "The wings are out in flight")
+advance(L.Lead * 0.9)
+check(hullHeight(ana) > L.Height * 0.99, "It came down before the cinematic's start")
+advance(L.Lead * 0.1 + L.Fall / 2)
 local h1 = hullHeight(ana)
-check(h1 < h0 and h1 > REST, "The pod isn't on its way down")
--- (every piece comes down with it)
-check(math.abs((pod.Beacon.CFrame.Position.Y - pod.PrimaryPart.CFrame.Position.Y) - BEACON) < 0.01, "The beacon was left behind")
-advance(Pods.Landing.Fall / 2 + 0.1)
+check(h1 < L.Height * 0.5 and h1 > REST, "The pod isn't on its way down")
+check(inside(), "The rider was left behind")
+local legs = firstNamed(pod, "Leg")
+check(#legs == 4, "No landing legs")
+-- Touchdown: on its pad, the thrusters off, dust, the stall waiting under the pad.
+advance(L.Fall / 2 + 0.05)
 check(math.abs(hullHeight(ana) - REST) < 0.01, "The pod didn't land on its pad")
-check(pod:GetAttribute("Landed") == true and pod.Thruster.Transparency == 1, "The thruster's still lit on the pad")
+check(pod.Thruster.Transparency == 1, "The thrusters are still lit on the pad")
+check(math.abs(local_(ana, legs[1]).Y - legs[1].Size.Y / 2) < 0.1, "The legs didn't come down onto the pad")
 local stall = pads[index].Model:FindFirstChild("Display")
-check(stall and stall:FindFirstChild("Counter"), "No display stall beside the landed pod")
-local rampTop = ramp.CFrame.Position.Y - pads[index].CFrame.Position.Y
-check(math.abs(rampTop - Pods.Base / 2) < 0.01, "The ramp isn't on the pad")
+check(stall and stall.Counter and local_(ana, stall.Counter).Y < 0, "No stall waiting under the pad")
+check(ana:GetAttribute("PodLanding") ~= nil and inside(), "Let out before it opened up")
+-- Deploying: doors apart, wings out, the stair down, the stall up; then out they come.
+advance(L.Deploy / 2)
+check(not pod:GetAttribute("Landed"), "Open already")
+advance(L.Deploy / 2 + 0.05)
+check(pod:GetAttribute("Landed") == true, "It never finished opening")
+check(math.abs(local_(ana, leaves[1]).X) > 1.9, "The doors didn't open")
+check(math.abs(local_(ana, wings[1]).X) > Pods.Width / 2 + 0.5, "The wings didn't swing out")
+check(local_(ana, ramp).Z < -Pods.Hull - 0.5, "The stair didn't fold out")
+check(ramp.CanCollide and pod.PrimaryPart.CanCollide, "You can walk through the pod or fall through its stair")
+check(local_(ana, stall.Counter).Y > 0, "The stall didn't rise")
+check(ana:GetAttribute("PodLanding") == nil and not anaRoot.Anchored, "The rider wasn't let out")
+local out = local_(ana, anaRoot)
+check(out.Z < -Pods.Hull and out.Z > -(Pods.Hull + Pods.Ramp) and out.Y > Pods.Base, "Not let out at the top of the stair")
+check(moved.Ana and (moved.Ana - Server.spawnFor(ana).Position).Magnitude < 0.01, "Not walked down to the foot of the stair")
 
--- A friend lands beside you.
+-- A friend's pad is beside yours.
 friendsOf[2] = { 1 }
 local ben = makePlayer(2, "Ben")
 local benIndex = ben:GetAttribute("PodIndex")
 local gap = (pads[benIndex].CFrame.Position - pads[index].CFrame.Position).Magnitude
 check(gap < 40, "A friend's pod landed far away (" .. math.floor(gap) .. " studs)")
 
--- The failsafe: no heartbeat at all, it's on its pad all the same.
-local cara = makePlayer(3, "Cara")
-now += Pods.Landing.Failsafe + 0.1
+-- The failsafe: no heartbeat at all, it's down, open and they're out all the same.
+local cara, caraRoot = makePlayer(3, "Cara")
+Server.land(cara)
+now += L.Lead + L.Fall + L.Deploy + 2.1
 for i = #delayed, 1, -1 do
 	local d = delayed[i]
 	if now >= d[1] then
@@ -318,29 +397,37 @@ for i = #delayed, 1, -1 do
 		d[2](table.unpack(d[3], 1, d[3].n))
 	end
 end
-check(math.abs(hullHeight(cara) - REST) < 0.01, "The failsafe didn't land the pod")
+check(math.abs(hullHeight(cara) - REST) < 0.01 and podModel(cara):GetAttribute("Landed"), "The failsafe didn't land the pod")
+check(cara:GetAttribute("PodLanding") == nil and not caraRoot.Anchored, "The failsafe left them inside")
 
--- Leaving: up and away, then the pad's free again (not before).
+-- Leaving: packed up, up and away, then the pad's free again (not before).
 local anaPod = podModel(ana)
 leave(ana)
-advance(Pods.Landing.LiftOff / 2)
+check(gone(stall), "The display stall stayed behind")
+check(local_({ GetAttribute = function() return index end }, ramp).Z > -Pods.Hull - 1, "It took off with the stair out")
+advance(L.LiftOff / 2)
 check(not gone(anaPod) and anaPod.PrimaryPart.CFrame.Position.Y - pads[index].CFrame.Position.Y > REST + 1, "The pod didn't lift off")
 check(Server._taken[index] ~= nil, "The pad was freed with the pod still on it")
-check(gone(stall) or stall.Parent == nil, "The display stall stayed behind")
-advance(Pods.Landing.LiftOff / 2 + 0.2)
+advance(L.LiftOff / 2 + 0.2)
 check(gone(anaPod), "The pod never left")
 check(Server._taken[index] == nil, "The pad was never freed")
 -- Leaving mid-landing: it goes back up from where it was, and the failsafe doesn't put it back.
 local dan = makePlayer(4, "Dan")
+Server.land(dan)
 local danPod = podModel(dan)
 local danIndex = dan:GetAttribute("PodIndex")
-advance(1)
+advance(L.Lead + 1)
 leave(dan)
 advance(0.2)
 check(danPod.PrimaryPart.CFrame.Position.Y - pads[danIndex].CFrame.Position.Y > 20, "A pod leaving mid-landing dropped onto its pad")
-advance(Pods.Landing.Failsafe)
+advance(L.Lead + L.Fall + L.Deploy + 3)
 check(gone(danPod) and Server._taken[danIndex] == nil, "A pod leaving mid-landing stayed")
--- Someone gone before their pod was picked gets none.
+-- Never came into the Outpost: the pad's free as soon as they go.
+local eve = makePlayer(6, "Eve")
+local eveIndex = eve:GetAttribute("PodIndex")
+leave(eve)
+check(Server._taken[eveIndex] == nil, "A pad kept for someone gone who never landed")
+-- Someone gone before their pad was picked gets none.
 local ghost = { UserId = 5, DisplayName = "Ghost", Parent = nil, Attributes = {} }
 function ghost:GetAttribute(k)
 	return self.Attributes[k]
@@ -348,7 +435,34 @@ end
 function ghost:SetAttribute(k, v)
 	self.Attributes[k] = v
 end
-Server._arrive(ghost)
-check(ghost:GetAttribute("PodIndex") == nil, "A pod for someone who'd already left")
+Server._reserve(ghost)
+check(ghost:GetAttribute("PodIndex") == nil, "A pad for someone who'd already left")
 
-print("PASS: " .. checks .. " pod checks (pads, friends side by side, landing, failsafe, lift-off, spawn at the ramp)")
+-- The cinematic's camera (Client.PodArrival): looking up at it coming down, then round to the doors.
+local Arrival = luau.load(fs.readFile(ROOT .. "/src/client/Modules/PodArrival.luau"), {
+	debugName = "PodArrival",
+	environment = setmetatable({
+		game = { GetService = function(_, name)
+			return ({ Players = { LocalPlayer = {} }, ReplicatedStorage = replicated, RunService = {}, TweenService = {} })[name]
+		end },
+		CFrame = FixedCFrame,
+		Vector3 = R.Vector3,
+		require = function(m)
+			return ({ Pods = Pods })[m]
+		end,
+	}, { __index = _G }),
+})()
+local padCF = pads[1].CFrame
+local function shotLook(t)
+	local eye, focus = Arrival.shot(t, padCF)
+	return eye, focus
+end
+local e0, f0 = shotLook(0)
+check((f0 - padCF.Position).Y > L.Height * 0.9, "The camera isn't on the pod up in the sky")
+check((e0.Position - padCF.Position).Y < 10, "The camera isn't down on the pad looking up")
+local e1, f1 = shotLook(L.Fall + L.Deploy)
+local doors = (padCF * R.CFrame.new(0, 4, 0)).Position
+check((f1 - doors).Magnitude < 0.5, "The camera doesn't end on the doors")
+check(padCF:PointToObjectSpace(e1.Position).Z < -10, "The camera doesn't end in front of the doors")
+
+print("PASS: " .. checks .. " pod checks (pads kept on joining, landing with you inside, touchdown, deploying, out down the stair, the cinematic's shots, failsafe, lift-off)")

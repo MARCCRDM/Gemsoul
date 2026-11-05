@@ -1,7 +1,8 @@
 --[[
-	Personal pods (Server.PodServer): everyone in the server has a pod on one
-	of the settlement's pads (Shared.Outpost.Settlement), landed from orbit
-	when they join and lifted off when they leave. You start at the foot of
+	Personal pods (Server.PodServer): everyone in the server has a pad on the
+	settlement (Shared.Outpost.Settlement); their pod lands on it, them
+	inside, the first time they come into the Outpost, and lifts off when
+	they leave. You start at the foot of
 	its ramp, and come back there: a respawn, a duel, the Rift.
 
 	  Pods.choose(pads, taken, near, rng) -> index?
@@ -14,9 +15,11 @@
 local Pods = {}
 
 Pods.Landing = {
+	Lead = 1.6, -- seconds parked overhead first (the loading cover lifts)
 	Height = 240, -- studs over the pad it starts from
 	Fall = 3.2, -- seconds down
-	Failsafe = 6, -- seconds: it's on its pad by then whatever happens
+	Deploy = 2.2, -- seconds opening up on the pad (legs, wings, doors, stair, stall)
+	Failsafe = 9, -- seconds: down and open by then whatever happens
 	LiftOff = 2.6, -- seconds up and gone when you leave
 }
 -- The pod (a habitat module), drawn Scale times its model's size: its

@@ -1,15 +1,22 @@
 --[[
-	Personal pods (Shared.Pods): a pod for everyone in the server, on one of
-	the settlement's pads (Server.World.OutpostWorld builds them), next to a
-	friend's if a friend is here. It lands from orbit when you join and lifts
-	off when you leave.
+	Personal pods (Shared.Pods): a pad on the settlement (Server.World.
+	OutpostWorld builds them) kept for everyone in the server from the moment
+	they join, next to a friend's if a friend is here. The first time they
+	come into the Outpost their pod lands on it with them inside: down from
+	orbit on its thrusters, a burst of dust on touchdown, then it deploys
+	(landing legs, solar wings out, the antenna up, the doors open, the stair
+	folds out, the display stall rises) and they walk down the steps. Their
+	client films it (Client.PodArrival) from the PodLanding attribute: the
+	server time the descent starts. It lifts off when they leave the server.
 
 	Where you start in the Outpost, and come back to (a respawn, a duel, the
-	Rift), is the foot of its ramp: the player's PodSpawn attribute (a
+	Rift), is the foot of its stair: the player's PodSpawn attribute (a
 	CFrame), read by OutpostServer, ArenaSessions, RiftServer and the
 	client's loading cover. PodIndex says which pad is theirs.
 
-	  PodServer.start(site)   site: OutpostServer.site() (its Pads)
+	  PodServer.start(site)    site: OutpostServer.site() (its Pads)
+	  PodServer.land(player) -> boolean   lands their pod with them in it
+	                           (false: it's down already, or there's none)
 	  PodServer.spawnFor(player) -> CFrame?
 ]]
 local Players = game:GetService("Players")
@@ -25,8 +32,9 @@ local DARK = Color3.fromRGB(58, 62, 72)
 local pads = {} -- { { Index, Tier, CFrame, Model } }
 local byIndex = {}
 local taken: { [number]: Player | true } = {} -- (true: a pod still lifting off)
-local podOf: { [Player]: { Index: number, Model: Model, Entry: any } } = {}
--- Pods on the move: { Model, Pad (CFrame), Kind ("Land" | "Lift"), T, From }
+-- Each player's pad, and their pod once it's landed (Entry: its motion).
+local podOf: { [Player]: { Index: number, Pad: any, Model: Model?, Entry: any } } = {}
+-- Pods on the move: { Model, Rest, Kind ("Land" | "Deploy" | "Lift"), T, ... }
 local moving = {}
 local rng = Random.new()
 local scrapped = setmetatable({}, { __mode = "k" }) -- (pods gone for good)
@@ -71,7 +79,8 @@ local WHITE = Color3.fromRGB(226, 228, 232)
 local WARM = Color3.fromRGB(255, 196, 96)
 local JET = Color3.fromRGB(120, 190, 255)
 local CYAN = Color3.fromRGB(110, 220, 255)
-local function build(player: Player, pad): Model
+local SOLAR = Color3.fromRGB(38, 54, 96)
+local function build(player: Player, pad): (Model, { any })
 	local f = pad.CFrame
 	local color = Pods.colorFor(player.UserId)
 	-- (drawn at Pods.Scale: these are the sizes before it)
@@ -85,8 +94,17 @@ local function build(player: Player, pad): Model
 	local w, d, base = Pods.Width / K, Pods.Hull * 2 / K, Pods.Base / K
 	local model = Instance.new("Model")
 	model.Name = "Pod"
-	-- the skirt it stands on, the body and its rounded roof
-	local skirt = part(model, F(0, base / 2, 0), V(w - 1, base, d - 0.6), DARK, Enum.Material.Metal)
+	-- What moves as it deploys, each built where it ends up (open): `delta`
+	-- (studs, in the pod's frame) back to where it's stowed, the share of
+	-- the deploy it moves in (`from`, `to`), and its phase ("Legs" on the
+	-- way down, "Deploy" on the pad).
+	local moves = {}
+	local function stow(p: BasePart, phase: string, delta: Vector3, from: number, to: number)
+		table.insert(moves, { Part = p, Phase = phase, Delta = delta, From = from, To = to })
+		return p
+	end
+	-- the skirt it stands on (up off the pad on its legs), the body and its rounded roof
+	local skirt = part(model, F(0, base * 0.65, 0), V(w - 1, base * 0.7, d - 0.6), DARK, Enum.Material.Metal)
 	skirt.CanCollide, skirt.CanQuery = true, true
 	local body = part(model, F(0, base + 2.3, 0), V(w, 4.6, d), WHITE, Enum.Material.SmoothPlastic)
 	body.Name = "Hull"
@@ -106,19 +124,41 @@ local function build(player: Player, pad): Model
 	part(model, F(0, base + 2.1, front - 0.1), V(3.8, 4.1, 0.3), DARK, Enum.Material.Metal)
 	local door = part(model, F(0, base + 2, front - 0.2), V(3.1, 3.7, 0.2), WARM, Enum.Material.Neon)
 	door.Name = "Door"
-	part(model, F(0, base + 2, front - 0.3), V(0.15, 3.7, 0.1), DARK, Enum.Material.Metal)
+	-- (its two leaves slide apart as it deploys)
 	for _, side in { -1, 1 } do
-		part(model, F(side * 3.3, base + 2.7, front - 0.1), V(2.3, 1.8, 0.3), DARK, Enum.Material.Metal)
-		part(model, F(side * 3.3, base + 2.7, front - 0.2), V(1.9, 1.4, 0.2), WARM, Enum.Material.Neon)
+		local leaf = part(model, F(side * (0.78 + 1.3), base + 2, front - 0.4), V(1.55, 3.7, 0.15), WHITE, Enum.Material.SmoothPlastic)
+		leaf.Name = "DoorLeaf"
+		stow(leaf, "Deploy", V(-side * 1.3, 0, 0), 0.22, 0.5)
+	end
+	for _, side in { -1, 1 } do
+		part(model, F(side * 3.9, base + 2.7, front - 0.1), V(1.9, 1.8, 0.3), DARK, Enum.Material.Metal)
+		part(model, F(side * 3.9, base + 2.7, front - 0.2), V(1.5, 1.4, 0.2), WARM, Enum.Material.Neon)
 	end
 	local glow = Instance.new("PointLight")
 	glow.Color, glow.Range, glow.Brightness = WARM, 14, 0.9
 	glow.Parent = door
 	-- the roof: a vent box and the antenna with its beacon
-	part(model, F(-w / 4, roofY + 1.7, 0.6), V(2.4, 0.6, 1.8), STEEL, Enum.Material.Metal)
-	part(model, F(w / 5, roofY + 2.5, 0.8), V(0.3, 2.2, 0.3), DARK, Enum.Material.Metal)
-	local beacon = part(model, F(w / 5, roofY + 3.9, 0.8), V(0.8, 0.8, 0.8), color, Enum.Material.Neon)
+	part(model, F(0, roofY + 1.7, 1.2), V(2, 0.6, 1.6), STEEL, Enum.Material.Metal)
+	local mast = part(model, F(1.4, roofY + 2.5, -0.6), V(0.3, 2.2, 0.3), DARK, Enum.Material.Metal)
+	stow(mast, "Deploy", V(0, -1.8, 0), 0.05, 0.35)
+	local beacon = part(model, F(1.4, roofY + 3.9, -0.6), V(0.8, 0.8, 0.8), color, Enum.Material.Neon)
 	beacon.Name = "Beacon"
+	stow(beacon, "Deploy", V(0, -1.8, 0), 0.05, 0.35)
+	-- the solar wings: folded flat on the roof, swung out over the ends
+	for _, side in { -1, 1 } do
+		local wing = part(model, F(side * (w / 2 + 1.5), roofY + 1.5, 0), V(3, 0.18, d - 3.4), SOLAR, Enum.Material.SmoothPlastic)
+		wing.Name = "Wing"
+		table.insert(moves, {
+			Part = wing,
+			Phase = "Deploy",
+			Hinge = F(side * (w / 2), roofY + 1.5, 0),
+			Arm = CFrame.new(-side * 1.5 * K, 0, 0),
+			Side = side,
+			From = 0.1,
+			To = 0.5,
+		})
+		part(model, F(side * (w / 2 - 0.05), roofY + 1.5, 0), V(0.3, 0.3, d - 3), DARK, Enum.Material.Metal)
+	end
 	local light = Instance.new("PointLight")
 	light.Color, light.Range, light.Brightness = color, 16, 1.2
 	light.Parent = beacon
@@ -136,11 +176,24 @@ local function build(player: Player, pad): Model
 		)
 		step.Name = if i == 1 then "Ramp" else "Step"
 		step.CanCollide, step.CanQuery = true, true
+		stow(step, "Deploy", V(0, 0, i * run), 0.45 + (i - 1) * 0.07, 0.75 + (i - 1) * 0.07)
 	end
 	for _, side in { -1, 1 } do
 		local from = (F(side * 1.9, base + 1.2, front - 0.2)).Position
 		local to = (F(side * 1.9, 1.2, front - Pods.Ramp / K)).Position
-		part(model, CFrame.lookAt((from + to) / 2, to), Vector3.new(0.15 * K, 0.15 * K, (to - from).Magnitude), DARK, Enum.Material.Metal)
+		local rail = part(model, CFrame.lookAt((from + to) / 2, to), Vector3.new(0.15 * K, 0.15 * K, (to - from).Magnitude), DARK, Enum.Material.Metal)
+		stow(rail, "Deploy", V(0, 0, Pods.Ramp / K), 0.6, 0.98)
+	end
+	-- the landing legs, out of the skirt on the way down
+	for _, x in { -1, 1 } do
+		for _, z in { -1, 1 } do
+			local at = F(x * (w / 2 - 1.3), base * 0.45, z * (d / 2 - 1))
+			local leg = part(model, at, V(0.7, base * 0.9, 0.7), STEEL, Enum.Material.Metal)
+			leg.Name = "Leg"
+			stow(leg, "Legs", V(0, base * 0.55, 0), 0, 1)
+			local foot = part(model, at * CFrame.new(0, -base * 0.42 * K, 0), V(1.5, 0.25, 1.5), DARK, Enum.Material.Metal)
+			stow(foot, "Legs", V(0, base * 0.55, 0), 0, 1)
+		end
 	end
 	-- the thrusters, lit only on the way down or up
 	for _, x in { -1, 1 } do
@@ -168,9 +221,15 @@ local function build(player: Player, pad): Model
 	label.Text = player.DisplayName
 	label.Parent = plate
 	plate.Parent = body
+	-- the roar on the way down
+	local roar = Instance.new("Sound")
+	roar.Name = "Thrust"
+	roar.SoundId = "rbxasset://sounds/action_falling.mp3"
+	roar.Volume, roar.RollOffMaxDistance = 0.7, 260
+	roar.Parent = body
 	model:SetAttribute("OwnerId", player.UserId)
 	model.Parent = pad.Model
-	return model
+	return model, moves
 end
 
 -- The display stall beside the pod, once it's down: posts, an awning lit
@@ -209,6 +268,31 @@ local function display(pad): Model
 	stall.Parent = pad.Model
 	return stall
 end
+local STALL_SINK = 4.6 * Pods.Scale -- (how far under the pad it waits to rise)
+
+local function ease(x: number): number
+	x = math.clamp(x, 0, 1)
+	return x * x * (3 - 2 * x)
+end
+-- Where a moving part is in the pod's frame (its rest on the pad), `e` of
+-- the way from stowed (0) to out (1).
+local function placeOf(entry, move, e: number): CFrame
+	if move.Hinge then
+		local angle = -move.Side * math.pi * 0.94 * e
+		return move.HingeRel * CFrame.Angles(0, 0, angle) * move.Arm
+	end
+	return CFrame.new(move.Delta * (1 - e)) * move.Open
+end
+-- Every moving part of `phase` to `t` (0..1 of it), the pod `height` up.
+local function pose(entry, phase: string, t: number, height: number)
+	local at = CFrame.new(0, height, 0) * entry.Rest
+	for _, move in entry.Moves do
+		if move.Phase == phase then
+			local e = ease((t - move.From) / math.max(0.01, move.To - move.From))
+			move.Part.CFrame = at * placeOf(entry, move, e)
+		end
+	end
+end
 
 -- (the pod's pivot is its Hull, `Rest` where it stands on the pad)
 local function setHeight(entry, height: number)
@@ -222,32 +306,159 @@ local function thruster(model: Model, on: boolean)
 			(jet :: BasePart).Transparency = if on then 0.15 else 1
 		end
 	end
-end
-local function landed(entry)
-	setHeight(entry, 0)
-	thruster(entry.Model, false)
-	entry.Model:SetAttribute("Landed", true)
-	if not entry.Display and entry.PadInfo then
-		entry.Display = display(entry.PadInfo)
+	local roar = model.PrimaryPart and model.PrimaryPart:FindFirstChild("Thrust")
+	if roar then
+		pcall(function()
+			if on then
+				(roar :: Sound):Play()
+			else
+				(roar :: Sound):Stop()
+			end
+		end)
 	end
+end
+local function serverNow(): number
+	local ok, t = pcall(function()
+		return workspace:GetServerTimeNow()
+	end)
+	return if ok and type(t) == "number" then t else os.clock()
+end
+
+-- The rider: held inside the hull while it comes down and opens up.
+local function carry(entry, height: number)
+	local player = entry.Rider
+	if not player then
+		return
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root or not player:GetAttribute("Outpost") then
+		return
+	end
+	root.Anchored = true
+	character:PivotTo(CFrame.new(0, height, 0) * entry.Rest * CFrame.new(0, -0.3 * Pods.Scale, 0.8 * Pods.Scale))
+end
+-- Out at the top of the stair, walking down it (the camera's theirs again).
+local function release(entry)
+	local player = entry.Rider
+	entry.Rider = nil
+	if not player then
+		return
+	end
+	player:SetAttribute("PodLanding", nil)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not root then
+		return
+	end
+	root.Anchored = false
+	if player:GetAttribute("Outpost") then
+		local pad = entry.Pad
+		character:PivotTo(pad * CFrame.new(0, Pods.Base + 3, -(Pods.Hull + 0.6)))
+		root.AssemblyLinearVelocity = Vector3.zero
+		if humanoid then
+			humanoid:MoveTo(Pods.spawnAt(pad).Position)
+		end
+	end
+end
+
+-- A puff of moon dust round the pad as it touches down.
+local function dust(pad: CFrame)
+	local puff = Instance.new("Part")
+	puff.Name = "TouchdownDust"
+	puff.Anchored, puff.CanCollide, puff.CanTouch, puff.CanQuery = true, false, false, false
+	puff.Transparency = 1
+	puff.Size = Vector3.new(16, 1, 16)
+	puff.CFrame = pad * CFrame.new(0, 0.5, 0)
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	smoke.Color = ColorSequence.new(Color3.fromRGB(176, 178, 188))
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 11) })
+	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+	smoke.Lifetime = NumberRange.new(1.2, 2.2)
+	smoke.Speed = NumberRange.new(14, 26)
+	smoke.SpreadAngle = Vector2.new(90, 8)
+	smoke.EmissionDirection = Enum.NormalId.Top
+	smoke.Drag = 3
+	smoke.Rate = 0
+	smoke.Parent = puff
+	local thud = Instance.new("Sound")
+	thud.SoundId = "rbxasset://sounds/collide.wav"
+	thud.Volume, thud.RollOffMaxDistance = 1, 200
+	thud.Parent = puff
+	puff.Parent = workspace
+	pcall(function()
+		smoke:Emit(60)
+		thud:Play()
+	end)
+	task.delay(3, function()
+		puff:Destroy()
+	end)
+end
+
+-- Down on the pad: dust, the stall waiting under it, then it deploys.
+local function touchdown(entry)
+	setHeight(entry, 0)
+	pose(entry, "Legs", 1, 0)
+	thruster(entry.Model, false)
+	dust(entry.Pad)
+	if not entry.Display and entry.PadInfo then
+		local stall = display(entry.PadInfo)
+		entry.Display = stall
+		entry.StallRest = {}
+		for _, p in stall:GetDescendants() do
+			if p:IsA("BasePart") then
+				entry.StallRest[p] = p.CFrame
+				p.CFrame = CFrame.new(0, -STALL_SINK, 0) * p.CFrame
+			end
+		end
+	end
+	entry.Kind, entry.T = "Deploy", 0
+end
+-- Open: everything out, the rider out, the stall up.
+local function deployed(entry)
+	pose(entry, "Deploy", 1, 0)
+	for p, rest in entry.StallRest or {} do
+		p.CFrame = rest
+	end
+	entry.Model:SetAttribute("Landed", true)
+	release(entry)
 end
 
 -- One step of everything on the move (RunService.Heartbeat).
 function PodServer._step(dt: number)
+	local landing = Pods.Landing
 	for i = #moving, 1, -1 do
 		local entry = moving[i]
 		entry.T += dt
 		if not standing(entry.Model) then
 			table.remove(moving, i)
 		elseif entry.Kind == "Land" then
-			if entry.T >= Pods.Landing.Fall then
-				table.remove(moving, i)
-				landed(entry)
+			if entry.T >= landing.Fall then
+				touchdown(entry)
+				carry(entry, 0)
 			else
-				setHeight(entry, Pods.altitude(entry.T))
+				local height = if entry.T < 0 then landing.Height else Pods.altitude(entry.T)
+				setHeight(entry, height)
+				pose(entry, "Legs", (entry.T - (landing.Fall - 1.1)) / 1, height)
+				pose(entry, "Deploy", 0, height)
+				carry(entry, height)
+			end
+		elseif entry.Kind == "Deploy" then
+			local t = entry.T / landing.Deploy
+			if t >= 1 then
+				table.remove(moving, i)
+				deployed(entry)
+			else
+				pose(entry, "Deploy", t, 0)
+				for p, rest in entry.StallRest or {} do
+					p.CFrame = CFrame.new(0, -STALL_SINK * (1 - ease((t - 0.5) / 0.5)), 0) * rest
+				end
+				carry(entry, 0)
 			end
 		else
-			if entry.T >= Pods.Landing.LiftOff then
+			if entry.T >= landing.LiftOff then
 				table.remove(moving, i)
 				scrap(entry.Model, entry.Index)
 			else
@@ -274,7 +485,8 @@ local function friendIds(player: Player): { [number]: boolean }
 	return ids
 end
 
-local function arrive(player: Player)
+-- Joined: a pad kept for them (next to a friend's if they can).
+local function reserve(player: Player)
 	if podOf[player] or #pads == 0 then
 		return
 	end
@@ -294,25 +506,61 @@ local function arrive(player: Player)
 	end
 	local pad = byIndex[index]
 	taken[index] = player
-	local model = build(player, pad)
-	local entry = { Model = model, Pad = pad.CFrame, Rest = model:GetPivot(), Kind = "Land", T = 0, Index = index, PadInfo = pad }
-	podOf[player] = { Index = index, Model = model, Entry = entry }
+	podOf[player] = { Index = index, Pad = pad }
 	player:SetAttribute("PodIndex", index)
 	player:SetAttribute("PodSpawn", Pods.spawnAt(pad.CFrame))
-	setHeight(entry, Pods.Landing.Height)
+end
+
+-- In the Outpost the first time: their pod comes down with them inside.
+function PodServer.land(player: Player): boolean
+	local pod = podOf[player]
+	if not pod or pod.Model then
+		return false
+	end
+	local landing = Pods.Landing
+	local model, moves = build(player, pod.Pad)
+	local rest = model:GetPivot()
+	for _, move in moves do
+		local rel = rest:Inverse() * move.Part.CFrame
+		move.Open = rel
+		if move.Hinge then
+			move.HingeRel = rest:Inverse() * move.Hinge
+		end
+	end
+	local entry = {
+		Model = model,
+		Rest = rest,
+		Pad = pod.Pad.CFrame,
+		PadInfo = pod.Pad,
+		Moves = moves,
+		Kind = "Land",
+		T = -landing.Lead,
+		Index = pod.Index,
+		Rider = player,
+	}
+	pod.Model, pod.Entry = model, entry
+	setHeight(entry, landing.Height)
+	pose(entry, "Legs", 0, landing.Height)
+	pose(entry, "Deploy", 0, landing.Height)
 	thruster(model, true)
 	table.insert(moving, entry)
-	-- On its pad by now whatever happens.
-	task.delay(Pods.Landing.Failsafe, function()
+	player:SetAttribute("PodLanding", serverNow() + landing.Lead)
+	carry(entry, landing.Height)
+	-- Down and open by now whatever happens.
+	task.delay(landing.Lead + landing.Fall + landing.Deploy + 2, function()
 		local i = table.find(moving, entry)
 		if i then
 			table.remove(moving, i)
 		end
 		local still = podOf[player]
-		if still and still.Entry == entry and standing(model) then -- (not lifting off already)
-			landed(entry)
+		if still and still.Entry == entry and standing(model) and not model:GetAttribute("Landed") then
+			if entry.Kind == "Land" then
+				touchdown(entry)
+			end
+			deployed(entry)
 		end
 	end)
+	return true
 end
 
 local function depart(player: Player)
@@ -321,9 +569,13 @@ local function depart(player: Player)
 	if not pod then
 		return
 	end
+	if not pod.Model then
+		taken[pod.Index] = nil -- (never landed: the pad's free now)
+		return
+	end
 	taken[pod.Index] = true -- (free once it's gone)
 	local entry = pod.Entry
-	entry.PadInfo = nil -- (no stall going up after this)
+	entry.PadInfo, entry.Rider = nil, nil -- (no stall going up after this)
 	if entry.Display then
 		entry.Display:Destroy() -- (packed up first)
 		entry.Display = nil
@@ -332,8 +584,11 @@ local function depart(player: Player)
 	local i = table.find(moving, entry)
 	if i then
 		table.remove(moving, i)
-		from = Pods.altitude(entry.T) -- (still coming down: up from there)
+		from = if entry.Kind == "Land" then (if entry.T < 0 then Pods.Landing.Height else Pods.altitude(entry.T)) else 0
 	end
+	-- (folded up, and away)
+	setHeight(entry, from)
+	pose(entry, "Deploy", 0, from)
 	local lift = { Model = pod.Model, Rest = entry.Rest, Kind = "Lift", T = 0, From = from, Index = pod.Index }
 	thruster(pod.Model, true)
 	table.insert(moving, lift)
@@ -356,17 +611,17 @@ function PodServer.start(site)
 		byIndex[pad.Index] = pad
 	end
 	Players.PlayerAdded:Connect(function(player)
-		task.spawn(arrive, player)
+		task.spawn(reserve, player)
 	end)
 	for _, player in Players:GetPlayers() do
-		task.spawn(arrive, player)
+		task.spawn(reserve, player)
 	end
 	Players.PlayerRemoving:Connect(depart)
 	RunService.Heartbeat:Connect(PodServer._step)
 end
 
 -- For tests.
-PodServer._arrive, PodServer._depart = arrive, depart
+PodServer._reserve, PodServer._depart = reserve, depart
 PodServer._podOf, PodServer._taken = podOf, taken
 
 return PodServer

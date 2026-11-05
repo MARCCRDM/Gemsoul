@@ -2268,6 +2268,8 @@ RiftTear.start()
 FrontierHud.start()
 -- The Rift: a vein's gate, the trip through it (Server.RiftServer).
 require(script.Parent.RiftClient).start()
+-- Your pod coming down with you in it, the first time in (Server.PodServer).
+require(script.Parent.PodArrival).start()
 -- (The Shelter's frame: the quarry's, lifted onto its legs.)
 local shelterFrame = Rules.shelterFrame() * CFrame.new(0, Rules.ShelterLift, 0)
 RunService.RenderStepped:Connect(function(dt)

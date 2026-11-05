@@ -1205,7 +1205,9 @@ end
 -- (offline tests hand one in) or the workspace's; returns how many columns
 -- it laid (0 with no terrain to lay them in).
 local RISE_CLEAR, RISE_FULL, ROAD_HALF = 6, 26, 14
-local function biomeTerrain(at: CFrame, Frontier, blocked: { any }, roads: { any }): number
+-- (`clearInside`: studs from the middle left without terrain: the
+-- settlement has a floor of its own, flat under its pads and walkways)
+local function biomeTerrain(at: CFrame, Frontier, blocked: { any }, roads: { any }, clearInside: number?): number
 	local terrain = OutpostWorld.Terrain
 	if not terrain then
 		local ok, found = pcall(function()
@@ -1277,7 +1279,7 @@ local function biomeTerrain(at: CFrame, Frontier, blocked: { any }, roads: { any
 		for k = 1, deep do
 			local x, z = middle(i, k)
 			local out = math.sqrt(x * x + z * z)
-			if out <= reach then
+			if out <= reach and out >= (clearInside or 0) then
 				local name, _, rise = Frontier.ground(x, z)
 				local height = 0
 				if rise > 0.05 then
@@ -3519,8 +3521,13 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		end
 		table.insert(blocked, { vs.Scar.Position, 16 })
 	end
-	if biomeTerrain(at, Frontier, blocked, roadLines) > 0 then
+	-- (Inside the settlement's wall there's no terrain: its own flat floor,
+	-- flush with the pads, walkways and plaza built on it, never over them.)
+	local wallR = OutpostWorld.Rules.Settlement.Wall
+	if biomeTerrain(at, Frontier, blocked, roadLines, wallR - 2) > 0 then
 		floor.Transparency = 1
+		local settled = solid(disc(ground, at * CFrame.new(0, -1, 0), wallR + 3, 2, REGOLITH, Enum.Material.Slate))
+		settled.Name = "SettlementFloor"
 	end
 	root.Parent = parent
 	-- Just past the foot of the Shelter's main ramp, facing out to the

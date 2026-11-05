@@ -944,6 +944,10 @@ local function enter(player: Player)
  end
  character:PivotTo(spawn)
 	player:SetAttribute("Outpost", true)
+	-- The first time in: their pod lands with them inside it (Server.PodServer).
+	if OutpostServer.podArrival then
+		OutpostServer.podArrival(player)
+	end
 	refreshKit(player)
 	socialPrompts(player, true)
 	return reply(true, "Welcome to Saga Outpost.", { State = stateOf(player) })
