@@ -8,6 +8,10 @@
 	                       whatever it's holding the camera at for a moment
 	  ThirdPerson.home()   while it's on: how far back it starts (StartZoom, or
 	                       LobbyZoom on the landing pad)
+	  ThirdPerson.Held     true while something else has the camera for a
+	                       moment (your pod coming down: Client.PodArrival,
+	                       which hands back with .enter once you're out): the
+	                       camera isn't put behind you meanwhile
 
 	Combat's first-person view saves and restores these same settings, so a
 	duel at the Outpost hands back to third person when it ends, back out
@@ -23,6 +27,7 @@ ThirdPerson.StartZoom = 14 -- studs behind the player on arrival
 ThirdPerson.LobbyZoom = 18 -- wider view of the mining field on the landing pad
 ThirdPerson.MinZoom = 6 -- the closest the player can scroll in
 ThirdPerson.MaxZoom = 40
+ThirdPerson.Held = false
 
 local saved: { Mode: Enum.CameraMode, Min: number, Max: number }? = nil
 local RESET_BIND = "SagaArrivalCamera"
@@ -82,6 +87,11 @@ function ThirdPerson.enter(destination: CFrame?)
 	local previous: Vector3? = nil
 	local previousCharacter: Model? = nil
 	RunService:BindToRenderStep(RESET_BIND, Enum.RenderPriority.Camera.Value + 4, function(dt)
+		-- (riding your pod down: you're inside it, and the cinematic has the
+		-- camera; it hands back once you're out)
+		if ThirdPerson.Held or typeof(player:GetAttribute("PodLanding")) == "number" then
+			return
+		end
 		-- (A fight has the camera: an Arena session, or a spar in the lobby
 		-- with the kit out. Pulled back to third person under the spar's
 		-- first-person view, the mouse stayed locked to the middle.)

@@ -1,7 +1,8 @@
 --[[
 	MY POD: your pod and its front yard (Shared.PodStyle; Server.PodServer
 	builds them; the prompt on your pod's door opens it). Every pick shows on
-	your pod straight away and is kept.
+	your pod straight away and is kept. Each piece shows its rarity; the ones
+	you haven't rolled yet (your pod rolls one each time it lands) are locked.
 
 	  Left    HULL (its colour) and GLOW (the beacon, the trim, your name),
 	          then the yard's two spots either side of the stair, LEFT and
@@ -24,14 +25,15 @@ local PodUI = {}
 local player = Players.LocalPlayer
 local P = IronUi.Colors
 local new = IronUi.new
-local W, H = 760, 480
+local W, H = 760, 500
 local LEFT_W = 400
 local CYAN = Color3.fromRGB(110, 220, 255)
 local INK = Color3.fromRGB(10, 13, 20)
 local CARD = Color3.fromRGB(18, 23, 34)
 
 local ui: { [string]: any } = {}
-local state = { Style = PodStyle.default(), Kaiju = {}, Busy = false }
+local state = { Style = PodStyle.default(), Kaiju = {}, Owned = {}, Busy = false }
+local LOCKED = Color3.fromRGB(34, 40, 54)
 
 local draw -- (forward)
 
@@ -60,9 +62,18 @@ local function chip(parent: Instance, text: string, color: Color3, x, y, w, h, o
 	return b
 end
 
+local KIND = { Hull = "Hull", Glow = "Glow", Left = "Decor", Right = "Decor" }
+
 -- Picks one thing (`key` of the style = `value`) and keeps it.
 local function pick(key: string, value: any)
 	if state.Busy then
+		return
+	end
+	local kind = KIND[key]
+	if kind and not PodStyle.owns(state.Owned, kind, value) then
+		local entry = PodStyle.find(kind, value)
+		local rarity = PodStyle.rarity(entry and entry.Rarity or "Common")
+		UiKit.toast(string.format("%s (%s) is locked: your pod rolls a new piece each time it lands.", entry and entry.Name or "That", rarity.Name), rarity.Color)
 		return
 	end
 	local wanted = table.clone(state.Style)
@@ -82,29 +93,57 @@ local function pick(key: string, value: any)
 	end)
 end
 
--- A row of colour swatches (`list`: PodStyle.Hulls or .Glows) for `key`.
+-- A row of colour swatches (`list`: PodStyle.Hulls or .Glows) for `key`,
+-- each with its rarity's colour under it.
 local function swatches(parent: Instance, list, key: string, y: number)
 	local row = {}
-	local size = 44
+	local size = 40
 	for i, entry in list do
-		local b = chip(parent, "", entry.Color, (i - 1) * (size + 10), y, size, size, function()
+		local x = (i - 1) * (size + 9)
+		local b = chip(parent, "", entry.Color, x, y, size, size, function()
 			pick(key, entry.Id)
 		end)
 		local ring = new("UIStroke", { Thickness = 0, Color = Color3.new(1, 1, 1) }, b)
-		row[entry.Id] = ring
+		local strip = new("Frame", {
+			BackgroundColor3 = PodStyle.rarity(entry.Rarity).Color,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(x + 6, y + size + 3),
+			Size = UDim2.fromOffset(size - 12, 3),
+		}, parent)
+		UiKit.round(strip, 2)
+		if entry.Prism then
+			new("UIGradient", {
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 90)),
+					ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 90)),
+					ColorSequenceKeypoint.new(0.66, Color3.fromRGB(90, 220, 255)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 110, 255)),
+				}),
+				Rotation = 45,
+			}, b)
+		end
+		local lock = line(b, "LOCKED", 8, P.Dim, 0, size / 2 - 5, size, 10)
+		lock.TextXAlignment = Enum.TextXAlignment.Center
+		row[entry.Id] = { Ring = ring, Button = b, Lock = lock, Color = entry.Color }
 	end
 	return row
 end
 
--- A grid of decor chips for the yard spot `key` ("Left" or "Right").
+-- A grid of decor chips for the yard spot `key` ("Left" or "Right"), each
+-- edged in its rarity's colour.
 local function decorChips(parent: Instance, key: string, y: number)
 	local row = {}
-	local cols, w, h = 4, 92, 28
+	local cols, w, h = 4, 94, 24
 	for i, entry in PodStyle.Decor do
 		local col, r = (i - 1) % cols, (i - 1) // cols
-		row[entry.Id] = chip(parent, entry.Name, P.Edge, col * (w + 8), y + r * (h + 6), w, h, function()
+		local b = chip(parent, entry.Name, P.Edge, col * (w + 6), y + r * (h + 4), w, h, function()
 			pick(key, entry.Id)
 		end)
+		b.TextScaled = true
+		new("UITextSizeConstraint", { MaxTextSize = 11 }, b)
+		new("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4) }, b)
+		new("UIStroke", { Thickness = 1, Color = PodStyle.rarity(entry.Rarity).Color, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, b)
+		row[entry.Id] = b
 	end
 	return row
 end
@@ -128,9 +167,9 @@ local function build()
 	ui.Glow = swatches(body, PodStyle.Glows, "Glow", 112)
 	ui.GlowName = line(body, "", 12, P.Text, 0, 160, LEFT_W, 16)
 	line(body, "YARD · LEFT OF THE STAIR", 12, P.Dim, 0, 186, LEFT_W, 16)
-	ui.Left = decorChips(body, "Left", 206)
-	line(body, "YARD · RIGHT OF THE STAIR", 12, P.Dim, 0, 284, LEFT_W, 16)
-	ui.Right = decorChips(body, "Right", 304)
+	ui.Left = decorChips(body, "Left", 204)
+	line(body, "YARD · RIGHT OF THE STAIR", 12, P.Dim, 0, 294, LEFT_W, 16)
+	ui.Right = decorChips(body, "Right", 312)
 	local rx, rw = LEFT_W + 24, W - 40 - LEFT_W - 24
 	line(body, "SHOWCASE", 12, P.Dim, rx, 0, rw, 16)
 	line(body, "One of your kaiju on the pedestal by your pod.", 11, P.Dim, rx, 18, rw, 16)
@@ -151,27 +190,26 @@ draw = function()
 		return
 	end
 	local style = state.Style
-	for id, ring in ui.Hull do
-		ring.Thickness = if style.Hull == id then 3 else 0
-	end
-	for id, ring in ui.Glow do
-		ring.Thickness = if style.Glow == id then 3 else 0
-	end
-	for _, entry in PodStyle.Hulls do
-		if entry.Id == style.Hull then
-			ui.HullName.Text = entry.Name
+	for _, kind in { "Hull", "Glow" } do
+		for id, swatch in ui[kind] do
+			local owned = PodStyle.owns(state.Owned, kind, id)
+			swatch.Ring.Thickness = if style[kind] == id then 3 else 0
+			swatch.Button.BackgroundColor3 = if owned then swatch.Color else swatch.Color:Lerp(LOCKED, 0.75)
+			swatch.Lock.Visible = not owned
 		end
-	end
-	for _, entry in PodStyle.Glows do
-		if entry.Id == style.Glow then
-			ui.GlowName.Text = entry.Name
-			ui.GlowName.TextColor3 = entry.Color
+		local entry = PodStyle.find(kind, style[kind])
+		local label = if kind == "Hull" then ui.HullName else ui.GlowName
+		if entry then
+			local rarity = PodStyle.rarity(entry.Rarity)
+			label.Text = entry.Name .. "  ·  " .. rarity.Name
+			label.TextColor3 = if kind == "Glow" then entry.Color else rarity.Color
 		end
 	end
 	for _, slot in { "Left", "Right" } do
 		for id, b in ui[slot] do
-			b.BackgroundColor3 = if style[slot] == id then CYAN else P.Edge
-			b.TextColor3 = if style[slot] == id then INK else P.Text
+			local owned = PodStyle.owns(state.Owned, "Decor", id)
+			b.BackgroundColor3 = if style[slot] == id then CYAN elseif owned then P.Edge else LOCKED
+			b.TextColor3 = if style[slot] == id then INK elseif owned then P.Text else P.Dim
 		end
 	end
 	IronUi.clear(ui.List)
@@ -210,6 +248,7 @@ function PodUI.open()
 		if result and result.Ok then
 			state.Style = result.Style or state.Style
 			state.Kaiju = result.Kaiju or {}
+			state.Owned = if type(result.Owned) == "table" then result.Owned else {}
 		end
 		draw()
 	end)

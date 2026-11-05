@@ -161,6 +161,32 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 		local profile = PlayerData.get(player) :: any
 		return profile and profile.Pod
 	end
+	-- The pieces you've rolled (profile.PodOwned: { ["Kind:Id"] = true }).
+	local function ownedOf(player)
+		local profile = PlayerData.get(player) :: any
+		if not profile then
+			return nil
+		end
+		if type(profile.PodOwned) ~= "table" then
+			profile.PodOwned = {}
+		end
+		return profile.PodOwned
+	end
+	PodServer.ownedOf = ownedOf
+	-- The pod roll as it lands: a piece unlocked and put on.
+	PodServer.rollFor = function(player)
+		local owned = ownedOf(player)
+		if not owned then
+			return nil
+		end
+		local profile = PlayerData.get(player) :: any
+		local piece = PodStyle.roll(owned, Random.new())
+		owned[piece.Kind .. ":" .. piece.Id] = true
+		profile.Pod = PodStyle.equip(PodStyle.clean(profile.Pod, function(id)
+			return kaijuOf(player, id) ~= nil
+		end, owned), piece)
+		return piece
+	end
 	Shop.register("PodStyleState", function(player)
 		local profile = PlayerData.get(player) :: any
 		if not profile then
@@ -175,19 +201,30 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 		table.sort(kaiju, function(a, b)
 			return (a.Level or 0) > (b.Level or 0)
 		end)
+		local owned = ownedOf(player)
 		local style = PodStyle.clean(profile.Pod, function(id)
 			return kaijuOf(player, id) ~= nil
-		end)
-		return Shop.reply(true, "", { Style = style, Kaiju = kaiju })
+		end, owned)
+		return Shop.reply(true, "", { Style = style, Kaiju = kaiju, Owned = owned })
 	end)
 	Shop.register("PodStyle", function(player, wanted)
 		local profile = PlayerData.get(player) :: any
 		if not profile then
 			return Shop.reply(false, "Your pod's not ready yet.")
 		end
+		local owned = ownedOf(player)
+		if type(wanted) == "table" then
+			for kind, slots in { Hull = { "Hull" }, Glow = { "Glow" }, Decor = { "Left", "Right" } } do
+				for _, slot in slots do
+					if PodStyle.find(kind, wanted[slot]) and not PodStyle.owns(owned, kind, wanted[slot]) then
+						return Shop.reply(false, "Locked: your pod rolls new pieces each time it lands.")
+					end
+				end
+			end
+		end
 		profile.Pod = PodStyle.clean(wanted, function(id)
 			return kaijuOf(player, id) ~= nil
-		end)
+		end, owned)
 		PodServer.restyle(player)
 		return Shop.reply(true, "", { Style = profile.Pod })
 	end)

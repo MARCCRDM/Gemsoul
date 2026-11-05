@@ -105,6 +105,48 @@ do
 	check(PodStyle.clean({ Showcase = "k1" }, function(id) return id == "k1" end).Showcase == "k1", "Their own kaiju wasn't kept for the showcase")
 	check(PodStyle.clean(nil).Hull == d.Hull and PodStyle.clean("junk").Glow == d.Glow, "No style isn't the default")
 	check(PodStyle.hull({ Hull = "Crimson" }) ~= PodStyle.hull(d) and PodStyle.glow({ Glow = "Ember" }) ~= PodStyle.glow(d), "Colours don't follow the style")
+	-- Ownership: what's free from the start, and only what you've rolled.
+	for kind, ids in { Hull = { d.Hull }, Glow = { d.Glow }, Decor = { d.Left, d.Right } } do
+		for _, id in ids do
+			check(PodStyle.owns({}, kind, id), "The default style isn't free: " .. kind .. " " .. id)
+		end
+	end
+	local mine = PodStyle.clean({ Hull = "Gilded", Glow = "Gold", Left = "Spire", Right = "Crates" }, nil, { ["Glow:Gold"] = true })
+	check(mine.Hull == d.Hull and mine.Glow == "Gold" and mine.Left == d.Left and mine.Right == "Crates", "A style kept a piece they haven't rolled")
+	check(PodStyle.hullMaterial({ Hull = "Chrome" }) == "Metal" and PodStyle.hullMaterial(d) == "SmoothPlastic", "No metal hulls")
+	-- Every rarity has pieces, every piece a real rarity.
+	local per = {}
+	for _, list in { PodStyle.Hulls, PodStyle.Glows, PodStyle.Decor } do
+		for _, entry in list do
+			check(PodStyle.rarity(entry.Rarity).Id == entry.Rarity, "A piece with no rarity: " .. entry.Id)
+			per[entry.Rarity] = (per[entry.Rarity] or 0) + 1
+		end
+	end
+	for _, r in PodStyle.Rarities do
+		check((per[r.Id] or 0) > 0, "No " .. r.Id .. " pieces")
+	end
+	-- The roll: commoner pieces more often, something new while there's
+	-- something new to get, never "nothing".
+	local rng = Rand.new(11)
+	local counts, owned, news = {}, {}, 0
+	for _ = 1, 400 do
+		local piece = PodStyle.roll(owned, rng)
+		check(PodStyle.find(piece.Kind, piece.Id) and piece.Id ~= "None", "Rolled something that isn't a piece")
+		check(PodStyle.find(piece.Kind, piece.Id).Rarity == piece.Rarity, "Rolled a piece with the wrong rarity")
+		check(piece.New == not PodStyle.owns(owned, piece.Kind, piece.Id), "A roll says new when it isn't (or not when it is)")
+		if piece.New then
+			news += 1
+		end
+		owned[piece.Kind .. ":" .. piece.Id] = true
+		counts[piece.Rarity] = (counts[piece.Rarity] or 0) + 1
+	end
+	check((counts.Common or 0) > (counts.Rare or 0) and (counts.Rare or 0) > (counts.Legendary or 0), "Rarer pieces come up as often as common ones")
+	check(news >= 15, "The roll keeps giving pieces you have")
+	local worn = PodStyle.equip(d, { Kind = "Glow", Id = "Prism" })
+	check(worn.Glow == "Prism" and worn.Hull == d.Hull and d.Glow ~= "Prism", "Equipping a roll changed the wrong thing")
+	check(PodStyle.equip(d, { Kind = "Decor", Id = "Statue" }).Left == "Statue", "A rolled decor isn't put out")
+	-- The flicks on the way down: quick, then slower to the pad.
+	check(Pods.flickAfter(-Pods.Landing.Lead) < Pods.flickAfter(Pods.Landing.Fall * 0.9), "The roll doesn't slow as it lands")
 end
 
 -- The rules ----------------------------------------------------------------------------------
@@ -356,8 +398,20 @@ check(type(index) == "number" and index ~= early:GetAttribute("PodIndex"), "Two 
 check(Server.spawnFor(ana) == Pods.spawnAt(pads[index].CFrame), "No spawn at the pod's stair")
 check(podModel(ana) == nil, "A pod landed before they came into the Outpost")
 
--- In the Outpost: it lands with them inside, up overhead until the descent starts.
+-- In the Outpost: it lands with them inside, up overhead until the descent starts,
+-- rolling a piece (Main's hook) and wearing it.
+local rolled = { Kind = "Hull", Id = "Chrome", Rarity = "Epic", Name = "CHROME", New = true }
+Server.rollFor = function(p)
+	return if p == ana then rolled else nil
+end
+Server.styleOf = function(p)
+	return if p == ana then { Hull = "Chrome" } else nil
+end
+Server.ownedOf = function(p)
+	return if p == ana then { ["Hull:Chrome"] = true } else nil
+end
 check(Server.land(ana) == true, "The pod didn't come down")
+check(ana:GetAttribute("PodRoll") == "Hull|Chrome|Epic|1", "The client isn't told what the pod rolled")
 check(Server.land(ana) == false, "The pod came down twice")
 check(math.abs(ana:GetAttribute("PodLanding") - (now + L.Lead)) < 1e-6, "No time for the client's cinematic")
 local pod = podModel(ana)
@@ -367,8 +421,7 @@ local plate = pod.PrimaryPart:FindFirstChild("Nameplate")
 check(plate and plate:FindFirstChildOfClass("TextLabel").Text == "Ana", "No nameplate with their name")
 local beacon = pod:FindFirstChild("Beacon")
 check(beacon and beacon.Color == PodStyle.glow(PodStyle.default()) and beacon:FindFirstChildOfClass("PointLight"), "No beacon in their glow")
-local doorPrompt = pod:FindFirstChild("Door") and pod.Door:FindFirstChild("PodPrompt")
-check(doorPrompt and doorPrompt:GetAttribute("PromptKind") == "Pod" and doorPrompt:GetAttribute("OwnerId") == ana.UserId, "No MY POD prompt on the door")
+check(pod:FindFirstChild("Door") and pod.Door:FindFirstChild("PodPrompt") == nil, "MY POD's prompt is up before they've got out")
 check(hullHeight(ana) > L.Height * 0.99, "The pod doesn't start up in the sky")
 check(pod.Thruster.Transparency < 1, "No thrusters on the way down")
 local function inside()
@@ -383,7 +436,17 @@ local leaves = firstNamed(pod, "DoorLeaf")
 check(#leaves == 2 and math.abs(local_(ana, leaves[1]).X) < 1.3, "The doors are open in flight")
 local wings = firstNamed(pod, "Wing")
 check(#wings == 2 and math.abs(local_(ana, wings[1]).X) < Pods.Width / 2, "The wings are out in flight")
-advance(L.Lead * 0.9)
+-- (the roll: the hull flicks through the catalogue on the way down)
+local looks, lastLook = 0, nil
+for _ = 1, math.floor(L.Lead * 0.9 * 30) do
+	advance(1 / 30)
+	local look = tostring(pod.Hull.Color) .. tostring(pod.Beacon.Color)
+	if look ~= lastLook then
+		looks += 1
+		lastLook = look
+	end
+end
+check(looks >= 6, "The pod doesn't flick through looks on the way down")
 check(hullHeight(ana) > L.Height * 0.99, "It came down before the cinematic's start")
 advance(L.Lead * 0.1 + L.Fall / 2)
 local h1 = hullHeight(ana)
@@ -395,6 +458,11 @@ check(#legs == 4, "No landing legs")
 advance(L.Fall / 2 + 0.05)
 check(math.abs(hullHeight(ana) - REST) < 0.01, "The pod didn't land on its pad")
 check(pod.Thruster.Transparency == 1, "The thrusters are still lit on the pad")
+check(pod.Hull.Color == PodStyle.hull({ Hull = "Chrome" }) and pod.Hull.Material == R.Enum.Material.Metal, "The roll didn't settle on what it rolled")
+check(pod.Beacon.Color == PodStyle.glow(PodStyle.default()), "The glow didn't settle on theirs")
+Server.rollFor = function() return nil end
+Server.styleOf = function() return nil end
+Server.ownedOf = function() return nil end
 check(math.abs(local_(ana, legs[1]).Y - legs[1].Size.Y / 2) < 0.1, "The legs didn't come down onto the pad")
 local stall = pads[index].Model:FindFirstChild("Display")
 check(stall and stall.Counter and local_(ana, stall.Counter).Y < 0, "No stall waiting under the pad")
@@ -410,6 +478,8 @@ check(local_(ana, ramp).Z < -Pods.Hull - 0.5, "The stair didn't fold out")
 check(ramp.CanCollide and pod.PrimaryPart.CanCollide, "You can walk through the pod or fall through its stair")
 check(local_(ana, stall.Counter).Y > 0, "The stall didn't rise")
 check(ana:GetAttribute("PodLanding") == nil and not anaRoot.Anchored, "The rider wasn't let out")
+local doorPrompt = pod.Door:FindFirstChild("PodPrompt")
+check(doorPrompt and doorPrompt:GetAttribute("PromptKind") == "Pod" and doorPrompt:GetAttribute("OwnerId") == ana.UserId, "No MY POD prompt on the door once they're out")
 local out = local_(ana, anaRoot)
 check(out.Z < -Pods.Hull and out.Z > -(Pods.Hull + Pods.Ramp) and out.Y > Pods.Base, "Not let out at the top of the stair")
 check(moved.Ana and (moved.Ana - Server.spawnFor(ana).Position).Magnitude < 0.01, "Not walked down to the foot of the stair")
@@ -502,6 +572,51 @@ Server._reserve(ghost)
 check(ghost:GetAttribute("PodIndex") == nil, "A pad for someone who'd already left")
 
 -- The cinematic's camera (Client.PodArrival): looking up at it coming down, then round to the doors.
+-- The camera handed back behind you (Client.ThirdPerson.clearEye), with
+-- the pod's box (wings out) the only thing in the way.
+local K = Pods.Scale
+local podBox = { X = Pods.Width / 2 + 3 * K, Y = Pods.Base + 9 * K, Z = Pods.Hull + 0.3 }
+local function hitsPod(from, to) -- (pad-local points: does the line cross the pod?)
+	local t0, t1 = 0, 1
+	for _, axis in { "X", "Y", "Z" } do
+		local lo, hi = if axis == "Y" then 0 else -podBox[axis], podBox[axis]
+		local a, d = from[axis], to[axis] - from[axis]
+		if math.abs(d) < 1e-9 then
+			if a < lo or a > hi then
+				return false
+			end
+		else
+			local u, v = (lo - a) / d, (hi - a) / d
+			if u > v then
+				u, v = v, u
+			end
+			t0, t1 = math.max(t0, u), math.min(t1, v)
+			if t0 > t1 then
+				return false
+			end
+		end
+	end
+	return true
+end
+local padCF = pads[1].CFrame
+local ThirdPerson = luau.load(fs.readFile(ROOT .. "/src/client/Modules/ThirdPerson.luau"), {
+	debugName = "ThirdPerson",
+	environment = setmetatable({
+		game = { GetService = function(_, name)
+			return ({ Players = { LocalPlayer = { CharacterAdded = signal() } }, RunService = {} })[name]
+		end },
+		RaycastParams = { new = function() return {} end },
+		workspace = {
+			Raycast = function(_, origin, direction)
+				local a, b = padCF:PointToObjectSpace(origin), padCF:PointToObjectSpace(origin + direction)
+				return if hitsPod(a, b) then {} else nil
+			end,
+		},
+		CFrame = FixedCFrame,
+		Vector3 = R.Vector3,
+		Enum = R.Enum,
+	}, { __index = _G }),
+})()
 local Arrival = luau.load(fs.readFile(ROOT .. "/src/client/Modules/PodArrival.luau"), {
 	debugName = "PodArrival",
 	environment = setmetatable({
@@ -510,12 +625,12 @@ local Arrival = luau.load(fs.readFile(ROOT .. "/src/client/Modules/PodArrival.lu
 		end },
 		CFrame = FixedCFrame,
 		Vector3 = R.Vector3,
+		script = { Parent = { ThirdPerson = "ThirdPerson" } },
 		require = function(m)
-			return ({ Pods = Pods, PodStyle = PodStyle })[m]
+			return ({ Pods = Pods, PodStyle = PodStyle, ThirdPerson = ThirdPerson })[m]
 		end,
 	}, { __index = _G }),
 })()
-local padCF = pads[1].CFrame
 local function shotLook(t)
 	local eye, focus = Arrival.shot(t, padCF)
 	return eye, focus
@@ -527,14 +642,23 @@ local e1, f1 = shotLook(L.Fall + L.Deploy)
 local doors = (padCF * R.CFrame.new(0, 4, 0)).Position
 check((f1 - doors).Magnitude < 0.5, "The camera doesn't end on the doors")
 check(padCF:PointToObjectSpace(e1.Position).Z < -10, "The camera doesn't end in front of the doors")
--- Handing back: never inside the pod or its stall, and the look runs past you to the field.
-local hand = padCF:PointToObjectSpace(Arrival.endEye(padCF))
-check(math.abs(hand.X) > Pods.Width / 2 + 2 or hand.Z < -(Pods.Hull + Pods.Ramp + 1), "The camera hands back inside the pod")
-check(hand.X < 0, "The camera hands back over the display stall")
-local foot = padCF:PointToObjectSpace(Pods.spawnAt(padCF).Position)
-check(foot.Z < hand.Z, "The camera hands back looking at the pod, not past you to the field")
--- (and the line from you to it clears the pod's front)
-local t = (-(Pods.Width / 2) - foot.X) / (hand.X - foot.X)
-check(foot.Z + (hand.Z - foot.Z) * t < -Pods.Hull - 0.6, "The pod's corner is between you and the camera")
+-- Handing back: behind you, the pod never in the way, wherever you are on the
+-- walk down from its doors to your spot.
+local spawnCF = Pods.spawnAt(padCF)
+local forward = R.Vector3.new(spawnCF.LookVector.X, 0, spawnCF.LookVector.Z).Unit
+local foot = padCF:PointToObjectSpace(spawnCF.Position)
+for _, z in { -(Pods.Hull + 1), -(Pods.Hull + Pods.Ramp), -(Pods.Hull + Pods.Ramp + 8), foot.Z } do
+	local focus = padCF * R.CFrame.new(0, 5, z)
+	local eye = ThirdPerson.clearEye(focus.Position, forward, ThirdPerson.LobbyZoom, 8, nil)
+	local a, b = padCF:PointToObjectSpace(focus.Position), padCF:PointToObjectSpace(eye)
+	check(not hitsPod(a, b), "The pod's between you and the camera, " .. math.floor(-z) .. " studs out")
+	check(math.abs((eye - focus.Position).Magnitude - math.sqrt(ThirdPerson.LobbyZoom ^ 2 + 64)) < 0.1, "The camera isn't at its zoom")
+end
+local hand = padCF:PointToObjectSpace(ThirdPerson.clearEye((padCF * R.CFrame.new(0, 5, foot.Z)).Position, forward, ThirdPerson.LobbyZoom, 8, nil))
+check(hand.Z > foot.Z and math.abs(hand.X) < 1, "At your spot the camera isn't straight behind you, looking out to the field")
+-- The roll's card reads what the pod rolled.
+local read = Arrival.parseRoll("Glow|Prism|Legendary|1")
+check(read and read.Name == "PRISM" and read.New == true and read.Rarity == "Legendary", "The roll card can't read the roll")
+check(Arrival.parseRoll("Glow|Plaid|Common|0") == nil and Arrival.parseRoll(nil) == nil, "The roll card reads a roll that isn't one")
 
 print("PASS: " .. checks .. " pod checks (pads kept on joining, landing with you inside, touchdown, deploying, out down the stair, the cinematic's shots, failsafe, lift-off)")

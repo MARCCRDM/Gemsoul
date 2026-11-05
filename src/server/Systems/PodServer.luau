@@ -21,9 +21,17 @@
 	  PodServer.restyle(player)   their pod and yard again, in their style now
 
 	Its style (Shared.PodStyle: the hull's colour, its glow, the showcase's
-	kaiju, the yard's decor) comes from PodServer.styleOf(player) and the
-	showcase's kaiju from PodServer.kaijuOf(player, id) (Main: the profile);
-	MY POD (Client.PodUI) opens from a prompt on its door, its owner's only.
+	kaiju, the yard's decor) comes from PodServer.styleOf(player), the pieces
+	they own from PodServer.ownedOf(player) and the showcase's kaiju from
+	PodServer.kaijuOf(player, id) (Main: the profile). MY POD (Client.PodUI)
+	opens from a prompt on its door, its owner's only, once they've walked
+	out of it.
+
+	The pod roll: as it lands, PodServer.rollFor(player) (Main) rolls a piece
+	(PodStyle.roll), unlocks it and puts it on; on the way down the hull and
+	glow flick through the catalogue, slower and slower, and settle on it at
+	touchdown. The player's PodRoll attribute says what it was
+	("Kind|Id|Rarity|New": Client.PodArrival shows it).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,10 +47,16 @@ end
 PodServer.kaijuOf = function(_player: Player, _id: string): any
 	return nil
 end
+PodServer.ownedOf = function(_player: Player): any
+	return nil -- (nil: nothing's checked)
+end
+PodServer.rollFor = function(_player: Player): any
+	return nil -- (the piece rolled: { Kind, Id, Rarity, Name, New })
+end
 local function styleFor(player: Player)
 	return PodStyle.clean(PodServer.styleOf(player), function(id)
 		return PodServer.kaijuOf(player, id) ~= nil
-	end)
+	end, PodServer.ownedOf(player))
 end
 
 local STEEL = Color3.fromRGB(128, 134, 146)
@@ -90,6 +104,37 @@ local function part(parent, cframe: CFrame, size: Vector3, color: Color3, materi
 end
 local UP = CFrame.Angles(0, 0, math.rad(90)) -- (a cylinder standing up)
 
+-- Its style on the pod `model` (and its yard `stall`): the hull's colour
+-- and material, the glow on the beacon, trim, name and yard lights. A Prism
+-- glow is white here; each client runs it round the rainbow (Client.
+-- PodShowcase).
+local function paint(model: Instance?, style)
+	if not model then
+		return
+	end
+	local hull, glow = PodStyle.hull(style), PodStyle.glow(style)
+	local material = Enum.Material[PodStyle.hullMaterial(style)] or Enum.Material.SmoothPlastic
+	local entry = PodStyle.find("Glow", style and style.Glow)
+	model:SetAttribute("Prism", if entry and entry.Prism then true else nil)
+	for _, p in model:GetDescendants() do
+		if p:IsA("BasePart") then
+			local kind = p:GetAttribute("Paint")
+			if kind == "Hull" then
+				p.Color, p.Material = hull, material
+			elseif kind == "Glow" then
+				p.Color = glow
+				local light = p:FindFirstChildOfClass("PointLight")
+				if light then
+					light.Color = glow
+				end
+			end
+		elseif p:IsA("TextLabel") and p.Parent and p.Parent.Name == "Nameplate" then
+			p.TextColor3 = glow:Lerp(Color3.new(1, 1, 1), 0.55)
+		end
+	end
+end
+PodServer.paint = paint
+
 -- The pod, built standing on `pad` (its door toward the Heart): a white
 -- habitat module with a rounded roof, warm-lit double doors and windows,
 -- an antenna with a beacon in the owner's colour, a stair down to the pad
@@ -104,7 +149,7 @@ local function build(player: Player, pad): (Model, { any })
 	local f = pad.CFrame
 	local style = styleFor(player)
 	local color = PodStyle.glow(style)
-	local hullColor = PodStyle.hull(style)
+	local hullColor = WHITE -- (painted in its style once built: `paint`)
 	-- (drawn at Pods.Scale: these are the sizes before it)
 	local K = Pods.Scale
 	local function F(x, y, z)
@@ -261,17 +306,6 @@ local function build(player: Player, pad): (Model, { any })
 			end
 		end
 	end
-	-- MY POD, on its door (its owner's: the client hides it from the rest)
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.Name = "PodPrompt"
-	prompt.ActionText, prompt.ObjectText = "Customize", "MY POD"
-	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = 14
-	prompt.RequiresLineOfSight = false
-	prompt:SetAttribute("PromptKind", "Pod")
-	prompt:SetAttribute("OwnerId", player.UserId)
-	prompt.Parent = door
 	-- (its body solid to the camera: Roblox's pulls in in front of it, never
 	-- through it)
 	for _, p in model:GetChildren() do
@@ -280,8 +314,28 @@ local function build(player: Player, pad): (Model, { any })
 		end
 	end
 	model:SetAttribute("OwnerId", player.UserId)
+	paint(model, style)
 	model.Parent = pad.Model
 	return model, moves
+end
+
+-- MY POD, on its door (its owner's: the client hides it from the rest),
+-- once it's open and they've walked out of it.
+local function prompt(model: Model, owner: Player)
+	local door = model:FindFirstChild("Door")
+	if not door or door:FindFirstChild("PodPrompt") then
+		return
+	end
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "PodPrompt"
+	p.ActionText, p.ObjectText = "Customize", "MY POD"
+	p.KeyboardKeyCode = Enum.KeyCode.E
+	p.HoldDuration = 0
+	p.MaxActivationDistance = 14
+	p.RequiresLineOfSight = false
+	p:SetAttribute("PromptKind", "Pod")
+	p:SetAttribute("OwnerId", owner.UserId)
+	p.Parent = door
 end
 
 -- The display stall beside the pod, once it's down: posts, an awning lit
@@ -329,6 +383,36 @@ function DECOR.Scope(m, at: CFrame, _glow: Color3)
 	end
 	part(m, at * CFrame.new(0, 2.8, 0) * CFrame.Angles(math.rad(35), 0, 0) * CFrame.Angles(0, math.rad(90), 0) * UP * CFrame.Angles(0, 0, math.rad(-90)),
 		Vector3.new(2.6, 0.6, 0.6), STEEL, Enum.Material.Metal, "Cylinder")
+end
+
+function DECOR.Spire(m, at: CFrame, glow: Color3)
+	part(m, at * CFrame.new(0, 0.4, 0), Vector3.new(2.4, 0.8, 2.4), DARK, Enum.Material.Metal)
+	-- (a tall crystal and two small ones leaning off it, lit from inside)
+	local core = part(m, at * CFrame.new(0, 3.4, 0) * CFrame.Angles(0, math.rad(45), 0), Vector3.new(0.9, 5.2, 0.9), glow, Enum.Material.Neon)
+	part(m, at * CFrame.new(0, 6.3, 0) * CFrame.Angles(0, math.rad(45), 0) * CFrame.Angles(math.rad(45), 0, 0), Vector3.new(0.64, 0.64, 0.64), glow, Enum.Material.Neon)
+	for _, spec in { { -0.75, 1.9, 0.35 }, { 0.8, 1.5, -0.4 } } do
+		part(m, at * CFrame.new(spec[1], 0.8 + spec[2] / 2, 0) * CFrame.Angles(0, 0.6, spec[3]), Vector3.new(0.5, spec[2], 0.5), glow, Enum.Material.Glass)
+	end
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness = glow, 14, 1.1
+	light.Parent = core
+end
+local GOLD = Color3.fromRGB(255, 196, 72)
+function DECOR.Statue(m, at: CFrame, glow: Color3)
+	-- a golden kaiju rearing up on a plinth, its eyes in the pod's glow
+	part(m, at * CFrame.new(0, 0.5, 0), Vector3.new(2.6, 1, 2.2), DARK, Enum.Material.Metal)
+	part(m, at * CFrame.new(0, 1.05, 0), Vector3.new(2.8, 0.1, 2.4), GOLD, Enum.Material.Metal)
+	local body = at * CFrame.new(0, 2.6, 0.2) * CFrame.Angles(math.rad(-18), 0, 0)
+	part(m, body, Vector3.new(1.5, 2.4, 1.3), GOLD, Enum.Material.Metal)
+	part(m, body * CFrame.new(0, 1.6, -0.35), Vector3.new(1.2, 1, 1.4), GOLD, Enum.Material.Metal) -- head
+	part(m, body * CFrame.new(0, 1.4, -1.2), Vector3.new(0.8, 0.5, 0.7), GOLD, Enum.Material.Metal) -- snout
+	for _, side in { -1, 1 } do
+		part(m, body * CFrame.new(side * 0.35, 1.8, -1.06), Vector3.new(0.2, 0.2, 0.08), glow, Enum.Material.Neon) -- eye
+		part(m, body * CFrame.new(side * 0.4, 2.3, -0.1) * CFrame.Angles(math.rad(-30), 0, side * 0.3), Vector3.new(0.22, 0.8, 0.22), GOLD, Enum.Material.Metal) -- horn
+		part(m, at * CFrame.new(side * 0.55, 1.6, 0.4), Vector3.new(0.55, 1.1, 0.7), GOLD, Enum.Material.Metal) -- leg
+		part(m, body * CFrame.new(side * 0.95, 0.4, -0.5) * CFrame.Angles(math.rad(-50), 0, side * 0.4), Vector3.new(0.35, 1.2, 0.35), GOLD, Enum.Material.Metal) -- claw
+	end
+	part(m, at * CFrame.new(0, 1.6, 1.4) * CFrame.Angles(math.rad(60), 0, 0), Vector3.new(0.5, 1.8, 0.5), GOLD, Enum.Material.Metal) -- tail
 end
 
 local function display(pad, style): Model
@@ -384,6 +468,14 @@ local function display(pad, style): Model
 			piece.Parent = stall
 		end
 	end
+	-- (what its glow colours: Client.PodShowcase runs a Prism glow round)
+	for _, p in stall:GetDescendants() do
+		if p:IsA("BasePart") and p.Color == glow and p.Material == Enum.Material.Neon then
+			p:SetAttribute("Paint", "Glow")
+		end
+	end
+	local entry = PodStyle.find("Glow", style.Glow)
+	stall:SetAttribute("Prism", if entry and entry.Prism then true else nil)
 	stall.Parent = pad.Model
 	return stall
 end
@@ -527,6 +619,8 @@ end
 
 -- Down on the pad: dust, the stall waiting under it, then it deploys.
 local function touchdown(entry)
+	entry.Flip = nil
+	paint(entry.Model, entry.Style) -- (the roll settles)
 	setHeight(entry, 0)
 	pose(entry, "Legs", 1, 0)
 	thruster(entry.Model, false)
@@ -555,6 +649,26 @@ local function deployed(entry)
 	end
 	entry.Model:SetAttribute("Landed", true)
 	release(entry)
+	if entry.Owner and entry.Owner.Parent then
+		prompt(entry.Model, entry.Owner)
+	end
+end
+
+-- The roll on the way down: a random hull and glow from the catalogue, the
+-- next sooner at first and slower as it nears the pad (Pods.flickAfter).
+local function shuffle(entry)
+	local hulls, glows = PodStyle.Hulls, PodStyle.Glows
+	local look = {
+		Hull = hulls[rng:NextInteger(1, #hulls)].Id,
+		Glow = glows[rng:NextInteger(1, #glows)].Id,
+	}
+	-- (never what it'll land as: the settle reads as a change)
+	if look.Hull == entry.Style.Hull and look.Glow == entry.Style.Glow then
+		look.Hull = hulls[(table.find(hulls, PodStyle.find("Hull", look.Hull)) or 0) % #hulls + 1].Id
+	end
+	paint(entry.Model, look)
+	local next = entry.T + Pods.flickAfter(entry.T)
+	entry.Flip = if next < Pods.Landing.Fall - 0.15 then next else nil
 end
 
 -- One step of everything on the move (RunService.Heartbeat).
@@ -572,6 +686,9 @@ function PodServer._step(dt: number)
 			else
 				local height = if entry.T < 0 then landing.Height else Pods.altitude(entry.T)
 				setHeight(entry, height)
+				if entry.Flip and entry.T >= entry.Flip then
+					shuffle(entry)
+				end
 				pose(entry, "Legs", (entry.T - (landing.Fall - 1.1)) / 1, height)
 				pose(entry, "Deploy", 0, height)
 				carry(entry, height)
@@ -649,6 +766,11 @@ function PodServer.land(player: Player): boolean
 		return false
 	end
 	local landing = Pods.Landing
+	-- (the roll: a piece unlocked and on, before it's built in that style)
+	local ok, piece = pcall(PodServer.rollFor, player)
+	if ok and type(piece) == "table" then
+		player:SetAttribute("PodRoll", string.format("%s|%s|%s|%s", piece.Kind, piece.Id, piece.Rarity, if piece.New then "1" else "0"))
+	end
 	local model, moves = build(player, pod.Pad)
 	local rest = model:GetPivot()
 	for _, move in moves do
@@ -670,6 +792,7 @@ function PodServer.land(player: Player): boolean
 		Rider = player,
 		Owner = player,
 		Style = styleFor(player),
+		Flip = -landing.Lead,
 	}
 	pod.Model, pod.Entry = model, entry
 	setHeight(entry, landing.Height)
@@ -740,22 +863,8 @@ function PodServer.restyle(player: Player)
 	local entry = pod.Entry
 	local style = styleFor(player)
 	entry.Style = style
-	local hull, glow = PodStyle.hull(style), PodStyle.glow(style)
-	for _, p in pod.Model:GetDescendants() do
-		if p:IsA("BasePart") then
-			local paint = p:GetAttribute("Paint")
-			if paint == "Hull" then
-				p.Color = hull
-			elseif paint == "Glow" then
-				p.Color = glow
-				local light = p:FindFirstChildOfClass("PointLight")
-				if light then
-					light.Color = glow
-				end
-			end
-		elseif p:IsA("TextLabel") then
-			p.TextColor3 = glow:Lerp(Color3.new(1, 1, 1), 0.55)
-		end
+	if not entry.Flip then
+		paint(pod.Model, style) -- (still rolling on the way down: it settles on this)
 	end
 	if entry.Display and pod.Model:GetAttribute("Landed") then
 		entry.Display:Destroy()

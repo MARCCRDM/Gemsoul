@@ -12,6 +12,7 @@
 	  Pods.spawnAt(pad: CFrame) -> CFrame   the foot of the ramp, facing the Heart
 	  Pods.colorFor(userId) -> Color3        the beacon's colour (always the same)
 	  Pods.altitude(t) / Pods.lift(t)       the landing and lift-off, height over the pad
+	  Pods.flickAfter(t) -> seconds          the roll's next flick on the way down
 ]]
 local Pods = {}
 
@@ -116,6 +117,17 @@ end
 -- The pad again from where you come in (Pods.spawnAt, backwards).
 function Pods.padFrom(spawn: CFrame): CFrame
 	return spawn * CFrame.new(0, -3, Pods.Hull + Pods.Ramp + 2 + Pods.SpawnOut)
+end
+
+-- The pod roll on the way down (Server.PodServer flicks the pod's paint,
+-- Client.PodArrival its card): seconds to the next flick `t` seconds into
+-- the descent (negative while it waits overhead), quick at first, slower
+-- and slower as it nears the pad, settling at touchdown.
+Pods.Flick = { First = 0.09, Last = 0.5 }
+function Pods.flickAfter(t: number): number
+	local landing = Pods.Landing
+	local k = math.clamp((t + landing.Lead) / (landing.Lead + landing.Fall), 0, 1)
+	return Pods.Flick.First + (Pods.Flick.Last - Pods.Flick.First) * k * k
 end
 
 local function smooth(x: number): number

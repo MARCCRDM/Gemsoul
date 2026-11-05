@@ -6,21 +6,32 @@
 	the display stall), and back behind you as you walk down the steps.
 	Letterboxed, the pad's number under it.
 
+	The pod roll: a card over the shot flicks through pod pieces (Shared.
+	PodStyle), slower and slower in step with the pod's paint (Shared.Pods.
+	flickAfter), and on touchdown shows what it landed on (the PodRoll
+	attribute: "Kind|Id|Rarity|New"), its rarity's colour round it.
+
+	The camera's handed back behind you, clear of the pod (Client.ThirdPerson
+	.clearEye), and ThirdPerson keeps off it while this has it (.Held).
+
 	Timed off the PodLanding attribute: the server time the descent starts
 	(the pod waits overhead until then). Everyone else just sees it land.
 
 	  PodArrival.start()   once, on the client (Client.OutpostScene)
 	  PodArrival.shot(t, pad) -> (eye: CFrame, focus: Vector3)   the camera
 	                       `t` seconds into the descent, on the pad `pad`
+	  PodArrival.parseRoll(text) -> { Kind, Id, Rarity, New, Name }?
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Pods = require(ReplicatedStorage.Shared.Pods)
+local PodStyle = require(ReplicatedStorage.Shared.PodStyle)
+local ThirdPerson = require(script.Parent.ThirdPerson)
 
 local PodArrival = {}
-PodArrival.Out = 1.4 -- seconds behind you walking down before the camera's yours
+PodArrival.Out = 1.6 -- seconds behind you walking down before the camera's yours
 local BIND = "PodArrival"
 
 local player = Players.LocalPlayer
@@ -62,11 +73,104 @@ function PodArrival.shot(t: number, pad: CFrame): (CFrame, Vector3)
 	return CFrame.lookAt(eye, focus), focus
 end
 
--- Where the camera hands back to you: up behind your shoulder, out past
--- the pod's end (not its stall's), so the view runs past you to the field
--- and the pod's never in the way.
-function PodArrival.endEye(pad: CFrame): Vector3
-	return (pad * CFrame.new(-14, 10, -3)).Position
+local KINDS = { Hull = "HULL", Glow = "GLOW", Decor = "YARD DECOR" }
+
+-- The PodRoll attribute, read: nil if it isn't one.
+function PodArrival.parseRoll(text: any)
+	if type(text) ~= "string" then
+		return nil
+	end
+	local kind, id, rarity, new = string.match(text, "^(%a+)|([%w_]+)|(%a+)|([01])$")
+	local entry = kind and PodStyle.find(kind, id)
+	if not entry then
+		return nil
+	end
+	return { Kind = kind, Id = id, Rarity = rarity, New = new == "1", Name = entry.Name }
+end
+
+-- Every piece the roll can land on (for the flicks).
+local function catalogue()
+	local all = {}
+	for _, kind in { "Hull", "Glow", "Decor" } do
+		for _, entry in (if kind == "Hull" then PodStyle.Hulls elseif kind == "Glow" then PodStyle.Glows else PodStyle.Decor) do
+			if entry.Id ~= "None" then
+				table.insert(all, { Kind = kind, Name = entry.Name, Rarity = entry.Rarity })
+			end
+		end
+	end
+	return all
+end
+
+-- The roll's card, under the top bar. Returns show(piece, final), pop()
+-- and the card.
+local function rollCard(gui: ScreenGui)
+	local card = Instance.new("Frame")
+	card.Name = "PodRoll"
+	card.AnchorPoint = Vector2.new(0.5, 0)
+	card.Position = UDim2.new(0.5, 0, 0.11, 16)
+	card.Size = UDim2.fromOffset(320, 86)
+	card.BackgroundColor3 = Color3.fromRGB(12, 16, 26)
+	card.BackgroundTransparency = 0.15
+	card.ZIndex = 3
+	card.Parent = gui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = card
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 2
+	stroke.Parent = card
+	local scale = Instance.new("UIScale")
+	scale.Parent = card
+	local function text(y: number, h: number, size: number, font: Enum.Font): TextLabel
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Position = UDim2.fromOffset(12, y)
+		label.Size = UDim2.new(1, -24, 0, h)
+		label.Font = font
+		label.TextSize = size
+		label.TextColor3 = Color3.fromRGB(230, 236, 245)
+		label.TextXAlignment = Enum.TextXAlignment.Center
+		label.ZIndex = 4
+		label.Parent = card
+		return label
+	end
+	local head = text(8, 14, 12, Enum.Font.GothamBold)
+	head.Text = "POD ROLL"
+	head.TextColor3 = Color3.fromRGB(150, 160, 178)
+	local name = text(24, 30, 26, Enum.Font.GothamBlack)
+	local sub = text(58, 18, 14, Enum.Font.GothamBold)
+	local tag = Instance.new("TextLabel")
+	tag.Name = "New"
+	tag.AnchorPoint = Vector2.new(1, 0)
+	tag.Position = UDim2.new(1, -8, 0, 8)
+	tag.Size = UDim2.fromOffset(46, 18)
+	tag.BackgroundColor3 = Color3.fromRGB(255, 214, 90)
+	tag.Font = Enum.Font.GothamBlack
+	tag.TextSize = 12
+	tag.TextColor3 = Color3.fromRGB(20, 16, 6)
+	tag.Text = "NEW"
+	tag.Visible = false
+	tag.ZIndex = 5
+	tag.Parent = card
+	local tagCorner = Instance.new("UICorner")
+	tagCorner.CornerRadius = UDim.new(0, 5)
+	tagCorner.Parent = tag
+	local function show(piece, final: boolean)
+		local rarity = PodStyle.rarity(piece.Rarity)
+		name.Text = piece.Name
+		sub.Text = (KINDS[piece.Kind] or piece.Kind) .. "  ·  " .. rarity.Name
+		sub.TextColor3 = rarity.Color
+		stroke.Color = rarity.Color
+		head.Text = if final and piece.New then "POD ROLL  ·  UNLOCKED" else "POD ROLL"
+		tag.Visible = final and piece.New == true
+	end
+	local function pop()
+		scale.Scale = 1.25
+		TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		stroke.Thickness = 4
+		TweenService:Create(stroke, TweenInfo.new(0.8), { Thickness = 2 }):Play()
+	end
+	return show, pop, card
 end
 
 local function letterbox(padIndex: number?)
@@ -104,7 +208,7 @@ local function letterbox(padIndex: number?)
 		TweenService:Create(bar, info, { Size = UDim2.new(1, 0, 0.11, 0) }):Play()
 	end
 	TweenService:Create(caption, info, { TextTransparency = 0 }):Play()
-	return function()
+	return gui, function()
 		local out = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		for _, bar in bars do
 			TweenService:Create(bar, out, { Size = UDim2.new(1, 0, 0, 0) }):Play()
@@ -127,24 +231,53 @@ local function film(start: number)
 	running = true
 	local pad = Pods.padFrom(spawn)
 	local camera = workspace.CurrentCamera
-	local unbox = letterbox(player:GetAttribute("PodIndex"))
+	local gui, unbox = letterbox(player:GetAttribute("PodIndex"))
 	local landing = Pods.Landing
 	local done = landing.Fall + landing.Deploy
 	local released: number? = nil
 	local finished = false
+	ThirdPerson.Held = true
+	-- The roll's card: flicking until touchdown, then what it landed on.
+	local show, pop, card = rollCard(gui)
+	local pieces = catalogue()
+	local flick = -landing.Lead
+	-- (no roll, no card: the server sets PodRoll before PodLanding)
+	local revealed = PodArrival.parseRoll(player:GetAttribute("PodRoll")) == nil
+	card.Visible = not revealed
+	local rng = Random.new()
+	-- Behind you, clear of the pod, facing out from it (as ThirdPerson
+	-- puts it once it's yours again).
+	local forward = Vector3.new(spawn.LookVector.X, 0, spawn.LookVector.Z)
+	forward = if forward.Magnitude > 0.01 then forward.Unit else Vector3.new(0, 0, -1)
+	local function behind(root: BasePart): (Vector3, Vector3)
+		local focus = root.Position + Vector3.new(0, 2, 0)
+		return ThirdPerson.clearEye(focus, forward, ThirdPerson.LobbyZoom, 8, player.Character), focus
+	end
 	local function finish()
 		if finished then
 			return
 		end
 		finished = true
 		RunService:UnbindFromRenderStep(BIND)
+		card.Visible = false
 		unbox()
+		ThirdPerson.Held = false
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if humanoid then
 			camera.CameraSubject = humanoid
 		end
+		if root and player:GetAttribute("Outpost") then
+			local eye, focus = behind(root)
+			camera.CFrame = CFrame.lookAt(eye, focus)
+			camera.Focus = CFrame.new(focus)
+		end
 		camera.CameraType = Enum.CameraType.Custom
 		running = false
+		-- (ThirdPerson again, from your spot: held at its zoom a moment)
+		if player:GetAttribute("Outpost") then
+			ThirdPerson.enter(spawn)
+		end
 	end
 	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 6, function()
 		local t = workspace:GetServerTimeNow() - start
@@ -161,16 +294,30 @@ local function film(start: number)
 			finish()
 			return
 		end
+		-- (the roll's card)
+		if not revealed then
+			if t >= landing.Fall then
+				revealed = true
+				local piece = PodArrival.parseRoll(player:GetAttribute("PodRoll"))
+				if piece then
+					show(piece, true)
+					pop()
+				end
+			elseif t >= flick then
+				show(pieces[rng:NextInteger(1, #pieces)], false)
+				flick = t + Pods.flickAfter(t)
+			end
+		end
 		camera.CameraType = Enum.CameraType.Scriptable
 		local eye, focus = PodArrival.shot(math.min(t, done), pad)
 		if released then
 			-- (out to the side of the stair as you walk down it, the pod
 			-- behind you: not behind you, that's inside the pod)
-			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 			if root then
 				local k = ease((os.clock() - released) / PodArrival.Out)
-				local look = root.Position + Vector3.new(0, 2, 0)
-				eye = eye:Lerp(CFrame.lookAt(PodArrival.endEye(pad), look), k)
+				local back, look = behind(root)
+				eye = eye:Lerp(CFrame.lookAt(back, look), k)
 				focus = focus:Lerp(look, k)
 			end
 		end

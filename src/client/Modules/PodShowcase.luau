@@ -6,6 +6,10 @@
 	the server: the pods' parts are at their budget, as the Kennel's are
 	(Client.KennelLife).
 
+	A Prism glow (Shared.PodStyle: the Legendary one) runs round the rainbow
+	here too: the pod's and its yard's glowing parts (Paint "Glow"), on
+	each model the server marks Prism.
+
 	  PodShowcase.step(dt)   each frame while you're in the Outpost
 	  PodShowcase.clear()    all of them gone (you've left)
 	  PodShowcase.fit(height, tall) -> scale   how much to scale a kaiju
@@ -21,6 +25,9 @@ PodShowcase.Spin = 0.5 -- radians a second
 PodShowcase.Every = 0.5 -- seconds between looks round for pods
 
 local shown: { [Instance]: { Model: Model, Key: string, Offset: CFrame, Yaw: number } } = {}
+local prisms: { BasePart } = {} -- (glowing parts on Prism pods and yards)
+local hue = 0
+PodShowcase.Cycle = 4 -- seconds round the rainbow
 local pads: Instance? = nil
 local since = math.huge
 local yaw = 0
@@ -41,6 +48,7 @@ function PodShowcase.clear()
 	for yard in shown do
 		drop(yard)
 	end
+	table.clear(prisms)
 end
 
 local function build(yard: Instance, species: string, element: string): any
@@ -93,6 +101,19 @@ function PodShowcase.step(dt: number)
 		end
 		local camera = workspace.CurrentCamera
 		local seen = {}
+		table.clear(prisms)
+		for _, pad in if pads then pads:GetChildren() else {} do
+			for _, name in { "Pod", "Display" } do
+				local model = pad:FindFirstChild(name)
+				if model and model:GetAttribute("Prism") then
+					for _, p in model:GetDescendants() do
+						if p:IsA("BasePart") and p:GetAttribute("Paint") == "Glow" then
+							table.insert(prisms, p)
+						end
+					end
+				end
+			end
+		end
 		for _, pad in if pads then pads:GetChildren() else {} do
 			local yard = pad:FindFirstChild("Display")
 			local stand = yard and yard:FindFirstChild("Showcase")
@@ -116,6 +137,17 @@ function PodShowcase.step(dt: number)
 		for yard in shown do
 			if not seen[yard] then
 				drop(yard)
+			end
+		end
+	end
+	if #prisms > 0 then
+		hue = (hue + dt / PodShowcase.Cycle) % 1
+		local color = Color3.fromHSV(hue, 0.6, 1)
+		for _, p in prisms do
+			p.Color = color
+			local light = p:FindFirstChildOfClass("PointLight")
+			if light then
+				light.Color = color
 			end
 		end
 	end
