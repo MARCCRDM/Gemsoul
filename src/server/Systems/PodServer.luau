@@ -135,7 +135,7 @@ local function paint(model: Instance?, style)
 end
 PodServer.paint = paint
 
--- The pod, built standing on `pad` (its door toward the Heart): a white
+-- The pod, built standing on `pad` (its door toward the middle): a white
 -- habitat module with a rounded roof, warm-lit double doors and windows,
 -- an antenna with a beacon in the owner's colour, a stair down to the pad
 -- and blue thrusters under it (lit only in flight). Its display stall
@@ -343,7 +343,7 @@ end
 -- and a couple of crates.
 local WOOD = Color3.fromRGB(120, 86, 58)
 -- The front yard's pieces (Shared.PodStyle.Decor), each at `at` (on the
--- pad, facing out toward the Heart), in the pod's glow `glow`.
+-- pad, facing out toward the middle), in the pod's glow `glow`.
 local DECOR = {}
 function DECOR.Lamps(m, at: CFrame, glow: Color3)
 	for _, dx in { -1.3, 1.3 } do

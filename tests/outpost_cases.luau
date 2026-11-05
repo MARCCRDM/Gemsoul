@@ -961,10 +961,16 @@ handlers.OutpostEnter(ben)
 check((benRoot.CFrame.Position - benPod.Position).Magnitude < 0.01, "Not brought to their pod's ramp")
 
 -- Pick a rock and stand by it.
+-- (a field boulder, not a Rift Vein's: a vein's rocks go when it moves on)
+local veinSpots = {}
+for _, vein in Server._veins or {} do
+	for _, spot in vein.Spots or {} do
+		veinSpots[spot] = true
+	end
+end
 local target
 for _, node in Server._nodes do
-		if node.Healing then continue end
-	if node.Size == "Boulder" and not node.Healing then
+	if node.Size == "Boulder" and not node.Healing and not veinSpots[node.Spot] then
 		target = node
 		break
 	end
@@ -1009,6 +1015,10 @@ do
 	CollectionService:AddTag(mech, "OutpostMech")
 	ana:SetAttribute("MechPilot", "Mole3")
 	advance(1)
+	-- (a tough one: a strike's swings can roll big, and this one must
+	-- still be standing after it)
+	local toughMax, toughHp = target.MaxHp, target.Hp
+	target.MaxHp, target.Hp = 100, 100
 	local swingsBefore, hpBefore = first.State.Picks.Survey, target.Hp
 	local rock = target.Model.PrimaryPart.CFrame.Position
 	anaRoot.CFrame = R.CFrame.new(rock + R.Vector3.new(Rules.MechReach - 2, 9, 0))
@@ -1032,6 +1042,7 @@ do
 	check(not refused.Ok and refused.Message:find("Hop out", 1, true), "Mined from a machine that can't mine")
 	ana:SetAttribute("MechPilot", nil)
 	mech.Parent = nil
+	target.MaxHp, target.Hp = toughMax, toughHp -- (back as it was before the strike)
 end
 -- Ben can't steal it while Ana is on it, but can once she walks away.
 standBy(benRoot, target)
@@ -1544,9 +1555,19 @@ do
 	for _, spot in site.Spots do
 		local q = Rules.shelterFrame():PointToObjectSpace(spot.Position)
 		check(math.abs(q.X) >= site.Shelter.Box.X or math.abs(q.Z) >= site.Shelter.Box.Y, "A rock inside the Shelter")
-		check(flatTo(spot.Position, mid) > set.Heart + 4, "A rock in the Crystal Heart")
+		for _, stage in set.Stages do
+			check(flatTo(spot.Position, (Rules.Location * R.CFrame.new(stage.X, 0, stage.Z)).Position) > set.StageReach + 2, "A rock in the " .. stage.Name)
+		end
 	end
-	-- the field: rocks round the Heart and at the pods' doorsteps, all in the safe core
+	-- Arena Row in the middle of the field: both rings inside it, clear of each other
+	for i, stage in set.Stages do
+		check(math.sqrt(stage.X ^ 2 + stage.Z ^ 2) + set.StageReach < set.Field, stage.Name .. " isn't in the middle of the field")
+		for j = i + 1, #set.Stages do
+			local other = set.Stages[j]
+			check(math.sqrt((stage.X - other.X) ^ 2 + (stage.Z - other.Z) ^ 2) > set.StageReach * 2 + 8, "Arena Row's rings overlap")
+		end
+	end
+	-- the field: rocks round Arena Row and at the pods' doorsteps, all in the safe core
 	local inField, doorstep = 0, 0
 	for _, i in site.NearSpots do
 		local r = flatTo(site.Spots[i].Position, mid)

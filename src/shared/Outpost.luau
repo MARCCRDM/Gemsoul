@@ -66,7 +66,7 @@ Outpost.ShelterLift = 8
 -- it, the Kaiju Arena's hall under it and its life on the client follow
 -- (Outpost.shelterFrame). In the settlement it's the Market & Gear, south-
 -- east of the mining field (Settlement.Market), turned so its main door
--- faces the Crystal Heart, the garage's bays at its back. (A CFrame's
+-- faces the middle, the garage's bays at its back. (A CFrame's
 -- Position: no Vector3 needed to load these rules.)
 local MARKET_ANGLE, MARKET_R = math.rad(40), 255
 Outpost.ShelterOffset = CFrame.new(math.cos(MARKET_ANGLE) * MARKET_R, 0, math.sin(MARKET_ANGLE) * MARKET_R).Position
@@ -81,18 +81,18 @@ end
 	reaches the wall). Studs from the middle, angles in degrees (0 east, 90
 	south, 270 north), offsets in the quarry's frame (Outpost.Location).
 
-	  middle      the mining field (Field) round the Crystal Heart (Heart)
+	  middle      the mining field (Field), Arena Row in its middle: the
+	              Intro Ring and the Grand Arena side by side (Stages)
 	  Ring        the walkway round the field (open onto the Arrival Plaza:
 	              RingGap degrees either side of south); Walks wind
 	              through the field from it to the plaza
 	  north       the pod terraces: Tiers of pads (Pad: each pad's apothem,
-	              an octagon), their stairs facing the Heart, a Terrace
+	              an octagon), their stairs facing the middle, a Terrace
 	              walkway between the tiers and one down from each pad;
 	              no pad within RoadGap degrees of the north road
 	  south       the Arrival Plaza (Plaza: an octagon, the shuttle's pad
-	              in the middle), the Grand Arena past it (Stages, the ARENA
-	              arch at its way in); the Intro Ring south-west of it; the
-	              DUNGEON arch by the walkway to the Market
+	              in the middle), the ARENA arch past it (the duel queue);
+	              the DUNGEON arch by the walkway to the Market
 	  south-west  the Kaiju Habitat (the Daycare: Shared.Daycare.Pen)
 	  south-east  the Market & Gear: the Shelter (ShelterOffset)
 	  Wall        round it all, open at the four spokes (GateWidth studs)
@@ -107,25 +107,24 @@ Outpost.Settlement = {
 	WallHeight = 7,
 	GateWidth = 30,
 	Field = 135,
-	Heart = 16,
 	Ring = 160,
 	RingGap = 8,
 	Plaza = { X = 0, Z = 200, Apothem = 40 },
-	-- Arena Row: open rings on the ground (Server.PrivateArenas builds them:
-	-- no walls, the fight's seen and sees out). Intro and practice fights
-	-- take one when it's free. The Grand Arena by the plaza, the ARENA arch
-	-- at its way in; the Intro Ring south-west.
+	-- Arena Row: open rings on the ground in the middle of the field, seen
+	-- from every pod (Server.PrivateArenas builds them: no walls, the fight's
+	-- seen and sees out). Intro and practice fights take one when it's free.
 	-- (in the order fights take them: the Intro Ring first)
 	Stages = {
-		{ Name = "IntroRing", X = -150, Z = 245 },
-		{ Name = "GrandArena", X = 0, Z = 290 },
+		{ Name = "IntroRing", X = -48, Z = 0 },
+		{ Name = "GrandArena", X = 48, Z = 0 },
 	},
 	StageReach = 36, -- studs: a ring's kerb, lamps and fence, round its middle
-	-- (x, z points: from the ring round the Heart to the plaza; one in to the Heart)
+	-- (x, z points: from the ring round the field to the plaza, round the
+	-- arenas' outsides and down between them)
 	Walks = {
-		{ { -131, -92 }, { -78, -36 }, { -66, 56 }, { -26, 124 }, { 0, 164 } },
-		{ { 131, -92 }, { 78, -36 }, { 66, 56 }, { 26, 124 }, { 0, 164 } },
-		{ { 0, -160 }, { -8, -96 }, { 0, -44 } },
+		{ { -131, -92 }, { -100, -40 }, { -98, 30 }, { -62, 92 }, { -26, 128 }, { 0, 164 } },
+		{ { 131, -92 }, { 100, -40 }, { 98, 30 }, { 62, 92 }, { 26, 128 }, { 0, 164 } },
+		{ { 0, -160 }, { -6, -96 }, { 0, -44 }, { 0, 44 }, { 0, 100 }, { 0, 164 } },
 		-- (and from the plaza out to the Kaiju Habitat, the Intro Ring and the
 		-- Market's side ramp, past the DUNGEON arch)
 		{ { -36, 204 }, { -128, 168 }, { -196, 104 } },

@@ -9,7 +9,7 @@
 	      a free pad: next to a friend's (`near`: their pads) if one has
 	      one, else the free pad nearest `anchor` (the Shelter), else any
 	      free pad on the inner tier, then the outer
-	  Pods.spawnAt(pad: CFrame) -> CFrame   the foot of the ramp, facing the Heart
+	  Pods.spawnAt(pad: CFrame) -> CFrame   the foot of the ramp, facing the middle
 	  Pods.colorFor(userId) -> Color3        the beacon's colour (always the same)
 	  Pods.altitude(t) / Pods.lift(t)       the landing and lift-off, height over the pad
 	  Pods.flickAfter(t) -> seconds          the roll's next flick on the way down
@@ -88,7 +88,7 @@ function Pods.choose(pads, taken, near: { number }, rng: Random, anchor: Vector3
 			return best
 		end
 	end
-	-- Or any free pad, the inner tier first (closest to the Heart).
+	-- Or any free pad, the inner tier first (closest to the middle).
 	local tier = math.huge
 	for _, pad in pads do
 		if not taken[pad.Index] and pad.Tier < tier then
@@ -108,7 +108,7 @@ function Pods.choose(pads, taken, near: { number }, rng: Random, anchor: Vector3
 end
 
 -- Where you come in: out along the walkway from your pod's stair, facing
--- the Heart (the pad's -Z), SpawnOut studs past its foot: the camera behind
+-- the middle (the pad's -Z), SpawnOut studs past its foot: the camera behind
 -- you has the pod in view, never inside it.
 Pods.SpawnOut = 18
 function Pods.spawnAt(pad: CFrame): CFrame

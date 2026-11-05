@@ -2082,7 +2082,7 @@ local function enterScene(result)
 	refreshHud()
 	UiKit.toast(
 		if typeof(player:GetAttribute("PodSpawn")) == "CFrame"
-			then "Welcome home: your pod's landed. Mine round the Crystal Heart: the rocks grow back."
+			then "Welcome home: your pod's landed. Mine the field round Arena Row: the rocks grow back."
 			else "Welcome to the Saga Shelter. Head out the door to mine: the rocks grow back.",
 		P.Gold
 	)

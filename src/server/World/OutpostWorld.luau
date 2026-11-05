@@ -2589,13 +2589,12 @@ local function hallDressing(parent, at: CFrame)
 end
 
 -- A secret: something hidden with a prompt-able part named "Secret".
--- The settlement (Shared.Outpost.Settlement): the Crystal Heart in the
--- middle of the mining field, the ring road round it, the pod pads on
+-- The settlement (Shared.Outpost.Settlement): the mining field with Arena
+-- Row in its middle (the rings are Server.PrivateArenas'), the ring road round it, the pod pads on
 -- their terraces, the Arrival Plaza with the Arena and Dungeon gates past it, the
 -- Enchanter at the field's edge and the wall round it all. Returns what the
--- server hooks up (Pads, Gates, Enchanter, Heart), what rocks keep clear of
+-- server hooks up (Pads, Gates, Enchanter, Heart: the middle), what rocks keep clear of
 -- (KeepOut) and the paths that count as roads (Lines).
-local HEART = Color3.fromRGB(110, 225, 255)
 local function settlement(parent, at: CFrame, rules, rng)
 	local set = rules.Settlement
 	local m = folder(parent, "Settlement")
@@ -2608,32 +2607,6 @@ local function settlement(parent, at: CFrame, rules, rng)
 		local mid = (at * CFrame.new(0, y or 0, 0)).Position
 		return CFrame.lookAt(p, mid)
 	end
-
-	-- The Crystal Heart: a ring of tall crystals round a glowing core, on a
-	-- low rock mound; seen from every pod.
-	local heart = folder(m, "CrystalHeart")
-	solid(disc(heart, at * CFrame.new(0, 1.2, 0), set.Heart, 2.4, Color3.fromRGB(70, 72, 84), Enum.Material.Slate))
-	local core = part(heart, at * CFrame.new(0, 9, 0), Vector3.new(6, 12, 6), HEART, Enum.Material.Neon)
-	core.Name = "Core"
-	light(core, HEART, 60, 2.2)
-	for i = 0, 8 do
-		local a = i / 9 * math.pi * 2
-		local tall = 10 + (i % 3) * 5 + rng:NextNumber(0, 3)
-		local r = 5 + (i % 2) * 3
-		local base = at * CFrame.Angles(0, a, 0) * CFrame.new(0, 2, -r) * CFrame.Angles(math.rad(-14 - (i % 3) * 6), 0, 0)
-		solid(
-			part(
-				heart,
-				base * CFrame.new(0, tall / 2, 0),
-				Vector3.new(2.6, tall, 2.6),
-				HEART:Lerp(Color3.new(1, 1, 1), 0.15),
-				Enum.Material.Glass,
-				nil,
-				{ Transparency = 0.15 }
-			)
-		)
-	end
-	table.insert(keepOut, { at.Position, set.Heart + 10 })
 
 	-- Paving: smooth grey walkways with a yellow dashed line down the middle
 	-- and cyan bollards along them; octagons (four bands across, each as
@@ -2713,7 +2686,7 @@ local function settlement(parent, at: CFrame, rules, rng)
 		local down = if spot.Tier == 1 then set.Ring + 7 else set.Terrace + 4
 		walk(world(rules.place(spot.Angle, row.R - set.Pad - 1.6)), world(rules.place(spot.Angle, down)), 6, false)
 	end
-	-- Walkways winding through the field, round the Heart to the plaza.
+	-- Walkways winding through the field, round the arenas to the plaza.
 	for _, points in set.Walks do
 		local pts = {}
 		for _, p in points do
@@ -2767,7 +2740,7 @@ local function settlement(parent, at: CFrame, rules, rng)
 	end
 
 	-- The pod pads: a raised octagon each, a dark deck with a yellow dashed
-	-- ring, cyan bollards round its corners and a step down toward the Heart,
+	-- ring, cyan bollards round its corners and a step down toward the middle,
 	-- facing it (Server.PodServer lands each player's pod on one).
 	local padsFolder = folder(m, "Pads")
 	local pads = {}
@@ -2784,13 +2757,13 @@ local function settlement(parent, at: CFrame, rules, rng)
 		-- a bollard on every corner but the two by the step
 		for k = 0, 7 do
 			local corner = k * math.pi / 4 + math.pi / 8
-			local onStep = math.abs(math.sin(corner)) < 0.5 and math.cos(corner) > 0 -- (-Z: toward the Heart)
+			local onStep = math.abs(math.sin(corner)) < 0.5 and math.cos(corner) > 0 -- (-Z: toward the middle)
 			if not onStep then
 				local p = (frame * CFrame.Angles(0, corner, 0) * CFrame.new(0, 1, -(set.Pad - 0.7) / math.cos(math.pi / 8))).Position
 				bollard(pad, p)
 			end
 		end
-		-- the step down toward the Heart
+		-- the step down toward the middle
 		solid(part(pad, frame * CFrame.new(0, 0.25, -(set.Pad + 0.8)), Vector3.new(7, 0.5, 1.6), CONCRETE, Enum.Material.SmoothPlastic))
 		pad:SetAttribute("PadIndex", index)
 		pad:SetAttribute("Tier", spot.Tier)
