@@ -50,8 +50,8 @@ MainMenu.SlideSeconds = 6
 MainMenu.HoldAfterTouch = 12 -- (seconds the banners stay put after you touch them)
 MainMenu.LogoId = 123729911771910 -- (the title art: Client Splash's)
 
-local GOLD = Color3.fromRGB(255, 202, 91)
-local GOLD_DARK = Color3.fromRGB(214, 150, 40)
+local GOLD = Color3.fromRGB(130, 202, 212)
+local GOLD_DARK = Color3.fromRGB(66, 116, 130)
 local INK = Color3.fromRGB(10, 12, 20)
 local PANEL = Color3.fromRGB(10, 12, 20)
 local BUTTON = Color3.fromRGB(22, 26, 38)
@@ -612,8 +612,8 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			ScaleType = Enum.ScaleType.Fit,
 			ZIndex = 23,
 		}, left)
-		-- PLAY: the big gold plate, a shine across it now and then.
-		local play = plate(left, "Play", L.LeftX, L.PlayY, L.PlayW, L.Play, Color3.fromRGB(255, 186, 58), 23)
+		-- PLAY: the big matte station-blue plate.
+		local play = plate(left, "Play", L.LeftX, L.PlayY, L.PlayW, L.Play, Color3.fromRGB(130, 202, 212), 23)
 		play.ClipsDescendants = true
 		label(play, "▶  PLAY", L.PlayText, INK, Enum.Font.GothamBlack, {
 			Name = "Words",
@@ -623,28 +623,13 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 26,
 		})
-		label(play, "INTO THE OUTPOST", L.Caption, Color3.fromRGB(110, 60, 10), Enum.Font.GothamBold, {
+		label(play, "INTO THE OUTPOST", L.Caption, Color3.fromRGB(30, 65, 77), Enum.Font.GothamBold, {
 			Name = "Caption",
 			Position = UDim2.new(0, math.floor(L.Play * 0.4), 1, -(L.Caption + math.floor(L.Play * 0.14))),
 			Size = UDim2.new(0.6, 0, 0, L.Caption + 4),
 			TextWrapped = false,
 			ZIndex = 26,
 		})
-		local shine = new("Frame", {
-			Name = "Shine",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(-0.2, 0, 0.5, 0),
-			Size = UDim2.new(0, math.floor(L.Play * 0.42), 2, 0),
-			Rotation = 24,
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BackgroundTransparency = 0.6,
-			BorderSizePixel = 0,
-			ZIndex = 25,
-		}, play)
-		IronUi.animate(shine, function(t)
-			local k = (t % 3.2) / 0.9
-			shine.Position = UDim2.new(-0.2 + math.min(1, k) * 1.4, 0, 0.5, 0)
-		end)
 		play:SetAttribute("UiSound", "Open")
 		play.Activated:Connect(function()
 			onPlay()
@@ -652,12 +637,12 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		IronUi.juice(play, 1.03, 0.97)
 		playButton = play
 		if not UserInputService.TouchEnabled or UserInputService.KeyboardEnabled then
-			local key = label(play, "ENTER", L.Foot + 4, Color3.fromRGB(255, 236, 200), Enum.Font.GothamBlack, {
+			local key = label(play, "ENTER", L.Foot + 4, Color3.fromRGB(231, 242, 244), Enum.Font.GothamBlack, {
 				Name = "Key",
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -22, 0.5, -2),
 				Size = UDim2.fromOffset((L.Foot + 4) * 5.2, L.Foot + 22),
-				BackgroundColor3 = Color3.fromRGB(90, 44, 6),
+				BackgroundColor3 = Color3.fromRGB(27, 62, 73),
 				BackgroundTransparency = 0.15,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				TextYAlignment = Enum.TextYAlignment.Center,

@@ -43,7 +43,7 @@ LoadingScreen.TipSeconds = 5
 
 -- The Saga palette (the title screen's).
 local BACKGROUND = Color3.fromRGB(12, 11, 23)
-local GOLD = Color3.fromRGB(255, 202, 91)
+local GOLD = Color3.fromRGB(130, 202, 212)
 local CYAN = Color3.fromRGB(120, 220, 235)
 local DIM = Color3.fromRGB(138, 150, 178)
 local FAINT = Color3.fromRGB(88, 94, 128)

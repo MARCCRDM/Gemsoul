@@ -201,7 +201,7 @@ end
 
 -- The card over the intro queue: who it's looking for, and the sparring
 -- partner's promise. Returns (setLine, close).
-local GOLD = Color3.fromRGB(255, 202, 91)
+local GOLD = Color3.fromRGB(130, 202, 212)
 local function searchCard(): ((string) -> (), () -> ())
 	local gui = UiKit.gui("IntroSearch", 25)
 	local card = Instance.new("Frame")

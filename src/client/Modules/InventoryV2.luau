@@ -101,7 +101,7 @@ local C = {
 	Dim = Color3.fromRGB(139, 155, 177),
 	Faint = Color3.fromRGB(74, 90, 112),
 	Line = Color3.fromRGB(255, 255, 255),
-	Gold = Color3.fromRGB(242, 189, 94),
+	Gold = Color3.fromRGB(130, 202, 212),
 	Teal = Color3.fromRGB(76, 195, 214),
 	Good = Color3.fromRGB(95, 208, 138),
 	Bad = Color3.fromRGB(255, 122, 107),
@@ -617,10 +617,10 @@ local function buildTop(canvas: Frame)
 		place(back, 0, 8, 186, 40)
 	end
 	round(back, 10)
-	local backEdge = stroke(back, Color3.fromRGB(255, 226, 160), 1, 0.6)
+	local backEdge = stroke(back, Color3.fromRGB(177, 218, 226), 1, 0.6)
 	back:SetAttribute("UiSound", "Back")
 	back.MouseEnter:Connect(function()
-		back.BackgroundColor3 = Color3.fromRGB(255, 212, 128)
+		back.BackgroundColor3 = Color3.fromRGB(153, 215, 224)
 		backEdge.Transparency = 0.1
 	end)
 	back.MouseLeave:Connect(function()

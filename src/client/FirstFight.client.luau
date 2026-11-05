@@ -38,7 +38,7 @@ local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
 local new = IronUi.new
-local GOLD, ORANGE, GREEN = Color3.fromRGB(255, 202, 91), Color3.fromRGB(255, 140, 70), Color3.fromRGB(96, 214, 128)
+local GOLD, ORANGE, GREEN = Color3.fromRGB(130, 202, 212), Color3.fromRGB(255, 140, 70), Color3.fromRGB(96, 214, 128)
 
 -- The ring, drawn over Combat's own button (same ScreenGui settings, so the
 -- button's on-screen position is the ring's too).

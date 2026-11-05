@@ -68,7 +68,7 @@ local C = {
 	Dim = Color3.fromRGB(138, 156, 178),
 	Faint = Color3.fromRGB(78, 94, 114),
 	Cyan = Color3.fromRGB(94, 206, 221),
-	Gold = Color3.fromRGB(240, 186, 92),
+	Gold = Color3.fromRGB(130, 202, 212),
 }
 local gui = UiKit.gui("Intro", 15)
 gui.IgnoreGuiInset = false
@@ -337,10 +337,10 @@ UiKit.round(primary, 10)
 new("UISizeConstraint", { MaxSize = Vector2.new(420, 52) }, primary)
 new(
 	"UIGradient",
-	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 214, 140), Color3.fromRGB(232, 162, 70)) },
+	{ Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(143, 207, 215), Color3.fromRGB(119, 190, 201)) },
 	primary
 )
-local buttonStroke = stroke(primary, Color3.fromRGB(255, 232, 186), 0.45, 1)
+local buttonStroke = stroke(primary, Color3.fromRGB(177, 218, 226), 0.45, 1)
 -- Quiet secondary controls under the main button.
 local function ghost(text, anchorX)
 	local b = new("TextButton", {
@@ -2514,7 +2514,7 @@ end)
 listen(primary.MouseEnter, function()
 	if not busy and not spin and primary.Active then
 		tween(buttonStroke, 0.15, { Thickness = 2, Transparency = 0 })
-		tween(primary, 0.15, { BackgroundColor3 = Color3.fromRGB(255, 205, 120) })
+		tween(primary, 0.15, { BackgroundColor3 = Color3.fromRGB(153, 215, 224) })
 	end
 end)
 listen(primary.MouseLeave, function()

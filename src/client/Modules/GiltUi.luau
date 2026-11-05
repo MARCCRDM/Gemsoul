@@ -2,15 +2,15 @@
 	The windows' look (the Bounty Board's, Client RiftClient; the Kennel's
 	sale, Client KennelSale; the coin packs, Client CoinShop): a game's
 	window, sharp and modern. Deep navy panels with a cool sheen down them,
-	an amber bar along the top, bold clean words (headings in capitals),
-	glossy amber for the button that matters, slate for the rest, and colour
+	an station-blue bar along the top, bold clean words (headings in capitals),
+	matte station-blue for the button that matters, slate for the rest, and colour
 	kept for what it means (the boss's element, a level's danger, ready or
 	not). (The module keeps its old name, Gilt, and its old calls.)
 
 	  Gilt.frame(holder, width, compact?) -> body   the framed window (its body a list)
 	  Gilt.well(frame, edge?)        a recessed well
-	  Gilt.stud(parent, size, at)    a small amber diamond
-	  Gilt.rule(parent, both?)       an amber hairline
+	  Gilt.stud(parent, size, at)    a small station-blue diamond
+	  Gilt.rule(parent, both?)       an station-blue hairline
 	  Gilt.words(parent, text, size, color)   bold words
 	  Gilt.heading(parent, text, order, small)   a section's heading
 	  Gilt.button(parent, text, primary, order, onClick?, tall?, size?)
@@ -21,8 +21,9 @@ local UiKit = require(script.Parent.UiKit)
 local new = IronUi.new
 
 local Gilt = {
-	-- (the old names, the new colours: amber for gold, steel for brass)
-	Gold = Color3.fromRGB(255, 196, 64),
+	-- (the old names, the new colours: station-blue for gold, steel for brass)
+	Gold = Color3.fromRGB(255, 196, 64), -- currency and rewards
+	Accent = Color3.fromRGB(130, 202, 212),
 	Bright = Color3.fromRGB(255, 226, 140),
 	Brass = Color3.fromRGB(62, 76, 108),
 	Bronze = Color3.fromRGB(40, 50, 76),
@@ -51,7 +52,7 @@ function Gilt.well(frame: GuiObject, edge: Color3?): UIStroke
 	}, frame)
 end
 
--- A small amber diamond: a divider's middle.
+-- A small station-blue diamond: a divider's middle.
 function Gilt.stud(parent: Instance, size: number, at: UDim2): Frame
 	local stud = new("Frame", {
 		Name = "Stud",
@@ -59,17 +60,17 @@ function Gilt.stud(parent: Instance, size: number, at: UDim2): Frame
 		Position = at,
 		Size = UDim2.fromOffset(size, size),
 		Rotation = 45,
-		BackgroundColor3 = Gilt.Gold,
+		BackgroundColor3 = Gilt.Accent,
 		ZIndex = 3,
 	}, parent)
 	return stud
 end
 
--- An amber hairline: fading out to the right, or to both ends (`both`).
+-- An station-blue hairline: fading out to the right, or to both ends (`both`).
 function Gilt.rule(parent: Instance, both: boolean?): Frame
 	local line = new("Frame", {
 		Name = "Rule",
-		BackgroundColor3 = Gilt.Gold,
+		BackgroundColor3 = Gilt.Accent,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 1),
 	}, parent)
@@ -104,7 +105,7 @@ function Gilt.words(parent: Instance, value: string, size: number, color: Color3
 	return label
 end
 
--- A section's heading: an amber tick, the words in capitals, a hairline.
+-- A section's heading: an station-blue tick, the words in capitals, a hairline.
 function Gilt.heading(parent: Instance, label: string, order: number, small: boolean): TextLabel
 	local row = new("Frame", {
 		Name = "Heading",
@@ -114,12 +115,12 @@ function Gilt.heading(parent: Instance, label: string, order: number, small: boo
 	}, parent)
 	local tick = new("Frame", {
 		Name = "Tick",
-		BackgroundColor3 = Gilt.Gold,
+		BackgroundColor3 = Gilt.Accent,
 		Position = UDim2.fromOffset(0, if small then 3 else 4),
 		Size = UDim2.fromOffset(3, if small then 10 else 13),
 	}, row)
 	UiKit.round(tick, 2)
-	local words = Gilt.words(row, string.upper(label), if small then 11 else 13, Gilt.Gold)
+	local words = Gilt.words(row, string.upper(label), if small then 11 else 13, Gilt.Ink)
 	words.Font = Gilt.Display
 	words.Position = UDim2.fromOffset(10, 0)
 	words.Size = UDim2.new(1, -10, 1, -3)
@@ -131,7 +132,7 @@ function Gilt.heading(parent: Instance, label: string, order: number, small: boo
 	return words
 end
 
--- A button: glossy amber with dark words for the one that matters
+-- A button: matte station-blue with dark words for the one that matters
 -- (`primary`), slate in a steel rim for the rest; it brightens under the
 -- mouse. Its colour is a face behind its words (a gradient on the button
 -- itself would tint the words too): the button keeps its own Text,
@@ -150,7 +151,7 @@ function Gilt.button(
 		Text = label,
 		TextSize = size or 16,
 		Font = if primary then Gilt.Display else Gilt.Serif,
-		TextColor3 = if primary then Color3.fromRGB(34, 18, 2) else Gilt.Ink,
+		TextColor3 = if primary then Color3.fromRGB(12, 25, 31) else Gilt.Ink,
 		TextTransparency = 1,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		BackgroundTransparency = 1,
@@ -169,21 +170,21 @@ function Gilt.button(
 	UiKit.round(face, 8)
 	local rest = if primary
 		then ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 222, 110)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 184, 52)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(240, 130, 24)),
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(143, 207, 215)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(130, 202, 212)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(119, 190, 201)),
 		})
 		else ColorSequence.new(Color3.fromRGB(44, 54, 80), Color3.fromRGB(26, 32, 50))
 	local lit = if primary
 		then ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 236, 150)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 202, 80)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(252, 148, 36)),
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(163, 219, 225)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 212, 220)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(138, 202, 213)),
 		})
 		else ColorSequence.new(Color3.fromRGB(58, 70, 102), Color3.fromRGB(34, 42, 64))
 	local shade = new("UIGradient", { Rotation = 90, Color = rest }, face)
 	local rim = new("UIStroke", {
-		Color = if primary then Color3.fromRGB(255, 240, 180) else Gilt.Brass,
+		Color = if primary then Color3.fromRGB(180, 221, 228) else Gilt.Brass,
 		Thickness = if primary then 1.5 else 1,
 		Transparency = if primary then 0.35 else 0.1,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
@@ -234,7 +235,7 @@ function Gilt.button(
 	return b
 end
 
--- The window: deep navy with a cool sheen down it, a steel edge, an amber
+-- The window: deep navy with a cool sheen down it, a steel edge, an station-blue
 -- bar along the top glowing at its middle. Its body (a list) to fill.
 function Gilt.frame(holder: Instance, width: number, compact: boolean?): Frame
 	local frame = new("Frame", {
@@ -255,12 +256,12 @@ function Gilt.frame(holder: Instance, width: number, compact: boolean?): Frame
 		}),
 	}, frame)
 	new("UIStroke", { Color = Gilt.Bronze, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
-	-- (the amber bar along the top, brightest at its middle)
+	-- (the station-blue bar along the top, brightest at its middle)
 	local bar = new("Frame", {
 		Name = "Rim",
-		BackgroundColor3 = Gilt.Gold,
+		BackgroundColor3 = Gilt.Accent,
 		Position = UDim2.fromOffset(18, 0),
-		Size = UDim2.new(1, -36, 0, 3),
+		Size = UDim2.new(1, -36, 0, 1),
 	}, frame)
 	UiKit.round(bar, 2)
 	new("UIGradient", {

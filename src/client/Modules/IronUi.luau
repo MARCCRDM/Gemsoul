@@ -15,7 +15,8 @@ IronUi.Colors = {
 	Inset = Color3.fromRGB(21, 25, 39),
 	Slot = Color3.fromRGB(31, 36, 55),
 	Edge = Color3.fromRGB(74, 86, 118), -- subdued station border
-	Gold = Color3.fromRGB(255, 202, 91), -- Saga amber
+	Gold = Color3.fromRGB(255, 202, 91), -- currency and reward gold
+	Accent = Color3.fromRGB(130, 202, 212), -- station controls
 	Text = Color3.fromRGB(235, 242, 249),
 	Dim = Color3.fromRGB(177, 193, 216),
 	Good = Color3.fromRGB(90, 220, 150),
@@ -163,7 +164,7 @@ function IronUi.wordmark(parent: Instance): Frame
 		Rotation = 90,
 		Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 247, 185)),
-			ColorSequenceKeypoint.new(0.48, P.Gold),
+			ColorSequenceKeypoint.new(0.48, P.Accent),
 			ColorSequenceKeypoint.new(1, Color3.fromRGB(229, 143, 44)),
 		}),
 	}, face)
@@ -419,7 +420,7 @@ function IronUi.highlight(button: GuiButton, surface: GuiObject?)
 		end
 		if stroke and stroke.Parent and baseColor then
 			tween(stroke, {
-				Color = if active then baseColor:Lerp(P.Gold, 0.38) else baseColor,
+				Color = if active then baseColor:Lerp(P.Accent, 0.38) else baseColor,
 				Thickness = if active then math.max(baseThickness, 2) else baseThickness,
 				Transparency = if active then 0.05 else baseTransparency,
 			})
@@ -697,7 +698,7 @@ end
 -- A round badge with an icon (an emoji works well), e.g. on a window's corner.
 function IronUi.badge(parent: Instance, icon: string, size: number, color: Color3?): Frame
 	local badge = new("Frame", {
-		BackgroundColor3 = color or P.Gold,
+		BackgroundColor3 = color or P.Accent,
 		Size = UDim2.fromOffset(size, size),
 	}, parent)
 	corner(badge, UDim.new(0.5, 0))

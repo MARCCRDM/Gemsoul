@@ -91,23 +91,24 @@ local C = {
 	Text = Color3.fromRGB(240, 243, 250),
 	Dim = Color3.fromRGB(152, 164, 190),
 	Faint = Color3.fromRGB(100, 112, 140),
-	Buy = Color3.fromRGB(255, 184, 52),
-	BuyText = Color3.fromRGB(34, 18, 2),
+	Buy = Color3.fromRGB(130, 202, 212),
+	BuyText = Color3.fromRGB(12, 25, 31),
 	Sale = Color3.fromRGB(255, 72, 104),
-	Gold = Color3.fromRGB(255, 196, 64),
+	Gold = Color3.fromRGB(255, 196, 64), -- prices and currency
+	Accent = Color3.fromRGB(130, 202, 212),
 	Good = Color3.fromRGB(96, 226, 150),
 	Ink = Color3.fromRGB(8, 10, 16),
 }
--- Glossy amber, at rest and under the mouse (a gradient over white).
+-- Matte station blue, at rest and under the mouse (a gradient over white).
 local AMBER = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 222, 110)),
-	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 184, 52)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(240, 130, 24)),
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(143, 207, 215)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(130, 202, 212)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(119, 190, 201)),
 })
 local AMBER_LIT = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 236, 150)),
-	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 202, 80)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(252, 148, 36)),
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(163, 219, 225)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 212, 220)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(138, 202, 213)),
 })
 local BLACK, BOLD, MEDIUM = Enum.Font.GothamBlack, Enum.Font.GothamBold, Enum.Font.GothamMedium
 -- On a phone on its side (SHORT) the store is the whole screen instead of a
@@ -574,7 +575,7 @@ local SHEEN = ColorSequence.new({
 })
 new("UIGradient", { Rotation = 90, Color = SHEEN }, panel)
 if not SHORT then
-	topBar(panel, C.Gold, 24, 3).Name = "Rim"
+	topBar(panel, C.Steel, 24, 3).Name = "Rim"
 end
 local scale = new("UIScale", {}, panel)
 
@@ -583,7 +584,7 @@ local scale = new("UIScale", {}, panel)
 -- the close button at its right end, and the categories run down a rail on
 -- the left, the picked one lit with a gold edge.)
 if not SHORT then
-	local mark = box(panel, C.Gold, 28, 22, 10, 10)
+	local mark = box(panel, C.Accent, 28, 22, 10, 10)
 	mark.Name = "Mark"
 	mark.Rotation = 45
 	local brand = text(panel, "STORE", 22, Color3.new(1, 1, 1), BLACK, 46, 13, 110, 26)
@@ -650,7 +651,7 @@ for i, id in Store.Tabs do
 		label = text(b, Store.TabNames[id], 14, C.Dim, BOLD, 16, 0, 0, 0)
 		label.Size = UDim2.new(1, -20, 1, 0)
 		label.TextTruncate = Enum.TextTruncate.AtEnd
-		underline = box(b, C.Gold, 0, 0, 4, 0)
+		underline = box(b, C.Accent, 0, 0, 4, 0)
 		underline.AnchorPoint = Vector2.new(0, 0.5)
 		underline.Position = UDim2.new(0, 5, 0.5, 0)
 		underline.Size = UDim2.new(0, 4, 0.55, 0)
@@ -663,10 +664,10 @@ for i, id in Store.Tabs do
 			tag.Visible = false
 		end
 	else
-		underline = box(b, C.Gold, 0, HEAD - 4, 0, 3)
+		underline = box(b, C.Accent, 0, HEAD - 4, 0, 3)
 		underline.Size = UDim2.new(1, 0, 0, 3)
 		-- (the picked tab lit from below: amber rising off its line)
-		local glow = box(underline, C.Gold, 0, -22, 0, 22)
+		local glow = box(underline, C.Accent, 0, -22, 0, 22)
 		glow.Name = "Glow"
 		glow.Size = UDim2.new(1, 0, 0, 22)
 		new("UIGradient", {
@@ -911,7 +912,7 @@ local function overlayCard(w: number, h: number): Frame
 	stroke(card, C.Steel, 1.5, 0)
 	card.BackgroundColor3 = Color3.new(1, 1, 1)
 	new("UIGradient", { Rotation = 90, Color = SHEEN }, card)
-	topBar(card, C.Gold, 24, 3).ZIndex = 22
+	topBar(card, C.Steel, 24, 3).ZIndex = 22
 	-- (never bigger than the store itself; a phone's, below Roblox's strip)
 	local room = H - (if SHORT then HEAD else 0)
 	new("UIScale", { Scale = math.min(1, (W - 16) / w, (room - 16) / h) }, card)
@@ -1336,7 +1337,7 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 	round(card, 12)
 	-- (its rarity's colour: washed in at the top, its edge, a bar along the
 	-- top; the picked one ringed in amber)
-	local edge = face(card, color, if picked then 0.2 else 0.1, if picked then C.Gold else color, if picked then 0 else 0.68)
+	local edge = face(card, color, if picked then 0.2 else 0.1, if picked then C.Accent else color, if picked then 0 else 0.68)
 	if picked then
 		edge.Thickness = 2
 	else
@@ -1349,7 +1350,7 @@ local function productCard(parent: Instance, id: string, order: number, tab: str
 	rarity.Position = UDim2.fromOffset(12, 12)
 	-- (a phone: no room beside the rarity, and the price line says so)
 	if (isWorn or mine) and not SHORT then
-		local tag = pill(card, if isWorn then "WEARING" else "OWNED", if isWorn then C.Gold else C.Good, true, 9 + UP)
+		local tag = pill(card, if isWorn then "WEARING" else "OWNED", if isWorn then C.Accent else C.Good, true, 9 + UP)
 		tag.AnchorPoint = Vector2.new(1, 0)
 		tag.Position = UDim2.new(1, -12, 0, 12)
 	end
@@ -2711,7 +2712,7 @@ local function offerPopup(name: string, key: string)
 	round(card, 16)
 	stroke(card, C.Steel, 1.5, 0)
 	new("UIGradient", { Rotation = 90, Color = SHEEN }, card)
-	topBar(card, C.Gold, 24, 3).Name = "Rim"
+	topBar(card, C.Steel, 24, 3).Name = "Rim"
 	local fitScale = new("UIScale", {}, card)
 	local function fitPopup()
 		local s = popup.AbsoluteSize

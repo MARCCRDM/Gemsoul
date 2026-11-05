@@ -1433,7 +1433,7 @@ end
 -- posters (OutpostServer draws them), crossed blades over them. Its
 -- markings amber; a dark rug in front of the counter.
 local ARENA_RED = Color3.fromRGB(214, 84, 70)
-local BOUNTY_AMBER = Color3.fromRGB(240, 178, 48)
+local BOUNTY_AMBER = Color3.fromRGB(111, 153, 164) -- painted service trim
 local function bountyBooth(parent, at: CFrame, posters: number)
 	local m = folder(parent, "BountyBooth")
 	local half, deep = 9.2, 11
@@ -2131,7 +2131,7 @@ local function shelter(parent, at: CFrame, rules)
 	local arena = at3(0, 0.8, 18)
 	solid(disc(m, arena * CFrame.new(0, 0.5, 0), 12.6, 1, STEEL, Enum.Material.DiamondPlate))
 	solid(disc(m, arena * CFrame.new(0, 0.75, 0), 12, 1.5, Color3.fromRGB(56, 58, 64), Enum.Material.Concrete))
-	disc(m, arena * CFrame.new(0, 1.51, 0), 11.2, 0.04, HAZARD)
+	disc(m, arena * CFrame.new(0, 1.51, 0), 11.2, 0.04, STEEL)
 	disc(m, arena * CFrame.new(0, 1.52, 0), 10.9, 0.06, Color3.fromRGB(88, 70, 52), Enum.Material.Ground).Name = "KennelBed"
 	for k = 0, 3 do
 		local a = (k + 0.5) / 4 * math.pi * 2
@@ -2740,7 +2740,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	-- Landing pad and shuttle, south-east of the Shelter.
 	local padAt = at * CFrame.new(72, 0, 118)
 	solid(disc(base, padAt * CFrame.new(0, 0.5, 0), 20, 1, HULL_DARK, Enum.Material.DiamondPlate))
-	disc(base, padAt * CFrame.new(0, 1.05, 0), 16, 0.1, HAZARD, Enum.Material.SmoothPlastic)
+	disc(base, padAt * CFrame.new(0, 1.05, 0), 16, 0.1, STEEL, Enum.Material.SmoothPlastic)
 	disc(base, padAt * CFrame.new(0, 1.1, 0), 14.6, 0.1, HULL_DARK, Enum.Material.DiamondPlate)
 	for i = 0, 7 do
 		local a = i / 8 * math.pi * 2
@@ -2800,7 +2800,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			part(base, ship * CFrame.new(x, 1.5, side * 3.5), Vector3.new(0.6, 3, 0.6), STEEL, Enum.Material.Metal)
 		end
 	end
-	part(base, ship * CFrame.new(0, 6.2, -4.55), Vector3.new(18, 0.6, 0.2), HAZARD, Enum.Material.SmoothPlastic)
+	part(base, ship * CFrame.new(0, 6.2, -4.55), Vector3.new(18, 0.6, 0.2), STEEL, Enum.Material.SmoothPlastic)
 	-- Habitats strung on tubes.
 	local habs = {
 		north * CFrame.new(-36, 0, 6),
@@ -2826,7 +2826,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			{ CFrame = tower * CFrame.new(0, 4 + i * 8, 0) * CFrame.Angles(0, 0, math.rad(90)) }
 		)
 		disc(base, tower * CFrame.new(0, 8 + i * 8, 0), r + 1.6, 0.4, HULL_DARK, Enum.Material.DiamondPlate)
-		local lampRing = disc(base, tower * CFrame.new(0, 8.3 + i * 8, 0), r + 1.65, 0.15, HAZARD, Enum.Material.Neon)
+		local lampRing = disc(base, tower * CFrame.new(0, 8.3 + i * 8, 0), r + 1.65, 0.15, GLOW, Enum.Material.Neon)
 		lampRing.Transparency = 0.2
 	end
 	part(base, tower * CFrame.new(4, 50, 3), Vector3.new(2.4, 22, 2.4), HULL_DARK, Enum.Material.Metal)

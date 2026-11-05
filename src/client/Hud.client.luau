@@ -127,10 +127,10 @@ local left = new("Frame", {
 }, gui)
 UiKit.list(left, 12)
 
-local heroColor = if MENU_ONLY then Color3.fromRGB(240, 140, 40) else Color3.fromRGB(255, 196, 30)
+local heroColor = Color3.fromRGB(130, 202, 212)
 local heroButton, heroFace = IronUi.chunk(left, {
 	Color = heroColor,
-	Rim = if MENU_ONLY then Color3.fromRGB(255, 214, 150) else Color3.fromRGB(255, 240, 160),
+	Rim = Color3.fromRGB(177, 218, 226),
 	Size = UDim2.fromOffset(180, 84),
 	Radius = 16,
 	Lip = 7,
@@ -145,7 +145,7 @@ heroLabel.AnchorPoint = Vector2.new(0.5, 1)
 heroLabel.Position = UDim2.new(0.5, 0, 1, 0)
 heroLabel.Size = UDim2.new(1, 0, 0, 34)
 heroLabel.TextXAlignment = Enum.TextXAlignment.Center
-IronUi.shine(heroFace, 3)
+-- Keep the main control still; hover and press feedback communicate interaction.
 keyHint(heroButton, if MENU_ONLY then "M" else "B")
 heroButton.Activated:Connect(function()
 	if MENU_ONLY then

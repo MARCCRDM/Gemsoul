@@ -28,7 +28,7 @@ local function new(kind, props, parent)
 	o.Parent = parent
 	return o
 end
-local GOLD = Color3.fromRGB(255, 205, 95)
+local GOLD = Color3.fromRGB(130, 202, 212)
 local function run()
 	local runId = GemClient.Profile.Tutorial.Run
 	local gui = new(

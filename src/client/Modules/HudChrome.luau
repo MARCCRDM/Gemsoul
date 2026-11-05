@@ -1,14 +1,14 @@
 --[[
-	The combat HUD's frame art and layout: dark steel panels with a gold
-	double rule and corner studs, thin bars with diamond end caps, and the
+	The combat HUD's frame art and layout: dark steel panels with a single
+	quiet border and optional corner studs, thin bars with diamond end caps, and the
 	one action bar along the bottom (surges Q/E/R, an ornament, maneuvers
 	1/2/3) with the three vitals above it: Charge on the left, Health in the
 	middle, Stamina on the right.
 
 	  HudChrome.dress(frame, opts)        dress a panel; returns its outer stroke
 	  HudChrome.diamond(parent, position, size, color)
-	  HudChrome.capBar(track)             gold rule and diamond caps on a bar
-	  HudChrome.rule(parent, y)           a gold divider fading at both ends
+	  HudChrome.capBar(track)             steel rule and diamond caps on a bar
+	  HudChrome.rule(parent, y)           a steel divider fading at both ends
 	  HudChrome.actionBar(parent)         the bottom bar: { Frame, SurgeTitle, ManeuverTitle }
 	  HudChrome.layoutActionBar(bar, surgeTray, maneuverTray)  sizes it around the trays
 	  HudChrome.layoutVitals(hud, parts, width, stacked)  places the three bars;
@@ -16,11 +16,11 @@
 ]]
 local HudChrome = {}
 
-HudChrome.Gold = Color3.fromRGB(214, 178, 106)
-HudChrome.GoldDim = Color3.fromRGB(126, 100, 58)
+HudChrome.Gold = Color3.fromRGB(158, 188, 199)
+HudChrome.GoldDim = Color3.fromRGB(65, 82, 94)
 HudChrome.Ink = Color3.fromRGB(11, 12, 17)
 HudChrome.Steel = Color3.fromRGB(36, 38, 48)
-HudChrome.Parchment = Color3.fromRGB(236, 224, 196)
+HudChrome.Parchment = Color3.fromRGB(231, 237, 241)
 HudChrome.Title = Enum.Font.GothamBold -- names and titles (the game's heading face)
 
 local function make(className: string, props, parent: Instance?)
@@ -47,8 +47,7 @@ function HudChrome.diamond(parent: Instance, position: UDim2, size: number, colo
 	return gem
 end
 
--- A panel: steel fading to ink, a dark-gold outer rule, a fine gold inner
--- rule and a gold stud on each corner.
+-- A panel: steel fading to ink, one quiet border, and opt-in corner studs.
 function HudChrome.dress(frame: GuiObject, opts)
 	opts = opts or {}
 	frame.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -59,16 +58,8 @@ function HudChrome.dress(frame: GuiObject, opts)
 		Color = ColorSequence.new(opts.Top or HudChrome.Steel, HudChrome.Ink),
 	}, frame)
 	make("UICorner", { CornerRadius = UDim.new(0, opts.Radius or 4) }, frame)
-	local stroke = make("UIStroke", { Color = HudChrome.GoldDim, Thickness = 1.5, Transparency = 0.1 }, frame)
-	local inner = make("Frame", {
-		Name = "InnerRule",
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(3, 3),
-		Size = UDim2.new(1, -6, 1, -6),
-	}, frame)
-	make("UICorner", { CornerRadius = UDim.new(0, math.max(0, (opts.Radius or 4) - 2)) }, inner)
-	make("UIStroke", { Color = HudChrome.Gold, Thickness = 1, Transparency = 0.7 }, inner)
-	if opts.Studs ~= false then
+	local stroke = make("UIStroke", { Color = HudChrome.GoldDim, Thickness = 1, Transparency = 0.25 }, frame)
+	if opts.Studs == true then
 		for _, corner in { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } } do
 			HudChrome.diamond(frame, UDim2.fromScale(corner[1], corner[2]), 7, HudChrome.Gold)
 		end
@@ -76,7 +67,7 @@ function HudChrome.dress(frame: GuiObject, opts)
 	return stroke
 end
 
--- A bar track: inked, a gold hairline, and a diamond capping each end.
+-- A bar track: inked, a steel hairline, and a diamond capping each end.
 function HudChrome.capBar(track: GuiObject)
 	track.BackgroundColor3 = HudChrome.Ink
 	track.BackgroundTransparency = 0.15
@@ -135,7 +126,7 @@ function HudChrome.actionBar(parent: Instance)
 		Position = UDim2.new(0.5, 0, 1, -22),
 	}, parent)
 	HudChrome.dress(frame, { Radius = 6, Studs = false })
-	-- Pointed ends: a large gold diamond on each side, half outside the bar.
+	-- Pointed ends: a large steel diamond on each side, half outside the bar.
 	for _, x in { 0, 1 } do
 		HudChrome.diamond(frame, UDim2.fromScale(x, 0.5), 16, HudChrome.GoldDim, 2)
 		HudChrome.diamond(frame, UDim2.fromScale(x, 0.5), 8, HudChrome.Gold, 3)
