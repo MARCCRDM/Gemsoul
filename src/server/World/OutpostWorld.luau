@@ -1044,7 +1044,7 @@ local function benches(parent, at: CFrame)
 	return feet
 end
 
--- A dirt haul road from `from` to `to`, with marker posts along it.
+-- A dirt haul road from `from` to `to`, its edges lit, marker posts along it.
 local function road(parent, from: Vector3, to: Vector3, width: number)
 	local mid = (from + to) / 2
 	local length = (to - from).Magnitude
@@ -1055,11 +1055,15 @@ local function road(parent, from: Vector3, to: Vector3, width: number)
 		DIRT,
 		Enum.Material.Sand
 	)
+	-- (edged in light neon blue, like the settlement's walkways)
+	for _, side in { -1, 1 } do
+		part(parent, CFrame.lookAt(mid, to) * CFrame.new(side * (width / 2 - 0.3), 0.18, 0), Vector3.new(0.35, 0.05, length), Color3.fromRGB(150, 225, 255), Enum.Material.Neon)
+	end
 	local steps = math.floor(length / 50)
 	for i = 1, steps do
 		local along = from:Lerp(to, i / (steps + 1))
 		local side = CFrame.lookAt(along, to) * CFrame.new(if i % 2 == 0 then width / 2 + 2 else -width / 2 - 2, 0, 0)
-		part(parent, side * CFrame.new(0, 1.5, 0), Vector3.new(0.6, 3, 0.6), HAZARD, Enum.Material.SmoothPlastic)
+		part(parent, side * CFrame.new(0, 1.5, 0), Vector3.new(0.6, 3, 0.6), HULL_DARK, Enum.Material.Metal)
 		part(parent, side * CFrame.new(0, 3.2, 0), Vector3.new(0.7, 0.4, 0.7), GLOW, Enum.Material.Neon)
 	end
 end
@@ -2608,10 +2612,12 @@ local function settlement(parent, at: CFrame, rules, rng)
 		return CFrame.lookAt(p, mid)
 	end
 
-	-- Paving: smooth grey walkways with a yellow dashed line down the middle
-	-- and cyan bollards along them; octagons (four bands across, each as
-	-- wide as a side) for the pads and the Arrival Plaza.
-	local PAVE = Color3.fromRGB(112, 114, 124)
+	-- Paving: dark slate walkways edged in light neon blue, a pale blue
+	-- dashed line down the middle and cyan bollards along them; octagons
+	-- (four bands across, each as wide as a side) for the pads and the
+	-- Arrival Plaza.
+	local PAVE = Color3.fromRGB(70, 78, 94)
+	local LINE = Color3.fromRGB(150, 225, 255)
 	local CONCRETE = Color3.fromRGB(122, 124, 134)
 	local DECK = Color3.fromRGB(68, 70, 80)
 	local paths = folder(m, "Paths")
@@ -2622,11 +2628,17 @@ local function settlement(parent, at: CFrame, rules, rng)
 		end
 		local along = CFrame.lookAt((from + to) / 2, to)
 		part(paths, along * CFrame.new(0, 0.15, 0), Vector3.new(width, 0.3, length + 1), PAVE, Enum.Material.SmoothPlastic)
+		-- (its glowing edges: the wider walkways only, the pads' own are plain)
+		if width >= 8 then
+			for _, side in { -1, 1 } do
+				part(paths, along * CFrame.new(side * (width / 2 - 0.35), 0.32, 0), Vector3.new(0.3, 0.05, length + 1), LINE, Enum.Material.Neon)
+			end
+		end
 		if dashed ~= false then
 			local n = math.max(1, math.floor(length / 7))
 			for k = 1, n do
 				local z = -length / 2 + (k - 0.5) * length / n
-				part(paths, along * CFrame.new(0, 0.32, z), Vector3.new(0.45, 0.04, math.min(3, length / n * 0.5)), HAZARD, Enum.Material.SmoothPlastic)
+				part(paths, along * CFrame.new(0, 0.32, z), Vector3.new(0.4, 0.04, math.min(3, length / n * 0.5)), LINE, Enum.Material.SmoothPlastic)
 			end
 		end
 		table.insert(lines, { from, to, width / 2 + 3 })
@@ -2656,7 +2668,7 @@ local function settlement(parent, at: CFrame, rules, rng)
 			local edge = frame * CFrame.Angles(0, k * math.pi / 4, 0) * CFrame.new(0, y, -apothem)
 			for j = 1, per do
 				local x = -side / 2 + (j - 0.5) * side / per
-				part(parent, edge * CFrame.new(x, 0, 0), Vector3.new(side / per * 0.55, 0.06, 0.5), HAZARD, Enum.Material.SmoothPlastic)
+				part(parent, edge * CFrame.new(x, 0, 0), Vector3.new(side / per * 0.55, 0.06, 0.5), LINE, Enum.Material.SmoothPlastic)
 			end
 		end
 	end
@@ -2787,7 +2799,9 @@ local function settlement(parent, at: CFrame, rules, rng)
 			local length = 2 * set.Wall * math.tan(math.pi / pieces) + 0.6
 			local f = facingIn(rules.place(a, set.Wall), set.WallHeight / 2)
 			solid(part(wall, f, Vector3.new(length, set.WallHeight, 3), Color3.fromRGB(92, 94, 104), Enum.Material.Concrete))
-			part(wall, f * CFrame.new(0, set.WallHeight / 2 + 0.15, 0), Vector3.new(length, 0.3, 3.2), HAZARD, Enum.Material.SmoothPlastic)
+			-- (a light blue line along its top)
+			part(wall, f * CFrame.new(0, set.WallHeight / 2 + 0.1, 0), Vector3.new(length, 0.2, 3.1), Color3.fromRGB(70, 78, 94), Enum.Material.SmoothPlastic)
+			part(wall, f * CFrame.new(0, set.WallHeight / 2 + 0.22, 0), Vector3.new(length, 0.1, 0.6), LINE, Enum.Material.Neon)
 		end
 	end
 	for _, g in { 0, 90, 180, 270 } do

@@ -4,9 +4,9 @@
 	your pod straight away and is kept. Each piece shows its rarity; the ones
 	you haven't rolled yet (your pod rolls one each time it lands) are locked.
 
-	  Left    HULL (its colour) and GLOW (the beacon, the trim, your name),
-	          then the yard's two spots either side of the stair, LEFT and
-	          RIGHT: what stands there
+	  Left    COLLECTION (how many pieces you have), HULL and GLOW swatches,
+	          then the YARD: which spot (left or right of the stair) and
+	          the decor for it. Hovering a piece names it.
 	  Right   SHOWCASE: one of your kaiju on the pedestal by the pod, or none
 
 	  PodUI.open()
@@ -16,6 +16,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PodStyle = require(ReplicatedStorage.Shared.PodStyle)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemClient = require(script.Parent.GemClient)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -25,34 +26,38 @@ local PodUI = {}
 local player = Players.LocalPlayer
 local P = IronUi.Colors
 local new = IronUi.new
-local W, H = 760, 500
-local LEFT_W = 400
+local W, H = 780, 520
+local LEFT_W = 430
 local CYAN = Color3.fromRGB(110, 220, 255)
-local INK = Color3.fromRGB(10, 13, 20)
-local CARD = Color3.fromRGB(18, 23, 34)
+local CARD = Color3.fromRGB(20, 26, 38)
+local CARD_ON = Color3.fromRGB(26, 50, 62)
+local LOCKED = Color3.fromRGB(16, 20, 30)
+local KIND = { Hull = "Hull", Glow = "Glow", Left = "Decor", Right = "Decor" }
+local SLOT_NAME = { Left = "LEFT OF THE STAIR", Right = "RIGHT OF THE STAIR" }
 
 local ui: { [string]: any } = {}
-local state = { Style = PodStyle.default(), Kaiju = {}, Owned = {}, Busy = false }
-local LOCKED = Color3.fromRGB(34, 40, 54)
+local state = { Style = PodStyle.default(), Kaiju = {}, Owned = {}, Busy = false, Slot = "Left" }
 
 local draw -- (forward)
 
-local function line(parent: Instance, value: string, size: number, color: Color3, x, y, w, h): TextLabel
-	local label = IronUi.text(parent, value, size, color, IronUi.Bold)
+local function line(parent: Instance, value: string, size: number, color: Color3, x, y, w, h, font: Enum.Font?): TextLabel
+	local label = IronUi.text(parent, value, size, color, font or IronUi.Bold)
 	label.AutomaticSize, label.TextWrapped = Enum.AutomaticSize.None, false
 	label.TextTruncate = Enum.TextTruncate.AtEnd
 	label.Position, label.Size = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h)
 	return label
 end
 
-local function chip(parent: Instance, text: string, color: Color3, x, y, w, h, onClick: () -> ()): TextButton
+-- An outline round a box (Border: on a TextButton it'd outline its text otherwise).
+local function ring(parent: Instance, thickness: number, color: Color3): UIStroke
+	return new("UIStroke", { Thickness = thickness, Color = color, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, parent)
+end
+
+local function button(parent: Instance, color: Color3, x, y, w, h, onClick: () -> ()): TextButton
 	local b = new("TextButton", {
-		Text = text,
-		Font = IronUi.Heading,
-		TextSize = 11,
-		TextColor3 = INK,
-		BackgroundColor3 = color,
+		Text = "",
 		AutoButtonColor = true,
+		BackgroundColor3 = color,
 		Position = UDim2.fromOffset(x, y),
 		Size = UDim2.fromOffset(w, h),
 	}, parent)
@@ -62,7 +67,48 @@ local function chip(parent: Instance, text: string, color: Color3, x, y, w, h, o
 	return b
 end
 
-local KIND = { Hull = "Hull", Glow = "Glow", Left = "Decor", Right = "Decor" }
+-- A small padlock (drawn: no glyph), its middle at (x, y) in `parent`.
+local function padlock(parent: Instance, x: number, y: number, color: Color3): Frame
+	local lock = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(12, 14),
+		ZIndex = 3,
+	}, parent)
+	local shackle = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		Size = UDim2.fromOffset(8, 9),
+		ZIndex = 3,
+	}, lock)
+	UiKit.round(shackle, 4)
+	ring(shackle, 2, color)
+	local body = new("Frame", {
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(0, 6),
+		Size = UDim2.fromOffset(12, 8),
+		ZIndex = 4,
+	}, lock)
+	UiKit.round(body, 2)
+	return lock
+end
+
+local function owns(kind: string, id: any): boolean
+	return PodStyle.owns(state.Owned, kind, id)
+end
+
+-- What a piece is, for its row's heading: "CHROME · EPIC" (· LOCKED).
+local function describe(kind: string, id: any): (string, Color3)
+	local entry = PodStyle.find(kind, id)
+	if not entry then
+		return "", P.Dim
+	end
+	local rarity = PodStyle.rarity(entry.Rarity)
+	return entry.Name .. "  ·  " .. rarity.Name .. (if owns(kind, id) then "" else "  ·  LOCKED"), rarity.Color
+end
 
 -- Picks one thing (`key` of the style = `value`) and keeps it.
 local function pick(key: string, value: any)
@@ -70,7 +116,7 @@ local function pick(key: string, value: any)
 		return
 	end
 	local kind = KIND[key]
-	if kind and not PodStyle.owns(state.Owned, kind, value) then
+	if kind and not owns(kind, value) then
 		local entry = PodStyle.find(kind, value)
 		local rarity = PodStyle.rarity(entry and entry.Rarity or "Common")
 		UiKit.toast(string.format("%s (%s) is locked: your pod rolls a new piece each time it lands.", entry and entry.Name or "That", rarity.Name), rarity.Color)
@@ -93,59 +139,84 @@ local function pick(key: string, value: any)
 	end)
 end
 
--- A row of colour swatches (`list`: PodStyle.Hulls or .Glows) for `key`,
--- each with its rarity's colour under it.
-local function swatches(parent: Instance, list, key: string, y: number)
+-- A row of colour swatches (`kind`: "Hull" or "Glow"), each with its
+-- rarity under it; hovering one names it on `label`.
+local PRISM = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 90)),
+	ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 90)),
+	ColorSequenceKeypoint.new(0.66, Color3.fromRGB(90, 220, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 110, 255)),
+})
+local function swatches(parent: Instance, kind: string, y: number, label: TextLabel)
 	local row = {}
-	local size = 40
-	for i, entry in list do
-		local x = (i - 1) * (size + 9)
-		local b = chip(parent, "", entry.Color, x, y, size, size, function()
-			pick(key, entry.Id)
+	local size, gap = 44, 10
+	for i, entry in (if kind == "Hull" then PodStyle.Hulls else PodStyle.Glows) do
+		local x = (i - 1) * (size + gap)
+		local b = button(parent, entry.Color, x, y, size, size, function()
+			pick(kind, entry.Id)
 		end)
-		local ring = new("UIStroke", { Thickness = 0, Color = Color3.new(1, 1, 1) }, b)
+		UiKit.round(b, 9)
+		if entry.Prism then
+			new("UIGradient", { Color = PRISM, Rotation = 45 }, b)
+		end
+		-- (not yours: dimmed, a padlock on it)
+		local shade = new("Frame", {
+			BackgroundColor3 = LOCKED,
+			BackgroundTransparency = 0.35,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 2,
+		}, b)
+		UiKit.round(shade, 9)
+		local lock = padlock(b, size / 2, size / 2, Color3.fromRGB(200, 208, 222))
+		local selected = ring(b, 0, Color3.new(1, 1, 1))
 		local strip = new("Frame", {
 			BackgroundColor3 = PodStyle.rarity(entry.Rarity).Color,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(x + 6, y + size + 3),
-			Size = UDim2.fromOffset(size - 12, 3),
+			Position = UDim2.fromOffset(x + 8, y + size + 4),
+			Size = UDim2.fromOffset(size - 16, 3),
 		}, parent)
 		UiKit.round(strip, 2)
-		if entry.Prism then
-			new("UIGradient", {
-				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 90)),
-					ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 90)),
-					ColorSequenceKeypoint.new(0.66, Color3.fromRGB(90, 220, 255)),
-					ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 110, 255)),
-				}),
-				Rotation = 45,
-			}, b)
-		end
-		local lock = line(b, "LOCKED", 8, P.Dim, 0, size / 2 - 5, size, 10)
-		lock.TextXAlignment = Enum.TextXAlignment.Center
-		row[entry.Id] = { Ring = ring, Button = b, Lock = lock, Color = entry.Color }
+		b.MouseEnter:Connect(function()
+			label.Text, label.TextColor3 = describe(kind, entry.Id)
+		end)
+		b.MouseLeave:Connect(function()
+			label.Text, label.TextColor3 = describe(kind, state.Style[kind])
+		end)
+		row[entry.Id] = { Ring = selected, Shade = shade, Lock = lock }
 	end
 	return row
 end
 
--- A grid of decor chips for the yard spot `key` ("Left" or "Right"), each
--- edged in its rarity's colour.
-local function decorChips(parent: Instance, key: string, y: number)
-	local row = {}
-	local cols, w, h = 4, 94, 24
+-- The yard's decor: a card each (its rarity down its left edge, a padlock
+-- if it's not yours), for the spot being dressed (state.Slot).
+local function decorCards(parent: Instance, y: number, label: TextLabel)
+	local cards = {}
+	local cols, gap = 3, 8
+	local w, h = (LEFT_W - (cols - 1) * gap) // cols, 30
 	for i, entry in PodStyle.Decor do
 		local col, r = (i - 1) % cols, (i - 1) // cols
-		local b = chip(parent, entry.Name, P.Edge, col * (w + 6), y + r * (h + 4), w, h, function()
-			pick(key, entry.Id)
+		local b = button(parent, CARD, col * (w + gap), y + r * (h + 6), w, h, function()
+			pick(state.Slot, entry.Id)
 		end)
-		b.TextScaled = true
-		new("UITextSizeConstraint", { MaxTextSize = 11 }, b)
-		new("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4) }, b)
-		new("UIStroke", { Thickness = 1, Color = PodStyle.rarity(entry.Rarity).Color, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, b)
-		row[entry.Id] = b
+		local edge = new("Frame", {
+			BackgroundColor3 = PodStyle.rarity(entry.Rarity).Color,
+			BorderSizePixel = 0,
+			Size = UDim2.new(0, 4, 1, 0),
+		}, b)
+		UiKit.round(edge, 2)
+		local name = line(b, entry.Name, 11, P.Text, 12, 0, w - 34, h)
+		local lock = padlock(b, w - 14, h / 2, P.Dim)
+		local selected = ring(b, 0, CYAN)
+		b.MouseEnter:Connect(function()
+			label.Text, label.TextColor3 = describe("Decor", entry.Id)
+		end)
+		b.MouseLeave:Connect(function()
+			label.Text, label.TextColor3 = describe("Decor", state.Style[state.Slot])
+		end)
+		cards[entry.Id] = { Button = b, Name = name, Lock = lock, Ring = selected }
 	end
-	return row
+	return cards
 end
 
 local function build()
@@ -160,23 +231,65 @@ local function build()
 	end)
 	ui.Window = w
 	local body = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(20, 78), Size = UDim2.new(1, -40, 1, -94) }, w.Panel)
-	line(body, "HULL", 12, P.Dim, 0, 0, LEFT_W, 16)
-	ui.Hull = swatches(body, PodStyle.Hulls, "Hull", 20)
-	ui.HullName = line(body, "", 12, P.Text, 0, 68, LEFT_W, 16)
-	line(body, "GLOW", 12, P.Dim, 0, 92, LEFT_W, 16)
-	ui.Glow = swatches(body, PodStyle.Glows, "Glow", 112)
-	ui.GlowName = line(body, "", 12, P.Text, 0, 160, LEFT_W, 16)
-	line(body, "YARD · LEFT OF THE STAIR", 12, P.Dim, 0, 186, LEFT_W, 16)
-	ui.Left = decorChips(body, "Left", 204)
-	line(body, "YARD · RIGHT OF THE STAIR", 12, P.Dim, 0, 294, LEFT_W, 16)
-	ui.Right = decorChips(body, "Right", 312)
-	local rx, rw = LEFT_W + 24, W - 40 - LEFT_W - 24
+	local bodyH = H - 94
+
+	-- the collection: how many pieces you have
+	line(body, "COLLECTION", 12, P.Dim, 0, 0, 120, 16)
+	ui.Count = line(body, "", 12, P.Text, LEFT_W - 160, 0, 160, 16)
+	ui.Count.TextXAlignment = Enum.TextXAlignment.Right
+	local track = new("Frame", { BackgroundColor3 = CARD, BorderSizePixel = 0, Position = UDim2.fromOffset(0, 20), Size = UDim2.fromOffset(LEFT_W, 6) }, body)
+	UiKit.round(track, 3)
+	ui.Fill = new("Frame", { BackgroundColor3 = CYAN, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1) }, track)
+	UiKit.round(ui.Fill, 3)
+
+	line(body, "HULL", 12, P.Dim, 0, 40, 60, 16)
+	ui.HullName = line(body, "", 12, P.Text, 60, 40, LEFT_W - 60, 16)
+	ui.HullName.TextXAlignment = Enum.TextXAlignment.Right
+	ui.Hull = swatches(body, "Hull", 60, ui.HullName)
+
+	line(body, "GLOW", 12, P.Dim, 0, 124, 60, 16)
+	ui.GlowName = line(body, "", 12, P.Text, 60, 124, LEFT_W - 60, 16)
+	ui.GlowName.TextXAlignment = Enum.TextXAlignment.Right
+	ui.Glow = swatches(body, "Glow", 144, ui.GlowName)
+
+	-- the yard: which spot, then what stands there
+	line(body, "YARD", 12, P.Dim, 0, 208, 60, 16)
+	ui.DecorName = line(body, "", 12, P.Text, 60, 208, LEFT_W - 60, 16)
+	ui.DecorName.TextXAlignment = Enum.TextXAlignment.Right
+	ui.Slots = {}
+	local half = (LEFT_W - 8) // 2
+	for i, slot in { "Left", "Right" } do
+		local b = button(body, CARD, (i - 1) * (half + 8), 228, half, 40, function()
+			state.Slot = slot
+			draw()
+		end)
+		line(b, SLOT_NAME[slot], 10, P.Dim, 12, 5, half - 24, 14)
+		local piece = line(b, "", 13, P.Text, 12, 19, half - 24, 16)
+		ui.Slots[slot] = { Button = b, Piece = piece, Ring = ring(b, 0, CYAN) }
+	end
+	ui.Decor = decorCards(body, 278, ui.DecorName)
+
+	-- how the roll works, and the rarities (commonest first)
+	local foot = bodyH - 18
+	line(body, "Your pod rolls a new piece every time it lands.", 11, P.Dim, 0, foot - 20, LEFT_W, 14, IronUi.Body)
+	local x = 0
+	for _, r in PodStyle.Rarities do
+		local dot = new("Frame", { BackgroundColor3 = r.Color, BorderSizePixel = 0, Position = UDim2.fromOffset(x, foot + 4), Size = UDim2.fromOffset(8, 8) }, body)
+		UiKit.round(dot, 4)
+		local width = math.ceil(#r.Name * 7.4)
+		line(body, r.Name, 10, r.Color, x + 12, foot, width + 4, 16)
+		x += 12 + width + 14
+	end
+
+	-- the showcase
+	local rx, rw = LEFT_W + 28, W - 40 - LEFT_W - 28
+	new("Frame", { BackgroundColor3 = P.Edge, BackgroundTransparency = 0.5, BorderSizePixel = 0, Position = UDim2.fromOffset(LEFT_W + 13, 0), Size = UDim2.fromOffset(1, bodyH) }, body)
 	line(body, "SHOWCASE", 12, P.Dim, rx, 0, rw, 16)
-	line(body, "One of your kaiju on the pedestal by your pod.", 11, P.Dim, rx, 18, rw, 16)
+	line(body, "One of your kaiju on the pedestal by your pod.", 11, P.Dim, rx, 18, rw, 16, IronUi.Body)
 	ui.List = new("ScrollingFrame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(rx, 42),
-		Size = UDim2.fromOffset(rw, H - 94 - 50),
+		Size = UDim2.fromOffset(rw, bodyH - 42),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 4,
@@ -190,50 +303,76 @@ draw = function()
 		return
 	end
 	local style = state.Style
+	-- the collection
+	local have, total = 0, 0
+	for kind, list in { Hull = PodStyle.Hulls, Glow = PodStyle.Glows, Decor = PodStyle.Decor } do
+		for _, entry in list do
+			if entry.Id ~= "None" then
+				total += 1
+				if owns(kind, entry.Id) then
+					have += 1
+				end
+			end
+		end
+	end
+	ui.Count.Text = string.format("%d / %d PIECES", have, total)
+	ui.Fill.Size = UDim2.fromScale(if total > 0 then have / total else 0, 1)
+	-- hull and glow
 	for _, kind in { "Hull", "Glow" } do
 		for id, swatch in ui[kind] do
-			local owned = PodStyle.owns(state.Owned, kind, id)
+			local mine = owns(kind, id)
 			swatch.Ring.Thickness = if style[kind] == id then 3 else 0
-			swatch.Button.BackgroundColor3 = if owned then swatch.Color else swatch.Color:Lerp(LOCKED, 0.75)
-			swatch.Lock.Visible = not owned
-		end
-		local entry = PodStyle.find(kind, style[kind])
-		local label = if kind == "Hull" then ui.HullName else ui.GlowName
-		if entry then
-			local rarity = PodStyle.rarity(entry.Rarity)
-			label.Text = entry.Name .. "  ·  " .. rarity.Name
-			label.TextColor3 = if kind == "Glow" then entry.Color else rarity.Color
+			swatch.Shade.Visible = not mine
+			swatch.Lock.Visible = not mine
 		end
 	end
-	for _, slot in { "Left", "Right" } do
-		for id, b in ui[slot] do
-			local owned = PodStyle.owns(state.Owned, "Decor", id)
-			b.BackgroundColor3 = if style[slot] == id then CYAN elseif owned then P.Edge else LOCKED
-			b.TextColor3 = if style[slot] == id then INK elseif owned then P.Text else P.Dim
-		end
+	ui.HullName.Text, ui.HullName.TextColor3 = describe("Hull", style.Hull)
+	ui.GlowName.Text, ui.GlowName.TextColor3 = describe("Glow", style.Glow)
+	-- the yard
+	for slot, s in ui.Slots do
+		local on = state.Slot == slot
+		local entry = PodStyle.find("Decor", style[slot])
+		s.Piece.Text = if entry then entry.Name else "NOTHING"
+		s.Ring.Thickness = if on then 2 else 0
+		s.Button.BackgroundColor3 = if on then CARD_ON else CARD
 	end
+	local current = style[state.Slot]
+	for id, card in ui.Decor do
+		local mine = owns("Decor", id)
+		local chosen = current == id
+		card.Ring.Thickness = if chosen then 2 else 0
+		card.Button.BackgroundColor3 = if chosen then CARD_ON elseif mine then CARD else LOCKED
+		card.Name.TextColor3 = if mine then P.Text else P.Dim
+		card.Name.TextTransparency = if mine then 0 else 0.35
+		card.Lock.Visible = not mine
+	end
+	ui.DecorName.Text, ui.DecorName.TextColor3 = describe("Decor", current)
+	-- the showcase
 	IronUi.clear(ui.List)
-	local function row(text: string, sub: string, chosen: boolean, onClick: () -> ())
+	local function row(text: string, sub: string, tint: Color3, chosen: boolean, onClick: () -> ())
 		local b = new("TextButton", {
 			Text = "",
 			AutoButtonColor = true,
-			BackgroundColor3 = if chosen then Color3.fromRGB(28, 52, 64) else CARD,
-			Size = UDim2.new(1, -6, 0, 44),
+			BackgroundColor3 = if chosen then CARD_ON else CARD,
+			Size = UDim2.new(1, -6, 0, 46),
 		}, ui.List)
 		UiKit.round(b, 8)
 		if chosen then
-			new("UIStroke", { Thickness = 2, Color = CYAN }, b)
+			ring(b, 2, CYAN)
 		end
 		b:SetAttribute("UiSound", "Click")
-		line(b, text, 13, P.Text, 12, 5, 260, 18)
-		line(b, sub, 11, P.Dim, 12, 23, 260, 16)
+		local edge = new("Frame", { BackgroundColor3 = tint, BorderSizePixel = 0, Size = UDim2.new(0, 4, 1, 0) }, b)
+		UiKit.round(edge, 2)
+		line(b, text, 13, P.Text, 14, 6, 220, 18)
+		line(b, sub, 11, P.Dim, 14, 25, 220, 15, IronUi.Body)
 		b.Activated:Connect(onClick)
 	end
-	row("NONE", "An empty pedestal", style.Showcase == nil, function()
+	row("NONE", "An empty pedestal", P.Edge, style.Showcase == nil, function()
 		pick("Showcase", nil)
 	end)
 	for _, k in state.Kaiju do
-		row(string.upper(k.Name or k.Species), string.format("%s · %s · LV %d", k.Species, k.Element or "?", k.Level or 1), style.Showcase == k.Id, function()
+		local tint = GemConfig.ElementColors[k.Element] or P.Edge
+		row(string.upper(k.Name or k.Species), string.format("%s  ·  %s  ·  LV %d", k.Species, k.Element or "?", k.Level or 1), tint, style.Showcase == k.Id, function()
 			pick("Showcase", k.Id)
 		end)
 	end

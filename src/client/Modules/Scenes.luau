@@ -639,24 +639,29 @@ function Scenes.spaceLighting()
 	end
 end
 
--- Restore the original moon-base lighting, including after a bright arena
--- or meadow visit. Keep the quarry readable beneath its stars and planets.
--- The finish: neon glows softly round its edges (the Shelter's running
--- lights, the rocks' crystals, the hologram) without blooming over
--- everything, a touch of contrast and colour so it doesn't look flat, and
--- only a faint sheen on metal (the Shelter's plate is meant to look worn,
--- not polished). A slight fog over the ground (the far side of the quarry
--- softens, each biome tints it: Client.FrontierHud) but no haze, so space
--- stays black, and no lift in brightness.
+-- The Outpost's lighting, including after a bright arena or meadow visit:
+-- day under a blue sky (the sun up, no stars), a soft blue haze on the
+-- horizon. The finish: neon glows softly round its edges (the walkways'
+-- lines, the rocks' crystals, the rings) without blooming over everything,
+-- a touch of contrast and colour so it doesn't look flat, and only a faint
+-- sheen on metal (the Shelter's plate is meant to look worn, not polished).
+-- Each biome tints the haze and the outdoor light (Client.FrontierHud).
 Scenes.OutpostFinish = {
-	Fog = { Density = 0.3, Offset = 0.12, Color = Color3.fromRGB(86, 92, 110), Decay = Color3.fromRGB(58, 62, 76) },
+	Clock = 14.5,
+	Brightness = 2.4,
+	Ambient = Color3.fromRGB(110, 118, 136),
+	Outdoor = Color3.fromRGB(150, 160, 182),
+	Fog = { Density = 0.28, Offset = 0.1, Color = Color3.fromRGB(190, 214, 245), Decay = Color3.fromRGB(110, 140, 190), Haze = 1.2, Glare = 0.2 },
 	Bloom = { Intensity = 0.3, Size = 24, Threshold = 1.6 },
-	Grade = { Contrast = 0.08, Saturation = 0.08, Tint = Color3.fromRGB(248, 250, 255) },
+	Grade = { Contrast = 0.08, Saturation = 0.1, Tint = Color3.fromRGB(250, 252, 255) },
 	Specular = 0.18,
 }
 function Scenes.outpostLighting()
 	local finish = Scenes.OutpostFinish
 	Scenes.spaceLighting()
+	Lighting.ClockTime = finish.Clock
+	Lighting.Brightness = finish.Brightness
+	Lighting.Ambient, Lighting.OutdoorAmbient = finish.Ambient, finish.Outdoor
 	Lighting.ExposureCompensation = -0.2 -- (a touch under: players found it too bright)
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = finish.Specular
@@ -665,6 +670,8 @@ function Scenes.outpostLighting()
 		for face, suffix in { Bk = "bk", Dn = "dn", Ft = "ft", Lf = "lf", Rt = "rt", Up = "up" } do
 			sky["Skybox" .. face] = "rbxasset://textures/sky/sky512_" .. suffix .. ".tex"
 		end
+		sky.StarCount = 0
+		sky.CelestialBodiesShown = true
 	end
 	-- (Made here when the server's lighting has none: menu-only mode's
 	-- space lighting has no grade.)
@@ -679,7 +686,7 @@ function Scenes.outpostLighting()
 	local fog = effect("Atmosphere")
 	fog.Density, fog.Offset, fog.Color, fog.Decay =
 		finish.Fog.Density, finish.Fog.Offset, finish.Fog.Color, finish.Fog.Decay
-	fog.Haze, fog.Glare = 0, 0
+	fog.Haze, fog.Glare = finish.Fog.Haze, finish.Fog.Glare
 	local bloom = effect("BloomEffect")
 	bloom.Intensity, bloom.Size, bloom.Threshold = finish.Bloom.Intensity, finish.Bloom.Size, finish.Bloom.Threshold
 	local grade = effect("ColorCorrectionEffect")

@@ -569,7 +569,7 @@ end}
 local Scenes={}
 ''' + lighting + r'''
 Scenes.outpostLighting()
-assert(Lighting.ClockTime==0 and not Lighting:FindFirstChildOfClass("Sky").CelestialBodiesShown,"Fresh moon lighting not applied")
+assert(Lighting.ClockTime==Scenes.OutpostFinish.Clock and Lighting:FindFirstChildOfClass("Sky").CelestialBodiesShown and Lighting:FindFirstChildOfClass("Sky").StarCount==0,"Fresh day lighting not applied")
 -- The finish is made on a fresh entry (menu-only mode's server lighting has no grade).
 local finish=Scenes.OutpostFinish
 local bloom,grade=Lighting:FindFirstChildOfClass("BloomEffect"),Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
@@ -587,22 +587,22 @@ end
 local clouds=Instance.new("Clouds")
 clouds.Parent=terrain
 clouds.Enabled=true
-Lighting.ClockTime=14.2
+Lighting.ClockTime=3
 Lighting.ExposureCompensation=.5
 Lighting:FindFirstChildOfClass("Sky").SkyboxUp="custom-day-sky"
 Scenes.outpostLighting()
-assert(Lighting.ClockTime==0 and Lighting.ExposureCompensation==-0.2 and not clouds.Enabled,"Daylight leaked into quarry")
+assert(Lighting.ClockTime==Scenes.OutpostFinish.Clock and Lighting.ExposureCompensation==-0.2 and not clouds.Enabled,"Another visit's light leaked into the Outpost")
 local atmosphere=Lighting:FindFirstChildOfClass("Atmosphere")
 assert(atmosphere.Density==Scenes.OutpostFinish.Fog.Density and atmosphere.Density>0 and atmosphere.Density<=0.35,"Quarry fog not slight")
-assert(atmosphere.Haze==0 and atmosphere.Glare==0,"Atmosphere hides space")
+assert(atmosphere.Haze==Scenes.OutpostFinish.Fog.Haze and atmosphere.Haze<=1.5 and atmosphere.Glare<=0.3,"The haze hides the field")
 assert(Lighting:FindFirstChildOfClass("ColorCorrectionEffect").Brightness==0,"Daytime grade retained")
 assert(Lighting:FindFirstChildOfClass("SunRaysEffect").Intensity==0,"Sun rays retained")
 local sky=Lighting:FindFirstChildOfClass("Sky")
-assert(sky.StarCount==5000 and not sky.CelestialBodiesShown and sky.SkyboxUp=="rbxasset://textures/sky/sky512_up.tex","Sky not restored")
+assert(sky.StarCount==0 and sky.CelestialBodiesShown and sky.SkyboxUp=="rbxasset://textures/sky/sky512_up.tex","Day sky not restored")
 local count=#Lighting.Children
 Scenes.outpostLighting()
 assert(#Lighting.Children==count and #terrain.Children==1,"Re-entry duplicated effects")
-print("PASS: fresh entry, daylight-to-moon lighting reset and repeated entry")
+print("PASS: fresh entry, another visit's lighting reset to the Outpost's day and repeated entry")
 end
 '''
 script = ROOT / ".tools/moon-quarry-test.luau"
