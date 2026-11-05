@@ -484,6 +484,10 @@ do
 	local shift = Vector3.new(0, 0, 250)
 	check(Frontier.atBase(Vector3.new(0, 8, 250), box, shift), "The moved Shelter's middle isn't at base")
 	check(not Frontier.atBase(Vector3.new(0, 8, 0), box, shift), "The old spot counted as at base after the move")
+	-- (and turned: the footprint turns with it, in the Shelter's own frame)
+	check(Frontier.atBase(Vector3.new(0, 0, 80), box, nil, math.pi / 2), "A turned Shelter's long side isn't at base")
+	check(not Frontier.atBase(Vector3.new(80, 0, 0), box, nil, math.pi / 2), "Out a turned Shelter's door counted as at base")
+	check(Frontier.atBase(Vector3.new(0, 8, 250), box, shift, 1.234), "A moved, turned Shelter's middle isn't at base")
 end
 
 -- Critters by band: levels, EXP, coins -----------------------------------------------------------------------

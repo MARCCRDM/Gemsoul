@@ -450,13 +450,13 @@ local function incursion(player: Player, band: string, count: number, raider: bo
 			-- (Round the base: close by, never in the Shelter; out there: the
 			-- frontier's tears.)
 			local spot = if band == "Core"
-				then Frontier.coreSpot(root.Position, look, center(), shelterBox(), rng, level3, Outpost.ShelterOffset)
+				then Frontier.coreSpot(root.Position, look, center(), shelterBox(), rng, level3, Outpost.ShelterOffset, Outpost.ShelterTurn)
 				else Frontier.riftSpot(root.Position, look, center(), rng, openTears(), spots, level3)
 			local floor = if spot
 				then KaijuServer.ground(spot)
 				else openGround(root, function()
 					return if band == "Core"
-						then Frontier.coreSpot(root.Position, look, center(), shelterBox(), rng, nil, Outpost.ShelterOffset)
+						then Frontier.coreSpot(root.Position, look, center(), shelterBox(), rng, nil, Outpost.ShelterOffset, Outpost.ShelterTurn)
 							or root.Position + look * Frontier.CoreCritters.Near
 						else Frontier.riftSpot(root.Position, look, center(), rng) :: Vector3
 				end)
@@ -1015,7 +1015,7 @@ local function step(dt: number)
 		local root = rootOf(player)
 		-- (Back at base or not, for anyone in the Outpost: healing needs it.)
 		local here = root and player:GetAttribute("Outpost") == true and player:GetAttribute("RiftRun") == nil
-		local atBase = if here then Frontier.atBase(root.Position - center(), shelterBox(), Outpost.ShelterOffset) else nil
+		local atBase = if here then Frontier.atBase(root.Position - center(), shelterBox(), Outpost.ShelterOffset, Outpost.ShelterTurn) else nil
 		if player:GetAttribute("AtBase") ~= atBase then
 			player:SetAttribute("AtBase", atBase)
 		end

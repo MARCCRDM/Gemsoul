@@ -2589,7 +2589,7 @@ end
 -- A secret: something hidden with a prompt-able part named "Secret".
 -- The settlement (Shared.Outpost.Settlement): the Crystal Heart in the
 -- middle of the mining field, the ring road round it, the pod pads on
--- their terraces, the Arena and Dungeon gates on the Gate Plaza, the
+-- their terraces, the Arrival Plaza with the Arena and Dungeon gates past it, the
 -- Enchanter at the field's edge and the wall round it all. Returns what the
 -- server hooks up (Pads, Gates, Enchanter, Heart), what rocks keep clear of
 -- (KeepOut) and the paths that count as roads (Lines).
@@ -2633,50 +2633,167 @@ local function settlement(parent, at: CFrame, rules, rng)
 	end
 	table.insert(keepOut, { at.Position, set.Heart + 10 })
 
-	-- The ring road round the field, open in front of the Shelter's door.
+	-- Paving: smooth grey walkways with a yellow dashed line down the middle
+	-- and cyan bollards along them; octagons (four bands across, each as
+	-- wide as a side) for the pads and the Arrival Plaza.
+	local PAVE = Color3.fromRGB(112, 114, 124)
+	local CONCRETE = Color3.fromRGB(122, 124, 134)
+	local DECK = Color3.fromRGB(68, 70, 80)
 	local paths = folder(m, "Paths")
+	local function walk(from: Vector3, to: Vector3, width: number, dashed: boolean?)
+		local length = (to - from).Magnitude
+		if length < 0.5 then
+			return
+		end
+		local along = CFrame.lookAt((from + to) / 2, to)
+		part(paths, along * CFrame.new(0, 0.15, 0), Vector3.new(width, 0.3, length + 1), PAVE, Enum.Material.SmoothPlastic)
+		if dashed ~= false then
+			local n = math.max(1, math.floor(length / 7))
+			for k = 1, n do
+				local z = -length / 2 + (k - 0.5) * length / n
+				part(paths, along * CFrame.new(0, 0.32, z), Vector3.new(0.45, 0.04, math.min(3, length / n * 0.5)), HAZARD, Enum.Material.SmoothPlastic)
+			end
+		end
+		table.insert(lines, { from, to, width / 2 + 3 })
+	end
+	local function bollard(parent, p: Vector3)
+		local base = CFrame.new(p)
+		part(parent, base * CFrame.new(0, 0.9, 0), Vector3.new(0.7, 1.8, 0.7), HULL_DARK, Enum.Material.Metal)
+		local cap = part(parent, base * CFrame.new(0, 2, 0), Vector3.new(0.75, 0.4, 0.75), GLOW, Enum.Material.Neon)
+		cap.Name = "Lamp"
+	end
+	local function octagon(parent, frame: CFrame, apothem: number, height: number, color, material)
+		local side = 2 * apothem * math.tan(math.pi / 8)
+		local bands = {}
+		for k = 0, 3 do
+			-- (a hair apart in height: no flicker where they overlap)
+			table.insert(
+				bands,
+				part(parent, frame * CFrame.new(0, k * 0.004, 0) * CFrame.Angles(0, k * math.pi / 4, 0), Vector3.new(2 * apothem, height, side), color, material or Enum.Material.SmoothPlastic)
+			)
+		end
+		return bands
+	end
+	-- a dashed octagon line, `apothem` out, `per` dashes a side
+	local function dashedOctagon(parent, frame: CFrame, apothem: number, per: number, y: number)
+		local side = 2 * apothem * math.tan(math.pi / 8)
+		for k = 0, 7 do
+			local edge = frame * CFrame.Angles(0, k * math.pi / 4, 0) * CFrame.new(0, y, -apothem)
+			for j = 1, per do
+				local x = -side / 2 + (j - 0.5) * side / per
+				part(parent, edge * CFrame.new(x, 0, 0), Vector3.new(side / per * 0.55, 0.06, 0.5), HAZARD, Enum.Material.SmoothPlastic)
+			end
+		end
+	end
+
+	-- The walkway round the field, open onto the Arrival Plaza; a bollard
+	-- every other joint, outside and in by turns.
 	local segs = 48
 	for i = 0, segs - 1 do
 		local a0, a1 = i / segs * 360, (i + 1) / segs * 360
 		if math.abs((a0 + a1) / 2 - 90) > set.RingGap then
-			local from, to = world(rules.place(a0, set.Ring)), world(rules.place(a1, set.Ring))
-			road(paths, from, to, 14)
-			table.insert(lines, { from, to })
+			walk(world(rules.place(a0, set.Ring)), world(rules.place(a1, set.Ring)), 14)
+			if i % 2 == 0 then
+				bollard(paths, world(rules.place(a0, set.Ring + (if i % 4 == 0 then 8 else -8))))
+			end
 		end
 	end
-	-- The path between the pod tiers.
+	-- The walkway between the pod tiers, and one down from each pad's stair.
 	local tierFrom, tierTo = set.Tiers[1].From, set.Tiers[1].To
 	local steps = 28
 	for i = 0, steps - 1 do
 		local a0 = tierFrom + i / steps * (tierTo - tierFrom)
 		local a1 = tierFrom + (i + 1) / steps * (tierTo - tierFrom)
-		local from, to = world(rules.place(a0, set.Terrace)), world(rules.place(a1, set.Terrace))
-		road(paths, from, to, 8)
-		table.insert(lines, { from, to })
+		walk(world(rules.place(a0, set.Terrace)), world(rules.place(a1, set.Terrace)), 8, false)
+	end
+	for _, spot in rules.padSpots() do
+		local row = set.Tiers[spot.Tier]
+		local down = if spot.Tier == 1 then set.Ring + 7 else set.Terrace + 4
+		walk(world(rules.place(spot.Angle, row.R - set.Pad - 1.6)), world(rules.place(spot.Angle, down)), 6, false)
+	end
+	-- Walkways winding through the field, round the Heart to the plaza.
+	for _, points in set.Walks do
+		local pts = {}
+		for _, p in points do
+			table.insert(pts, Vector3.new(p[1], 0, p[2]))
+		end
+		-- (a Catmull-Rom curve through them, in short straight pieces)
+		local last = world(pts[1])
+		for k = 1, #pts - 1 do
+			local p0, p1, p2, p3 = pts[math.max(1, k - 1)], pts[k], pts[k + 1], pts[math.min(#pts, k + 2)]
+			local pieces = math.max(1, math.ceil((p2 - p1).Magnitude / 10))
+			for j = 1, pieces do
+				local t = j / pieces
+				local t2, t3 = t * t, t * t * t
+				local q = (p1 * 2 + (p2 - p0) * t + (p0 * 2 - p1 * 5 + p2 * 4 - p3) * t2 + (p1 * 3 - p0 - p2 * 3 + p3) * t3) * 0.5
+				local here = world(q)
+				walk(last, here, 9)
+				last = here
+			end
+		end
 	end
 
-	-- The pod pads: a landing disc each, hazard-ringed, four lamps, facing
-	-- the Heart (Server.PodServer lands each player's pod on one).
+	-- The Arrival Plaza: a paved octagon south of the field, a dashed ring
+	-- and four lit panels on it, bollards round it, the shuttle's pad in the
+	-- middle (the build puts it there), and an apron south of it out to the
+	-- Arena and the Dungeon.
+	local plazaSet = set.Plaza
+	local plaza = folder(m, "ArrivalPlaza")
+	local plazaAt = at * CFrame.new(plazaSet.X, 0, plazaSet.Z)
+	for _, band in octagon(plaza, plazaAt * CFrame.new(0, 0.16, 0), plazaSet.Apothem, 0.32, PAVE) do
+		solid(band)
+	end
+	dashedOctagon(plaza, plazaAt, plazaSet.Apothem - 7, 4, 0.36)
+	for _, c in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+		part(plaza, plazaAt * CFrame.new(c[1] * 30, 0.36, c[2] * 30), Vector3.new(8, 0.06, 2.4), GLOW, Enum.Material.Neon)
+	end
+	for k = 0, 7 do
+		local corner = k * math.pi / 4 + math.pi / 8
+		local p = (plazaAt * CFrame.Angles(0, corner, 0) * CFrame.new(0, 0, -(plazaSet.Apothem + 1.5) / math.cos(math.pi / 8))).Position
+		-- (none where the walkways come in, north, nor on the apron, south)
+		if math.abs(math.cos(corner)) < 0.8 then
+			bollard(plaza, p)
+		end
+	end
+	local apron = plazaSet.Apron
+	local apronFrom = plazaSet.Z + plazaSet.Apothem - 6
+	local apronAt = at * CFrame.new(plazaSet.X, 0.15, (apronFrom + apron.To) / 2)
+	solid(part(plaza, apronAt, Vector3.new(apron.Half * 2, 0.3, apron.To - apronFrom), PAVE, Enum.Material.SmoothPlastic))
+	for _, side in { -1, 1 } do
+		part(plaza, apronAt * CFrame.new(side * (apron.Half - 0.6), 0.17, 0), Vector3.new(0.5, 0.06, apron.To - apronFrom), HAZARD, Enum.Material.SmoothPlastic)
+	end
+	table.insert(lines, { world(Vector3.new(plazaSet.X, 0, apronFrom)), world(Vector3.new(plazaSet.X, 0, apron.To)) })
+	table.insert(keepOut, { plazaAt.Position, plazaSet.Apothem / math.cos(math.pi / 8) + 4 })
+	for _, x in { -apron.Half * 0.5, apron.Half * 0.5 } do
+		table.insert(keepOut, { (at * CFrame.new(plazaSet.X + x, 0, (apronFrom + apron.To) / 2)).Position, apron.Half * 0.5 + 6 })
+	end
+
+	-- The pod pads: a raised octagon each, a dark deck with a yellow dashed
+	-- ring, cyan bollards round its corners and a step down toward the Heart,
+	-- facing it (Server.PodServer lands each player's pod on one).
 	local padsFolder = folder(m, "Pads")
 	local pads = {}
 	for index, spot in rules.padSpots() do
 		local frame = facingIn(spot.Offset)
 		local pad = folder(padsFolder, "Pad" .. index)
-		local plate = solid(disc(pad, frame * CFrame.new(0, 0.5, 0), set.Pad, 1, HULL_DARK, Enum.Material.DiamondPlate))
-		plate.Name = "Plate"
-		disc(pad, frame * CFrame.new(0, 1.03, 0), set.Pad - 1.2, 0.08, HAZARD, Enum.Material.SmoothPlastic)
-		disc(pad, frame * CFrame.new(0, 1.08, 0), set.Pad - 2.4, 0.08, HULL_DARK, Enum.Material.DiamondPlate)
-		for k = 0, 3 do
-			local a = k / 4 * math.pi * 2 + math.pi / 4
-			local lamp = part(
-				pad,
-				frame * CFrame.new(math.cos(a) * (set.Pad - 0.6), 1.25, math.sin(a) * (set.Pad - 0.6)),
-				Vector3.new(0.8, 0.5, 0.8),
-				GLOW,
-				Enum.Material.Neon
-			)
-			lamp.Name = "Lamp"
+		local bands = octagon(pad, frame * CFrame.new(0, 0.5, 0), set.Pad, 1, CONCRETE)
+		for _, band in bands do
+			solid(band)
 		end
+		bands[1].Name = "Plate"
+		octagon(pad, frame * CFrame.new(0, 1.04, 0), set.Pad - 1.6, 0.12, DECK)
+		dashedOctagon(pad, frame, set.Pad - 2.6, 1, 1.13)
+		-- a bollard on every corner but the two by the step
+		for k = 0, 7 do
+			local corner = k * math.pi / 4 + math.pi / 8
+			local onStep = math.abs(math.sin(corner)) < 0.5 and math.cos(corner) > 0 -- (-Z: toward the Heart)
+			if not onStep then
+				local p = (frame * CFrame.Angles(0, corner, 0) * CFrame.new(0, 1, -(set.Pad - 0.7) / math.cos(math.pi / 8))).Position
+				bollard(pad, p)
+			end
+		end
+		-- the step down toward the Heart
+		solid(part(pad, frame * CFrame.new(0, 0.25, -(set.Pad + 0.8)), Vector3.new(7, 0.5, 1.6), CONCRETE, Enum.Material.SmoothPlastic))
 		pad:SetAttribute("PadIndex", index)
 		pad:SetAttribute("Tier", spot.Tier)
 		table.insert(pads, { Index = index, Tier = spot.Tier, CFrame = frame * CFrame.new(0, 1.1, 0), Model = pad })
@@ -2711,7 +2828,7 @@ local function settlement(parent, at: CFrame, rules, rng)
 		end
 	end
 
-	-- The Gate Plaza's two gates: an arch each, facing the field, its word
+	-- The Arena and Dungeon gates past the Arrival Plaza: an arch each, facing the field, its word
 	-- over the opening and a glowing doorway; the server puts the prompt on
 	-- its Door (Arena: the duel queue; Dungeon: the Bounty Board).
 	local gates = {}
@@ -2833,8 +2950,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local roadLines = {}
 	local settle = assert(OutpostWorld.Rules, "OutpostWorld needs Shared.Outpost").Settlement
 	for _, a in Frontier.Spokes do
-		-- (from the settlement's ring road; the south one from behind the Shelter)
-		local start = if math.abs(a - math.pi / 2) < 0.01 then 316 else settle.Ring + 7
+		-- (from the settlement's ring road; the south one from the plaza's apron)
+		local start = if math.abs(a - math.pi / 2) < 0.01 then settle.Plaza.Apron.To - 2 else settle.Ring + 7
 		local from = (at * CFrame.new(math.cos(a) * start, 0, math.sin(a) * start)).Position
 		local to = (at * CFrame.new(math.cos(a) * (QUARRY - 20), 0, math.sin(a) * (QUARRY - 20))).Position
 		road(roads, from, to, 18)
@@ -2910,7 +3027,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local base = folder(root, "Outpost")
 	local north = at * CFrame.new(0, 0, -375) -- (out past the settlement's north gate)
 	-- Landing pad and shuttle, south-east of the Shelter.
-	local padAt = at * CFrame.new(rules.place(27, 255)) -- (the Gate Plaza)
+	local padAt = at * CFrame.new(rules.Settlement.Plaza.X, 0, rules.Settlement.Plaza.Z) -- (the Arrival Plaza)
 	solid(disc(base, padAt * CFrame.new(0, 0.5, 0), 20, 1, HULL_DARK, Enum.Material.DiamondPlate))
 	disc(base, padAt * CFrame.new(0, 1.05, 0), 16, 0.1, STEEL, Enum.Material.SmoothPlastic)
 	disc(base, padAt * CFrame.new(0, 1.1, 0), 14.6, 0.1, HULL_DARK, Enum.Material.DiamondPlate)
@@ -3136,7 +3253,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	)
 	beacon.Name = "Beacon"
 	-- Cargo containers.
-	for i, c in { { -180, 210, 0 }, { 285, 150, 0 } } do
+	for i, c in { { -180, 210, 0 }, { -126, 266, 0 } } do
 		local colors = { HAZARD, Color3.fromRGB(70, 110, 160), Color3.fromRGB(170, 70, 60), STEEL }
 		solid(
 			part(
@@ -3149,7 +3266,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		)
 	end
 	-- Supply crates stacked about.
-	for _, c in { { 165, 205 }, { -150, 215 }, { 115, 228 } } do
+	for _, c in { { -96, 206 }, { -150, 215 }, { -110, 178 } } do
 		for k = 0, 2 do
 			solid(
 				part(
@@ -3190,7 +3307,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ solar.Position, 30 },
 		{ tanks.Position, 24 },
 		{ (at * CFrame.new(-180, 0, 210)).Position, 10 },
-		{ (at * CFrame.new(285, 0, 150)).Position, 10 },
+		{ (at * CFrame.new(-126, 0, 266)).Position, 10 },
 		{ rigAt.Position, 16 },
 		-- (the container stacks out in the quarry)
 		{ (at * CFrame.new(-400, 0, -56)).Position, 20 },
@@ -3226,7 +3343,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 			local a, b = line[1] * Vector3.new(1, 0, 1), line[2] * Vector3.new(1, 0, 1)
 			local q = p * Vector3.new(1, 0, 1)
 			local t = math.clamp((q - a):Dot(b - a) / (b - a):Dot(b - a), 0, 1)
-			if (a + (b - a) * t - q).Magnitude < 14 then
+			if (a + (b - a) * t - q).Magnitude < (line[3] or 14) then -- (a walkway: its own reach)
 				return true
 			end
 		end

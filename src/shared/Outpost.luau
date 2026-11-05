@@ -64,12 +64,14 @@ Outpost.ShelterLift = 8
 -- Where the Shelter stands, from the quarry's middle (studs, on the floor),
 -- and how far it's turned (ShelterTurn, radians). Everything built round
 -- it, the Kaiju Arena's hall under it and its life on the client follow
--- (Outpost.shelterFrame). In the settlement it stands south of the mining
--- field, turned round so its main door faces the Crystal Heart, the
--- garage's bays at its back. (A CFrame's Position: no Vector3 needed to
--- load these rules.)
-Outpost.ShelterOffset = CFrame.new(0, 0, 250).Position
-Outpost.ShelterTurn = math.pi
+-- (Outpost.shelterFrame). In the settlement it's the Market & Gear, south-
+-- east of the mining field (Settlement.Market), turned so its main door
+-- faces the Crystal Heart, the garage's bays at its back. (A CFrame's
+-- Position: no Vector3 needed to load these rules.)
+local MARKET_ANGLE, MARKET_R = math.rad(40), 255
+Outpost.ShelterOffset = CFrame.new(math.cos(MARKET_ANGLE) * MARKET_R, 0, math.sin(MARKET_ANGLE) * MARKET_R).Position
+-- (its door, its +Z, turned to face the middle)
+Outpost.ShelterTurn = math.atan2(-math.cos(MARKET_ANGLE), -math.sin(MARKET_ANGLE))
 function Outpost.shelterFrame(): CFrame
 	return Outpost.Location * CFrame.new(Outpost.ShelterOffset) * CFrame.Angles(0, Outpost.ShelterTurn, 0)
 end
@@ -80,14 +82,18 @@ end
 	south, 270 north), offsets in the quarry's frame (Outpost.Location).
 
 	  middle      the mining field (Field) round the Crystal Heart (Heart)
-	  Ring        the ring road round the field (broken in front of the
-	              Shelter's door: RingGap degrees either side of south)
-	  north       the pod terraces: Tiers of pads (Pad: each pad's radius),
-	              their ramps facing the Heart, a Terrace path between the
-	              tiers; no pad within RoadGap degrees of the north road
-	  south       the Shelter (ShelterOffset)
-	  west        the Kaiju Grounds (the Daycare: Shared.Daycare.Pen)
-	  east        the Gate Plaza: the Arena gate and the Dungeon gate
+	  Ring        the walkway round the field (open onto the Arrival Plaza:
+	              RingGap degrees either side of south); Walks wind
+	              through the field from it to the plaza
+	  north       the pod terraces: Tiers of pads (Pad: each pad's apothem,
+	              an octagon), their stairs facing the Heart, a Terrace
+	              walkway between the tiers and one down from each pad;
+	              no pad within RoadGap degrees of the north road
+	  south       the Arrival Plaza (Plaza: an octagon, the shuttle's pad
+	              in the middle), and past it at the south gate the Arena
+	              and the Dungeon side by side
+	  south-west  the Kaiju Habitat (the Daycare: Shared.Daycare.Pen)
+	  south-east  the Market & Gear: the Shelter (ShelterOffset)
 	  Wall        round it all, open at the four spokes (GateWidth studs)
 
 	  Outpost.padSpots() -> { { Offset: Vector3, Angle: number, Tier: number } }
@@ -102,7 +108,17 @@ Outpost.Settlement = {
 	Field = 135,
 	Heart = 16,
 	Ring = 160,
-	RingGap = 16,
+	RingGap = 8,
+	Plaza = { X = 0, Z = 222, Apothem = 58, Apron = { To = 304, Half = 74 } },
+	-- (x, z points: from the ring round the Heart to the plaza; one in to the Heart)
+	Walks = {
+		{ { -131, -92 }, { -78, -36 }, { -66, 56 }, { -26, 124 }, { 0, 164 } },
+		{ { 131, -92 }, { 78, -36 }, { 66, 56 }, { 26, 124 }, { 0, 164 } },
+		{ { 0, -160 }, { -8, -96 }, { 0, -44 } },
+		-- (and from the plaza out to the Kaiju Habitat and the Market's side ramp)
+		{ { -52, 212 }, { -128, 168 }, { -196, 104 } },
+		{ { 70, 288 }, { 92, 282 }, { 116, 272 } },
+	},
 	Tiers = {
 		{ R = 245, Count = 25, From = 186, To = 354 },
 		{ R = 292, Count = 28, From = 189, To = 351 },
@@ -110,10 +126,11 @@ Outpost.Settlement = {
 	Terrace = 268,
 	Pad = 12,
 	RoadGap = 6,
-	Doorstep = { R = { 196, 206, 214 }, Every = 8.4, From = 192, To = 352 },
+	Doorstep = { R = { 196, 206, 214 } }, -- (rocks between the inner pads: Outpost.doorstepSpots)
 	Daycare = { Angle = 160, R = 255 },
-	Arena = { Angle = 14, R = 318 },
-	Dungeon = { Angle = 40, R = 318 },
+	Market = { Angle = 40, R = 255 },
+	Arena = { Angle = 99, R = 316 },
+	Dungeon = { Angle = 81, R = 316 },
 	Enchanter = { Angle = 62, R = 150 },
 }
 function Outpost.place(angle: number, r: number): Vector3
@@ -133,16 +150,21 @@ function Outpost.padSpots(): { { Offset: Vector3, Angle: number, Tier: number } 
 	end
 	return list
 end
+-- (between the inner pads, where their walkways don't run, a little in
+-- and out by turns)
 function Outpost.doorstepSpots(): { Vector3 }
 	local rules = Outpost.Settlement.Doorstep
+	local row = Outpost.Settlement.Tiers[1]
+	local step = (row.To - row.From) / (row.Count - 1)
 	local list, k = {}, 0
-	local angle = rules.From
-	while angle <= rules.To do
+	for i = 0, row.Count - 2 do
+		local angle = row.From + (i + 0.5) * step
 		if math.abs(angle - 270) >= Outpost.Settlement.RoadGap + 2 then
+			for _, r in { rules.R[1 + k % #rules.R], rules.R[1 + (k + 1) % #rules.R] } do
+				table.insert(list, Outpost.place(angle, r))
+			end
 			k += 1
-			table.insert(list, Outpost.place(angle, rules.R[(k - 1) % #rules.R + 1]))
 		end
-		angle += rules.Every
 	end
 	return list
 end

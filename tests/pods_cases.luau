@@ -259,6 +259,8 @@ local function podModel(p)
 	local index = p:GetAttribute("PodIndex")
 	return index and pads[index].Model:FindFirstChild("Pod")
 end
+local REST = Pods.Base + 2.3 * Pods.Scale -- (the hull's middle over the pad, landed)
+local BEACON = (4.6 + 3.9 - 2.3) * Pods.Scale -- (the beacon over the hull's middle)
 local function hullHeight(p)
 	local model = podModel(p)
 	return model.PrimaryPart.CFrame.Position.Y - pads[p:GetAttribute("PodIndex")].CFrame.Position.Y
@@ -280,21 +282,24 @@ check(plate and plate:FindFirstChildOfClass("TextLabel").Text == "Ana", "No name
 local beacon = pod:FindFirstChild("Beacon")
 check(beacon and beacon.Color == Pods.colorFor(ana.UserId) and beacon:FindFirstChildOfClass("PointLight"), "No beacon in their colour")
 local ramp = pod:FindFirstChild("Ramp")
-check(ramp and ramp.CanCollide and pod.PrimaryPart.CanCollide, "You can walk through the pod or fall through its ramp")
+check(ramp and ramp.CanCollide and pod.PrimaryPart.CanCollide, "You can walk through the pod or fall through its stair")
+check(pads[index].Model:FindFirstChild("Display") == nil, "The display stall is up before the pod has landed")
 -- It comes down from on high, the thruster lit, and lands on its pad.
 local h0 = hullHeight(ana)
 check(h0 > Pods.Landing.Height * 0.9, "The pod doesn't start up in the sky")
 check(pod.Thruster.Transparency < 1, "No thruster on the way down")
 advance(Pods.Landing.Fall / 2)
 local h1 = hullHeight(ana)
-check(h1 < h0 and h1 > 6.5, "The pod isn't on its way down")
+check(h1 < h0 and h1 > REST, "The pod isn't on its way down")
 -- (every piece comes down with it)
-check(math.abs((pod.Beacon.CFrame.Position.Y - pod.PrimaryPart.CFrame.Position.Y) - (18.6 - 6.5)) < 0.01, "The beacon was left behind")
+check(math.abs((pod.Beacon.CFrame.Position.Y - pod.PrimaryPart.CFrame.Position.Y) - BEACON) < 0.01, "The beacon was left behind")
 advance(Pods.Landing.Fall / 2 + 0.1)
-check(math.abs(hullHeight(ana) - 6.5) < 0.01, "The pod didn't land on its pad")
+check(math.abs(hullHeight(ana) - REST) < 0.01, "The pod didn't land on its pad")
 check(pod:GetAttribute("Landed") == true and pod.Thruster.Transparency == 1, "The thruster's still lit on the pad")
+local stall = pads[index].Model:FindFirstChild("Display")
+check(stall and stall:FindFirstChild("Counter"), "No display stall beside the landed pod")
 local rampTop = ramp.CFrame.Position.Y - pads[index].CFrame.Position.Y
-check(math.abs(rampTop - 0.9) < 0.01, "The ramp isn't on the pad")
+check(math.abs(rampTop - Pods.Base / 2) < 0.01, "The ramp isn't on the pad")
 
 -- A friend lands beside you.
 friendsOf[2] = { 1 }
@@ -313,14 +318,15 @@ for i = #delayed, 1, -1 do
 		d[2](table.unpack(d[3], 1, d[3].n))
 	end
 end
-check(math.abs(hullHeight(cara) - 6.5) < 0.01, "The failsafe didn't land the pod")
+check(math.abs(hullHeight(cara) - REST) < 0.01, "The failsafe didn't land the pod")
 
 -- Leaving: up and away, then the pad's free again (not before).
 local anaPod = podModel(ana)
 leave(ana)
 advance(Pods.Landing.LiftOff / 2)
-check(not gone(anaPod) and anaPod.PrimaryPart.CFrame.Position.Y - pads[index].CFrame.Position.Y > 6.5 + 1, "The pod didn't lift off")
+check(not gone(anaPod) and anaPod.PrimaryPart.CFrame.Position.Y - pads[index].CFrame.Position.Y > REST + 1, "The pod didn't lift off")
 check(Server._taken[index] ~= nil, "The pad was freed with the pod still on it")
+check(gone(stall) or stall.Parent == nil, "The display stall stayed behind")
 advance(Pods.Landing.LiftOff / 2 + 0.2)
 check(gone(anaPod), "The pod never left")
 check(Server._taken[index] == nil, "The pad was never freed")

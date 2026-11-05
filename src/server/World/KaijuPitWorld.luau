@@ -432,8 +432,9 @@ function KaijuPitWorld.build(origin: CFrame, parent: Instance)
 	local screen = part(shell, kiosk * CFrame.new(0, 5.7, 0), Vector3.new(5, 2.6, 0.3), HULL_DARK, Enum.Material.Metal)
 	screen.Name = "GuideScreen"
 	paint(shell, kiosk * CFrame.new(0, 5.7, -0.16), Vector3.new(4.2, 1.6, 0.02), "INFO")
-	local guide =
-		CFrame.lookAt(at(11, hall.Balcony + 0.1, -Z + 9.5).Position, at(0, hall.Balcony + 0.1, -Z + 8).Position)
+	-- (turned in the hall's own frame toward where you arrive, 11 left and
+	-- 1.5 forward: the hall itself may stand turned, under the Shelter)
+	local guide = at(11, hall.Balcony + 0.1, -Z + 9.5) * CFrame.Angles(0, math.atan2(11, 1.5), 0)
 	-- Warm work lights along the walls.
 	for x = -X + 18, X - 18, 36 do
 		for _, s in { -1, 1 } do

@@ -56,9 +56,9 @@ local WHITE = Color3.new(1, 1, 1)
 -- Where things are, in the quarry's frame (Server OutpostWorld.build).
 -- (The haul roads are the four spokes, Frontier.Spokes: north, east, south, west.)
 -- (From the settlement's ring road out; the south road from behind the Shelter: SouthFrom.)
-QuarryLife.Roads = { From = 179, SouthFrom = 318, To = 524, Step = 20, Side = 8.4, Ring = 420 }
+QuarryLife.Roads = { From = 179, SouthFrom = 302, To = 524, Step = 20, Side = 8.4, Ring = 420 }
 QuarryLife.Ramps = { { 1, 470 }, { 2, 455 }, { 3, 470 }, { 4, 455 } } -- (road, studs out: the jump ramps, Server OutpostWorld)
-QuarryLife.Pad = V(227.2, 1.15, 115.8) -- the shuttle pad's top (on the Gate Plaza)
+QuarryLife.Pad = V(0, 1.15, 222) -- the shuttle pad's top (in the middle of the Arrival Plaza)
 QuarryLife.Drop = V(56, 18, -355) -- where the lifter hovers at the north outpost (out past the wall)
 QuarryLife.Cruise = 62 -- the lifter's height between (well over the Shelter's skylight)
 QuarryLife.Flight = 40 -- seconds each way

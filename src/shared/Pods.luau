@@ -19,9 +19,14 @@ Pods.Landing = {
 	Failsafe = 6, -- seconds: it's on its pad by then whatever happens
 	LiftOff = 2.6, -- seconds up and gone when you leave
 }
--- The pod: its hull's radius and how far in front its ramp reaches.
-Pods.Hull = 5.5
-Pods.Ramp = 7
+-- The pod (a habitat module), drawn Scale times its model's size: its
+-- width, half its depth (door to centre), the skirt it stands on and how
+-- far in front its stair reaches (studs, at that scale).
+Pods.Scale = 1.35
+Pods.Width = 11 * Pods.Scale
+Pods.Hull = 3.8 * Pods.Scale
+Pods.Base = 1.6 * Pods.Scale
+Pods.Ramp = 3.2 * Pods.Scale
 -- Beacons: a colour each, kept for a player (by their UserId).
 Pods.Colors = {
 	Color3.fromRGB(110, 220, 255),

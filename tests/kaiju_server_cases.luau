@@ -2329,6 +2329,13 @@ local Frontier = shared("Frontier")
 local FrontierServer = serverModule("FrontierServer")
 local riftsFolder
 local center = outpost * Vector3.new(1, 0, 1)
+-- In the Shelter (the Market & Gear): x, z from its middle in its own frame
+-- (Shared.Outpost.ShelterOffset, turned ShelterTurn).
+local function atShelter(x, y, z)
+	local rules = shared("Outpost")
+	local c, s = math.cos(rules.ShelterTurn), math.sin(rules.ShelterTurn)
+	return center + Vector3.new(rules.ShelterOffset.X + x * c + z * s, y, rules.ShelterOffset.Z - x * s + z * c)
+end
 FrontierServer.start({
 	Scars = { CFrame.new(center + Vector3.new(Frontier.Rim + 2, 0, 0)) },
 	Spawn = CFrame.new(center + Vector3.new(0, 3, 0)),
@@ -2386,7 +2393,7 @@ end
 -- A miner swinging in the core: no rifts, however long, and no noise.
 clearCritters()
 table.clear(playerHits)
-stand(center + Vector3.new(60, 5, 250))
+stand(atShelter(60, 5, 0))
 swingFor(60, 0.5)
 check(#rifts() == 0 and #critterFor(b) == 0, "A rift opened in the core")
 check(b:GetAttribute("FrontierBand") == "Core", "No band for the HUD")
@@ -2394,7 +2401,7 @@ check((b:GetAttribute("FrontierNoise") or 0) <= Frontier.Noise.Restart + 0.05, "
 check(b:GetAttribute("FrontierAlone") == nil, "Alone in the core")
 -- Back at base: the Shelter's footprint (AtBase: only there does the
 -- lobby heal), not the quarry round it.
-stand(center + Vector3.new(-40, 11, 280))
+stand(atShelter(-40, 11, 30))
 FrontierServer._step(0.5)
 check(b:GetAttribute("AtBase") == true, "In the Shelter, not at base")
 stand(center + Vector3.new(120, 5, 0))
@@ -2555,7 +2562,7 @@ swingFor(200, 0.4, function()
 end)
 local leaver = critterFor(b)[1]
 check(leaver ~= nil, "No critter to send home")
-stand(center + Vector3.new(40, 5, 250))
+stand(atShelter(40, 5, 0))
 leaver.Root.CFrame = CFrame.new(center + Vector3.new(375, 5, 0))
 leaver.Home = leaver.Root.Position
 before = #rifts()
@@ -2707,7 +2714,7 @@ local function stirringUp()
 	check(b:GetAttribute("FrontierStir") == shownStir(), "The HUD wasn't told it settled")
 	-- Back in the core it settles faster, swinging or not (and swinging
 	-- there stirs nothing).
-	stand(center + Vector3.new(40, 5, 250))
+	stand(atShelter(40, 5, 0))
 	local was = state.Stir
 	swingFor(10, 0.5)
 	check(math.abs(state.Stir - (was - 5 * D.CoreFade)) < 1e-6, "The core didn't settle it: " .. state.Stir)
@@ -2787,7 +2794,7 @@ now += 0.5
 FrontierServer._step(0.5)
 FrontierServer._setWanderAt(math.huge)
 check(#FrontierServer._wanders == 1, "No second wandering rift")
-stand(center + Vector3.new(40, 5, 250))
+stand(atShelter(40, 5, 0))
 now += Frontier.Rift.Hop + 0.1
 runDelayed()
 check(#critterFor(b) == 0 and #FrontierServer._wanders == 0, "A wandering rift let critters out with nobody near")
@@ -5729,7 +5736,7 @@ end)()
 		return false
 	end
 	-- The haul: only gems mined out past the core.
-	stand(center + Vector3.new(60, 5, 250))
+	stand(atShelter(60, 5, 0))
 	local coreGem = { Id = "core-1", Tier = "Common", Element = "Fire" }
 	table.insert(profile.Gems, coreGem)
 	FrontierServer.mined(b, coreGem)
@@ -5888,7 +5895,7 @@ end)()
 	-- Back in the core, the haul is safe.
 	b:SetAttribute("SparDown", nil)
 	FrontierServer._hauls[b] = { { Id = "haul-1" } }
-	stand(center + Vector3.new(60, 5, 250))
+	stand(atShelter(60, 5, 0))
 	FrontierServer._step(0.5)
 	check(FrontierServer._hauls[b] == nil, "The haul wasn't safe back in the core")
 	clearCritters()
@@ -5914,7 +5921,7 @@ end)()
 	b.Character.PrimaryPart = rootB
 	local hB = b.Character:FindFirstChildOfClass("Humanoid")
 	hB.MaxHealth, hB.Health = 100, 1
-	stand(center + Vector3.new(60, 5, 250))
+	stand(atShelter(60, 5, 0))
 	check(FrontierServer.knockedOut(b) == nil and b:GetAttribute("Robbed") == nil, "Robbed in the core")
 	-- Killed in the core all the same: dead a moment, nothing taken, then
 	-- back at base, whole.

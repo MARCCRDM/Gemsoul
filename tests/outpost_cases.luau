@@ -1536,8 +1536,11 @@ do
 		end
 	end
 	-- the Shelter, south, turned to face the field
+	-- the Market & Gear (the Shelter): south-east of the field, its door facing the middle
 	local front = Rules.shelterFrame():VectorToWorldSpace(R.Vector3.new(0, 0, 1))
-	check(Rules.ShelterOffset.Z > set.Field and front.Z < -0.99, "The Shelter isn't south of the field, facing it")
+	local toMiddle = -R.Vector3.new(Rules.ShelterOffset.X, 0, Rules.ShelterOffset.Z).Unit
+	check(Rules.ShelterOffset.X > set.Field / 2 and Rules.ShelterOffset.Z > set.Field / 2, "The Market isn't south-east of the field")
+	check(front:Dot(toMiddle) > 0.99, "The Market's door doesn't face the middle")
 	for _, spot in site.Spots do
 		local q = Rules.shelterFrame():PointToObjectSpace(spot.Position)
 		check(math.abs(q.X) >= site.Shelter.Box.X or math.abs(q.Z) >= site.Shelter.Box.Y, "A rock inside the Shelter")
