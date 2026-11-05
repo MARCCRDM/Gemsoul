@@ -109,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.53 · 2026-11-05 the Shelter back, open ground rings, pods by the Shelter",
+		Build = "1.54 · 2026-11-05 MY POD: hull, glow, kaiju showcase, front-yard decor",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error

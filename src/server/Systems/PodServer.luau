@@ -18,13 +18,32 @@
 	  PodServer.land(player) -> boolean   lands their pod with them in it
 	                           (false: it's down already, or there's none)
 	  PodServer.spawnFor(player) -> CFrame?
+	  PodServer.restyle(player)   their pod and yard again, in their style now
+
+	Its style (Shared.PodStyle: the hull's colour, its glow, the showcase's
+	kaiju, the yard's decor) comes from PodServer.styleOf(player) and the
+	showcase's kaiju from PodServer.kaijuOf(player, id) (Main: the profile);
+	MY POD (Client.PodUI) opens from a prompt on its door, its owner's only.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Pods = require(ReplicatedStorage.Shared.Pods)
+local PodStyle = require(ReplicatedStorage.Shared.PodStyle)
 
 local PodServer = {}
+-- (Main wires these to the profile: its Pod, and its kaiju by id)
+PodServer.styleOf = function(_player: Player): any
+	return nil
+end
+PodServer.kaijuOf = function(_player: Player, _id: string): any
+	return nil
+end
+local function styleFor(player: Player)
+	return PodStyle.clean(PodServer.styleOf(player), function(id)
+		return PodServer.kaijuOf(player, id) ~= nil
+	end)
+end
 
 local STEEL = Color3.fromRGB(128, 134, 146)
 local DARK = Color3.fromRGB(58, 62, 72)
@@ -83,7 +102,9 @@ local CYAN = Color3.fromRGB(110, 220, 255)
 local SOLAR = Color3.fromRGB(38, 54, 96)
 local function build(player: Player, pad): (Model, { any })
 	local f = pad.CFrame
-	local color = Pods.colorFor(player.UserId)
+	local style = styleFor(player)
+	local color = PodStyle.glow(style)
+	local hullColor = PodStyle.hull(style)
 	-- (drawn at Pods.Scale: these are the sizes before it)
 	local K = Pods.Scale
 	local function F(x, y, z)
@@ -107,19 +128,21 @@ local function build(player: Player, pad): (Model, { any })
 	-- the skirt it stands on (up off the pad on its legs), the body and its rounded roof
 	local skirt = part(model, F(0, base * 0.65, 0), V(w - 1, base * 0.7, d - 0.6), DARK, Enum.Material.Metal)
 	skirt.CanCollide, skirt.CanQuery = true, true
-	local body = part(model, F(0, base + 2.3, 0), V(w, 4.6, d), WHITE, Enum.Material.SmoothPlastic)
+	local body = part(model, F(0, base + 2.3, 0), V(w, 4.6, d), hullColor, Enum.Material.SmoothPlastic)
 	body.Name = "Hull"
 	body.CanCollide, body.CanQuery = true, true
 	model.PrimaryPart = body
 	local roofY = base + 4.6
-	part(model, F(0, roofY + 0.7, 0), V(w, 1.4, d - 2.8), WHITE, Enum.Material.SmoothPlastic)
+	part(model, F(0, roofY + 0.7, 0), V(w, 1.4, d - 2.8), hullColor, Enum.Material.SmoothPlastic)
 	for _, side in { -1, 1 } do
 		-- (a cylinder lies along X: the roof's rounded edges)
-		part(model, F(0, roofY, side * (d / 2 - 1.4)), V(w, 2.8, 2.8), WHITE, Enum.Material.SmoothPlastic, "Cylinder")
+		part(model, F(0, roofY, side * (d / 2 - 1.4)), V(w, 2.8, 2.8), hullColor, Enum.Material.SmoothPlastic, "Cylinder")
 		-- dark end panels and a trim band round the bottom
 		part(model, F(side * (w / 2 + 0.05), base + 2.6, 0), V(0.3, 5, d - 1), DARK, Enum.Material.Metal)
 	end
 	part(model, F(0, base + 0.35, 0), V(w + 0.2, 0.5, d + 0.2), DARK, Enum.Material.Metal)
+	-- its glow: a trim line round the hull over the band
+	part(model, F(0, base + 0.68, 0), V(w + 0.24, 0.14, d + 0.24), color, Enum.Material.Neon).Name = "Trim"
 	-- the front: double doors and two windows, lit warm
 	local front = -d / 2
 	part(model, F(0, base + 2.1, front - 0.1), V(3.8, 4.1, 0.3), DARK, Enum.Material.Metal)
@@ -127,7 +150,7 @@ local function build(player: Player, pad): (Model, { any })
 	door.Name = "Door"
 	-- (its two leaves slide apart as it deploys)
 	for _, side in { -1, 1 } do
-		local leaf = part(model, F(side * (0.78 + 1.3), base + 2, front - 0.4), V(1.55, 3.7, 0.15), WHITE, Enum.Material.SmoothPlastic)
+		local leaf = part(model, F(side * (0.78 + 1.3), base + 2, front - 0.4), V(1.55, 3.7, 0.15), hullColor, Enum.Material.SmoothPlastic)
 		leaf.Name = "DoorLeaf"
 		stow(leaf, "Deploy", V(-side * 1.3, 0, 0), 0.22, 0.5)
 	end
@@ -216,7 +239,7 @@ local function build(player: Player, pad): (Model, { any })
 	label.Size = UDim2.fromScale(1, 1)
 	label.Font = Enum.Font.GothamBold
 	label.TextScaled = true
-	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.55)
 	label.TextStrokeColor3 = Color3.fromRGB(20, 22, 30)
 	label.TextStrokeTransparency = 0.3
 	label.Text = player.DisplayName
@@ -228,6 +251,27 @@ local function build(player: Player, pad): (Model, { any })
 	roar.SoundId = "rbxasset://sounds/action_falling.mp3"
 	roar.Volume, roar.RollOffMaxDistance = 0.7, 260
 	roar.Parent = body
+	-- (what its style colours: the hull, and its glow)
+	for _, p in model:GetChildren() do
+		if p:IsA("BasePart") then
+			if p.Color == hullColor and p.Material == Enum.Material.SmoothPlastic then
+				p:SetAttribute("Paint", "Hull")
+			elseif p.Name == "Beacon" or p.Name == "Trim" then
+				p:SetAttribute("Paint", "Glow")
+			end
+		end
+	end
+	-- MY POD, on its door (its owner's: the client hides it from the rest)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "PodPrompt"
+	prompt.ActionText, prompt.ObjectText = "Customize", "MY POD"
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("PromptKind", "Pod")
+	prompt:SetAttribute("OwnerId", player.UserId)
+	prompt.Parent = door
 	-- (its body solid to the camera: Roblox's pulls in in front of it, never
 	-- through it)
 	for _, p in model:GetChildren() do
@@ -244,7 +288,50 @@ end
 -- warm underneath, a counter (where the owner's favourite things will go)
 -- and a couple of crates.
 local WOOD = Color3.fromRGB(120, 86, 58)
-local function display(pad): Model
+-- The front yard's pieces (Shared.PodStyle.Decor), each at `at` (on the
+-- pad, facing out toward the Heart), in the pod's glow `glow`.
+local DECOR = {}
+function DECOR.Lamps(m, at: CFrame, glow: Color3)
+	for _, dx in { -1.3, 1.3 } do
+		part(m, at * CFrame.new(dx, 2, 0), Vector3.new(0.35, 4, 0.35), DARK, Enum.Material.Metal)
+		local cap = part(m, at * CFrame.new(dx, 4.2, 0), Vector3.new(0.9, 0.5, 0.9), glow, Enum.Material.Neon)
+		local light = Instance.new("PointLight")
+		light.Color, light.Range, light.Brightness = glow, 10, 0.8
+		light.Parent = cap
+	end
+end
+function DECOR.Planter(m, at: CFrame, glow: Color3)
+	part(m, at * CFrame.new(0, 0.6, 0), Vector3.new(3, 1.2, 1.8), DARK, Enum.Material.Metal)
+	for i, spec in { { -0.8, 2.6, 0.2 }, { 0.3, 3.4, -0.25 }, { 0.95, 2.2, 0.35 } } do
+		part(m, at * CFrame.new(spec[1], 1.2 + spec[2] / 2, 0) * CFrame.Angles(0, i, spec[3]), Vector3.new(0.6, spec[2], 0.6), glow, Enum.Material.Neon)
+	end
+end
+function DECOR.Flag(m, at: CFrame, glow: Color3)
+	part(m, at * CFrame.new(0, 3.6, 0), Vector3.new(0.25, 7.2, 0.25), STEEL, Enum.Material.Metal)
+	part(m, at * CFrame.new(0, 7.3, 0), Vector3.new(0.45, 0.45, 0.45), glow, Enum.Material.Neon, "Ball")
+	part(m, at * CFrame.new(1.1, 6, 0), Vector3.new(2, 2.4, 0.08), glow, Enum.Material.Fabric)
+end
+function DECOR.Crates(m, at: CFrame, _glow: Color3)
+	part(m, at * CFrame.new(-0.6, 0.8, 0), Vector3.new(1.6, 1.6, 1.6), WOOD, Enum.Material.WoodPlanks)
+	part(m, at * CFrame.new(-0.4, 2.2, 0.1) * CFrame.Angles(0, 0.4, 0), Vector3.new(1.2, 1.2, 1.2), WOOD, Enum.Material.WoodPlanks)
+	part(m, at * CFrame.new(1.1, 0.8, 0) * UP, Vector3.new(1.6, 1.2, 1.2), Color3.fromRGB(128, 76, 50), Enum.Material.CorrodedMetal, "Cylinder")
+end
+function DECOR.Drill(m, at: CFrame, glow: Color3)
+	part(m, at * CFrame.new(0, 0.5, 0), Vector3.new(2.2, 1, 2.2), DARK, Enum.Material.Metal)
+	part(m, at * CFrame.new(0, 2.4, 0), Vector3.new(0.4, 3, 0.4), Color3.fromRGB(240, 178, 48), Enum.Material.Metal)
+	part(m, at * CFrame.new(0, 3.9, 0) * UP, Vector3.new(1.4, 1, 1), STEEL, Enum.Material.Metal, "Cylinder")
+	part(m, at * CFrame.new(0, 1.3, 0) * CFrame.Angles(0, 0, math.rad(180)), Vector3.new(0.6, 1.2, 0.6), glow, Enum.Material.Neon)
+end
+function DECOR.Scope(m, at: CFrame, _glow: Color3)
+	for k = 0, 2 do
+		local a = k / 3 * math.pi * 2
+		part(m, at * CFrame.Angles(0, a, 0) * CFrame.new(0, 1.2, 0.7) * CFrame.Angles(math.rad(-20), 0, 0), Vector3.new(0.18, 2.6, 0.18), DARK, Enum.Material.Metal)
+	end
+	part(m, at * CFrame.new(0, 2.8, 0) * CFrame.Angles(math.rad(35), 0, 0) * CFrame.Angles(0, math.rad(90), 0) * UP * CFrame.Angles(0, 0, math.rad(-90)),
+		Vector3.new(2.6, 0.6, 0.6), STEEL, Enum.Material.Metal, "Cylinder")
+end
+
+local function display(pad, style): Model
 	local f = pad.CFrame
 	local K = Pods.Scale
 	local function F(x, y, z)
@@ -273,10 +360,43 @@ local function display(pad): Model
 	part(stall, F(x - 1, 0.4, z + 1.6) * CFrame.Angles(0, math.rad(20), 0), V(0.8, 0.8, 0.8), WOOD, Enum.Material.WoodPlanks)
 	local cyan = part(stall, F(x - 1, 1.55, z - 1.5), V(0.35, 0.5, 0.35), CYAN, Enum.Material.Neon)
 	cyan.Name = "Lantern"
+	-- The yard: the showcase's pedestal (its kaiju is each client's to build,
+	-- Client.PodShowcase, from the Showcase attributes) and a decor spot each
+	-- side of the stair.
+	style = style or PodStyle.default()
+	local glow = PodStyle.glow(style)
+	local slots = PodStyle.Slots
+	local plinthAt = f * CFrame.new(slots.Showcase.X, 0, slots.Showcase.Z)
+	local plinth = part(stall, plinthAt * CFrame.new(0, 0.7, 0), Vector3.new(2.6, 1.4, 2.6), DARK, Enum.Material.Metal)
+	plinth.Name = "Showcase"
+	plinth.CanCollide = true
+	part(stall, plinthAt * CFrame.new(0, 1.43, 0) * UP, Vector3.new(0.06, 2.4, 2.4), glow, Enum.Material.Neon, "Cylinder").Name = "ShowcaseGlow"
+	local holo = Instance.new("PointLight")
+	holo.Color, holo.Range, holo.Brightness = glow, 9, 0.7
+	holo.Parent = plinth
+	for _, slot in { "Left", "Right" } do
+		local spot = slots[slot]
+		local build = DECOR[style[slot]]
+		if build then
+			local piece = Instance.new("Model")
+			piece.Name = "Decor" .. slot
+			build(piece, f * CFrame.new(spot.X, 0, spot.Z), glow)
+			piece.Parent = stall
+		end
+	end
 	stall.Parent = pad.Model
 	return stall
 end
 local STALL_SINK = 4.6 * Pods.Scale -- (how far under the pad it waits to rise)
+
+-- The showcase's kaiju, for each client to build on its pedestal.
+local function showcase(stall: Model, player: Player, style)
+	local record = style and style.Showcase and PodServer.kaijuOf(player, style.Showcase)
+	stall:SetAttribute("ShowcaseSpecies", if record then record.Species else nil)
+	stall:SetAttribute("ShowcaseElement", if record then record.Element else nil)
+	stall:SetAttribute("ShowcaseName", if record then (record.Name or record.Species) else nil)
+	stall:SetAttribute("ShowcaseLevel", if record then record.Level else nil)
+end
 
 local function ease(x: number): number
 	x = math.clamp(x, 0, 1)
@@ -412,8 +532,11 @@ local function touchdown(entry)
 	thruster(entry.Model, false)
 	dust(entry.Pad)
 	if not entry.Display and entry.PadInfo then
-		local stall = display(entry.PadInfo)
+		local stall = display(entry.PadInfo, entry.Style)
 		entry.Display = stall
+		if entry.Rider then
+			showcase(stall, entry.Rider, entry.Style)
+		end
 		entry.StallRest = {}
 		for _, p in stall:GetDescendants() do
 			if p:IsA("BasePart") then
@@ -545,6 +668,8 @@ function PodServer.land(player: Player): boolean
 		T = -landing.Lead,
 		Index = pod.Index,
 		Rider = player,
+		Owner = player,
+		Style = styleFor(player),
 	}
 	pod.Model, pod.Entry = model, entry
 	setHeight(entry, landing.Height)
@@ -603,6 +728,41 @@ local function depart(player: Player)
 	task.delay(Pods.Landing.LiftOff + 2, function()
 		scrap(pod.Model, pod.Index)
 	end)
+end
+
+-- Their style again (MY POD: Client.PodUI): the hull and glow recoloured,
+-- the yard rebuilt (once it's up), the showcase's kaiju.
+function PodServer.restyle(player: Player)
+	local pod = podOf[player]
+	if not pod or not pod.Model or not standing(pod.Model) then
+		return
+	end
+	local entry = pod.Entry
+	local style = styleFor(player)
+	entry.Style = style
+	local hull, glow = PodStyle.hull(style), PodStyle.glow(style)
+	for _, p in pod.Model:GetDescendants() do
+		if p:IsA("BasePart") then
+			local paint = p:GetAttribute("Paint")
+			if paint == "Hull" then
+				p.Color = hull
+			elseif paint == "Glow" then
+				p.Color = glow
+				local light = p:FindFirstChildOfClass("PointLight")
+				if light then
+					light.Color = glow
+				end
+			end
+		elseif p:IsA("TextLabel") then
+			p.TextColor3 = glow:Lerp(Color3.new(1, 1, 1), 0.55)
+		end
+	end
+	if entry.Display and pod.Model:GetAttribute("Landed") then
+		entry.Display:Destroy()
+		entry.Display = display(entry.PadInfo, style)
+		entry.StallRest = nil
+		showcase(entry.Display, player, style)
+	end
 end
 
 function PodServer.spawnFor(player: Player): CFrame?

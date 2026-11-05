@@ -92,6 +92,20 @@ local function load(path, name, env)
 end
 local Outpost = load("src/shared/Outpost.luau", "Outpost")
 local Pods = load("src/shared/Pods.luau", "Pods")
+local PodStyle = load("src/shared/PodStyle.luau", "PodStyle")
+
+-- Styles: only what's real is kept.
+do
+	local d = PodStyle.default()
+	local cleaned = PodStyle.clean({ Hull = "Plaid", Glow = "Gold", Left = "Moat", Right = "Flag", Showcase = "k9" }, function(id)
+		return id == "k1"
+	end)
+	check(cleaned.Hull == d.Hull and cleaned.Glow == "Gold" and cleaned.Left == d.Left and cleaned.Right == "Flag", "A style kept something made up")
+	check(cleaned.Showcase == nil, "A showcase kaiju that isn't theirs")
+	check(PodStyle.clean({ Showcase = "k1" }, function(id) return id == "k1" end).Showcase == "k1", "Their own kaiju wasn't kept for the showcase")
+	check(PodStyle.clean(nil).Hull == d.Hull and PodStyle.clean("junk").Glow == d.Glow, "No style isn't the default")
+	check(PodStyle.hull({ Hull = "Crimson" }) ~= PodStyle.hull(d) and PodStyle.glow({ Glow = "Ember" }) ~= PodStyle.glow(d), "Colours don't follow the style")
+end
 
 -- The rules ----------------------------------------------------------------------------------
 -- A beacon colour each, the same every time.
@@ -222,7 +236,7 @@ local Players = {
 		}
 	end,
 }
-local replicated = { Shared = { Pods = "Pods" } }
+local replicated = { Shared = { Pods = "Pods", PodStyle = "PodStyle" } }
 local moved = {}
 local workspaceRoot = R.Instance.new("Folder")
 local env = setmetatable({
@@ -247,7 +261,7 @@ local env = setmetatable({
 	task = fakeTask,
 	typeof = R.typeof or typeof,
 	require = function(m)
-		return ({ Pods = Pods })[m]
+		return ({ Pods = Pods, PodStyle = PodStyle })[m]
 	end,
 	__now = function()
 		return now
@@ -352,7 +366,9 @@ check(pod:GetAttribute("OwnerId") == ana.UserId, "The pod doesn't say whose it i
 local plate = pod.PrimaryPart:FindFirstChild("Nameplate")
 check(plate and plate:FindFirstChildOfClass("TextLabel").Text == "Ana", "No nameplate with their name")
 local beacon = pod:FindFirstChild("Beacon")
-check(beacon and beacon.Color == Pods.colorFor(ana.UserId) and beacon:FindFirstChildOfClass("PointLight"), "No beacon in their colour")
+check(beacon and beacon.Color == PodStyle.glow(PodStyle.default()) and beacon:FindFirstChildOfClass("PointLight"), "No beacon in their glow")
+local doorPrompt = pod:FindFirstChild("Door") and pod.Door:FindFirstChild("PodPrompt")
+check(doorPrompt and doorPrompt:GetAttribute("PromptKind") == "Pod" and doorPrompt:GetAttribute("OwnerId") == ana.UserId, "No MY POD prompt on the door")
 check(hullHeight(ana) > L.Height * 0.99, "The pod doesn't start up in the sky")
 check(pod.Thruster.Transparency < 1, "No thrusters on the way down")
 local function inside()
@@ -397,6 +413,34 @@ check(ana:GetAttribute("PodLanding") == nil and not anaRoot.Anchored, "The rider
 local out = local_(ana, anaRoot)
 check(out.Z < -Pods.Hull and out.Z > -(Pods.Hull + Pods.Ramp) and out.Y > Pods.Base, "Not let out at the top of the stair")
 check(moved.Ana and (moved.Ana - Server.spawnFor(ana).Position).Magnitude < 0.01, "Not walked down to the foot of the stair")
+
+-- The yard: the showcase's pedestal and the default decor either side of the stair.
+do
+	local yard = pads[index].Model:FindFirstChild("Display")
+	check(yard:FindFirstChild("Showcase") and yard:FindFirstChild("DecorLeft") and yard:FindFirstChild("DecorRight"), "No showcase or decor in the yard")
+	check(yard:GetAttribute("ShowcaseSpecies") == nil, "A showcase kaiju nobody picked")
+	local at = local_(ana, yard.Showcase)
+	check(math.abs(at.X - PodStyle.Slots.Showcase.X) < 0.01 and math.abs(at.Z - PodStyle.Slots.Showcase.Z) < 0.01, "The pedestal isn't in its spot")
+	check(math.abs(at.X) > Pods.Width / 2 + 0.8, "The pedestal is in the pod")
+end
+-- Restyled: the hull, the glow, the decor and the showcase change on the spot.
+do
+	local mine = { Hull = "Crimson", Glow = "Ember", Left = "Flag", Right = "None", Showcase = "k1" }
+	Server.styleOf = function(p)
+		return if p == ana then mine else nil
+	end
+	Server.kaijuOf = function(p, id)
+		return if p == ana and id == "k1" then { Species = "Gulper", Element = "Fire", Name = "Chomp", Level = 7 } else nil
+	end
+	Server.restyle(ana)
+	check(pod.Hull.Color == PodStyle.hull(mine) and pod.Beacon.Color == PodStyle.glow(mine) and pod.Trim.Color == PodStyle.glow(mine), "The pod didn't take its new colours")
+	local yard = pads[index].Model:FindFirstChild("Display")
+	check(yard and yard:FindFirstChild("DecorLeft") and yard:FindFirstChild("DecorRight") == nil, "The yard's decor didn't change")
+	check(yard:GetAttribute("ShowcaseSpecies") == "Gulper" and yard:GetAttribute("ShowcaseName") == "Chomp" and yard:GetAttribute("ShowcaseLevel") == 7, "The showcase's kaiju isn't set for the clients")
+	check(local_(ana, yard.Showcase).Y > 0, "The rebuilt yard is under the pad")
+	Server.styleOf = function() return nil end
+	Server.kaijuOf = function() return nil end
+end
 
 -- A friend's pad is beside yours.
 friendsOf[2] = { 1 }
@@ -467,7 +511,7 @@ local Arrival = luau.load(fs.readFile(ROOT .. "/src/client/Modules/PodArrival.lu
 		CFrame = FixedCFrame,
 		Vector3 = R.Vector3,
 		require = function(m)
-			return ({ Pods = Pods })[m]
+			return ({ Pods = Pods, PodStyle = PodStyle })[m]
 		end,
 	}, { __index = _G }),
 })()

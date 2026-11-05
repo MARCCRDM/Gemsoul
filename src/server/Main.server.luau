@@ -147,6 +147,50 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 	local PodServer = require(script.Parent.Systems.PodServer)
 	PodServer.start(OutpostServer.site())
 	OutpostServer.podArrival = PodServer.land
+	-- Its style (Shared.PodStyle) and its showcase's kaiju, from the profile;
+	-- MY POD (Client.PodUI) reads them and sets them.
+	local PodStyle = require(game:GetService("ReplicatedStorage").Shared.PodStyle)
+	local function kaijuOf(player, id)
+		local profile = PlayerData.get(player) :: any
+		local list = profile and profile.Kaiju and profile.Kaiju.List
+		local record = list and list[id]
+		return if type(record) == "table" then record else nil
+	end
+	PodServer.kaijuOf = kaijuOf
+	PodServer.styleOf = function(player)
+		local profile = PlayerData.get(player) :: any
+		return profile and profile.Pod
+	end
+	Shop.register("PodStyleState", function(player)
+		local profile = PlayerData.get(player) :: any
+		if not profile then
+			return Shop.reply(false, "Your pod's not ready yet.")
+		end
+		local kaiju = {}
+		for id, record in (profile.Kaiju and profile.Kaiju.List) or {} do
+			if type(record) == "table" then
+				table.insert(kaiju, { Id = id, Species = record.Species, Element = record.Element, Name = record.Name, Level = record.Level })
+			end
+		end
+		table.sort(kaiju, function(a, b)
+			return (a.Level or 0) > (b.Level or 0)
+		end)
+		local style = PodStyle.clean(profile.Pod, function(id)
+			return kaijuOf(player, id) ~= nil
+		end)
+		return Shop.reply(true, "", { Style = style, Kaiju = kaiju })
+	end)
+	Shop.register("PodStyle", function(player, wanted)
+		local profile = PlayerData.get(player) :: any
+		if not profile then
+			return Shop.reply(false, "Your pod's not ready yet.")
+		end
+		profile.Pod = PodStyle.clean(wanted, function(id)
+			return kaijuOf(player, id) ~= nil
+		end)
+		PodServer.restyle(player)
+		return Shop.reply(true, "", { Style = profile.Pod })
+	end)
 	-- Arena Row: copies of the Arena out in the open, for fights to take
 	-- (Server.PrivateArenas: Training first, the Intro Ring then the Grand Arena).
 	if Config.CombatEnabled or not Config.MenuOnly then

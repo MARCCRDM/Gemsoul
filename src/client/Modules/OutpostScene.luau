@@ -1875,6 +1875,11 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt,
 	elseif kind == "Enchanter" then
 		-- (the settlement's Enchanter: set gems into your gear)
 		require(script.Parent.InventoryUI).open()
+	elseif kind == "Pod" then
+		-- (your pod's door: MY POD)
+		if prompt:GetAttribute("OwnerId") == player.UserId then
+			require(script.Parent.PodUI).open()
+		end
 	elseif kind == "Duels" then
 		-- (Brutus's duel counter: the duel queue.)
 		require(script.Parent.SocialUI).open("Arena")
@@ -2270,6 +2275,9 @@ FrontierHud.start()
 require(script.Parent.RiftClient).start()
 -- Your pod coming down with you in it, the first time in (Server.PodServer).
 require(script.Parent.PodArrival).start()
+-- MY POD: its door's prompt on your own pod only; the pods' showcase kaiju.
+require(script.Parent.PodUI).start()
+local PodShowcase = require(script.Parent.PodShowcase)
 -- (The Shelter's frame: the quarry's, lifted onto its legs.)
 local shelterFrame = Rules.shelterFrame() * CFrame.new(0, Rules.ShelterLift, 0)
 RunService.RenderStepped:Connect(function(dt)
@@ -2285,6 +2293,11 @@ RunService.RenderStepped:Connect(function(dt)
 		BountyBoard.mount(shelterFrame)
 		StoreDisplays.mount(shelterFrame)
 		QuarryLife.mount(Rules.Location)
+	end
+	if active then
+		PodShowcase.step(dt)
+	else
+		PodShowcase.clear()
 	end
 	SkyRift.show(active)
 	ShelterLife.show(active)
