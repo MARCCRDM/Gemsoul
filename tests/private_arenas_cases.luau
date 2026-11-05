@@ -148,5 +148,20 @@ check(PrivateArenas.claim(g) == sa, "The Intro Ring wasn't taken again")
 for _, who in { e, f, g } do
 	PrivateArenas.release(who)
 end
+-- A duel: one ring for both fighters, the one it asks for first; free again
+-- only once they're both out of it; nil when every ring's taken.
+local h, i, j, k = player(8), player(9), player(10), player(11)
+check(PrivateArenas.claimStage({ h, i }, "GrandArena") == sb, "A duel didn't take the Grand Arena")
+check(h:GetAttribute("ArenaCenter") == sb and i:GetAttribute("ArenaCenter") == sb, "A duel's fighters don't both have the ring")
+check(PrivateArenas.claimStage({ j, k }, "GrandArena") == sa, "A second duel didn't take the other ring")
+check(PrivateArenas.claimStage({ player(12), player(13) }, "GrandArena") == nil, "A duel took a ring that's taken")
+PrivateArenas.release(h)
+check(PrivateArenas.claimStage({ player(14), player(15) }) == nil, "A ring freed with a fighter still in it")
+PrivateArenas.release(i)
+local again = player(16)
+check(PrivateArenas.claimStage({ again }, "GrandArena") == sb, "The Grand Arena wasn't free once both were out")
+for _, who in { j, k, again } do
+	PrivateArenas.release(who)
+end
 
 print(string.format("PASS: %d private arena checks (one each, far apart, scenery only, reused; Arena Row: open rings on the ground, a see-through barrier always up)", checks))

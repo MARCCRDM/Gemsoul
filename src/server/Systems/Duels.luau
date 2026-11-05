@@ -107,6 +107,7 @@ local Season = require(ReplicatedStorage.Shared.Season)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local CombatServer = require(script.Parent.CombatServer)
 local ArenaSessions = require(script.Parent.ArenaSessions)
+local PrivateArenas = require(script.Parent.PrivateArenas)
 local Party = require(script.Parent.Party)
 local PlayerData = require(script.Parent.PlayerData)
 local IntroRounds = require(ReplicatedStorage.Shared.IntroRounds)
@@ -269,7 +270,9 @@ end
 local function freeSlot(): number?
 	local used = {}
 	for _, match in matches do
-		used[match.Slot] = true
+		if match.Slot then -- (none: it's in a ring of Arena Row)
+			used[match.Slot] = true
+		end
 	end
 	for slot = 1, Matchmaking.Lanes do
 		if not used[slot] then
@@ -361,6 +364,14 @@ local function release(match)
 	for _, shield in match.Shields do
 		shield:Destroy()
 	end
+	-- (its ring of Arena Row free again once everyone's out of it)
+	if match.Center then
+		for _, team in match.Teams do
+			for _, member in team do
+				PrivateArenas.release(member)
+			end
+		end
+	end
 	matches[match.Id] = nil
 end
 
@@ -370,6 +381,7 @@ end
 -- offer's off, and the other's told). IntroRematch on each: the other's
 -- name, while it stands (Duels.RematchFor seconds).
 Duels.RematchFor = 45
+Duels.Stage = "GrandArena" -- (the ring duels take first: Shared.Outpost.Settlement.Stages)
 Duels.RematchTries = 30 -- (half a second apart: the loser's respawn)
 local Rematch = { Offers = {} :: { [Player]: any } }
 function Rematch.clear(player: Player, tell: string?)
@@ -642,13 +654,33 @@ local function dropShields(match)
 	end
 end
 
--- Puts every fighter on their lane spot, at full health and shielded.
+-- Where a fighter stands in a ring of Arena Row (`center`: its floor's
+-- middle): the two sides StageApart studs apart across it, a team's members
+-- side by side, facing the other side. Pure: (spot, the point it faces).
+Duels.StageApart = 24
+function Duels.stageSpot(center: Vector3, team: number, index: number, count: number): (Vector3, Vector3)
+	local side = if team == 1 then -1 else 1
+	local across = (index - (count + 1) / 2) * 5
+	local spot = center + Vector3.new(side * Duels.StageApart / 2, 3, across)
+	return spot, center + Vector3.new(0, 3, across)
+end
+
+-- Puts every fighter on their lane spot (or their spot in the match's ring
+-- of Arena Row), at full health and shielded.
 local function stage(match)
 	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
 	local floor = landmarks and landmarks:GetAttribute("ArenaFloor")
 	for t, team in match.Teams do
 		for index, member in team do
 			local humanoid, root = alive(member)
+			if humanoid and root and match.Center then
+				local at, facing = Duels.stageSpot(match.Center, t, index, #team)
+				member.Character:PivotTo(CFrame.lookAt(at, facing))
+				member.Character:SetAttribute("RoundKO", nil)
+				humanoid.Health = humanoid.MaxHealth
+				shield(match, member)
+				continue
+			end
 			local spot, centre = Matchmaking.lane(match.Slot, t, index, #team)
 			if humanoid and root and typeof(floor) == "Vector3" then
 				local at = floor + spot + Vector3.new(0, 3, 0)
@@ -683,12 +715,6 @@ end
 local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 	extra = extra or {}
 	local ranked = rules.Rated
-	local slot = freeSlot()
-	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
-	local floor = landmarks and landmarks:GetAttribute("ArenaFloor")
-	if not slot or typeof(floor) ~= "Vector3" then
-		return false, "The Arena is full. Try again in a moment."
-	end
 	for _, team in teams do
 		for _, member in team do
 			local reason = busy(member)
@@ -696,6 +722,21 @@ local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 				return false, member.DisplayName .. " " .. reason .. "."
 			end
 		end
+	end
+	-- In the Outpost: a ring of Arena Row (the Grand Arena first), everyone
+	-- watching; the shared Arena's lanes only when every ring's taken.
+	local everyone = {}
+	for _, team in teams do
+		for _, member in team do
+			table.insert(everyone, member)
+		end
+	end
+	local center = PrivateArenas.claimStage(everyone, Duels.Stage)
+	local slot = if center then nil else freeSlot()
+	local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+	local floor = landmarks and landmarks:GetAttribute("ArenaFloor")
+	if not center and (not slot or typeof(floor) ~= "Vector3") then
+		return false, "The Arena is full. Try again in a moment."
 	end
 	nextId += 1
 	local now = os.clock()
@@ -715,6 +756,7 @@ local function startMatch(mode: string, teams, rules, extra): (boolean, string?)
 		Teams = teams,
 		Out = {},
 		Slot = slot,
+		Center = center, -- (its ring of Arena Row, if it has one)
 		State = "Countdown",
 		StartsAt = now + countdown,
 		Ends = now + countdown + limit,
@@ -1150,8 +1192,10 @@ end
 -- Lanes not taken by a match or held for a ready check.
 local function lanesFree(): number
 	local taken = 0
-	for _ in matches do
-		taken += 1
+	for _, match in matches do
+		if match.Slot then
+			taken += 1
+		end
 	end
 	for _ in readyChecks do
 		taken += 1

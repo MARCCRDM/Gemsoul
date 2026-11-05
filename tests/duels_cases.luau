@@ -649,10 +649,34 @@ for i = 2, 10 do
 end
 check(running == 2 * Matchmaking.Lanes, "A freed lane wasn't reused")
 
+-- Arena Row: a duel takes a ring of the Outpost's (the Grand Arena first)
+-- when one's free, the two sides across it, and frees it after.
+do
+	local cara, dan = makePlayer(901, "Cara"), makePlayer(902, "Dan")
+	PrivateArenas.RingsFree = 1
+	check(handlers.DuelChallenge(cara, dan.UserId).Ok and handlers.DuelRespond(dan, cara.UserId, true).Ok, "A challenge refused with a ring free")
+	local m = Duels.matchOf(dan)
+	check(m and m.Center == PrivateArenas.Center and m.Slot == nil, "A duel didn't take the free ring")
+	check(PrivateArenas.RingsFree == 0 and PrivateArenas.LastPrefer == "GrandArena", "The Grand Arena isn't the ring duels take first")
+	local sides = {}
+	for _, p in { cara, dan } do
+		local d = p.Root.Position - PrivateArenas.Center
+		check(math.abs(math.abs(d.X) - Duels.StageApart / 2) < 0.01 and math.abs(d.Z) < 10, p.DisplayName .. " isn't in the ring")
+		table.insert(sides, math.sign(d.X))
+	end
+	check(sides[1] ~= sides[2], "Both sides on one side of the ring")
+	advance(Matchmaking.Countdown)
+	dan:SetAttribute("CombatSession", nil) -- (LEAVE)
+	check(m.State == "Done", "Leaving the ring didn't forfeit")
+	advance(Matchmaking.EndPause)
+	check(PrivateArenas.RingsFree == 1 and next(PrivateArenas.Held) == nil, "The ring wasn't freed after the duel")
+	PrivateArenas.RingsFree = 0
+end
+
 print(
 	"PASS: "
 		.. checks
-		.. " duel checks (Elo, pairing, lanes, who can hit whom, queue, challenges, 2v2 parties, knockouts, forfeits, time limit, rewards)"
+		.. " duel checks (Elo, pairing, lanes, Arena Row's rings, who can hit whom, queue, challenges, 2v2 parties, knockouts, forfeits, time limit, rewards)"
 )
 
 local playedTasks,wonTasks=0,0

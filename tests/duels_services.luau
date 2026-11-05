@@ -319,6 +319,33 @@ local ArenaSessions = {
 		return { Ok = true, Message = "Training Arena: a sparring partner steps in." }
 	end,
 }
+-- Arena Row (Server.PrivateArenas): RingsFree rings, none unless a test
+-- opens one (then duels take one; the shared Arena's lanes otherwise).
+-- (A global: Duels has few locals to spare.)
+PrivateArenas = { RingsFree = 0, Center = Vector3.new(500, 1, 500), Held = {} }
+function PrivateArenas.claimStage(players, prefer)
+	PrivateArenas.LastPrefer = prefer
+	if PrivateArenas.RingsFree <= 0 then
+		return nil
+	end
+	PrivateArenas.RingsFree -= 1
+	local ring = {}
+	for _, p in players do
+		ring[p] = true
+		PrivateArenas.Held[p] = ring
+	end
+	return PrivateArenas.Center
+end
+function PrivateArenas.release(p)
+	local ring = PrivateArenas.Held[p]
+	PrivateArenas.Held[p] = nil
+	if ring then
+		ring[p] = nil
+		if next(ring) == nil then
+			PrivateArenas.RingsFree += 1
+		end
+	end
+end
 local parties = {}
 local Party = {
 	of = function(p)

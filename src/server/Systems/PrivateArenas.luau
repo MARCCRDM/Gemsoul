@@ -2,8 +2,9 @@
 	Private arenas: a copy of the Arena (workspace.CombatArena) of one's own
 	for every Training session (a new miner's first fight and intro rounds,
 	a practice bout), far from everyone else's, so nobody walks into another
-	player's fight, sees it, or hears it. Duels, PvP and raids keep the
-	shared Arena.
+	player's fight, sees it, or hears it. Duels (Server.Duels) take a ring
+	of Arena Row (claimStage), the Grand Arena first; PvP and raids keep the
+	shared Arena, and duels too when every ring's taken.
 
 	A copy is the Arena's scenery only: no vendors, prompts, scripts, spawn
 	pads or tags. Copies are kept for reuse once their fight's over (a few
@@ -19,7 +20,13 @@
 	  PrivateArenas.claim(player) -> Vector3?   the floor's centre of a copy
 	                                            of their own (nil if there's
 	                                            no Arena to copy)
+	  PrivateArenas.claimStage(players, prefer?) -> Vector3?   a free ring of
+	                                            Arena Row for all of them (a
+	                                            duel), `prefer` (its name) first
+	                                            (nil: none free)
 	  PrivateArenas.release(player)             their copy, back to the spares
+	                                            (a ring: free once all its
+	                                            fighters are out)
 	  PrivateArenas.stage(name, ground, reach)  an open ring built for good
 	                                            at `ground` (Arena Row in the
 	                                            Outpost: Shared.Outpost.
@@ -52,7 +59,8 @@ local STRIP = {
 }
 
 local owned = {} :: { [Player]: Model }
--- Arena Row's copies: { Model, Center, Fence, Owner }, in the order they're taken.
+-- Arena Row's copies: { Name, Model, Center, Fence, Owner, Holders }, in the
+-- order they're taken (Holders: everyone fighting in it).
 local stages = {}
 local spares = {} :: { Model }
 local used = {} :: { [number]: boolean }
@@ -228,7 +236,7 @@ function PrivateArenas.stage(name: string, ground: Vector3, reach: number): Vect
 	model:SetAttribute("Center", target)
 	model:SetAttribute("Stage", true)
 	local glow = PrivateArenas.RingColors[name] or Color3.fromRGB(110, 220, 255)
-	local stage = { Model = model, Center = target, Fence = fenceOf(model, target, reach, glow), Owner = nil :: Player? }
+	local stage = { Name = name, Model = model, Center = target, Fence = fenceOf(model, target, reach, glow), Owner = nil :: Player?, Holders = {} }
 	model.Parent = folder()
 	table.insert(stages, stage)
 	return target
@@ -243,6 +251,7 @@ function PrivateArenas.claim(player: Player): Vector3?
 	for _, stage in stages do
 		if not stage.Owner and stage.Model.Parent then
 			stage.Owner = player
+			stage.Holders = { [player] = true }
 			stage.Model:SetAttribute("Owner", player.UserId)
 			fenced(stage, true)
 			owned[player] = stage.Model
@@ -276,6 +285,32 @@ function PrivateArenas.claim(player: Player): Vector3?
 	return model:GetAttribute("Center")
 end
 
+function PrivateArenas.claimStage(players: { Player }, prefer: string?): Vector3?
+	if #players == 0 then
+		return nil
+	end
+	local pick = nil
+	for _, stage in stages do
+		if not stage.Owner and stage.Model.Parent and (not pick or stage.Name == prefer) then
+			pick = stage
+		end
+	end
+	if not pick then
+		return nil
+	end
+	pick.Owner = players[1]
+	pick.Holders = {}
+	pick.Model:SetAttribute("Owner", players[1].UserId)
+	fenced(pick, true)
+	for _, player in players do
+		PrivateArenas.release(player) -- (anything they held before)
+		pick.Holders[player] = true
+		owned[player] = pick.Model
+		player:SetAttribute("ArenaCenter", pick.Center)
+	end
+	return pick.Center
+end
+
 function PrivateArenas.release(player: Player)
 	player:SetAttribute("ArenaCenter", nil)
 	local model = owned[player]
@@ -283,14 +318,22 @@ function PrivateArenas.release(player: Player)
 	if not model then
 		return
 	end
-	model:SetAttribute("Owner", nil)
 	for _, stage in stages do
 		if stage.Model == model then
-			stage.Owner = nil -- (Arena Row's: stays, open again)
-			fenced(stage, false)
+			stage.Holders[player] = nil
+			local next_ = next(stage.Holders) :: Player?
+			if next_ == nil then
+				stage.Owner = nil -- (Arena Row's: stays, open again once everyone's out)
+				model:SetAttribute("Owner", nil)
+				fenced(stage, false)
+			else
+				stage.Owner = next_
+				model:SetAttribute("Owner", next_.UserId)
+			end
 			return
 		end
 	end
+	model:SetAttribute("Owner", nil)
 	if #spares < PrivateArenas.Spare and model.Parent then
 		table.insert(spares, model)
 	else
