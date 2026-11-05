@@ -61,6 +61,10 @@ Outpost.Location = CFrame.new(0, 0, 7000)
 -- frame, Location lifted that far, is where the client mounts its life
 -- (Client.ShelterLife, Client.StoreDisplays).
 Outpost.ShelterLift = 8
+-- Open to the sky: the Shelter's walls, roof and towers are gone; its deck
+-- (Market & Gear: the shops, the crew, the gallery, the kennel stage, the
+-- mech yard) stands in the open on its legs, its ramps down to the ground.
+Outpost.ShelterOpen = true
 -- Where the Shelter stands, from the quarry's middle (studs, on the floor),
 -- and how far it's turned (ShelterTurn, radians). Everything built round
 -- it, the Kaiju Arena's hall under it and its life on the client follow

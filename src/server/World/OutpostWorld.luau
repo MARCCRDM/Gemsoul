@@ -1755,6 +1755,11 @@ local function shelter(parent, at: CFrame, rules)
 	local laneN, laneS = SHELTER.Lane[1], SHELTER.Lane[2]
 	local laneMid = (laneN + laneS) / 2
 	local walls = ARMOR
+	-- Open to the sky (rules.ShelterOpen): no walls, roof, towers or gatehouse,
+	-- just the deck on its legs with its ramps, the yard wall behind the mech
+	-- bays, a backdrop behind each row of stalls, street lamps and an arch
+	-- over the way in. Everything on it stays where it was.
+	local open = rules.ShelterOpen == true
 	local function at3(x, y, z)
 		return at * CFrame.new(x, y, z)
 	end
@@ -1890,16 +1895,34 @@ local function shelter(parent, at: CFrame, rules)
 		solid(part(m, at3(x, (y0 + y1) / 2, z), Vector3.new(sx, y1 - y0, sz), walls, Enum.Material.Metal))
 		table.insert(lengths, { X = x, Z = z, SX = sx, SZ = sz, Lintel = lintel })
 	end
-	wall(0, -D - 1, W * 2 + 4, 2, 0, H)
-	local side = W + 2 - SHELTER.Door
-	wall(-(SHELTER.Door + side / 2), D + 1, side, 2, 0, H)
-	wall(SHELTER.Door + side / 2, D + 1, side, 2, 0, H)
-	wall(0, D + 1, SHELTER.Door * 2, 2, SHELTER.DoorHeight, H, true)
-	for _, s in { -1, 1 } do
-		local x = s * (W + 1)
-		wall(x, (-D - 2 + laneN) / 2, 2, laneN + D + 2, 0, H)
-		wall(x, (laneS + D + 2) / 2, 2, D + 2 - laneS, 0, H)
-		wall(x, laneMid, 2, laneS - laneN, SHELTER.LaneDoorHeight, H, true)
+	if open then
+		-- The yard wall behind the mech bays, and a backdrop behind each row of
+		-- stalls: the shops (west), the Hall of Fame and the bounty office
+		-- (east), the duel booth and the dev desk (south-east), the gem
+		-- gallery (south-west). Each capped in hazard yellow.
+		local backs = {
+			{ 0, -D - 1, W * 2 + 4, 2, 10 },
+			{ -(W + 1), 24, 2, 62, 20 },
+			{ W + 1, 27, 2, 66, 18 },
+			{ 50, D + 1, 52, 2, 16 },
+			{ -44, D + 1, 40, 2, 12 },
+		}
+		for _, b in backs do
+			wall(b[1], b[2], b[3], b[4], 0, b[5])
+			part(m, at3(b[1], b[5] + 0.2, b[2]), Vector3.new(b[3] + 0.3, 0.4, b[4] + 0.3), HAZARD, Enum.Material.SmoothPlastic)
+		end
+	else
+		wall(0, -D - 1, W * 2 + 4, 2, 0, H)
+		local side = W + 2 - SHELTER.Door
+		wall(-(SHELTER.Door + side / 2), D + 1, side, 2, 0, H)
+		wall(SHELTER.Door + side / 2, D + 1, side, 2, 0, H)
+		wall(0, D + 1, SHELTER.Door * 2, 2, SHELTER.DoorHeight, H, true)
+		for _, s in { -1, 1 } do
+			local x = s * (W + 1)
+			wall(x, (-D - 2 + laneN) / 2, 2, laneN + D + 2, 0, H)
+			wall(x, (laneS + D + 2) / 2, 2, D + 2 - laneS, 0, H)
+			wall(x, laneMid, 2, laneS - laneN, SHELTER.LaneDoorHeight, H, true)
+		end
 	end
 	-- Bands along every length, proud of both faces: a dark plinth, and up
 	-- under the roof a band of rusted plate.
@@ -1908,11 +1931,15 @@ local function shelter(parent, at: CFrame, rules)
 		if not l.Lintel then
 			part(m, at3(l.X, 1.6, l.Z), thick + Vector3.new(0, 3.2, 0), HULL_DARK, Enum.Material.Metal)
 		end
-		part(m, at3(l.X, 29, l.Z), thick + Vector3.new(0, 4, 0) - Vector3.new(if l.SX > 2 then 1 else 0, 0, if l.SZ > 2 then 1 else 0),
-			RUST, Enum.Material.CorrodedMetal)
+		if not open then
+			part(m, at3(l.X, 29, l.Z), thick + Vector3.new(0, 4, 0) - Vector3.new(if l.SX > 2 then 1 else 0, 0, if l.SZ > 2 then 1 else 0),
+				RUST, Enum.Material.CorrodedMetal)
+		end
 	end
 	-- Outside: a red running light under the band (the front's broken round
 	-- the name), and rusted plates set into the front either side of the door.
+	-- (None of it, nor the ribs and towers, when it's open to the sky.)
+	if not open then
 	for _, s in { -1, 1 } do
 		part(m, at3(s * 55, 26.4, D + 2.2), Vector3.new(62, 0.4, 0.3), RED, Enum.Material.Neon)
 		part(m, at3(s * (W + 2.2), 26.4, 0), Vector3.new(0.3, 0.4, D * 2 + 4), RED, Enum.Material.Neon)
@@ -1946,6 +1973,7 @@ local function shelter(parent, at: CFrame, rules)
 			end
 		end
 	end
+	end
 
 	-- The legs: one out of each corner tower, one out of each side's middle
 	-- rib and two out of the front's, each a heavy thigh angled down and
@@ -1963,7 +1991,7 @@ local function shelter(parent, at: CFrame, rules)
 	end
 	for _, leg in legs do
 		local base, out = leg[1], leg[2]
-		local hip = base + out * 1.5 + Vector3.new(0, 9, 0)
+		local hip = base + out * 1.5 + Vector3.new(0, if open then -0.4 else 9, 0)
 		local knee = base + out * 11 + Vector3.new(0, 6 - lift, 0)
 		local foot = base + out * 13 + Vector3.new(0, 1.2 - lift, 0)
 		solid(beam(hip, knee, 4.4, 3.4, ARMOR))
@@ -1979,7 +2007,20 @@ local function shelter(parent, at: CFrame, rules)
 	-- the upper deck, the barracks' second storey, with its two exhaust
 	-- stacks glowing red.
 	local roofY = H + 0.6
+	if open then
+		-- Street lamps instead of the roof's: along the yard wall between the
+		-- bays, and round the deck clear of the stalls, warm light down.
+		for _, spot in { { -57, -57.6 }, { 0, -57.6 }, { 57, -57.6 }, { -30, 2 }, { 30, 2 }, { -30, 34 }, { 30, 30 }, { 54, -8 }, { -54, -8 } } do
+			local foot = at3(spot[1], 0.86, spot[2])
+			solid(part(m, foot * CFrame.new(0, 7.5, 0), Vector3.new(0.7, 15, 0.7), HULL_DARK, Enum.Material.Metal))
+			part(m, foot * CFrame.new(0, 0.4, 0), Vector3.new(1.6, 0.8, 1.6), ARMOR, Enum.Material.Metal)
+			part(m, foot * CFrame.new(0, 15.2, 0), Vector3.new(3.4, 0.7, 3.4), HULL_DARK, Enum.Material.Metal)
+			local face = part(m, foot * CFrame.new(0, 14.8, 0), Vector3.new(2.8, 0.12, 2.8), AMBER, Enum.Material.Neon)
+			light(face, Color3.fromRGB(255, 226, 190), 46, 1.4, true)
+		end
+	end
 	local sky = { X = 34, Z0 = -2, Z1 = 40 }
+	if not open then
 	local function roof(x, z, sx, sz)
 		solid(part(m, at3(x, roofY, z), Vector3.new(sx, 1.2, sz), HULL_DARK, Enum.Material.DiamondPlate))
 	end
@@ -2032,19 +2073,50 @@ local function shelter(parent, at: CFrame, rules)
 			light(panel, Color3.fromRGB(255, 238, 214), 42, 0.9)
 		end
 	end
+	end
 
 	-- The main door: hazard posts inside, and outside an armoured gatehouse
 	-- standing out over the landing (two piers and a lintel, lit red down
 	-- the piers' inner edges and under the lintel, a sloped brow on top),
 	-- the name over it, and inside, over the door, the way to the quarry.
 	local gate = { Out = 8, Pier = 9.4, Top = SHELTER.DoorHeight + 4 }
-	for _, s in { -1, 1 } do
+	if open then
+		-- The way in: an arch over the top of the main ramp, two lit piers and
+		-- a beam carrying the name, MARKET (the HUD's word), lit both ways.
+		for _, s in { -1, 1 } do
+			solid(part(m, at3(s * (SHELTER.Door + 2), 9, D + 3), Vector3.new(3, 18, 3), HULL_DARK, Enum.Material.Metal))
+			part(m, at3(s * (SHELTER.Door + 0.45), 9, D + 3), Vector3.new(0.12, 15, 1.2), STATION.Market, Enum.Material.Neon)
+			part(m, at3(s * (SHELTER.Door + 2), 0.9, D + 3), Vector3.new(4, 1.2, 4), ARMOR, Enum.Material.Metal)
+		end
+		local beam_ = part(m, at3(0, 19.4, D + 3), Vector3.new(SHELTER.Door * 2 + 7, 3.4, 2), HULL_DARK, Enum.Material.Metal)
+		beam_.Name = "ArchSign"
+		for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = face
+			gui.CanvasSize = Vector2.new((SHELTER.Door * 2 + 7) * 30, 3.4 * 30)
+			gui.LightInfluence = 0
+			gui.Brightness = 1.3
+			gui.Parent = beam_
+			local word = Instance.new("TextLabel")
+			word.BackgroundTransparency = 1
+			word.Size = UDim2.fromScale(1, 1)
+			word.Text = "MARKET" -- (a place in a word: the HUD's)
+			word.TextScaled = true
+			word.Font = Enum.Font.GothamBlack
+			word.TextColor3 = Color3.fromRGB(236, 244, 250)
+			word.Parent = gui
+		end
+		part(m, at3(0, 17.6, D + 3), Vector3.new(SHELTER.Door * 2 + 7, 0.2, 2.1), STATION.Market, Enum.Material.Neon)
+		light(beam_, Color3.fromRGB(160, 236, 210), 24, 1)
+	end
+	for _, s in (if open then {} else { -1, 1 }) do
 		part(m, at3(s * (SHELTER.Door + 1.2), SHELTER.DoorHeight / 2, D + 1), Vector3.new(2.4, SHELTER.DoorHeight, 2.8), HAZARD, Enum.Material.Metal)
 		solid(part(m, at3(s * (SHELTER.Door + gate.Pier / 2), gate.Top / 2, D + 2 + gate.Out / 2), Vector3.new(gate.Pier, gate.Top, gate.Out),
 			HULL_DARK, Enum.Material.Metal))
 		part(m, at3(s * (SHELTER.Door + 0.4), SHELTER.DoorHeight / 2 + 1, D + 2 + gate.Out + 0.06), Vector3.new(0.3, SHELTER.DoorHeight - 6, 0.12),
 			RED, Enum.Material.Neon)
 	end
+	if not open then
 	part(m, at3(0, (SHELTER.DoorHeight + gate.Top) / 2, D + 2 + gate.Out / 2), Vector3.new(SHELTER.Door * 2, gate.Top - SHELTER.DoorHeight, gate.Out),
 		ARMOR, Enum.Material.Metal)
 	part(m, at3(0, gate.Top + 1.3, D + 3 + gate.Out / 2) * CFrame.Angles(0, math.pi, 0), Vector3.new((SHELTER.Door + gate.Pier) * 2 + 1, 2.6, gate.Out + 2),
@@ -2052,6 +2124,7 @@ local function shelter(parent, at: CFrame, rules)
 	part(m, at3(0, SHELTER.DoorHeight + 0.2, D + 2 + gate.Out + 0.1), Vector3.new(SHELTER.Door * 2, 0.4, 0.4), RED, Enum.Material.Neon)
 	-- (No SHELTER over the door: taken down 2026-10-31.)
 	painted(m, facing(0, 25, D - 0.2, 0, -1), Vector3.new(16, 2.8, 0.4), "QUARRY")
+	end
 
 	-- The ramps: a wide one from the main door down to the quarry, and one
 	-- from each garage door for the mechs (lift over ShelterRamp studs: a
@@ -2100,12 +2173,13 @@ local function shelter(parent, at: CFrame, rules)
 	for i, kind in bays do
 		local x = -66.5 + (i - 1) * 19
 		-- (Its number painted big on the wall over it; the mech says what it is.)
-		painted(m, facing(x, 21, -D + 0.4, 0, 1), Vector3.new(8, 5.2, 0.4), string.format("%02d", i), HAZARD)
+		painted(m, facing(x, if open then 6.4 else 21, -D + 0.4, 0, 1), Vector3.new(8, 5.2, 0.4), string.format("%02d", i), HAZARD)
 		local spot = at3(x, 1, bayZ).Position
 		table.insert(parking, { Kind = kind, CFrame = CFrame.lookAt(spot, spot - at.LookVector) })
 	end
 	-- Each garage door: hazard posts, the rolled-up door, EXIT over it.
-	for _, s in { -1, 1 } do
+	-- (Open to the sky: the yard's lanes just run out to their ramps.)
+	for _, s in (if open then {} else { -1, 1 }) do
 		for _, z in { laneN - 1, laneS + 1 } do
 			part(m, at3(s * (W - 0.7), SHELTER.LaneDoorHeight / 2, z), Vector3.new(1.4, SHELTER.LaneDoorHeight, 1.4), HAZARD, Enum.Material.Metal)
 		end
@@ -2513,7 +2587,7 @@ end
 -- stations' colours, pendant lamps over the booths, stanchions and a rope
 -- in front of the Hall of Fame's dais, and a supply corner stacked
 -- between the booths.
-local function hallDressing(parent, at: CFrame)
+local function hallDressing(parent, at: CFrame, open: boolean?)
 	local m = folder(parent, "HallDressing")
 	local W, D, H = SHELTER.HalfWidth, SHELTER.HalfDepth, SHELTER.Height
 	local function at3(x, y, z)
@@ -2533,7 +2607,7 @@ local function hallDressing(parent, at: CFrame)
 	part(m, at3(49, 0.9, D - 1.4), Vector3.new(W - 14 - 2, 0.06, 0.3), seam)
 	-- Pilasters: up the east wall between the board and the bounty office,
 	-- and up the south wall either side of Brutus's booth.
-	for _, spot in { { W - 0.9, 34, 0 }, { 28, D - 0.9, 90 }, { 68, D - 0.9, 90 } } do
+	for _, spot in (if open then {} else { { W - 0.9, 34, 0 }, { 28, D - 0.9, 90 }, { 68, D - 0.9, 90 } }) do
 		local rib = at3(spot[1], (H - 1) / 2 + 0.8, spot[2]) * CFrame.Angles(0, math.rad(spot[3]), 0)
 		part(m, rib, Vector3.new(1.8, H - 1, 1.8), HULL_DARK, Enum.Material.Metal)
 		local slit = part(m, rib * CFrame.new(-1, 1, 0), Vector3.new(0.14, H - 8, 0.4), AMBER, Enum.Material.Neon)
@@ -2547,13 +2621,17 @@ local function hallDressing(parent, at: CFrame)
 		{ 72, 56, BOUNTY_AMBER },
 	}
 	for _, spec in pennants do
-		local top = at3(spec[1], H - 1.4, spec[2])
+		-- (open to the sky: each on a pole of its own)
+		local top = at3(spec[1], if open then 15 else H - 1.4, spec[2])
+		if open then
+			part(m, at3(spec[1] + 1.6, 0.86 + 7.2, spec[2]), Vector3.new(0.3, 14.4, 0.3), HULL_DARK, Enum.Material.Metal)
+		end
 		part(m, top, Vector3.new(3, 0.25, 0.25), HULL_DARK, Enum.Material.Metal)
 		part(m, top * CFrame.new(0, -4.6, 0), Vector3.new(2.6, 9, 0.12), spec[3], Enum.Material.Fabric)
 		part(m, top * CFrame.new(0, -8.4, -0.08), Vector3.new(2.6, 0.7, 0.12), HULL_DARK, Enum.Material.Fabric)
 	end
 	-- Pendants over the booths' rugs.
-	for _, spot in { { W - 16, 46 }, { 52, D - 16 } } do
+	for _, spot in (if open then {} else { { W - 16, 46 }, { 52, D - 16 } }) do
 		local shade = part(m, at3(spot[1], 24.4, spot[2]), Vector3.new(3, 1.4, 3), HULL_DARK, Enum.Material.Metal)
 		local hung = part(m, at3(spot[1], 23.64, spot[2]), Vector3.new(2.2, 0.14, 2.2), AMBER, Enum.Material.Neon)
 		tube(m, shade.CFrame.Position, at3(spot[1], H + 0.6, spot[2]).Position, 0.08, HULL_DARK)
@@ -3291,7 +3369,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local bounty = bountyBooth(root, home.Bounty, OutpostWorld.BountyPosters)
 	local duel = duelBooth(root, home.Duel)
 	devDesk(root, home.Dev)
-	hallDressing(root, home.Hall)
+	hallDressing(root, home.Hall, rules.ShelterOpen == true)
 	local festiveExclusions = harvestPatches(root, at)
 	local town = settlement(root, at, rules, rng)
 	for _, line in town.Lines do
