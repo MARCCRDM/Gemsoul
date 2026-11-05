@@ -327,8 +327,18 @@ check(left and right and find(root, "Sky") ~= nil, "No night sky behind the menu
 local artFrame = find(right, "Art")
 check(artFrame and artFrame.Size.X.Offset >= 900 and artFrame.Position.X.Offset > find(left, "Play").Position.X.Offset, "The banner's art isn't big on the right")
 check(find(artFrame, "Picture"):FindFirstChildOfClass("UIGradient") ~= nil and find(artFrame, "Fade") ~= nil, "The art doesn't melt into the night")
-check(find(left, "Logo").ImageRectSize.X > 0, "The logo isn't cut out of the title art")
-check(find(left, "PlayLip") ~= nil and find(left, "Shine") ~= nil, "PLAY isn't the gold plate")
+do
+	-- (cut out by share, whatever size Roblox keeps the art at: the words fill the frame)
+	local frame = find(left, "Logo")
+	local art = frame:FindFirstChild("Art")
+	check(frame.ClipsDescendants and art and art.Image:find(tostring(MainMenu.LogoId), 1, true), "The logo isn't cut out of the title art")
+	local rect = MainMenu.LogoRect
+	local left_ = -art.Position.X.Offset / art.Size.X.Offset * MainMenu.LogoArt
+	local top = -art.Position.Y.Offset / art.Size.Y.Offset * MainMenu.LogoArt
+	check(math.abs(left_ - rect[1]) < 5 and math.abs(top - rect[2]) < 5, "The logo frame isn't on the art's words") -- (whole pixels on screen)
+	check(math.abs(frame.Size.X.Offset / art.Size.X.Offset * MainMenu.LogoArt - rect[3]) < 8, "The logo frame isn't the words' width")
+end
+check(find(left, "PlayLip") ~= nil, "PLAY isn't the big plate") -- (station blue now, no shine: the Nov 4 restyle)
 check(find(root, "Panel") == nil, "Still boxed panels")
 for _, id in { "Play", "Guide", "Updates", "Feedback", "Credits", "Settings", "Logo", "News" } do
 	check(find(left, id) ~= nil, "No " .. id .. " on the left")

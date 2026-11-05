@@ -87,6 +87,7 @@ local LAYOUTS = {
 }
 -- (the logo's part of the title art: its words, without the sky around them)
 MainMenu.LogoRect = { 55, 330, 880, 335 }
+MainMenu.LogoArt = 988 -- (the title art's size: saga_title.png is 988 square; the rect is in its pixels)
 MainMenu.Layouts = LAYOUTS
 
 -- Which layout a screen `screen` big gets, and how far it's scaled.
@@ -598,20 +599,29 @@ function MainMenu.build(parent: GuiObject, options: { [string]: any })
 		new("UIGradient", {
 			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(0.7, 0.55), NumberSequenceKeypoint.new(1, 1) }),
 		}, shade)
-		local rect = MainMenu.LogoRect
+		-- (cut out by its share of the art, not its pixels: Roblox may keep the
+		-- upload at another size, and a pixel cut-out then showed only sky)
+		local rect, art = MainMenu.LogoRect, MainMenu.LogoArt
 		local logoH = math.floor(L.LogoW * rect[4] / rect[3])
-		local logo = new("ImageLabel", {
+		local logo = new("Frame", {
 			Name = "Logo",
 			Position = UDim2.fromOffset(L.LeftX, L.LogoY),
 			Size = UDim2.fromOffset(L.LogoW, logoH),
 			BackgroundTransparency = 1,
-			Image = "rbxassetid://" .. MainMenu.LogoId,
-			ImageRectOffset = Vector2.new(rect[1], rect[2]),
-			ImageRectSize = Vector2.new(rect[3], rect[4]),
-			ResampleMode = Enum.ResamplerMode.Pixelated,
-			ScaleType = Enum.ScaleType.Fit,
+			ClipsDescendants = true,
 			ZIndex = 23,
 		}, left)
+		local artW, artH = L.LogoW * art / rect[3], logoH * art / rect[4]
+		new("ImageLabel", {
+			Name = "Art",
+			Position = UDim2.fromOffset(-rect[1] / art * artW, -rect[2] / art * artH),
+			Size = UDim2.fromOffset(artW, artH),
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://" .. MainMenu.LogoId,
+			ResampleMode = Enum.ResamplerMode.Pixelated,
+			ScaleType = Enum.ScaleType.Stretch,
+			ZIndex = 23,
+		}, logo)
 		-- PLAY: the big matte station-blue plate.
 		local play = plate(left, "Play", L.LeftX, L.PlayY, L.PlayW, L.Play, Color3.fromRGB(130, 202, 212), 23)
 		play.ClipsDescendants = true
