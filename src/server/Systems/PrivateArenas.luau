@@ -160,6 +160,8 @@ end
 PrivateArenas.RingColors = {
 	GrandArena = Color3.fromRGB(255, 120, 70),
 	IntroRing = Color3.fromRGB(110, 220, 255),
+	DuelRingWest = Color3.fromRGB(190, 120, 255),
+	DuelRingEast = Color3.fromRGB(120, 235, 140),
 }
 local function ringAt(name: string, target: Vector3, radius: number): Model
 	local model = Instance.new("Model")

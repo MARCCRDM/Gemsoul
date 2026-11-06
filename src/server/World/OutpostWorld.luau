@@ -2911,15 +2911,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	local roadLines = {}
 	local settle = assert(OutpostWorld.Rules, "OutpostWorld needs Shared.Outpost").Settlement
 	for _, a in Frontier.Spokes do
-		-- (from the settlement's ring road; the south one from the plaza's apron)
-		-- (the south one from behind the Grand Arena)
-		local grand = settle.Stages[1]
-		for _, stage in settle.Stages do
-			if stage.Name == "GrandArena" then
-				grand = stage
-			end
-		end
-		local start = if math.abs(a - math.pi / 2) < 0.01 then grand.Z + settle.StageReach + 4 else settle.Ring + 7
+		-- (from the settlement's ring road; the south one from the plaza's
+		-- south edge)
+		local start = if math.abs(a - math.pi / 2) < 0.01 then settle.Plaza.Z + settle.Plaza.Apothem + 4 else settle.Ring + 7
 		local from = (at * CFrame.new(math.cos(a) * start, 0, math.sin(a) * start)).Position
 		local to = (at * CFrame.new(math.cos(a) * (QUARRY - 20), 0, math.sin(a) * (QUARRY - 20))).Position
 		road(roads, from, to, 18)
@@ -3328,7 +3322,20 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		{ -16, 126 }, { 16, 126 }, { -28, 138 }, { 28, 138 },
 		{ -44, 74 }, { 44, 74 }, { -28, 120 }, { 28, 120 }, { -16, 140 }, { 16, 140 },
 		{ -42, 124 } } do
-		table.insert(spots, shelterAt * CFrame.new(p[1], 0, p[2]))
+		local spot = shelterAt * CFrame.new(p[1], 0, p[2])
+		-- (none in Arena Row's rings, Shared.Outpost.Settlement.Stages: one
+		-- that would be is put just outside it instead)
+		local settlement = OutpostWorld.Rules and OutpostWorld.Rules.Settlement
+		for _, stage in if settlement then settlement.Stages else {} do
+			local middle = (at * CFrame.new(stage.X, 0, stage.Z)).Position
+			local out = Vector3.new(spot.Position.X - middle.X, 0, spot.Position.Z - middle.Z)
+			local reach = settlement.StageReach + 7
+			if out.Magnitude < reach then
+				local away = if out.Magnitude > 0.1 then out.Unit else Vector3.new(1, 0, 0)
+				spot = CFrame.new(middle + away * reach + Vector3.new(0, spot.Position.Y - middle.Y, 0)) * spot.Rotation
+			end
+		end
+		table.insert(spots, spot)
 		table.insert(arrivalSpots, #spots)
 	end
 	-- Room for a rock at `p`: off the roads and buildings, `gap` from the rest.

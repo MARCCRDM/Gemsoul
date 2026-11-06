@@ -112,17 +112,22 @@ Outpost.Settlement = {
 	-- Arena Row: open rings on the ground in the middle of the field, seen
 	-- from every pod (Server.PrivateArenas builds them: no walls, the fight's
 	-- seen and sees out). Intro and practice fights take one when it's free.
-	-- (in the order fights take them: the Intro Ring first)
+	-- Four, in a square: the Intro Ring and the Grand Arena, the two duel
+	-- rings south of them toward the plaza.
+	-- (in the order practice takes them, the Intro Ring first; duels take
+	-- the Grand Arena first, Server.Duels)
 	Stages = {
 		{ Name = "IntroRing", X = -48, Z = 0 },
+		{ Name = "DuelRingWest", X = -48, Z = 84 },
+		{ Name = "DuelRingEast", X = 48, Z = 84 },
 		{ Name = "GrandArena", X = 48, Z = 0 },
 	},
 	StageReach = 36, -- studs: a ring's kerb, lamps and fence, round its middle
 	-- (x, z points: from the ring round the field to the plaza, round the
 	-- arenas' outsides and down between them)
 	Walks = {
-		{ { -131, -92 }, { -100, -40 }, { -98, 30 }, { -62, 92 }, { -26, 128 }, { 0, 164 } },
-		{ { 131, -92 }, { 100, -40 }, { 98, 30 }, { 62, 92 }, { 26, 128 }, { 0, 164 } },
+		{ { -131, -92 }, { -100, -40 }, { -100, 40 }, { -98, 100 }, { -62, 138 }, { -26, 146 }, { 0, 164 } },
+		{ { 131, -92 }, { 100, -40 }, { 100, 40 }, { 98, 100 }, { 62, 138 }, { 26, 146 }, { 0, 164 } },
 		{ { 0, -160 }, { -6, -96 }, { 0, -44 }, { 0, 44 }, { 0, 100 }, { 0, 164 } },
 		-- (and from the plaza out to the Kaiju Habitat, the south-west and the
 		-- Market's side ramp)
