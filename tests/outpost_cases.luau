@@ -1567,6 +1567,31 @@ do
 			check(math.sqrt((stage.X - other.X) ^ 2 + (stage.Z - other.Z) ^ 2) > set.StageReach * 2 + 8, "Arena Row's rings overlap")
 		end
 	end
+	-- Its LED screens: one a board, each facing out from Arena Row, clear of its rings.
+	local settlementModel = site.Model:FindFirstChild("Settlement", true)
+	local ledFolder = settlementModel and settlementModel:FindFirstChild("LedScreens")
+	local boardsSeen = {}
+	local rowMiddle = R.Vector3.new(0, 0, 0)
+	for _, stage in set.Stages do
+		rowMiddle += R.Vector3.new(stage.X, 0, stage.Z) / #set.Stages
+	end
+	for _, d in if ledFolder then ledFolder:GetDescendants() else {} do
+		if d:IsA("BasePart") and d.Name == "LedPanel" then
+			local board = d:GetAttribute("Board")
+			boardsSeen[board] = true
+			local q = Rules.Location:PointToObjectSpace(d.CFrame.Position)
+			local look = Rules.Location:VectorToObjectSpace(d.CFrame.LookVector)
+			local out = R.Vector3.new(q.X - rowMiddle.X, 0, q.Z - rowMiddle.Z).Unit
+			check(look:Dot(out) > 0.95, "The " .. tostring(board) .. " screen doesn't face out")
+			check(d.CFrame.Position.Y - d.Size.Y / 2 > Rules.Location.Position.Y + 5, "The " .. tostring(board) .. " screen is too low to walk under")
+			for _, stage in set.Stages do
+				check(math.sqrt((q.X - stage.X) ^ 2 + (q.Z - stage.Z) ^ 2) > set.StageReach + 8, "The " .. tostring(board) .. " screen is in the " .. stage.Name)
+			end
+		end
+	end
+	for _, board in { "Ranked", "Live", "Miners", "Hunters" } do
+		check(boardsSeen[board], "No LED screen for " .. board)
+	end
 	-- the field: rocks round Arena Row and at the pods' doorsteps, all in the safe core
 	local inField, doorstep = 0, 0
 	for _, i in site.NearSpots do

@@ -24,6 +24,7 @@
 	                                            Arena Row for all of them (a
 	                                            duel), `prefer` (its name) first
 	                                            (nil: none free)
+	  PrivateArenas.rings() -> { { Name, Fighters } }   Arena Row now
 	  PrivateArenas.release(player)             their copy, back to the spares
 	                                            (a ring: free once all its
 	                                            fighters are out)
@@ -342,6 +343,21 @@ function PrivateArenas.release(player: Player)
 		used[model:GetAttribute("Slot")] = nil
 		model:Destroy()
 	end
+end
+
+-- Arena Row's rings as they are now, in order: { Name, Fighters = { name } }
+-- (Server.Boards: the LED screens' live board).
+function PrivateArenas.rings(): { { Name: string, Fighters: { string } } }
+	local list = {}
+	for _, stage in stages do
+		local fighters = {}
+		for player in stage.Holders do
+			table.insert(fighters, player.DisplayName)
+		end
+		table.sort(fighters)
+		table.insert(list, { Name = stage.Name, Fighters = fighters })
+	end
+	return list
 end
 
 -- Who has one now (for tests and the DEV tools).

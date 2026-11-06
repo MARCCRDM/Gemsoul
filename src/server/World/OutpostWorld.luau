@@ -2750,6 +2750,32 @@ local function settlement(parent, at: CFrame, rules, rng)
 	for _, stage in set.Stages do
 		table.insert(keepOut, { (at * CFrame.new(stage.X, 0, stage.Z)).Position, set.StageReach + 6 })
 	end
+	-- Its LED screens (set.Screens): a dark face on two legs, a lit strip
+	-- along its top; each client lights its LEDs (Client.LedScreens, the
+	-- LedPanel's Board attribute: Shared.Led).
+	local screens = folder(m, "LedScreens")
+	local size = set.Screen
+	for _, spec in set.Screens or {} do
+		local a = math.rad(spec.Facing)
+		-- (its face, -Z, looks along Facing)
+		local turn = math.atan2(-math.cos(a), -math.sin(a))
+		local base = at * CFrame.new(spec.X, 0, spec.Z) * CFrame.Angles(0, turn, 0)
+		local screen = Instance.new("Model")
+		screen.Name = spec.Board .. "Screen"
+		local middle = base * CFrame.new(0, size.Lift + size.Height / 2, 0)
+		local panel = part(screen, middle, Vector3.new(size.Width, size.Height, 0.4), Color3.fromRGB(6, 7, 11), Enum.Material.SmoothPlastic)
+		panel.Name = "LedPanel"
+		panel:SetAttribute("Board", spec.Board)
+		solid(part(screen, middle * CFrame.new(0, 0, 0.9), Vector3.new(size.Width + 1.6, size.Height + 1.6, 1.4), HULL_DARK, Enum.Material.Metal))
+		part(screen, middle * CFrame.new(0, size.Height / 2 + 0.9, 0), Vector3.new(size.Width + 1.6, 0.3, 1.8), GLOW, Enum.Material.Neon)
+		for _, side in { -1, 1 } do
+			local leg = base * CFrame.new(side * (size.Width / 2 - 2.5), (size.Lift + size.Height) / 2, 1.2)
+			solid(part(screen, leg, Vector3.new(1.4, size.Lift + size.Height, 1.4), HULL_DARK, Enum.Material.Metal))
+			solid(disc(screen, base * CFrame.new(side * (size.Width / 2 - 2.5), 0.3, 1.2), 2.2, 0.6, HULL_DARK, Enum.Material.Metal))
+		end
+		screen.Parent = screens
+		table.insert(keepOut, { base.Position, size.Width / 2 + 4 })
+	end
 
 	-- The pod pads: a raised octagon each, a dark deck with a yellow dashed
 	-- ring, cyan bollards round its corners and a step down toward the middle,

@@ -230,6 +230,8 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 		PodServer.restyle(player)
 		return Shop.reply(true, "", { Style = profile.Pod })
 	end)
+	-- The LED screens round Arena Row: their boards (Server.Boards).
+	require(script.Parent.Systems.Boards).start()
 	-- Arena Row: copies of the Arena out in the open, for fights to take
 	-- (Server.PrivateArenas: Training first, the Intro Ring then the Grand Arena).
 	if Config.CombatEnabled or not Config.MenuOnly then

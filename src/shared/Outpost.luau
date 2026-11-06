@@ -123,6 +123,17 @@ Outpost.Settlement = {
 		{ Name = "GrandArena", X = 48, Z = 0 },
 	},
 	StageReach = 36, -- studs: a ring's kerb, lamps and fence, round its middle
+	-- The LED screens round Arena Row (Shared.Led's boards: Client.LedScreens
+	-- lights them), one each side, facing out (Facing: the way its face
+	-- looks, in degrees as above): north to the pods, south to the plaza.
+	-- Screen: its face in studs, and how high its bottom edge stands.
+	Screens = {
+		{ Board = "Ranked", X = 0, Z = -60, Facing = 270 },
+		{ Board = "Live", X = 122, Z = 42, Facing = 0 },
+		{ Board = "Miners", X = 0, Z = 134, Facing = 90 },
+		{ Board = "Hunters", X = -122, Z = 42, Facing = 180 },
+	},
+	Screen = { Width = 36, Height = 15, Lift = 8 },
 	-- (x, z points: from the ring round the field to the plaza, round the
 	-- arenas' outsides and down between them)
 	Walks = {

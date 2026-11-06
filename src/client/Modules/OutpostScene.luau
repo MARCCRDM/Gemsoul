@@ -2281,6 +2281,7 @@ require(script.Parent.PodArrival).start()
 -- MY POD: its door's prompt on your own pod only; the pods' showcase kaiju.
 require(script.Parent.PodUI).start()
 local PodShowcase = require(script.Parent.PodShowcase)
+local LedScreens = require(script.Parent.LedScreens)
 local DayNight = require(ReplicatedStorage.Shared.DayNight)
 local skySince = math.huge
 -- (The Shelter's frame: the quarry's, lifted onto its legs.)
@@ -2301,8 +2302,10 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	if active then
 		PodShowcase.step(dt)
+		LedScreens.step(dt)
 	else
 		PodShowcase.clear()
+		LedScreens.clear()
 	end
 	-- Day and night (Shared.DayNight), a few times a second, while the
 	-- Outpost's own light is up (Scenes: OutpostSky; never the Rift's, a
