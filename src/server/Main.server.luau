@@ -173,13 +173,15 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 		return profile.PodOwned
 	end
 	PodServer.ownedOf = ownedOf
-	-- The pod roll as it lands: a piece unlocked and put on.
+	-- The pod roll on its first landing ever: a piece unlocked and put on.
+	-- (Once only: after that it lands in the style you've picked, MY POD.)
 	PodServer.rollFor = function(player)
 		local owned = ownedOf(player)
-		if not owned then
+		local profile = PlayerData.get(player) :: any
+		if not owned or not profile or profile.PodRolled then
 			return nil
 		end
-		local profile = PlayerData.get(player) :: any
+		profile.PodRolled = true
 		local piece = PodStyle.roll(owned, Random.new())
 		owned[piece.Kind .. ":" .. piece.Id] = true
 		profile.Pod = PodStyle.equip(PodStyle.clean(profile.Pod, function(id)

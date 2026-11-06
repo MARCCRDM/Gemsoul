@@ -519,6 +519,12 @@ do
 	check(Server.land(rae) == true, "Rae's pod didn't come down")
 	advance(L.Lead + 0.2)
 	check(raeRoot.Anchored and rae:GetAttribute("PodLanding") ~= nil, "Rae isn't riding her pod")
+	-- (no roll this landing: it comes down as it's kept, no flicks)
+	local raePod = podModel(rae)
+	check(rae:GetAttribute("PodRoll") == nil, "A roll card with no roll")
+	local kept = raePod.Hull.Color
+	advance(0.6)
+	check(raePod.Hull.Color == kept, "A pod with no roll flicked through looks")
 	rae:SetAttribute("RiftRun", "R1")
 	advance(0.1)
 	check(not raeRoot.Anchored and rae:GetAttribute("PodLanding") == nil, "The pod held on to someone gone into the Rift")

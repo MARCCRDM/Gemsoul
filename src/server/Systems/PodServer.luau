@@ -27,10 +27,11 @@
 	opens from a prompt on its door, its owner's only, once they've walked
 	out of it.
 
-	The pod roll: as it lands, PodServer.rollFor(player) (Main) rolls a piece
-	(PodStyle.roll), unlocks it and puts it on; on the way down the hull and
-	glow flick through the catalogue, slower and slower, and settle on it at
-	touchdown. The player's PodRoll attribute says what it was
+	The pod roll: on its first landing ever, PodServer.rollFor(player) (Main)
+	rolls a piece (PodStyle.roll), unlocks it and puts it on; on the way down
+	the hull and glow flick through the catalogue, slower and slower, and
+	settle on it at touchdown. Every landing after (nil from rollFor) comes
+	down in the style they've kept, no flicks. The player's PodRoll attribute says what it was
 	("Kind|Id|Rarity|New": Client.PodArrival shows it).
 ]]
 local Players = game:GetService("Players")
@@ -774,10 +775,14 @@ function PodServer.land(player: Player): boolean
 		return false
 	end
 	local landing = Pods.Landing
-	-- (the roll: a piece unlocked and on, before it's built in that style)
+	-- (the roll, its first landing only: a piece unlocked and on, before
+	-- it's built in that style; after that it lands as it's kept)
 	local ok, piece = pcall(PodServer.rollFor, player)
-	if ok and type(piece) == "table" then
+	local rolled = ok and type(piece) == "table"
+	if rolled then
 		player:SetAttribute("PodRoll", string.format("%s|%s|%s|%s", piece.Kind, piece.Id, piece.Rarity, if piece.New then "1" else "0"))
+	else
+		player:SetAttribute("PodRoll", nil)
 	end
 	local model, moves = build(player, pod.Pad)
 	local rest = model:GetPivot()
@@ -800,7 +805,7 @@ function PodServer.land(player: Player): boolean
 		Rider = player,
 		Owner = player,
 		Style = styleFor(player),
-		Flip = -landing.Lead,
+		Flip = if rolled then -landing.Lead else nil, -- (the flicks: a roll's only)
 	}
 	pod.Model, pod.Entry = model, entry
 	setHeight(entry, landing.Height)
