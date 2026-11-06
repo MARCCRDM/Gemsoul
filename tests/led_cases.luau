@@ -97,6 +97,7 @@ check(#Led.pages("Ranked", samples.Ranked) == 1 + 3, "The ranked ladder isn't fo
 check(#Led.pages("Hunters", samples.Hunters) == 2, "An empty ladder doesn't say how to get on it")
 -- Live: the rings' page, then one for each fight on.
 check(#Led.pages("Live", samples.Live) == 3, "Live doesn't show each fight on")
+check(#Led.pages("Live", { Rings = { {Name="IntroRing",Fighters={}}, {Name="DuelRingWest",Fighters={}}, {Name="DuelRingEast",Fighters={}}, {Name="DuelRingNorthWest",Fighters={}}, {Name="DuelRingNorthEast",Fighters={}}, {Name="GrandArena",Fighters={}} } }) == 3, "Six rings aren't four to a page")
 check(#Led.pages("Live", { Rings = {} }) == 2, "Live with nothing on doesn't invite a duel")
 -- No data yet (the server hasn't sent any): still pages, no error.
 for _, board in Led.Boards do

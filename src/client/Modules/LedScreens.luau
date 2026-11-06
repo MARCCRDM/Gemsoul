@@ -1,7 +1,8 @@
 --[[
-	The Outpost's LED screens, lit (World.OutpostWorld builds them round Arena
-	Row: each a LedPanel with its Board attribute; Shared.Led draws the
-	pages; Server.Boards sends their data on ReplicatedStorage.LedBoards).
+	The Outpost's LED screens, lit (World.OutpostWorld builds them: giants
+	in the sky round the whole settlement, facing in, each a LedPanel with
+	its Board attribute; Shared.Led draws the pages; Server.Boards sends
+	their data on ReplicatedStorage.LedBoards).
 
 	Every screen is a grid of LEDs (Led.W x Led.H), each its own dot, dim
 	when it's off. A screen shows its board's pages one at a time, Hold
@@ -19,8 +20,8 @@ local Led = require(ReplicatedStorage.Shared.Led)
 local LedScreens = {}
 LedScreens.Hold = 5 -- seconds a page stays up
 LedScreens.Wipe = 0.45 -- seconds for the next to wipe across
-LedScreens.Reach = 280 -- studs: built within this
-LedScreens.Drop = 340 -- studs: taken down past this
+LedScreens.Reach = 1100 -- studs: built within this (they're seen from all over the Outpost)
+LedScreens.Drop = 1250 -- studs: taken down past this
 LedScreens.Every = 0.5 -- seconds between looks round
 LedScreens.Dot = 0.72 -- of a cell, an LED's size
 LedScreens.RowsPerFrame = 6 -- LED rows built a frame (no hitch)
@@ -63,7 +64,7 @@ local function build(panel: BasePart)
 	gui.Name = "LedGui"
 	gui.Face = Enum.NormalId.Front
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 24
+	gui.PixelsPerStud = 8
 	gui.LightInfluence = 0
 	gui.Brightness = 1.6
 	gui.MaxDistance = LedScreens.Drop

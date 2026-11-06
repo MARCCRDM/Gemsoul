@@ -1567,23 +1567,21 @@ do
 			check(math.sqrt((stage.X - other.X) ^ 2 + (stage.Z - other.Z) ^ 2) > set.StageReach * 2 + 8, "Arena Row's rings overlap")
 		end
 	end
-	-- Its LED screens: one a board, each facing out from Arena Row, clear of its rings.
+	-- Its LED screens: one a board, giants in the sky out past the wall, each facing in.
 	local settlementModel = site.Model:FindFirstChild("Settlement", true)
 	local ledFolder = settlementModel and settlementModel:FindFirstChild("LedScreens")
 	local boardsSeen = {}
-	local rowMiddle = R.Vector3.new(0, 0, 0)
-	for _, stage in set.Stages do
-		rowMiddle += R.Vector3.new(stage.X, 0, stage.Z) / #set.Stages
-	end
+	local rowMiddle = R.Vector3.new(0, 0, 0) -- (the settlement's middle)
 	for _, d in if ledFolder then ledFolder:GetDescendants() else {} do
 		if d:IsA("BasePart") and d.Name == "LedPanel" then
 			local board = d:GetAttribute("Board")
 			boardsSeen[board] = true
 			local q = Rules.Location:PointToObjectSpace(d.CFrame.Position)
 			local look = Rules.Location:VectorToObjectSpace(d.CFrame.LookVector)
-			local out = R.Vector3.new(q.X - rowMiddle.X, 0, q.Z - rowMiddle.Z).Unit
-			check(look:Dot(out) > 0.95, "The " .. tostring(board) .. " screen doesn't face out")
-			check(d.CFrame.Position.Y - d.Size.Y / 2 > Rules.Location.Position.Y + 5, "The " .. tostring(board) .. " screen is too low to walk under")
+			local inward = R.Vector3.new(rowMiddle.X - q.X, 0, rowMiddle.Z - q.Z).Unit
+			check(R.Vector3.new(look.X, 0, look.Z).Unit:Dot(inward) > 0.95 and look.Y < 0, "The " .. tostring(board) .. " screen doesn't face in and down at the rings")
+			check(d.CFrame.Position.Y - d.Size.Y / 2 > Rules.Location.Position.Y + 50, "The " .. tostring(board) .. " screen isn't up in the sky")
+			check(math.sqrt(q.X ^ 2 + q.Z ^ 2) > set.Wall, "The " .. tostring(board) .. " screen is inside the settlement")
 			for _, stage in set.Stages do
 				check(math.sqrt((q.X - stage.X) ^ 2 + (q.Z - stage.Z) ^ 2) > set.StageReach + 8, "The " .. tostring(board) .. " screen is in the " .. stage.Name)
 			end

@@ -2750,31 +2750,35 @@ local function settlement(parent, at: CFrame, rules, rng)
 	for _, stage in set.Stages do
 		table.insert(keepOut, { (at * CFrame.new(stage.X, 0, stage.Z)).Position, set.StageReach + 6 })
 	end
-	-- Its LED screens (set.Screens): a dark face on two legs, a lit strip
-	-- along its top; each client lights its LEDs (Client.LedScreens, the
-	-- LedPanel's Board attribute: Shared.Led).
+	-- Its LED screens (set.Screens): giants in the sky round the settlement,
+	-- facing in and tilted down at it, a dark face in a frame with lit strips
+	-- top and bottom and a glow under it where it hovers; each client
+	-- lights its LEDs (Client.LedScreens, the LedPanel's Board attribute:
+	-- Shared.Led).
 	local screens = folder(m, "LedScreens")
 	local size = set.Screen
 	for _, spec in set.Screens or {} do
 		local a = math.rad(spec.Facing)
-		-- (its face, -Z, looks along Facing)
+		-- (its face, -Z, looks along Facing, tipped down by Tilt)
 		local turn = math.atan2(-math.cos(a), -math.sin(a))
 		local base = at * CFrame.new(spec.X, 0, spec.Z) * CFrame.Angles(0, turn, 0)
+		local middle = base * CFrame.new(0, size.Lift + size.Height / 2, 0) * CFrame.Angles(math.rad(-(size.Tilt or 0)), 0, 0)
 		local screen = Instance.new("Model")
 		screen.Name = spec.Board .. "Screen"
-		local middle = base * CFrame.new(0, size.Lift + size.Height / 2, 0)
 		local panel = part(screen, middle, Vector3.new(size.Width, size.Height, 0.4), Color3.fromRGB(6, 7, 11), Enum.Material.SmoothPlastic)
 		panel.Name = "LedPanel"
 		panel:SetAttribute("Board", spec.Board)
-		solid(part(screen, middle * CFrame.new(0, 0, 0.9), Vector3.new(size.Width + 1.6, size.Height + 1.6, 1.4), HULL_DARK, Enum.Material.Metal))
-		part(screen, middle * CFrame.new(0, size.Height / 2 + 0.9, 0), Vector3.new(size.Width + 1.6, 0.3, 1.8), GLOW, Enum.Material.Neon)
+		part(screen, middle * CFrame.new(0, 0, 1.6), Vector3.new(size.Width + 3, size.Height + 3, 2.8), HULL_DARK, Enum.Material.Metal)
+		for _, edge in { -1, 1 } do
+			part(screen, middle * CFrame.new(0, edge * (size.Height / 2 + 1.4), 0), Vector3.new(size.Width + 3, 0.8, 2.4), GLOW, Enum.Material.Neon)
+		end
+		-- (what holds it up: a glow under each end)
 		for _, side in { -1, 1 } do
-			local leg = base * CFrame.new(side * (size.Width / 2 - 2.5), (size.Lift + size.Height) / 2, 1.2)
-			solid(part(screen, leg, Vector3.new(1.4, size.Lift + size.Height, 1.4), HULL_DARK, Enum.Material.Metal))
-			solid(disc(screen, base * CFrame.new(side * (size.Width / 2 - 2.5), 0.3, 1.2), 2.2, 0.6, HULL_DARK, Enum.Material.Metal))
+			local jet = part(screen, middle * CFrame.new(side * (size.Width / 2 - 10), -(size.Height / 2 + 3), 1), Vector3.new(9, 2.4, 9), HULL_DARK, Enum.Material.Metal)
+			local flame = part(screen, jet.CFrame * CFrame.new(0, -1.8, 0), Vector3.new(6, 1.2, 6), GLOW, Enum.Material.Neon)
+			light(flame, GLOW, 40, 1.4)
 		end
 		screen.Parent = screens
-		table.insert(keepOut, { base.Position, size.Width / 2 + 4 })
 	end
 
 	-- The pod pads: a raised octagon each, a dark deck with a yellow dashed

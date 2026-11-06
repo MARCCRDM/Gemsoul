@@ -172,25 +172,36 @@ local function ladder(art: string, title: { { string } }, heading: string, rows,
 end
 
 -- Arena Row now: a page of the rings, then one for each fight on.
-local SHORT = { IntroRing = "INTRO", GrandArena = "GRAND", DuelRingWest = "WEST", DuelRingEast = "EAST" }
+local SHORT = {
+	IntroRing = "INTRO",
+	GrandArena = "GRAND",
+	DuelRingWest = "SW",
+	DuelRingEast = "SE",
+	DuelRingNorthWest = "NW",
+	DuelRingNorthEast = "NE",
+}
 local function live(data)
 	local rings = (type(data) == "table" and data.Rings) or {}
-	local b = Led.new()
-	Led.center(b, 0, "ARENA ROW", CYAN)
-	local fights = {}
-	for i, ring in rings do
-		if i > 4 then
-			break
+	local pages, fights = {}, {}
+	-- (four rings a page)
+	for from = 1, math.max(1, #rings), 4 do
+		local b = Led.new()
+		Led.center(b, 0, "ARENA ROW", CYAN)
+		for k = 0, 3 do
+			local ring = rings[from + k]
+			if not ring then
+				break
+			end
+			local y = Led.Line + 1 + k * Led.Line
+			Led.text(b, 0, y, SHORT[ring.Name] or Led.fit(ring.Name, 5), WHITE)
+			local busy = type(ring.Fighters) == "table" and #ring.Fighters > 0
+			rightText(b, Led.W - 1, y, if busy then "FIGHT ON" else "OPEN", if busy then GOOD else DIM)
+			if busy then
+				table.insert(fights, ring)
+			end
 		end
-		local y = Led.Line + 1 + (i - 1) * Led.Line
-		Led.text(b, 0, y, SHORT[ring.Name] or Led.fit(ring.Name, 5), WHITE)
-		local busy = type(ring.Fighters) == "table" and #ring.Fighters > 0
-		rightText(b, Led.W - 1, y, if busy then "FIGHT ON" else "OPEN", if busy then GOOD else DIM)
-		if busy then
-			table.insert(fights, ring)
-		end
+		table.insert(pages, b)
 	end
-	local pages = { b }
 	for _, ring in fights do
 		local f = Led.new()
 		Led.center(f, 0, (SHORT[ring.Name] or "") .. " RING", CYAN)

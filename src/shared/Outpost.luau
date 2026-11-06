@@ -112,34 +112,39 @@ Outpost.Settlement = {
 	-- Arena Row: open rings on the ground in the middle of the field, seen
 	-- from every pod (Server.PrivateArenas builds them: no walls, the fight's
 	-- seen and sees out). Intro and practice fights take one when it's free.
-	-- Four, in a square: the Intro Ring and the Grand Arena, the two duel
-	-- rings south of them toward the plaza.
+	-- Six, three rows of two: the Intro Ring and the Grand Arena in the
+	-- middle row, two duel rings north of them toward the pods and two
+	-- south toward the plaza.
 	-- (in the order practice takes them, the Intro Ring first; duels take
 	-- the Grand Arena first, Server.Duels)
 	Stages = {
 		{ Name = "IntroRing", X = -48, Z = 0 },
 		{ Name = "DuelRingWest", X = -48, Z = 84 },
 		{ Name = "DuelRingEast", X = 48, Z = 84 },
+		{ Name = "DuelRingNorthWest", X = -48, Z = -84 },
+		{ Name = "DuelRingNorthEast", X = 48, Z = -84 },
 		{ Name = "GrandArena", X = 48, Z = 0 },
 	},
 	StageReach = 36, -- studs: a ring's kerb, lamps and fence, round its middle
-	-- The LED screens round Arena Row (Shared.Led's boards: Client.LedScreens
-	-- lights them), one each side, facing out (Facing: the way its face
-	-- looks, in degrees as above): north to the pods, south to the plaza.
-	-- Screen: its face in studs, and how high its bottom edge stands.
+	-- The LED screens (Shared.Led's boards: Client.LedScreens lights them):
+	-- four giants in the sky round the whole settlement, out past its wall,
+	-- one each side, facing in and tilted down at it (Facing: the way its
+	-- face looks, in degrees as above), so wherever you are you see one.
+	-- Screen: its face in studs, how high its bottom edge hangs, how far it
+	-- tilts down (degrees).
 	Screens = {
-		{ Board = "Ranked", X = 0, Z = -60, Facing = 270 },
-		{ Board = "Live", X = 122, Z = 42, Facing = 0 },
-		{ Board = "Miners", X = 0, Z = 134, Facing = 90 },
-		{ Board = "Hunters", X = -122, Z = 42, Facing = 180 },
+		{ Board = "Ranked", X = 0, Z = -440, Facing = 90 },
+		{ Board = "Live", X = 440, Z = 0, Facing = 180 },
+		{ Board = "Miners", X = 0, Z = 440, Facing = 270 },
+		{ Board = "Hunters", X = -440, Z = 0, Facing = 0 },
 	},
-	Screen = { Width = 36, Height = 15, Lift = 8 },
+	Screen = { Width = 144, Height = 60, Lift = 70, Tilt = 10 },
 	-- (x, z points: from the ring round the field to the plaza, round the
 	-- arenas' outsides and down between them)
 	Walks = {
 		{ { -131, -92 }, { -100, -40 }, { -100, 40 }, { -98, 100 }, { -62, 138 }, { -26, 146 }, { 0, 164 } },
 		{ { 131, -92 }, { 100, -40 }, { 100, 40 }, { 98, 100 }, { 62, 138 }, { 26, 146 }, { 0, 164 } },
-		{ { 0, -160 }, { -6, -96 }, { 0, -44 }, { 0, 44 }, { 0, 100 }, { 0, 164 } },
+		{ { 0, -160 }, { 0, -100 }, { 0, -44 }, { 0, 44 }, { 0, 100 }, { 0, 164 } },
 		-- (and from the plaza out to the Kaiju Habitat, the south-west and the
 		-- Market's side ramp)
 		{ { -36, 204 }, { -128, 168 }, { -196, 104 } },
