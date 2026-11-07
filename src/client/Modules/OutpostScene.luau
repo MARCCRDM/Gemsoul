@@ -2302,11 +2302,13 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	if active then
 		PodShowcase.step(dt)
-		LedScreens.step(dt)
 	else
 		PodShowcase.clear()
-		LedScreens.clear()
 	end
+	-- The LED screens stay lit wherever they can be seen from (the Arena's
+	-- fights too, under them): they go by distance and the camera's look
+	-- themselves (only built within Reach, only drawn in front of you).
+	LedScreens.step(dt)
 	-- Day and night (Shared.DayNight), a few times a second, while the
 	-- Outpost's own light is up (Scenes: OutpostSky; never the Rift's, a
 	-- dungeon's or the Arena's).

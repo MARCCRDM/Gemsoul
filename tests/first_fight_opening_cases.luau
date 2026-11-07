@@ -1,9 +1,9 @@
 -- lune run tests/first_fight_opening_cases.luau <repo>
--- Round 1's opening (Client FirstFight): as a new miner's first fight starts,
--- the narrator says "Welcome, Miner. Your training begins now.", then the
--- controls' line, with a bobbing arrow over each button it names: first the
--- Q / E / R moves, then ATTACK, BLOCK and DODGE. The controls' hint rings
--- wait till it's done. Driven on a clock of its own, with Combat's HUD faked.
+-- A new miner's first fight (Client FirstFight): no lesson in it any more
+-- (the basics are a video of their own before the element roll: Client
+-- Intro, Modules.BasicsScreen), so nothing's read and the controls' hint
+-- rings come up at once. Driven on a clock of its own, with Combat's HUD
+-- faked. And Intro: the video, then the roll.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -122,19 +122,6 @@ button("Attack", "Basic", nil, 900)
 button("Block", "Block", nil, 1000)
 button("Dodge", "Dodge", nil, 1100)
 
--- The narrator: what's read, in order (its own timing: Narration.Seconds).
-local Seconds = { TrainingBegins = 3.5, Controls = 5.9 }
-local said = {}
-local Narration = {
-	play = function(name)
-		table.insert(said, { Name = name, At = now })
-		return Seconds[name] or 0
-	end,
-}
-function Narration.say(name)
-	local seconds = Narration.play(name)
-	fakeTask.wait(seconds)
-end
 local UiKit = {
 	gui = function(name)
 		local g = Instance.new("ScreenGui")
@@ -153,25 +140,7 @@ local IronUi = {
 		return i
 	end,
 }
--- The basics' screen (Modules.BasicsScreen): its lines in turn, two seconds
--- each here, telling the opening which one's up.
-local lesson = {}
-local BasicsScreen = {
-	run = function(onLine)
-		for _, line in { "BasicsAttack", "BasicsBlock", "BasicsAbilities", "BasicsDodge", "BasicsResources" } do
-			if player:GetAttribute("FirstFight") ~= true then
-				break
-			end
-			table.insert(lesson, line)
-			onLine(line)
-			fakeTask.wait(2)
-		end
-		onLine(nil)
-	end,
-}
 local stubs = {
-	BasicsScreen = BasicsScreen,
-	Narration = Narration,
 	UiKit = UiKit,
 	IronUi = IronUi,
 	GemClient = { Profile = { Character = {} } },
@@ -235,66 +204,29 @@ local env = setmetatable({
 }, { __index = _G })
 luau.load(source, { debugName = "FirstFight", environment = env })()
 
-local arrowsGui = playerGui:FindFirstChild("FirstFightArrows")
 local ringGui = playerGui:FindFirstChild("FirstFightHints")
-check(arrowsGui and ringGui, "No arrows or hint rings")
-local function up()
-	local list = {}
-	for _, a in arrowsGui:GetChildren() do
-		if arrowsGui.Enabled and a.Visible then
-			table.insert(list, (a.Name:gsub("^Arrow", "")))
-		end
-	end
-	table.sort(list)
-	return table.concat(list, ",")
-end
+check(ringGui, "No hint rings")
+check(playerGui:FindFirstChild("FirstFightArrows") == nil, "The lesson's arrows are still in the fight")
 
 -- Nothing before the fight.
 step(1)
-check(#said == 0 and up() == "", "The opening played before the first fight")
+check(not ringGui.Enabled, "A hint ring before the first fight")
 
--- Round 1 starts, the drop still on (a matched first fight is marked at
--- the match, before its drop): the welcome waits till the fight's in view.
-player:SetAttribute("ArenaDropUntil", 99)
+-- Round 1 starts: the hint rings at once (no welcome, no lesson to wait for).
 player:SetAttribute("FirstFight", true)
-step(2)
-check(#said == 0, "The welcome played under the drop")
-player:SetAttribute("ArenaDropUntil", nil)
-step(0.1)
-check(said[1] and said[1].Name == "TrainingBegins", "The welcome wasn't first once the fight was in view")
-step(1)
-check(#said == 1 and up() == "", "The controls came before the welcome was done")
-check(not ringGui.Enabled, "A hint ring over the welcome")
-step(2.6)
-check(lesson[1] == "BasicsAttack", "The basics didn't follow the welcome")
-step(0.2)
-check(up() == "Swing", "Attacking: not an arrow on ATTACK: " .. up())
-check(not ringGui.Enabled, "A hint ring over the lesson")
-local attack = arrowsGui:FindFirstChild("ArrowSwing")
-check(attack.Position.X.Offset == 932, "The ATTACK arrow isn't over ATTACK")
-step(2)
-check(lesson[2] == "BasicsBlock" and up() == "Block", "Blocking: not an arrow on BLOCK: " .. up())
-step(2)
-check(lesson[3] == "BasicsAbilities" and up() == "E,Q,R", "Abilities: not an arrow on each of Q, E and R: " .. up())
--- (each over its button, a little above)
-local q = arrowsGui:FindFirstChild("ArrowQ")
-check(q.Position.X.Offset == 132 and q.Position.Y.Offset < 600, "The Q arrow isn't over the Q button")
-step(2)
-check(lesson[4] == "BasicsDodge" and up() == "Dodge", "Dodging: not an arrow on DODGE: " .. up())
-step(2)
-check(lesson[5] == "BasicsResources" and up() == "", "Charge and stamina: an arrow on a button")
-step(2.2)
-check(up() == "" and not arrowsGui.Enabled, "The arrows stayed after the lesson")
 step(0.3)
-check(ringGui.Enabled, "The hint rings didn't come back after the opening")
-check(#said == 1 and #lesson == 5, "Something else was read")
+check(ringGui.Enabled, "The hint rings didn't come up as the first fight started")
 
--- Once: a second first fight in the visit has no opening.
-player:SetAttribute("FirstFight", nil)
-step(0.5)
-player:SetAttribute("FirstFight", true)
-step(8)
-check(#said == 1 and #lesson == 5, "The opening played twice")
+-- Intro: the basics' video first (a fresh miner's, not a rejoin with a
+-- kit rolled already), then the element roll.
+do
+	local intro = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
+	local block = intro:find("\nif not FastStart.Pick then\n\t%-%- First the basics")
+	check(block, "Intro doesn't open the no-picker flow with the basics' video")
+	local video = intro:find("if not savedKit then\n\t\tpcall(BasicsScreen.run)", block, true)
+	local roll = intro:find('GemClient.request("PrepareStarterLottery")', block, true)
+	check(video and roll and video < roll, "The basics' video doesn't come before the element roll")
+end
 
 -- A friend request lets the mouse go (the combat view held it in the middle:
 -- Roblox's pop-up couldn't be clicked without knowing Tab), and says where.
@@ -305,5 +237,5 @@ do
 	check(body:find("Enum.FriendStatus.FriendRequestReceived", 1, true) and body:find("FirstPerson.setCursorFree(true)", 1, true) and body:find("UiKit.toast(", 1, true), "A friend request leaves the mouse locked")
 end
 
-print(string.format("PASS: %d first fight opening checks (the welcome, then the basics' lines with an arrow on each one's button: ATTACK, BLOCK, Q/E/R, DODGE)", checks))
+print(string.format("PASS: %d first fight opening checks (the basics' video before the roll, no lesson in the fight, the hint rings at once)", checks))
 process.exit(0)

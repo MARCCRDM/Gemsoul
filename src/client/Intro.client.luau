@@ -1,10 +1,11 @@
 -- Launch ceremony: server-owned outcomes, simultaneous reels, a spotlight for every reward.
 --
--- The fast start (Shared.FastStart; Pick off): no picker. Their element is
--- rolled by the server, Thermal or Cryo, and lands on a quick reel of the
--- two; then the surge roll (revealMoves), moving on by itself; then the
--- loading screen, up till their first fight starts (Lobby.client finds it
--- and lets the cover go: the player attribute IntroCover). No kaiju here:
+-- The fast start (Shared.FastStart; Pick off): no picker. First the basics'
+-- video (Modules.BasicsScreen); then their element is rolled by the
+-- server, Thermal or Cryo, and lands on a quick reel of the two; then
+-- the surge roll (revealMoves), moving on by itself; then the loading
+-- screen, up till their first fight starts (Lobby.client finds it and lets
+-- the cover go: the player attribute IntroCover). No kaiju here:
 -- the starter roll is Wren's, at the Kennel.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -33,6 +34,7 @@ local LotterySound = require(script.Parent.Modules.LotterySound)
 local Icons = require(script.Parent.Modules.SurgeIcons)
 local CardFX = require(script.Parent.Modules.ElementCardFX)
 local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
+local BasicsScreen = require(script.Parent.Modules.BasicsScreen)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -2554,6 +2556,12 @@ fit()
 -- stepping back, the name big under them; then on by itself to the surge
 -- roll and the first fight. A failed roll: RETRY.
 if not FastStart.Pick then
+	-- First the basics, a video of their own (Modules.BasicsScreen: attacking,
+	-- blocking, abilities, dodging, charge and stamina), then the roll, then
+	-- the first fight. (Not again for a kit already rolled: a rejoin.)
+	if not savedKit then
+		pcall(BasicsScreen.run)
+	end
 	do
 		local list = FastStart.StarterElements
 		gui.Enabled = true

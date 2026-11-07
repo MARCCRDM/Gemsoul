@@ -12,8 +12,9 @@
 	drawn while it's in front of your camera (one behind you is switched
 	off and keeps time without painting: there are eight).
 
-	  LedScreens.step(dt)   each frame while you're in the Outpost
-	  LedScreens.clear()    all of them off (you've left)
+	  LedScreens.step(dt)   each frame, wherever you are (the Arena under them
+	                        too); out of Reach, nothing's built
+	  LedScreens.clear()    all of them off
 	  LedScreens.info() -> Led.scenes' info (the kaiju and bosses shown)
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
