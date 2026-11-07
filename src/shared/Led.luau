@@ -18,12 +18,20 @@
 	             they are and what they're weak to
 	  Kaiju      west: the kaiju, one by one, and what each one does
 
+	and between them SAGA TOONS, short spin-off cartoons of the kaiju and
+	bosses (Led.Toons), each ending on a tip for a new miner: BONK! (Tung Tung Tung Sahur vs a rock) and MINE!
+	(Grandape and Razorback, one chest) on the Guide, HOT N COLD (Drago
+	melts Frigo; Frigo freezes Drago) on Elements, DISGUISE (Tralalero
+	hides from its own poster) on Bounties, SNEEZE (Skyjelly's HYPERBEAM)
+	on Kaiju.
+
 	  Led.W, Led.H, Led.Boards, Led.ElementNames
 	  Led.new() -> buffer;  Led.get(buffer, x, y) -> rgb?
 	  Led.text(buffer, x, y, text, rgb, scale?) -> width;  Led.width(text, scale?)
 	  Led.center(buffer, y, text, rgb, scale?);  Led.art(buffer, art, x, y, tint?, k?)
 	  Led.fit(text, chars) -> text   capitals the font has, cut to fit
 	  Led.scenes(board, info) -> { { Duration, Draw = (t) -> buffer } }
+	  Led.toon(name) -> scene?   an episode (nil: no art for its cast)
 	      info: { Kaiju = { { Art, Name, Role } }, Bosses = { { Art, Name,
 	      Element, Weakness, Threat } } } (Client.LedScreens, from the
 	      game's own data)
@@ -523,10 +531,624 @@ local function kaiju(entry)
 	end)
 end
 
+-- Cartoons ------------------------------------------------------------------------------------------
+-- SAGA TOONS: short spin-off cartoons of the kaiju and bosses, a dozen
+-- seconds each, shot by shot: the cast walk, hop, squash and stretch,
+-- talk in speech bubbles, BONK and blast each other.
+
+local FOOT = Led.H - 2 -- the row the cast stand on (the ground's under it)
+local SKY_DOTS = rgb(40, 46, 66)
+
+local function ease(k: number): number
+	k = math.clamp(k, 0, 1)
+	return 1 - (1 - k) ^ 3
+end
+local function lerp(a: number, b: number, k: number): number
+	return a + (b - a) * math.clamp(k, 0, 1)
+end
+
+-- A picture with its feet at (cx, foot): flipped (`Flip`), stretched (`SX`,
+-- `SY`), tinted (`Tint`, `K`). Returns its width, height and top.
+local function sprite(b, name: string, cx: number, foot: number, o: any?): (number, number, number)
+	local art = LedArt[name]
+	if not art then
+		return 0, 0, foot
+	end
+	o = o or {}
+	local w = math.max(1, math.floor(art.W * (o.SX or 1) + 0.5))
+	local h = math.max(1, math.floor(art.H * (o.SY or 1) + 0.5))
+	local colors = {}
+	for i, c in art.Palette do
+		local own = rgb(c[1], c[2], c[3])
+		colors[i] = if o.Tint and o.K then mix(own, o.Tint, o.K) else own
+	end
+	local left, top = math.floor(cx - w / 2 + 0.5), math.floor(foot) - h + 1
+	for dy = 0, h - 1 do
+		local row = art.Rows[math.min(art.H, math.floor(dy * art.H / h) + 1)]
+		for dx = 0, w - 1 do
+			local sx = math.min(art.W, math.floor(dx * art.W / w) + 1)
+			if o.Flip then
+				sx = art.W - sx + 1
+			end
+			local index = string.find(DIGITS, string.sub(row, sx, sx), 1, true)
+			if index and colors[index] then
+				Led.set(b, left + dx, top + dy, colors[index])
+			end
+		end
+	end
+	return w, h, top
+end
+
+-- A speech bubble across the top, its tail down toward `cx`.
+local function bubble(b, cx: number, text: string, color: number?)
+	text = Led.fit(text, Led.Chars - 1)
+	local w = Led.width(text) + 4
+	local left = math.clamp(math.floor(cx - w / 2), 0, Led.W - w)
+	for y = 0, 6 do
+		for x = left, left + w - 1 do
+			local edge = y == 0 or y == 6 or x == left or x == left + w - 1
+			local corner = (y == 0 or y == 6) and (x == left or x == left + w - 1)
+			Led.set(b, x, y, if corner then nil elseif edge then WHITE else nil)
+		end
+	end
+	local tail = math.clamp(math.floor(cx), left + 2, left + w - 3)
+	Led.set(b, tail, 7, WHITE)
+	Led.set(b, tail + (if cx < left + w / 2 then -1 else 1), 8, WHITE)
+	Led.text(b, left + 2, 1, text, color or WHITE)
+end
+
+-- A burst of rays round (cx, cy).
+local function burst(b, cx: number, cy: number, r: number, color: number)
+	for i = 0, 7 do
+		local a = i / 8 * math.pi * 2 + 0.2
+		for s = math.floor(r * 0.45), math.floor(r) do
+			Led.set(b, cx + math.cos(a) * s, cy + math.sin(a) * s * 0.8, color)
+		end
+	end
+end
+
+-- Stars going round a dazed head.
+local function dizzy(b, cx: number, y: number, t: number)
+	for i = 0, 2 do
+		local a = t * 6 + i * math.pi * 2 / 3
+		Led.set(b, cx + math.cos(a) * 5, y + math.sin(a) * 1.5, if i == 0 then WHITE else GOLD)
+	end
+end
+
+-- A "!" over a head.
+local function shout(b, cx: number, y: number, color: number)
+	for dy = 0, 2 do
+		Led.set(b, cx, y + dy, color)
+	end
+	Led.set(b, cx, y + 4, color)
+end
+
+-- A rock: a lump, shaded, cracked `crack` (0..2) of the way.
+local function rock(b, cx: number, foot: number, crack: number, apart: number?)
+	apart = apart or 0
+	for y = 0, 9 do
+		local half = math.floor(math.sqrt(math.max(0, 1 - ((y - 9) / 10) ^ 2)) * 8 + 0.5)
+		for x = -half, half do
+			local shade = if x < -half / 3 then rgb(150, 156, 170) elseif x > half / 2 then rgb(78, 82, 96) else rgb(112, 118, 134)
+			local side = if x < 0 then -apart else apart
+			Led.set(b, cx + x + side, foot - 9 + y, shade)
+		end
+	end
+	if crack >= 1 then
+		for i, d in { { 0, 0 }, { 1, 1 }, { 0, 2 }, { -1, 3 }, { 0, 4 } } do
+			if i <= 3 or crack >= 2 then
+				Led.set(b, cx + d[1], foot - 8 + d[2], rgb(30, 32, 40))
+			end
+		end
+	end
+end
+
+-- The ground: a line along the bottom, a few dots of sky.
+local function ground(b, shake: number?)
+	shake = shake or 0
+	for x = 0, Led.W - 1 do
+		Led.set(b, x, Led.H - 1, if (x + shake) % 6 == 0 then rgb(70, 80, 104) else rgb(46, 54, 74))
+	end
+	for i = 1, 5 do
+		Led.set(b, hash(i * 9) * Led.W, 2 + hash(i * 4) * 10, SKY_DOTS)
+	end
+end
+
+-- A title card: SAGA TOONS, the episode's name, the stars peeking up.
+local function card(b, name: string, cast: { string }, t: number)
+	Led.center(b, 1, "SAGA TOONS", GOLD)
+	if Led.width(name, 2) <= Led.W - 2 then
+		Led.center(b, 8, name, WHITE, 2)
+	else
+		Led.center(b, 11, name, WHITE)
+	end
+	for i, who in cast do
+		local x = if i == 1 then 8 else Led.W - 9
+		local peek = ease(t / 0.6)
+		sprite(b, who, x, FOOT + math.floor((1 - peek) * 12), { SX = 0.6, SY = 0.6, Flip = i == 2 })
+	end
+	shimmer(b, t, 40)
+	sparkles(b, t, 10, GOLD, #name)
+end
+
+-- Hopping along: how high off the ground at `t`.
+local function hop(t: number, speed: number?): number
+	return math.floor(math.abs(math.sin(t * (speed or 9))) * 2 + 0.5)
+end
+
+-- The lesson at the end: TIP, a few typed lines, the star bobbing beside them.
+local function lesson(b, who: string, lines: { string }, color: number, u: number, t: number)
+	sprite(b, who, 11, FOOT - hop(u, 4))
+	Led.text(b, 26, 1, "TIP", GOLD)
+	for i, line in lines do
+		local shown = math.clamp(math.floor((u - (i - 1) * 0.35) * 26), 0, #line)
+		centerIn(b, 24, Led.W - 1, 1 + i * Led.Line, string.sub(line, 1, shown), if i == 1 then color else WHITE)
+	end
+	sparkles(b, t, 8, color, #lines)
+end
+
+-- An episode: its title card, then its shots, each { seconds, draw(b, u, k, t) }
+-- (u: seconds into the shot, k: 0..1 through it, t: into the episode), then
+-- its lesson (a tip for a new miner: { who, lines, color }).
+local function episode(name: string, cast: { string }, shots: { any }, tip: any?)
+	if tip then
+		shots = table.clone(shots)
+		table.insert(shots, { 2.2, function(b, u, _k, t)
+			lesson(b, tip[1], tip[2], tip[3], u, t)
+		end })
+	end
+	for _, who in cast do
+		if not LedArt[who] then
+			return nil
+		end
+	end
+	local total = 1.6
+	for _, shot in shots do
+		total += shot[1]
+	end
+	return scene(total, function(t)
+		local b = Led.new()
+		if t < 1.6 then
+			card(b, name, cast, t)
+			ground(b)
+			return b
+		end
+		local at = 1.6
+		for i, shot in shots do
+			if t < at + shot[1] or i == #shots then
+				local u = t - at
+				shot[2](b, u, math.clamp(u / shot[1], 0, 1), t)
+				break
+			end
+			at += shot[1]
+		end
+		ground(b)
+		return b
+	end)
+end
+
+local TOONS = {}
+
+-- BONK!: Tung Tung Tung Sahur wants a gem out of a rock. The rock wins, then
+-- it doesn't.
+function TOONS.Bonk()
+	local S, ROCK = "MiniBossSahurTrio", 52
+	local function rockAt(b, crack, apart, shake)
+		rock(b, ROCK + (shake or 0), FOOT, crack, apart)
+	end
+	return episode("BONK!", { S }, {
+		{ 2.0, function(b, u, k)
+			rockAt(b, 0)
+			sprite(b, S, lerp(-8, 24, k), FOOT - hop(u))
+		end },
+		{ 1.4, function(b, u)
+			rockAt(b, 0)
+			sprite(b, S, 24, FOOT)
+			bubble(b, 24, "EASY GEMS", GOLD)
+		end },
+		{ 1.2, function(b, u, k)
+			local lunge = if k < 0.3 then ease(k / 0.3) else 1 - ease((k - 0.3) / 0.7)
+			local shake = if k > 0.3 and k < 0.7 then (if math.floor(u * 30) % 2 == 0 then 1 else -1) else 0
+			rockAt(b, 0, 0, shake)
+			sprite(b, S, 24 + lunge * 16, FOOT)
+			if k > 0.3 then
+				burst(b, ROCK - 6, FOOT - 9, 6, WHITE)
+				Led.text(b, 36, 2, "BONK", GOLD)
+			end
+		end },
+		{ 1.6, function(b, u, k, t)
+			rockAt(b, 0)
+			local squash = 0.12 * math.cos(u * 14) * (1 - k)
+			local _, _, top = sprite(b, S, 24, FOOT, { SY = 0.85 - squash, SX = 1.12 + squash })
+			dizzy(b, 24, top - 2, t)
+			bubble(b, 24, "OW!", RED)
+		end },
+		{ 1.2, function(b, u, k)
+			local lunge = if k < 0.25 then ease(k / 0.25) else 1 - ease((k - 0.25) / 0.75)
+			rockAt(b, if k > 0.25 then 2 else 0)
+			sprite(b, S, 24 + lunge * 17, FOOT, { SX = 1 + lunge * 0.15 })
+			if k > 0.25 then
+				burst(b, ROCK - 6, FOOT - 9, 8, GOLD)
+				Led.text(b, 32, 2, "CRACK!", WHITE)
+			end
+		end },
+		{ 2.2, function(b, u, k)
+			rockAt(b, 2, math.floor(ease(k * 2) * 4))
+			local _, _, top = sprite(b, S, 24, FOOT)
+			-- the gem pops up out of the rock and lands on his head
+			local gk = math.clamp(k / 0.6, 0, 1)
+			local gw, gh = artSize("SmallFire")
+			local gx = lerp(ROCK, 24, gk) - gw / 2
+			local gy = lerp(FOOT - 10, top - gh, gk) - math.sin(gk * math.pi) * 14
+			Led.art(b, "SmallFire", math.floor(gx), math.floor(gy))
+			if k > 0.6 then
+				shout(b, 24 + 8, top - 4, GOLD)
+			end
+		end },
+		{ 2.4, function(b, u, k, t)
+			rock(b, ROCK, FOOT, 2, 4)
+			local jump = math.floor(math.abs(math.sin(u * 7)) * 5)
+			local _, _, top = sprite(b, S, 24, FOOT - jump)
+			local gw, gh = artSize("SmallFire")
+			Led.art(b, "SmallFire", 24 - math.floor(gw / 2), top - gh)
+			bubble(b, 24, "RARE ONE!", GOOD)
+			sparkles(b, t, 14, GOLD, 21)
+		end },
+	}, { S, { "MINE ROCKS", "FOR GEMS", "RARE ONES!" }, GOLD })
+end
+
+-- HOT N COLD: Bombardiro Drago melts Frigo Camelo. Frigo comes back, and
+-- Drago's weak to Cryo.
+function TOONS.HotCold()
+	local D, F = "MiniBossDrago", "MiniBossFrigo"
+	local DX, FX = 15, 57
+	local ICE = rgb(150, 220, 255)
+	return episode("HOT N COLD", { D, F }, {
+		{ 1.4, function(b, u, k)
+			sprite(b, D, lerp(-10, DX, ease(k)), FOOT - hop(u))
+			sprite(b, F, lerp(Led.W + 10, FX, ease(k)), FOOT - hop(u + 0.2), { Flip = true })
+		end },
+		{ 1.4, function(b)
+			sprite(b, D, DX, FOOT)
+			sprite(b, F, FX, FOOT, { Flip = true })
+			bubble(b, DX, "HOT STUFF", ELEMENT.Fire)
+		end },
+		{ 2.0, function(b, u, k)
+			sprite(b, D, DX, FOOT)
+			-- Frigo melts: shorter, wider, redder, dripping
+			local melt = ease(k)
+			sprite(b, F, FX, FOOT, { Flip = true, SY = 1 - melt * 0.72, SX = 1 + melt * 0.5, Tint = ELEMENT.Fire, K = 0.15 + 0.25 * math.sin(u * 20) ^ 2 })
+			-- the fire: a stream of embers from Drago's mouth
+			for i = 1, 22 do
+				local life = (u * 2.2 + i / 22) % 1
+				local x = lerp(DX + 7, FX - 4, life)
+				local y = FOOT - 12 + math.sin(i * 1.7 + u * 9) * (1 + life * 3)
+				Led.set(b, x, y, if life < 0.3 then rgb(255, 240, 150) elseif life < 0.7 then rgb(255, 150, 50) else ELEMENT.Fire)
+			end
+		end },
+		{ 1.2, function(b, u)
+			sprite(b, D, DX, FOOT - hop(u, 12))
+			sprite(b, F, FX, FOOT, { Flip = true, SY = 0.28, SX = 1.5, Tint = ICE, K = 0.3 })
+			bubble(b, DX, "HA HA!", ELEMENT.Fire)
+		end },
+		{ 1.6, function(b, u, k, t)
+			sprite(b, D, DX, FOOT)
+			sprite(b, F, FX, FOOT, { Flip = true, SY = lerp(0.28, 1, ease(k)), SX = lerp(1.5, 1, ease(k)), Tint = WHITE, K = 0.35 })
+			ring(b, FX, FOOT - 9, 4 + k * 9, scale(ICE, 1 - k * 0.5))
+			WEATHER.Frost(b, t)
+		end },
+		{ 1.8, function(b, u, k)
+			local freeze = ease(k)
+			sprite(b, D, DX, FOOT, { Tint = ICE, K = freeze * 0.6 })
+			sprite(b, F, FX, FOOT, { Flip = true })
+			-- the cold: a fan of frost from Frigo to Drago
+			for i = 1, 26 do
+				local life = (u * 1.8 + i / 26) % 1
+				local x = lerp(FX - 6, DX + 4, life)
+				local y = FOOT - 10 + math.sin(i * 2.3) * (1 + life * 5)
+				Led.set(b, x, y, if i % 3 == 0 then WHITE else ICE)
+			end
+			if k > 0.5 then
+				local h = math.floor((k - 0.5) * 2 * 22)
+				for y = FOOT - h + 1, FOOT do
+					Led.set(b, DX - 10, y, ICE)
+					Led.set(b, DX + 10, y, ICE)
+				end
+			end
+		end },
+		{ 2.2, function(b, u, k, t)
+			local shiver = if math.floor(u * 16) % 2 == 0 then 1 else 0
+			sprite(b, D, DX + shiver, FOOT, { Tint = ICE, K = 0.6 })
+			for y = FOOT - 21, FOOT do
+				Led.set(b, DX - 10, y, ICE)
+				Led.set(b, DX + 10, y, ICE)
+			end
+			for x = DX - 10, DX + 10 do
+				Led.set(b, x, FOOT - 22, ICE)
+			end
+			sprite(b, F, FX, FOOT - hop(u, 6), { Flip = true })
+			if k < 0.5 then
+				bubble(b, DX, "B-B-BRR", ICE)
+			else
+				bubble(b, FX, "WEAK TO CRYO!", ELEMENT.Frost)
+			end
+			sparkles(b, t, 8, ICE, 31)
+		end },
+	}, { F, { "BOSSES HAVE", "A WEAKNESS", "HIT IT!" }, ELEMENT.Frost })
+end
+
+-- SNEEZE: Dreadmaw laughs at little Skyjelly's HYPERBEAM. Once.
+function TOONS.Sneeze()
+	local J, M = "MiniKaijuSkyjelly", "MiniKaijuDreadmaw"
+	local JX, MX = 14, 54
+	return episode("SNEEZE", { J, M }, {
+		{ 1.6, function(b, u, k)
+			sprite(b, J, JX, FOOT - math.floor(math.sin(u * 4) + 1))
+			local step = math.floor(u * 3)
+			local shake = if (u * 3) % 1 < 0.2 then 1 else 0
+			sprite(b, M, lerp(Led.W + 12, MX, (step + 1) / 5), FOOT - shake, { Flip = true })
+		end },
+		{ 1.2, function(b, u)
+			local shake = if math.floor(u * 24) % 2 == 0 then 1 else -1
+			sprite(b, J, JX + shake, FOOT, { SY = 0.92 })
+			sprite(b, M, MX, FOOT, { Flip = true, SX = 1.08, SY = 1.08 })
+			bubble(b, MX, "RAWR!", RED)
+		end },
+		{ 2.0, function(b, u, k, t)
+			local _, _, top = sprite(b, J, JX, FOOT, { Tint = CYAN, K = k * 0.5 })
+			sprite(b, M, MX, FOOT, { Flip = true })
+			Led.text(b, 28, 1, "CHARGE " .. math.floor(k * 100) .. "%", CYAN)
+			-- sparks drawn in to it
+			for i = 1, 10 do
+				local life = (u * 1.5 + i / 10) % 1
+				local a = i * 2.4
+				Led.set(b, JX + math.cos(a) * 14 * (1 - life), top + 8 + math.sin(a) * 9 * (1 - life), CYAN)
+			end
+		end },
+		{ 1.4, function(b, u, k)
+			sprite(b, J, JX, FOOT, { SY = if k < 0.15 then 0.85 else 1 })
+			sprite(b, M, MX, FOOT, { Flip = true })
+			-- one little spark, off its nose
+			local x = if k < 0.6 then lerp(JX + 8, MX - 8, k / 0.6) else lerp(MX - 8, MX - 16, (k - 0.6) / 0.4)
+			local y = FOOT - 10 - (if k < 0.6 then 0 else math.sin((k - 0.6) / 0.4 * math.pi) * 4)
+			Led.set(b, x, y, WHITE)
+			Led.set(b, x + 1, y, CYAN)
+			Led.text(b, JX - 2, 1, "PEW", CYAN)
+		end },
+		{ 1.6, function(b, u)
+			sprite(b, J, JX, FOOT, { SY = 0.9 })
+			sprite(b, M, MX, FOOT - hop(u, 14), { Flip = true })
+			bubble(b, MX, "HA HA HA", RED)
+		end },
+		{ 1.8, function(b, u, k)
+			local w = sprite(b, J, JX, FOOT, { Tint = CYAN, K = 0.35 + 0.15 * math.sin(u * 30) })
+			local flash = k > 0.25
+			sprite(b, M, MX, FOOT, { Flip = true, Tint = WHITE, K = if flash then 0.7 else 0 })
+			if k > 0.15 then
+				local reach = math.clamp((k - 0.15) * 300, 0, Led.W)
+				for x = JX + math.floor(w / 2), math.min(Led.W - 1, JX + reach) do
+					local width = 2 + math.floor(math.sin(u * 30 + x * 0.6) + 1)
+					for dy = -width, width do
+						Led.set(b, x, FOOT - 9 + dy, if math.abs(dy) == width then CYAN elseif math.abs(dy) <= 1 then WHITE else mix(CYAN, WHITE, 0.4))
+					end
+				end
+			end
+		end },
+		{ 2.2, function(b, u, k, t)
+			sprite(b, J, JX, FOOT - math.floor(math.sin(u * 4) + 1))
+			if k < 0.5 then
+				local fly = ease(k * 2)
+				sprite(b, M, lerp(MX, Led.W + 6, fly), FOOT - fly * 40, { Flip = true, SY = 1 + fly * 0.4, SX = 1 - fly * 0.3 })
+			else
+				local tw = (k - 0.5) * 2
+				burst(b, Led.W - 8, 4, 2 + math.sin(tw * math.pi) * 3, WHITE)
+				Led.text(b, Led.W - 26, 9, "DING", GOLD)
+			end
+			if k > 0.3 then
+				bubble(b, JX, "OOPS", CYAN)
+			end
+			sparkles(b, t, 6, CYAN, 41)
+		end },
+	}, { J, { "HYPERBEAM", "CHARGE IT UP", "THEN PRESS Z" }, CYAN })
+end
+
+-- MINE!: Grandape and Razorback find the same chest.
+function TOONS.Mine()
+	local G, R = "MiniKaijuGrandape", "MiniKaijuRazorback"
+	local CX = 36
+	local function chest(b, x, k)
+		-- (a chest: brown box, gold band and lock)
+		local left = math.floor(x) - 5
+		for y = FOOT - 7, FOOT do
+			for dx = 0, 10 do
+				local c = if y == FOOT - 4 then GOLD elseif y < FOOT - 4 then rgb(160, 96, 48) else rgb(120, 70, 34)
+				Led.set(b, left + dx, y - (k or 0), c)
+			end
+		end
+		Led.set(b, left + 5, FOOT - 3 - (k or 0), GOLD)
+		Led.set(b, left + 5, FOOT - 2 - (k or 0), GOLD)
+	end
+	local GEMS = { "SmallFire", "SmallFrost", "SmallShock", "SmallPoison" }
+	return episode("MINE!", { G, R }, {
+		{ 1.6, function(b, u, k, t)
+			chest(b, CX)
+			sparkles(b, t, 6, GOLD, 51)
+			sprite(b, G, lerp(-10, 18, ease(k)), FOOT - hop(u))
+			sprite(b, R, lerp(Led.W + 10, 56, ease(k)), FOOT - hop(u + 0.3), { Flip = true })
+		end },
+		{ 0.8, function(b, u)
+			chest(b, CX)
+			local _, _, gt = sprite(b, G, 18, FOOT - (if u < 0.3 then 2 else 0))
+			local _, _, rt = sprite(b, R, 56, FOOT - (if u < 0.3 then 2 else 0), { Flip = true })
+			shout(b, 18, gt - 6, GOLD)
+			shout(b, 56, rt - 6, GOLD)
+		end },
+		{ 2.6, function(b, u, k)
+			local pull = math.sin(u * 5)
+			chest(b, CX + pull * 4)
+			sprite(b, G, 22 + pull * 4, FOOT, { SX = 1 + math.max(0, -pull) * 0.1 })
+			sprite(b, R, 52 + pull * 4, FOOT, { Flip = true, SX = 1 + math.max(0, pull) * 0.1 })
+			if math.floor(u / 0.65) % 2 == 0 then
+				bubble(b, 22, "MINE!", GOLD)
+			else
+				bubble(b, 52, "MINE!", CYAN)
+			end
+		end },
+		{ 1.4, function(b, u, k)
+			chest(b, CX, if k < 0.3 then math.floor(math.sin(u * 40) + 1) else 0)
+			local back = ease(math.clamp((k - 0.3) / 0.7, 0, 1))
+			sprite(b, G, 22 - back * 10, FOOT, { SY = 1 - back * 0.15 })
+			sprite(b, R, 52 + back * 10, FOOT, { Flip = true, SY = 1 - back * 0.15 })
+			if k > 0.3 then
+				burst(b, CX, FOOT - 6, 4 + back * 8, GOLD)
+				Led.text(b, CX - 9, 1, "POP!", WHITE)
+			end
+		end },
+		{ 2.0, function(b, u, k, t)
+			chest(b, CX)
+			sprite(b, G, 12, FOOT)
+			sprite(b, R, 62, FOOT, { Flip = true })
+			for i, gem in GEMS do
+				local gw, gh = artSize(gem)
+				local dir = if i <= 2 then -1 else 1
+				local spread = (if i % 2 == 0 then 8 else 16)
+				local x = CX + dir * spread * k - gw / 2
+				local arc = math.sin(math.clamp(k * 1.4, 0, 1) * math.pi) * (10 + i * 2)
+				local y = FOOT - gh + 1 - arc
+				Led.art(b, gem, math.floor(x), math.floor(y))
+			end
+			sparkles(b, t, 10, WHITE, 61)
+		end },
+		{ 2.0, function(b, u, k, t)
+			local meet = ease(math.clamp(k / 0.5, 0, 1))
+			chest(b, CX)
+			local gx = lerp(12, 28, meet)
+			local rx = lerp(62, 46, meet)
+			local _, _, gt = sprite(b, G, gx, FOOT - (if k > 0.5 then hop(u, 8) else 0))
+			local _, _, rt = sprite(b, R, rx, FOOT - (if k > 0.5 then hop(u + 0.2, 8) else 0), { Flip = true })
+			if k <= 0.5 then
+				Led.art(b, "SmallFire", math.floor(gx) - 4, gt - 9)
+				Led.art(b, "SmallFrost", math.floor(rx) - 4, rt - 9)
+			else
+				burst(b, CX, FOOT - 14, 5, GOLD)
+				Led.center(b, 1, "SHARE!", GOOD)
+			end
+			sparkles(b, t, 8, GOLD, 71)
+		end },
+		{ 1.8, function(b, u, k, t)
+			-- each sets its gem in its armor: lit up in the gem's element
+			chest(b, CX)
+			local glow = 0.5 + 0.15 * math.sin(u * 10)
+			sprite(b, G, 28, FOOT, { Tint = ELEMENT.Fire, K = glow })
+			sprite(b, R, 46, FOOT, { Flip = true, Tint = ELEMENT.Frost, K = glow })
+			ring(b, 28, FOOT - 9, 4 + k * 9, scale(ELEMENT.Fire, 1 - k * 0.6))
+			ring(b, 46, FOOT - 9, 4 + k * 9, scale(ELEMENT.Frost, 1 - k * 0.6))
+			Led.center(b, 1, "+RESIST", GOOD)
+		end },
+	}, { G, { "SET GEMS IN", "YOUR ARMOR", "AT ENCHANTER" }, rgb(255, 120, 200) })
+end
+
+-- DISGUISE: Tralalero sees its own WANTED poster, puts a helmet on. Bulwark
+-- isn't fooled.
+function TOONS.Disguise()
+	local T, K = "MiniBossTralaleroTwin", "MiniKaijuBulwark"
+	local PX = 60
+	local function poster(b)
+		for y = 4, FOOT - 2 do
+			for x = PX - 9, PX + 9 do
+				local edge = y == 4 or y == FOOT - 2 or x == PX - 9 or x == PX + 9
+				Led.set(b, x, y, if edge then GOLD else nil)
+			end
+		end
+		for x = PX - 8, PX + 8 do
+			Led.set(b, x, 5, RED)
+			Led.set(b, x, 6, RED)
+		end
+		sprite(b, T, PX, FOOT - 3, { SX = 0.7, SY = 0.85 })
+	end
+	local function helmet(b, cx, top)
+		-- (a little helmet: a dome and a visor)
+		for dy = 0, 4 do
+			local half = if dy == 0 then 3 elseif dy == 1 then 4 else 5
+			for dx = -half, half do
+				Led.set(b, cx + dx, top + dy, if dy == 3 then CYAN else rgb(190, 196, 210))
+			end
+		end
+	end
+	return episode("DISGUISE", { T, K }, {
+		{ 1.8, function(b, u, k)
+			poster(b)
+			sprite(b, T, lerp(-10, 34, k), FOOT - hop(u))
+		end },
+		{ 1.0, function(b, u)
+			poster(b)
+			local _, _, top = sprite(b, T, 34, FOOT - (if u < 0.35 then 3 else 0))
+			shout(b, 34, top - 7, RED)
+		end },
+		{ 1.6, function(b, u, k)
+			poster(b)
+			local _, _, top = sprite(b, T, 34, FOOT)
+			helmet(b, 34, math.floor(lerp(-6, top - 1, ease(k))))
+		end },
+		{ 1.8, function(b, u)
+			poster(b)
+			local _, _, top = sprite(b, T, 34, FOOT - hop(u, 5))
+			helmet(b, 34, top - 1)
+			bubble(b, 34, "NO ONE WILL KNOW", WHITE)
+		end },
+		{ 1.8, function(b, u, k)
+			poster(b)
+			local _, _, top = sprite(b, T, 34, FOOT)
+			helmet(b, 34, top - 1)
+			sprite(b, K, lerp(-12, 13, ease(k)), FOOT - hop(u, 6))
+			if k > 0.5 then
+				bubble(b, 13, "HMM?", GOLD)
+			end
+		end },
+		{ 1.4, function(b, u, k)
+			poster(b)
+			local _, _, top = sprite(b, T, 34, FOOT - (if k > 0.3 then 2 else 0))
+			local fly = math.clamp((k - 0.3) / 0.7, 0, 1)
+			helmet(b, 34 + math.floor(fly * 20), math.floor(top - 1 - math.sin(fly * math.pi) * 8 + fly * 10))
+			sprite(b, K, 15, FOOT)
+			bubble(b, 15, "GOTCHA!", RED)
+		end },
+		{ 2.2, function(b, u, k, t)
+			poster(b)
+			local run = ease(k)
+			sprite(b, T, lerp(34, Led.W + 14, run), FOOT - hop(u, 16))
+			sprite(b, K, lerp(15, Led.W + 4, math.clamp(run * 1.1 - 0.1, 0, 1)), FOOT - hop(u, 14))
+			for i = 1, 4 do
+				local dx = lerp(34, Led.W + 14, run) - 10 - i * 3
+				Led.set(b, dx, FOOT - (i % 2), DIM)
+			end
+			Led.text(b, 2, 1, "BOUNTY ON!", RED)
+		end },
+	}, { K, { "BOUNTIES", "TAKE ONE AT", "THE OFFICE" }, RED })
+end
+
+Led.Toons = { "Bonk", "HotCold", "Sneeze", "Mine", "Disguise" }
+-- An episode (a scene), if there's art for its cast.
+function Led.toon(name: string)
+	local make = TOONS[name]
+	local ep = if make then make() else nil
+	if ep then
+		ep.Toon = name
+	end
+	return ep
+end
+-- Puts episode `name` into `list` (at `at`), if it can be shown.
+local function addToon(list: { any }, name: string, at: number?)
+	local ep = Led.toon(name)
+	if ep then
+		table.insert(list, math.clamp(at or #list + 1, 1, #list + 1), ep)
+	end
+end
+
 local SCENES = {}
 function SCENES.Guide(info)
 	local first = info.Kaiju and info.Kaiju[1] and info.Kaiju[1].Art
-	return {
+	local list = {
 		title({ "SAGA", "MINERS" }, GOLD),
 		mining(),
 		enchant(),
@@ -534,12 +1156,16 @@ function SCENES.Guide(info)
 		tip({ "YOUR POD", "PRESS E AT", "ITS DOOR" }, CYAN, "Shield"),
 		tip({ "DUELS", "ARENA ROW", "PLAY > 1V1" }, GOLD, "Helmet"),
 	}
+	addToon(list, "Bonk", 3)
+	addToon(list, "Mine")
+	return list
 end
 function SCENES.Elements(_info)
 	local list = { elementsTitle() }
 	for _, name in ELEMENTS do
 		table.insert(list, element(name))
 	end
+	addToon(list, "HotCold")
 	table.insert(list, tip({ "ENCHANTER", "SETS GEMS", "IN GEAR" }, rgb(255, 120, 200), "PoisonGem", rgb(255, 120, 200)))
 	return list
 end
@@ -548,6 +1174,7 @@ function SCENES.Bounties(info)
 	for _, boss in info.Bosses or {} do
 		table.insert(list, wanted(boss))
 	end
+	addToon(list, "Disguise", 7)
 	table.insert(list, tip({ "HUNT THEM", "AT BOUNTY", "OFFICE" }, GOLD, "Chest"))
 	return list
 end
@@ -556,6 +1183,7 @@ function SCENES.Kaiju(info)
 	for _, entry in info.Kaiju or {} do
 		table.insert(list, kaiju(entry))
 	end
+	addToon(list, "Sneeze", 9)
 	table.insert(list, hyperbeam(info.Kaiju and info.Kaiju[2] and info.Kaiju[2].Art))
 	return list
 end

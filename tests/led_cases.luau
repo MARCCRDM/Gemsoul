@@ -1,5 +1,5 @@
 -- The Outpost's LED screens: the font, the art (tools/led_art.py's) and each
--- board's animated scenes (Shared.Led).
+-- board's animated scenes and cartoons (Shared.Led).
 -- Run by tests/run_led.py (needs lune).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -91,7 +91,7 @@ for _, board in Led.Boards do
 	check(#scenes >= 3, board .. " has too few scenes")
 	local moving = 0
 	for k, scene in scenes do
-		check(scene.Duration >= 3 and scene.Duration <= 15, board .. " scene " .. k .. " is too short or long")
+		check(scene.Duration >= 3 and scene.Duration <= (if scene.Toon then 16.5 else 15), board .. " scene " .. k .. " is too short or long")
 		local last = nil
 		for step = 0, 9 do
 			local frame = scene.Draw(scene.Duration * step / 10)
@@ -112,8 +112,29 @@ for _, board in Led.Boards do
 	check(moving >= #scenes, board .. "'s scenes hardly move")
 end
 -- The boards that show them: a scene for each kaiju and each boss.
-check(#Led.scenes("Bounties", info) == 2 + #info.Bosses, "The Bounty Board doesn't show each boss")
-check(#Led.scenes("Kaiju", info) == 2 + #info.Kaiju, "The kaiju board doesn't show each kaiju")
+check(#Led.scenes("Bounties", info) == 3 + #info.Bosses, "The Bounty Board doesn't show each boss")
+check(#Led.scenes("Kaiju", info) == 3 + #info.Kaiju, "The kaiju board doesn't show each kaiju")
+-- SAGA TOONS: every episode has its cast's art, plays on a screen, and every
+-- screen has one; each ends on a tip (TIP lit, top left of the words).
+local shown = {}
+for _, board in Led.Boards do
+	local has = false
+	for _, scene in Led.scenes(board, info) do
+		if scene.Toon then
+			has = true
+			shown[scene.Toon] = true
+		end
+	end
+	check(has, board .. " shows no cartoon")
+end
+for _, name in Led.Toons do
+	local ep = Led.toon(name)
+	check(ep and ep.Toon == name, "No art for the cartoon " .. name)
+	check(shown[name], "The cartoon " .. name .. " isn't on a screen")
+	local last = ep.Draw(ep.Duration - 0.05)
+	check(Led.get(last, 26, 1) == Led.Colors.Gold, name .. " doesn't end on a tip")
+end
+check(Led.toon("Nope") == nil, "A cartoon that isn't there")
 -- Every element named, in its own colour.
 for _, element in { "Fire", "Frost", "Shock", "Poison" } do
 	check(Led.ElementNames[element] and Led.ElementColors[element], "No name or colour for " .. element)
@@ -123,4 +144,4 @@ for _, board in Led.Boards do
 	check(#Led.scenes(board, nil) >= 1, board .. " broke with no data")
 end
 
-print("PASS: " .. checks .. " LED screen checks (the font, the art, text where it's put, every board's scenes on screen and moving, the kaiju and bosses shown)")
+print("PASS: " .. checks .. " LED screen checks (the font, the art, text where it's put, every board's scenes on screen and moving, the kaiju and bosses shown, the cartoons on every screen)")

@@ -40,10 +40,13 @@ PICTURES = {
     "SmallShock": (ART / "gem-Shock.png", 9),
     "SmallPoison": (ART / "gem-Poison.png", 9),
 }
-# (every kaiju and boss picture there, as Kaiju<Name> and Boss<Id>)
+# (every kaiju and boss picture there, as Kaiju<Name> and Boss<Id>, and as
+# MiniKaiju<Name> and MiniBoss<Id>)
 for _picture in sorted(LED.glob("*.png")):
     _kind, _name = _picture.stem.split("_", 1)
     PICTURES[("Kaiju" if _kind == "k" else "Boss") + _name] = (_picture, 28)
+    # (and smaller, for the cartoons: two of them and a speech bubble on a screen)
+    PICTURES[("MiniKaiju" if _kind == "k" else "MiniBoss") + _name] = (_picture, 20)
 
 
 def convert(path: Path, size: int = SIZE):
