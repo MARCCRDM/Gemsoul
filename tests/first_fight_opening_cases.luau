@@ -223,9 +223,17 @@ do
 	local intro = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
 	local block = intro:find("\nif not FastStart.Pick then\n\t%-%- First the basics")
 	check(block, "Intro doesn't open the no-picker flow with the basics' video")
-	local video = intro:find("if not savedKit then\n\t\tpcall(BasicsScreen.run)", block, true)
+	local fresh = intro:find("if not savedKit then", block, true)
+	local video = intro:find("pcall(BasicsScreen.run, function()", block, true)
+	local loaded = intro:find("LoadingFlow.active()", block, true)
 	local roll = intro:find('GemClient.request("PrepareStarterLottery")', block, true)
-	check(video and roll and video < roll, "The basics' video doesn't come before the element roll")
+	check(fresh and video and roll and fresh < video and video < roll, "The basics' video doesn't come before the element roll")
+	check(loaded and loaded > video and loaded < roll, "The basics' video doesn't wait for the loading screen")
+	-- No music till it's over: Intro marks it (IntroVideo), Music goes quiet.
+	local quiet = intro:find('me:SetAttribute("IntroVideo", true)', block, true)
+	check(quiet and quiet < video, "The music isn't held from the start of the intro")
+	local music = fs.readFile(ROOT .. "/src/client/Music.client.luau")
+	check(music:find('"IntroVideo"', 1, true) and music:find('if attributes.IntroVideo then\n\t\tmood = "Silence"', 1, true), "Music plays over the basics' video")
 end
 
 -- A friend request lets the mouse go (the combat view held it in the middle:
@@ -237,5 +245,5 @@ do
 	check(body:find("Enum.FriendStatus.FriendRequestReceived", 1, true) and body:find("FirstPerson.setCursorFree(true)", 1, true) and body:find("UiKit.toast(", 1, true), "A friend request leaves the mouse locked")
 end
 
-print(string.format("PASS: %d first fight opening checks (the basics' video before the roll, no lesson in the fight, the hint rings at once)", checks))
+print(string.format("PASS: %d first fight opening checks (the basics' video before the roll, after the loading, no music under it; no lesson in the fight, the hint rings at once)", checks))
 process.exit(0)

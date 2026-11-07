@@ -10,7 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local Music = require(script.Parent.Modules.Music)
 
 local player = Players.LocalPlayer
-local WATCHED = { "DungeonId", "CombatSession", "Outpost", "Expedition" }
+local WATCHED = { "DungeonId", "CombatSession", "Outpost", "Expedition", "IntroVideo" }
 local FIGHT_KEYS = {
 	[Enum.KeyCode.Q] = true,
 	[Enum.KeyCode.E] = true,
@@ -36,6 +36,9 @@ local function update()
 	local mood = Music.moodFor(attributes)
 	if mood == "Arena" and not engaged then
 		mood = "Silence" -- quiet until the first action, then the Arena song
+	end
+	if attributes.IntroVideo then
+		mood = "Silence" -- the basics' video (Modules.BasicsScreen): just the narrator
 	end
 	Music.play(mood)
 end

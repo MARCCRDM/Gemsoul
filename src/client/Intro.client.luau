@@ -1,7 +1,7 @@
 -- Launch ceremony: server-owned outcomes, simultaneous reels, a spotlight for every reward.
 --
 -- The fast start (Shared.FastStart; Pick off): no picker. First the basics'
--- video (Modules.BasicsScreen); then their element is rolled by the
+-- video, in the Arena (Modules.BasicsScreen); then their element is rolled by the
 -- server, Thermal or Cryo, and lands on a quick reel of the two; then
 -- the surge roll (revealMoves), moving on by itself; then the loading
 -- screen, up till their first fight starts (Lobby.client finds it and lets
@@ -2556,11 +2556,31 @@ fit()
 -- stepping back, the name big under them; then on by itself to the surge
 -- roll and the first fight. A failed roll: RETRY.
 if not FastStart.Pick then
-	-- First the basics, a video of their own (Modules.BasicsScreen: attacking,
-	-- blocking, abilities, dodging, charge and stamina), then the roll, then
-	-- the first fight. (Not again for a kit already rolled: a rejoin.)
+	-- First the basics, a video of their own on a giant LED screen in the
+	-- Arena (Modules.BasicsScreen: attacking, blocking, abilities, dodging,
+	-- charge and stamina), then the roll, then the first fight. (Not again
+	-- for a kit already rolled: a rejoin.) Not under the loading screen: its first line once the loading has
+	-- stayed done a moment (a cover can follow another). No music from here
+	-- till it's over (IntroVideo: Client Music).
 	if not savedKit then
-		pcall(BasicsScreen.run)
+		local me = game:GetService("Players").LocalPlayer
+		me:SetAttribute("IntroVideo", true)
+		local deadline = os.clock() + 45
+		pcall(BasicsScreen.run, function()
+			local clearSince = nil
+			while os.clock() < deadline do
+				if LoadingFlow.active() then
+					clearSince = nil
+				else
+					clearSince = clearSince or os.clock()
+					if os.clock() - clearSince >= 0.6 then
+						return
+					end
+				end
+				task.wait(0.05)
+			end
+		end)
+		me:SetAttribute("IntroVideo", nil)
 	end
 	do
 		local list = FastStart.StarterElements
