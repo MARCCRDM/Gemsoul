@@ -236,26 +236,32 @@ end
 
 local running = false
 
-function BasicsScreen.run(ready: (() -> ())?)
-	if running then
-		return
-	end
-	running = true
-	player:SetAttribute("IntroVideo", true)
+-- The video itself: the overlay (black) at once, then, once `ready` (the
+-- loading done), the screen in the ring and the camera on it, the HUD away,
+-- the lines. What it put up goes in `state`, for cleanUp.
+local function play(state, ready: (() -> ())?)
 	local skipped = false
 	local overlay, words, black = buildOverlay(function()
 		skipped = true
 	end)
+	state.Overlay = overlay
+	-- (not before the loading's done: its covers wait for the camera to be
+	-- back with you, so moving it first would hold them up)
+	if ready then
+		pcall(ready)
+	end
 	local at, eye = BasicsScreen.spot()
 	pcall(function()
 		player:RequestStreamAroundAsync(eye.Position, 5)
 	end)
 	local model, dots = buildPanel(at)
+	state.Model = model
 	local shown = {}
 	-- The camera: on the screen from the ring's edge, drifting in.
 	local camera = workspace.CurrentCamera :: Camera
 	local started = os.clock()
 	local target = at.Position
+	state.Bound = true
 	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 20, function()
 		local k = math.clamp((os.clock() - started) / 8, 0, 1)
 		k = 1 - (1 - k) ^ 2
@@ -265,10 +271,7 @@ function BasicsScreen.run(ready: (() -> ())?)
 		camera.CFrame = CFrame.lookAt(from + sway, target + Vector3.new(0, -1.5, 0))
 		camera.Focus = CFrame.new(target)
 	end)
-	if ready then
-		pcall(ready)
-	end
-	local hidden = hideHud(overlay)
+	state.Hidden = hideHud(overlay)
 	fade(black, 1, 0.6)
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	for _, name in Led.BasicsOrder do
@@ -308,22 +311,52 @@ function BasicsScreen.run(ready: (() -> ())?)
 			task.wait(0.35)
 		end
 	end
-	-- Out: to black, the camera back to the player, the screen gone.
+	-- Out: to black first (cleanUp then hands the camera back).
 	words.Text = ""
 	fade(black, 0, 0.5)
-	RunService:UnbindFromRenderStep(BIND)
-	camera.CameraType = Enum.CameraType.Custom
-	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		camera.CameraSubject = humanoid
+end
+
+-- Everything back as it was, however the video ended (an error included:
+-- never a camera left on the ring or the HUD left away).
+local function cleanUp(state)
+	if state.Bound then
+		pcall(function()
+			RunService:UnbindFromRenderStep(BIND)
+		end)
+		local camera = workspace.CurrentCamera
+		if camera then
+			camera.CameraType = Enum.CameraType.Custom
+			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				camera.CameraSubject = humanoid
+			end
+		end
 	end
-	model:Destroy()
-	for _, screen in hidden do
+	if state.Model then
+		state.Model:Destroy()
+	end
+	for _, screen in state.Hidden or {} do
 		if screen.Parent then
 			screen.Enabled = true
 		end
 	end
-	overlay:Destroy()
+	if state.Overlay then
+		state.Overlay:Destroy()
+	end
+end
+
+function BasicsScreen.run(ready: (() -> ())?)
+	if running then
+		return
+	end
+	running = true
+	player:SetAttribute("IntroVideo", true)
+	local state = {}
+	local ok, problem = pcall(play, state, ready)
+	if not ok then
+		warn("[BasicsScreen] the basics' video stopped:", problem)
+	end
+	cleanUp(state)
 	player:SetAttribute("IntroVideo", nil)
 	running = false
 end
