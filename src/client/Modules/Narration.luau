@@ -55,10 +55,10 @@ Narration.Lines = {
 	BasicsBlock = "Blocking. Hold block to raise your guard. Block just before a hit lands... for a perfect block.",
 	BasicsAbilities = "Abilities. Your gems give you three of them, on Q, E and R. Each one costs charge. Cast them, to turn a fight.",
 	BasicsDodge = "Dodging. Press dodge to roll out of the way. Save it for the big attacks.",
-	BasicsResources = "Charge, and stamina. Every hit you land fills your charge. The blue bar. Your abilities spend it. Swinging, blocking and dodging use stamina. The green bar. Ease off, and it refills. Now. Show me what you've got.",
+	BasicsResources = "Charge, and stamina. Every hit you land fills your charge. The blue bar. Your abilities spend it. Swinging, blocking and dodging use stamina. The green bar. Ease off, and it refills. Your training begins now.",
 }
 -- How long each one plays (seconds, the files' lengths).
-Narration.Seconds = { TrainingBegins = 3.5, Controls = 5.9, FirstDungeon = 9.7, KaijuTeam = 7.7, RotMinions = 7.5, BasicsAttack = 10.85, BasicsBlock = 8.94, BasicsAbilities = 11.07, BasicsDodge = 7.35, BasicsResources = 18.3 }
+Narration.Seconds = { TrainingBegins = 3.5, Controls = 5.9, FirstDungeon = 9.7, KaijuTeam = 7.7, RotMinions = 7.5, BasicsAttack = 10.85, BasicsBlock = 8.94, BasicsAbilities = 11.07, BasicsDodge = 7.35, BasicsResources = 18.63 }
 -- A line read phrase by phrase (the basics: Client.BasicsScreen), when each
 -- phrase starts (seconds into it): its caption follows the phrase, and the
 -- LED its cue.
@@ -67,7 +67,7 @@ Narration.Phrases = {
 	BasicsBlock = { "Blocking.", "Hold block to raise your guard.", "Block just before a hit lands...", "for a perfect block." },
 	BasicsAbilities = { "Abilities.", "Your gems give you three of them, on Q, E and R.", "Each one costs charge.", "Cast them, to turn a fight." },
 	BasicsDodge = { "Dodging.", "Press dodge to roll out of the way.", "Save it for the big attacks." },
-	BasicsResources = { "Charge, and stamina.", "Every hit you land fills your charge. The blue bar.", "Your abilities spend it.", "Swinging, blocking and dodging use stamina. The green bar.", "Ease off, and it refills.", "Now. Show me what you've got." },
+	BasicsResources = { "Charge, and stamina.", "Every hit you land fills your charge. The blue bar.", "Your abilities spend it.", "Swinging, blocking and dodging use stamina. The green bar.", "Ease off, and it refills.", "Your training begins now." },
 }
 Narration.Cues = {
 	BasicsAttack = { 0.15, 2.34, 5.29, 8.01 },

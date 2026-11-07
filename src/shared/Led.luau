@@ -2388,9 +2388,9 @@ function BASICS.BasicsResources(b, k: number, u: number, _keys, _say)
 		return
 	end
 	if k == 6 then
-		bigWord(b, u, "SHOW ME", GOLD, 9)
+		bigWord(b, u, "TRAINING", GOLD, 9)
 		if u > 0.6 then
-			Led.center(b, 22, "WHAT YOU'VE GOT", WHITE)
+			Led.center(b, 22, "BEGINS NOW", WHITE)
 		end
 		return
 	end
