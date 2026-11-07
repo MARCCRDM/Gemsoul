@@ -40,7 +40,8 @@
 	               at once, in a fight or out of one; each kaiju comes back
 	               out with its moves' waits as they were (`waits`).
 	               Getting into the game, Team 1 is the one out (once a
-	               visit). Every kaiju that comes out plays its deploy for
+	               visit), once you're out of your pod (KaijuServer.AfterPod
+	               after you step out of it: never before you). Every kaiju that comes out plays its deploy for
 	               everyone (KaijuOutAt on it: KaijuHud plays yours again
 	               once your loading screen's gone).
 	  Auto heal    switched on (Kaiju.AutoHeal, kept as roster.AutoHeal),
@@ -831,6 +832,30 @@ local function teamOneOnJoin(player: Player, roster)
 	PlayerData.sync(player)
 end
 
+-- Out after you on the way in: while your pod comes down with you inside
+-- (Server.PodServer: the PodLanding attribute) your team stays in its
+-- Gemsouls, and comes out KaijuServer.AfterPod seconds after you've stepped
+-- out of it.
+KaijuServer.AfterPod = 1.2
+local podHeld: { [Player]: any } = {}
+local function inPod(player: Player, now: number): boolean
+	if typeof(player:GetAttribute("PodLanding")) == "number" then
+		podHeld[player] = true
+		return true
+	end
+	local held = podHeld[player]
+	if held == true then
+		podHeld[player] = now + KaijuServer.AfterPod
+		return true
+	elseif type(held) == "number" then
+		if now < held then
+			return true
+		end
+		podHeld[player] = nil
+	end
+	return false
+end
+
 local function upkeep(player: Player, now: number)
 	local profile = PlayerData.get(player)
 	if not profile then
@@ -884,7 +909,7 @@ local function upkeep(player: Player, now: number)
 		)
 	end
 	local want = {}
-	if roster and canBeOut(player) and not Kaiju.away(roster) then
+	if roster and canBeOut(player) and not inPod(player, now) and not Kaiju.away(roster) then
 		-- (The team in its slots, the support in SupportSlot: Kaiju.squadIds.)
 		local ids, slots
 		if player:GetAttribute("DungeonKaiju") == true then
@@ -3020,7 +3045,7 @@ local function left(player: Player)
 	teams[player], waits[player], rising[player] = nil, nil, nil
 	saidJump[player], lastJump[player], views[player] = nil, nil, nil
 	healAt[player], toldEmpty[player] = nil, nil
-	joined[player] = nil
+	joined[player], podHeld[player] = nil, nil
 end
 
 function KaijuServer.start()
