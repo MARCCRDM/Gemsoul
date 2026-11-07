@@ -8,22 +8,27 @@
 	tools/led_art.py).
 
 	Each screen plays its board's scenes one after another, each a few
-	seconds of animation:
+	seconds: a header (the topic, which scene of how many), a body that
+	builds in (art on the left, three lines on the right, or a diagram
+	across the screen), a bar along the bottom for the time left. The facts
+	are the game's own (Shared.GameGuide says the same).
 
-	  Guide      north, to the pods: welcome, mining for gems, enchanting
-	             your armor, the HYPERBEAM, your pod, Arena Row
-	  Elements   east: each element, its own animation (Thermal's embers,
-	             Cryo's snow, Ion's lightning, Corrosive's bubbles)
-	  Bounties   south, to the plaza: the Rift's bosses, WANTED, what
-	             they are and what they're weak to
-	  Kaiju      west: the kaiju, one by one, and what each one does
+	  Guide      N   start here: mine, gear up, team up, fight, tasks
+	  Controls   NE  attack, block, dodge, Surges, HYPERBEAM, catch, keys
+	  Elements   E   the cycle, each element, armor resists, WEAK!/RESIST
+	  Gems       SE  rarity, the Legendaries, richer further out, spare
+	                 gems, EQUIP BEST
+	  Bounties   S   each Rift boss: element, threat, weakness
+	  Rift       SW  veins to gates to bosses, ladders, telegraphs, threat,
+	                 party, loot
+	  Kaiju      W   your team, each kaiju and its role, healing, teams,
+	                 the Kaiju Arena
+	  Outpost    NW  the map (each place lit in turn), critters, falling,
+	                 mechs, your pod
 
-	and between them SAGA TOONS, short spin-off cartoons of the kaiju and
-	bosses (Led.Toons), each ending on a tip for a new miner: BONK! (Tung Tung Tung Sahur vs a rock) and MINE!
-	(Grandape and Razorback, one chest) on the Guide, HOT N COLD (Drago
-	melts Frigo; Frigo freezes Drago) on Elements, DISGUISE (Tralalero
-	hides from its own poster) on Bounties, SNEEZE (Skyjelly's HYPERBEAM)
-	on Kaiju.
+	and among them SAGA TOONS, short cartoons of the kaiju and bosses
+	(Led.Toons), each ending on a tip: MINE! on the Guide, SNEEZE on
+	Controls, HOT N COLD on Elements, BONK! on Gems, DISGUISE on Bounties.
 
 	  Led.W, Led.H, Led.Boards, Led.ElementNames
 	  Led.new() -> buffer;  Led.get(buffer, x, y) -> rgb?
@@ -43,7 +48,7 @@ local Led = {}
 Led.W, Led.H = 72, 30
 Led.Chars = math.floor((Led.W + 1) / LedFont.Advance) -- (18 across)
 Led.Line = LedFont.Height + 1
-Led.Boards = { "Guide", "Elements", "Bounties", "Kaiju" }
+Led.Boards = { "Guide", "Controls", "Elements", "Gems", "Bounties", "Rift", "Kaiju", "Outpost" }
 Led.ElementNames = { Fire = "THERMAL", Frost = "CRYO", Shock = "ION", Poison = "CORROSIVE" }
 
 local function rgb(r: number, g: number, b: number): number
@@ -302,233 +307,6 @@ end
 
 local function scene(duration: number, draw: (number) -> any)
 	return { Duration = duration, Draw = draw }
-end
-
--- A title: big words, a shimmer across them, sparkles about.
-local function title(big: { string }, color: number, under: string?, sparkle: number?)
-	return scene(6, function(t)
-		local b = Led.new()
-		local top = if under then 2 else math.floor((Led.H - (#big * 12 - 2)) / 2)
-		for i, word in big do
-			Led.center(b, top + (i - 1) * 12, word, color, 2)
-		end
-		if under then
-			Led.center(b, Led.H - 5, under, WHITE)
-		end
-		shimmer(b, t, 34)
-		sparkles(b, t, 18, sparkle or GOLD, #big)
-		return b
-	end)
-end
-
--- A tip: lines of words, the first in `color`, a picture on the left if any.
-local function tip(lines: { string }, color: number, art: string?, sparkle: number?)
-	return scene(6, function(t)
-		local b = Led.new()
-		local left = 0
-		if art then
-			local w, h = artSize(art)
-			Led.art(b, art, 2, math.floor((Led.H - h) / 2) + math.floor(math.sin(t * 2.4) * 1.2 + 0.5))
-			left = w + 4
-		end
-		local top = math.floor((Led.H - #lines * Led.Line + 1) / 2)
-		for i, line in lines do
-			-- (each line typed out in turn)
-			local shown = math.clamp(math.floor((t - (i - 1) * 0.5) * 22), 0, #line)
-			centerIn(b, left, Led.W - 1, top + (i - 1) * Led.Line, string.sub(line, 1, shown), if i == 1 then color else WHITE)
-		end
-		sparkles(b, t, 10, sparkle or color, 3)
-		return b
-	end)
-end
-
--- Enchanting your armor: a gem flies into the helmet, the helmet lights up
--- in its element, a ring bursts out; a new element each time round.
-local function enchant()
-	local loop = 2.8
-	return scene(loop * 4, function(t)
-		local b = Led.new()
-		local round = math.floor(t / loop) % 4 + 1
-		local element = ELEMENTS[round]
-		local color = ELEMENT[element]
-		local u = t % loop
-		local hw, hh = artSize("Helmet")
-		local hx, hy = 3, math.floor((Led.H - hh) / 2)
-		local cx, cy = hx + hw / 2, hy + hh / 2
-		local hit = 1.1
-		-- the helmet: lit in the element after the hit, fading back a little
-		local glow = if u >= hit then math.max(0.25, 0.75 - (u - hit) * 0.4) else 0
-		Led.art(b, "Helmet", hx, hy, color, glow)
-		-- the ring bursting out of it
-		if u >= hit and u < hit + 0.7 then
-			local k = (u - hit) / 0.7
-			ring(b, cx, cy, 4 + k * 14, scale(color, 1 - k * 0.6))
-		end
-		-- the words, right
-		centerIn(b, 33, Led.W - 1, 2, "ENCHANT", GOLD)
-		centerIn(b, 33, Led.W - 1, 9, "YOUR ARMOR", WHITE)
-		if u >= hit then
-			centerIn(b, 33, Led.W - 1, 17, Led.ElementNames[element], color)
-			centerIn(b, 33, Led.W - 1, 23, "+RESIST", GOOD)
-		else
-			centerIn(b, 33, Led.W - 1, 20, "SET A GEM", DIM)
-		end
-		-- the gem, in flight from the right
-		if u < hit then
-			local k = u / hit
-			local sw, sh = artSize(SMALL[element])
-			local gx = (Led.W - 4) + (cx - (Led.W - 4)) * k - sw / 2
-			local gy = cy - sh / 2 - math.sin(k * math.pi) * 9
-			Led.art(b, SMALL[element], math.floor(gx), math.floor(gy))
-			-- (its trail)
-			for s = 1, 4 do
-				local kk = math.max(0, k - s * 0.05)
-				Led.set(b, (Led.W - 4) + (cx - (Led.W - 4)) * kk, cy - math.sin(kk * math.pi) * 9, scale(color, 0.6 - s * 0.12))
-			end
-		end
-		sparkles(b, t, 8, color, round)
-		return b
-	end)
-end
-
--- The HYPERBEAM: a kaiju, then its beam pouring across the screen.
-local function hyperbeam(kaiju: string?)
-	return scene(7, function(t)
-		local b = Led.new()
-		local art = kaiju or "KaijuRazorback"
-		local w, h = artSize(art)
-		local charge = math.clamp(t / 2, 0, 1)
-		Led.art(b, art, 1, Led.H - h, CYAN, if t > 2 then 0.25 + 0.15 * math.sin(t * 20) else charge * 0.3)
-		centerIn(b, w + 2, Led.W - 1, 1, "PRESS Z", GOLD)
-		if t < 2 then
-			centerIn(b, w + 2, Led.W - 1, 12, "CHARGING", CYAN)
-			centerIn(b, w + 2, Led.W - 1, 19, math.floor(charge * 100) .. "%", WHITE)
-		else
-			-- the beam: out from the kaiju, flickering, edged white
-			local reach = math.clamp((t - 2) * 90, 0, Led.W)
-			local mid = 16
-			for x = w - 2, math.min(Led.W - 1, w - 2 + reach) do
-				local width = 2 + math.floor(math.sin(t * 30 + x * 0.6) * 1 + 1)
-				for dy = -width, width do
-					local edge = math.abs(dy) == width
-					Led.set(b, x, mid + dy, if edge then CYAN elseif math.abs(dy) <= 1 then WHITE else mix(CYAN, WHITE, 0.4))
-				end
-			end
-			centerIn(b, w + 2, Led.W - 1, Led.H - 5, "HYPERBEAM", WHITE)
-		end
-		return b
-	end)
-end
-
--- Mining: gems hop up out of a rock, sparkling.
-local function mining()
-	return scene(6, function(t)
-		local b = Led.new()
-		-- (two by two on the left, each hopping in turn)
-		for i, element in ELEMENTS do
-			local hop = math.abs(math.sin(t * 3 + i * 0.8)) * 3
-			local w, h = artSize(SMALL[element])
-			local col, row = (i - 1) % 2, (i - 1) // 2
-			Led.art(b, SMALL[element], 2 + col * 13, 4 + row * 13 - math.floor(hop))
-		end
-		centerIn(b, 30, Led.W - 1, 6, "MINE ROCKS", GOLD)
-		centerIn(b, 30, Led.W - 1, 13, "FIND GEMS", WHITE)
-		centerIn(b, 30, Led.W - 1, 20, "RARE ONES!", GOOD)
-		sparkles(b, t, 16, GOLD, 9)
-		return b
-	end)
-end
-
--- An element: its gem, its weather, what it's for.
-local function element(name: string)
-	local color = ELEMENT[name]
-	return scene(7, function(t)
-		local b = Led.new()
-		local gem = GEM[name]
-		local w, h = artSize(gem)
-		local pulse = (math.sin(t * 4) + 1) / 2
-		Led.art(b, gem, 2, math.floor((Led.H - h) / 2), WHITE, pulse * 0.25)
-		centerIn(b, w + 4, Led.W - 1, 3, Led.ElementNames[name], color)
-		centerIn(b, w + 4, Led.W - 1, 12, "IN ARMOR", WHITE)
-		centerIn(b, w + 4, Led.W - 1, 18, "RESISTS IT", WHITE)
-		WEATHER[name](b, t)
-		return b
-	end)
-end
-
--- The four elements in turn, each gem lighting up.
-local function elementsTitle()
-	return scene(6, function(t)
-		local b = Led.new()
-		Led.center(b, 1, "ELEMENTS", WHITE, 2)
-		local lit = math.floor(t * 1.5) % 4 + 1
-		for i, name in ELEMENTS do
-			local w, h = artSize(SMALL[name])
-			local x = 4 + (i - 1) * 17
-			Led.art(b, SMALL[name], x, Led.H - h - 1, WHITE, if i == lit then 0.4 else 0)
-			if i == lit then
-				ring(b, x + w / 2, Led.H - h / 2 - 1, 6 + (t * 1.5 % 1) * 3, scale(ELEMENT[name], 0.7))
-			end
-		end
-		return b
-	end)
-end
-
-local THREAT = { "I", "II", "III" }
--- A boss on the Bounty Board: WANTED, its picture sliding in, what it is.
-local function wanted(boss)
-	return scene(6, function(t)
-		local b = Led.new()
-		local w, h = artSize(boss.Art)
-		local slide = math.clamp(t / 0.5, 0, 1)
-		Led.art(b, boss.Art, math.floor(-w + (w + 1) * (1 - (1 - slide) ^ 3)), Led.H - h)
-		local left = w + 3
-		if math.floor(t * 2.5) % 2 == 0 or t > 2 then
-			centerIn(b, left, Led.W - 1, 0, "WANTED", RED)
-		end
-		local lines = wrap(boss.Name or "", math.floor((Led.W - left + 1) / LedFont.Advance))
-		for i = 1, math.min(2, #lines) do
-			centerIn(b, left, Led.W - 1, 1 + i * Led.Line, lines[i], WHITE)
-		end
-		local el = boss.Element and Led.ElementNames[boss.Element]
-		if el then
-			centerIn(b, left, Led.W - 1, 19, el .. " " .. (THREAT[boss.Threat or 1] or ""), ELEMENT[boss.Element])
-		end
-		local weak = boss.Weakness and Led.ElementNames[boss.Weakness]
-		if weak and t > 1.2 then
-			centerIn(b, left, Led.W - 1, 25, "WEAK: " .. weak, ELEMENT[boss.Weakness])
-		end
-		return b
-	end)
-end
-
--- What each kind of kaiju does.
-local ROLE = {
-	Warrior = { "WARRIOR", "HITS HARD" },
-	Ranged = { "RANGED", "FROM AFAR" },
-	Tank = { "TANK", "TAKES HITS" },
-	Assassin = { "ASSASSIN", "STRIKES FAST" },
-	Warden = { "SUPPORT", "HEALS YOU" },
-}
--- A kaiju: its picture stomping in place, its name, what it does.
-local function kaiju(entry)
-	return scene(5, function(t)
-		local b = Led.new()
-		local w, h = artSize(entry.Art)
-		local slide = math.clamp(t / 0.45, 0, 1)
-		local x = math.floor(Led.W - (Led.W - 1) * (1 - (1 - slide) ^ 3))
-		local bob = if slide >= 1 then math.floor(math.abs(math.sin(t * 5)) * 1.6) else 0
-		Led.art(b, entry.Art, x, Led.H - h - bob)
-		local left = w + 3
-		local role = ROLE[entry.Role] or { Led.fit(entry.Role or "", 10), "" }
-		centerIn(b, left, Led.W - 1, 4, entry.Name or "", GOLD)
-		if slide >= 1 then
-			centerIn(b, left, Led.W - 1, 13, role[1], CYAN)
-			centerIn(b, left, Led.W - 1, 20, role[2], WHITE)
-		end
-		sparkles(b, t, 6, CYAN, 11)
-		return b
-	end)
 end
 
 -- Cartoons ------------------------------------------------------------------------------------------
@@ -1137,6 +915,1021 @@ function Led.toon(name: string)
 	end
 	return ep
 end
+-- Guides --------------------------------------------------------------------------------------------
+-- The screens' look: a header (what it's about, in the board's colour, and
+-- which scene of how many), a rule drawn in under it, the body below it,
+-- and a thin bar along the bottom for how far through the scene is. The
+-- body is art on the left (ART: 22 LEDs) and three lines of text on the
+-- right, sliding in one after another; or a diagram across the whole
+-- screen. Everything says something true about the game (Shared.GameGuide
+-- has the same facts).
+
+local SOFT = rgb(150, 162, 186) -- (secondary text)
+local RULE = rgb(44, 52, 72) -- (rules and frames)
+local TEXT_X = 24 -- the text column (12 letters)
+local ROW = { 9, 15, 21 } -- the body's three lines
+local RARITY = {
+	{ "COMMON", rgb(200, 200, 200) },
+	{ "UNCOMMON", rgb(90, 220, 120) },
+	{ "RARE", rgb(80, 160, 255) },
+	{ "ULTRA RARE", rgb(255, 90, 220) },
+	{ "LEGENDARY", rgb(255, 176, 60) },
+}
+local LEGENDS = {
+	{ "STARFIRE", "RUBY", "Fire", rgb(255, 46, 46) },
+	{ "AURORA", "SAPPHIRE", "Frost", rgb(60, 120, 255) },
+	{ "STORMHEART", "CITRINE", "Shock", rgb(255, 236, 90) },
+	{ "VENOMHEART", "EMERALD", "Poison", rgb(0, 255, 120) },
+}
+local BEATS = { Fire = "Frost", Frost = "Shock", Shock = "Poison", Poison = "Fire" }
+local WEAK_TO = { Frost = "Fire", Shock = "Frost", Poison = "Shock", Fire = "Poison" }
+
+-- `c` faded to `k` (never all the way: an LED at 0 is a black dot).
+local function fade(c: number, k: number): number
+	return scale(c, math.max(0.15, k))
+end
+
+-- An entrance: 0 before `at`, easing to 1 over `len`.
+local function enter(t: number, at: number, len: number?): number
+	return ease((t - at) / (len or 0.4))
+end
+
+local function rect(b, x: number, y: number, w: number, h: number, c: number?)
+	for yy = y, y + h - 1 do
+		for xx = x, x + w - 1 do
+			Led.set(b, xx, yy, c)
+		end
+	end
+end
+local function hline(b, x0: number, x1: number, y: number, c: number)
+	for x = x0, x1 do
+		Led.set(b, x, y, c)
+	end
+end
+local function box(b, x: number, y: number, w: number, h: number, c: number)
+	hline(b, x, x + w - 1, y, c)
+	hline(b, x, x + w - 1, y + h - 1, c)
+	for yy = y, y + h - 1 do
+		Led.set(b, x, yy, c)
+		Led.set(b, x + w - 1, yy, c)
+	end
+end
+local function line(b, x0: number, y0: number, x1: number, y1: number, c: number)
+	local n = math.max(math.abs(x1 - x0), math.abs(y1 - y0), 1)
+	for i = 0, n do
+		Led.set(b, x0 + (x1 - x0) * i / n + 0.5, y0 + (y1 - y0) * i / n + 0.5, c)
+	end
+end
+-- Draws with `draw(tmp)`, keeping only the columns x0..x1.
+local function clip(b, x0: number, x1: number, draw)
+	local tmp = Led.new()
+	draw(tmp)
+	for i, c in tmp.P do
+		local x = (i - 1) % Led.W
+		if x >= x0 and x <= x1 then
+			b.P[i] = c
+		end
+	end
+end
+-- Text in runs of colours: { { text, colour } }.
+local function runs(b, x: number, y: number, parts)
+	for _, part in parts do
+		local s = Led.fit(part[1])
+		Led.text(b, x, y, s, part[2])
+		x += #s * LedFont.Advance
+	end
+end
+-- Text too long for its column scrolls along it (a marquee): text, or
+-- runs ({ { text, colour } }).
+local function marquee(b, x: number, y: number, chars: number, text: any, color: number?, t: number)
+	local parts = if type(text) == "table" then text else { { text, color } }
+	local count = 0
+	for _, part in parts do
+		count += #Led.fit(part[1])
+	end
+	if count <= chars then
+		runs(b, x, y, parts)
+		return
+	end
+	local span = (count + 4) * LedFont.Advance
+	local hold = 0.8
+	local off = math.floor(math.max(0, (t - hold) * 14) % span)
+	clip(b, x, x + chars * LedFont.Advance - 2, function(tmp)
+		runs(tmp, x - off, y, parts)
+		runs(tmp, x - off + span, y, parts)
+	end)
+end
+
+local function header(b, t: number, label: string, index: number?, total: number?, accent: number, x0: number)
+	Led.text(b, x0, 0, Led.fit(label, 13), accent)
+	if index and total then
+		local s = string.format("%02d/%02d", index, total)
+		if x0 + Led.width(Led.fit(label, 13)) + 3 < Led.W - Led.width(s) then
+			Led.text(b, Led.W - Led.width(s), 0, s, SOFT)
+		end
+	end
+	local reach = x0 + math.floor(enter(t, 0, 0.6) * (Led.W - x0))
+	hline(b, x0, reach - 1, 6, RULE)
+	hline(b, x0, math.min(reach, x0 + 9) - 1, 6, accent)
+end
+local function progress(b, t: number, duration: number, accent: number, x0: number)
+	local w = math.floor(math.clamp(t / duration, 0, 1) * (Led.W - x0))
+	hline(b, x0, x0 + w - 1, Led.H - 1, scale(accent, 0.45))
+end
+-- The body's lines, from x: each slides in from the right in turn; a line
+-- is text (white) or runs ({ { text, colour } }).
+local function body(b, t: number, list: { any }, x: number?, at: number?)
+	x = x or TEXT_X
+	for i, item in list do
+		local k = enter(t, (at or 0.3) + (i - 1) * 0.15, 0.45)
+		if k > 0 then
+			local dx = math.floor((1 - k) * 12 + 0.5)
+			clip(b, x, Led.W - 1, function(tmp)
+				if type(item) == "table" then
+					runs(tmp, x + dx, ROW[i], item)
+				else
+					Led.text(tmp, x + dx, ROW[i], item, WHITE)
+				end
+			end)
+		end
+	end
+end
+
+-- A guide scene: header, body (`draw(b, t)`), the bar. Made once its board
+-- knows how many it has (for the header's 03/07): finish() below.
+local function guide(label: string, accent: number, duration: number, draw, x0: number?)
+	return {
+		Guide = true,
+		Make = function(index: number, total: number)
+			return scene(duration, function(t)
+				local b = Led.new()
+				draw(b, t)
+				header(b, t, label, index, total, accent, x0 or 0)
+				progress(b, t, duration, accent, x0 or 0)
+				return b
+			end)
+		end,
+	}
+end
+-- The usual one: art on the left (`art(b, t)`), three lines on the right.
+local function card(label: string, accent: number, lines: { any }, art, duration: number?)
+	return guide(label, accent, duration or 7, function(b, t)
+		if art then
+			art(b, t)
+		end
+		body(b, t, lines)
+	end)
+end
+
+-- A keycap: its label in a frame, a shadow under it; pressed, it's down a
+-- row and lit. Returns its width.
+local function keycap(b, x: number, y: number, label: string, accent: number, pressed: boolean?): number
+	local w = Led.width(label)
+	local pad = if w + 4 > 22 then 1 else 2
+	local cw = w + pad * 2
+	if pressed then
+		rect(b, x + 1, y + 2, cw - 2, 5, scale(accent, 0.3))
+		box(b, x, y + 1, cw, 7, accent)
+		Led.text(b, x + pad, y + 2, label, WHITE)
+	else
+		rect(b, x + 1, y + 1, cw - 2, 5, nil)
+		box(b, x, y, cw, 7, SOFT)
+		hline(b, x + 1, x + cw - 2, y + 7, RULE)
+		Led.text(b, x + pad, y + 1, label, WHITE)
+	end
+	return cw
+end
+-- A mouse, its left or right button lit.
+local function mouse(b, x: number, y: number, which: string?, accent: number)
+	box(b, x, y, 9, 12, SOFT)
+	for yy = y + 1, y + 4 do
+		Led.set(b, x + 4, yy, SOFT)
+	end
+	hline(b, x + 1, x + 7, y + 5, SOFT)
+	if which == "Left" then
+		rect(b, x + 1, y + 1, 3, 4, accent)
+	elseif which == "Right" then
+		rect(b, x + 5, y + 1, 3, 4, accent)
+	end
+end
+
+-- A row of steps joined by a line, lit one after another by a light
+-- running along it; labels above and below in turn so they never touch.
+local function steps(labels: { string }, accent: number, duration: number)
+	return function(b, t)
+		local n = #labels
+		local y = 17
+		local xs = {}
+		for i = 1, n do
+			xs[i] = math.floor(6 + (i - 1) * (Led.W - 13) / (n - 1) + 0.5)
+		end
+		local head = math.clamp((t - 0.6) / (duration - 2), 0, 1) * (xs[n] - xs[1]) + xs[1]
+		hline(b, xs[1], xs[n], y, RULE)
+		hline(b, xs[1], math.floor(head), y, scale(accent, 0.6))
+		for i, x in xs do
+			local lit = head >= x - 0.5
+			rect(b, x - 1, y - 1, 3, 3, if lit then accent else SOFT)
+			if lit then
+				Led.set(b, x, y, WHITE)
+				local since = (head - x) / 6
+				if since < 1 then
+					box(b, x - 2, y - 2, 5, 5, fade(accent, 1 - since))
+				end
+			end
+			local label = labels[i]
+			local w = Led.width(label)
+			local ly = if i % 2 == 1 then 10 else 21
+			Led.text(b, math.clamp(x - math.floor(w / 2), 0, Led.W - w), ly, label, if lit then WHITE else SOFT)
+		end
+		Led.set(b, head, y, WHITE)
+	end
+end
+
+-- A cut gem in pixels, `w` across (odd), its top at `top`: the table and
+-- crown lit from the left, the girdle, the pavilion in facets to its point.
+local function pixelGem(b, cx: number, top: number, w: number, c: number, glint: number?)
+	local half = math.floor(w / 2)
+	local rows = {}
+	for r = 0, 2 do
+		table.insert(rows, { half - 3 + r, "Crown", r })
+	end
+	table.insert(rows, { half, "Girdle", 3 })
+	local h = half
+	local r = 4
+	while h > 0 do
+		h = math.max(0, math.floor(half - (r - 3) * 1.25 + 0.5))
+		table.insert(rows, { h, "Pavilion", r })
+		r += 1
+	end
+	for _, row in rows do
+		local hw, part, y = row[1], row[2], row[3]
+		for x = -hw, hw do
+			local k = (x + hw) / math.max(1, 2 * hw)
+			local col
+			if part == "Crown" then
+				col = if y == 0 then mix(c, WHITE, 0.55) elseif k < 0.34 then mix(c, WHITE, 0.4) elseif k < 0.67 then mix(c, WHITE, 0.15) else scale(c, 0.75)
+			elseif part == "Girdle" then
+				col = mix(c, WHITE, 0.3)
+			else
+				local facet = math.floor((x + (y - 3) * (if x < 0 then 1 else -1)) / 3) % 2 == 0
+				col = if facet then (if x < 0 then mix(c, WHITE, 0.1) else c) else scale(c, if x < 0 then 0.8 else 0.6)
+			end
+			Led.set(b, cx + x, top + y, col)
+		end
+	end
+	if glint then
+		local g = (glint % 1)
+		if g < 0.3 then
+			local x, y = cx - half + 2, top + 1
+			Led.set(b, x, y, WHITE)
+			Led.set(b, x - 1, y, mix(c, WHITE, 0.7))
+			Led.set(b, x + 1, y, mix(c, WHITE, 0.7))
+			Led.set(b, x, y - 1, mix(c, WHITE, 0.7))
+		end
+	end
+	return #rows
+end
+
+-- Art ------------------------------------------------------------------------------------------------
+-- (each in the left column: x 0 to 21, rows 8 to 28)
+
+-- A pick at a rock: three swings crack it, the third splits it and a gem
+-- rises out, a different element each time round.
+local function artMine(b, t: number)
+	local loop = 3.6
+	local u = t % loop
+	local element = ELEMENTS[math.floor(t / loop) % 4 + 1]
+	local hits = { 0.5, 1.15, 1.8 }
+	local done = 0
+	for _, h in hits do
+		if u >= h then
+			done += 1
+		end
+	end
+	local split = if done >= 3 then math.floor(ease((u - hits[3]) / 0.3) * 3 + 0.5) else 0
+	local shake = 0
+	for _, h in hits do
+		if u >= h and u < h + 0.12 then
+			shake = if math.floor(u * 40) % 2 == 0 then 1 else -1
+		end
+	end
+	rock(b, 9 + shake, 27, math.min(done, 2), split)
+	if done < 3 or u < hits[3] + 0.25 then
+		-- the pick: raised, swung down onto the rock's top, back up
+		local angle = 205
+		for _, h in hits do
+			if u >= h - 0.28 and u < h then
+				angle = lerp(205, 138, ((u - (h - 0.28)) / 0.28) ^ 2)
+			elseif u >= h and u < h + 0.25 then
+				angle = lerp(138, 205, ease((u - h) / 0.25))
+			end
+		end
+		local a = math.rad(angle)
+		local px, py = 19, 10
+		local hx, hy = px + math.cos(a) * 11, py + math.sin(a) * 11
+		line(b, px, py, hx, hy, rgb(150, 100, 56))
+		local nx, ny = -math.sin(a), math.cos(a)
+		line(b, hx - nx * 3, hy - ny * 3, hx + nx * 3, hy + ny * 3, rgb(210, 218, 230))
+	end
+	for _, h in hits do
+		if u >= h and u < h + 0.1 then
+			for _, d in { { -2, -1 }, { 2, -1 }, { -1, -2 }, { 1, -2 } } do
+				Led.set(b, 9 + d[1], 18 + d[2], WHITE)
+			end
+		end
+	end
+	if done >= 3 then
+		local k = enter(u, hits[3] + 0.1, 0.6)
+		local gw, gh = artSize(SMALL[element])
+		Led.art(b, SMALL[element], 9 - math.floor(gw / 2), math.floor(lerp(20, 9, k)))
+		if k >= 1 then
+			local p = ((u - hits[3] - 0.7) / 0.8) % 1
+			box(b, 9 - math.floor(gw / 2) - 1 - math.floor(p * 3), 8 - math.floor(p * 3), gw + 2 + math.floor(p * 3) * 2, gh + 2 + math.floor(p * 3) * 2, fade(ELEMENT[element], 1 - p))
+		end
+	end
+end
+
+-- A gem dropping into a helmet's socket: the helmet takes its element.
+local function artGear(b, t: number)
+	local loop = 3
+	local u = t % loop
+	local element = ELEMENTS[math.floor(t / loop) % 4 + 1]
+	local color = ELEMENT[element]
+	local landed = u >= 0.9
+	local glow = if landed then math.max(0, 0.6 - (u - 0.9) * 0.35) else 0
+	sprite(b, "Helmet", 10, 27, { SX = 0.72, SY = 0.72, Tint = color, K = glow })
+	local gw, gh = artSize(SMALL[element])
+	local y = if landed then 17 else lerp(6, 17, (u / 0.9) ^ 2)
+	Led.art(b, SMALL[element], 10 - math.floor(gw / 2), math.floor(y))
+	if landed and u < 1.6 then
+		local k = (u - 0.9) / 0.7
+		ring(b, 10, 21, 3 + k * 9, fade(color, 1 - k))
+	end
+end
+
+-- Your team from above: you, the lead out ahead, two behind it, the
+-- support between, each going out to its place in turn.
+local FORMATION = { { 10, 10, ELEMENT.Fire }, { 5, 15, ELEMENT.Frost }, { 15, 15, ELEMENT.Shock }, { 10, 20, GOOD } }
+local function artTeam(b, t: number)
+	local px, py = 10, 26
+	rect(b, px - 1, py - 1, 3, 3, WHITE)
+	for i, slot in FORMATION do
+		local k = enter(t, 0.3 + (i - 1) * 0.3, 0.5)
+		local x = math.floor(lerp(px, slot[1], k) + 0.5)
+		local y = math.floor(lerp(py, slot[2], k) + 0.5)
+		rect(b, x - 1, y - 1, 3, 3, slot[3])
+		if i == 4 then
+			Led.set(b, x, y - 1, WHITE)
+			Led.set(b, x - 1, y, WHITE)
+			Led.set(b, x, y, WHITE)
+			Led.set(b, x + 1, y, WHITE)
+			Led.set(b, x, y + 1, WHITE)
+		end
+	end
+	-- (the way you're going)
+	local p = (t * 0.8) % 1
+	Led.set(b, px, py - 3 - math.floor(p * 3), fade(WHITE, 1 - p))
+end
+
+-- A boss taking hits: a flash on each, its damage rising off it.
+local function artFight(b, t: number, who: string?)
+	local period = 0.8
+	local n = math.floor(t / period)
+	local u = t % period
+	sprite(b, who or "MiniBossDrago", 11, 27, { Tint = WHITE, K = if u < 0.08 then 0.7 else 0 })
+	local numbers = { "84", "125", "97", "140" }
+	local s = numbers[n % #numbers + 1]
+	local k = u / period
+	Led.text(b, 12 - math.floor(Led.width(s) / 2) + (if n % 2 == 0 then 4 else -4), math.floor(14 - k * 5), s, scale(if s == "125" or s == "140" then GOLD else WHITE, 1 - k * 0.6))
+end
+
+-- A checklist ticking itself off.
+local function artTasks(b, t: number)
+	local loop = 3.6
+	local u = t % loop
+	for i, y in { 10, 16, 22 } do
+		local done = u >= 0.6 + (i - 1) * 0.7
+		box(b, 1, y, 5, 5, if done then GOOD else SOFT)
+		hline(b, 8, 20, y + 2, if done then scale(GOOD, 0.5) else RULE)
+		if done then
+			Led.set(b, 2, y + 2, GOOD)
+			Led.set(b, 3, y + 3, GOOD)
+			Led.set(b, 4, y + 1, GOOD)
+		end
+	end
+end
+
+-- Swings at a dummy, from either side in turn.
+local function artAttack(b, t: number, accent: number)
+	local period = 0.55
+	local n = math.floor(t / period)
+	local u = (t % period) / period
+	mouse(b, 6, 8, if u < 0.25 then "Left" else nil, accent)
+	rect(b, 9, 22, 3, 6, SOFT)
+	Led.set(b, 10, 21, SOFT)
+	if u < 0.5 then
+		local side = if n % 2 == 0 then -1 else 1
+		for i = 0, 4 do
+			local a = math.rad(-100 + side * 20 + (i - 2) * 22 * side + u * 40 * side)
+			Led.set(b, 10 + math.cos(a) * 7 * side, 24 + math.sin(a) * 5, fade(WHITE, 1 - u * 1.4 + i * 0.05))
+		end
+	end
+end
+
+-- Holding guard as a shot comes in; every other one blocked just in time:
+-- a perfect block's flash.
+local function artBlock(b, t: number, accent: number)
+	local loop = 1.6
+	local u = t % loop
+	local perfect = math.floor(t / loop) % 2 == 1
+	local held = if perfect then u >= 0.86 and u < 1.2 else u >= 0.2 and u < 1.3
+	mouse(b, 6, 8, if held then "Right" else nil, accent)
+	local hit = 1
+	if u < hit then
+		local x = math.floor(lerp(21, 7, u / hit))
+		Led.set(b, x, 24, RED)
+		Led.set(b, x + 1, 24, scale(RED, 0.5))
+	end
+	if held then
+		for y = 21, 27 do
+			Led.set(b, 5, y, accent)
+		end
+	end
+	if u >= hit and u < hit + 0.18 then
+		if perfect then
+			for _, d in { { 2, -3 }, { 3, 0 }, { 2, 3 }, { 4, -2 }, { 4, 2 } } do
+				Led.set(b, 5 + d[1], 24 + d[2], WHITE)
+			end
+		else
+			Led.set(b, 6, 24, SOFT)
+		end
+	end
+end
+
+-- A slam's red ring grows where you stand; SPACE, and you're out of it.
+local function artDodge(b, t: number, accent: number)
+	local loop = 1.8
+	local u = t % loop
+	local pressed = u >= 0.7 and u < 0.85
+	keycap(b, 0, 8, "SPACE", accent, pressed)
+	local k = math.clamp(u / 0.9, 0, 1)
+	if u < 1.05 then
+		ring(b, 8, 23, 1 + k * 4, if u >= 0.9 then WHITE else scale(RED, 0.5 + k * 0.5))
+	end
+	local dx = if u >= 0.7 then lerp(0, 10, ease((u - 0.7) / 0.2)) else 0
+	rect(b, math.floor(7 + dx), 22, 2, 2, WHITE)
+	if u >= 0.7 and u < 1 then
+		for s = 1, 3 do
+			Led.set(b, 7 + dx - s * 2, 23, scale(WHITE, 0.5 - s * 0.12))
+		end
+	end
+end
+
+-- Hits fill the Charge bar; full, Q, E and R cast in turn.
+local function artSurges(b, t: number, accent: number)
+	local loop = 3.2
+	local u = t % loop
+	local colors = { ELEMENT.Fire, ELEMENT.Frost, ELEMENT.Shock }
+	local full = u >= 1.4
+	for i, key in { "Q", "E", "R" } do
+		local cast = full and u >= 1.5 + (i - 1) * 0.4 and u < 1.5 + (i - 1) * 0.4 + 0.3
+		keycap(b, (i - 1) * 7, 8, key, colors[i], cast)
+	end
+	local fill = math.clamp(math.floor(u / 0.28) / 5, 0, 1)
+	if full then
+		fill = math.clamp(1 - (u - 1.5) / 1.2, 0, 1)
+	end
+	box(b, 0, 18, 21, 4, RULE)
+	hline(b, 1, 1 + math.floor(18 * fill), 19, if full then WHITE else accent)
+	hline(b, 1, 1 + math.floor(18 * fill), 20, if full then accent else scale(accent, 0.6))
+	Led.text(b, 0, 23, "CHARGE", SOFT)
+end
+
+-- The HYPERBEAM: charged, then Z, then the beam.
+local function artBeam(b, t: number, accent: number)
+	local loop = 3
+	local u = t % loop
+	local fire = u >= 1.6
+	keycap(b, 7, 8, "Z", accent, fire and u < 1.8)
+	local charge = math.clamp(u / 1.5, 0, 1)
+	local s = math.floor(charge * 100) .. "%"
+	if not fire then
+		Led.text(b, 11 - math.floor(Led.width(s) / 2), 19, s, if charge >= 1 then WHITE else accent)
+	else
+		local reach = math.floor(math.clamp((u - 1.6) * 80, 0, 22))
+		for x = 0, reach do
+			local w = 1 + math.floor(math.sin(u * 30 + x) * 0.5 + 0.5)
+			for dy = -w, w do
+				Led.set(b, x, 22 + dy, if math.abs(dy) == w then accent elseif dy == 0 then WHITE else mix(accent, WHITE, 0.5))
+			end
+		end
+	end
+end
+
+-- A wild kaiju worn down till it glows gold, then caught.
+local function artCatch(b, t: number, accent: number)
+	local loop = 3.4
+	local u = t % loop
+	local hp = math.clamp(1 - u / 1.4, 0.12, 1)
+	local gold = u >= 1.4
+	local caught = u >= 2.2
+	keycap(b, 7, 8, "C", accent, caught and u < 2.4)
+	if not caught then
+		local glow = if gold then 0.5 + 0.3 * math.sin(u * 14) else 0
+		rect(b, 8, 21, 5, 5, mix(ELEMENT.Poison, GOLD, glow))
+		box(b, 4, 18, 13, 2, RULE)
+		hline(b, 5, 5 + math.floor(10 * hp), 18, if gold then GOLD else RED)
+	else
+		local k = math.clamp((u - 2.2) / 0.5, 0, 1)
+		if k < 1 then
+			box(b, math.floor(8 - 4 * (1 - k)), math.floor(21 - 4 * (1 - k)), math.floor(5 + 8 * (1 - k)), math.floor(5 + 8 * (1 - k)), GOLD)
+		else
+			Led.art(b, SMALL.Shock, 6, 19)
+		end
+	end
+end
+
+-- A gem with its own weather round it (kept to the art column).
+local function artElement(name: string)
+	return function(b, t)
+		clip(b, 0, 21, function(tmp)
+			WEATHER[name](tmp, t)
+		end)
+		for i, c in b.P do
+			if (i - 1) % Led.W <= 21 then
+				b.P[i] = scale(c, 0.55)
+			end
+		end
+		pixelGem(b, 10, 12, 19, ELEMENT[name], t * 0.6)
+	end
+end
+
+-- Armor's resist filling, a gem a piece, up to its 35% cap.
+local function artResist(b, t: number, accent: number)
+	local loop = 4
+	local u = t % loop
+	box(b, 7, 8, 8, 17, RULE)
+	local pieces = math.clamp(math.floor(u / 0.5), 0, 5)
+	for i = 1, pieces do
+		rect(b, 8, 24 - i * 3, 6, 2, if i == 5 then WHITE else accent)
+	end
+	local s = math.floor(pieces * 7) .. "%"
+	Led.text(b, 11 - math.floor(Led.width(s) / 2), 25, s, if pieces == 5 then WHITE else SOFT)
+end
+
+-- Rarity as a staircase, each step lit in turn.
+local function artRarity(b, t: number)
+	local lit = math.floor(t / 1.2) % 5 + 1
+	for i, r in RARITY do
+		local h = 3 + i * 3
+		local k = enter(t, 0.2 + i * 0.12, 0.4)
+		local hh = math.floor(h * k)
+		rect(b, 1 + (i - 1) * 4, 27 - hh + 1, 3, hh, if i == lit then r[2] else scale(r[2], 0.45))
+	end
+end
+
+-- A gem going into a kaiju's health bar.
+local function artHeal(b, t: number)
+	local loop = 2.6
+	local u = t % loop
+	sprite(b, "MiniKaijuGrandape", 11, 27, { SX = 0.85, SY = 0.85 })
+	box(b, 2, 8, 18, 3, RULE)
+	local hp = if u < 1 then 0.3 else lerp(0.3, 1, ease((u - 1) / 0.6))
+	hline(b, 3, 3 + math.floor(15 * hp), 9, if hp >= 1 then GOOD else scale(GOOD, 0.7))
+	if u < 1 then
+		Led.art(b, SMALL.Poison, 16, math.floor(lerp(20, 8, u)))
+	end
+end
+
+-- Five gear slots, filled at one tap.
+local function artEquip(b, t: number, accent: number)
+	local loop = 3
+	local u = t % loop
+	local tapped = u >= 0.8
+	local colors = { RARITY[5][2], RARITY[4][2], RARITY[5][2], RARITY[3][2], RARITY[4][2] }
+	for i = 1, 5 do
+		local x = 1 + ((i - 1) % 3) * 7
+		local y = 9 + math.floor((i - 1) / 3) * 7
+		box(b, x, y, 6, 6, RULE)
+		if tapped and u >= 0.8 + i * 0.06 then
+			rect(b, x + 1, y + 1, 4, 4, colors[i])
+		end
+	end
+	keycap(b, 0, 21, "EQUIP", accent, u >= 0.7 and u < 0.95)
+end
+
+-- A WANTED notice on a board.
+local function artNotice(b, t: number)
+	box(b, 2, 8, 18, 20, GOLD)
+	rect(b, 3, 9, 16, 3, RED)
+	for i, y in { 15, 19, 23 } do
+		local k = enter(t, 0.3 + i * 0.15, 0.3)
+		hline(b, 5, 5 + math.floor(11 * k), y, SOFT)
+	end
+end
+
+-- A Rift vein pulsing in the rock.
+local function artVein(b, t: number)
+	local vein = { { 1, 26 }, { 5, 23 }, { 8, 24 }, { 11, 19 }, { 14, 20 }, { 17, 14 }, { 20, 11 } }
+	local violet = rgb(190, 90, 255)
+	for i = 1, #vein - 1 do
+		local p = (t * 1.2 - i * 0.15) % 1
+		line(b, vein[i][1], vein[i][2], vein[i + 1][1], vein[i + 1][2], mix(scale(violet, 0.5), WHITE, math.max(0, 1 - p * 3) * 0.8))
+	end
+	-- the gate at its end
+	local k = (math.sin(t * 3) + 1) / 2
+	box(b, 15, 7, 7, 9, mix(violet, WHITE, k * 0.4))
+end
+
+-- A boss's slam: the red zone grows, you step out of it.
+local function artTelegraph(b, t: number)
+	local loop = 2.2
+	local u = t % loop
+	local k = math.clamp(u / 1.3, 0, 1)
+	sprite(b, "MiniBossSahurTrio", 6, 20, { SX = 0.6, SY = 0.6 })
+	if u < 1.45 then
+		for y = 21, 27 do
+			for x = 1, 20 do
+				local d = ((x - 9) / 9) ^ 2 + ((y - 24) / 3.5) ^ 2
+				if d <= k * k then
+					Led.set(b, x, y, if u >= 1.3 then WHITE else scale(RED, 0.35 + 0.3 * k))
+				end
+			end
+		end
+	end
+	local out = if u >= 0.9 then ease((u - 0.9) / 0.25) else 0
+	rect(b, math.floor(14 + out * 6), 23, 2, 2, WHITE)
+end
+
+-- Three of you against one.
+local function artParty(b, t: number)
+	sprite(b, "MiniBossFrigo", 15, 27, { SX = 0.75, SY = 0.75 })
+	for i, y in { 11, 18, 25 } do
+		local k = enter(t, 0.2 + i * 0.25, 0.5)
+		rect(b, math.floor(lerp(-3, 3, k)), y, 2, 2, ({ WHITE, CYAN, GOLD })[i])
+	end
+end
+
+-- A cache opening.
+local function artLoot(b, t: number)
+	local loop = 3
+	local u = t % loop
+	local open = u >= 0.8
+	sprite(b, "Chest", 11, 27, { SX = 0.7, SY = 0.7, Tint = GOLD, K = if open then 0.25 else 0 })
+	if open and u < 2 then
+		local k = (u - 0.8) / 1.2
+		for i = 0, 5 do
+			local a = math.rad(-150 + i * 24)
+			Led.set(b, 11 + math.cos(a) * (4 + k * 7), 17 + math.sin(a) * (3 + k * 6), fade(GOLD, 1 - k))
+		end
+	end
+end
+
+-- Critters closing in; your kaiju meeting them.
+local function artCritters(b, t: number)
+	local loop = 3
+	local u = t % loop
+	rect(b, 9, 19, 3, 3, WHITE)
+	for i, from in { { 0, 9 }, { 20, 11 }, { 1, 27 }, { 20, 27 } } do
+		local k = math.clamp(u / 1.6, 0, 1) * 0.7
+		Led.set(b, lerp(from[1], 10, k), lerp(from[2], 20, k), RED)
+	end
+	if u >= 1.1 then
+		local k = enter(u, 1.1, 0.4)
+		for i, to in { { 4, 13 }, { 16, 14 }, { 6, 25 } } do
+			rect(b, math.floor(lerp(10, to[1], k)), math.floor(lerp(20, to[2], k)), 2, 2, ({ ELEMENT.Fire, ELEMENT.Frost, ELEMENT.Shock })[i])
+		end
+	end
+end
+
+-- Down: your newest gems carried off.
+local function artFall(b, t: number)
+	local loop = 2.6
+	local u = t % loop
+	rect(b, 5, 25, 5, 2, SOFT)
+	for i, element in { "Fire", "Frost", "Shock" } do
+		local k = math.clamp((u - i * 0.25) / 1.4, 0, 1)
+		Led.set(b, lerp(9, 21, k), 24 - i * 3 - k * 3, scale(ELEMENT[element], 1 - k * 0.7))
+		Led.set(b, lerp(10, 22, k), 24 - i * 3 - k * 3, RED)
+	end
+end
+
+-- A mech: legs, cab, a drill turning.
+local function artMech(b, t: number)
+	local step = math.floor(t * 4) % 2
+	rect(b, 5, 13, 9, 7, rgb(255, 176, 60))
+	rect(b, 7, 14, 5, 3, CYAN)
+	rect(b, 6, 20, 2, 7 - step, SOFT)
+	rect(b, 11, 20, 2, 6 + step, SOFT)
+	hline(b, 14, 16, 17, SOFT)
+	for i = 0, 3 do
+		local on = (i + math.floor(t * 12)) % 2 == 0
+		Led.set(b, 17 + i, 16, if on then WHITE else SOFT)
+		Led.set(b, 17 + i, 18, if on then SOFT else WHITE)
+	end
+	Led.set(b, 21, 17, WHITE)
+end
+
+-- Your pod: its door slides open, the stair out.
+local function artPod(b, t: number, accent: number)
+	local loop = 3
+	local u = t % loop
+	for y = 0, 10 do
+		local half = math.floor(math.sqrt(math.max(0, 1 - ((y - 10) / 11) ^ 2)) * 9 + 0.5)
+		hline(b, 10 - half, 10 + half, 13 + y, rgb(200, 206, 220))
+	end
+	local open = math.clamp((u - 0.4) / 0.6, 0, 1)
+	rect(b, 8, 18, 5, 6, scale(accent, 0.4 + open * 0.6))
+	hline(b, 3, 17, 24, accent)
+	if open >= 1 then
+		for s = 0, 2 do
+			hline(b, 9 - s, 12 + s, 25 + s, SOFT)
+		end
+	end
+end
+
+-- Full-screen pieces --------------------------------------------------------------------------------
+
+-- The element cycle: each beats the next round the ring.
+local CYCLE_AT = { Fire = { 14, 9 }, Frost = { 23, 18 }, Shock = { 14, 27 }, Poison = { 5, 18 } }
+local function cycle(b, t: number)
+	local turn = math.floor(t / 1.6) % 4 + 1
+	local u = (t % 1.6) / 1.6
+	local from = ELEMENTS[turn]
+	local to = BEATS[from]
+	for _, name in ELEMENTS do
+		local at = CYCLE_AT[name]
+		local lit = name == from or (name == to and u > 0.5)
+		rect(b, at[1] - 1, at[2] - 1, 3, 3, if lit then ELEMENT[name] else scale(ELEMENT[name], 0.4))
+	end
+	ring(b, 14, 18, 9, RULE)
+	-- the light going from one to the next, round the ring
+	local a0 = ({ Fire = -90, Frost = 0, Shock = 90, Poison = 180 })[from]
+	local a = math.rad(a0 + 90 * math.clamp(u * 1.6, 0, 1))
+	Led.set(b, 14 + math.cos(a) * 9, 18 + math.sin(a) * 9 * 0.9, WHITE)
+	local x = 32
+	runs(b, x, 9, { { Led.ElementNames[from], ELEMENT[from] } })
+	runs(b, x, 15, { { "BEATS", SOFT } })
+	if u > 0.4 then
+		runs(b, x, 21, { { Led.ElementNames[to], ELEMENT[to] } })
+	end
+end
+
+-- WEAK! and RESIST: what the hits say.
+local function hitsDemo(b, t: number)
+	local u = t % 2.4
+	local first = u < 1.2
+	local k = (u % 1.2) / 1.2
+	local rise = math.floor(k * 3)
+	if first then
+		Led.text(b, 4, 12 - rise, "WEAK!", GOLD, 2)
+		Led.text(b, 50, 13, "+25%", GOLD)
+	else
+		Led.text(b, 4, 12 - rise, "RESIST", SOFT)
+		Led.text(b, 4, 18 - rise, "LESS DAMAGE", SOFT)
+	end
+	Led.text(b, 4, 24, "ON EVERY HIT", SOFT)
+end
+
+-- Richer rocks further from home, more danger too.
+local function further(b, t: number)
+	Led.text(b, 0, 9, "RICHER FURTHER OUT", WHITE)
+	-- home on the left
+	rect(b, 1, 21, 6, 5, SOFT)
+	Led.set(b, 2, 20, SOFT)
+	Led.set(b, 3, 19, SOFT)
+	Led.set(b, 4, 19, SOFT)
+	Led.set(b, 5, 20, SOFT)
+	local walker = math.clamp((t - 0.4) / 5, 0, 1)
+	for x = 9, 70, 2 do
+		Led.set(b, x, 26, RULE)
+	end
+	for i, x in { 18, 33, 48, 63 } do
+		local r = RARITY[i + 1]
+		local size = 1 + i
+		local seen = walker * 62 + 9 >= x - 6
+		rect(b, x - size, 26 - size, size * 2 + 1, size, if seen then rgb(100, 106, 120) else RULE)
+		if seen then
+			Led.set(b, x, 25 - size, r[2])
+			Led.set(b, x + 1, 25 - size, r[2])
+		end
+		if i >= 3 and seen and math.floor(t * 4 + i) % 2 == 0 then
+			Led.set(b, x + size + 3, 22, RED)
+		end
+	end
+	rect(b, math.floor(9 + walker * 60), 22, 2, 3, WHITE)
+	if walker > 0.6 then
+		Led.text(b, 48, 16, "DANGER", RED)
+	end
+end
+
+-- The Rift's ladders: a column an element, its bosses one above another,
+-- each beaten one opening the next.
+local function ladders(info)
+	return function(b, t)
+		local cols = {}
+		for _, name in ELEMENTS do
+			cols[name] = {}
+		end
+		for _, boss in info.Bosses or {} do
+			if cols[boss.Element] then
+				table.insert(cols[boss.Element], boss)
+			end
+		end
+		local beaten = math.floor(math.max(0, t - 0.6) / 0.9)
+		for c, name in ELEMENTS do
+			local x = 4 + (c - 1) * 18
+			Led.art(b, SMALL[name], x, 8)
+			for i, _boss in cols[name] do
+				local y = 27 - (i - 1) * 5
+				local state = if i <= beaten then "Beaten" elseif i == beaten + 1 then "Open" else "Locked"
+				local color = if state == "Beaten" then ELEMENT[name] elseif state == "Open" then WHITE else RULE
+				box(b, x, y - 2, 9, 4, color)
+				if state == "Beaten" then
+					rect(b, x + 1, y - 1, 7, 2, scale(ELEMENT[name], 0.5))
+				elseif state == "Open" and math.floor(t * 3) % 2 == 0 then
+					rect(b, x + 3, y - 1, 3, 2, WHITE)
+				end
+			end
+		end
+	end
+end
+
+-- Threat I to III: who each is for.
+local function threat(b, t: number)
+	local list = {
+		{ "I", "BUILT FOR ONE", rgb(255, 202, 91) },
+		{ "II", "HARDER", rgb(255, 140, 60) },
+		{ "III", "BRING A PARTY", RED },
+	}
+	for i, row in list do
+		local k = enter(t, 0.3 + (i - 1) * 0.3, 0.45)
+		if k > 0 then
+			local dx = math.floor((1 - k) * 14)
+			clip(b, 0, Led.W - 1, function(tmp)
+				Led.text(tmp, 2 + dx, ROW[i], row[1], row[3])
+				Led.text(tmp, 18 + dx, ROW[i], row[2], WHITE)
+			end)
+		end
+	end
+end
+
+-- The settlement from above (left), each place lit in turn with what it's
+-- for (right).
+local MAP_R = 14
+local function mapAt(x: number, z: number): (number, number)
+	local s = MAP_R / 345
+	return 14.5 + x * s, 15 + z * s
+end
+local PLACES = {
+	{ "ARENA ROW", { "DUELS AND", "PRACTICE" }, function()
+		return 0, 0
+	end },
+	{ "YOUR POD", { "YOUR HOME,", "UP NORTH" }, function()
+		return 0, -268
+	end },
+	{ "ENCHANTER", { "GEMS INTO", "YOUR GEAR" }, function()
+		return math.cos(math.rad(62)) * 150, math.sin(math.rad(62)) * 150
+	end },
+	{ "MARKET", { "STORE AND", "SELL GEMS" }, function()
+		return math.cos(math.rad(40)) * 255, math.sin(math.rad(40)) * 255
+	end },
+	{ "HABITAT", { "KAIJU", "DAYCARE" }, function()
+		return math.cos(math.rad(160)) * 255, math.sin(math.rad(160)) * 255
+	end },
+	{ "PLAZA", { "SHUTTLE", "ARRIVALS" }, function()
+		return 0, 200
+	end },
+}
+local function map(b, t: number)
+	local each = 2
+	local which = math.floor(t / each) % #PLACES + 1
+	local u = t % each
+	local accent = GOOD
+	-- the wall, the field's ring, the pods' terraces, the stages
+	for i = 0, 63 do
+		local a = i / 64 * math.pi * 2
+		local x, y = mapAt(math.cos(a) * 345, math.sin(a) * 345)
+		Led.set(b, x, y, SOFT)
+		local fx, fy = mapAt(math.cos(a) * 160, math.sin(a) * 160)
+		Led.set(b, fx, fy, RULE)
+	end
+	for _, row in { 245, 292 } do
+		for deg = 186, 354, 12 do
+			local a = math.rad(deg)
+			local x, y = mapAt(math.cos(a) * row, math.sin(a) * row)
+			Led.set(b, x, y, scale(CYAN, 0.5))
+		end
+	end
+	for _, d in { { -48, 0 }, { 48, 0 }, { -48, 84 }, { 48, 84 }, { -48, -84 }, { 48, -84 } } do
+		local x, y = mapAt(d[1], d[2])
+		Led.set(b, x, y, scale(GOLD, 0.6))
+	end
+	-- the one lit now
+	local place = PLACES[which]
+	local px, py = mapAt(place[3]())
+	local p = (u * 1.5) % 1
+	rect(b, math.floor(px) - 1, math.floor(py) - 1, 3, 3, accent)
+	box(b, math.floor(px) - 2 - math.floor(p * 2), math.floor(py) - 2 - math.floor(p * 2), 5 + math.floor(p * 2) * 2, 5 + math.floor(p * 2) * 2, fade(accent, 1 - p))
+	-- what it is
+	Led.text(b, 32, 9, place[1], accent)
+	for i, s in place[2] do
+		local k = enter(u, 0.15 + i * 0.12, 0.35)
+		if k > 0 then
+			Led.text(b, 32 + math.floor((1 - k) * 8), 9 + i * Led.Line, s, WHITE)
+		end
+	end
+end
+
+-- The whole list of keys.
+local function keys(b, t: number, accent: number)
+	for i, row in { { "X", "PICK / KIT" }, { "TAB", "NEXT TARGET" }, { "1-4", "KAIJU TEAMS" } } do
+		local k = enter(t, 0.2 + (i - 1) * 0.3, 0.4)
+		if k > 0 then
+			local y = 8 + (i - 1) * 7
+			local pressed = ((t - i * 0.8) % 2.4) < 0.25
+			keycap(b, 2, y, row[1], accent, pressed)
+			Led.text(b, 22 + math.floor((1 - k) * 10), y + 1, row[2], WHITE)
+		end
+	end
+end
+
+-- The bounties: how many, counted up.
+local function bountyCount(info)
+	return function(b, t)
+		local n = #(info.Bosses or {})
+		local shown = math.floor(math.clamp(t / 1.2, 0, 1) * n + 0.5)
+		local s = shown .. (if shown == 1 then " BOSS" else " BOSSES")
+		Led.center(b, 10, s, WHITE, 2)
+		local ladders = {}
+		for _, boss in info.Bosses or {} do
+			ladders[boss.Element or ""] = true
+		end
+		local count = 0
+		for _ in ladders do
+			count += 1
+		end
+		if t > 1.4 then
+			Led.center(b, 22, count .. " ELEMENT LADDERS", SOFT)
+		end
+	end
+end
+
+-- Kaiju and bosses ------------------------------------------------------------------------------------
+
+local THREAT = { "I", "II", "III" }
+local ROLE = {
+	Warrior = { "WARRIOR", "HITS HARD" },
+	Ranged = { "RANGED", "FROM AFAR" },
+	Tank = { "TANK", "TAKES HITS" },
+	Assassin = { "ASSASSIN", "STRIKES FAST" },
+	Warden = { "SUPPORT", "HEALS YOU" },
+}
+local function slideIn(t: number): number
+	return math.floor((1 - enter(t, 0.1, 0.5)) * -24)
+end
+local function kaijuCard(entry)
+	local role = ROLE[entry.Role] or { Led.fit(entry.Role or "", 12), "" }
+	return card("KAIJU", CYAN, {
+		{ { entry.Name or "", GOLD } },
+		{ { role[1], CYAN } },
+		role[2],
+	}, function(b, t)
+		local art = "Mini" .. entry.Art
+		if not LedArt[art] then
+			art = entry.Art
+		end
+		sprite(b, art, 11 + slideIn(t), 28)
+	end, 5)
+end
+local function bossCard(boss)
+	local el = boss.Element and Led.ElementNames[boss.Element]
+	local weak = boss.Weakness and Led.ElementNames[boss.Weakness]
+	return guide("BOUNTY", RED, 6, function(b, t)
+		local art = "Mini" .. boss.Art
+		if not LedArt[art] then
+			art = boss.Art
+		end
+		sprite(b, art, 11 + slideIn(t), 28)
+		if enter(t, 0.3, 0.4) > 0 then
+			marquee(b, TEXT_X, ROW[1], 12, boss.Name or "", WHITE, t)
+		end
+		if el and enter(t, 0.5, 0.4) > 0 then
+			Led.text(b, TEXT_X, ROW[2], el, ELEMENT[boss.Element])
+			-- its threat, as pips
+			local x = TEXT_X + Led.width(el) + 3
+			for i = 1, 3 do
+				rect(b, x + (i - 1) * 3, ROW[2] + 1, 2, 3, if i <= (boss.Threat or 1) then RED else RULE)
+			end
+		end
+		if weak and enter(t, 0.7, 0.4) > 0 then
+			marquee(b, TEXT_X, ROW[3], 12, { { "WEAK: ", SOFT }, { weak, ELEMENT[boss.Weakness] } }, nil, t)
+		end
+	end)
+end
+
+-- The boards -----------------------------------------------------------------------------------------
+
 -- Puts episode `name` into `list` (at `at`), if it can be shown.
 local function addToon(list: { any }, name: string, at: number?)
 	local ep = Led.toon(name)
@@ -1144,48 +1937,177 @@ local function addToon(list: { any }, name: string, at: number?)
 		table.insert(list, math.clamp(at or #list + 1, 1, #list + 1), ep)
 	end
 end
+-- The board's guide scenes made, numbered among themselves.
+local function finish(list: { any }): { any }
+	local total = 0
+	for _, item in list do
+		if item.Guide then
+			total += 1
+		end
+	end
+	local out, n = {}, 0
+	for _, item in list do
+		if item.Guide then
+			n += 1
+			table.insert(out, item.Make(n, total))
+		else
+			table.insert(out, item)
+		end
+	end
+	return out
+end
 
 local SCENES = {}
 function SCENES.Guide(info)
-	local first = info.Kaiju and info.Kaiju[1] and info.Kaiju[1].Art
 	local list = {
-		title({ "SAGA", "MINERS" }, GOLD),
-		mining(),
-		enchant(),
-		hyperbeam(first),
-		tip({ "YOUR POD", "PRESS E AT", "ITS DOOR" }, CYAN, "Shield"),
-		tip({ "DUELS", "ARENA ROW", "PLAY > 1V1" }, GOLD, "Helmet"),
+		guide("START HERE", GOLD, 7, steps({ "MINE", "GEAR", "TEAM", "FIGHT", "TASKS" }, GOLD, 7)),
+		card("01 MINE", GOLD, { "BREAK ROCKS.", "EVERY ROCK", "HOLDS A GEM" }, artMine),
+		card("02 GEAR UP", GOLD, { "SOCKET GEMS", "INTO GEAR IN", "INVENTORY" }, artGear),
+		card("03 TEAM UP", GOLD, { "UP TO THREE", "KAIJU FIGHT", "BESIDE YOU" }, artTeam),
+		card("04 FIGHT", GOLD, { "BEAT RIVALS,", "PLAYERS AND", "RIFT BOSSES" }, function(b, t)
+			artFight(b, t)
+		end),
+		card("05 TASKS", GOLD, { "NOT SURE?", "OPEN TASKS.", "STEPS PAY" }, artTasks),
 	}
-	addToon(list, "Bonk", 3)
 	addToon(list, "Mine")
-	return list
+	return finish(list)
+end
+function SCENES.Controls(_info)
+	local list = {
+		card("ATTACK", CYAN, { { { "CLICK", CYAN } }, "SWING AT", "FOES, ROCKS" }, function(b, t)
+			artAttack(b, t, CYAN)
+		end),
+		card("BLOCK", CYAN, { { { "HOLD R-CLICK", CYAN } }, "TIME IT FOR", "A PERFECT" }, function(b, t)
+			artBlock(b, t, CYAN)
+		end),
+		card("DODGE", CYAN, { { { "SPACE", CYAN } }, "ROLL CLEAR", "OF BIG HITS" }, function(b, t)
+			artDodge(b, t, CYAN)
+		end),
+		card("SURGES", CYAN, { "HITS FILL", "CHARGE.", { { "Q E R", CYAN }, { ": CAST", WHITE } } }, function(b, t)
+			artSurges(b, t, CYAN)
+		end),
+		card("HYPERBEAM", CYAN, { "YOUR KAIJU", "CHARGE IT.", { { "FIRE: ", WHITE }, { "Z", CYAN } } }, function(b, t)
+			artBeam(b, t, CYAN)
+		end),
+		card("CATCH", CYAN, { "WEAR IT DOWN", "TILL GOLD,", { { "THEN ", WHITE }, { "C", CYAN } } }, function(b, t)
+			artCatch(b, t, CYAN)
+		end),
+		guide("MORE KEYS", CYAN, 7, function(b, t)
+			keys(b, t, CYAN)
+		end),
+	}
+	addToon(list, "Sneeze")
+	return finish(list)
 end
 function SCENES.Elements(_info)
-	local list = { elementsTitle() }
+	local list = { guide("THE CYCLE", WHITE, 7, cycle) }
 	for _, name in ELEMENTS do
-		table.insert(list, element(name))
+		local beats, weak = BEATS[name], WEAK_TO[name]
+		local _ = weak
+		table.insert(list, card(Led.ElementNames[name], ELEMENT[name], {
+			{ { "BEATS", SOFT } },
+			{ { Led.ElementNames[beats], ELEMENT[beats] } },
+			"+25% DAMAGE",
+		}, artElement(name)))
 	end
+	table.insert(list, card("ARMOR", WHITE, { "EACH GEM", "RESISTS ITS", "OWN ELEMENT" }, function(b, t)
+		artResist(b, t, CYAN)
+	end))
+	table.insert(list, guide("HITS", GOLD, 6, hitsDemo))
 	addToon(list, "HotCold")
-	table.insert(list, tip({ "ENCHANTER", "SETS GEMS", "IN GEAR" }, rgb(255, 120, 200), "PoisonGem", rgb(255, 120, 200)))
-	return list
+	return finish(list)
+end
+function SCENES.Gems(_info)
+	local list = {
+		guide("RARITY", GOLD, 7, function(b, t)
+			artRarity(b, t)
+			local lit = math.floor(t / 1.2) % 5 + 1
+			body(b, t, { { { RARITY[lit][1], RARITY[lit][2] } }, "RARER GEMS", "ARE STRONGER" })
+		end),
+		guide("LEGENDARY", RARITY[5][2], 8, function(b, t)
+			local i = math.floor(t / 2) % 4 + 1
+			local u = t % 2
+			local legend = LEGENDS[i]
+			-- (prismatic: a shine running over it)
+			local gem = Led.new()
+			pixelGem(gem, 10, 12, 19, legend[4], t * 0.8)
+			local band = (t * 14) % 40 - 10
+			for idx, c in gem.P do
+				local x, y = (idx - 1) % Led.W, (idx - 1) // Led.W
+				local d = math.abs((x + y) - band - 12)
+				b.P[idx] = if d < 3 then mix(c, WHITE, (1 - d / 3) * 0.6) else c
+			end
+			local _ = u
+			body(b, u, { { { legend[1], legend[4] } }, { { legend[2], legend[4] } }, { { Led.ElementNames[legend[3]], SOFT } } }, nil, 0)
+		end),
+		guide("GO FURTHER", GOLD, 7, further),
+		card("SPARE GEMS", GOLD, { "HEAL KAIJU", "OR SELL ON", "THE MARKET" }, artHeal),
+		card("EQUIP BEST", GOLD, { "ONE TAP PUTS", "YOUR BEST", "GEMS ON" }, function(b, t)
+			artEquip(b, t, GOLD)
+		end),
+	}
+	addToon(list, "Bonk")
+	return finish(list)
 end
 function SCENES.Bounties(info)
-	local list = { title({ "WANTED" }, RED, "THE BOUNTY BOARD", RED) }
+	local list = { guide("BOUNTIES", RED, 5, bountyCount(info)) }
 	for _, boss in info.Bosses or {} do
-		table.insert(list, wanted(boss))
+		table.insert(list, bossCard(boss))
 	end
+	table.insert(list, card("BOUNTY BOARD", RED, { "TAKE THEM AT", "THE BOUNTY", "BOARD" }, artNotice))
 	addToon(list, "Disguise", 7)
-	table.insert(list, tip({ "HUNT THEM", "AT BOUNTY", "OFFICE" }, GOLD, "Chest"))
-	return list
+	return finish(list)
 end
 function SCENES.Kaiju(info)
-	local list = { title({ "KAIJU" }, CYAN, "THEY FIGHT FOR YOU", CYAN) }
+	local list = {
+		card("YOUR TEAM", CYAN, { "3 FIGHTERS", { { "+1 SUPPORT", GOOD } }, "THAT HEALS" }, artTeam),
+	}
 	for _, entry in info.Kaiju or {} do
-		table.insert(list, kaiju(entry))
+		table.insert(list, kaijuCard(entry))
 	end
-	addToon(list, "Sneeze", 9)
-	table.insert(list, hyperbeam(info.Kaiju and info.Kaiju[2] and info.Kaiju[2].Art))
-	return list
+	table.insert(list, card("HEALING", CYAN, { "THEY DON'T", "SELF-HEAL.", "GEMS HEAL" }, artHeal))
+	table.insert(list, card("TEAMS", CYAN, { "SET UP FOUR", "TEAMS. SWAP", { { "WITH ", WHITE }, { "1-4", CYAN } } }, function(b, t)
+		for i = 1, 4 do
+			keycap(b, 1 + ((i - 1) % 2) * 10, 9 + math.floor((i - 1) / 2) * 10, tostring(i), CYAN, math.floor(t / 0.7) % 4 + 1 == i)
+		end
+	end))
+	table.insert(list, card("KAIJU ARENA", CYAN, { "BATTLE OTHER", "PLAYERS IN", "THE SHELTER" }, function(b, t)
+		box(b, 0, 21, 8, 3, RULE)
+		box(b, 13, 21, 8, 3, RULE)
+		local k = math.abs(math.sin(t * 3))
+		rect(b, math.floor(2 + k * 3), 17, 3, 3, ELEMENT.Fire)
+		rect(b, math.floor(16 - k * 3), 17, 3, 3, ELEMENT.Frost)
+		if k > 0.95 then
+			Led.set(b, 10, 16, WHITE)
+			Led.set(b, 10, 20, WHITE)
+		end
+	end))
+	return finish(list)
+end
+function SCENES.Rift(info)
+	local violet = rgb(190, 90, 255)
+	local list = {
+		guide("THE RIFT", violet, 7, steps({ "VEIN", "GATE", "BOSS", "LOOT" }, violet, 7)),
+		card("RIFT VEINS", violet, { "VEINS IN THE", "QUARRY LEAD", "TO A GATE" }, artVein),
+		guide("LADDERS", violet, 7, ladders(info)),
+		card("TELEGRAPHS", violet, { "BIG HITS ARE", "TELEGRAPHED.", "MOVE OUT" }, artTelegraph),
+		guide("THREAT", violet, 6, threat),
+		card("PARTY UP", violet, { "BOSSES HIT", "HARD. BRING", "FRIENDS" }, artParty),
+		card("LOOT", violet, { "BEAT A BOSS:", "CACHE ROLL,", "NEXT OPENS" }, artLoot),
+	}
+	return finish(list)
+end
+function SCENES.Outpost(_info)
+	local list = {
+		guide("MAP", GOOD, 12, map, 32),
+		card("CRITTERS", GOOD, { "MINE A WHILE", "AND THEY", "COME FOR YOU" }, artCritters),
+		card("IF YOU FALL", GOOD, { "THEY GRAB", "YOUR NEWEST", "GEMS" }, artFall),
+		card("MECHS", GOOD, { "MECHS IN THE", "GARAGE MINE", "FASTER" }, artMech),
+		card("YOUR POD", GOOD, { { { "E", GOOD }, { " AT ITS", WHITE } }, "DOOR OPENS", "MY POD" }, function(b, t)
+			artPod(b, t, GOOD)
+		end),
+	}
+	return finish(list)
 end
 
 function Led.scenes(board: string, info: any): { any }

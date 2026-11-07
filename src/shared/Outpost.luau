@@ -127,16 +127,20 @@ Outpost.Settlement = {
 	},
 	StageReach = 36, -- studs: a ring's kerb, lamps and fence, round its middle
 	-- The LED screens (Shared.Led's boards: Client.LedScreens lights them):
-	-- four giants in the sky round the whole settlement, out past its wall,
-	-- one each side, facing in and tilted down at it (Facing: the way its
-	-- face looks, in degrees as above), so wherever you are you see one.
-	-- Screen: its face in studs, how high its bottom edge hangs, how far it
-	-- tilts down (degrees).
+	-- eight giants in the sky round the whole settlement, out past its
+	-- wall, one each side and one each corner, facing in and tilted down at
+	-- it (Facing: the way its face looks, in degrees as above), so wherever
+	-- you are you see a few. Screen: its face in studs, how high its bottom
+	-- edge hangs, how far it tilts down (degrees).
 	Screens = {
 		{ Board = "Guide", X = 0, Z = -440, Facing = 90 },
+		{ Board = "Controls", X = 311, Z = -311, Facing = 135 },
 		{ Board = "Elements", X = 440, Z = 0, Facing = 180 },
+		{ Board = "Gems", X = 311, Z = 311, Facing = 225 },
 		{ Board = "Bounties", X = 0, Z = 440, Facing = 270 },
+		{ Board = "Rift", X = -311, Z = 311, Facing = 315 },
 		{ Board = "Kaiju", X = -440, Z = 0, Facing = 0 },
+		{ Board = "Outpost", X = -311, Z = -311, Facing = 45 },
 	},
 	Screen = { Width = 144, Height = 60, Lift = 70, Tilt = 10 },
 	-- (x, z points: from the ring round the field to the plaza, round the

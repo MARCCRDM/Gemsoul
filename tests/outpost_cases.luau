@@ -1587,7 +1587,7 @@ do
 			end
 		end
 	end
-	for _, board in { "Guide", "Elements", "Bounties", "Kaiju" } do
+	for _, board in { "Guide", "Controls", "Elements", "Gems", "Bounties", "Rift", "Kaiju", "Outpost" } do
 		check(boardsSeen[board], "No LED screen for " .. board)
 	end
 	-- the field: rocks round Arena Row and at the pods' doorsteps, all in the safe core

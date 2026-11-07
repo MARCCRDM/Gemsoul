@@ -1,6 +1,6 @@
 --[[
 	The Outpost's LED screens, lit (World.OutpostWorld builds them: giants
-	in the sky round the whole settlement, facing in, each a LedPanel with
+	in the sky round the whole settlement (eight), facing in, each a LedPanel with
 	its Board attribute; Shared.Led draws their scenes, from the game's own
 	kaiju and bosses: Shared.Kaiju, Shared.RiftRun).
 
@@ -8,7 +8,9 @@
 	when it's off. A screen plays its board's scenes one after another,
 	animated (Fps frames a second, only the LEDs that change are touched),
 	the next scene wiping in across it column by column. A screen's LEDs are
-	only built while you're within Reach of it (and go past Drop).
+	only built while you're within Reach of it (and go past Drop), and only
+	drawn while it's in front of your camera (one behind you is switched
+	off and keeps time without painting: there are eight).
 
 	  LedScreens.step(dt)   each frame while you're in the Outpost
 	  LedScreens.clear()    all of them off (you've left)
@@ -26,6 +28,7 @@ LedScreens.Drop = 1250 -- studs: taken down past this
 LedScreens.Every = 0.5 -- seconds between looks round
 LedScreens.Dot = 0.72 -- of a cell, an LED's size
 LedScreens.RowsPerFrame = 6 -- LED rows built a frame (no hitch)
+LedScreens.Behind = -0.25 -- the camera's look against the way to a screen: under this, it's behind you
 
 local OFF = Color3.fromRGB(22, 25, 34)
 
@@ -96,6 +99,7 @@ local function build(panel: BasePart)
 		Frame = math.huge,
 		Shown = {},
 		Wiping = nil,
+		Visible = true,
 	}
 end
 
@@ -160,8 +164,13 @@ local function play(screen, dt: number)
 	if screen.T >= current.Duration then
 		screen.Scene = screen.Scene % #screen.Scenes + 1
 		screen.T = 0
-		screen.Wiping = 0
+		screen.Wiping = if screen.Visible then 0 else nil
 		current = screen.Scenes[screen.Scene]
+	end
+	-- (behind you: time goes on, nothing's painted)
+	if not screen.Visible then
+		screen.Frame = math.huge
+		return
 	end
 	local frame = math.floor(screen.T * LedScreens.Fps)
 	if frame == screen.Frame and not screen.Wiping then
@@ -193,12 +202,21 @@ function LedScreens.step(dt: number)
 		local seen = {}
 		for _, d in if folder then folder:GetDescendants() else {} do
 			if d:IsA("BasePart") and d.Name == "LedPanel" and camera then
-				local far = (d.CFrame.Position - camera.CFrame.Position).Magnitude
+				local to = d.CFrame.Position - camera.CFrame.Position
+				local far = to.Magnitude
 				if screens[d] then
 					seen[d] = far < LedScreens.Drop
 				elseif far < LedScreens.Reach then
 					screens[d] = build(d)
 					seen[d] = true
+				end
+				local screen = screens[d]
+				if screen then
+					local ahead = far < 1 or camera.CFrame.LookVector:Dot(to / far) > LedScreens.Behind
+					if screen.Visible ~= ahead then
+						screen.Visible = ahead
+						screen.Gui.Enabled = ahead
+					end
 				end
 			end
 		end
