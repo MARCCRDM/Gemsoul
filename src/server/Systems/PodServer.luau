@@ -114,7 +114,11 @@ local function paint(model: Instance?, style)
 		return
 	end
 	local hull, glow = PodStyle.hull(style), PodStyle.glow(style)
-	local material = Enum.Material[PodStyle.hullMaterial(style)] or Enum.Material.SmoothPlastic
+	local roof, frame = PodStyle.roof(style) or hull, PodStyle.frame(style) or DARK
+	local ok, found = pcall(function()
+		return (Enum.Material :: any)[PodStyle.hullMaterial(style)]
+	end)
+	local material = if ok and found then found else Enum.Material.SmoothPlastic
 	local entry = PodStyle.find("Glow", style and style.Glow)
 	model:SetAttribute("Prism", if entry and entry.Prism then true else nil)
 	for _, p in model:GetDescendants() do
@@ -122,6 +126,11 @@ local function paint(model: Instance?, style)
 			local kind = p:GetAttribute("Paint")
 			if kind == "Hull" then
 				p.Color, p.Material = hull, material
+			elseif kind == "Roof" then
+				-- (a two-tone roof keeps a plain finish; one the hull's colour takes the hull's)
+				p.Color, p.Material = roof, if PodStyle.roof(style) then Enum.Material.SmoothPlastic else material
+			elseif kind == "Frame" then
+				p.Color, p.Material = frame, Enum.Material.Metal
 			elseif kind == "Glow" then
 				p.Color = glow
 				local light = p:FindFirstChildOfClass("PointLight")
@@ -179,10 +188,10 @@ local function build(player: Player, pad): (Model, { any })
 	body.CanCollide, body.CanQuery = true, true
 	model.PrimaryPart = body
 	local roofY = base + 4.6
-	part(model, F(0, roofY + 0.7, 0), V(w, 1.4, d - 2.8), hullColor, Enum.Material.SmoothPlastic)
+	part(model, F(0, roofY + 0.7, 0), V(w, 1.4, d - 2.8), hullColor, Enum.Material.SmoothPlastic):SetAttribute("Paint", "Roof")
 	for _, side in { -1, 1 } do
 		-- (a cylinder lies along X: the roof's rounded edges)
-		part(model, F(0, roofY, side * (d / 2 - 1.4)), V(w, 2.8, 2.8), hullColor, Enum.Material.SmoothPlastic, "Cylinder")
+		part(model, F(0, roofY, side * (d / 2 - 1.4)), V(w, 2.8, 2.8), hullColor, Enum.Material.SmoothPlastic, "Cylinder"):SetAttribute("Paint", "Roof")
 		-- dark end panels and a trim band round the bottom
 		part(model, F(side * (w / 2 + 0.05), base + 2.6, 0), V(0.3, 5, d - 1), DARK, Enum.Material.Metal)
 	end
@@ -297,13 +306,15 @@ local function build(player: Player, pad): (Model, { any })
 	roar.SoundId = "rbxasset://sounds/action_falling.mp3"
 	roar.Volume, roar.RollOffMaxDistance = 0.7, 260
 	roar.Parent = body
-	-- (what its style colours: the hull, and its glow)
+	-- (what its style colours: the hull, its roof, its frame and its glow)
 	for _, p in model:GetChildren() do
-		if p:IsA("BasePart") then
+		if p:IsA("BasePart") and p:GetAttribute("Paint") == nil then
 			if p.Color == hullColor and p.Material == Enum.Material.SmoothPlastic then
 				p:SetAttribute("Paint", "Hull")
 			elseif p.Name == "Beacon" or p.Name == "Trim" then
 				p:SetAttribute("Paint", "Glow")
+			elseif p.Color == DARK and p.Material == Enum.Material.Metal and p.Name ~= "Skirt" then
+				p:SetAttribute("Paint", "Frame")
 			end
 		end
 	end
@@ -397,6 +408,66 @@ function DECOR.Spire(m, at: CFrame, glow: Color3)
 	local light = Instance.new("PointLight")
 	light.Color, light.Range, light.Brightness = glow, 14, 1.1
 	light.Parent = core
+end
+function DECOR.Bench(m, at: CFrame, _glow: Color3)
+	for _, dx in { -1.1, 1.1 } do
+		part(m, at * CFrame.new(dx, 0.5, 0), Vector3.new(0.3, 1, 1), DARK, Enum.Material.Metal)
+		part(m, at * CFrame.new(dx, 1.4, 0.45), Vector3.new(0.25, 1.6, 0.25), DARK, Enum.Material.Metal)
+	end
+	part(m, at * CFrame.new(0, 1.05, 0), Vector3.new(3, 0.2, 1.1), WOOD, Enum.Material.WoodPlanks)
+	part(m, at * CFrame.new(0, 1.9, 0.5) * CFrame.Angles(math.rad(-12), 0, 0), Vector3.new(3, 0.6, 0.15), WOOD, Enum.Material.WoodPlanks)
+end
+function DECOR.Dish(m, at: CFrame, glow: Color3)
+	part(m, at * CFrame.new(0, 0.3, 0), Vector3.new(1.6, 0.6, 1.6), DARK, Enum.Material.Metal)
+	part(m, at * CFrame.new(0, 1.6, 0), Vector3.new(0.35, 2.4, 0.35), STEEL, Enum.Material.Metal)
+	local tilt = at * CFrame.new(0, 3, 0) * CFrame.Angles(math.rad(-40), 0, 0)
+	part(m, tilt * UP, Vector3.new(0.25, 3, 3), Color3.fromRGB(224, 228, 236), Enum.Material.SmoothPlastic, "Cylinder")
+	part(m, tilt * CFrame.new(0, 0.9, 0), Vector3.new(0.12, 1.6, 0.12), STEEL, Enum.Material.Metal)
+	part(m, tilt * CFrame.new(0, 1.75, 0), Vector3.new(0.35, 0.35, 0.35), glow, Enum.Material.Neon, "Ball")
+end
+function DECOR.Cart(m, at: CFrame, glow: Color3)
+	local rust = Color3.fromRGB(128, 76, 50)
+	part(m, at * CFrame.new(0, 1.2, 0), Vector3.new(2.6, 1.2, 1.6), rust, Enum.Material.CorrodedMetal)
+	part(m, at * CFrame.new(0, 1.85, 0), Vector3.new(2.8, 0.15, 1.8), DARK, Enum.Material.Metal)
+	for _, dx in { -0.85, 0.85 } do
+		for _, dz in { -0.85, 0.85 } do
+			part(m, at * CFrame.new(dx, 0.45, dz), Vector3.new(0.25, 0.9, 0.9), DARK, Enum.Material.Metal, "Cylinder")
+		end
+	end
+	-- (heaped with gems: the glow's and a few of the elements')
+	local colors = { glow, Color3.fromRGB(255, 92, 60), Color3.fromRGB(90, 170, 255), Color3.fromRGB(255, 214, 50), glow }
+	for i, spec in { { -0.8, 0.2, 0.3 }, { -0.2, -0.3, 0.9 }, { 0.4, 0.25, 0.5 }, { 0.9, -0.2, 1.2 }, { 0.05, 0.1, 1.6 } } do
+		part(m, at * CFrame.new(spec[1], 2.1, spec[2]) * CFrame.Angles(spec[3], spec[3] * 2, 0.4), Vector3.new(0.55, 0.55, 0.55), colors[i], Enum.Material.Neon)
+	end
+end
+function DECOR.Holo(m, at: CFrame, glow: Color3)
+	part(m, at * CFrame.new(0, 0.3, 0), Vector3.new(1.4, 0.6, 1.4), DARK, Enum.Material.Metal)
+	part(m, at * CFrame.new(0, 0.62, 0), Vector3.new(1, 0.06, 1), glow, Enum.Material.Neon)
+	local panel = part(m, at * CFrame.new(0, 2.6, 0), Vector3.new(2.8, 1.8, 0.05), glow, Enum.Material.Glass)
+	panel.Transparency = 0.6
+	for _, edge in { { 0, 0.92, 2.8, 0.08 }, { 0, -0.92, 2.8, 0.08 }, { -1.4, 0, 0.08, 1.9 }, { 1.4, 0, 0.08, 1.9 } } do
+		part(m, at * CFrame.new(edge[1], 2.6 + edge[2], 0), Vector3.new(edge[3], edge[4], 0.08), glow, Enum.Material.Neon)
+	end
+	-- (a gem drawn on it)
+	part(m, at * CFrame.new(0, 2.6, -0.04) * CFrame.Angles(0, 0, math.rad(45)), Vector3.new(0.6, 0.6, 0.04), glow, Enum.Material.Neon)
+	for _, side in { -1, 1 } do
+		local beam = part(m, at * CFrame.new(side * 0.45, 1.5, 0) * CFrame.Angles(0, 0, side * 0.35), Vector3.new(0.05, 1.8, 0.05), glow, Enum.Material.Neon)
+		beam.Transparency = 0.5
+	end
+end
+function DECOR.Meteor(m, at: CFrame, glow: Color3)
+	-- a crater ring, the rock half sunk in it, lit cracks across it
+	for k = 0, 9 do
+		local a = k / 10 * math.pi * 2
+		part(m, at * CFrame.Angles(0, a, 0) * CFrame.new(0, 0.2, 1.6) * CFrame.Angles(math.rad(-20), 0, 0), Vector3.new(1.1, 0.4, 0.6), DARK, Enum.Material.Slate)
+	end
+	local rock = part(m, at * CFrame.new(0, 1, 0), Vector3.new(2.4, 2.4, 2.4), Color3.fromRGB(46, 42, 48), Enum.Material.Basalt, "Ball")
+	for i, spec in { { 0.2, 0.3 }, { 1.4, -0.4 }, { 2.6, 0.5 }, { 4, -0.2 }, { 5.2, 0.35 } } do
+		part(m, at * CFrame.new(0, 1.05, 0) * CFrame.Angles(spec[2], spec[1], 0) * CFrame.new(0, 0, -1.18), Vector3.new(0.14, 1.4 + (i % 2) * 0.4, 0.06), glow, Enum.Material.Neon)
+	end
+	local light = Instance.new("PointLight")
+	light.Color, light.Range, light.Brightness = glow, 12, 1.2
+	light.Parent = rock
 end
 local GOLD = Color3.fromRGB(255, 196, 72)
 function DECOR.Statue(m, at: CFrame, glow: Color3)

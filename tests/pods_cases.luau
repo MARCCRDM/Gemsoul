@@ -512,6 +512,43 @@ do
 	Server.kaijuOf = function() return nil end
 end
 
+-- The catalogue's looks: every piece says what it is; a two-tone hull's
+-- roof and frame take their own colours; every yard piece builds.
+do
+	for _, list in { PodStyle.Hulls, PodStyle.Glows, PodStyle.Decor } do
+		for _, entry in list do
+			check(type(entry.Blurb) == "string" and #entry.Blurb > 0, "A piece with nothing said about it: " .. entry.Id)
+		end
+	end
+	local style = { Hull = "Racer", Glow = "Cyan", Left = "Lamps", Right = "Crates" }
+	Server.styleOf = function(p)
+		return if p == ana then style else nil
+	end
+	Server.restyle(ana)
+	local roofs, frames = 0, 0
+	for _, p in pod:GetDescendants() do
+		if p:IsA("BasePart") and p:GetAttribute("Paint") == "Roof" then
+			roofs += 1
+			check(p.Color == PodStyle.roof(style), "A two-tone roof isn't its colour")
+		elseif p:IsA("BasePart") and p:GetAttribute("Paint") == "Frame" then
+			frames += 1
+			check(p.Color == PodStyle.frame(style), "The frame isn't its colour")
+		end
+	end
+	check(roofs >= 3 and frames >= 3, "No roof or frame to paint (" .. roofs .. ", " .. frames .. ")")
+	check(pod.Hull.Color == PodStyle.hull(style), "The two-tone hull isn't its colour")
+	for _, entry in PodStyle.Decor do
+		if entry.Id ~= "None" then
+			style = { Hull = "Frost", Glow = "Cyan", Left = entry.Id, Right = "None" }
+			Server.restyle(ana)
+			local yard = pads[index].Model:FindFirstChild("Display")
+			local piece = yard and yard:FindFirstChild("DecorLeft")
+			check(piece and #piece:GetChildren() >= 3, "The " .. entry.Id .. " yard piece didn't build")
+		end
+	end
+	Server.styleOf = function() return nil end
+end
+
 -- Taken off somewhere else mid-landing (the Rift, a fight): let go where
 -- they are, the cinematic over; the pod lands on its own.
 do

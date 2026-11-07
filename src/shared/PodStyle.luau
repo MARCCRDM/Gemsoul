@@ -6,12 +6,12 @@
 	front corners.
 
 	Every piece has a rarity, Common to Legendary. A few are yours from the
-	start (Free); the rest come from the pod roll: each time your pod lands
-	it rolls one (PodStyle.roll: a rarity by Weight, then a piece of it you
+	start (Free); the rest come from the pod roll: your pod's first landing
+	rolls one (PodStyle.roll: a rarity by Weight, then a piece of it you
 	don't have yet if there is one), unlocks it and wears it, flickering
 	through the others on the way down (Client.PodArrival shows the roll).
 
-	  PodStyle.Hulls, .Glows, .Decor   { { Id, Name, Rarity, Color?, Material? } }
+	  PodStyle.Hulls, .Glows, .Decor   { { Id, Name, Rarity, Blurb, Color?, Roof?, Frame?, Material? } }
 	  PodStyle.Rarities                { { Id, Name, Weight, Color } }, commonest first
 	  PodStyle.Slots                   the yard's spots, in the pad's frame
 	  PodStyle.default() -> style
@@ -22,6 +22,7 @@
 	  PodStyle.equip(style, piece) -> style   wearing it (decor: the left spot)
 	  PodStyle.find(kind, id) -> entry?
 	  PodStyle.hull(style) / .glow(style) -> Color3;  .hullMaterial(style) -> string
+	  PodStyle.roof(style) / .frame(style) -> Color3?   nil: the hull's own / the default frame
 ]]
 local PodStyle = {}
 
@@ -33,36 +34,62 @@ PodStyle.Rarities = {
 	{ Id = "Legendary", Name = "LEGENDARY", Weight = 2, Color = Color3.fromRGB(255, 190, 60) },
 }
 
+-- (Roof: the roof's colour if not the hull's; Frame: the dark frame's, end
+-- panels, band and legs; Material: the hull's finish. Blurb: what MY POD
+-- says about it.)
+local function rgb(r, g, b)
+	return Color3.fromRGB(r, g, b)
+end
 PodStyle.Hulls = {
-	{ Id = "Frost", Name = "FROST WHITE", Rarity = "Common", Color = Color3.fromRGB(226, 228, 232) },
-	{ Id = "Graphite", Name = "GRAPHITE", Rarity = "Common", Color = Color3.fromRGB(70, 74, 86) },
-	{ Id = "Sand", Name = "DUNE SAND", Rarity = "Common", Color = Color3.fromRGB(214, 190, 150) },
-	{ Id = "Moss", Name = "MOSS", Rarity = "Uncommon", Color = Color3.fromRGB(86, 116, 78) },
-	{ Id = "Navy", Name = "DEEP NAVY", Rarity = "Uncommon", Color = Color3.fromRGB(44, 62, 112) },
-	{ Id = "Crimson", Name = "CRIMSON", Rarity = "Rare", Color = Color3.fromRGB(176, 52, 60) },
-	{ Id = "Chrome", Name = "CHROME", Rarity = "Epic", Color = Color3.fromRGB(196, 204, 216), Material = "Metal" },
-	{ Id = "Gilded", Name = "GILDED", Rarity = "Legendary", Color = Color3.fromRGB(255, 192, 72), Material = "Metal" },
+	{ Id = "Frost", Name = "FROST WHITE", Rarity = "Common", Color = rgb(226, 228, 232), Blurb = "Factory white, straight off the line." },
+	{ Id = "Graphite", Name = "GRAPHITE", Rarity = "Common", Color = rgb(70, 74, 86), Blurb = "Dark grey. Hides the crater dust." },
+	{ Id = "Sand", Name = "DUNE SAND", Rarity = "Common", Color = rgb(214, 190, 150), Blurb = "The colour of the quarry floor." },
+	{ Id = "Sky", Name = "SKY", Rarity = "Common", Color = rgb(150, 190, 225), Blurb = "Pale blue, like the day sky." },
+	{ Id = "Moss", Name = "MOSS", Rarity = "Uncommon", Color = rgb(86, 116, 78), Blurb = "Field green, built for the wilds." },
+	{ Id = "Navy", Name = "DEEP NAVY", Rarity = "Uncommon", Color = rgb(44, 62, 112), Blurb = "Deep blue, night-shift paint." },
+	{ Id = "Arctic", Name = "ARCTIC", Rarity = "Uncommon", Color = rgb(232, 238, 244), Roof = rgb(84, 184, 228), Blurb = "White hull under an ice-blue roof." },
+	{ Id = "Rust", Name = "RUST", Rarity = "Uncommon", Color = rgb(150, 84, 54), Material = "CorrodedMetal", Blurb = "Weathered plate. Seen some storms." },
+	{ Id = "Crimson", Name = "CRIMSON", Rarity = "Rare", Color = rgb(176, 52, 60), Blurb = "Deep red, impossible to miss." },
+	{ Id = "Racer", Name = "RACER", Rarity = "Rare", Color = rgb(236, 238, 242), Roof = rgb(204, 38, 48), Frame = rgb(22, 22, 26), Blurb = "Race livery: white, a red roof, a black frame." },
+	{ Id = "Plate", Name = "TREAD PLATE", Rarity = "Rare", Color = rgb(150, 156, 166), Material = "DiamondPlate", Frame = rgb(30, 32, 38), Blurb = "Tread plate all over. Built to take hits." },
+	{ Id = "Midnight", Name = "MIDNIGHT", Rarity = "Rare", Color = rgb(26, 32, 66), Frame = rgb(226, 178, 72), Blurb = "Midnight blue in a gold frame." },
+	{ Id = "Chrome", Name = "CHROME", Rarity = "Epic", Color = rgb(196, 204, 216), Material = "Metal", Blurb = "Polished to a mirror." },
+	{ Id = "Foil", Name = "COBALT FOIL", Rarity = "Epic", Color = rgb(58, 108, 232), Material = "Foil", Blurb = "Crinkled cobalt foil, like a probe's." },
+	{ Id = "Magma", Name = "MAGMA", Rarity = "Epic", Color = rgb(90, 40, 28), Material = "CrackedLava", Frame = rgb(24, 20, 20), Blurb = "Lava glowing through cracked rock." },
+	{ Id = "Glacier", Name = "GLACIER", Rarity = "Epic", Color = rgb(176, 222, 248), Material = "Ice", Roof = rgb(232, 246, 255), Blurb = "A hull of solid glacier ice." },
+	{ Id = "Gilded", Name = "GILDED", Rarity = "Legendary", Color = rgb(255, 192, 72), Material = "Metal", Blurb = "Solid gold. For the very best miners." },
+	{ Id = "Obsidian", Name = "OBSIDIAN", Rarity = "Legendary", Color = rgb(20, 20, 26), Roof = rgb(255, 192, 72), Frame = rgb(255, 192, 72), Blurb = "Volcanic black, crowned and framed in gold." },
 }
 PodStyle.Glows = {
-	{ Id = "Cyan", Name = "CYAN", Rarity = "Common", Color = Color3.fromRGB(110, 220, 255) },
-	{ Id = "Gold", Name = "GOLD", Rarity = "Common", Color = Color3.fromRGB(255, 196, 80) },
-	{ Id = "Lime", Name = "LIME", Rarity = "Uncommon", Color = Color3.fromRGB(150, 255, 120) },
-	{ Id = "Magenta", Name = "MAGENTA", Rarity = "Uncommon", Color = Color3.fromRGB(255, 110, 210) },
-	{ Id = "Violet", Name = "VIOLET", Rarity = "Rare", Color = Color3.fromRGB(180, 130, 255) },
-	{ Id = "Ember", Name = "EMBER", Rarity = "Epic", Color = Color3.fromRGB(255, 120, 70) },
+	{ Id = "Cyan", Name = "CYAN", Rarity = "Common", Color = rgb(110, 220, 255), Blurb = "The Outpost's own blue." },
+	{ Id = "Gold", Name = "GOLD", Rarity = "Common", Color = rgb(255, 196, 80), Blurb = "Warm lamp gold." },
+	{ Id = "White", Name = "WHITE", Rarity = "Common", Color = rgb(236, 242, 255), Blurb = "Plain white light." },
+	{ Id = "Lime", Name = "LIME", Rarity = "Uncommon", Color = rgb(150, 255, 120), Blurb = "Bright lime green." },
+	{ Id = "Magenta", Name = "MAGENTA", Rarity = "Uncommon", Color = rgb(255, 110, 210), Blurb = "Hot pink-purple." },
+	{ Id = "Coral", Name = "CORAL", Rarity = "Uncommon", Color = rgb(255, 128, 104), Blurb = "Soft coral orange." },
+	{ Id = "Violet", Name = "VIOLET", Rarity = "Rare", Color = rgb(180, 130, 255), Blurb = "Rift violet." },
+	{ Id = "Teal", Name = "TEAL", Rarity = "Rare", Color = rgb(60, 232, 190), Blurb = "Deep sea teal." },
+	{ Id = "Rose", Name = "ROSE", Rarity = "Rare", Color = rgb(255, 84, 140), Blurb = "A sharp rose red." },
+	{ Id = "Ember", Name = "EMBER", Rarity = "Epic", Color = rgb(255, 120, 70), Blurb = "Like coals in a forge." },
+	{ Id = "Toxic", Name = "TOXIC", Rarity = "Epic", Color = rgb(186, 255, 40), Blurb = "Corrosive green. Don't touch." },
 	-- (its colour runs round the rainbow: Client.PodShowcase)
-	{ Id = "Prism", Name = "PRISM", Rarity = "Legendary", Color = Color3.fromRGB(255, 255, 255), Prism = true },
+	{ Id = "Prism", Name = "PRISM", Rarity = "Legendary", Color = rgb(255, 255, 255), Prism = true, Blurb = "Runs round the whole rainbow." },
 }
 PodStyle.Decor = {
-	{ Id = "None", Name = "NOTHING", Rarity = "Common" },
-	{ Id = "Lamps", Name = "TWIN LAMPS", Rarity = "Common" },
-	{ Id = "Crates", Name = "SUPPLY CRATES", Rarity = "Common" },
-	{ Id = "Planter", Name = "CRYSTAL PLANTER", Rarity = "Uncommon" },
-	{ Id = "Flag", Name = "BANNER", Rarity = "Uncommon" },
-	{ Id = "Scope", Name = "TELESCOPE", Rarity = "Rare" },
-	{ Id = "Drill", Name = "MINI DRILL", Rarity = "Rare" },
-	{ Id = "Spire", Name = "CRYSTAL SPIRE", Rarity = "Epic" },
-	{ Id = "Statue", Name = "GOLDEN KAIJU", Rarity = "Legendary" },
+	{ Id = "None", Name = "NOTHING", Rarity = "Common", Blurb = "Leave the spot clear." },
+	{ Id = "Lamps", Name = "TWIN LAMPS", Rarity = "Common", Blurb = "Two lamps in your glow." },
+	{ Id = "Crates", Name = "SUPPLY CRATES", Rarity = "Common", Blurb = "Crates and a drum, fresh off the shuttle." },
+	{ Id = "Bench", Name = "BENCH", Rarity = "Common", Blurb = "Somewhere to sit and watch the duels." },
+	{ Id = "Planter", Name = "CRYSTAL PLANTER", Rarity = "Uncommon", Blurb = "Crystals growing in a box." },
+	{ Id = "Flag", Name = "BANNER", Rarity = "Uncommon", Blurb = "A banner in your glow." },
+	{ Id = "Dish", Name = "SAT DISH", Rarity = "Uncommon", Blurb = "Listening to orbit." },
+	{ Id = "Scope", Name = "TELESCOPE", Rarity = "Rare", Blurb = "For watching the sky." },
+	{ Id = "Drill", Name = "MINI DRILL", Rarity = "Rare", Blurb = "A drill rig for the yard." },
+	{ Id = "Cart", Name = "GEM CART", Rarity = "Rare", Blurb = "A mine cart heaped with gems." },
+	{ Id = "Spire", Name = "CRYSTAL SPIRE", Rarity = "Epic", Blurb = "A tall crystal, lit from inside." },
+	{ Id = "Holo", Name = "HOLO SIGN", Rarity = "Epic", Blurb = "A hologram panel in your glow." },
+	{ Id = "Statue", Name = "GOLDEN KAIJU", Rarity = "Legendary", Blurb = "A golden kaiju rearing up." },
+	{ Id = "Meteor", Name = "METEORITE", Rarity = "Legendary", Blurb = "A fallen star, still glowing." },
 }
 -- Yours from the start.
 PodStyle.Free = { Hull = { Frost = true }, Glow = { Cyan = true }, Decor = { None = true, Lamps = true, Crates = true } }
@@ -172,6 +199,14 @@ function PodStyle.hull(style): Color3
 end
 function PodStyle.hullMaterial(style): string
 	return (PodStyle.find("Hull", style and style.Hull) or PodStyle.Hulls[1]).Material or "SmoothPlastic"
+end
+function PodStyle.roof(style): Color3?
+	local entry = PodStyle.find("Hull", style and style.Hull)
+	return entry and entry.Roof
+end
+function PodStyle.frame(style): Color3?
+	local entry = PodStyle.find("Hull", style and style.Hull)
+	return entry and entry.Frame
 end
 function PodStyle.glow(style): Color3
 	return (PodStyle.find("Glow", style and style.Glow) or PodStyle.Glows[1]).Color
