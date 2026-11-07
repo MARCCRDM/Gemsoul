@@ -147,4 +147,26 @@ for _, words in { '["Take a bounty"]', '["SOLO OR PARTY"]', '["Bounty"]', '["WAN
 	check(es:find(words, 1, true) ~= nil, "No Spanish for " .. words)
 end
 
+-- The PLAY menu's suggestion: the easiest open bounty not beaten yet (one
+-- for a single miner first), else the toughest open one to go again.
+do
+	local function e(id, unlocked, beaten, threat, level, group)
+		return { Id = id, Unlocked = unlocked, Beaten = beaten, Threat = threat, Level = level, Group = group }
+	end
+	local ladders = {
+		{ Element = "Fire", Ladder = { e("A", true, 1, 1, 5), e("B", true, 0, 3, 20, true) } },
+		{ Element = "Frost", Ladder = { e("C", true, 0, 2, 12), e("D", false, 0, 1, 4) } },
+		{ Element = "Shock", Ladder = { e("E", true, 0, 2, 9) } },
+	}
+	check(Bounties.suggest(ladders).Id == "E", "Not the easiest open bounty for one")
+	ladders[3].Ladder[1].Beaten = 2
+	check(Bounties.suggest(ladders).Id == "C", "Didn't move on to the next")
+	ladders[2].Ladder[1].Beaten = 1
+	check(Bounties.suggest(ladders).Id == "B", "A party bounty wasn't suggested once it's the only one left")
+	ladders[1].Ladder[2].Beaten = 1
+	check(Bounties.suggest(ladders).Id == "B", "All beaten: not the toughest to go again")
+	check(Bounties.suggest({}) == nil and Bounties.suggest(nil) == nil, "Suggested something from nothing")
+	check(Bounties.suggest({ { Ladder = { e("X", false, 0, 1, 1) } } }) == nil, "Suggested a locked bounty")
+end
+
 print(string.format("PASS: %d bounty board checks (one bounty a face, never the same, every bounty in turn, in the open on the hall floor, built with its prompt, in Spanish)", checks))

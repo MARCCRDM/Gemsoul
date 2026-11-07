@@ -39,6 +39,8 @@ local ArenaStreak = require(ReplicatedStorage.Shared.ArenaStreak)
 local BodyHealth = require(script.Parent.BodyHealth)
 local CoinShop = require(script.Parent.CoinShop)
 local GemClient = require(script.Parent.GemClient)
+local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
+local Bounties = require(ReplicatedStorage.Shared.Bounties)
 local IronUi = require(script.Parent.IronUi)
 local MobileLayout = require(script.Parent.MobileLayout)
 local UiKit = require(script.Parent.UiKit)
@@ -360,8 +362,9 @@ local function card(spec)
 	return b
 end
 
--- Ranked first, the big card where the eye lands; Casual and Practice
--- stacked beside it; the Bounty Board a bar along the bottom. Casual and
+-- Ranked first, the big card where the eye lands; Casual and the Bounty
+-- Board (the next bounty to take) stacked beside it; 1v1 Practice a bar
+-- along the bottom. Casual and
 -- Ranked fight on your current stats (Shared.PvPRules: full progression).
 local rankedCard = card({
 	Title = "1v1 RANKED",
@@ -560,29 +563,127 @@ card({
 		run("DuelQueue", "casual")
 	end,
 })
-card({
-	Title = "1v1 PRACTICE",
-	Art = "Duel",
-	Kicker = "VS A RIVAL",
-	Sub = "A rival miner with their own random kit. Coins on a win.",
-	Emblem = "Equipment",
-	Color = P.Gold,
-	Reward = string.format("WIN +%d ◆", Matchmaking.RivalWinCoins),
-	X = 830,
-	Y = 290,
-	W = 290,
-	H = 210,
-	Go = function()
-		require(script.Parent.ArenaScene).enter(true)
-	end,
-})
-
--- The Bounty Board (Client.RiftClient: every Rift boss, alone or with your
--- party), a bar along the bottom: the same board as Brutus's counter.
+-- The Bounty Board as a card under Casual (Client.RiftClient: every Rift
+-- boss, alone or with your party): the bounty to take next (Shared.Bounties
+-- .suggest, from the board's own "RiftPeek"), its portrait, element, level,
+-- threat and weakness; a tap opens the board on it.
+local EMBER = Color3.fromRGB(255, 150, 60)
+local THREAT_NAME = { "I", "II", "III" }
+local bounty = { Boss = nil, At = -math.huge }
+local function hex(c: Color3): string
+	return string.format("#%02X%02X%02X", math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+end
 do
-	local EMBER = Color3.fromRGB(255, 150, 60)
-	local bounty = new("TextButton", {
+	local b = new("TextButton", {
 		Name = "Bounty",
+		Text = "",
+		AutoButtonColor = false,
+		Position = UDim2.fromOffset(830, 290),
+		Size = UDim2.fromOffset(290, 210),
+		BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
+		ClipsDescendants = true,
+		ZIndex = 21,
+	}, stage)
+	UiKit.round(b, 10)
+	local rim = new("UIStroke", { Color = EMBER, Thickness = 2, Transparency = 0.2 }, b)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(EMBER:Lerp(CARD, 0.62), CARD) }, b)
+	local stand = new("Frame", {
+		Name = "Portrait",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 14),
+		Size = UDim2.fromOffset(150, 150),
+		ZIndex = 22,
+	}, b)
+	local function label(value, size, color, font, x, y, w, h)
+		local l = text(b, value, size, color, font)
+		l.Position, l.Size, l.ZIndex = UDim2.fromOffset(x, y), UDim2.fromOffset(w, h), 23
+		l.TextXAlignment, l.TextYAlignment = Enum.TextXAlignment.Left, Enum.TextYAlignment.Top
+		l.TextWrapped, l.RichText = true, true
+		return l
+	end
+	local kicker = label("NEXT BOUNTY", 13, EMBER, IronUi.Heading, 20, 18, 200, 16)
+	local name = label("BOUNTY BOARD", 22, P.Text, IronUi.Heading, 20, 38, 168, 54)
+	local detail = label("Rift bosses, alone or with your party.", 12, P.Dim, IronUi.Heading, 20, 98, 168, 34)
+	local weak = label("", 12, P.Dim, IronUi.Heading, 20, 134, 168, 16)
+	local foot = label("BOUNTY BOARD  ›", 13, EMBER, IronUi.Heading, 20, 178, 150, 16)
+	local tag = label("", 11, P.Dim, IronUi.Heading, 150, 180, 124, 14)
+	tag.TextXAlignment = Enum.TextXAlignment.Right
+	b.MouseEnter:Connect(function()
+		rim.Thickness, rim.Transparency = 3, 0
+	end)
+	b.MouseLeave:Connect(function()
+		rim.Thickness, rim.Transparency = 2, 0.2
+	end)
+	b.Activated:Connect(function()
+		LobbyUI.closePicker()
+		require(script.Parent.RiftClient).openGate(Bounties.Gate, nil, bounty.Boss and bounty.Boss.Id)
+	end)
+	bounty.Card = { Kicker = kicker, Name = name, Detail = detail, Weak = weak, Foot = foot, Tag = tag, Stand = stand }
+end
+-- The boss's portrait (ReplicatedStorage.RiftPortraits: the server builds
+-- it while answering the peek), lit in its element's colour.
+local function bountyPortrait(id: string, tint: Color3)
+	local stand = bounty.Card.Stand
+	task.spawn(function()
+		local folder = ReplicatedStorage:FindFirstChild("RiftPortraits") or ReplicatedStorage:WaitForChild("RiftPortraits", 8)
+		local source = folder and (folder:FindFirstChild(id) or folder:WaitForChild(id, 8))
+		if not source or not source:IsA("Model") or not (bounty.Boss and bounty.Boss.Id == id) then
+			return
+		end
+		stand:ClearAllChildren()
+		pcall(function()
+			require(script.Parent.Showcase).model(stand, source:Clone(), { Tint = tint, Aspect = 1, Fill = 0.9, Turn = 0.6 })
+		end)
+	end)
+end
+-- What the card says, asked again each time PLAY opens (not more than every
+-- 15 seconds).
+local function refreshBounty()
+	if os.clock() - bounty.At < 15 then
+		return
+	end
+	bounty.At = os.clock()
+	task.spawn(function()
+		local ok, result = pcall(GemClient.request, "RiftPeek", Bounties.Gate)
+		if not ok or type(result) ~= "table" or not result.Ok then
+			return
+		end
+		local boss = Bounties.suggest(result.Ladders)
+		local c = bounty.Card
+		if not boss then
+			bounty.Boss = nil
+			return
+		end
+		local changed = not bounty.Boss or bounty.Boss.Id ~= boss.Id
+		bounty.Boss = boss
+		local tint = GemConfig.ElementColors[boss.Element or ""] or EMBER
+		c.Kicker.Text = if (boss.Beaten or 0) > 0 then "GO AGAIN" else "NEXT BOUNTY"
+		c.Name.Text = string.upper(boss.Name or "")
+		c.Detail.Text = string.format(
+			'<font color="%s">%s</font>  ·  LV %d  ·  THREAT %s',
+			hex(tint),
+			string.upper(GemConfig.elementName(boss.Element or "")),
+			boss.Level or 1,
+			THREAT_NAME[boss.Threat or 1] or "I"
+		)
+		local weakness = boss.Weakness and GemConfig.ElementColors[boss.Weakness]
+		c.Weak.Text = if weakness
+			then string.format('WEAK TO <font color="%s">%s</font>', hex(weakness), string.upper(GemConfig.elementName(boss.Weakness)))
+			else ""
+		c.Tag.Text = if boss.Starter then "RECOMMENDED SOLO" elseif boss.Group then "BRING A PARTY" else "SOLO OR PARTY"
+		c.Tag.TextColor3 = if boss.Group then RED else P.Dim
+		if changed then
+			c.Stand:ClearAllChildren()
+			bountyPortrait(boss.Id, tint)
+		end
+	end)
+end
+
+-- 1v1 Practice, a bar along the bottom: a rival miner, coins on a win.
+do
+	local practice = new("TextButton", {
+		Name = "Practice",
 		Text = "",
 		AutoButtonColor = false,
 		Position = UDim2.fromOffset(0, 516),
@@ -590,37 +691,37 @@ do
 		BackgroundColor3 = Color3.new(1, 1, 1), -- the gradient carries the colour
 		ZIndex = 21,
 	}, stage)
-	UiKit.round(bounty, 10)
-	-- (dark, like the cards, with an ember edge on the left: not a slab of orange)
-	new("UIGradient", { Rotation = 0, Color = ColorSequence.new(EMBER:Lerp(CARD, 0.8), CARD) }, bounty)
-	local rim = new("UIStroke", { Color = EMBER, Thickness = 1.5, Transparency = 0.55 }, bounty)
+	UiKit.round(practice, 10)
+	-- (dark, like the cards, with a gold edge on the left)
+	new("UIGradient", { Rotation = 0, Color = ColorSequence.new(P.Gold:Lerp(CARD, 0.82), CARD) }, practice)
+	local rim = new("UIStroke", { Color = P.Gold, Thickness = 1.5, Transparency = 0.55 }, practice)
 	local edge = new("Frame", {
 		Position = UDim2.fromOffset(0, 8),
 		Size = UDim2.new(0, 4, 1, -16),
-		BackgroundColor3 = EMBER,
+		BackgroundColor3 = P.Gold,
 		BorderSizePixel = 0,
 		ZIndex = 22,
-	}, bounty)
+	}, practice)
 	UiKit.round(edge, 2)
-	local name = text(bounty, "BOUNTY BOARD", 20, P.Text, IronUi.Heading)
+	local name = text(practice, "1v1 PRACTICE", 20, P.Text, IronUi.Heading)
 	name.Position, name.Size, name.ZIndex = UDim2.fromOffset(20, 0), UDim2.fromOffset(220, 44), 22
 	name.TextXAlignment = Enum.TextXAlignment.Left
-	local what = text(bounty, "RIFT BOSSES  ·  ALONE OR WITH YOUR PARTY", 13, EMBER, IronUi.Heading)
+	local what = text(practice, "VS A RIVAL MINER  ·  THEIR OWN RANDOM KIT  ·  COINS ON A WIN", 13, P.Gold, IronUi.Heading)
 	what.Position, what.Size, what.ZIndex = UDim2.fromOffset(240, 0), UDim2.fromOffset(600, 44), 22
 	what.TextXAlignment = Enum.TextXAlignment.Left
-	local go = text(bounty, "OPEN  ›", 16, EMBER, IronUi.Heading)
+	local go = text(practice, string.format("WIN +%d ◆   PLAY  ›", Matchmaking.RivalWinCoins), 16, P.Gold, IronUi.Heading)
 	go.AnchorPoint = Vector2.new(1, 0)
-	go.Position, go.Size, go.ZIndex = UDim2.new(1, -20, 0, 0), UDim2.fromOffset(120, 44), 22
+	go.Position, go.Size, go.ZIndex = UDim2.new(1, -20, 0, 0), UDim2.fromOffset(240, 44), 22
 	go.TextXAlignment = Enum.TextXAlignment.Right
-	bounty.MouseEnter:Connect(function()
+	practice.MouseEnter:Connect(function()
 		rim.Thickness, rim.Transparency = 2, 0.1
 	end)
-	bounty.MouseLeave:Connect(function()
+	practice.MouseLeave:Connect(function()
 		rim.Thickness, rim.Transparency = 1.5, 0.55
 	end)
-	bounty.Activated:Connect(function()
+	practice.Activated:Connect(function()
 		LobbyUI.closePicker()
-		require(script.Parent.RiftClient).openGate("Bounty")
+		require(script.Parent.ArenaScene).enter(true)
 	end)
 end
 
@@ -669,6 +770,7 @@ end
 
 function LobbyUI.openPicker()
 	refreshCards()
+	refreshBounty()
 	fitStage()
 	picker.Visible = true
 	bar.Visible = false

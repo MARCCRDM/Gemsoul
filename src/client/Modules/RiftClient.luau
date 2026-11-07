@@ -46,9 +46,10 @@
 	               what you found), the time left to choose running down.
 
 	  RiftClient.start()            watch your Rift attributes (once)
-	  RiftClient.openGate(vein, at?)  the gate's lobby (`at`: the gate, for who's at it);
+	  RiftClient.openGate(vein, at?, focus?)  the gate's lobby (`at`: the gate, for who's at it);
 	                                vein "Bounty": Brutus's bounty board, the same lobby
-	                                with a tab for each biome's ladder (Shared.Bounties)
+	                                with a tab for each biome's ladder (Shared.Bounties),
+	                                on boss `focus`'s tab with it picked if given
 	  RiftClient.gateOpen() -> bool  the gate's lobby up
 	  RiftClient.leave()            through a way home
 	  RiftClient.stripText(state) -> (string, string)   the strip's two lines (pure)
@@ -886,11 +887,23 @@ function RiftClient.enterBounty(bossId: string): (boolean, string?)
 	return false, if ok and type(result) == "table" then result.Message else nil
 end
 
-function RiftClient.openGate(vein: any, at: Vector3?)
+function RiftClient.openGate(vein: any, at: Vector3?, focus: string?)
 	if gateCard and gateCard.Parent or player:GetAttribute("RiftRun") then
 		return
 	end
 	local info = peek(vein)
+	-- (opened on one boss, `focus`: its biome's tab, it picked, if it's open)
+	local startBiome = 1
+	if focus and info.Ladders and not info.Joining then
+		for i, row in info.Ladders do
+			for _, entry in row.Ladder or {} do
+				if entry.Id == focus and entry.Unlocked then
+					startBiome = i
+					info.Biome, info.Element, info.Ladder, info.Next = row.Biome, row.Element, row.Ladder, focus
+				end
+			end
+		end
+	end
 	local ladder = info.Ladder or {}
 	local s = screen()
 	local small = narrow(s)
@@ -1071,7 +1084,7 @@ function RiftClient.openGate(vein: any, at: Vector3?)
 			end
 			redrawCards()
 		end
-		local biome = 1
+		local biome = startBiome
 		local function drawBiomes()
 			if not biomeRow then
 				return

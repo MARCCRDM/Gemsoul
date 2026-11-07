@@ -20,6 +20,8 @@
 	                                frame) and Period (seconds a bounty's up)
 	  Bounties.entries() -> { { Boss, Element, Biome } }   every bounty, in
 	                                the board's order
+	  Bounties.suggest(ladders) -> entry?   the bounty to take next, from a
+	                                "RiftPeek"'s Ladders (the PLAY menu's card)
 	  Bounties.boardAt(now) -> (front, back, share)   what its two faces show
 	                                at `now` (the server's clock), never the
 	                                same one, and how far through its turn
@@ -34,6 +36,44 @@ local Bounties = {}
 Bounties.Gate = "Bounty"
 Bounties.Reach = 16
 Bounties.Poster = Vector2.new(280, 380)
+
+-- Lexicographic: whether key `a` comes before key `b`.
+local function before(a: { number }, b: { number }): boolean
+	for i = 1, #a do
+		if a[i] ~= b[i] then
+			return a[i] < b[i]
+		end
+	end
+	return false
+end
+
+-- The bounty to suggest next, from a peek's ladders ({ { Element, Ladder =
+-- { { Id, Unlocked, Beaten, Threat, Level, Group } } } }): one that's open
+-- and not beaten yet, built for one before one built for a party, then the
+-- lowest threat, then the lowest level; everything beaten, the toughest one
+-- open (to go again). Nil if nothing's open.
+function Bounties.suggest(ladders: any): any
+	local best, bestKey = nil, nil
+	local again, againKey = nil, nil
+	for _, row in if type(ladders) == "table" then ladders else {} do
+		for order, entry in if type(row.Ladder) == "table" then row.Ladder else {} do
+			if entry.Unlocked then
+				if (entry.Beaten or 0) <= 0 then
+					local key = { if entry.Group then 1 else 0, entry.Threat or 1, entry.Level or 0, order }
+					if not bestKey or before(key, bestKey) then
+						best, bestKey = entry, key
+					end
+				else
+					local key = { -(entry.Threat or 1), -(entry.Level or 0) }
+					if not againKey or before(key, againKey) then
+						again, againKey = entry, key
+					end
+				end
+			end
+		end
+	end
+	return best or again
+end
 
 -- Each biome's ladder, in the Loop's order.
 function Bounties.list()
