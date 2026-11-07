@@ -2113,7 +2113,7 @@ function SCENES.Outpost(_info)
 end
 
 -- The basics -----------------------------------------------------------------------------------------
--- A new miner starts on a lesson, a video before the roll (Client.BasicsScreen): five
+-- A new miner's first fight opens on a lesson (Client.BasicsScreen): five
 -- of the narrator's lines (Client.Narration's Basics...), each its own
 -- scene here, moving on phrase by phrase in time with the voice (`cues`:
 -- when each phrase starts). The first phrase names the topic big; the rest

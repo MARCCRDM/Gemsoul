@@ -144,7 +144,7 @@ for _, board in Led.Boards do
 	check(#Led.scenes(board, nil) >= 1, board .. " broke with no data")
 end
 
--- The basics (a new miner's video, Client.BasicsScreen): each line's
+-- The basics (a new miner's first fight, Client.BasicsScreen): each line's
 -- scene on screen all the way through, the topic named big on its first
 -- phrase and something else showing once the next one starts; a phone's
 -- and a keyboard's.
@@ -168,4 +168,4 @@ for _, touch in { false, true } do
 	end
 end
 
-print("PASS: " .. checks .. " LED screen checks (the font, the art, text where it's put, every board's scenes on screen and moving, the kaiju and bosses shown, the cartoons on the screens, the basics' video)")
+print("PASS: " .. checks .. " LED screen checks (the font, the art, text where it's put, every board's scenes on screen and moving, the kaiju and bosses shown, the cartoons on the screens, the first fight's basics)")

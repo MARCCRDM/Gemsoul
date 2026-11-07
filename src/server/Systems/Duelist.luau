@@ -133,6 +133,7 @@ local function clearTutorial(owner: Player)
 	owner:SetAttribute("TutorialGoal", nil)
 	owner:SetAttribute("FastTutorial", nil)
 	owner:SetAttribute("FirstFight", nil)
+	owner:SetAttribute("Lesson", nil)
 end
 local starting: { [Player]: boolean } = {}
 local idCounter = 0
@@ -157,6 +158,7 @@ end
 -- An intro rival casts them whenever one's ready (duel.Showcase), at least
 -- ShowcaseGap seconds apart, at ShowcasePower of their damage (a new
 -- player sees the moves without being flattened by them).
+Duelist.LessonHold = 90 -- seconds a first fight's partner holds still for the basics, at most (the lesson's about 60)
 Duelist.ShowcaseGap = 4
 Duelist.ShowcasePower = 0.75
 function Duelist.showcaseSurges(loadout, pick: (number) -> number): { string }
@@ -1682,6 +1684,14 @@ local function think(enemy, now: number)
 	if duel.Tutorial and tutorialThink(duel, enemy, now, target, distance, dir) then
 		return
 	end
+	-- A new miner watching the basics (Client.BasicsScreen: the Lesson
+	-- attribute): the partner holds still, guard down, facing them.
+	if duel.FirstFight and duel.Owner:GetAttribute("Lesson") then
+		dropGuard(enemy, now)
+		humanoid:MoveTo(enemy.Root.Position)
+		face(enemy.Root, target.Position)
+		return
+	end
 	local color = GemConfig.ElementColors[duel.Element] or Color3.fromRGB(255, 190, 80)
 
 	-- Its lingering pools (Toxic Cloud) tick on the player standing in them.
@@ -3113,6 +3123,28 @@ function Duelist.start()
 		else
 			tutorialProgress(duel, kind)
 		end
+	end)
+	-- The first fight's lesson (Client.BasicsScreen): its partner holds
+	-- still while it plays (on), or fights (off: done, or they hit it).
+	-- Only in a first fight, and never longer than LessonHold seconds.
+	local lessons: { [Player]: number } = {}
+	Shop.register("BasicsLesson", function(player, on)
+		if on == true and player:GetAttribute("FirstFight") == true then
+			local mine = (lessons[player] or 0) + 1
+			lessons[player] = mine
+			player:SetAttribute("Lesson", true)
+			task.delay(Duelist.LessonHold, function()
+				if lessons[player] == mine then
+					player:SetAttribute("Lesson", nil)
+				end
+			end)
+		else
+			player:SetAttribute("Lesson", nil)
+		end
+		return Shop.reply(true, "")
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lessons[player] = nil
 	end)
 	Shop.register("CombatTutorialSkip", function(player)
 		local duel = duels[player]
