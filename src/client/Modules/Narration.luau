@@ -39,11 +39,11 @@ Narration.Ids = {
 	FirstDungeon = 125560006550856, -- first_dungeon.mp3
 	KaijuTeam = 133613092362157, -- kaiju_team.mp3
 	RotMinions = 71254270011218, -- rot_minions.mp3
-	BasicsAttack = 0, -- basics_attack.mp3
-	BasicsBlock = 0, -- basics_block.mp3
-	BasicsAbilities = 0, -- basics_abilities.mp3
-	BasicsDodge = 0, -- basics_dodge.mp3
-	BasicsResources = 0, -- basics_resources.mp3
+	BasicsAttack = 86694093254227, -- basics_attack.mp3
+	BasicsBlock = 90769068160197, -- basics_block.mp3
+	BasicsAbilities = 80319102339818, -- basics_abilities.mp3
+	BasicsDodge = 114278772210482, -- basics_dodge.mp3
+	BasicsResources = 119618357055313, -- basics_resources.mp3
 }
 Narration.Lines = {
 	TrainingBegins = "Welcome, Miner. Your training begins now.",

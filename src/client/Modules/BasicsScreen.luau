@@ -13,6 +13,9 @@
 	reads the player's Lesson attribute); the moment they land a hit on it
 	the hold lets go (they're ready), the lesson carrying on.
 
+	A SKIP button (over the caption) cuts the line being read and goes on to
+	the next one; on the last, it ends the lesson.
+
 	  BasicsScreen.run(onLine?)   plays it through (yields); `onLine(name)`
 	                              as each line starts (FirstFight's arrows)
 	  BasicsScreen.Size, .Past, .Lift   the screen's size and where it stands
@@ -26,6 +29,7 @@ local UserInputService = game:GetService("UserInputService")
 local Led = require(ReplicatedStorage.Shared.Led)
 local GemClient = require(script.Parent.GemClient)
 local Narration = require(script.Parent.Narration)
+local UiKit = require(script.Parent.UiKit)
 
 local BasicsScreen = {}
 BasicsScreen.Size = Vector2.new(26, 10.8) -- studs (the LEDs' 72 x 30)
@@ -181,6 +185,33 @@ local function rise(screen, at: CFrame, away: boolean)
 	end
 end
 
+-- SKIP: over the narrator's caption, centred (clear of the HUD's buttons).
+local function skipButton(onSkip: () -> ()): ScreenGui
+	local gui = UiKit.gui("BasicsSkip", 31)
+	local button = Instance.new("TextButton")
+	button.Name = "Skip"
+	button.AnchorPoint = Vector2.new(0.5, 1)
+	button.Position = UDim2.new(0.5, 0, 1, -224)
+	button.Size = UDim2.fromOffset(132, 40)
+	button.BackgroundColor3 = Color3.fromRGB(8, 10, 16)
+	button.BackgroundTransparency = 0.2
+	button.AutoButtonColor = true
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 18
+	button.TextColor3 = Color3.fromRGB(255, 202, 91)
+	button.Text = "SKIP  \u{203A}"
+	button.Parent = gui
+	UiKit.round(button, 8)
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = Color3.fromRGB(255, 202, 91)
+	stroke.Transparency = 0.4
+	stroke.Thickness = 1.5
+	stroke.Parent = button
+	button.Activated:Connect(onSkip)
+	return gui
+end
+
 local running = false
 
 function BasicsScreen.run(onLine: ((string) -> ())?)
@@ -211,6 +242,10 @@ function BasicsScreen.run(onLine: ((string) -> ())?)
 		end
 	end
 	rise(screen, at, false)
+	local skipped = false
+	local skipGui = skipButton(function()
+		skipped = true
+	end)
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	for _, name in Led.BasicsOrder do
 		if player:GetAttribute("FirstFight") ~= true then
@@ -224,7 +259,8 @@ function BasicsScreen.run(onLine: ((string) -> ())?)
 		local voiced = Narration.play(name) > 0
 		local started = os.clock()
 		local last = -1
-		while player:GetAttribute("FirstFight") == true do
+		skipped = false
+		while player:GetAttribute("FirstFight") == true and not skipped do
 			local t = if voiced then Narration.elapsed() else os.clock() - started
 			if t >= seconds or os.clock() - started > seconds + 4 then
 				break
@@ -242,8 +278,13 @@ function BasicsScreen.run(onLine: ((string) -> ())?)
 			end
 			RunService.RenderStepped:Wait()
 		end
-		task.wait(0.35)
+		if skipped then
+			Narration.stop()
+		else
+			task.wait(0.35)
+		end
 	end
+	skipGui:Destroy()
 	letGo()
 	if onLine then
 		pcall(onLine, nil)
