@@ -1,7 +1,9 @@
 local ArenaDrop = require(script.Parent.ArenaDrop)
 -- Joining the PvP Arena is explicit; training visitors cannot receive player damage.
--- A Training session (a first fight, the intro rounds, practice) is fought
--- in a private copy of the Arena (Server.PrivateArenas): nobody else's.
+-- A Training session (a first fight, the intro rounds) and a practice bout
+-- against a rival (PLAY's 1v1 PRACTICE) are fought in a ring of Arena Row
+-- in the Outpost, else a private copy of the Arena (Server.PrivateArenas):
+-- nobody else's.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
@@ -32,6 +34,8 @@ function ArenaSessions.pullSpot(center: Vector3, radius: number, position: Vecto
 	local inward = if offset.Magnitude > 0.1 then offset.Unit else Vector3.new(0, 0, 1)
 	return center + inward * math.max(0, radius - ArenaSessions.PullIn) + Vector3.new(0, 4, 0)
 end
+-- The rings practice against a rival takes first (Shared.Outpost.Settlement.Stages).
+ArenaSessions.PracticeRings = { "DuelRingNorthWest", "DuelRingNorthEast", "DuelRingWest", "DuelRingEast" }
 local busy = {}
 local function enter(player, pvp)
 	if busy[player] or player:GetAttribute("CombatSession") then
@@ -50,9 +54,11 @@ local function enter(player, pvp)
 	if not PlayerData.get(player) or not humanoid or humanoid.Health <= 0 or typeof(center) ~= "Vector3" then
 		return Shop.reply(false, "The Arena isn't ready yet.")
 	end
-	if not pvp then
-		center = PrivateArenas.claim(player) or center
-	end
+	-- In a ring of Arena Row, out in the Outpost: training (a new miner's
+	-- intro fights) the Intro Ring first; practice against a rival (PLAY's
+	-- 1v1 PRACTICE) the duel rings first, leaving the Intro Ring and the
+	-- Grand Arena for the intro and the duels.
+	center = PrivateArenas.claim(player, if pvp then ArenaSessions.PracticeRings else nil) or center
 	busy[player] = true
 	ArenaDrop.prepare(player)
 	local angle = math.rad((player.UserId % 8) * 45)
@@ -83,7 +89,7 @@ local function enter(player, pvp)
 	return Shop.reply(
 		true,
 		if pvp
-			then "PvP Arena: a rival miner steps in. Other Arena fighters can attack you too."
+			then "Practice: a rival miner steps in. Win for coins."
 			else "Training Arena: a sparring partner steps in. Player damage is off."
 	)
 end

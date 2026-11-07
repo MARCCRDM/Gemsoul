@@ -148,6 +148,13 @@ check(PrivateArenas.claim(g) == sa, "The Intro Ring wasn't taken again")
 for _, who in { e, f, g } do
 	PrivateArenas.release(who)
 end
+-- A practice bout asks for its rings first (ArenaSessions.PracticeRings).
+local pr = player(30)
+check(PrivateArenas.claim(pr, { "GrandArena", "IntroRing" }) == sb, "A fight didn't take the ring it asked for first")
+local pr2 = player(31)
+check(PrivateArenas.claim(pr2, { "GrandArena" }) == sa, "With its ring taken, a fight didn't take another")
+PrivateArenas.release(pr)
+PrivateArenas.release(pr2)
 -- A duel: one ring for both fighters, the one it asks for first; free again
 -- only once they're both out of it; nil when every ring's taken.
 local h, i, j, k = player(8), player(9), player(10), player(11)

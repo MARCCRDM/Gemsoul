@@ -133,10 +133,10 @@ Outpost.Settlement = {
 	-- Screen: its face in studs, how high its bottom edge hangs, how far it
 	-- tilts down (degrees).
 	Screens = {
-		{ Board = "Ranked", X = 0, Z = -440, Facing = 90 },
-		{ Board = "Live", X = 440, Z = 0, Facing = 180 },
-		{ Board = "Miners", X = 0, Z = 440, Facing = 270 },
-		{ Board = "Hunters", X = -440, Z = 0, Facing = 0 },
+		{ Board = "Guide", X = 0, Z = -440, Facing = 90 },
+		{ Board = "Elements", X = 440, Z = 0, Facing = 180 },
+		{ Board = "Bounties", X = 0, Z = 440, Facing = 270 },
+		{ Board = "Kaiju", X = -440, Z = 0, Facing = 0 },
 	},
 	Screen = { Width = 144, Height = 60, Lift = 70, Tilt = 10 },
 	-- (x, z points: from the ring round the field to the plaza, round the

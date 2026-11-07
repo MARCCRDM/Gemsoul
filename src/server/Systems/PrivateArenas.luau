@@ -17,14 +17,15 @@
 	ArenaBarrier), and the floor counts as the Arena (Shared.Combat.inArena,
 	by each copy's Center attribute under workspace.PrivateArenas).
 
-	  PrivateArenas.claim(player) -> Vector3?   the floor's centre of a copy
-	                                            of their own (nil if there's
-	                                            no Arena to copy)
+	  PrivateArenas.claim(player, prefer?) -> Vector3?   the floor's centre
+	                                            of a ring of Arena Row (`prefer`'s
+	                                            first, by name), else a copy of
+	                                            their own (nil if there's no
+	                                            Arena to copy)
 	  PrivateArenas.claimStage(players, prefer?) -> Vector3?   a free ring of
 	                                            Arena Row for all of them (a
 	                                            duel), `prefer` (its name) first
 	                                            (nil: none free)
-	  PrivateArenas.rings() -> { { Name, Fighters } }   Arena Row now
 	  PrivateArenas.release(player)             their copy, back to the spares
 	                                            (a ring: free once all its
 	                                            fighters are out)
@@ -247,13 +248,27 @@ function PrivateArenas.stage(name: string, ground: Vector3, reach: number): Vect
 	return target
 end
 
-function PrivateArenas.claim(player: Player): Vector3?
+function PrivateArenas.claim(player: Player, prefer: { string }?): Vector3?
 	local mine = owned[player]
 	if mine and mine.Parent then
 		return mine:GetAttribute("Center")
 	end
-	-- Arena Row first, out in the open, when one's free.
+	-- Arena Row first, out in the open, when one's free (`prefer`'s rings,
+	-- in its order, before the rest in theirs).
+	local order = {}
+	for _, name in prefer or {} do
+		for _, stage in stages do
+			if stage.Name == name then
+				table.insert(order, stage)
+			end
+		end
+	end
 	for _, stage in stages do
+		if not table.find(order, stage) then
+			table.insert(order, stage)
+		end
+	end
+	for _, stage in order do
 		if not stage.Owner and stage.Model.Parent then
 			stage.Owner = player
 			stage.Holders = { [player] = true }
@@ -345,21 +360,6 @@ function PrivateArenas.release(player: Player)
 		used[model:GetAttribute("Slot")] = nil
 		model:Destroy()
 	end
-end
-
--- Arena Row's rings as they are now, in order: { Name, Fighters = { name } }
--- (Server.Boards: the LED screens' live board).
-function PrivateArenas.rings(): { { Name: string, Fighters: { string } } }
-	local list = {}
-	for _, stage in stages do
-		local fighters = {}
-		for player in stage.Holders do
-			table.insert(fighters, player.DisplayName)
-		end
-		table.sort(fighters)
-		table.insert(list, { Name = stage.Name, Fighters = fighters })
-	end
-	return list
 end
 
 -- Who has one now (for tests and the DEV tools).

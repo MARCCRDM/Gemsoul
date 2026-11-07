@@ -1,25 +1,26 @@
 --[[
 	The Outpost's LED screens, lit (World.OutpostWorld builds them: giants
 	in the sky round the whole settlement, facing in, each a LedPanel with
-	its Board attribute; Shared.Led draws the pages; Server.Boards sends
-	their data on ReplicatedStorage.LedBoards).
+	its Board attribute; Shared.Led draws their scenes, from the game's own
+	kaiju and bosses: Shared.Kaiju, Shared.RiftRun).
 
 	Every screen is a grid of LEDs (Led.W x Led.H), each its own dot, dim
-	when it's off. A screen shows its board's pages one at a time, Hold
-	seconds each, the next wiping in across it column by column. A screen's
-	LEDs are only built while you're within Reach of it (and go past Drop).
+	when it's off. A screen plays its board's scenes one after another,
+	animated (Fps frames a second, only the LEDs that change are touched),
+	the next scene wiping in across it column by column. A screen's LEDs are
+	only built while you're within Reach of it (and go past Drop).
 
 	  LedScreens.step(dt)   each frame while you're in the Outpost
 	  LedScreens.clear()    all of them off (you've left)
+	  LedScreens.info() -> Led.scenes' info (the kaiju and bosses shown)
 ]]
-local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Led = require(ReplicatedStorage.Shared.Led)
 
 local LedScreens = {}
-LedScreens.Hold = 5 -- seconds a page stays up
-LedScreens.Wipe = 0.45 -- seconds for the next to wipe across
+LedScreens.Fps = 10 -- frames a second
+LedScreens.Wipe = 0.45 -- seconds for the next scene to wipe across
 LedScreens.Reach = 1100 -- studs: built within this (they're seen from all over the Outpost)
 LedScreens.Drop = 1250 -- studs: taken down past this
 LedScreens.Every = 0.5 -- seconds between looks round
@@ -28,11 +29,11 @@ LedScreens.RowsPerFrame = 6 -- LED rows built a frame (no hitch)
 
 local OFF = Color3.fromRGB(22, 25, 34)
 
--- [panel] = { Gui, Dots = { Frame }, Built, Board, Pages, Page, Shown = { rgb }, Since, Wiping }
+-- [panel] = { Gui, Back, Dots, BuiltRows, Board, Scenes, Scene, T, Frame, Shown, Wiping }
 local screens: { [BasePart]: any } = {}
 local since = math.huge
 local folder: Instance? = nil
-local data: { [string]: any } = {}
+local cached: any = nil
 
 local function color(rgb: number?): Color3
 	if not rgb then
@@ -41,22 +42,28 @@ local function color(rgb: number?): Color3
 	return Color3.fromRGB(rgb // 65536 % 256, rgb // 256 % 256, rgb % 256)
 end
 
-local function boardData(board: string): any
-	local box = ReplicatedStorage:FindFirstChild("LedBoards")
-	local raw = box and box:GetAttribute(board)
-	if type(raw) ~= "string" then
-		return nil
+-- The kaiju and bosses the screens show, from the game's data (once).
+function LedScreens.info()
+	if cached then
+		return cached
 	end
-	local ok, decoded = pcall(HttpService.JSONDecode, HttpService, raw)
-	return if ok then decoded else nil
-end
-
-local function makePages(screen)
-	local raw = boardData(screen.Board)
-	screen.Pages = Led.pages(screen.Board, raw)
-	if screen.Page > #screen.Pages then
-		screen.Page = 1
+	local okK, Kaiju = pcall(require, ReplicatedStorage.Shared.Kaiju)
+	local okR, RiftRun = pcall(require, ReplicatedStorage.Shared.RiftRun)
+	local order = {}
+	if okR and RiftRun and RiftRun.Ladders then
+		for _, element in { "Fire", "Frost", "Shock", "Poison" } do
+			for _, id in RiftRun.Ladders[element] or {} do
+				table.insert(order, id)
+			end
+		end
 	end
+	cached = Led.catalog(function(name)
+		local species = okK and Kaiju and Kaiju.Species and Kaiju.Species[name]
+		return species and species.Role
+	end, function(id)
+		return okR and RiftRun and RiftRun.bossById(id)
+	end, order)
+	return cached
 end
 
 local function build(panel: BasePart)
@@ -76,20 +83,20 @@ local function build(panel: BasePart)
 	back.Parent = gui
 	gui.Adornee = panel
 	gui.Parent = panel
-	local screen = {
+	return {
 		Panel = panel,
 		Gui = gui,
 		Back = back,
 		Dots = {},
 		BuiltRows = 0,
-		Board = panel:GetAttribute("Board") or "Ranked",
-		Page = 1,
+		Board = panel:GetAttribute("Board") or "Guide",
+		Scenes = Led.scenes(panel:GetAttribute("Board") or "Guide", LedScreens.info()),
+		Scene = 1,
+		T = 0,
+		Frame = math.huge,
 		Shown = {},
-		Since = 0,
 		Wiping = nil,
 	}
-	makePages(screen)
-	return screen
 end
 
 -- A few rows of LEDs more (all of them built over a few frames).
@@ -112,13 +119,13 @@ local function buildRows(screen)
 	screen.BuiltRows = last
 end
 
--- Lights columns [from, to) of the screen as page `page` has them.
-local function paint(screen, page, from: number, to: number)
+-- Lights columns [from, to) of the screen as `frame` has them.
+local function paint(screen, frame, from: number, to: number)
 	local w = Led.W
 	for x = from, math.min(to, w) - 1 do
 		for y = 0, Led.H - 1 do
 			local i = y * w + x + 1
-			local want = page and page.P[i]
+			local want = frame and frame.P[i]
 			if screen.Shown[i] ~= want then
 				screen.Shown[i] = want
 				local dot = screen.Dots[i]
@@ -129,6 +136,7 @@ local function paint(screen, page, from: number, to: number)
 		end
 	end
 end
+LedScreens._paint = paint
 
 local function drop(panel: BasePart)
 	local screen = screens[panel]
@@ -141,6 +149,35 @@ end
 function LedScreens.clear()
 	for panel in screens do
 		drop(panel)
+	end
+end
+
+-- One step of a screen's show: the scene's frame now (a few a second), the
+-- next scene when this one's over, wiping in.
+local function play(screen, dt: number)
+	screen.T += dt
+	local current = screen.Scenes[screen.Scene]
+	if screen.T >= current.Duration then
+		screen.Scene = screen.Scene % #screen.Scenes + 1
+		screen.T = 0
+		screen.Wiping = 0
+		current = screen.Scenes[screen.Scene]
+	end
+	local frame = math.floor(screen.T * LedScreens.Fps)
+	if frame == screen.Frame and not screen.Wiping then
+		return
+	end
+	screen.Frame = frame
+	local ok, buffer = pcall(current.Draw, frame / LedScreens.Fps)
+	if not ok then
+		return
+	end
+	if screen.Wiping then
+		local upto = math.floor(math.clamp(screen.T / LedScreens.Wipe, 0, 1) * Led.W + 0.5)
+		paint(screen, buffer, 0, upto)
+		screen.Wiping = if upto >= Led.W then nil else upto
+	else
+		paint(screen, buffer, 0, Led.W)
 	end
 end
 
@@ -174,29 +211,9 @@ function LedScreens.step(dt: number)
 	for _, screen in screens do
 		if screen.BuiltRows < Led.H then
 			buildRows(screen)
-			if screen.BuiltRows >= Led.H then
-				paint(screen, screen.Pages[screen.Page], 0, Led.W)
-			end
 			continue
 		end
-		screen.Since += dt
-		if screen.Wiping then
-			-- (the next page wiping in, column by column)
-			local t = math.clamp(screen.Since / LedScreens.Wipe, 0, 1)
-			local upto = math.floor(t * Led.W + 0.5)
-			paint(screen, screen.Pages[screen.Page], screen.Wiping, upto)
-			screen.Wiping = upto
-			if t >= 1 then
-				screen.Wiping = nil
-				screen.Since = 0
-			end
-		elseif screen.Since >= LedScreens.Hold then
-			-- the next page, its board's data as it is now
-			makePages(screen)
-			screen.Page = screen.Page % math.max(1, #screen.Pages) + 1
-			screen.Since = 0
-			screen.Wiping = 0
-		end
+		play(screen, dt)
 	end
 end
 

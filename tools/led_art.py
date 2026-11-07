@@ -24,7 +24,9 @@ COLOURS = 8  # per picture
 ALPHA = 110  # under this, the LED is off
 DIGITS = "0123456789abcde"
 
-# name: the picture
+LED = ROOT / "assets/images/led"  # the kaiju and bosses, rendered from their models
+
+# name: the picture, or (the picture, LEDs across and down)
 PICTURES = {
     "FireGem": ART / "gem-Fire.png",
     "FrostGem": ART / "gem-Frost.png",
@@ -33,7 +35,15 @@ PICTURES = {
     "Chest": ART / "chest.png",
     "Helmet": ART / "helmet.png",
     "Shield": ART / "shield.png",
+    "SmallFire": (ART / "gem-Fire.png", 9),
+    "SmallFrost": (ART / "gem-Frost.png", 9),
+    "SmallShock": (ART / "gem-Shock.png", 9),
+    "SmallPoison": (ART / "gem-Poison.png", 9),
 }
+# (every kaiju and boss picture there, as Kaiju<Name> and Boss<Id>)
+for _picture in sorted(LED.glob("*.png")):
+    _kind, _name = _picture.stem.split("_", 1)
+    PICTURES[("Kaiju" if _kind == "k" else "Boss") + _name] = (_picture, 28)
 
 
 def convert(path: Path, size: int = SIZE):
@@ -91,8 +101,9 @@ def luau() -> str:
         "local LedArt = {}",
         "",
     ]
-    for name, path in PICTURES.items():
-        w, h, colours, rows = convert(path)
+    for name, spec in PICTURES.items():
+        path, size = spec if isinstance(spec, tuple) else (spec, SIZE)
+        w, h, colours, rows = convert(path, size)
         palette = ", ".join("{ %d, %d, %d }" % c for c in colours)
         out.append(f"LedArt.{name} = {{")
         out.append(f"\tW = {w},")

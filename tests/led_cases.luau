@@ -1,5 +1,5 @@
 -- The Outpost's LED screens: the font, the art (tools/led_art.py's) and each
--- board's pages (Shared.Led), and the boards' data (Server.Boards).
+-- board's animated scenes (Shared.Led).
 -- Run by tests/run_led.py (needs lune).
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -66,42 +66,61 @@ check(w == 7 and Led.get(b, 0, 0) == 0xFF0000 and Led.get(b, 3, 0) == nil and Le
 Led.text(b, Led.W - 2, Led.H - 2, "WWW", 1) -- (off the edge: clipped, no error)
 check(Led.get(b, Led.W - 2, Led.H - 1) ~= nil, "Text at the edge wasn't drawn")
 
--- Every page fits: nothing lit outside the screen, and each page says something.
-local function lit(page)
+-- The scenes: every board's, every frame of them on the screen, never blank
+-- for long, and moving (they're animations, not pages).
+local info = Led.catalog(function(name)
+	return ({ Razorback = "Ranged", Bulwark = "Warrior", Skyjelly = "Warden" })[name]
+end, function(id)
+	return ({
+		Drago = { Name = "Bombardiro Drago", Element = "Fire", Weakness = "Frost", Threat = 1 },
+		SahurTrio = { Name = "Tung Tung Tung Sahur", Element = "Fire", Weakness = "Frost", Threat = 3 },
+	})[id]
+end, { "SahurTrio", "Drago" })
+check(#info.Kaiju == 3 and info.Kaiju[1].Art and LedArt[info.Kaiju[1].Art], "The kaiju shown aren't the ones with pictures and data")
+check(#info.Bosses == 2 and info.Bosses[1].Name == "Tung Tung Tung Sahur", "The bosses aren't in the order given")
+local function lit(frame)
 	local n = 0
-	for i in page.P do
-		check(i >= 1 and i <= Led.W * Led.H, "A page lights an LED off the screen")
+	for i in frame.P do
+		check(i >= 1 and i <= Led.W * Led.H, "A frame lights an LED off the screen")
 		n += 1
 	end
 	return n
 end
-local rows = {}
-for i = 1, 14 do
-	table.insert(rows, { Name = "Miner" .. i, Value = 2000 - i * 37 })
-end
-local samples = {
-	Ranked = { Rows = rows },
-	Miners = { Turn = 3, Rows = rows },
-	Hunters = { Rows = {} },
-	Live = { Rings = { { Name = "IntroRing", Fighters = { "Rookie" } }, { Name = "DuelRingWest", Fighters = {} }, { Name = "DuelRingEast", Fighters = {} }, { Name = "GrandArena", Fighters = { "Ana", "Ben" } } } },
-}
 for _, board in Led.Boards do
-	local pages = Led.pages(board, samples[board])
-	check(#pages >= 2, board .. " has nothing to show one at a time")
-	for _, page in pages do
-		check(lit(page) > 20, board .. " has a blank page")
+	local scenes = Led.scenes(board, info)
+	check(#scenes >= 3, board .. " has too few scenes")
+	local moving = 0
+	for k, scene in scenes do
+		check(scene.Duration >= 3 and scene.Duration <= 15, board .. " scene " .. k .. " is too short or long")
+		local last = nil
+		for step = 0, 9 do
+			local frame = scene.Draw(scene.Duration * step / 10)
+			check(lit(frame) > 15, board .. " scene " .. k .. " goes blank")
+			local key = table.concat((function()
+				local t = {}
+				for i = 1, Led.W * Led.H, 7 do
+					t[#t + 1] = tostring(frame.P[i] or 0)
+				end
+				return t
+			end)(), ",")
+			if last and key ~= last then
+				moving += 1
+			end
+			last = key
+		end
 	end
+	check(moving >= #scenes, board .. "'s scenes hardly move")
 end
--- A ladder: a title, then four to a page, twelve at most.
-check(#Led.pages("Ranked", samples.Ranked) == 1 + 3, "The ranked ladder isn't four to a page, twelve at most")
-check(#Led.pages("Hunters", samples.Hunters) == 2, "An empty ladder doesn't say how to get on it")
--- Live: the rings' page, then one for each fight on.
-check(#Led.pages("Live", samples.Live) == 3, "Live doesn't show each fight on")
-check(#Led.pages("Live", { Rings = { {Name="IntroRing",Fighters={}}, {Name="DuelRingWest",Fighters={}}, {Name="DuelRingEast",Fighters={}}, {Name="DuelRingNorthWest",Fighters={}}, {Name="DuelRingNorthEast",Fighters={}}, {Name="GrandArena",Fighters={}} } }) == 3, "Six rings aren't four to a page")
-check(#Led.pages("Live", { Rings = {} }) == 2, "Live with nothing on doesn't invite a duel")
--- No data yet (the server hasn't sent any): still pages, no error.
+-- The boards that show them: a scene for each kaiju and each boss.
+check(#Led.scenes("Bounties", info) == 2 + #info.Bosses, "The Bounty Board doesn't show each boss")
+check(#Led.scenes("Kaiju", info) == 2 + #info.Kaiju, "The kaiju board doesn't show each kaiju")
+-- Every element named, in its own colour.
+for _, element in { "Fire", "Frost", "Shock", "Poison" } do
+	check(Led.ElementNames[element] and Led.ElementColors[element], "No name or colour for " .. element)
+end
+-- Nothing to show yet: still a scene, no error.
 for _, board in Led.Boards do
-	check(#Led.pages(board, nil) >= 1, board .. " broke with no data")
+	check(#Led.scenes(board, nil) >= 1, board .. " broke with no data")
 end
 
-print("PASS: " .. checks .. " LED screen checks (the font, the art, text where it's put, every board's pages, no data yet)")
+print("PASS: " .. checks .. " LED screen checks (the font, the art, text where it's put, every board's scenes on screen and moving, the kaiju and bosses shown)")
