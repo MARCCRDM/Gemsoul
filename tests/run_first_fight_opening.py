@@ -1,4 +1,4 @@
-"""Round 1's opening (Client FirstFight): the welcome, then the controls' line with arrows on Q/E/R and ATTACK/BLOCK/DODGE."""
+"""Round 1's opening (Client FirstFight): the welcome, then the basics on their LED (arrows on ATTACK, BLOCK, Q/E/R, DODGE)."""
 from pathlib import Path
 import shutil, subprocess
 

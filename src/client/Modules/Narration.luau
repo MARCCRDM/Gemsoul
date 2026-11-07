@@ -7,12 +7,18 @@
 	  "Controls"        right after it: the ability keys and combat buttons
 	  "FirstDungeon"    arriving in the first dungeon
 	  "KaijuTeam"       the starter kaiju roll (the spin waits for it)
+	  "Basics..."       the first fight's lesson on its LED (Client.BasicsScreen):
+	                    Attack, Block, Abilities, Dodge, Resources
 
 	  Narration.play(name, quiet?) -> seconds   reads it (once a visit), returns how
 	                                    long it takes (0: already read)
 	  Narration.say(name)               the same, and waits till it's done
 	  Narration.stop()
 	  Narration.voiced(name) -> bool     its voice is uploaded (Ids)
+	  Narration.elapsed() -> seconds     into the line being read (the sound's
+	                                    own place while it plays)
+	  Narration.Phrases, .Cues          a line read phrase by phrase: its
+	                                    caption follows them (the basics)
 
 	Roblox only plays uploaded audio: tools/upload_audio.py uploads the
 	files and writes each id below. Until a line's id is set, only its
@@ -33,6 +39,11 @@ Narration.Ids = {
 	FirstDungeon = 125560006550856, -- first_dungeon.mp3
 	KaijuTeam = 133613092362157, -- kaiju_team.mp3
 	RotMinions = 71254270011218, -- rot_minions.mp3
+	BasicsAttack = 0, -- basics_attack.mp3
+	BasicsBlock = 0, -- basics_block.mp3
+	BasicsAbilities = 0, -- basics_abilities.mp3
+	BasicsDodge = 0, -- basics_dodge.mp3
+	BasicsResources = 0, -- basics_resources.mp3
 }
 Narration.Lines = {
 	TrainingBegins = "Welcome, Miner. Your training begins now.",
@@ -40,13 +51,36 @@ Narration.Lines = {
 	FirstDungeon = "Miner... we don't know what these monsters are. But they come from a different dimension. And they are stealing our resources, and destroying our worlds.",
 	KaijuTeam = "These are your kaiju. These powerful beasts will defend you, at all times. Train them... and heal them with gemsouls.",
 	RotMinions = "These are rot minions. They still try to steal your gems. Your kaijus are trained to fight and defend you.",
+	BasicsAttack = "First, attacking. Press attack to swing your weapon. Keep swinging to chain a combo. Hold it down, for a heavy blow.",
+	BasicsBlock = "Blocking. Hold block to raise your guard. Block just before a hit lands... for a perfect block.",
+	BasicsAbilities = "Abilities. Your gems give you three of them, on Q, E and R. Each one costs charge. Cast them, to turn a fight.",
+	BasicsDodge = "Dodging. Press dodge to roll out of the way. Save it for the big attacks.",
+	BasicsResources = "Charge, and stamina. Every hit you land fills your charge. The blue bar. Your abilities spend it. Swinging, blocking and dodging use stamina. The green bar. Ease off, and it refills. Now. Show me what you've got.",
 }
 -- How long each one plays (seconds, the files' lengths).
-Narration.Seconds = { TrainingBegins = 3.5, Controls = 5.9, FirstDungeon = 9.7, KaijuTeam = 7.7, RotMinions = 7.5 }
+Narration.Seconds = { TrainingBegins = 3.5, Controls = 5.9, FirstDungeon = 9.7, KaijuTeam = 7.7, RotMinions = 7.5, BasicsAttack = 10.85, BasicsBlock = 8.94, BasicsAbilities = 11.07, BasicsDodge = 7.35, BasicsResources = 18.3 }
+-- A line read phrase by phrase (the basics: Client.BasicsScreen), when each
+-- phrase starts (seconds into it): its caption follows the phrase, and the
+-- LED its cue.
+Narration.Phrases = {
+	BasicsAttack = { "First, attacking.", "Press attack to swing your weapon.", "Keep swinging to chain a combo.", "Hold it down, for a heavy blow." },
+	BasicsBlock = { "Blocking.", "Hold block to raise your guard.", "Block just before a hit lands...", "for a perfect block." },
+	BasicsAbilities = { "Abilities.", "Your gems give you three of them, on Q, E and R.", "Each one costs charge.", "Cast them, to turn a fight." },
+	BasicsDodge = { "Dodging.", "Press dodge to roll out of the way.", "Save it for the big attacks." },
+	BasicsResources = { "Charge, and stamina.", "Every hit you land fills your charge. The blue bar.", "Your abilities spend it.", "Swinging, blocking and dodging use stamina. The green bar.", "Ease off, and it refills.", "Now. Show me what you've got." },
+}
+Narration.Cues = {
+	BasicsAttack = { 0.15, 2.34, 5.29, 8.01 },
+	BasicsBlock = { 0.15, 1.56, 4.33, 6.93 },
+	BasicsAbilities = { 0.15, 1.78, 6.08, 8.58 },
+	BasicsDodge = { 0.15, 1.59, 4.9 },
+	BasicsResources = { 0.15, 2.39, 6.55, 8.84, 13.47, 15.98 },
+}
 Narration.Volume = 1.2
 
 local played: { [string]: boolean } = {}
 local sound: Sound? = nil
+local startedAt = 0
 local gui: ScreenGui? = nil
 local label: TextLabel? = nil
 local shown = 0
@@ -121,7 +155,28 @@ function Narration.play(name: string, quiet: boolean?): number
 			sound = s
 		end)
 	end
-	if not quiet then
+	startedAt = os.clock()
+	local phrases = Narration.Phrases[name]
+	if not quiet and phrases then
+		-- (phrase by phrase, each as it's read)
+		task.spawn(function()
+			local at = 0
+			while mine == shown do
+				local t = Narration.elapsed()
+				local now = 0
+				for i, start in Narration.Cues[name] or {} do
+					if t >= start - 0.05 then
+						now = i
+					end
+				end
+				if now ~= at and phrases[now] then
+					at = now
+					caption(phrases[now])
+				end
+				task.wait(0.05)
+			end
+		end)
+	elseif not quiet then
 		caption(text)
 	end
 	task.delay(seconds + 0.4, function()
@@ -130,6 +185,22 @@ function Narration.play(name: string, quiet: boolean?): number
 		end
 	end)
 	return seconds
+end
+
+-- Seconds into the line being read: the sound's own place in it while it
+-- plays (so what's timed off it keeps up with the voice, however late the
+-- audio starts), else the clock since it began.
+function Narration.elapsed(): number
+	local s = sound
+	if s and s.IsPlaying and s.TimePosition > 0 then
+		return s.TimePosition
+	end
+	if s and not s.IsLoaded and os.clock() - startedAt < 3 then
+		-- (still loading: the voice hasn't started, so nor has the line)
+		startedAt = os.clock()
+		return 0
+	end
+	return os.clock() - startedAt
 end
 
 -- Whether `name` has its voice uploaded (else only its words show).

@@ -777,6 +777,16 @@ end
 
 -- In a new miner's first dungeon (the HUNT BOUNTY: in the Rift, the intro's
 -- dungeon still owed): kaiju knocked out are back quickly, at full health.
+-- The starter team owed, given at once with no roll shown (DEV > SKIP
+-- INTRO: Server.IntroRoundsServer.skip). Returns how many joined.
+function KaijuServer.giveStarter(player: Player): number
+	local profile = PlayerData.get(player)
+	if not profile or Kaiju.rollsOwed(profile) <= 0 then
+		return 0
+	end
+	return #claimRoll(player)
+end
+
 local function firstDungeon(player: Player): boolean
 	if player:GetAttribute("RiftRun") == nil then
 		return false

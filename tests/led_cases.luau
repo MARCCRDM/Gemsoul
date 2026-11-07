@@ -144,4 +144,28 @@ for _, board in Led.Boards do
 	check(#Led.scenes(board, nil) >= 1, board .. " broke with no data")
 end
 
-print("PASS: " .. checks .. " LED screen checks (the font, the art, text where it's put, every board's scenes on screen and moving, the kaiju and bosses shown, the cartoons on the screens)")
+-- The basics (a new miner's first fight, Client.BasicsScreen): each line's
+-- scene on screen all the way through, the topic named big on its first
+-- phrase and something else showing once the next one starts; a phone's
+-- and a keyboard's.
+for _, touch in { false, true } do
+	for _, name in Led.BasicsOrder do
+		local cues = { 0.15, 2, 4, 6 }
+		local sc = Led.basics(name, cues, 8, touch)
+		check(sc.Duration == 8, name .. "'s scene isn't the line's length")
+		local first = sc.Draw(1)
+		local second = sc.Draw(3)
+		local same = 0
+		for i = 1, Led.W * Led.H do
+			if first.P[i] == second.P[i] then
+				same += 1
+			end
+		end
+		check(same < Led.W * Led.H, name .. " shows the same thing on its next phrase")
+		for step = 0, 79 do
+			check(lit(sc.Draw(step / 10)) > 15, name .. " goes blank")
+		end
+	end
+end
+
+print("PASS: " .. checks .. " LED screen checks (the font, the art, text where it's put, every board's scenes on screen and moving, the kaiju and bosses shown, the cartoons on the screens, the first fight's basics)")

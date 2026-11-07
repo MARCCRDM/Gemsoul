@@ -26,7 +26,9 @@ Roblox limits how many audio files an account can upload a month (fewer
 for accounts that aren't ID-verified). Ids already uploaded are remembered
 in tools/audio_ids.json and skipped next time, so if you hit the limit just
 run it again later; --limit N uploads at most N files this run, --dry-run
-shows what it would do, --force re-uploads everything.
+shows what it would do, --force re-uploads everything, --only PREFIX uploads
+just the files whose path starts with PREFIX (e.g. the new narration:
+--only assets/sounds/narration/basics_).
 """
 import argparse
 import json
@@ -136,6 +138,7 @@ def main():
     parser.add_argument("--limit", type=int, default=999, help="upload at most this many files this run")
     parser.add_argument("--force", action="store_true", help="upload again even if already uploaded")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--only", action="append", default=[], help="upload only files whose path starts with this (repeatable), e.g. assets/sounds/narration/basics_")
     args = parser.parse_args()
 
     known = {}
@@ -152,6 +155,10 @@ def main():
             if not name.endswith(EXTENSIONS) or name.startswith("_"):
                 continue
             rel = f"{folder}/{name}"
+            if args.only and not any(rel.startswith(prefix) for prefix in args.only):
+                if rel in known:
+                    ids[name] = known[rel]
+                continue
             if rel in known and not args.force:
                 ids[name] = known[rel]
                 continue

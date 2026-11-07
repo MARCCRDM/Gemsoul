@@ -37,6 +37,8 @@
 	  Led.fit(text, chars) -> text   capitals the font has, cut to fit
 	  Led.scenes(board, info) -> { { Duration, Draw = (t) -> buffer } }
 	  Led.toon(name) -> scene?   an episode (nil: no art for its cast)
+	  Led.basics(name, cues, seconds, touch?) -> scene   a new miner's lesson,
+	      one of Led.BasicsOrder, in time with the narrator (Client.BasicsScreen)
 	      info: { Kaiju = { { Art, Name, Role } }, Bosses = { { Art, Name,
 	      Element, Weakness, Threat } } } (Client.LedScreens, from the
 	      game's own data)
@@ -2108,6 +2110,349 @@ function SCENES.Outpost(_info)
 		end),
 	}
 	return finish(list)
+end
+
+-- The basics -----------------------------------------------------------------------------------------
+-- A new miner's first fight opens on a lesson (Client.BasicsScreen): five
+-- of the narrator's lines (Client.Narration's Basics...), each its own
+-- scene here, moving on phrase by phrase in time with the voice (`cues`:
+-- when each phrase starts). The first phrase names the topic big; the rest
+-- show it. `touch`: a phone's buttons named instead of the keyboard's.
+
+Led.BasicsOrder = { "BasicsAttack", "BasicsBlock", "BasicsAbilities", "BasicsDodge", "BasicsResources" }
+local CHARGE_BLUE, STAMINA_GREEN = rgb(70, 130, 255), rgb(65, 195, 112)
+local B_TEXT = 28 -- (the text column: 11 letters; the art's left of it)
+local KEYS = {
+	Desk = { Attack = "CLICK", Block = "R-CLICK", Dodge = "SPACE" },
+	Touch = { Attack = "ATTACK", Block = "BLOCK", Dodge = "DODGE" },
+}
+local SAY = {
+	Desk = { Attack = "CLICK", Block = "R-CLICK", Dodge = "SPACE" },
+	Touch = { Attack = "ATTACK", Block = "BLOCK", Dodge = "DODGE" },
+}
+
+-- Which phrase is being read at `t`, and how long since it started.
+local function cueAt(cues: { number }, t: number): (number, number)
+	local k = 1
+	for i, start in cues do
+		if t >= start - 0.05 then
+			k = i
+		end
+	end
+	return k, t - (cues[k] or 0)
+end
+
+-- A word wiped in big, left to right, centred on row `y`.
+local function bigWord(b, u: number, word: string, color: number, y: number)
+	local reveal = math.floor(enter(u, 0, 0.45) * Led.W)
+	clip(b, 0, reveal, function(tmp)
+		Led.center(tmp, y, word, color, 2)
+	end)
+	if reveal < Led.W then
+		for yy = y - 1, y + 10 do
+			Led.set(b, reveal, yy, WHITE)
+		end
+	end
+end
+
+-- The text column's lines, sliding in in turn from `at`.
+local function sayLines(b, u: number, list: { any }, at: number?)
+	for i, item in list do
+		local k = enter(u, (at or 0.1) + (i - 1) * 0.15, 0.4)
+		if k > 0 then
+			local dx = math.floor((1 - k) * 10 + 0.5)
+			clip(b, B_TEXT, Led.W - 1, function(tmp)
+				if type(item) == "table" then
+					runs(tmp, B_TEXT + dx, ROW[i], item)
+				else
+					Led.text(tmp, B_TEXT + dx, ROW[i], item, WHITE)
+				end
+			end)
+		end
+	end
+end
+
+-- The control, its press shown: the mouse's button for a click (its left to
+-- attack, its right to block), else its cap.
+local function control(b, keys, id: string, pressed: boolean, x: number?)
+	local label = keys[id]
+	if label == "CLICK" or label == "R-CLICK" then
+		mouse(b, x or 2, 8, if pressed then (if label == "CLICK" then "Left" else "Right") else nil, CYAN)
+	else
+		keycap(b, x or 0, 9, label, CYAN, pressed)
+	end
+end
+
+-- A training dummy, struck: its flash.
+local function dummy(b, x: number, hit: boolean)
+	rect(b, x - 1, 20, 3, 8, if hit then WHITE else SOFT)
+	rect(b, x - 2, 18, 5, 2, if hit then WHITE else SOFT)
+	Led.set(b, x, 17, SOFT)
+end
+
+-- A swing's arc round (x, y), from the left or right, `k` through it.
+local function arc(b, x: number, y: number, side: number, k: number, r: number, color: number)
+	for i = 0, 5 do
+		local a = math.rad(-150 + i * 24 + k * 30) * side
+		local s = 1 - math.abs(i - 2.5) / 3
+		Led.set(b, x + math.cos(a) * r * side, y + math.sin(a) * r * 0.7, fade(color, s * (1 - k * 0.6)))
+	end
+end
+
+local BASICS = {}
+
+function BASICS.BasicsAttack(b, k: number, u: number, keys, say)
+	if k == 1 then
+		bigWord(b, u, "ATTACK", GOLD, 12)
+		return
+	end
+	if k == 2 or k == 3 then
+		local period = if k == 3 then 0.38 else 0.6
+		local n = math.floor(u / period)
+		local p = (u % period) / period
+		control(b, keys, "Attack", p < 0.3)
+		dummy(b, 18, p < 0.18)
+		if p < 0.6 then
+			arc(b, 18, 23, if n % 2 == 0 then 1 else -1, p / 0.6, 6, WHITE)
+		end
+		if k == 2 then
+			sayLines(b, u, { { { say.Attack, CYAN } }, "TO SWING", "YOUR WEAPON" })
+		else
+			local combo = math.min(9, n + 1)
+			sayLines(b, u, { "KEEP", "SWINGING:", { { "COMBO ", WHITE }, { "X" .. combo, GOLD } } })
+		end
+		return
+	end
+	-- the heavy: held, a ring closing in on the dummy, then the blow
+	local hold = 1.1
+	local p = u % 2
+	local held = p < hold
+	control(b, keys, "Attack", held)
+	dummy(b, 18, p >= hold and p < hold + 0.15)
+	if held then
+		local r = 7 - (p / hold) * 4
+		ring(b, 18, 23, r, fade(GOLD, 0.4 + 0.6 * p / hold))
+	elseif p < hold + 0.5 then
+		local q = (p - hold) / 0.5
+		arc(b, 18, 23, 1, q, 7, GOLD)
+		arc(b, 18, 23, -1, q, 5, GOLD)
+	end
+	sayLines(b, u, { "HOLD IT", "DOWN FOR A", { { "HEAVY BLOW", GOLD } } })
+end
+
+function BASICS.BasicsBlock(b, k: number, u: number, keys, say)
+	if k == 1 then
+		bigWord(b, u, "BLOCK", CYAN, 12)
+		return
+	end
+	local function shield(on: boolean, color: number)
+		if on then
+			for y = 18, 27 do
+				Led.set(b, 5, y, color)
+				Led.set(b, 6, y, scale(color, 0.6))
+			end
+		end
+	end
+	if k == 2 then
+		-- held up: blows land on the guard
+		local p = u % 1.1
+		control(b, keys, "Block", true, 15)
+		shield(true, CYAN)
+		local x = math.floor(lerp(24, 8, math.clamp(p / 0.8, 0, 1)))
+		if p < 0.8 then
+			Led.set(b, x, 23, RED)
+			Led.set(b, x + 1, 23, scale(RED, 0.5))
+		elseif p < 0.95 then
+			Led.set(b, 8, 22, WHITE)
+			Led.set(b, 8, 24, WHITE)
+		end
+		sayLines(b, u, { { { "HOLD ", WHITE }, { say.Block, CYAN } }, "TO RAISE", "YOUR GUARD" })
+		return
+	end
+	-- the timing: the guard goes up just before the blow lands
+	local loop = 1.8
+	local p = u % loop
+	local land = 1.3
+	local up = p >= land - 0.18 and p < land + 0.3
+	control(b, keys, "Block", up, 15)
+	shield(up, if k == 4 and p >= land then GOLD else CYAN)
+	if p < land then
+		local x = math.floor(lerp(24, 8, p / land))
+		Led.set(b, x, 23, RED)
+		Led.set(b, x + 1, 23, scale(RED, 0.5))
+	elseif p < land + 0.3 and k == 4 then
+		for _, d in { { 2, -4 }, { 3, -1 }, { 3, 2 }, { 5, -3 }, { 5, 3 }, { 6, 0 } } do
+			Led.set(b, 6 + d[1], 23 + d[2], GOLD)
+		end
+	end
+	if k == 3 then
+		sayLines(b, u, { "TIME IT", "JUST BEFORE", "IT LANDS" })
+	else
+		sayLines(b, u, { { { "PERFECT", GOLD } }, "BLOCK: IT", "COSTS NONE" })
+	end
+end
+
+local ABILITY_COLORS = { ELEMENT.Fire, ELEMENT.Frost, ELEMENT.Shock }
+function BASICS.BasicsAbilities(b, k: number, u: number, _keys, _say)
+	if k == 1 then
+		bigWord(b, u, "ABILITIES", GOLD, 12)
+		return
+	end
+	local caps = { "Q", "E", "R" }
+	local lit = 0
+	if k == 2 then
+		lit = math.clamp(math.floor((u - 1.2) / 0.55) + 1, 0, 3)
+	elseif k >= 3 then
+		lit = 3
+	end
+	local casting = if k == 4 then math.floor(u / 0.9) % 3 + 1 else nil
+	local castP = if k == 4 then (u % 0.9) / 0.9 else 0
+	for i, cap in caps do
+		local x = (i - 1) * 8
+		local on = i <= lit
+		keycap(b, x, 10, cap, ABILITY_COLORS[i], casting == i and castP < 0.3)
+		if on then
+			-- its gem over it
+			local gx = x + 3
+			Led.set(b, gx, 9, ABILITY_COLORS[i])
+			Led.set(b, gx - 1, 9, scale(ABILITY_COLORS[i], 0.6))
+			Led.set(b, gx + 1, 9, scale(ABILITY_COLORS[i], 0.6))
+			Led.set(b, gx, 8, mix(ABILITY_COLORS[i], WHITE, 0.5))
+		end
+	end
+	if k >= 3 then
+		-- the Charge bar, a chunk spent on each cast
+		local fill = if k == 3 then 0.75 - (u % 2 >= 1 and 0.25 or 0) else 0.75 - (if castP > 0.3 then 0.25 else 0)
+		box(b, 0, 19, 24, 4, RULE)
+		hline(b, 1, 1 + math.floor(21 * fill), 20, CHARGE_BLUE)
+		hline(b, 1, 1 + math.floor(21 * fill), 21, scale(CHARGE_BLUE, 0.7))
+		Led.text(b, 0, 23, "CHARGE", CHARGE_BLUE)
+	end
+	if casting and castP >= 0.25 then
+		-- the cast: a burst from its key
+		local q = (castP - 0.25) / 0.75
+		ring(b, (casting - 1) * 8 + 3, 13, 2 + q * 8, fade(ABILITY_COLORS[casting], 1 - q))
+	end
+	if k == 2 then
+		sayLines(b, u, { "YOUR GEMS", "GIVE YOU", { { "Q  E  R", GOLD } } })
+	elseif k == 3 then
+		sayLines(b, u, { "EACH ONE", "COSTS", { { "CHARGE", CHARGE_BLUE } } })
+	else
+		sayLines(b, u, { "CAST THEM", "TO TURN", "A FIGHT" })
+	end
+end
+
+function BASICS.BasicsDodge(b, k: number, u: number, keys, say)
+	if k == 1 then
+		bigWord(b, u, "DODGE", CYAN, 12)
+		return
+	end
+	local big = k == 3
+	local loop = if big then 2.2 else 1.6
+	local p = u % loop
+	local press = if big then 1.25 else 0.7
+	control(b, keys, "Dodge", p >= press and p < press + 0.15)
+	local land = press + 0.25
+	local kk = math.clamp(p / land, 0, 1)
+	if p < land + 0.15 then
+		local r = (if big then 8 else 4) * kk + 1
+		for y = 17, 28 do
+			for x = 0, 25 do
+				local d = ((x - 9) / math.max(1, r)) ^ 2 + ((y - 23) / math.max(1, r * 0.55)) ^ 2
+				if d <= 1 then
+					Led.set(b, x, y, if p >= land then WHITE else scale(RED, 0.3 + 0.5 * kk))
+				end
+			end
+		end
+	end
+	local dx = if p >= press then lerp(0, if big then 14 else 10, ease((p - press) / 0.2)) else 0
+	rect(b, math.floor(8 + dx), 22, 2, 2, WHITE)
+	if p >= press and p < press + 0.35 then
+		for s = 1, 3 do
+			Led.set(b, 8 + dx - s * 2, 23, fade(WHITE, 0.5 - s * 0.12))
+		end
+	end
+	if k == 2 then
+		sayLines(b, u, { { { say.Dodge, CYAN } }, "ROLL OUT OF", "THE WAY" })
+	else
+		sayLines(b, u, { "SAVE IT FOR", "THE BIG", { { "ATTACKS", RED } } })
+	end
+end
+
+function BASICS.BasicsResources(b, k: number, u: number, _keys, _say)
+	if k == 1 then
+		bigWord(b, u, "CHARGE", CHARGE_BLUE, 8)
+		if u > 0.5 then
+			bigWord(b, u - 0.5, "STAMINA", STAMINA_GREEN, 19)
+		end
+		return
+	end
+	if k == 6 then
+		bigWord(b, u, "SHOW ME", GOLD, 9)
+		if u > 0.6 then
+			Led.center(b, 22, "WHAT YOU'VE GOT", WHITE)
+		end
+		return
+	end
+	-- the two bars, as the fight's HUD has them
+	local function bar(y: number, fill: number, color: number, label: string, flash: boolean?)
+		Led.text(b, 0, y, label, color)
+		box(b, 32, y - 1, 40, 7, RULE)
+		local w = math.floor(38 * math.clamp(fill, 0, 1))
+		rect(b, 33, y, w, 5, if flash then mix(color, WHITE, 0.5) else color)
+		rect(b, 33, y, w, 1, mix(color, WHITE, 0.35))
+	end
+	local charge, stamina = 0.2, 1
+	local chargeFlash, staminaFlash = false, false
+	local note = nil
+	if k == 2 then
+		local hits = math.floor(u / 0.45)
+		charge = math.min(1, 0.2 + hits * 0.08)
+		chargeFlash = (u % 0.45) < 0.1
+		note = { "+5", CHARGE_BLUE, "EACH HIT" }
+	elseif k == 3 then
+		local casts = math.floor(u / 0.8)
+		charge = math.max(0.1, 0.9 - casts * 0.25)
+		chargeFlash = (u % 0.8) < 0.12
+		note = { "CAST", CHARGE_BLUE, "SPENDS IT" }
+	elseif k == 4 then
+		charge = 0.4
+		local spends = math.floor(u / 0.7)
+		stamina = math.max(0.15, 1 - spends * 0.14)
+		staminaFlash = (u % 0.7) < 0.1
+		local what = ({ "SWING", "BLOCK", "DODGE" })[spends % 3 + 1]
+		note = { what, STAMINA_GREEN, "USES IT" }
+	elseif k == 5 then
+		charge = 0.4
+		stamina = math.min(1, 0.2 + u * 0.3)
+		note = { "EASE OFF", STAMINA_GREEN, "REFILLS" }
+	end
+	bar(9, charge, CHARGE_BLUE, "CHARGE", chargeFlash)
+	if k >= 4 then
+		bar(17, stamina, STAMINA_GREEN, "STAMINA", staminaFlash)
+	end
+	if note then
+		runs(b, 0, 24, { { note[1] .. " ", note[2] }, { note[3], WHITE } })
+	end
+end
+
+-- One of the lesson's scenes: `name` (Led.BasicsOrder), timed off `cues`
+-- (the phrases' starts) over `seconds`; `touch`: a phone.
+function Led.basics(name: string, cues: { number }, seconds: number, touch: boolean?)
+	local draw = BASICS[name]
+	local index = table.find(Led.BasicsOrder, name) or 1
+	local keys = if touch then KEYS.Touch else KEYS.Desk
+	local say = if touch then SAY.Touch else SAY.Desk
+	return scene(seconds, function(t)
+		local b = Led.new()
+		local k, u = cueAt(cues, t)
+		if draw then
+			draw(b, k, u, keys, say)
+		end
+		header(b, t, "BASICS", index, #Led.BasicsOrder, GOLD, 0)
+		progress(b, t, seconds, GOLD, 0)
+		return b
+	end)
 end
 
 function Led.scenes(board: string, info: any): { any }

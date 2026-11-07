@@ -188,18 +188,45 @@ if not restart.Active and require(game:GetService("ReplicatedStorage").Shared.Fa
 	end)
 end
 
+-- SKIP INTRO: the whole intro done on this account at once (its gear set,
+-- coins, the starter kaiju, the first dungeon and the lobby's intro), to
+-- test what comes after (Server.IntroRoundsServer.skip). Tap twice.
+do
+	local skip = Instance.new("TextButton")
+	skip.Name = "SkipIntro"
+	skip.Size = UDim2.fromOffset(141, 30)
+	skip.Position = UDim2.fromOffset(153, 84)
+	skip.BackgroundColor3 = Color3.fromRGB(90, 220, 150)
+	skip.TextColor3 = Color3.fromRGB(10, 30, 20)
+	skip.Font = Enum.Font.GothamBold
+	skip.TextSize = 12
+	skip.Text = "SKIP INTRO"
+	skip.Parent = panel
+	corner(skip, 5)
+	local armed = 0
+	skip.Activated:Connect(function()
+		if os.clock() > armed then
+			armed = os.clock() + 4
+			status.Text = "Tap again to complete the whole intro on this account."
+			return
+		end
+		armed = 0
+		run("DevSkipIntro")
+	end)
+end
+
 -- NEW INTRO: DUNGEON: the new intro from its dungeon, on this account (its
 -- two 1v1s counted won): the kaiju roll if owed, the pod drop, the Breach
 -- and the Nest, their roll cards, then the lobby. The whole new intro from
 -- its start: PLAY AS A NEW PLAYER.
 local firstDungeon = Instance.new("TextButton")
 firstDungeon.Name = "FirstDungeon"
-firstDungeon.Size = UDim2.fromOffset(288, 30)
+firstDungeon.Size = UDim2.fromOffset(141, 30)
 firstDungeon.Position = UDim2.fromOffset(6, 84)
 firstDungeon.BackgroundColor3 = Color3.fromRGB(206, 112, 40)
 firstDungeon.TextColor3 = Color3.fromRGB(255, 244, 226)
 firstDungeon.Font = Enum.Font.GothamBold
-firstDungeon.TextSize = 12
+firstDungeon.TextSize = 11
 firstDungeon.Text = "NEW INTRO: DUNGEON"
 firstDungeon.Parent = panel
 corner(firstDungeon, 5)

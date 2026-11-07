@@ -153,7 +153,24 @@ local IronUi = {
 		return i
 	end,
 }
+-- The basics' screen (Modules.BasicsScreen): its lines in turn, two seconds
+-- each here, telling the opening which one's up.
+local lesson = {}
+local BasicsScreen = {
+	run = function(onLine)
+		for _, line in { "BasicsAttack", "BasicsBlock", "BasicsAbilities", "BasicsDodge", "BasicsResources" } do
+			if player:GetAttribute("FirstFight") ~= true then
+				break
+			end
+			table.insert(lesson, line)
+			onLine(line)
+			fakeTask.wait(2)
+		end
+		onLine(nil)
+	end,
+}
 local stubs = {
+	BasicsScreen = BasicsScreen,
 	Narration = Narration,
 	UiKit = UiKit,
 	IronUi = IronUi,
@@ -249,29 +266,35 @@ step(1)
 check(#said == 1 and up() == "", "The controls came before the welcome was done")
 check(not ringGui.Enabled, "A hint ring over the welcome")
 step(2.6)
-check(said[2] and said[2].Name == "Controls", "The controls' line didn't follow the welcome")
+check(lesson[1] == "BasicsAttack", "The basics didn't follow the welcome")
 step(0.2)
-check(up() == "E,Q,R", "Not an arrow on each of Q, E and R: " .. up())
-check(not ringGui.Enabled, "A hint ring over the controls' line")
+check(up() == "Swing", "Attacking: not an arrow on ATTACK: " .. up())
+check(not ringGui.Enabled, "A hint ring over the lesson")
+local attack = arrowsGui:FindFirstChild("ArrowSwing")
+check(attack.Position.X.Offset == 932, "The ATTACK arrow isn't over ATTACK")
+step(2)
+check(lesson[2] == "BasicsBlock" and up() == "Block", "Blocking: not an arrow on BLOCK: " .. up())
+step(2)
+check(lesson[3] == "BasicsAbilities" and up() == "E,Q,R", "Abilities: not an arrow on each of Q, E and R: " .. up())
 -- (each over its button, a little above)
 local q = arrowsGui:FindFirstChild("ArrowQ")
 check(q.Position.X.Offset == 132 and q.Position.Y.Offset < 600, "The Q arrow isn't over the Q button")
-step(2.4)
-check(up() == "Block,Dodge,Swing", "Not an arrow on each of ATTACK, BLOCK and DODGE: " .. up())
-local attack = arrowsGui:FindFirstChild("ArrowSwing")
-check(attack.Position.X.Offset == 932, "The ATTACK arrow isn't over ATTACK")
-step(4.5)
-check(up() == "" and not arrowsGui.Enabled, "The arrows stayed after the line")
+step(2)
+check(lesson[4] == "BasicsDodge" and up() == "Dodge", "Dodging: not an arrow on DODGE: " .. up())
+step(2)
+check(lesson[5] == "BasicsResources" and up() == "", "Charge and stamina: an arrow on a button")
+step(2.2)
+check(up() == "" and not arrowsGui.Enabled, "The arrows stayed after the lesson")
 step(0.3)
 check(ringGui.Enabled, "The hint rings didn't come back after the opening")
-check(#said == 2, "Something else was read")
+check(#said == 1 and #lesson == 5, "Something else was read")
 
 -- Once: a second first fight in the visit has no opening.
 player:SetAttribute("FirstFight", nil)
 step(0.5)
 player:SetAttribute("FirstFight", true)
 step(8)
-check(#said == 2, "The opening played twice")
+check(#said == 1 and #lesson == 5, "The opening played twice")
 
 -- A friend request lets the mouse go (the combat view held it in the middle:
 -- Roblox's pop-up couldn't be clicked without knowing Tab), and says where.
@@ -282,5 +305,5 @@ do
 	check(body:find("Enum.FriendStatus.FriendRequestReceived", 1, true) and body:find("FirstPerson.setCursorFree(true)", 1, true) and body:find("UiKit.toast(", 1, true), "A friend request leaves the mouse locked")
 end
 
-print(string.format("PASS: %d first fight opening checks (the welcome, then the controls' line with arrows on Q/E/R, then ATTACK/BLOCK/DODGE)", checks))
+print(string.format("PASS: %d first fight opening checks (the welcome, then the basics' lines with an arrow on each one's button: ATTACK, BLOCK, Q/E/R, DODGE)", checks))
 process.exit(0)

@@ -12,10 +12,11 @@
 	  Q E R   when you can afford each move, until you use it
 
 	It opens with the narrator (Modules.Narration): "Welcome, Miner. Your
-	training begins now.", then the controls' line, a bobbing arrow over each
-	button it names: the Q / E / R moves ("Use your abilities to cast."),
-	then ATTACK, BLOCK and DODGE ("Swing, block and dodge..."). The hints
-	wait till it's done.
+	training begins now.", then the basics on an LED screen of their own
+	(Modules.BasicsScreen: attacking, blocking, abilities, dodging, charge
+	and stamina, each shown as it's read), a bobbing arrow over the button
+	each one's about. The partner holds still for it (till you hit it), and
+	the hints wait till it's done.
 
 	The partner's wind-ups and guard come from the attributes the server sets
 	on it (ActionKind, ActionName, ActionStart, ActionAt, GuardUntil); what
@@ -34,6 +35,7 @@ local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
 local Narration = require(script.Parent.Modules.Narration)
+local BasicsScreen = require(script.Parent.Modules.BasicsScreen)
 local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
@@ -76,14 +78,20 @@ end
 local ARROWS = {
 	Abilities = { "Q", "E", "R" },
 	Combat = { "Swing", "Block", "Dodge" },
+	Attack = { "Swing" },
+	Block = { "Block" },
+	Dodge = { "Dodge" },
 }
--- (When in the controls' line each set shows: its words' times, seconds.)
-local ARROW_TIMES = { { "Abilities", 0, 2.2 }, { "Combat", 2.2, 6.4 } }
+-- (the basics' lines, and the arrows each one points with)
+local LINE_ARROWS = { BasicsAttack = "Attack", BasicsBlock = "Block", BasicsAbilities = "Abilities", BasicsDodge = "Dodge" }
 local arrowGui = UiKit.gui("FirstFightArrows", 10)
 arrowGui.Enabled = false
 local arrows: { [string]: TextLabel } = {}
 for _, ids in ARROWS do
 	for _, id in ids do
+		if arrows[id] then
+			continue -- (one arrow a button, whichever lines point at it)
+		end
 		arrows[id] = new("TextLabel", {
 			Name = "Arrow" .. id,
 			AnchorPoint = Vector2.new(0.5, 1),
@@ -134,25 +142,10 @@ local function opening()
 	end
 	pcall(Narration.say, "TrainingBegins")
 	if player:GetAttribute("FirstFight") == true then
-		local ok, seconds = pcall(Narration.play, "Controls")
-		if ok and type(seconds) == "number" and seconds > 0 then
-			local started = os.clock()
-			arrowGui.Enabled = true
-			while player:GetAttribute("FirstFight") == true do
-				local t = os.clock() - started
-				local now = nil
-				for _, span in ARROW_TIMES do
-					if t >= span[2] and t < span[3] then
-						now = span[1]
-					end
-				end
-				if not now and t >= ARROW_TIMES[#ARROW_TIMES][3] then
-					break
-				end
-				pointing = now
-				task.wait(0.05)
-			end
-		end
+		arrowGui.Enabled = true
+		pcall(BasicsScreen.run, function(line)
+			pointing = if line then LINE_ARROWS[line] else nil
+		end)
 	end
 	pointing = nil
 	arrowGui.Enabled = false
@@ -271,16 +264,18 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 	local bob = math.abs(math.sin(now * 5)) * 10
-	for set, ids in ARROWS do
-		for _, id in ids do
-			local arrow, button = arrows[id], arrowTargets[id]
-			if set == pointing and button and button.Parent and button.Visible then
-				local top = button.AbsolutePosition + Vector2.new(button.AbsoluteSize.X / 2, 0)
-				arrow.Position = UDim2.fromOffset(top.X, top.Y - 4 - bob)
-				arrow.Visible = true
-			else
-				arrow.Visible = false
-			end
+	local wanted = {}
+	for _, id in (pointing and ARROWS[pointing]) or {} do
+		wanted[id] = true
+	end
+	for id, arrow in arrows do
+		local button = arrowTargets[id]
+		if wanted[id] and button and button.Parent and button.Visible then
+			local top = button.AbsolutePosition + Vector2.new(button.AbsoluteSize.X / 2, 0)
+			arrow.Position = UDim2.fromOffset(top.X, top.Y - 4 - bob)
+			arrow.Visible = true
+		else
+			arrow.Visible = false
 		end
 	end
 end)

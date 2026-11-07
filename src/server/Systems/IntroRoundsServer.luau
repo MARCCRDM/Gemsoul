@@ -786,6 +786,67 @@ local function leaveRounds(player: Player)
 	end
 	return reply(true, "Back to the Outpost.")
 end
+-- DEV > SKIP INTRO (Owners only): the whole intro done on this account, as
+-- if played through, for testing what comes after it (the funnel's later
+-- steps): every round's piece still to win (no cards), the set's coins and
+-- gem, the first dungeon's coins, the best build on, the starter kaiju
+-- team, the first dungeon and the lobby's intro counted done; out of an
+-- intro fight to the Outpost. Nothing's taken away, and it's safe to press
+-- again.
+function IntroRoundsServer.skip(player: Player)
+	local owners = Config.Playtest and Config.Playtest.Owners or {}
+	if not table.find(owners, player.UserId) then
+		return reply(false, "This test tool is for the game's owners.")
+	end
+	local profile = PlayerData.get(player) :: any
+	if not profile then
+		return reply(false, "Your profile is still loading.")
+	end
+	local state = if type(profile.IntroRounds) == "table" then profile.IntroRounds else { Won = 0, Losses = 0, Rare = false, Pieces = {} }
+	profile.IntroRounds = state
+	state.Pieces = if type(state.Pieces) == "table" then state.Pieces else {}
+	local wasDone = (tonumber(state.Won) or 0) >= IntroRounds.Count
+	local given = 0
+	while state.Won < IntroRounds.Count do
+		local slot = IntroRounds.slot(IntroRounds.round(state))
+		local piece = grant(player, profile, slot, IntroRounds.rarity(state, rng:NextNumber()))
+		if not piece then
+			return reply(false, "Your gear bag is full: make room, then SKIP INTRO again.")
+		end
+		IntroRounds.won(state, piece.Rarity)
+		state.Pieces[slot] = { Name = piece.Name, Rarity = piece.Rarity }
+		given += 1
+	end
+	if not profile.IntroSetGem then
+		pcall(IntroRoundsServer.setGem, profile)
+	end
+	local coins = (if wasDone then 0 else IntroRounds.SetCoins) + (if profile.IntroDungeonCleared then 0 else IntroRounds.FirstDungeonCoins)
+	if coins > 0 then
+		PlayerData.addCoins(player, coins, "Tutorial")
+	end
+	pcall(IntroRoundsServer.bestBuild, player, profile)
+	setDone[player] = true
+	profile.IntroFinale = "Done"
+	profile.IntroDungeonCleared = true
+	profile.Intro = if type(profile.Intro) == "table" then profile.Intro else {}
+	profile.Intro.Done = true
+	local kaiju = 0
+	pcall(function()
+		kaiju = require(script.Parent.KaijuServer).giveStarter(player)
+	end)
+	for _, name in { "IntroRounds", "IntroRoundFight", "IntroRoundsLeft", "IntroFinaleStep", "Lesson" } do
+		player:SetAttribute(name, nil)
+	end
+	markFinale(player)
+	if player:GetAttribute("CombatSession") == "Training" then
+		pcall(function()
+			require(script.Parent.ArenaSessions).leave(player)
+		end)
+	end
+	PlayerData.sync(player)
+	return reply(true, string.format("Intro skipped: %d gear pieces, %d coins, %d kaiju. Rejoin for a clean start.", given, coins, kaiju))
+end
+
 -- HUNT BOUNTY's way out: off the Arena where they stand (never the lobby's
 -- spawn first), then into the Outpost behind the loading screen, as the
 -- Rift's gate only opens from there (RiftServer: problem). The client goes
@@ -963,6 +1024,7 @@ function IntroRoundsServer.start()
 	-- DEV > NEW INTRO: DUNGEON (Owners only): the new intro from its
 	-- dungeon, on this account: its two 1v1s counted won (the pieces they
 	-- paid kept), the dungeon's pieces still to come. Again any time.
+	Shop.register("DevSkipIntro", IntroRoundsServer.skip)
 	Shop.register("DevIntroDungeon", function(player: Player)
 		local owners = Config.Playtest and Config.Playtest.Owners or {}
 		if not table.find(owners, player.UserId) then

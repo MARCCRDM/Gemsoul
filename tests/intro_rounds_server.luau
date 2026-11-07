@@ -406,4 +406,39 @@ do
 	check(not Server.busyElsewhere(player), "Out in the Outpost, the lobby's intro is held back")
 	Server.clearCritters(player) -- (none out: nothing to do, no error)
 end
+-- DEV > SKIP INTRO: the game's owners only; the whole intro done at once
+-- (every piece, the set's and the first dungeon's coins, the kaiju, the
+-- finale counted done, out of the fight), and never paid twice.
+do
+	local Config = shared("Config")
+	profile = newProfile({})
+	coins = 0
+	table.clear(attributes)
+	attributes.CombatSession = "Training"
+	check(not Server.skip(player).Ok and coins == 0, "Someone not an owner skipped the intro")
+	local owner = Config.Playtest and Config.Playtest.Owners and Config.Playtest.Owners[1]
+	check(owner ~= nil, "No owner to test SKIP INTRO with")
+	local starters = 0
+	stubs.KaijuServer = { giveStarter = function() starters += 1 return 3 end }
+	player.UserId = owner
+	local result = Server.skip(player)
+	check(result.Ok, "SKIP INTRO failed: " .. tostring(result.Message))
+	check(profile.IntroRounds.Won == IntroRounds.Count, "Not every round counted won")
+	local pieces = 0
+	for _, slot in IntroRounds.Order do
+		if profile.IntroRounds.Pieces[slot] then
+			pieces += 1
+		end
+	end
+	check(pieces == IntroRounds.Count, "Not a piece for every round: " .. pieces)
+	check(coins == IntroRounds.SetCoins + IntroRounds.FirstDungeonCoins, "Not the set's and the first dungeon's coins: " .. coins)
+	check(profile.IntroFinale == "Done" and profile.IntroDungeonCleared == true and profile.Intro.Done == true, "The intro isn't counted done")
+	check(starters == 1, "No starter kaiju")
+	check(attributes.CombatSession == nil and attributes.IntroRounds == nil, "Still in the intro's fight")
+	local paid = coins
+	check(Server.skip(player).Ok and coins == paid, "SKIP INTRO paid twice")
+	player.UserId = 1
+	stubs.KaijuServer = nil
+end
+
 print(string.format("PASS: %d intro rounds server checks", checks))
