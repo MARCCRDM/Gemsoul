@@ -1,7 +1,8 @@
 -- lune run tests/first_fight_opening_cases.luau <repo>
 -- Round 1's opening (Client FirstFight): once a new miner's first fight is
 -- in view (the loading screen and the drop over), the basics on the arena's
--- LED screen (Modules.BasicsScreen), a bobbing arrow over each button a line
+-- LED screen (Modules.BasicsScreen), alongside the fight (the partner
+-- doesn't wait), a bobbing arrow over each button a line
 -- names: ATTACK, BLOCK, Q / E / R, DODGE. No welcome line before it (the
 -- lesson ends on "Your training begins now."). The controls' hint rings wait
 -- till it's done. Driven on a clock of its own, with Combat's HUD faked.
@@ -312,6 +313,10 @@ do
 	local intro = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
 	check(not intro:find("BasicsScreen", 1, true), "The kit roll still has the basics' video in front of it")
 	local screen = fs.readFile(ROOT .. "/src/client/Modules/BasicsScreen.luau")
+	-- (the fight's on during the lesson: the partner isn't held for it)
+	check(not screen:find("BasicsLesson", 1, true), "The lesson still holds the partner still")
+	local duelist = fs.readFile(ROOT .. "/src/server/Systems/Duelist.luau")
+	check(not duelist:find('GetAttribute("Lesson")', 1, true), "The server still holds the partner for the lesson")
 	check(screen:find('player:SetAttribute("IntroVideo", true)', 1, true) and screen:find('player:SetAttribute("IntroVideo", nil)', 1, true), "The lesson doesn't hold the music")
 	local music = fs.readFile(ROOT .. "/src/client/Music.client.luau")
 	check(music:find('"IntroVideo"', 1, true) and music:find('if attributes.IntroVideo then\n\t\tmood = "Silence"', 1, true), "Music plays over the lesson")
@@ -326,5 +331,5 @@ do
 	check(body:find("Enum.FriendStatus.FriendRequestReceived", 1, true) and body:find("FirstPerson.setCursorFree(true)", 1, true) and body:find("UiKit.toast(", 1, true), "A friend request leaves the mouse locked")
 end
 
-print(string.format("PASS: %d first fight opening checks (the basics on the arena's screen once the fight's in view, an arrow on each line's button: ATTACK, BLOCK, Q/E/R, DODGE; no music under it; no video before the roll)", checks))
+print(string.format("PASS: %d first fight opening checks (the basics on the arena's screen alongside the fight once it's in view, an arrow on each line's button: ATTACK, BLOCK, Q/E/R, DODGE; no music under it; no video before the roll)", checks))
 process.exit(0)

@@ -10,9 +10,8 @@
 	so it's in front of them wherever the fight put them, and sinks away
 	when the lesson's done.
 
-	While it plays the partner holds still ("BasicsLesson": Server.Duelist
-	reads the player's Lesson attribute); the moment they land a hit on it
-	the hold lets go (they're ready), the lesson carrying on. No music under
+	It plays while they fight: the fight's on from the start (the partner
+	doesn't wait), the screen teaching as they go. No music under
 	it (the player attribute IntroVideo: Client Music), the music once it's
 	over.
 
@@ -30,7 +29,6 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Led = require(ReplicatedStorage.Shared.Led)
-local GemClient = require(script.Parent.GemClient)
 local Narration = require(script.Parent.Narration)
 local UiKit = require(script.Parent.UiKit)
 
@@ -226,23 +224,6 @@ local function play(onLine: ((string) -> ())?, state)
 	end
 	local screen = build(at)
 	state.Model = screen.Model
-	pcall(function()
-		GemClient.request("BasicsLesson", true)
-	end)
-	-- (a hit on the partner: they're ready, it can fight back)
-	local other = partner()
-	local otherHumanoid = other and other:FindFirstChildOfClass("Humanoid")
-	local startHealth = otherHumanoid and otherHumanoid.Health
-	local held = true
-	local function letGo()
-		if held then
-			held = false
-			pcall(function()
-				GemClient.request("BasicsLesson", false)
-			end)
-		end
-	end
-	state.LetGo = letGo
 	rise(screen, at, false)
 	local skipped = false
 	state.SkipGui = skipButton(function()
@@ -275,9 +256,6 @@ local function play(onLine: ((string) -> ())?, state)
 					paint(screen, buffer)
 				end
 			end
-			if held and otherHumanoid and startHealth and otherHumanoid.Health < startHealth - 0.5 then
-				letGo()
-			end
 			RunService.RenderStepped:Wait()
 		end
 		if skipped then
@@ -288,7 +266,6 @@ local function play(onLine: ((string) -> ())?, state)
 	end
 	state.SkipGui:Destroy()
 	state.SkipGui = nil
-	letGo()
 	if onLine then
 		pcall(onLine, nil)
 	end
@@ -312,10 +289,7 @@ function BasicsScreen.run(onLine: ((string) -> ())?)
 			pcall(onLine, nil)
 		end
 	end
-	-- Taken down however it ended: the partner let go, SKIP and the screen gone.
-	if state.LetGo then
-		state.LetGo()
-	end
+	-- Taken down however it ended: SKIP and the screen gone.
 	if state.SkipGui then
 		state.SkipGui:Destroy()
 	end

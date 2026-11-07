@@ -11,13 +11,14 @@
 	  Heavy   while its guard is up, until you throw a heavy
 	  Q E R   when you can afford each move, until you use it
 
-	It opens, once the fight's in view (the loading screen and the drop
-	over), on the basics: a giant LED screen rising behind the partner
+	Once the fight's in view (the loading screen and the drop over), the
+	basics play alongside it: a giant LED screen rising behind the partner
 	(Modules.BasicsScreen: attacking, blocking, abilities, dodging, charge
 	and stamina, the narrator reading each as it's shown, ending on "Your
 	training begins now."), a bobbing arrow over the button each one's
-	about. The partner holds still for it (till you hit it), there's no
-	music under it, and the hints wait till it's done.
+	about. The fight's on all the while (the partner doesn't wait), with no
+	music till the lesson's over; these hint rings come in after it (the
+	arrows point the way meanwhile).
 
 	The partner's wind-ups and guard come from the attributes the server sets
 	on it (ActionKind, ActionName, ActionStart, ActionAt, GuardUntil); what

@@ -834,7 +834,7 @@ function IntroRoundsServer.skip(player: Player)
 	pcall(function()
 		kaiju = require(script.Parent.KaijuServer).giveStarter(player)
 	end)
-	for _, name in { "IntroRounds", "IntroRoundFight", "IntroRoundsLeft", "IntroFinaleStep", "Lesson" } do
+	for _, name in { "IntroRounds", "IntroRoundFight", "IntroRoundsLeft", "IntroFinaleStep" } do
 		player:SetAttribute(name, nil)
 	end
 	markFinale(player)
