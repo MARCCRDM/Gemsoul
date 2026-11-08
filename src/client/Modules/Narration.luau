@@ -8,8 +8,11 @@
 	  "FirstDungeon"    arriving in the first dungeon
 	  "KaijuTeam"       the starter kaiju roll (the spin waits for it)
 	  "Basics..."       the combat basics, full screen before the ability roll
-	                    (Client.BasicsScreen): Attack, Block, Abilities (Dodge
-	                    and Resources recorded, not in it now)
+	                    (Client.BasicsScreen): TrainingBegins as its welcome,
+	                    then Attack, Block, Abilities (Dodge and Resources
+	                    recorded, not in it now)
+	  "Finale..."       the Outpost's intro after the first dungeon (Client
+	                    IntroFinale): Mine, Gems, Fight, Done
 
 	  Narration.play(name, quiet?) -> seconds   reads it (once a visit), returns how
 	                                    long it takes (0: already read)
@@ -45,6 +48,10 @@ Narration.Ids = {
 	BasicsAbilities = 80319102339818, -- basics_abilities.mp3
 	BasicsDodge = 114278772210482, -- basics_dodge.mp3
 	BasicsResources = 119618357055313, -- basics_resources.mp3
+	FinaleMine = 0, -- finale_mine.mp3
+	FinaleGems = 0, -- finale_gems.mp3
+	FinaleFight = 0, -- finale_fight.mp3
+	FinaleDone = 0, -- finale_done.mp3
 }
 Narration.Lines = {
 	TrainingBegins = "Welcome, Miner. Your training begins now.",
@@ -57,9 +64,13 @@ Narration.Lines = {
 	BasicsAbilities = "Abilities. Your gems give you three of them, on Q, E and R. Each one costs charge. Cast them, to turn a fight.",
 	BasicsDodge = "Dodging. Press dodge to roll out of the way. Save it for the big attacks.",
 	BasicsResources = "Charge, and stamina. Every hit you land fills your charge. The blue bar. Your abilities spend it. Swinging, blocking and dodging use stamina. The green bar. Ease off, and it refills. Your training begins now.",
+	FinaleMine = "Welcome home, miner. Hit the rock to mine it.",
+	FinaleGems = "Mining digs up gems. Put a gem in your gear to enchant it: each one gives you a move on Q, E or R. Better gems hide further out.",
+	FinaleFight = "Your kaijus will defend you. Train and protect them, and they will protect you.",
+	FinaleDone = "Well done, miner. The Outpost is yours.",
 }
 -- How long each one plays (seconds, the files' lengths).
-Narration.Seconds = { TrainingBegins = 3.5, Controls = 5.9, FirstDungeon = 9.7, KaijuTeam = 7.7, RotMinions = 7.5, BasicsAttack = 10.85, BasicsBlock = 8.94, BasicsAbilities = 11.07, BasicsDodge = 7.35, BasicsResources = 18.63 }
+Narration.Seconds = { TrainingBegins = 3.5, Controls = 5.9, FirstDungeon = 9.7, KaijuTeam = 7.7, RotMinions = 7.5, BasicsAttack = 10.85, BasicsBlock = 8.94, BasicsAbilities = 11.07, BasicsDodge = 7.35, BasicsResources = 18.63, FinaleMine = 4.02, FinaleGems = 10.7, FinaleFight = 5.88, FinaleDone = 3.79 }
 -- A line read phrase by phrase (the basics: Client.BasicsScreen), when each
 -- phrase starts (seconds into it): its caption follows the phrase, and the
 -- LED its cue.

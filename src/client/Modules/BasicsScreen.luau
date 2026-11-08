@@ -4,7 +4,8 @@
 	then the six intro rounds). The narrator's lines in Led.BasicsOrder
 	(Modules.Narration: BasicsAttack, BasicsBlock, BasicsAbilities), each
 	shown as it's read: acted out by two real fighters on a small stage
-	(Modules.BasicsDemo), or if they can't be had, on an LED panel
+	(Modules.BasicsDemo), the narrator's welcome ("Welcome, Miner. Your
+	training begins now.") first, or if they can't be had, on an LED panel
 	(Shared.Led.basics, timed off the voice itself: Narration.elapsed and the
 	line's Cues), its words under it phrase by phrase (its own caption: the
 	narrator's usual one sits too low, over the panel on a phone).
@@ -24,6 +25,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Led = require(ReplicatedStorage.Shared.Led)
 local BasicsDemo = require(script.Parent.BasicsDemo)
+local GemClient = require(script.Parent.GemClient)
 local Narration = require(script.Parent.Narration)
 local UiKit = require(script.Parent.UiKit)
 
@@ -31,6 +33,7 @@ local BasicsScreen = {}
 BasicsScreen.Fps = 20
 BasicsScreen.Dot = 0.72
 BasicsScreen.Order = 29
+BasicsScreen.Opener = "TrainingBegins" -- (the narrator's welcome, first, when the demo's up)
 BasicsScreen.FighterWait = 25 -- seconds, at most, for the demo's fighters to arrive (from the start)
 BasicsScreen.FighterGrace = 3 -- and once the loading's done, at most this much longer
 
@@ -178,9 +181,25 @@ local function play(state, ready: (() -> ())?)
 			warn("[BasicsScreen] the demo didn't build:", made)
 		end
 	end
-	for index, name in Led.BasicsOrder do
+	-- What they watched of it, for the numbers (Server.Duelist's BasicsSeen:
+	-- each part, watched through or skipped, and for how long).
+	local function seen(part: string, cut: boolean, spent: number)
+		task.spawn(function()
+			pcall(GemClient.request, "BasicsSeen", part, cut, math.floor(spent * 10) / 10)
+		end)
+	end
+	-- The lines: with the demo, the narrator's welcome first (the fighters
+	-- squaring up), then the basics in Led.BasicsOrder.
+	local lines = table.clone(Led.BasicsOrder)
+	if demo then
+		table.insert(lines, 1, BasicsScreen.Opener)
+	end
+	local total = #Led.BasicsOrder
+	local watched = 0
+	for i, name in lines do
+		local index = if name == BasicsScreen.Opener then 0 else i - (#lines - total)
 		local seconds = Narration.Seconds[name] or 8
-		local scene = Led.basics(name, Narration.Cues[name] or { 0 }, seconds, touch)
+		local scene = if demo then nil else Led.basics(name, Narration.Cues[name] or { 0 }, seconds, touch)
 		local voiced = Narration.play(name, true) > 0
 		local phrases = Narration.Phrases[name] or { Narration.Lines[name] or "" }
 		local cues = Narration.Cues[name] or { 0 }
@@ -188,7 +207,7 @@ local function play(state, ready: (() -> ())?)
 		local last = -1
 		skipped = false
 		if demo then
-			demo.show(name, index, #Led.BasicsOrder)
+			demo.show(name, index, total)
 		end
 		while not skipped do
 			local t = if voiced then Narration.elapsed() else os.clock() - started
@@ -212,7 +231,7 @@ local function play(state, ready: (() -> ())?)
 				end
 			end
 			local frame = math.floor(t * BasicsScreen.Fps)
-			if not demo and frame ~= last then
+			if not demo and scene and frame ~= last then
 				last = frame
 				local ok, buffer = pcall(scene.Draw, frame / BasicsScreen.Fps)
 				if ok then
@@ -226,7 +245,11 @@ local function play(state, ready: (() -> ())?)
 		else
 			task.wait(0.35)
 		end
+		local spent = math.min(os.clock() - started, seconds + 4)
+		watched += spent
+		seen(name, skipped, spent)
 	end
+	seen("Done", false, watched)
 	-- Out: a fade to the dark, then gone.
 	local fade = Instance.new("Frame")
 	fade.Size = UDim2.fromScale(1, 1)
@@ -253,12 +276,17 @@ function BasicsScreen.run(ready: (() -> ())?)
 		warn("[BasicsScreen] the basics stopped:", problem)
 		Narration.stop()
 	end
-	-- (gone however it ended)
+	-- (gone however it ended, the demo's fighters too: the server's copies
+	-- in your PlayerGui)
 	if state.Demo then
 		pcall(state.Demo.destroy)
 	end
 	if state.Gui then
 		state.Gui:Destroy()
+	end
+	local store = player:FindFirstChildOfClass("PlayerGui") and player.PlayerGui:FindFirstChild("BasicsDemo")
+	if store then
+		store:Destroy()
 	end
 	player:SetAttribute("IntroVideo", nil)
 	running = false

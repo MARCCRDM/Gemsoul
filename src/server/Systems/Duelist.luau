@@ -3157,6 +3157,26 @@ function Duelist.start()
 	Players.PlayerRemoving:Connect(function(player)
 		demoBusy[player] = nil
 	end)
+	-- What they watched of it (Client BasicsScreen): each part, watched
+	-- through or skipped, and for how long; "Done" at the end, with the
+	-- whole time (its fighters go then).
+	Shop.register("BasicsSeen", function(player, part, skipped, seconds)
+		if type(part) ~= "string" or #part > 24 then
+			return Shop.reply(false, "")
+		end
+		local spent = if type(seconds) == "number" then math.clamp(seconds, 0, 120) else 0
+		pcall(function()
+			require(script.Parent.Analytics).event(player, "BasicsLesson", spent, part, if skipped == true then "Skipped" else "Watched")
+		end)
+		if part == "Done" then
+			local gui = player:FindFirstChildOfClass("PlayerGui")
+			local store = gui and gui:FindFirstChild("BasicsDemo")
+			if store then
+				store:Destroy()
+			end
+		end
+		return Shop.reply(true, "")
+	end)
 	Shop.register("CombatTutorialSkip", function(player)
 		local duel = duels[player]
 		if duel and duel.Tutorial and not duel.FastTutorial and duel.Tutorial.Step < Tutorial.count() then

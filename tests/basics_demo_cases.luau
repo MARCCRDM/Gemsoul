@@ -274,6 +274,37 @@ for index, name in { "BasicsAttack", "BasicsBlock", "BasicsAbilities" } do
 		check(barBefore and barAfter and barAfter < barBefore - 0.2, name .. ": casting didn't spend charge (" .. tostring(barBefore) .. " -> " .. tostring(barAfter) .. ")")
 	end
 end
+-- The narrator's welcome first: its own script (the fighters squared up,
+-- the hero's arms thrown wide), the topic shown with no number.
+do
+	local opener = Demo.Scripts.TrainingBegins
+	check(opener and opener.Title == "WELCOME, MINER" and #opener.Hero > 0, "No welcome script for the narrator's first line")
+	local welcomeStage = Instance.new("Frame")
+	local welcome = Demo.new(welcomeStage, hero, foe, false)
+	welcome.show("TrainingBegins", 0, 3)
+	local titles = {}
+	for _, d in welcomeStage:FindFirstChild("Overlay"):GetDescendants() do
+		if d:IsA("TextLabel") and d.Text ~= "" then
+			titles[d.Text] = true
+		end
+	end
+	check(titles["WELCOME, MINER"] and not titles["00/03"], "The welcome isn't shown as its topic, with no number")
+	local copy = welcomeStage:FindFirstChild("Demo"):FindFirstChildOfClass("WorldModel"):FindFirstChild("Hero")
+	local armRest = copy.RightUpperArm.CFrame
+	local base = clock
+	local raised = false
+	local t = 0
+	while t < 2 do
+		t += 1 / 30
+		clock = base + t
+		welcome.step("TrainingBegins", t)
+		if (copy.RightUpperArm.CFrame.LookVector - armRest.LookVector).Magnitude > 0.3 then
+			raised = true
+		end
+	end
+	welcome.destroy()
+	check(raised, "The hero's greeting (arms wide) never showed")
+end
 -- on a phone: the controls by their buttons' names
 do
 	local phone = Demo.new(Instance.new("Frame"), hero, foe, true)
@@ -288,7 +319,12 @@ check(stage:FindFirstChild("Demo") == nil and stage:FindFirstChild("Overlay") ==
 do
 	local screen = fs.readFile(ROOT .. "/src/client/Modules/BasicsScreen.luau")
 	check(screen:find("BasicsDemo.fighters(", 1, true) and screen:find("pcall(BasicsDemo.new, screen.Panel", 1, true) and screen:find("pcall(demo.step, name, t)", 1, true), "The basics' screen doesn't play the demo")
-	check(screen:find("if not demo and frame ~= last then", 1, true), "The LED panel isn't the fallback")
+	check(screen:find("if not demo and scene and frame ~= last then", 1, true), "The LED panel isn't the fallback")
+	-- (the welcome first, with the demo; what was watched sent to the server)
+	check(screen:find('BasicsScreen.Opener = "TrainingBegins"', 1, true) and screen:find("table.insert(lines, 1, BasicsScreen.Opener)", 1, true), "The narrator's welcome doesn't open the lesson")
+	check(screen:find('"BasicsSeen"', 1, true) and screen:find('seen("Done", false, watched)', 1, true), "What was watched isn't sent for the numbers")
+	local server = fs.readFile(ROOT .. "/src/server/Systems/Duelist.luau")
+	check(server:find('Shop.register("BasicsSeen"', 1, true) and server:find('"BasicsLesson"', 1, true), "The server doesn't count what was watched")
 	local duelist = fs.readFile(ROOT .. "/src/server/Systems/Duelist.luau")
 	check(duelist:find('Shop.register("BasicsDemo"', 1, true), "The server doesn't build the demo's fighters")
 end

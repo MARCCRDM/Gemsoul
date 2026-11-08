@@ -55,7 +55,7 @@ IntroFinale.Lines = {
 	Hunt = "Your next event: hunt the bounty. Bombardiro Drago waits at the end of your first dungeon. Beat him for a thousand coins, gear, gems and a new kaiju.",
 	Reward = "Bounty claimed! Your reward: a new kaiju.",
 	Finish = "Recommended: finish your intro fights. Each one wins you another piece of your gear set.",
-	Done = "Well done, miner. Welcome to the Outpost.",
+	Done = "Well done, miner. The Outpost is yours.",
 }
 IntroFinale.Commons = { Field = true, Common = true } -- (the plain rocks: IntroGuide's)
 IntroFinale.MineFor = 90 -- seconds before the rock step moves on by itself
@@ -220,6 +220,10 @@ local function mine()
 		end)
 	end
 	banner("HIT THE ROCK", "Swing your pick at it: click, or tap")
+	-- (read out too: Client Modules/Narration's FinaleMine, its own caption off)
+	pcall(function()
+		require(script.Parent.Narration).play("FinaleMine", true)
+	end)
 	-- The arrows always lead to the rock nearest you now (a rock mined out or
 	-- one nearer as you walk: the way follows).
 	local GroundGuide = nil
@@ -319,6 +323,10 @@ local function gems()
 	end
 	local title = text("GEMS & ENCHANTING", 22, 26, GOLD, Enum.Font.GothamBlack, 32)
 	title.TextXAlignment = Enum.TextXAlignment.Center
+	-- (read out too: FinaleGems, its own caption off; OK closes it early)
+	pcall(function()
+		require(script.Parent.Narration).play("FinaleGems", true)
+	end)
 	local rows = {
 		{ "◆", "Mining digs up gems.", Color3.fromRGB(94, 206, 221) },
 		{ "✦", "Put a gem in your gear to enchant it: each gives you a move on Q, E or R.", Color3.fromRGB(255, 140, 90) },
@@ -472,6 +480,11 @@ local function kaiju(fight: boolean?)
 		return
 	end
 	GemClient.request("IntroFinale", "Fight")
+	-- (what they're for, as they fight: on screen and read out)
+	banner("YOUR KAIJU", IntroFinale.Lines.Fight)
+	pcall(function()
+		require(script.Parent.Narration).play("FinaleFight", true)
+	end)
 	local started = os.clock()
 	while os.clock() - started < IntroFinale.FightFor and not away() do
 		task.wait(2)
@@ -480,6 +493,7 @@ local function kaiju(fight: boolean?)
 			break
 		end
 	end
+	banner(nil)
 end
 
 -- 5. Your first dungeon -------------------------------------------------------------------------------------
@@ -869,6 +883,13 @@ local function run()
 	end
 	local done = GemClient.request("IntroFinale", "Done")
 	if not going then
+		-- The last word: on screen and read out, for as long as it takes.
+		banner("THE OUTPOST IS YOURS", IntroFinale.Lines.Done)
+		local voiced = 0
+		pcall(function()
+			voiced = require(script.Parent.Narration).play("FinaleDone", true)
+		end)
+		task.wait(math.max(3.5, voiced + 0.3))
 		banner(nil)
 	end
 	-- A little after, the meteor (its Magma Golem: Server.MeteorGolemServer):

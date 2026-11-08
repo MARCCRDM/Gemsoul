@@ -53,6 +53,13 @@ local GEMS = { Q = Color3.fromRGB(255, 120, 60), E = Color3.fromRGB(90, 200, 255
 -- Rings: a bolt flying to the rival, a blast's ring out over the floor;
 -- Gems: when Q, E and R light; Spend: charge spent, when, how much.
 BasicsDemo.Scripts = {
+	-- The narrator's welcome, before the basics: the fighters squared up, the
+	-- hero's arms thrown wide in greeting.
+	TrainingBegins = {
+		Title = "WELCOME, MINER",
+		Hero = { { "Buff", 0.5, 0.9 } },
+		Foe = {},
+	},
 	BasicsAttack = {
 		Title = "ATTACK",
 		Hero = {
@@ -361,7 +368,7 @@ function BasicsDemo.new(stage: GuiObject, heroSource: Model, foeSource: Model, t
 		local spec = BasicsDemo.Scripts[name] or {}
 		line = { Name = name, Script = spec, Offset = os.clock(), Fired = {} }
 		title.Text = spec.Title or ""
-		number.Text = string.format("%02d/%02d", index, total)
+		number.Text = if index > 0 then string.format("%02d/%02d", index, total) else ""
 		pop.Text = ""
 		cap.Visible, capHint.Visible = false, false
 		local abilities = spec.Gems ~= nil

@@ -1173,10 +1173,23 @@ local function join(run, player: Player)
 			require(script.Parent.Funnel).reach(player, "Dungeon entered")
 		end
 	end)
+	-- (A new miner's first time in: its notices one at a time, after the
+	-- narrator's line, not four at once.)
+	local function later(seconds: number, text: string)
+		if not intro then
+			notify(player, text)
+			return
+		end
+		task.delay(seconds, function()
+			if player.Parent and player:GetAttribute("RiftRun") == run.Id then
+				notify(player, text)
+			end
+		end)
+	end
 	if intro then
 		local ok, joined = pcall(KaijuServer.ensureStarter, player)
 		if ok and joined > 0 then
-			notify(player, "Your starter kaiju team is with you: they fight beside you in here.")
+			later(11, "Your starter kaiju team is with you: they fight beside you in here.")
 		end
 		-- (Any knocked out on the way here, in the intro's fights, come in
 		-- on their feet and at full health.)
@@ -1185,14 +1198,14 @@ local function join(run, player: Player)
 		-- blows and it's ready for the boss.
 		pcall(function()
 			require(script.Parent.KaijuBeamServer).topUp(player, require(ReplicatedStorage.Shared.KaijuBeam).FirstDungeon)
-			notify(player, "Your kaiju's HYPERBEAM is nearly charged: a few more hits, then press Z (the beam button on a phone) at the boss.")
+			later(24, "Your kaiju's HYPERBEAM is nearly charged: a few more hits, then press Z (the beam button on a phone) at the boss.")
 		end)
 		pcall(KaijuServer.deployTeam, player)
 	end
 	-- (In there you fight: your combat kit comes out, till you swap it for
 	-- your pick for the healing crystals.)
 	SparServer.riftKit(player, true)
-	notify(player, "Green crystals by the cave walls heal you: swap to your pick (1, or the kit button) and mine them.")
+	later(17, "Green crystals by the cave walls heal you: swap to your pick (1, or the kit button) and mine them.")
 	show(run)
 	if cleared > 0 then
 		notify(player, string.format("In at cave %d: your party's cleared the way this far.", cleared))
