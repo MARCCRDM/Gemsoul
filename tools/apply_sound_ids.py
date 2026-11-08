@@ -49,7 +49,9 @@ def sound_files():
         if not os.path.isdir(directory):
             continue
         for name in sorted(os.listdir(directory)):
-            if name.endswith(AUDIO) and not name.startswith("_"):
+            # (sounds; and the league crests' image, uploaded the same way)
+            wanted = AUDIO + ((".png",) if folder == "assets/images/crests" else ())
+            if name.endswith(wanted) and not name.startswith("_"):
                 found[name] = (folder, lua)
     return found
 

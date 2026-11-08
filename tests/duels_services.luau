@@ -235,6 +235,7 @@ local Progress = {
 local streakResults = {}
 -- Win rewards (ArenaStreaks.winReward): each one asked for, recorded.
 local winRewards = {}
+local leagueRewards = {}
 local ArenaStreaks = {
 	onRankedResult = function(p, won, foe)
 		table.insert(streakResults, { Player = p, Won = won, Foe = foe })
@@ -243,6 +244,11 @@ local ArenaStreaks = {
 	winReward = function(p, foe)
 		table.insert(winRewards, { Player = p, Foe = foe })
 		return { Id = "win" .. #winRewards }
+	end,
+	-- League tiers reached (Shared.Leagues.Track): each one paid, recorded.
+	leagueReward = function(p, name, spec)
+		table.insert(leagueRewards, { Player = p, Name = name, Coins = spec.Coins })
+		return { Name = name, Coins = spec.Coins }
 	end,
 }
 -- Swing restores (Systems/Restores): each share given, recorded; the pick

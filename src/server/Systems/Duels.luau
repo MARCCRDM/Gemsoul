@@ -104,6 +104,7 @@ local GearPresets = require(ReplicatedStorage.Shared.GearPresets)
 local Matchmaking = require(ReplicatedStorage.Shared.Matchmaking)
 local PvPRules = require(ReplicatedStorage.Shared.PvPRules)
 local Season = require(ReplicatedStorage.Shared.Season)
+local Leagues = require(ReplicatedStorage.Shared.Leagues)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local CombatServer = require(script.Parent.CombatServer)
 local ArenaSessions = require(script.Parent.ArenaSessions)
@@ -159,7 +160,45 @@ function Duels.record(player: Player)
 	-- every win it had as one.)
 	local record = profile.Duel :: any
 	record.Solo = record.Solo or record.Wins or 0
+	-- Its league (Shared.Leagues): from the rating, the first time.
+	if type(record.League) ~= "table" then
+		local step = Leagues.stepOf(record.Rating or Matchmaking.StartRating)
+		record.League = { Step = step, Season = Season.Name, Best = step, Safe = 0 }
+	end
 	return profile.Duel
+end
+
+-- This server's ladder for `player` (by everyone's DuelRating here): their
+-- place, how many there are, how many they passed coming up from `before`,
+-- and who's directly above (and the rating gap). (The Climb: Client
+-- MatchResult.)
+function Duels.ladder(player: Player, before: number?)
+	local mine = player:GetAttribute("DuelRating") or Matchmaking.StartRating
+	local rank, of, passed = 1, 0, 0
+	local above, gap = nil, math.huge
+	for _, other in Players:GetPlayers() do
+		local rating = other:GetAttribute("DuelRating")
+		if type(rating) ~= "number" then
+			continue
+		end
+		of += 1
+		if other ~= player then
+			if rating > mine then
+				rank += 1
+				if rating - mine < gap then
+					above, gap = other, rating - mine
+				end
+			elseif before and rating >= before and rating < mine then
+				passed += 1
+			end
+		end
+	end
+	return {
+		Rank = rank,
+		Of = math.max(of, 1),
+		Passed = passed,
+		Next = if above then { Name = above.DisplayName, Gap = gap } else nil,
+	}
 end
 
 -- Public on the player, for everyone's player list.
@@ -167,6 +206,10 @@ local function publish(player: Player)
 	local record = Duels.record(player)
 	if record then
 		player:SetAttribute("DuelRating", record.Rating)
+		-- (its league's step, 1-16: nameplates, PLAY, the versus card)
+		local league = (record :: any).League
+		player:SetAttribute("League", if league and (league.Played or 0) > 0 then league.Step else nil)
+		player:SetAttribute("LeagueSafe", (record :: any).League and (record :: any).League.Safe or 0)
 		player:SetAttribute("DuelWins", record.Wins)
 		player:SetAttribute("DuelsPlayed", (record :: any).Played or 0)
 		player:SetAttribute("DuelAuto", AutoQueue.setting(record))
@@ -292,16 +335,45 @@ local function teamRating(team): number
 	return if n > 0 then sum / n else Matchmaking.StartRating
 end
 
+-- Each fighter's lead kaiju (the first of the team out): what only this
+-- game has, and a fair hint at what to bring against them.
+local function leadKaiju(member: Player)
+	local ok, lead = pcall(function()
+		local Kaiju = require(ReplicatedStorage.Shared.Kaiju)
+		local profile = PlayerData.get(member)
+		local roster = profile and (profile :: any).Kaiju
+		if type(roster) ~= "table" or type(roster.List) ~= "table" then
+			return nil
+		end
+		local id = roster.Active or (type(roster.Team) == "table" and roster.Team[1])
+		for _, record in roster.List do
+			if type(record) == "table" and (record.Id == id or id == nil) then
+				local species = Kaiju.species(record.Species)
+				return { Species = record.Species, Name = species and species.Name or record.Species, Element = record.Element, Level = record.Level or 1 }
+			end
+		end
+		return nil
+	end)
+	return if ok then lead else nil
+end
+
 local function teamsInfo(match)
 	local teams = {}
 	for t, team in match.Teams do
 		teams[t] = {}
 		for _, member in team do
-			local record = Duels.record(member)
+			local record = Duels.record(member) :: any
+			local rating = if record then record.Rating else Matchmaking.StartRating
 			table.insert(teams[t], {
 				UserId = member.UserId,
 				Name = member.DisplayName,
-				Rating = if record then record.Rating else Matchmaking.StartRating,
+				Rating = rating,
+				-- (the versus card: Client SocialUI)
+				League = if record and record.League then record.League.Step else Leagues.stepOf(rating),
+				Wins = if record then record.Wins or 0 else 0,
+				Played = if record then (record.Wins or 0) + (record.Losses or 0) else 0,
+				Streak = if record then record.RankedStreak or 0 else 0,
+				Kaiju = leadKaiju(member),
 			})
 		end
 	end
@@ -430,6 +502,7 @@ function finish(match, winner: number?, reason: string)
 	end
 	match.State = "Done"
 	local ratings = { teamRating(match.Teams[1]), teamRating(match.Teams[2]) }
+	local leagueChange: { [Player]: any } = {} -- (each ranked 1v1 fighter's league move)
 	local rewards = match.Rules.Rewards
 	local names = {}
 	for t, team in match.Teams do
@@ -483,6 +556,22 @@ function finish(match, winner: number?, reason: string)
 						after = before
 					end
 					record.Rating = after
+					-- Its league moves with it, and the season's track pays
+					-- the first time each tier is reached (Shared.Leagues).
+					if #match.Teams[1] == 1 and #match.Teams[2] == 1 then
+						local held = record :: any
+						local saved, change = Leagues.update(held.League, after, Season.Name, before)
+						held.League = saved
+						local paid = {}
+						for _, step in change.Track do
+							local given = ArenaStreaks.leagueReward(member, Leagues.info(step).Label, Leagues.Track[step])
+							if given then
+								table.insert(paid, given)
+							end
+						end
+						change.Paid = paid
+						leagueChange[member] = change
+					end
 				end
 				record.Wins += if won then 1 else 0
 				if won and #match.Teams[1] == 1 and #match.Teams[2] == 1 then
@@ -588,6 +677,10 @@ function finish(match, winner: number?, reason: string)
 					Opponents = names[if t == 1 then 2 else 1],
 					Rules = { Name = match.Rules.Name, Stats = match.Rules.Stats },
 					Streak = rankedStreak,
+					-- the league move (Shared.Leagues: Before, After, Promoted,
+					-- Demoted, Shielded, NewLeague, Safe, Paid) and the ladder
+					League = leagueChange[member],
+					Ladder = if leagueChange[member] then Duels.ladder(member, before) else nil,
 					Tournament = tournament,
 					WinReward = winReward ~= nil,
 					Plays = if record then RewardRoll.plays(record) else nil,

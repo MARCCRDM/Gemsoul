@@ -1923,6 +1923,51 @@ faceRight.Position, faceRight.Size = UDim2.new(0.5, 44, 0, 40), UDim2.new(0.5, -
 local faceCount = text(faceoff, "", 34, P.Gold, HEADING)
 faceCount.AutomaticSize, faceCount.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
 faceCount.Position, faceCount.Size = UDim2.new(0, 0, 1, -50), UDim2.new(1, 0, 0, 40)
+-- The versus card's lines for a 1v1 (Shared.Leagues): each side's crest,
+-- league and rating, record and streak, and lead kaiju.
+local LeagueBadge = require(script.Parent.LeagueBadge)
+local Leagues = require(ReplicatedStorage.Shared.Leagues)
+local faceSides = {}
+for i, right in { false, true } do
+	local sideOf = {}
+	sideOf.Badge = LeagueBadge.new(faceoff, 40)
+	sideOf.Badge.Frame.Position = if right then UDim2.new(0.5, 44, 0, 92) else UDim2.new(0.5, -84, 0, 92)
+	local function line(size: number, y: number, color: Color3)
+		local l = text(faceoff, "", size, color, BOLD)
+		l.AutomaticSize = Enum.AutomaticSize.None
+		l.TextXAlignment = if right then Enum.TextXAlignment.Left else Enum.TextXAlignment.Right
+		l.Position = if right then UDim2.new(0.5, 92, 0, y) else UDim2.new(0, 16, 0, y)
+		l.Size = UDim2.new(0.5, -108, 0, size + 4)
+		l.TextTruncate = Enum.TextTruncate.AtEnd
+		return l
+	end
+	sideOf.League = line(14, 90, P.Text)
+	sideOf.Record = line(11, 108, P.Dim)
+	sideOf.Kaiju = line(11, 123, P.Dim)
+	faceSides[i] = sideOf
+end
+local function showSide(sideOf, entry)
+	local on = entry ~= nil
+	for _, part in { sideOf.Badge.Frame, sideOf.League, sideOf.Record, sideOf.Kaiju } do
+		part.Visible = on
+	end
+	if not entry then
+		return
+	end
+	local step = entry.League or Leagues.stepOf(entry.Rating or Leagues.Start)
+	local info = Leagues.info(step)
+	sideOf.Badge:set(step)
+	sideOf.League.Text = string.format("%s  ·  %d", info.Label, entry.Rating or 0)
+	sideOf.League.TextColor3 = info.Color
+	local played = entry.Played or 0
+	sideOf.Record.Text = (if played > 0
+			then string.format("%d%% WINS  ·  %d FIGHTS", math.floor((entry.Wins or 0) / played * 100 + 0.5), played)
+			else "FIRST RANKED FIGHT")
+		.. (if (entry.Streak or 0) >= 2 then string.format("  ·  %d IN A ROW", entry.Streak) else "")
+	local k = entry.Kaiju
+	sideOf.Kaiju.Text = if k then string.format("LEAD KAIJU: %s  ·  %s  ·  LV %d", string.upper(k.Name or "?"), string.upper(k.Element or "?"), k.Level or 1) else ""
+	sideOf.Kaiju.TextColor3 = if k and GemConfig.ElementColors[k.Element] then GemConfig.ElementColors[k.Element] else P.Dim
+end
 local fightTimer = text(overlay, "", 18, P.Gold, HEADING)
 fightTimer.AutomaticSize, fightTimer.TextXAlignment = Enum.AutomaticSize.None, Enum.TextXAlignment.Center
 fightTimer.AnchorPoint = Vector2.new(0.5, 0)
@@ -1967,6 +2012,9 @@ local function showReveal(info)
 	end
 	faceKind.Text = string.format("ROUND %d  ·  YOU %d – %d THEM", info.Round, info.Wins.Mine, info.Wins.Theirs)
 	faceLeft.Text, faceRight.Text = picked(info.Picks.Mine), picked(info.Picks.Theirs)
+	showSide(faceSides[1], nil)
+	showSide(faceSides[2], nil)
+	faceoff.Size = UDim2.fromOffset(560, 150)
 	faceoff.Visible = true
 end
 
@@ -1994,6 +2042,11 @@ local function showFaceoff(info)
 		faceKind.Text ..= string.format(if info.BonusUpfront then "  ·  JOIN BONUS +%d ◆" else "  ·  CALLED IN: WIN +%d ◆", info.Bonus or 0)
 	end
 	faceLeft.Text, faceRight.Text = names(mine), names(theirs)
+	-- A 1v1: the versus card's lines under each name; the card grows for them.
+	local solo = #(mine or {}) == 1 and #(theirs or {}) == 1 and not info.Intro
+	showSide(faceSides[1], if solo then mine[1] else nil)
+	showSide(faceSides[2], if solo then theirs[1] else nil)
+	faceoff.Size = UDim2.fromOffset(560, if solo then 200 else 150)
 	if info.Rounds then
 		info.Score, info.Round = { Mine = 0, Theirs = 0 }, 1
 		faceKind.Text ..= string.format("  ·  FIRST TO %d", info.Rounds.ToWin)

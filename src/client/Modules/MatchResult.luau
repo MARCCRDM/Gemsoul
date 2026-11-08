@@ -8,6 +8,11 @@
 	               rule under it runs down till you're sent back.
 	  The figures  RATING (and the change), COINS (and any bonus), and how
 	               it ended (rounds won, time's up, forfeit).
+	  League       a ranked 1v1's league (Shared.Leagues): its crest, the
+	               rank now (PROMOTED, DOWN A TIER, or held by the safety
+	               after a promotion), the way to the next tier, a league
+	               reward paid, and the climb on this server (your place,
+	               who you passed, who's next above).
 	  Tournament   a queued 1v1's arena tournament (Shared.SwingRestore):
 	               ten segments, this run's wins lit, the wins that restore
 	               swings marked with their share, and what this one did.
@@ -27,7 +32,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Leagues = require(ReplicatedStorage.Shared.Leagues)
 local RewardRoll = require(ReplicatedStorage.Shared.RewardRoll)
+local LeagueBadge = require(script.Parent.LeagueBadge)
 local SwingRestore = require(ReplicatedStorage.Shared.SwingRestore)
 local IronUi = require(script.Parent.IronUi)
 local UiKit = require(script.Parent.UiKit)
@@ -44,6 +51,7 @@ local INNER = W - PAD * 2
 local HEAD_H = 76 -- (the header, down to its rule)
 local FIG_H = 76 -- (the figures' row)
 local TOUR_H = 76 -- (the tournament)
+local LEAGUE_H = 70 -- (the league)
 local REWARD_H = 56 -- (the win reward)
 local FOOT_H = 34
 
@@ -146,6 +154,14 @@ function MatchResult.mount(parent: Instance)
 	for _, r in ui.Rules do
 		r.Size = UDim2.fromOffset(1, 40)
 	end
+	-- The league.
+	ui.LeagueRule = rule(panel, 0)
+	ui.Badge = LeagueBadge.new(panel, 48)
+	ui.LeagueName = label(panel, "", 20, P.Text, HEADING, PAD + 60, 0, 240, 24)
+	ui.LeagueNote = label(panel, "", 11, P.Dim, BOLD, PAD + 60, 0, INNER - 60, 14)
+	ui.Climb = label(panel, "", 11, P.Dim, BOLD, PAD + 60, 0, INNER - 60, 14)
+	ui.LeagueTag = label(panel, "", 11, P.Gold, HEADING, W - PAD - 200, 0, 200, 16)
+	ui.LeagueTag.TextXAlignment = Enum.TextXAlignment.Right
 	-- The tournament.
 	ui.TourRule = rule(panel, 0)
 	ui.TourCaption = label(panel, "ARENA TOURNAMENT", 10, P.Dim, BOLD, PAD, 0, 220, 14)
@@ -275,6 +291,44 @@ function MatchResult.show(info, seconds: number)
 	ui.Rules[1].Position = UDim2.fromOffset(PAD + third, y + 4)
 	ui.Rules[2].Position = UDim2.fromOffset(PAD + third * 2 + 12, y + 4)
 	y = HEAD_H + FIG_H
+	-- The league.
+	local league = info.League
+	for _, part in { ui.LeagueRule, ui.Badge.Frame, ui.LeagueName, ui.LeagueNote, ui.Climb, ui.LeagueTag } do
+		part.Visible = league ~= nil
+	end
+	if league then
+		local now = Leagues.info(league.After)
+		ui.LeagueRule.Position = UDim2.fromOffset(PAD, y)
+		ui.Badge.Frame.Position = UDim2.fromOffset(PAD, y + 12)
+		ui.Badge:set(league.After)
+		ui.LeagueName.Position = UDim2.fromOffset(PAD + 60, y + 10)
+		ui.LeagueName.Text = now.Label
+		ui.LeagueName.TextColor3 = now.Color
+		ui.LeagueTag.Position = UDim2.fromOffset(W - PAD - 200, y + 14)
+		ui.LeagueTag.Text = if league.Promoted then "PROMOTED"
+			elseif league.Demoted then "DOWN A TIER"
+			elseif league.Shielded then "SAFE"
+			else ""
+		ui.LeagueTag.TextColor3 = if league.Demoted then P.Bad elseif league.Promoted then P.Gold else P.Good
+		local _, toNext = Leagues.progress(league.After, info.Rating or now.Floor)
+		local paid = league.Paid and league.Paid[#league.Paid]
+		ui.LeagueNote.Position = UDim2.fromOffset(PAD + 60, y + 34)
+		ui.LeagueNote.TextColor3 = if paid then P.Gold else P.Dim
+		ui.LeagueNote.Text = if paid
+			then string.format("League reward: +%d ◆%s%s", paid.Coins or 0, if paid.Cache then "  ·  a cache to open" else "", if paid.Title then "  ·  title " .. paid.Title else "")
+			elseif league.Shielded then string.format("Held in %s: %d safe match%s left", Leagues.info(league.After).Name, league.Safe or 0, if (league.Safe or 0) == 1 then "" else "es")
+			elseif toNext then string.format("%d rating to %s", toNext, Leagues.info(league.After + 1).Label)
+			else "Top league"
+		local ladder = info.Ladder
+		ui.Climb.Position = UDim2.fromOffset(PAD + 60, y + 50)
+		ui.Climb.Text = if ladder
+			then string.format("#%d of %d on this server", ladder.Rank, ladder.Of)
+				.. (if (ladder.Passed or 0) > 0 then string.format("  ·  ▲ %d passed", ladder.Passed) else "")
+				.. (if ladder.Next then string.format("  ·  next: %s, %d rating", ladder.Next.Name, ladder.Next.Gap) else "")
+			else ""
+		ui.Climb:SetAttribute("NoTranslate", true) -- (a name)
+		y += LEAGUE_H
+	end
 	-- The tournament.
 	local t = info.Tournament
 	for _, part in { ui.TourRule, ui.TourCaption, ui.TourCount, ui.Track, ui.TourLine } do

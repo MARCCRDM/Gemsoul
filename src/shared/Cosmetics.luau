@@ -342,6 +342,17 @@ Cosmetics.List = {
 		Color = Color3.fromRGB(255, 205, 90),
 		Exclusive = "Invite",
 	},
+	-- Ranked leagues (Shared.Leagues) ---------------------------------------------------
+	TitleTitan = {
+		Id = "TitleTitan",
+		Kind = "Title",
+		Name = "TITAN",
+		Description = "Over your head for everyone to see: you reached the Titan league in Ranked.",
+		Rarity = "Legendary",
+		Color = Color3.fromRGB(255, 210, 90),
+		Exclusive = "Ranked",
+		How = "Reach the Titan league in Ranked 1v1.",
+	},
 	-- Ranked win streaks (Shared.ArenaStreak) ----------------------------------------
 	TitleStreak30 = {
 		Id = "TitleStreak30",

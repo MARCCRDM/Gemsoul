@@ -18,6 +18,7 @@ It uploads, in this order (most important first):
   assets/sounds/narration/*   -> src/client/Modules/Narration.luau
   assets/sounds/*.mp3         -> src/client/Modules/UiSound.luau
   assets/images/menu/*.png    -> src/shared/MainMenuContent.luau (the main menu's banners)
+  assets/images/crests/*.png  -> src/shared/Leagues.luau (the ranked league crests)
 then replaces the matching "Name = 0, -- file.mp3" (or .ogg, .png) lines with the new ids.
 Pictures go up as Decals; if a banner shows blank in game, upload that .png in
 Studio's Asset Manager instead and paste its image id into the line by hand.
@@ -53,6 +54,7 @@ GROUPS = [
     ("assets/sounds/narration", "src/client/Modules/Narration.luau"),
     ("assets/sounds", "src/client/Modules/UiSound.luau"),
     ("assets/images/menu", "src/shared/MainMenuContent.luau"),
+    ("assets/images/crests", "src/shared/Leagues.luau"),
 ]
 EXTENSIONS = (".mp3", ".ogg", ".png")
 API = "https://apis.roblox.com/assets/v1"

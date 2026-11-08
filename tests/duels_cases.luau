@@ -154,6 +154,12 @@ kill(ben)
 check(match.State == "Done", "A knockout didn't end the match")
 local won, lost = last(ana, "MatchEnd")[2], last(ben, "MatchEnd")[2]
 check(won.Won and not lost.Won and won.Delta == 16 and lost.Delta == -16, "Rating change wrong")
+-- Its league (Shared.Leagues): the winner still Copper III (1016), the
+-- loser down to Stone I (984), saved, published, and sent with the result.
+check(won.League and won.League.After == 4 and lost.League and lost.League.After == 3 and lost.League.Demoted, "The result's league move is wrong")
+check(profiles[ana].Duel.League.Step == 4 and profiles[ben].Duel.League.Step == 3 and profiles[ana].Duel.League.Played == 1, "The league wasn't saved")
+check(ana:GetAttribute("League") == 4 and ben:GetAttribute("League") == 3, "The league wasn't published")
+check(#leagueRewards == 0, "A league reward for no new tier")
 check(
 	profiles[ana].Duel.Rating == 1016 and profiles[ana].Duel.Wins == 1 and profiles[ben].Duel.Losses == 1,
 	"Record not saved"

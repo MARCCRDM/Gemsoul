@@ -463,6 +463,26 @@ check(devClaim.Ok, "A test cache couldn't be claimed")
 check(#vaulted == vaultedBefore + 1, "A test cache's leftover didn't go to the Market")
 check(#profile.Duel.StreakCaches == realCount, "The claimed test cache stayed")
 
+-- League rewards (Shared.Leagues.Track, ArenaStreaks.leagueReward): a
+-- tier's coins at once; a new league's cache (its free gem, pieces at least
+-- its floor) to claim; Titan's title.
+do
+	local coins, caches = profile.Coins, #profile.Duel.StreakCaches
+	local given = Server.leagueReward(player, "COPPER II", { Coins = 1500 })
+	check(given and given.Coins == 1500 and profile.Coins == coins + 1500 and #profile.Duel.StreakCaches == caches, "A tier's coins weren't paid, or it opened a cache")
+	given = Server.leagueReward(player, "COBALT III", { Coins = 3000, Cache = { GemTier = "Rare", Floor = "Rare" } })
+	local cache = profile.Duel.StreakCaches[#profile.Duel.StreakCaches]
+	check(given.Cache and #profile.Duel.StreakCaches == caches + 1 and string.find(cache.Id, "^League_"), "A new league didn't open its cache")
+	local free = 0
+	for _, entry in cache.Items do
+		free += if entry.Free and entry.Item.Kind == "Gem" and entry.Rarity == "Rare" then 1 else 0
+	end
+	check(free == 1, "A league cache's free gem")
+	profile.Cosmetics.Owned.TitleTitan = nil
+	given = Server.leagueReward(player, "TITAN", { Coins = 15000, Cache = { GemTier = "Legendary", Floor = "Legendary" }, Title = "TitleTitan" })
+	check(given.Title == "TITAN" and profile.Cosmetics.Owned.TitleTitan, "Titan's title wasn't given")
+end
+
 -- Boss caches (Shared.BossLoot, ArenaStreaks.bossCache): two pieces of gear
 -- to keep one of, at least its threat's floor and quality, FocusCount of
 -- them its favourite kind; the other up on the Market from the Rift Vault.

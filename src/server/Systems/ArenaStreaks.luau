@@ -281,6 +281,31 @@ function ArenaStreaks.bossCache(player: Player, boss, gem, source: string?, opts
 	return cache
 end
 
+-- A league tier reached the first time this season (Shared.Leagues.Track):
+-- its coins and title now, and a cache to claim like a streak's (a free gem
+-- of its GemTier, two pieces of gear at least its Floor). -> what it gave.
+function ArenaStreaks.leagueReward(player: Player, name: string, spec)
+	local duel, profile = record(player)
+	if not duel or not profile then
+		return nil
+	end
+	if spec.Coins and spec.Coins > 0 then
+		PlayerData.addCoins(player, spec.Coins, "League")
+	end
+	local title = spec.Title and Cosmetics.get(spec.Title)
+	if title then
+		profile.Cosmetics.Owned[title.Id] = true
+	end
+	if spec.Cache then
+		local m = { Wins = 0, Name = name, FreeGems = { rollGem(spec.Cache.GemTier) } }
+		m.Gear, m.Plays = rolled(duel, spec.Cache.Floor)
+		local cache = ArenaStreaks.rollCache(m)
+		cache.Id = "League_" .. string.gsub(name, "%W", "") .. "_" .. tostring(os.time())
+		table.insert(duel.StreakCaches, cache)
+	end
+	return { Name = name, Coins = spec.Coins or 0, Cache = spec.Cache ~= nil, Title = title and title.Name }
+end
+
 -- A milestone reached: coins and title now, the cache to claim.
 local function reward(player: Player, duel, profile, m)
 	local paid = duel.StreakPaid[seasonKey()] or {}
