@@ -1590,6 +1590,58 @@ do
 	for _, board in { "Guide", "Controls", "Elements", "Gems", "Bounties", "Rift", "Kaiju", "Outpost" } do
 		check(boardsSeen[board], "No LED screen for " .. board)
 	end
+	-- The landmarks in the outer belt (OutpostWorld.Landmarks): all built,
+	-- inside the wall, off the walkways, pads, rings and the Shelter, and no
+	-- rock grows in one.
+	do
+		local L = World.Landmarks
+		local marksModel = site.Model:FindFirstChild("Landmarks", true)
+		check(marksModel ~= nil, "No landmarks in the Outpost")
+		local counts = {}
+		for _, child in if marksModel then marksModel:GetChildren() else {} do
+			counts[child.Name] = (counts[child.Name] or 0) + 1
+		end
+		for name, want in { WelcomeArch = 1, FlagAvenue = 1, Signpost = 1, Watchtower = #L.Towers.Angles, CommsArray = 1, TitanBones = 1 } do
+			check(counts[name] == want, "Landmark " .. name .. ": " .. tostring(counts[name]) .. " built, not " .. want)
+		end
+		local spots = {
+			{ "the comms array", L.Comms.X, L.Comms.Z, 26 },
+			{ "the Titan Bones", L.Bones.X, L.Bones.Z, 46 },
+			{ "the signpost", L.Signpost.X, L.Signpost.Z, 10 },
+		}
+		for _, deg in L.Towers.Angles do
+			local a = math.rad(deg)
+			table.insert(spots, { "a watchtower", math.cos(a) * L.Towers.R, math.sin(a) * L.Towers.R, 10 })
+		end
+		local function toSegment(px, pz, ax, az, bx, bz)
+			local dx, dz = bx - ax, bz - az
+			local t = math.clamp(((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz), 0, 1)
+			return math.sqrt((px - ax - dx * t) ^ 2 + (pz - az - dz * t) ^ 2)
+		end
+		local shelterAt = Rules.Location:ToObjectSpace(Rules.shelterFrame())
+		for _, spot in spots do
+			local name, x, z, keep = spot[1], spot[2], spot[3], spot[4]
+			check(math.sqrt(x * x + z * z) + keep * 0.3 < set.Wall, name .. " is out past the wall")
+			check(math.sqrt(x * x + z * z) > set.Ring + 7 + keep * 0.5, name .. " is in the field")
+			for _, stage in set.Stages do
+				check(math.sqrt((x - stage.X) ^ 2 + (z - stage.Z) ^ 2) > set.StageReach + keep, name .. " is in the " .. stage.Name)
+			end
+			for _, walk in set.Walks do
+				for k = 1, #walk - 1 do
+					check(toSegment(x, z, walk[k][1], walk[k][2], walk[k + 1][1], walk[k + 1][2]) > keep * 0.6 + 4.5, name .. " is on a walkway")
+				end
+			end
+			check(math.abs(x) > 9 + keep * 0.5 and math.abs(z) > 9 + keep * 0.5, name .. " is on a haul road")
+			for _, pad in Rules.padSpots() do
+				check(math.sqrt((x - pad.Offset.X) ^ 2 + (z - pad.Offset.Z) ^ 2) > set.Pad + 6 + keep, name .. " is on a pod pad")
+			end
+			check(math.sqrt((x - shelterAt.X) ^ 2 + (z - shelterAt.Z) ^ 2) > 110, name .. " is in the Shelter")
+			for _, i in site.NearSpots do
+				local q = Rules.Location:PointToObjectSpace(site.Spots[i].Position)
+				check(math.sqrt((q.X - x) ^ 2 + (q.Z - z) ^ 2) > keep - 1, "A rock grows in " .. name)
+			end
+		end
+	end
 	-- the field: rocks round Arena Row and at the pods' doorsteps, all in the safe core
 	local inField, doorstep = 0, 0
 	for _, i in site.NearSpots do

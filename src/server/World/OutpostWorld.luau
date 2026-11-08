@@ -2870,6 +2870,282 @@ local function settlement(parent, at: CFrame, rules, rng)
 	return { Pads = pads, Gates = gates, Enchanter = desk, Heart = at, KeepOut = keepOut, Lines = lines }
 end
 
+-- Landmarks in the settlement's outer belt (Shared.Outpost.Settlement:
+-- between the field's walkway and the wall), where it was bare: a welcome
+-- arch over the south road with a flag avenue up to it from the Arrival
+-- Plaza, a signpost at the plaza, watchtowers at four points on the wall, a
+-- comms array in the east and the Titan Bones (a dig round a giant kaiju's
+-- skeleton) in the south-west. Each spot is clear of the roads, walkways,
+-- pads, the Shelter and the Kaiju Grounds. Returns their keep-outs (no
+-- rocks grow in them).
+local BONE = Color3.fromRGB(224, 216, 194)
+local BONE_DARK = Color3.fromRGB(160, 150, 128)
+local RED_LAMP = Color3.fromRGB(255, 70, 60)
+OutpostWorld.Landmarks = {
+	Arch = { X = 0, Z = 326 },
+	Flags = { 256, 280, 304 }, -- (z, either side of the south road)
+	Signpost = { X = -44, Z = 238 },
+	Towers = { Angles = { 60, 150, 210, 330 }, R = 335 },
+	Comms = { X = 287, Z = 40 },
+	Bones = { X = -170, Z = 262 },
+}
+local function landmarks(parent, at: CFrame): { any }
+	local L = OutpostWorld.Landmarks
+	local m = folder(parent, "Landmarks")
+	local keep = {}
+	local function spot(x: number, z: number): CFrame
+		return at * CFrame.new(x, 0, z)
+	end
+	local function towardMiddle(x: number, z: number): CFrame
+		return facingPoint(spot(x, z).Position, at.Position)
+	end
+
+	-- The welcome arch over the south road, just inside the gate: two lit
+	-- pylons, SAGA OUTPOST on the beam both ways, a gem over it.
+	do
+		local arch = folder(m, "WelcomeArch")
+		local base = spot(L.Arch.X, L.Arch.Z)
+		local H = 34 -- (the beam's middle)
+		for _, sx in { -1, 1 } do
+			local x = sx * 20
+			solid(part(arch, base * CFrame.new(x, 1.2, 0), Vector3.new(9, 2.4, 9), HULL_DARK, Enum.Material.Concrete))
+			part(arch, base * CFrame.new(x, 2.5, 0), Vector3.new(9.2, 0.25, 9.2), HAZARD, Enum.Material.Metal)
+			solid(part(arch, base * CFrame.new(x, H / 2 + 1, 0), Vector3.new(5.5, H - 2, 5.5), HULL_DARK, Enum.Material.Metal))
+			for _, sz in { -1, 1 } do
+				part(arch, base * CFrame.new(x, H / 2, sz * 2.8), Vector3.new(1.2, H - 8, 0.2), GLOW, Enum.Material.Neon)
+			end
+			light(part(arch, base * CFrame.new(x, H + 4.9, 0), Vector3.new(6, 1.4, 6), SAGA, Enum.Material.Neon), SAGA, 30, 1.2)
+		end
+		local beam = part(arch, base * CFrame.new(0, H, 0), Vector3.new(48, 8, 3.4), HULL_DARK, Enum.Material.Metal)
+		beam.Name = "Sign"
+		letters(beam, Enum.NormalId.Front, beam.Size, "SAGA OUTPOST", SAGA, 0)
+		letters(beam, Enum.NormalId.Back, beam.Size, "SAGA OUTPOST", SAGA, 0)
+		for _, y in { H - 4.15, H + 4.15 } do
+			part(arch, base * CFrame.new(0, y, 0), Vector3.new(48.6, 0.35, 3.7), GLOW, Enum.Material.Neon)
+		end
+		-- the crest: a gem on a short spire over the middle
+		part(arch, base * CFrame.new(0, H + 5.5, 0), Vector3.new(4, 3, 4), HULL_DARK, Enum.Material.Metal)
+		local gem = part(arch, base * CFrame.new(0, H + 10, 0) * CFrame.Angles(0, math.rad(45), math.rad(45)), Vector3.new(4.6, 4.6, 4.6), VIOLET, Enum.Material.Neon)
+		light(gem, VIOLET, 40, 1.5)
+		table.insert(keep, { base.Position, 24 })
+	end
+
+	-- The flag avenue: banners either side of the south road from the plaza
+	-- to the arch, amber and cyan by turns, each on an arm over the road.
+	do
+		local flags = folder(m, "FlagAvenue")
+		for i, z in L.Flags do
+			for _, sx in { -1, 1 } do
+				local foot = spot(sx * 14, z)
+				solid(strut(flags, foot.Position, (foot * CFrame.new(0, 17, 0)).Position, 0.3, STEEL))
+				part(flags, foot * CFrame.new(0, 17.4, 0), Vector3.new(0.9, 0.9, 0.9), SAGA, Enum.Material.Neon, "Ball")
+				part(flags, foot * CFrame.new(-sx * 2.4, 16.2, 0), Vector3.new(4.8, 0.3, 0.3), STEEL, Enum.Material.Metal)
+				local color = if (i + (if sx > 0 then 1 else 0)) % 2 == 0 then SAGA else GLOW
+				part(flags, foot * CFrame.new(-sx * 2.6, 11.8, 0), Vector3.new(3.8, 8.2, 0.15), color, Enum.Material.Fabric)
+				part(flags, foot * CFrame.new(-sx * 2.6, 11.8, 0), Vector3.new(0.7, 6.8, 0.2), HULL_DARK, Enum.Material.SmoothPlastic)
+				table.insert(keep, { foot.Position, 4 })
+			end
+		end
+	end
+
+	-- The signpost by the plaza: a post with an arrow board for each way,
+	-- each turned toward where it says.
+	do
+		local sign = folder(m, "Signpost")
+		local foot = spot(L.Signpost.X, L.Signpost.Z)
+		solid(part(sign, foot * CFrame.new(0, 7, 0), Vector3.new(1, 14, 1), HULL_DARK, Enum.Material.Metal))
+		part(sign, foot * CFrame.new(0, 14.3, 0), Vector3.new(1.4, 0.6, 1.4), SAGA, Enum.Material.Neon)
+		local rules = OutpostWorld.Rules
+		local shelter = if rules and rules.ShelterOffset then rules.ShelterOffset else Vector3.new(195, 0, 164)
+		for k, way in {
+			{ "ARENA ROW", Vector3.new(0, 0, 0), GLOW },
+			{ "MARKET", shelter, SAGA },
+			{ "KAIJU GROUNDS", Vector3.new(DAYCARE.X, 0, DAYCARE.Z), Color3.fromRGB(120, 235, 140) },
+			{ "TITAN BONES", Vector3.new(L.Bones.X, 0, L.Bones.Z), BONE },
+		} do
+			local from = foot.Position
+			local to = spot(way[2].X, way[2].Z).Position
+			local turn = facingPoint(from, to) * CFrame.Angles(0, math.rad(90), 0) -- (its X toward it)
+			local board = part(sign, turn * CFrame.new(4.4, 12.4 - k * 2.2, 0), Vector3.new(8, 1.6, 0.3), PLATE_INK, Enum.Material.Metal)
+			letters(board, Enum.NormalId.Front, board.Size, way[1], way[3], 0)
+			letters(board, Enum.NormalId.Back, board.Size, way[1], way[3], 0)
+			part(sign, turn * CFrame.new(8.9, 12.4 - k * 2.2, 0) * CFrame.Angles(0, math.rad(90), 0), Vector3.new(0.3, 1.6, 1), PLATE_INK, Enum.Material.Metal, "Wedge")
+		end
+		table.insert(keep, { foot.Position, 10 })
+	end
+
+	-- The watchtowers: on four points round the wall, clear of the gates,
+	-- the Shelter and the lamp masts. Splayed legs, a deck with a rail, a
+	-- hut, a searchlight on the middle and a red beacon on top.
+	for _, deg in L.Towers.Angles do
+		local a = math.rad(deg)
+		local x, z = math.cos(a) * L.Towers.R, math.sin(a) * L.Towers.R
+		local base = towardMiddle(x, z)
+		local t = folder(m, "Watchtower")
+		local h = 24
+		local corners = { { -4, -4 }, { 4, -4 }, { 4, 4 }, { -4, 4 } }
+		for i, c in corners do
+			solid(strut(t, (base * CFrame.new(c[1], 0, c[2])).Position, (base * CFrame.new(c[1] * 0.7, h, c[2] * 0.7)).Position, 0.55, HULL_DARK))
+			local n = corners[i % 4 + 1]
+			strut(t, (base * CFrame.new(c[1] * 0.92, 3, c[2] * 0.92)).Position, (base * CFrame.new(n[1] * 0.8, h * 0.6, n[2] * 0.8)).Position, 0.22, STEEL)
+			strut(t, (base * CFrame.new(n[1] * 0.92, 3, n[2] * 0.92)).Position, (base * CFrame.new(c[1] * 0.8, h * 0.6, c[2] * 0.8)).Position, 0.22, STEEL)
+		end
+		solid(part(t, base * CFrame.new(0, h, 0), Vector3.new(10, 1, 10), HULL_DARK, Enum.Material.DiamondPlate))
+		for _, side in { { 0, -4.8, 10, 0.3 }, { 0, 4.8, 10, 0.3 }, { -4.8, 0, 0.3, 10 }, { 4.8, 0, 0.3, 10 } } do
+			part(t, base * CFrame.new(side[1], h + 2, side[2]), Vector3.new(side[3], 0.3, side[4]), HAZARD, Enum.Material.Metal)
+		end
+		part(t, base * CFrame.new(0, h + 3, 1.2), Vector3.new(5, 5, 4.4), HULL, Enum.Material.Metal)
+		part(t, base * CFrame.new(0, h + 3.8, -1.05), Vector3.new(4.4, 1.2, 0.1), GLOW, Enum.Material.Neon)
+		part(t, base * CFrame.new(0, h + 5.8, 1.2), Vector3.new(6, 0.5, 5.6), HULL_DARK, Enum.Material.Metal)
+		local lamp = part(t, base * CFrame.new(0, h + 7, 0) * CFrame.Angles(math.rad(-18), 0, 0), Vector3.new(2, 2, 2.6), HULL_DARK, Enum.Material.Metal)
+		part(t, lamp.CFrame * CFrame.new(0, 0, -1.32), Vector3.new(1.6, 1.6, 0.05), Color3.fromRGB(255, 244, 214), Enum.Material.Neon)
+		local beam = Instance.new("SpotLight")
+		beam.Face, beam.Range, beam.Angle, beam.Brightness = Enum.NormalId.Front, 60, 32, 2
+		beam.Color = Color3.fromRGB(255, 244, 214)
+		beam.Parent = lamp
+		strut(t, (base * CFrame.new(0, h + 6, 2.6)).Position, (base * CFrame.new(0, h + 11, 2.6)).Position, 0.15, STEEL)
+		light(part(t, base * CFrame.new(0, h + 11.4, 2.6), Vector3.new(0.8, 0.8, 0.8), RED_LAMP, Enum.Material.Neon, "Ball"), RED_LAMP, 14, 1)
+		table.insert(keep, { base.Position, 10 })
+	end
+
+	-- The comms array in the east: a lattice mast with a beacon, three dishes
+	-- turned up at the sky, and their equipment boxes, on a round pad.
+	do
+		local c = folder(m, "CommsArray")
+		local base = towardMiddle(L.Comms.X, L.Comms.Z)
+		solid(disc(c, base * CFrame.new(0, 0.2, 0), 20, 0.4, Color3.fromRGB(70, 78, 94), Enum.Material.Concrete))
+		part(c, base * CFrame.new(0, 0.42, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(0.04, 39, 39), GLOW, Enum.Material.Neon, "Cylinder")
+		part(c, base * CFrame.new(0, 0.43, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(0.05, 38, 38), Color3.fromRGB(70, 78, 94), Enum.Material.Concrete, "Cylinder")
+		local top = 44
+		local legs = { { -3, -3 }, { 3, -3 }, { 3, 3 }, { -3, 3 } }
+		for i, l in legs do
+			solid(strut(c, (base * CFrame.new(l[1], 0.4, l[2])).Position, (base * CFrame.new(l[1] * 0.25, top, l[2] * 0.25)).Position, 0.35, STEEL))
+			local n = legs[i % 4 + 1]
+			for y = 8, top - 6, 9 do
+				local k = 1 - y / top * 0.75
+				strut(c, (base * CFrame.new(l[1] * k, y, l[2] * k)).Position, (base * CFrame.new(n[1] * k, y, n[2] * k)).Position, 0.15, STEEL)
+			end
+		end
+		strut(c, (base * CFrame.new(0, top, 0)).Position, (base * CFrame.new(0, top + 10, 0)).Position, 0.18, STEEL)
+		light(part(c, base * CFrame.new(0, top + 10.4, 0), Vector3.new(1.1, 1.1, 1.1), RED_LAMP, Enum.Material.Neon, "Ball"), RED_LAMP, 20, 1.2)
+		for _, d in { { -11, 5, -50 }, { 11, 5, 40 }, { 0, -12, 160 } } do
+			local foot = base * CFrame.new(d[1], 0, d[2]) * CFrame.Angles(0, math.rad(d[3]), 0)
+			solid(strut(c, foot.Position, (foot * CFrame.new(0, 5, 0)).Position, 0.8, HULL_DARK))
+			local face = foot * CFrame.new(0, 7.4, 0) * CFrame.Angles(math.rad(-50), 0, 0)
+			disc(c, face, 5.2, 0.5, HULL, Enum.Material.SmoothPlastic)
+			disc(c, face * CFrame.new(0, 0.28, 0), 4.6, 0.1, Color3.fromRGB(230, 234, 240), Enum.Material.SmoothPlastic)
+			strut(c, (face * CFrame.new(0, 0.3, 0)).Position, (face * CFrame.new(0, 3.4, 0)).Position, 0.12, STEEL)
+			part(c, face * CFrame.new(0, 3.6, 0), Vector3.new(0.7, 0.7, 0.7), GLOW, Enum.Material.Neon, "Ball")
+		end
+		for _, b in { { -8, -10 }, { 9, -9 } } do
+			solid(part(c, base * CFrame.new(b[1], 1.9, b[2]), Vector3.new(5, 3, 3.4), HULL_DARK, Enum.Material.Metal))
+			part(c, base * CFrame.new(b[1], 2.6, b[2] - 1.75), Vector3.new(3.6, 0.3, 0.1), GLOW, Enum.Material.Neon)
+		end
+		table.insert(keep, { base.Position, 26 })
+	end
+
+	-- The Titan Bones: a giant kaiju's skeleton half out of the regolith,
+	-- its spine round the settlement, ribs arching out of the dig, the
+	-- skull at the west end with its horns; a rope round the dig, work
+	-- lamps and its sign.
+	do
+		local f = folder(m, "TitanBones")
+		local mid = spot(L.Bones.X, L.Bones.Z)
+		local out = (mid.Position - at.Position) * Vector3.new(1, 0, 1)
+		out = if out.Magnitude > 0.1 then out.Unit else Vector3.new(0, 0, 1)
+		local along = out:Cross(Vector3.yAxis) -- (round the settlement)
+		local base = CFrame.lookAt(mid.Position, mid.Position + along)
+		-- the dig: a darker patch, an oval along it
+		part(f, base * CFrame.new(0, 0.06, 0) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(0.12, 34, 78), REGOLITH_DARK, Enum.Material.Ground, "Cylinder")
+		-- the spine: tail (+Z) to neck (-Z), rising out of the ground
+		local count = 13
+		local function spineAt(i: number): (number, number)
+			local k = i / (count - 1) -- 0 tail .. 1 neck
+			return 28 - k * 52, -0.6 + math.sin(k * math.pi * 0.9) * 4.2
+		end
+		for i = 0, count - 1 do
+			local z, y = spineAt(i)
+			local s = 0.55 + 0.45 * math.sin(i / (count - 1) * math.pi * 0.9 + 0.3)
+			part(f, base * CFrame.new(0, y, z), Vector3.new(3.2, 2.4, 2.6) * s, BONE, Enum.Material.SmoothPlastic)
+			part(f, base * CFrame.new(0, y + 2.2 * s, z) * CFrame.Angles(math.rad(-20), 0, 0), Vector3.new(0.8, 3.4, 1.6) * s, BONE_DARK, Enum.Material.SmoothPlastic, "Wedge")
+		end
+		-- the ribs: arching up and out of the dig either side, longest in the middle
+		for i = 3, 10 do
+			local z, y = spineAt(i)
+			local k = math.sin((i - 2) / 9 * math.pi)
+			local reach, rise = 6 + 7 * k, 3 + 5 * k
+			for _, sx in { -1, 1 } do
+				local p0 = (base * CFrame.new(sx * 1.2, y, z)).Position
+				local p1 = (base * CFrame.new(sx * reach * 0.45, y + rise, z + 0.6)).Position
+				local p2 = (base * CFrame.new(sx * reach * 0.85, y + rise * 0.55, z + 1)).Position
+				local p3 = (base * CFrame.new(sx * reach, -0.8, z + 1.2)).Position
+				solid(strut(f, p0, p1, 0.55, BONE, Enum.Material.SmoothPlastic))
+				strut(f, p1, p2, 0.5, BONE, Enum.Material.SmoothPlastic)
+				strut(f, p2, p3, 0.45, BONE, Enum.Material.SmoothPlastic)
+			end
+		end
+		-- the skull past the neck, the jaw dropped open on the ground
+		local skull = base * CFrame.new(0, 3.2, -31) * CFrame.Angles(math.rad(-8), math.rad(10), 0)
+		solid(part(f, skull, Vector3.new(7, 5.4, 8), BONE, Enum.Material.SmoothPlastic))
+		part(f, skull * CFrame.new(0, -0.6, -6.6), Vector3.new(5, 3.6, 5.6), BONE, Enum.Material.SmoothPlastic, "Wedge")
+		part(f, skull * CFrame.new(0, -3.6, -4.2) * CFrame.Angles(math.rad(14), 0, 0), Vector3.new(5.4, 1.2, 9), BONE_DARK, Enum.Material.SmoothPlastic)
+		for _, sx in { -1, 1 } do
+			part(f, skull * CFrame.new(sx * 3.52, 0.8, -1.4), Vector3.new(0.1, 1.6, 2), Color3.fromRGB(28, 26, 30), Enum.Material.SmoothPlastic)
+			local h0 = (skull * CFrame.new(sx * 2.6, 2.4, 1.5)).Position
+			local h1 = (skull * CFrame.new(sx * 5.4, 6.4, 4.4)).Position
+			local h2 = (skull * CFrame.new(sx * 6.2, 9.6, 9.4)).Position
+			strut(f, h0, h1, 0.7, BONE_DARK, Enum.Material.SmoothPlastic)
+			strut(f, h1, h2, 0.42, BONE_DARK, Enum.Material.SmoothPlastic)
+			for t = 0, 3 do
+				part(f, skull * CFrame.new(sx * 1.9, -2.6, -4.6 - t * 1.6) * CFrame.Angles(math.rad(180), 0, 0), Vector3.new(0.5, 1.1, 0.7), Color3.fromRGB(246, 242, 228), Enum.Material.SmoothPlastic, "Wedge")
+			end
+		end
+		-- loose bones
+		for _, b in { { 10, 0.4, 20, 30 }, { -12, 0.4, -6, -40 }, { 9, 0.4, -24, 70 } } do
+			local c0 = base * CFrame.new(b[1], b[2], b[3]) * CFrame.Angles(0, math.rad(b[4]), 0)
+			strut(f, (c0 * CFrame.new(-2.2, 0, 0)).Position, (c0 * CFrame.new(2.2, 0, 0)).Position, 0.4, BONE, Enum.Material.SmoothPlastic)
+			part(f, c0 * CFrame.new(2.4, 0.1, 0), Vector3.new(0.9, 0.9, 0.9), BONE, Enum.Material.SmoothPlastic, "Ball")
+		end
+		-- the rope round the dig, on posts
+		local posts = 14
+		local last = nil
+		for i = 0, posts do
+			local a = i / posts * math.pi * 2
+			local here = base * CFrame.new(math.cos(a) * 19, 0, math.sin(a) * 41)
+			if i < posts then
+				solid(part(f, here * CFrame.new(0, 1.6, 0), Vector3.new(0.5, 3.2, 0.5), HAZARD, Enum.Material.Wood))
+			end
+			if last then
+				strut(f, (last * CFrame.new(0, 2.8, 0)).Position, (here * CFrame.new(0, 2.8, 0)).Position, 0.08, Color3.fromRGB(230, 60, 50), Enum.Material.Fabric)
+			end
+			last = here
+		end
+		-- work lamps on tripods, and the sign toward the plaza
+		for _, l in { { 15, -22 }, { -15, 14 } } do
+			local foot = base * CFrame.new(l[1], 0, l[2])
+			for k = 0, 2 do
+				local a = k / 3 * math.pi * 2
+				strut(f, (foot * CFrame.new(math.cos(a) * 1.6, 0, math.sin(a) * 1.6)).Position, (foot * CFrame.new(0, 7, 0)).Position, 0.12, STEEL)
+			end
+			local head = part(f, CFrame.lookAt((foot * CFrame.new(0, 7.4, 0)).Position, (base * CFrame.new(0, 2, 0)).Position), Vector3.new(1.6, 1.2, 1), HULL_DARK, Enum.Material.Metal)
+			local spot = Instance.new("SpotLight")
+			spot.Face, spot.Range, spot.Angle, spot.Brightness = Enum.NormalId.Front, 34, 60, 1.6
+			spot.Color = AMBER
+			spot.Parent = head
+			part(f, head.CFrame * CFrame.new(0, 0, -0.52), Vector3.new(1.3, 0.9, 0.05), AMBER, Enum.Material.Neon)
+		end
+		local plaza = spot(0, 200).Position
+		local signAt = facingPoint((base * CFrame.new(21, 0, 0)).Position, plaza)
+		solid(part(f, signAt * CFrame.new(-3, 2.5, 0), Vector3.new(0.6, 5, 0.6), HULL_DARK, Enum.Material.Wood))
+		solid(part(f, signAt * CFrame.new(3, 2.5, 0), Vector3.new(0.6, 5, 0.6), HULL_DARK, Enum.Material.Wood))
+		local board = part(f, signAt * CFrame.new(0, 4.6, 0), Vector3.new(8, 2.6, 0.3), PLATE_INK, Enum.Material.Wood)
+		letters(board, Enum.NormalId.Front, board.Size, "TITAN BONES", BONE, 0)
+		letters(board, Enum.NormalId.Back, board.Size, "DIG SITE · KEEP OUT", HAZARD, 0)
+		table.insert(keep, { mid.Position, 46 })
+	end
+	return keep
+end
+
 function OutpostWorld.build(at: CFrame, parent: Instance)
 	local root = Instance.new("Model")
 	root.Name = "SagaOutpost"
@@ -3284,6 +3560,8 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 	hallDressing(root, home.Hall)
 	local festiveExclusions = harvestPatches(root, at)
 	local town = settlement(root, at, rules, rng)
+	-- (and the landmarks out in its outer belt)
+	local marks = landmarks(root, at)
 	for _, line in town.Lines do
 		table.insert(roadLines, line)
 	end
@@ -3310,6 +3588,9 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		table.insert(keepOut, exclusion)
 	end
 	for _, k in town.KeepOut do
+		table.insert(keepOut, k)
+	end
+	for _, k in marks do
 		table.insert(keepOut, k)
 	end
 	for _, secret in hidden do

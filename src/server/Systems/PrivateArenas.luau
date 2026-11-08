@@ -167,6 +167,69 @@ PrivateArenas.RingColors = {
 	DuelRingNorthWest = Color3.fromRGB(255, 214, 70),
 	DuelRingNorthEast = Color3.fromRGB(255, 110, 190),
 }
+-- Arena Row's rings by name, on a sign at each one's outer side.
+PrivateArenas.RingNames = {
+	GrandArena = "GRAND ARENA",
+	IntroRing = "INTRO RING",
+	DuelRingNorthWest = "DUEL RING 1",
+	DuelRingNorthEast = "DUEL RING 2",
+	DuelRingWest = "DUEL RING 3",
+	DuelRingEast = "DUEL RING 4",
+}
+-- (which side of Arena Row each ring is on: Shared.Outpost.Settlement.Stages)
+PrivateArenas.RingSides = {
+	GrandArena = 1,
+	IntroRing = -1,
+	DuelRingNorthWest = -1,
+	DuelRingNorthEast = 1,
+	DuelRingWest = -1,
+	DuelRingEast = 1,
+}
+-- A ring's name board: on two posts just past its fence, on the side away
+-- from Arena Row's middle (`outward`: +1 east, -1 west), read from north
+-- and south alike, its name in the ring's own colour. No taller than the
+-- ring's lamp posts (nothing hides a fight).
+local function nameBoard(model: Model, name: string, target: Vector3, reach: number, outward: number, glow: Color3)
+	local text = PrivateArenas.RingNames[name]
+	if not text then
+		return
+	end
+	local at = target + Vector3.new(outward * (reach + 7), 0, 0)
+	local dark = Color3.fromRGB(28, 30, 38)
+	local function piece(partName: string, cframe: CFrame, size: Vector3, color: Color3, material)
+		local p = Instance.new("Part")
+		p.Name = partName
+		p.Anchored, p.CanTouch, p.CanQuery = true, false, false
+		p.Size, p.CFrame, p.Color, p.Material = size, cframe, color, material
+		p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+		p.Parent = model
+		return p
+	end
+	for _, dx in { -4.6, 4.6 } do
+		piece("SignPost", CFrame.new(at + Vector3.new(dx, 1.8, 0)), Vector3.new(0.6, 3.6, 0.6), Color3.fromRGB(40, 44, 54), Enum.Material.Metal)
+	end
+	local board = piece("NameBoard", CFrame.new(at + Vector3.new(0, 4.4, 0)), Vector3.new(11, 2.2, 0.4), dark, Enum.Material.Metal)
+	board.CanCollide = false
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		gui.CanvasSize = Vector2.new(440, 96)
+		gui.LightInfluence = 0
+		gui.Brightness = 1.4
+		gui.Parent = board
+		local word = Instance.new("TextLabel")
+		word.BackgroundTransparency = 1
+		word.Position, word.Size = UDim2.fromScale(0.05, 0.12), UDim2.fromScale(0.9, 0.76)
+		word.Font = Enum.Font.GothamBlack
+		word.TextScaled = true
+		word.TextColor3 = glow
+		word.Text = text
+		word.Parent = gui
+	end
+	local strip = piece("NameStrip", CFrame.new(at + Vector3.new(0, 3.15, 0)), Vector3.new(11, 0.25, 0.5), glow, Enum.Material.Neon)
+	strip.CanCollide = false
+end
+
 local function ringAt(name: string, target: Vector3, radius: number): Model
 	local model = Instance.new("Model")
 	model.Name = name
@@ -242,6 +305,8 @@ function PrivateArenas.stage(name: string, ground: Vector3, reach: number): Vect
 	model:SetAttribute("Center", target)
 	model:SetAttribute("Stage", true)
 	local glow = PrivateArenas.RingColors[name] or Color3.fromRGB(110, 220, 255)
+	-- (its name, on the side away from the row's middle)
+	pcall(nameBoard, model, name, target, reach, PrivateArenas.RingSides[name] or 1, glow)
 	local stage = { Name = name, Model = model, Center = target, Fence = fenceOf(model, target, reach, glow), Owner = nil :: Player?, Holders = {} }
 	model.Parent = folder()
 	table.insert(stages, stage)
