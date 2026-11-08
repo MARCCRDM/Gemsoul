@@ -2572,9 +2572,21 @@ local function hallDressing(parent, at: CFrame)
 		part(m, post * CFrame.new(0, 3.2, 0), Vector3.new(0.5, 0.5, 0.5), HOF_GOLD, Enum.Material.Metal, "Ball")
 		table.insert(posts, post)
 	end
+	-- (each rope from one post's top to the next, hanging a little in the
+	-- middle: two halves, each laid along its own run, never along the
+	-- world's axes, as the Shelter's turned)
+	local ROPE = Color3.fromRGB(150, 30, 34)
 	for i = 1, #posts - 1 do
-		local a, b = posts[i].Position, posts[i + 1].Position
-		part(m, CFrame.new((a + b) / 2 + Vector3.new(0, 2.6, 0)), Vector3.new(0.16, 0.16, (b - a).Magnitude - 0.4), Color3.fromRGB(150, 30, 34), Enum.Material.Fabric)
+		local a = posts[i].Position + Vector3.new(0, 2.95, 0)
+		local b = posts[i + 1].Position + Vector3.new(0, 2.95, 0)
+		local low = (a + b) / 2 - Vector3.new(0, 0.45, 0)
+		for _, run in { { a, low }, { low, b } } do
+			local from, to = run[1], run[2]
+			local dir = (to - from).Unit
+			local right = dir:Cross(Vector3.new(0, 1, 0)).Unit
+			local frame = CFrame.fromMatrix((from + to) / 2, right, right:Cross(dir), -dir) -- (looking along the run)
+			part(m, frame, Vector3.new(0.16, 0.16, (to - from).Magnitude + 0.08), ROPE, Enum.Material.Fabric)
+		end
 	end
 	-- The supply corner between the booths: crates and barrels.
 	local corner = at3(68, 0.86, 55)

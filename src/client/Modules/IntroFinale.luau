@@ -31,6 +31,8 @@
 	can't happen (no rock near, no roll owed) is passed over.
 
 	  IntroFinale.start()   once (Lobby.client)
+	  IntroFinale.minionsIntro()   the rot minions and the kaiju's fight off a
+	                       first rock outside it (Client IntroGuide), once
 	  IntroFinale.offerBoss()   FIRST BOSS from the rounds' card: its window
 	  IntroFinale.Lines     what's said
 ]]
@@ -1019,6 +1021,31 @@ function IntroFinale.offerBoss(straight: boolean?)
 	-- (the hunt's loop takes it as soon as they're out in the Outpost: huntDue)
 	heldUntil = 0
 	direct = straight == true
+end
+
+-- The rot minions off a first rock broken outside the lobby's intro (the
+-- rock arrows', Client IntroGuide: the intro skipped, or done before
+-- them): the cinematic, then the kaiju seeing them off. Once per account
+-- (the server keeps count: profile.RotMinionsSeen); nothing if the lobby's
+-- intro is on (it brings them itself) or they're off in a fight.
+function IntroFinale.minionsIntro()
+	if running or hunting or away() or player:GetAttribute("IntroFinale") == "Mines" then
+		return
+	end
+	running = true
+	local ok, problem = pcall(function()
+		step("Minions")
+		local came = minions()
+		if came and not away() then
+			step("Kaiju")
+			kaiju(true)
+		end
+	end)
+	if not ok then
+		warn("[IntroFinale] " .. tostring(problem))
+	end
+	step("Over")
+	running = false
 end
 
 local started = false

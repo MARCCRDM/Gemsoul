@@ -398,6 +398,21 @@ do
 	check(not Server.busyElsewhere(player), "Out in the Outpost, the lobby's intro is held back")
 	Server.clearCritters(player) -- (none out: nothing to do, no error)
 end
+-- The rot minions: once per account, off the first rock, in the lobby's
+-- intro or out of it (the intro skipped: Client IntroGuide's).
+do
+	profile = newProfile({})
+	profile.IntroFinale = "Done"
+	local asked = Server._finale(player, "Critters")
+	check(asked.Message ~= "Nothing to do here.", "The rot minions refused off the lobby's intro, never seen")
+	check(not profile.RotMinionsSeen, "Counted as seen with none come")
+	profile.RotMinionsSeen = true
+	local again = Server._finale(player, "Critters")
+	check(not again.Ok, "The rot minions came twice")
+	check(not Server._finale(player, "Done").Ok, "The lobby's intro finished from outside it")
+	profile.IntroFinale = "Mines"
+	check(not Server._finale(player, "Critters").Ok, "The lobby's intro brought the minions again, seen already")
+end
 -- DEV > SKIP INTRO: the game's owners only; the whole intro done at once
 -- (every piece, the set's and the first dungeon's coins, the kaiju, the
 -- finale counted done, out of the fight), and never paid twice.

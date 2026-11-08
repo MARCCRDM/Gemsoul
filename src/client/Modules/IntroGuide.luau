@@ -5,7 +5,8 @@
 	  1. Mech     (off: FirstStage skips it) to the nearest free mech,
 	              until they're in one (MechPilot)
 	  2. Mine     to the nearest common rock near the outpost, then the next,
-	              until they've mined MineRocks of them
+	              until they've mined MineRocks of them; at the first, the
+	              rot minions (IntroFinale.minionsIntro, once an account)
 	  3. Out      outward from where they are, a stretch at a time, toward
 	              the outskirts (Outskirts studs from the middle: past the
 	              core, where the richer rocks start), fading as they get
@@ -37,6 +38,7 @@ IntroGuide.Outskirts = Frontier.Core + 30 -- where it leaves them
 IntroGuide.Stretch = 35 -- how far ahead it leads each time, heading out
 IntroGuide.FadeOver = 60 -- the last stretch, fading out
 IntroGuide.GiveUp = 8 * 60
+IntroGuide.MinionsAfter = 1.5 -- seconds after the first rock's hit before the rot minions come
 -- Where the arrows start: the rocks ("Mech", to a free mech first, is off:
 -- new players aren't led to the mechs).
 IntroGuide.FirstStage = "Mine"
@@ -148,6 +150,15 @@ function IntroGuide.start()
 				mined[rock] = true
 				state.Mined += 1
 				rescanAt = 0
+				if state.Mined == 1 then
+					-- (the first rock: the rot minions come for it, and the
+					-- kaiju see them off: Client IntroFinale, once an account)
+					task.delay(IntroGuide.MinionsAfter, function()
+						pcall(function()
+							require(script.Parent.IntroFinale).minionsIntro()
+						end)
+					end)
+				end
 			end
 			last = hp
 		end)

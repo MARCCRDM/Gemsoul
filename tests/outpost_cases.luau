@@ -1666,8 +1666,42 @@ do
 	end
 	check(Frontier.Core >= set.Wall, "The safe core stops short of the wall")
 end
+-- The Hall of Fame's ropes run post to post (the Shelter is turned: never
+-- along the world's axes), each end at a stanchion's top.
+do
+	local balls, ropes = {}, {}
+	for _, d in site.Model:GetDescendants() do
+		if d:IsA("Part") and d.Shape == R.Enum.PartType.Ball and math.abs(d.Size.X - 0.5) < 0.01 then
+			table.insert(balls, d.CFrame.Position)
+		elseif d:IsA("BasePart") and d.Material == R.Enum.Material.Fabric and math.abs(d.Color.R * 255 - 150) < 1 and math.abs(d.Color.G * 255 - 30) < 1 then
+			table.insert(ropes, d)
+		end
+	end
+	check(#ropes >= 3, "The Hall of Fame's ropes are missing: " .. #ropes)
+	local function nearPost(p)
+		for _, ball in balls do
+			local flat = R.Vector3.new(p.X - ball.X, 0, p.Z - ball.Z)
+			if flat.Magnitude < 0.6 and math.abs(p.Y - ball.Y) < 0.8 then
+				return true
+			end
+		end
+		return false
+	end
+	local ends = 0
+	for _, rope in ropes do
+		local half = rope.Size.Z / 2
+		for _, sign in { -1, 1 } do
+			if nearPost((rope.CFrame * R.CFrame.new(0, 0, sign * half)).Position) then
+				ends += 1
+			end
+		end
+	end
+	-- (two halves a span: each has one end at a post, the other where they meet)
+	check(ends == #ropes, "A rope isn't hung from the stanchions: " .. ends .. " ends at posts for " .. #ropes .. " pieces")
+end
+
 print(
 	"PASS: "
 		.. checks
-		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, Garrick's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave, X for the kit and T for the target)"
+		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, Garrick's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave, X for the kit and T for the target, the Hall of Fame's ropes)"
 )

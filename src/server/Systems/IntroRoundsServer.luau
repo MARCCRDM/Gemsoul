@@ -432,7 +432,12 @@ local function finale(player: Player, step: any, name: any)
 		return reply(true, "")
 	end
 	local profile = PlayerData.get(player) :: any
-	if not profile or profile.IntroFinale ~= "Mines" then
+	-- (The rot minions come once per account, off the first rock: in the
+	-- lobby's intro, or the rock arrows' (Client IntroGuide) if that's
+	-- where a miner breaks their first rock, the intro skipped or done.)
+	local minionsOwed = profile ~= nil and not profile.RotMinionsSeen
+	local minionStep = step == "Critters" or step == "Fight" or step == "Left"
+	if not profile or (profile.IntroFinale ~= "Mines" and not (minionStep and (minionsOwed or finaleCritters[player] ~= nil))) then
 		return reply(false, "Nothing to do here.")
 	end
 	if (step == "Critters" or step == "Fight") and busyElsewhere(player) then
@@ -446,10 +451,14 @@ local function finale(player: Player, step: any, name: any)
 		if finaleCritters[player] then
 			return reply(true, "")
 		end
+		if not minionsOwed then
+			return reply(false, "Seen already.")
+		end
 		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 		if not root then
 			return reply(false, "No character.")
 		end
+		profile.RotMinionsSeen = true
 		local KaijuWilds = require(script.Parent.KaijuWilds)
 		local Frontier = require(script.Parent.FrontierServer)
 		local c = IntroRoundsServer.Critters
@@ -524,6 +533,10 @@ local function finale(player: Player, step: any, name: any)
 				left += 1
 			end
 		end
+		if left == 0 and profile.IntroFinale ~= "Mines" then
+			-- (the rock arrows' minions all down: done with)
+			finaleCritters[player], finaleLoose[player] = nil, nil
+		end
 		return reply(true, "", { Left = left })
 	elseif step == "Invite" then
 		-- Their answer to the first dungeon's window, for the funnel.
@@ -551,6 +564,7 @@ local function finale(player: Player, step: any, name: any)
 	end
 	return reply(false, "Unknown step.")
 end
+IntroRoundsServer._finale = finale -- (tests)
 IntroRoundsServer.finale = finale
 
 -- Where `player`'s intro is: "Duel", "Dungeon" or "Done" (nil: not a new miner's).
