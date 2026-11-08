@@ -109,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.83 · 2026-11-08 basics demo heard: swings, blows, blocks and casts; sound ids from a Studio import",
+		Build = "1.84 · 2026-11-08 the first batch of real sounds: 30 ids in",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error

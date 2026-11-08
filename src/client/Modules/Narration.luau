@@ -51,7 +51,7 @@ Narration.Ids = {
 	FinaleMine = 0, -- finale_mine.mp3
 	FinaleGems = 0, -- finale_gems.mp3
 	FinaleFight = 0, -- finale_fight.mp3
-	FinaleDone = 0, -- finale_done.mp3
+	FinaleDone = 127824470453716, -- finale_done.mp3
 }
 Narration.Lines = {
 	TrainingBegins = "Welcome, Miner. Your training begins now.",

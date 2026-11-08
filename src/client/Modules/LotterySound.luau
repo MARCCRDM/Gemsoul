@@ -25,12 +25,12 @@ local LotterySound = {}
 LotterySound.Ids = {
 	SealBreak = 0, -- seal_break.mp3
 	SpinHum = 0, -- spin_hum.ogg
-	Tick = 0, -- tick.mp3
+	Tick = 131724631621226, -- tick.mp3
 	Lock = 0, -- lock.mp3
 	Reveal1 = 0, -- reveal_1.mp3
 	Reveal2 = 0, -- reveal_2.mp3
 	Reveal3 = 0, -- reveal_3.mp3
-	Reveal4 = 0, -- reveal_4.mp3
+	Reveal4 = 127810925228683, -- reveal_4.mp3
 	Reveal5 = 0, -- reveal_5.mp3
 	Attune = 0, -- attune.mp3
 }

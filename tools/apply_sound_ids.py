@@ -19,6 +19,7 @@ Where the lines come from:
      text file and run this on it.
 Any of these line shapes is read:  swing_1.mp3=1234567890
   swing_1=1234567890   swing_1.mp3: rbxassetid://1234567890   [swing_1] 1234567890
+  swing_1_nCWuLo=1234567890   (the random tag Studio's import adds is taken off)
 The name is matched against the sound folders upload_audio.py knows
 (assets/music, assets/sounds, assets/sounds/combat, assets/sounds/lottery,
 assets/sounds/narration) and its "Name = 0, -- file.mp3" line in the matching
@@ -68,11 +69,25 @@ def resolve(ids, files):
     for name in files:
         by_stem.setdefault(os.path.splitext(name)[0], []).append(name)
     matched, unknown = {}, []
+    suffix = re.compile(r"_(?=[A-Za-z0-9]{4,8}$)(?=.*[A-Za-z])[A-Za-z0-9]+$")
+
+    def lookup(name):
+        if name in files:
+            return name
+        if name in by_stem and len(by_stem[name]) == 1:
+            return by_stem[name][0]
+        return None
+
     for written, asset_id in ids.items():
-        if written in files:
-            matched[written] = asset_id
-        elif written in by_stem and len(by_stem[written]) == 1:
-            matched[by_stem[written][0]] = asset_id
+        name = written
+        found = lookup(name)
+        # Studio's bulk import tags each name with a random suffix
+        # (swing_3_nCWuLo): taken off, one piece at a time, till it's a file.
+        while not found and suffix.search(name):
+            name = suffix.sub("", name)
+            found = lookup(name)
+        if found:
+            matched[found] = asset_id
         else:
             unknown.append(written)
     return matched, unknown
