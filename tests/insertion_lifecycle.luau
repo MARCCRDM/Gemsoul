@@ -310,6 +310,24 @@ Drop.begin({ fixed }, {})
 fh.Died:Fire()
 check(fr.Anchored, "cleanup lost preexisting anchored state")
 check(fixed:GetAttribute("ArenaDropUntil") == nil, "death retained protection")
+-- A player's body held still as the drop begins (their pod still landing
+-- with them inside: Server.PodServer) is free once it's over: the hold's
+-- anchoring must not come back on them.
+local carried, cr = actor(true)
+local carriedRider = object("Player")
+carriedRider.Character = carried
+owners[carried] = carriedRider
+carriedRider:SetAttribute("CombatSession", "Training")
+local carriedTime = Drop.begin({ carried }, { carriedRider })
+check(cr.Anchored, "A carried rider wasn't staged")
+advance(carriedTime + 0.1)
+check(not cr.Anchored, "A rider held still as the drop began came out of it stuck")
+-- (readied for a fight while held: the same)
+cr.Anchored = true
+Drop.prepare(carriedRider)
+check(cr.Anchored, "A rider wasn't held while readied")
+Drop.cancel(carried)
+check(not cr.Anchored, "A rider readied while held stayed stuck after it")
 local left, lr = actor()
 local right, rr = actor()
 lr.Position, rr.Position = vec(-20, 3, 7), vec(20, 6, -8)

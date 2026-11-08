@@ -350,6 +350,27 @@ do
  check(ArenaSessions.pullBack(a,root),"No pull back")
  root.Position=saved
 end
+do
+ -- A body still anchored in a fight with nothing holding it (a hold from
+ -- before the fight never let go: the pod's landing, say) is set free:
+ -- what counts as a hold.
+ local now=workspace:GetServerTimeNow()
+ local attrs={}
+ local function get(name) return attrs[name] end
+ check(ArenaSessions.heldBy(get,now)==nil,"Held by nothing")
+ attrs.PodLanding=now+5
+ check(ArenaSessions.heldBy(get,now)=="PodLanding","The pod's hold not seen")
+ attrs.PodLanding=nil
+ attrs.ArenaDropUntil=now+2
+ check(ArenaSessions.heldBy(get,now)=="ArenaDropUntil","The drop's hold not seen")
+ attrs.ArenaDropUntil=now-1
+ check(ArenaSessions.heldBy(get,now)==nil,"A drop long over still held")
+ attrs.ArenaDropPreparing=now+10
+ check(ArenaSessions.heldBy(get,now)=="ArenaDropPreparing","Readying for a drop not seen")
+ attrs.ArenaDropPreparing=nil
+ attrs.DungeonSelecting=true
+ check(ArenaSessions.heldBy(get,now)=="DungeonSelecting","A dungeon's choice not seen")
+end
 Players.PlayerAdded.Fire(c)
 Players.PlayerAdded.Fire(b)
 b.CharacterAdded.Fire()

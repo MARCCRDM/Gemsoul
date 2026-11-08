@@ -86,7 +86,6 @@ function Drop.prepare(player)
 	model:SetAttribute("ArenaDropUntil", deadline)
 	SeatExit.detach(model)
 	local restoreLabels = concealLabels(model)
-	local anchored = root.Anchored
 	root.Anchored = true
 	local saved, effects, connections = {}, {}, {}
 	local function hide(object)
@@ -127,7 +126,7 @@ function Drop.prepare(player)
 			end
 		end
 		if root.Parent then
-			root.Anchored = anchored
+			root.Anchored = false -- (free, whatever held them before: see begin)
 		end
 		model:SetAttribute("ArenaDropUntil", nil)
 		if player:GetAttribute("ArenaDropPreparing") == deadline then
@@ -283,7 +282,15 @@ function Drop.begin(models, viewers, dropModels, sides)
 				if dropping then
 					root.CFrame = destination
 				end
-				root.Anchored = anchored
+				-- A player's body comes out free. Anchoring it is only ever a
+				-- hold (their pod still landing with them inside, a dungeon's
+				-- choice, this drop), and none of those outlasts the drop; so
+				-- what it was when the drop began must not come back on them
+				-- (a fight entered while the pod was still landing came out of
+				-- its drop anchored, and they stood rooted in the ring). A
+				-- computer fighter's goes back to what it was: its own system
+				-- holds and frees it.
+				root.Anchored = if Players:GetPlayerFromCharacter(model) then false else anchored
 			end
 			model:SetAttribute("ArenaDropUntil", nil)
 			model:SetAttribute("ArenaDropStart", nil)

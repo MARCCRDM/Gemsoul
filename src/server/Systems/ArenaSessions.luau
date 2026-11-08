@@ -34,6 +34,27 @@ function ArenaSessions.pullSpot(center: Vector3, radius: number, position: Vecto
 	local inward = if offset.Magnitude > 0.1 then offset.Unit else Vector3.new(0, 0, 1)
 	return center + inward * math.max(0, radius - ArenaSessions.PullIn) + Vector3.new(0, 4, 0)
 end
+-- What holds a fighter's body still, by the attributes on them: their pod
+-- still landing with them inside (PodLanding: Server.PodServer), the Arena
+-- drop (ArenaDropPreparing / ArenaDropUntil, while they're ahead of `now`:
+-- Server.ArenaDrop) or a dungeon's choice (DungeonSelecting: Server.Dungeons).
+-- nil: nothing should, so a body still anchored is a hold never let go.
+-- `get` reads one attribute. Pure.
+function ArenaSessions.heldBy(get: (string) -> any, now: number): string?
+	if get("PodLanding") ~= nil then
+		return "PodLanding"
+	end
+	for _, name in { "ArenaDropPreparing", "ArenaDropUntil" } do
+		local until_ = get(name)
+		if type(until_) == "number" and until_ > now then
+			return name
+		end
+	end
+	if get("DungeonSelecting") then
+		return "DungeonSelecting"
+	end
+	return nil
+end
 -- The rings practice against a rival takes first (Shared.Outpost.Settlement.Stages).
 ArenaSessions.PracticeRings = { "DuelRingNorthWest", "DuelRingNorthEast", "DuelRingWest", "DuelRingEast" }
 local busy = {}
@@ -238,8 +259,24 @@ function ArenaSessions.start()
 			return
 		end
 		timer = 0
+		local serverNow = workspace:GetServerTimeNow()
 		for _, player in Players:GetPlayers() do
 			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			-- In a fight you can always walk: a body still anchored with
+			-- nothing holding it (a hold from before the fight never let go:
+			-- the pod's landing, say) is set free.
+			if
+				player:GetAttribute("CombatSession")
+				and root
+				and root.Anchored
+				and not player:GetAttribute("DungeonId")
+				and not player:GetAttribute("RaidId")
+				and ArenaSessions.heldBy(function(name)
+					return player:GetAttribute(name)
+				end, serverNow) == nil
+			then
+				root.Anchored = false
+			end
 			if
 				player:GetAttribute("CombatSession")
 				and root
