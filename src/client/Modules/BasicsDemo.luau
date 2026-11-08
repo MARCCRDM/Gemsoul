@@ -174,6 +174,22 @@ local function new(class: string, props, parent: Instance?)
 	return i
 end
 
+-- A viewport has one light and no bounce: dark metal goes near black in
+-- it. Dark parts (not the glowing ones) are lifted toward a steel grey,
+-- the darker the more.
+BasicsDemo.Steel = Color3.fromRGB(150, 160, 182)
+BasicsDemo.Lift = 0.45
+local function brighten(part: BasePart)
+	if part.Material == Enum.Material.Neon or part.Transparency >= 1 then
+		return
+	end
+	local c = part.Color
+	local bright = 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
+	if bright < 0.45 then
+		part.Color = c:Lerp(BasicsDemo.Steel, BasicsDemo.Lift * (1 - bright / 0.45))
+	end
+end
+
 -- A fighter in the viewport: a copy, every part anchored, its links
 -- (joints and welds) remembered, so it can be laid out from its joints.
 local function fighter(source: Model, world: Instance, at: CFrame)
@@ -186,6 +202,7 @@ local function fighter(source: Model, world: Instance, at: CFrame)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Anchored, d.CanCollide, d.CanQuery, d.CanTouch = true, false, false, false
+			brighten(d)
 		elseif d:IsA("WeldConstraint") and d.Part0 and d.Part1 then
 			table.insert(welds, { d.Part0, d.Part1, d.Part0.CFrame:ToObjectSpace(d.Part1.CFrame) })
 		elseif d:IsA("Script") or d:IsA("LocalScript") then
@@ -277,14 +294,14 @@ function BasicsDemo.new(stage: GuiObject, heroSource: Model, foeSource: Model, t
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.fromRGB(14, 17, 27),
 		BorderSizePixel = 0,
-		Ambient = Color3.fromRGB(150, 155, 175),
-		LightColor = Color3.fromRGB(255, 246, 232),
+		Ambient = Color3.fromRGB(205, 208, 222), -- (bright: the frontier armour is dark metal)
+		LightColor = Color3.fromRGB(255, 250, 240),
 		LightDirection = Vector3.new(-0.6, -1, -0.8),
 		ZIndex = 2,
 	}, stage)
 	new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.fromRGB(40, 48, 72), Color3.fromRGB(10, 12, 20)),
+		Color = ColorSequence.new(Color3.fromRGB(70, 82, 116), Color3.fromRGB(22, 26, 40)),
 	}, view)
 	UiKit.round(view, 6)
 	local world = new("WorldModel", {}, view)
@@ -305,10 +322,10 @@ function BasicsDemo.new(stage: GuiObject, heroSource: Model, foeSource: Model, t
 		return p
 	end
 	local flat = CFrame.Angles(0, 0, math.rad(90))
-	piece(CFrame.new(0, -0.25, 0) * flat, Vector3.new(0.5, 22, 22), Color3.fromRGB(30, 34, 46), nil, Enum.PartType.Cylinder)
+	piece(CFrame.new(0, -0.25, 0) * flat, Vector3.new(0.5, 22, 22), Color3.fromRGB(58, 64, 84), nil, Enum.PartType.Cylinder)
 	piece(CFrame.new(0, 0.01, 0) * flat, Vector3.new(0.02, 18.6, 18.6), CYAN, Enum.Material.Neon, Enum.PartType.Cylinder)
-	piece(CFrame.new(0, 0.02, 0) * flat, Vector3.new(0.03, 18, 18), Color3.fromRGB(36, 40, 54), nil, Enum.PartType.Cylinder)
-	piece(CFrame.new(0, 0.03, 0) * flat, Vector3.new(0.04, 2.4, 2.4), Color3.fromRGB(60, 66, 84), nil, Enum.PartType.Cylinder)
+	piece(CFrame.new(0, 0.02, 0) * flat, Vector3.new(0.03, 18, 18), Color3.fromRGB(70, 77, 100), nil, Enum.PartType.Cylinder)
+	piece(CFrame.new(0, 0.03, 0) * flat, Vector3.new(0.04, 2.4, 2.4), Color3.fromRGB(104, 112, 138), nil, Enum.PartType.Cylinder)
 
 	local hero = fighter(heroSource, world, CFrame.lookAt(Vector3.new(-4.2, 0, 0), Vector3.new(4.2, 0, 0)))
 	local foe = fighter(foeSource, world, CFrame.lookAt(Vector3.new(4.2, 0, 0), Vector3.new(-4.2, 0, 0)))

@@ -49,7 +49,7 @@ local function color(rgb: number?): Color3
 end
 
 -- The screen: dark all over, the LED panel in the upper middle (gold rim),
--- the words under it, SKIP in the bottom right corner.
+-- the words under it, SKIP at the bottom in the middle.
 local function build(onSkip: () -> ())
 	local gui = UiKit.gui("BasicsVideo", BasicsScreen.Order)
 	gui.IgnoreGuiInset = true
@@ -115,8 +115,8 @@ local function build(onSkip: () -> ())
 	most.Parent = words
 	local button = Instance.new("TextButton")
 	button.Name = "Skip"
-	button.AnchorPoint = Vector2.new(1, 1)
-	button.Position = UDim2.new(1, -20, 1, -20)
+	button.AnchorPoint = Vector2.new(0.5, 1)
+	button.Position = UDim2.new(0.5, 0, 1, -24) -- (bottom middle, under the words)
 	button.Size = UDim2.fromOffset(132, 40)
 	button.BackgroundColor3 = Color3.fromRGB(14, 17, 26)
 	button.AutoButtonColor = true

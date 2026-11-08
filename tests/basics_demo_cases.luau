@@ -179,7 +179,7 @@ end
 local holder = Instance.new("Folder")
 local stage = Instance.new("Frame")
 stage.Parent = holder
-local hero = rig("Hero", Color3.fromRGB(214, 170, 130), Color3.fromRGB(70, 110, 170))
+local hero = rig("Hero", Color3.fromRGB(214, 170, 130), Color3.fromRGB(22, 26, 34)) -- (dark frontier armour)
 local foe = rig("Foe", Color3.fromRGB(190, 140, 110), Color3.fromRGB(160, 60, 60))
 local demo = Demo.new(stage, hero, foe, false)
 local view = stage:FindFirstChild("Demo")
@@ -192,6 +192,19 @@ for _, p in heroCopy:GetDescendants() do
 		check(p.Anchored and not p.CanCollide, "A fighter's part isn't anchored: " .. p.Name)
 	end
 end
+-- lit so dark armour reads: a bright ambient, dark parts lifted, the source left as is
+check(view.Ambient.R > 0.7 and view.Ambient.G > 0.7 and view.Ambient.B > 0.7, "The demo stage is lit too dimly")
+local function shade(c)
+	return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
+end
+local darkest = 1
+for _, p in heroCopy:GetDescendants() do
+	if p:IsA("BasePart") and p.Material ~= Enum.Material.Neon and p.Transparency < 1 then
+		darkest = math.min(darkest, shade(p.Color))
+	end
+end
+check(darkest > 0.15, "A fighter's part is still near black on the stage: " .. darkest)
+check(shade(hero.Shield.Color) < 0.15, "Lifting the copy's colours changed the player's own fighter")
 -- on the floor, facing each other
 local function root(m)
 	return m.HumanoidRootPart.CFrame
