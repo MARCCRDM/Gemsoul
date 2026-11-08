@@ -2113,13 +2113,15 @@ function SCENES.Outpost(_info)
 end
 
 -- The basics -----------------------------------------------------------------------------------------
--- A new miner's first fight opens on a lesson (Client.BasicsScreen): five
--- of the narrator's lines (Client.Narration's Basics...), each its own
+-- A new miner's first screen is a lesson (Client.BasicsScreen, full screen):
+-- the narrator's basics lines (Client.Narration's Basics...), each its own
 -- scene here, moving on phrase by phrase in time with the voice (`cues`:
 -- when each phrase starts). The first phrase names the topic big; the rest
 -- show it. `touch`: a phone's buttons named instead of the keyboard's.
 
-Led.BasicsOrder = { "BasicsAttack", "BasicsBlock", "BasicsAbilities", "BasicsDodge", "BasicsResources" }
+-- (the lesson as it plays now: attack, block, abilities. Dodge and
+-- Resources stay drawn, out of the order.)
+Led.BasicsOrder = { "BasicsAttack", "BasicsBlock", "BasicsAbilities" }
 local CHARGE_BLUE, STAMINA_GREEN = rgb(70, 130, 255), rgb(65, 195, 112)
 local B_TEXT = 28 -- (the text column: 11 letters; the art's left of it)
 local KEYS = {

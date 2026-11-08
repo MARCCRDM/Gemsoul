@@ -11,14 +11,8 @@
 	  Heavy   while its guard is up, until you throw a heavy
 	  Q E R   when you can afford each move, until you use it
 
-	Once the fight's in view (the loading screen and the drop over), the
-	basics play alongside it: a giant LED screen rising behind the partner
-	(Modules.BasicsScreen: attacking, blocking, abilities, dodging, charge
-	and stamina, the narrator reading each as it's shown, ending on "Your
-	training begins now."), a bobbing arrow over the button each one's
-	about. The fight's on all the while (the partner doesn't wait), with no
-	music till the lesson's over; these hint rings come in after it (the
-	arrows point the way meanwhile).
+	(The basics are taught before all this, in their own video ahead of the
+	element roll: Modules.BasicsScreen, from Client Intro.)
 
 	The partner's wind-ups and guard come from the attributes the server sets
 	on it (ActionKind, ActionName, ActionStart, ActionAt, GuardUntil); what
@@ -36,8 +30,6 @@ end
 local Tech = require(ReplicatedStorage.Shared.CombatTechnology)
 local GemClient = require(script.Parent.Modules.GemClient)
 local IronUi = require(script.Parent.Modules.IronUi)
-local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
-local BasicsScreen = require(script.Parent.Modules.BasicsScreen)
 local UiKit = require(script.Parent.Modules.UiKit)
 
 local player = Players.LocalPlayer
@@ -74,87 +66,6 @@ local function findTarget(id: string): GuiObject?
 		end
 	end
 	return nil
-end
-
--- The opening's arrows: one over each button the narrator names, bobbing.
-local ARROWS = {
-	Abilities = { "Q", "E", "R" },
-	Combat = { "Swing", "Block", "Dodge" },
-	Attack = { "Swing" },
-	Block = { "Block" },
-	Dodge = { "Dodge" },
-}
--- (the basics' lines, and the arrows each one points with)
-local LINE_ARROWS = { BasicsAttack = "Attack", BasicsBlock = "Block", BasicsAbilities = "Abilities", BasicsDodge = "Dodge" }
-local arrowGui = UiKit.gui("FirstFightArrows", 10)
-arrowGui.Enabled = false
-local arrows: { [string]: TextLabel } = {}
-for _, ids in ARROWS do
-	for _, id in ids do
-		if arrows[id] then
-			continue -- (one arrow a button, whichever lines point at it)
-		end
-		arrows[id] = new("TextLabel", {
-			Name = "Arrow" .. id,
-			AnchorPoint = Vector2.new(0.5, 1),
-			BackgroundTransparency = 1,
-			Size = UDim2.fromOffset(44, 44),
-			Font = Enum.Font.GothamBlack,
-			Text = "▼",
-			TextColor3 = GOLD,
-			TextScaled = true,
-			TextStrokeColor3 = Color3.fromRGB(20, 14, 6),
-			TextStrokeTransparency = 0.2,
-			Visible = false,
-			ZIndex = 20,
-		}, arrowGui)
-	end
-end
-local pointing: string? = nil -- (the set of arrows up: "Abilities" / "Combat")
-local narrating = false -- (the hints wait while the narrator speaks)
-local opened = false
-local OPEN_WAIT = 60 -- seconds the opening waits for the fight to be in view, at most
-
--- Round 1's opening: the basics on the arena's screen, with the arrows.
-local function opening()
-	if opened then
-		return
-	end
-	opened = true
-	narrating = true
-	gui.Enabled, shown = false, nil
-	-- Not under the loading screen or the drop: once the fight's in view,
-	-- its HUD up (the sparring rival's or another new miner's, a matched
-	-- first fight: the same opening), for a moment. At most OpenWait
-	-- seconds; never in view by then, no lesson (the hints go on).
-	local waited = os.clock()
-	local inViewSince = nil
-	while os.clock() - waited < OPEN_WAIT and player:GetAttribute("FirstFight") == true do
-		local hud = player.PlayerGui:FindFirstChild("CombatHud")
-		local inView = player:GetAttribute("IntroCover") == nil
-			and player:GetAttribute("ArenaDropUntil") == nil
-			and not LoadingFlow.active()
-			and hud ~= nil
-			and (not hud:IsA("ScreenGui") or hud.Enabled)
-		inViewSince = if inView then inViewSince or os.clock() else nil
-		if inViewSince and os.clock() - inViewSince >= 0.5 then
-			break
-		end
-		task.wait(0.1)
-	end
-	if player:GetAttribute("FirstFight") ~= true or not inViewSince then
-		narrating = false
-		return
-	end
-	if player:GetAttribute("FirstFight") == true then
-		arrowGui.Enabled = true
-		pcall(BasicsScreen.run, function(line)
-			pointing = if line then LINE_ARROWS[line] else nil
-		end)
-	end
-	pointing = nil
-	arrowGui.Enabled = false
-	narrating = false
 end
 
 -- Your Q / E / R moves: name, cost and what pays for it.
@@ -254,37 +165,6 @@ local function show(id: string)
 	gui.Enabled = true
 end
 
--- Every frame of the opening: each arrow over its button, bobbing.
-local arrowTargets: { [string]: GuiObject? } = {}
-local arrowsLooked = 0
-RunService.RenderStepped:Connect(function()
-	if not arrowGui.Enabled then
-		return
-	end
-	local now = os.clock()
-	if now - arrowsLooked > 0.5 then
-		arrowsLooked = now
-		for id in arrows do
-			arrowTargets[id] = findTarget(id)
-		end
-	end
-	local bob = math.abs(math.sin(now * 5)) * 10
-	local wanted = {}
-	for _, id in (pointing and ARROWS[pointing]) or {} do
-		wanted[id] = true
-	end
-	for id, arrow in arrows do
-		local button = arrowTargets[id]
-		if wanted[id] and button and button.Parent and button.Visible then
-			local top = button.AbsolutePosition + Vector2.new(button.AbsoluteSize.X / 2, 0)
-			arrow.Position = UDim2.fromOffset(top.X, top.Y - 4 - bob)
-			arrow.Visible = true
-		else
-			arrow.Visible = false
-		end
-	end
-end)
-
 -- Every frame while a hint is up: the ring round its button, breathing.
 RunService.RenderStepped:Connect(function()
 	if not gui.Enabled then
@@ -317,7 +197,7 @@ RunService.Heartbeat:Connect(function()
 		return
 	end
 	nextTick = now + 0.1
-	if player:GetAttribute("FirstFight") ~= true or FastStart.finished(done) or narrating then
+	if player:GetAttribute("FirstFight") ~= true or FastStart.finished(done) then
 		gui.Enabled, shown = false, nil
 		return
 	end
@@ -360,12 +240,3 @@ RunService.Heartbeat:Connect(function()
 		gui.Enabled, shown = false, nil
 	end
 end)
-
--- Round 1 starts (the server marks your first fight): the opening.
-local function begin()
-	if player:GetAttribute("FirstFight") == true then
-		task.spawn(opening)
-	end
-end
-player:GetAttributeChangedSignal("FirstFight"):Connect(begin)
-begin()

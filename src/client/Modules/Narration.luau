@@ -7,8 +7,9 @@
 	  "Controls"        right after it: the ability keys and combat buttons
 	  "FirstDungeon"    arriving in the first dungeon
 	  "KaijuTeam"       the starter kaiju roll (the spin waits for it)
-	  "Basics..."       the first fight's lesson on its LED (Client.BasicsScreen):
-	                    Attack, Block, Abilities, Dodge, Resources
+	  "Basics..."       the combat basics, full screen before the ability roll
+	                    (Client.BasicsScreen): Attack, Block, Abilities (Dodge
+	                    and Resources recorded, not in it now)
 
 	  Narration.play(name, quiet?) -> seconds   reads it (once a visit), returns how
 	                                    long it takes (0: already read)

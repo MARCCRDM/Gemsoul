@@ -339,13 +339,14 @@ do
 	Server._next, Server._leave = realNext, realLeave
 end
 
--- The first ChoiceAfter (3) rounds a must; from then on each win's card
--- offers the first dungeon (HUNT BOUNTY) beside CONTINUE ROUNDS. Taken, the
--- rest of the set waits (NEXT STEP's FIGHT), and the starter kaiju roll
--- plays before the dungeon (never mid-rounds).
+-- All six rounds first (ChoiceAfter is the whole set): no way out before.
+-- The set's card then has one way on, HUNT BOUNTY: the starter kaiju roll
+-- plays before the dungeon (never mid-rounds), then out of the Arena and
+-- into it, by the Outpost under the loading screen (its pod doesn't land
+-- yet: that's after the dungeon).
 do
 	local must = IntroRounds.ChoiceAfter
-	check(must == 3, "The rounds before the dungeon's offered aren't 3: " .. tostring(must))
+	check(must == IntroRounds.Count, "The bounty's offered before the whole set: after " .. tostring(must))
 	profile = newProfile({})
 	check(not Server.choose(player, "Boss").Ok, "Stepped out before winning a fight")
 	check(not Server.huntPending(player), "The kaiju roll free before HUNT BOUNTY")
@@ -357,40 +358,31 @@ do
 	local early = Server.choose(player, "Boss")
 	check(not early.Ok and early.Choice == nil and Server.held(player), "An early HUNT BOUNTY took them out before round " .. must)
 	check(not Server.choose(player, "Hax").Ok, "A way out that isn't one")
-	-- Round 3 won: HUNT BOUNTY on the card (CONTINUE ROUNDS beside it).
+	-- The last round won: the set's done, HUNT BOUNTY its one way on.
 	Server.won(player)
-	check(Server.huntNext(profile, profile.IntroRounds), "No HUNT BOUNTY after round " .. must)
-	check(Server.held(player) and not Server.huntPending(player), "Free of the rounds before picking a way on")
-	-- (CONTINUE ROUNDS: the next round, the offer back on the next win's card)
+	check(Server.huntNext(profile, profile.IntroRounds), "No HUNT BOUNTY after the set")
+	check(profile.IntroFinale == "Dungeon", "The set done didn't make the first dungeon next")
+	check(not Server.huntPending(player), "The kaiju roll free before HUNT BOUNTY was picked")
 	local hunted = Server._hunt(player)
 	check(hunted.Ok and Server.huntPending(player), "HUNT BOUNTY didn't let the kaiju roll play")
-	Server._next(player)
-	check(not Server.huntPending(player), "CONTINUE ROUNDS left the kaiju roll free mid-rounds")
-	-- HUNT BOUNTY: out of the rounds, the rest waiting.
-	check(Server._hunt(player).Ok, "HUNT BOUNTY refused at round " .. must)
+	attributes.CombatSession = "Training" -- (on the set's card, still in the Arena)
 	local out = Server.choose(player, "Boss")
 	check(out.Ok and out.Choice == "Boss", "HUNT BOUNTY didn't take them out")
 	check(attributes.CombatSession == nil and attributes.LeftStaying == true, "HUNT BOUNTY went by the lobby's spawn")
 	check(attributes.Outpost == true, "HUNT BOUNTY left them outside the Outpost: the gate won't open")
 	check(not Server.held(player) and attributes.IntroRoundsLeft == nil, "Still held in the rounds after HUNT BOUNTY")
-	check(Server.left(player) == IntroRounds.Count - must, "The rounds left went with HUNT BOUNTY")
+	check(Server.left(player) == 0, "Rounds left over with the whole set won")
 	check(attributes.IntroFinale == "Dungeon" and Server.owesDungeon(player), "The Rift wouldn't pay the first dungeon's purse")
 	check(Server.dungeonCleared(player) and profile.IntroFinale == "Mines", "Clearing it didn't open the lobby's intro")
 	check(not Server.owesDungeon(player), "The first dungeon's purse paid twice")
-	-- After the dungeon: never HUNT BOUNTY again; FIGHT finishes the set.
+	-- After the dungeon: never HUNT BOUNTY again.
 	local state = profile.IntroRounds
 	check(not Server.huntNext(profile, state), "HUNT BOUNTY again after the first dungeon (Mines)")
 	profile.IntroFinale = "Done"
 	check(not Server.huntNext(profile, state), "HUNT BOUNTY again after the first dungeon (Done)")
-	Server._next(player)
-	check(Server.held(player) and attributes.IntroRoundsLeft == IntroRounds.Count - must, "Back to the rounds, but not held in them")
-	for _ = must + 1, IntroRounds.Count do
-		Server.won(player)
-	end
-	check(Server.left(player) == 0 and profile.IntroFinale == "Done", "Finishing the set after the dungeon owed it again")
-	-- The rule itself: from round 3, while the dungeon's owed.
-	check(Server.huntNext({ IntroFinale = nil }, { Won = must }) and Server.huntNext({ IntroFinale = "Dungeon" }, { Won = IntroRounds.Count }), "No HUNT BOUNTY from round " .. must)
-	check(not Server.huntNext({ IntroFinale = nil }, { Won = 1 }) and not Server.huntNext({ IntroFinale = "Dungeon" }, { Won = must - 1 }), "HUNT BOUNTY before round " .. must)
+	-- The rule itself: the whole set won, while the dungeon's owed.
+	check(Server.huntNext({ IntroFinale = nil }, { Won = must }) and Server.huntNext({ IntroFinale = "Dungeon" }, { Won = IntroRounds.Count }), "No HUNT BOUNTY after the set")
+	check(not Server.huntNext({ IntroFinale = nil }, { Won = 3 }) and not Server.huntNext({ IntroFinale = "Dungeon" }, { Won = must - 1 }), "HUNT BOUNTY before the set's done")
 	check(not Server.huntNext({ IntroFinale = "Dungeon", IntroDungeonCleared = true }, { Won = IntroRounds.Count }), "HUNT BOUNTY with the dungeon cleared")
 	check(not Server.huntNext({ IntroFinale = "Done" }, { Won = IntroRounds.Count }), "HUNT BOUNTY for an older save")
 	attributes.CombatSession = nil

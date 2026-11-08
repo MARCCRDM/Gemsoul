@@ -1,10 +1,11 @@
 -- Launch ceremony: server-owned outcomes, simultaneous reels, a spotlight for every reward.
 --
--- The fast start (Shared.FastStart; Pick off): no picker. Their element is
--- rolled by the server, Thermal or Cryo, and lands on a quick reel of the
--- two; then the surge roll (revealMoves), moving on by itself; then the
--- loading screen, up till their first fight starts (Lobby.client finds it
--- and lets the cover go: the player attribute IntroCover). No kaiju here:
+-- The fast start (Shared.FastStart; Pick off): no picker. First the combat
+-- basics, full screen (Modules.BasicsScreen); then their element is rolled by the
+-- server, Thermal or Cryo, and lands on a quick reel of the two; then
+-- the surge roll (revealMoves), moving on by itself; then the loading
+-- screen, up till their first fight starts (Lobby.client finds it and lets
+-- the cover go: the player attribute IntroCover). No kaiju here:
 -- the starter roll is Wren's, at the Kennel.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -33,6 +34,7 @@ local LotterySound = require(script.Parent.Modules.LotterySound)
 local Icons = require(script.Parent.Modules.SurgeIcons)
 local CardFX = require(script.Parent.Modules.ElementCardFX)
 local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
+local BasicsScreen = require(script.Parent.Modules.BasicsScreen)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -2554,6 +2556,31 @@ fit()
 -- stepping back, the name big under them; then on by itself to the surge
 -- roll and the first fight. A failed roll: RETRY.
 if not FastStart.Pick then
+	-- First the combat basics, full screen (Modules.BasicsScreen: attack,
+	-- block, abilities), then the ability roll, then the six intro rounds.
+	-- (Not again for a kit already rolled: a rejoin.) Not under the loading
+	-- screen: its first line once the loading has stayed done a moment (a
+	-- cover can follow another). No music till it's over.
+	if not savedKit then
+		local me = game:GetService("Players").LocalPlayer
+		me:SetAttribute("IntroVideo", true)
+		local deadline = os.clock() + 45
+		pcall(BasicsScreen.run, function()
+			local clearSince = nil
+			while os.clock() < deadline do
+				if LoadingFlow.active() then
+					clearSince = nil
+				else
+					clearSince = clearSince or os.clock()
+					if os.clock() - clearSince >= 0.6 then
+						return
+					end
+				end
+				task.wait(0.05)
+			end
+		end)
+		me:SetAttribute("IntroVideo", nil)
+	end
 	do
 		local list = FastStart.StarterElements
 		gui.Enabled = true

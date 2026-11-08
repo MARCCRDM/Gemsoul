@@ -109,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.76 · 2026-11-07 the basics play alongside the first fight (no waiting partner)",
+		Build = "1.77 · 2026-11-08 intro: basics full screen, ability roll, 6 rounds, bounty, then the pod drop",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error
