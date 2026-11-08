@@ -1780,7 +1780,7 @@ local function frontierSuit(family: number)
 			-- Armored collar, flush central reactor and separate life-support unit.
 			block(torso, 0, y * 0.48, 0.02, x * 0.5, y * 0.12, z * 0.78, trim)
 			block(torso, 0, y * 0.04, -z * 0.64, x * 0.17, y * 0.29, 0.1, trim)
-			lit(torso, 0, y * 0.08, -z * 0.702, x * 0.08, y * 0.1, 0.035)
+			lit(torso, 0, y * 0.08, -z * 0.702, x * 0.12, y * 0.14, 0.035)
 			plate(torso, 0, y * 0.02, z * 0.62, x * 0.53, y * 0.84, 0.27, trim)
 			block(torso, 0, y * 0.19, z * 0.79, x * 0.28, y * 0.25, 0.08, metal)
 			for i = 1, 3 do
@@ -1904,6 +1904,9 @@ local function frontierSuit(family: number)
 				-- Sloping shoulder shell; heavier families have more coverage, not wider arms.
 				local span = if family == 3 then 1.42 elseif family == 2 then 1.26 else 1.08
 				block(upper, inward, s.Y * 0.32, 0, s.X * span, s.Y * 0.3, s.Z * 1.16, metal, side * -17)
+				-- A lit vent down the outside of each upper arm and shin at
+				-- every rank: the suit's accent where it can be seen.
+				lit(upper, inward + side * s.X * 0.33, -s.Y * 0.16, -s.Z * 0.42, 0.045, s.Y * 0.34, 0.025)
 				if rarity >= 2 then
 					block(upper, inward, s.Y * 0.36, -s.Z * 0.58, s.X * span, 0.055, 0.045, edge, side * -17)
 				end
@@ -2029,6 +2032,7 @@ local function frontierSuit(family: number)
 				-- overlaps the greave, instead of a floating diamond above the knee.
 				block(shin, 0, s.Y * 0.32, -s.Z * 0.08, width, s.Y * 0.29, s.Z * 0.86, trim)
 				block(shin, 0, s.Y * 0.32, -s.Z * 0.53, width * 0.86, s.Y * 0.24, s.Z * 0.12, metal:Lerp(edge, 0.18))
+				lit(shin, side * width * 0.3, -s.Y * 0.12, -s.Z * 0.58, 0.04, s.Y * 0.3, 0.025)
 				-- The common boots already carry their family's silhouette.
 				if family == 1 then -- Prospector: enclosed work greave and mag-lock clasp.
 					block(shin, 0, -s.Y * 0.09, -s.Z * 0.42, width * 0.86, s.Y * 0.66, s.Z * 0.22, metal)

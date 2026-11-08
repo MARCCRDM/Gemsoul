@@ -38,7 +38,13 @@ local function load(path: string, name: string, extra)
 	end
 	return luau.load(read(path), { debugName = name, environment = e })()
 end
-local Skins = load("src/server/Systems/BrainrotSkins.luau", "BrainrotSkins")
+local Style = load("src/shared/CreatureStyle.luau", "CreatureStyle")
+local Skins = load("src/server/Systems/BrainrotSkins.luau", "BrainrotSkins", {
+	game = { GetService = function() return { Shared = { CreatureStyle = Style } } end },
+	require = function(module)
+		return module
+	end,
+})
 local Bosses = load("src/server/Systems/BrainrotBosses.luau", "BrainrotBosses", {
 	script = { Parent = { BrainrotSkins = Skins } },
 	require = function(module)
@@ -466,7 +472,7 @@ do
 	check(kinds.Stride == 4 and strides[1] == 2 and strides[-1] == 2, name .. ": not four legs in diagonal pairs")
 	check(kinds.Tail == 5, name .. ": its tail doesn't curl segment by segment")
 	check(lowest > -3.2 and lowest < -2.7, string.format("%s: its feet aren't on the ground (%.2f)", name, lowest))
-	check(parts <= 260, string.format("%s: %d parts", name, parts))
+	check(parts <= 275, string.format("%s: %d parts", name, parts)) -- (its own 260, and the ten of its element look)
 	print(string.format("  %-13s %3d parts, on all fours", name, parts))
 end
 
@@ -488,5 +494,31 @@ end
 local left = { Motion.angles("Head", 101.3, 0, 0, -1) }
 local right = { Motion.angles("Head", 101.3, 0, 0, 1) }
 check(math.abs(left[2] - right[2]) > 0.05, "Heads look about together")
+
+-- One look with the kaiju (Shared.CreatureStyle, BrainrotSkins.blend): no
+-- part keeps the raw element colour it was built with, and each boss wears
+-- its element's plates, lit vents and a glowing core in the kaiju's palette.
+for _, spec in Rules.Bosses do
+	local rig = buildBody(roblox.Color3.new(1, 1, 1))
+	check(Bosses.apply(rig, spec, accent, false), spec.Id .. ": not dressed")
+	local pal = Style.palette(spec.Element)
+	local plates, vents, cores, raw = 0, 0, 0, 0
+	for _, d in rig:GetDescendants() do
+		if d:IsA("BasePart") then
+			if Style.near(d.Color, accent) then
+				raw += 1
+			end
+			if d.Name == "ElementPlate" and Style.near(d.Color, pal.Plate) then
+				plates += 1
+			elseif d.Name == "ElementVent" and d.Material == roblox.Enum.Material.Neon and Style.near(d.Color, pal.Glow) then
+				vents += 1
+			elseif d.Name == "ElementCore" and d.Material == roblox.Enum.Material.Neon and Style.near(d.Color, pal.Glow) then
+				cores += 1
+			end
+		end
+	end
+	check(raw == 0, spec.Id .. ": " .. raw .. " parts still in the raw element colour")
+	check(plates == 4 and vents == 4 and cores == 1, string.format("%s: %d plates, %d vents, %d cores", spec.Id, plates, vents, cores))
+end
 
 print(string.format("PASS: %d boss checks (the ten, boss rooms and camps, bodies, heads, motion)", checks))

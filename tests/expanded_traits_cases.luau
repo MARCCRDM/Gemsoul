@@ -159,7 +159,7 @@ for _, isR15 in { false, true } do
 			4,
 			{ VisorColor = Color3.fromRGB(72, 207, 226), FinishColor = Color3.fromRGB(200, 100, 50), Variant = 4 }
 		)
-		assert(built - before >= 25 and built - before <= 110, "Frontier family part budget violated")
+		assert(built - before >= 25 and built - before <= 114, "Frontier family part budget violated") -- (110, and a lit vent on each upper arm and shin)
 		for _, slot in { "Helmet", "Armor", "Gloves", "Boots" } do
 			local start = built
 			ArmorKits.build({}, rig(isR15), look, Color3.fromRGB(72, 207, 226), 1, nil, slot)
@@ -228,7 +228,7 @@ for _, builder in { FrontierAssets.sidearm, FrontierAssets.sword, FrontierAssets
 			Color3.fromRGB(72, 117, 129)
 		)
 		local count = built - before
-		assert(count > previous and count < 50, "Weapon/shield detail must increase within budget")
+		assert(count > previous and count < 56, "Weapon/shield detail must increase within budget") -- (50, and the shield's rim and element seams at every rank)
 		for i = #builtParts - count + 1, #builtParts do
 			local part = builtParts[i]
 			assert(

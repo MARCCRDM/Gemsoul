@@ -728,12 +728,12 @@ local SNAP, OVERSHOOT, RECOVER = 0.07, 0.15, 0.3
 --              is knocked back and the body braces
 local HURT_TIME, BLOCK_TIME = 0.32, 0.22
 local FLINCH = {
-	Waist = { 0.28, 0.18, 0 },
-	Neck = { 0.32, 0, 0 },
-	RightShoulder = { -0.25, 0, 0.25 },
-	LeftShoulder = { -0.25, 0, -0.25 },
-	RightKnee = { -0.15, 0, 0 },
-	LeftKnee = { -0.15, 0, 0 },
+	Waist = { 0.36, 0.22, 0 },
+	Neck = { 0.42, 0, 0 },
+	RightShoulder = { -0.4, 0, 0.3 },
+	LeftShoulder = { -0.4, 0, -0.3 },
+	RightKnee = { -0.22, 0, 0 },
+	LeftKnee = { -0.22, 0, 0 },
 }
 local JOLT = {
 	LeftShoulder = { -0.35, 0, 0.15 },
@@ -758,17 +758,23 @@ local function impulse(d: number, length: number): number
 end
 
 -- Breathing and a slight weight shift in the fighting stance, so it never
--- stands frozen between blows.
+-- stands frozen between blows; and every few seconds the weight settles
+-- onto the other foot (a knee gives, the hips turn a touch, the shoulders
+-- roll), so it stands like a fighter, not a statue that breathes.
 local function breathe(pose, t: number)
 	local b = math.sin(t * 2.4)
 	local shift = math.sin(t * 0.9)
+	local settle = math.sin(t * 0.37)
+	local s = settle * settle * settle -- (mostly still, then a move)
 	return add(pose, {
-		Waist = { 0.03 * b, 0.05 * shift, 0 },
-		Neck = { -0.02 * b, -0.04 * shift, 0 },
-		RightShoulder = { 0.04 * b, 0, 0 },
-		LeftShoulder = { 0.04 * b, 0, 0 },
-		RightKnee = { -0.04 * (1 + b), 0, 0 },
-		LeftKnee = { -0.04 * (1 + b), 0, 0 },
+		Waist = { 0.03 * b, 0.05 * shift + 0.07 * s, 0.02 * s },
+		Neck = { -0.02 * b, -0.04 * shift - 0.05 * s, 0 },
+		RightShoulder = { 0.04 * b + 0.06 * s, 0, 0.03 * s },
+		LeftShoulder = { 0.04 * b - 0.04 * s, 0, 0 },
+		RightHip = { 0.06 * s, 0, 0 },
+		LeftHip = { -0.06 * s, 0, 0 },
+		RightKnee = { -0.04 * (1 + b) - 0.1 * math.max(0, s), 0, 0 },
+		LeftKnee = { -0.04 * (1 + b) - 0.1 * math.max(0, -s), 0, 0 },
 	}, 1)
 end
 
@@ -898,6 +904,12 @@ local function actionPose(a, t: number, base)
 		local length = math.max(0.05, at - start)
 		local p = (t - start) / length
 		local pose = lerp(base, windup, ease(p * 1.4) * (1 + 0.12 * ease((p - 0.75) / 0.25)))
+		if kind == "Heavy" then
+			-- The front foot lifts and plants as the blade goes up: the stomp
+			-- that sells the weight about to come down.
+			local stomp = math.sin(math.clamp(p / 0.6, 0, 1) * math.pi)
+			pose = add(pose, { RightHip = { 0.55 * stomp, 0, 0 }, RightKnee = { -0.7 * stomp, 0, 0 }, Waist = { 0.05 * stomp, 0, 0 } }, 1)
+		end
 		if kind == "Heavy" or kind == "Nova" or kind == "Erupt" then
 			local shake = 0.035 * ease((p - 0.5) / 0.5) * math.sin(t * 47)
 			pose = add(pose, { RightShoulder = { shake, 0, 0 }, LeftShoulder = { -shake, 0, 0 } }, 1)
@@ -919,7 +931,18 @@ local function actionPose(a, t: number, base)
 		return lerp(windup, strike, ease(d / snapTime) * (1 + OVERSHOOT)), 45
 	elseif d < hold then
 		-- Follow-through: settle back onto the strike pose.
-		return lerp(windup, strike, 1 + OVERSHOOT * (1 - ease((d - snapTime) / math.max(0.05, hold - snapTime)))), 35
+		local pose = lerp(windup, strike, 1 + OVERSHOOT * (1 - ease((d - snapTime) / math.max(0.05, hold - snapTime))))
+		if kind == "Stagger" then
+			-- Reeling: it wobbles on its heels, arms out, till it finds its feet.
+			local w = (1 - d / hold) * 0.14
+			pose = add(pose, {
+				Waist = { 0, w * math.sin(t * 11), w * 0.6 * math.sin(t * 8) },
+				Neck = { 0, w * 0.8 * math.sin(t * 7), 0 },
+				RightShoulder = { w * 1.4 * math.sin(t * 9), 0, 0 },
+				LeftShoulder = { -w * 1.4 * math.sin(t * 9), 0, 0 },
+			}, 1)
+		end
+		return pose, 35
 	elseif d < hold + RECOVER then
 		-- Recover to the stance, smoothly.
 		return lerp(strike, base, ease((d - hold) / RECOVER)), 28

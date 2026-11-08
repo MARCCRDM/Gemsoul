@@ -2279,7 +2279,7 @@ function Bosses.apply(rig, spec, accent: Color3, boss: boolean?): boolean
 		end
 	end
 	build(rig, accent)
-	Skins.finish(rig, spec, boss)
+	Skins.finish(rig, spec, boss, accent)
 	return true
 end
 

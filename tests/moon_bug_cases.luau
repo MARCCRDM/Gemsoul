@@ -32,6 +32,11 @@ local env = setmetatable({
 local function read(path: string): string
 	return fs.readFile(ROOT .. "/" .. path)
 end
+local Style = luau.load(read("src/shared/CreatureStyle.luau"), { debugName = "CreatureStyle", environment = env })()
+env.game = { GetService = function() return { Shared = { CreatureStyle = Style } } end }
+env.require = function(module)
+	return module
+end
 local Skins =
 	luau.load(read("src/server/Systems/BrainrotSkins.luau"), { debugName = "BrainrotSkins", environment = env })()
 local rules =

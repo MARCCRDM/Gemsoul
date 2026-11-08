@@ -1,6 +1,7 @@
 -- Reference-guided native creature geometry. See docs/boss-model-references.md.
 -- The invisible R15 skeleton remains the authoritative combat/animation driver.
 local Skins = {}
+local CreatureStyle = require(game:GetService("ReplicatedStorage").Shared.CreatureStyle)
 local V, C, A = Vector3.new, Color3.fromRGB, CFrame.Angles
 local BALL, CYL = Enum.PartType.Ball, Enum.PartType.Cylinder
 local white, dark = C(232, 226, 202), C(19, 24, 25)
@@ -716,12 +717,98 @@ function Skins.apply(rig, spec, accent, boss, gearTier, hasShield)
 	if spec.Shape ~= "Wood" and gearTier ~= 0 then
 		armor(rig, spec, accent, gearTier or (if boss then 4 else 1), hasShield)
 	end
-	Skins.finish(rig, spec, boss)
+	Skins.finish(rig, spec, boss, accent)
 end
 
--- After a body's dressed (here, or BrainrotBosses): a boss is scaled up,
--- its moving details keep their rest poses, and the attributes clients read.
-function Skins.finish(rig, spec, boss)
+-- One look with the kaiju (Shared.CreatureStyle). The builders light a
+-- creature's eyes, seams and armour glows in the raw element colour they're
+-- given: that becomes its element's palette (the kaiju's), and it wears the
+-- kaiju's angular plates on its upper arms and thighs, lit vents down its
+-- forearms and shins, and a glowing core on the front of its chest, all in
+-- the palette. Ten parts, no more (a boss has a part budget:
+-- tests/brainrot_boss_cases).
+-- How far out (the body's X, to `side`) what hangs on `bone` reaches.
+local function reachOf(rig, bone, side: number): number
+	local root = rig.HumanoidRootPart
+	local reach = 0
+	for _, p in rig:GetChildren() do
+		if p:IsA("BasePart") and p ~= bone and p.Transparency < 1 then
+			local link = p:FindFirstChild("CreatureDetail") or p:FindFirstChild("CreatureMotion")
+			if link and (link :: any).Part0 == bone then
+				local rel = root.CFrame:PointToObjectSpace(p.CFrame.Position)
+				reach = math.max(reach, side * rel.X + math.max(p.Size.X, p.Size.Z) / 2)
+			end
+		end
+	end
+	return reach
+end
+-- A part on `bone` placed at `at` in the body's space (its root at rest).
+local function place(rig, bone, name, size, at: Vector3, color, shape, turn: CFrame?)
+	local cf = bone.CFrame:ToObjectSpace(rig.HumanoidRootPart.CFrame * CFrame.new(at) * (turn or CFrame.identity))
+	return part(rig, bone, name, size, cf.Position, color, shape, cf.Rotation)
+end
+function Skins.blend(rig, spec, accent: Color3, boss: boolean?)
+	local pal = CreatureStyle.palette(spec.Element)
+	CreatureStyle.recolour(rig:GetDescendants(), accent, pal)
+	local k = if boss then 1 else 0.8
+	for _, s in { -1, 1 } do
+		local L = if s == -1 then "Left" else "Right"
+		local upper, fore = rig:FindFirstChild(L .. "UpperArm"), rig:FindFirstChild(L .. "LowerArm")
+		local thigh, shin = rig:FindFirstChild(L .. "UpperLeg"), rig:FindFirstChild(L .. "LowerLeg")
+		-- (the plates sit sunk into the limb's round, leaning out at the top
+		-- like a pauldron, so they read as mounted on it, not floating off it)
+		if upper then
+			local x = math.max(reachOf(rig, upper, s), 0.6)
+			place(rig, upper, "ElementPlate", V(0.3, 0.85, 0.62) * k, V(s * (x - 0.08), 0.95, 0.05), pal.Plate, nil, A(0.12, 0, -s * 0.24))
+		end
+		if thigh then
+			local x = math.max(reachOf(rig, thigh, s), 0.5)
+			place(rig, thigh, "ElementPlate", V(0.26, 0.72, 0.56) * k, V(s * (x - 0.06), -0.9, 0), pal.Plate, nil, A(0, 0, -s * 0.18))
+		end
+		if fore then
+			local x = math.max(reachOf(rig, fore, s), 0.6)
+			place(rig, fore, "ElementVent", V(0.07, 0.5, 0.14) * k, V(s * (x + 0.02), -0.2, -0.05), pal.Glow).Material =
+				Enum.Material.Neon
+		end
+		if shin then
+			local x = math.max(reachOf(rig, shin, s), 0.5)
+			place(rig, shin, "ElementVent", V(0.07, 0.5, 0.14) * k, V(s * (x + 0.02), -2.05, -0.05), pal.Glow).Material =
+				Enum.Material.Neon
+		end
+	end
+	-- The core: a lit diamond in a dark socket, on the front of whatever is
+	-- foremost on the chest (its chest, belly, breast or barrel).
+	local torso = rig:FindFirstChild("UpperTorso")
+	if torso then
+		local root = rig.HumanoidRootPart
+		local front, y = -0.5, 0.9
+		for _, p in rig:GetChildren() do
+			if p:IsA("BasePart") and p.Transparency < 1 and p ~= torso then
+				local link = p:FindFirstChild("CreatureDetail")
+				if link and (link :: any).Part0 == torso then
+					local rel = root.CFrame:PointToObjectSpace(p.CFrame.Position)
+					local z = rel.Z - p.Size.Z / 2
+					if math.abs(rel.X) < 0.7 and rel.Y > 0.2 and rel.Y < 1.7 and p.Size.X > 1.2 and z < front then
+						front, y = z, rel.Y
+					end
+				end
+			end
+		end
+		-- (big enough to survive a moon bug's thinning: Skins.thin)
+		place(rig, torso, "CoreSocket", V(0.64, 0.64, 0.1) * k, V(0, y, front - 0.03), dark, nil, A(0, 0, math.pi / 4))
+		place(rig, torso, "ElementCore", V(0.46, 0.46, 0.12) * k, V(0, y, front - 0.06), pal.Glow, nil, A(0, 0, math.pi / 4)).Material =
+			Enum.Material.Neon
+	end
+end
+
+-- After a body's dressed (here, or BrainrotBosses): it blends in with the
+-- kaiju (above, given the raw `accent` it was built with), a boss is scaled
+-- up, its moving details keep their rest poses, and the attributes clients
+-- read.
+function Skins.finish(rig, spec, boss, accent: Color3?)
+	if accent and spec.Element then
+		Skins.blend(rig, spec, accent, boss)
+	end
 	if boss then
 		rig:ScaleTo(spec.Scale or 1.8)
 	end

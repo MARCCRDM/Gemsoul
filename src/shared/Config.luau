@@ -109,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.86 · 2026-11-08 real sounds: 91 of 111 ids in",
+		Build = "1.87 · 2026-11-08 one look for every creature: bosses in the kaiju palette with plates, vents and a core; shield seams and suit vents; livelier fight poses",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error

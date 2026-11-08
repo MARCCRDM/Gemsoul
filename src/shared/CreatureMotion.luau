@@ -24,8 +24,9 @@ function Motion.angles(kind: string, time: number, phase: number, amount: number
 			0,
 			0
 	elseif kind == "Body" then
-		-- a kaiju's trunk on its hips: it breathes, and bobs as it walks
-		return math.sin(time * 2.1) * 0.015 + math.sin(phase * 2) * 0.03 * amount, 0, 0
+		-- a kaiju's trunk on its hips: it breathes (deeper than a twitch),
+		-- turns a little as it looks about, and bobs as it walks
+		return math.sin(time * 2.1) * 0.028 + math.sin(phase * 2) * 0.03 * amount, math.sin(time * 0.7) * 0.03, 0
 	elseif kind == "Moss" then
 		return math.sin(time * 1.6 + side) * 0.06 + amount * 0.08, 0, math.sin(phase + side) * amount * 0.08
 	elseif kind == "Head" then

@@ -210,7 +210,7 @@ end
 local sound = fs.readFile(ROOT .. "/src/client/Modules/CombatSound.luau")
 for _, name in { "LevelUp", "KaijuLevelUp", "CallBack", "Deploy" } do
 	check(
-		sound:find("\t" .. name .. " = 0, --", 1, true) and sound:find("\t" .. name .. " = {", 1, true),
+		sound:find("\t" .. name .. " = %d+, %-%-") and sound:find("\t" .. name .. " = {", 1, true),
 		name .. " has no sound"
 	)
 end

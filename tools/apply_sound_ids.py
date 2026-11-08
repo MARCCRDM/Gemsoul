@@ -31,6 +31,7 @@ import os
 import re
 import sys
 
+sys.dont_write_bytecode = True  # (no __pycache__ in tools/)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from upload_audio import EXTENSIONS, GROUPS, IDS_FILE, ROOT, write_ids  # noqa: E402
 

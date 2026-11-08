@@ -75,9 +75,9 @@ local reveal = fs.readFile(ROOT .. "/src/client/Modules/MiningWorldReveal.luau")
 check(reveal:find('gem.Tier == "Legendary"', 1, true) and reveal:find("LegendaryWindow.play(miner and miner.Character, gem, packet.MinerName)", 1, true),
 	"Someone else's Legendary doesn't open its window over them")
 check(reveal:find("entry.Board.Enabled = false", 1, true), "Their box doesn't step aside for the window")
--- Its sound: a slot for the file, and a stand-in till it's uploaded.
+-- Its sound: a slot for the file (its id once uploaded), and a stand-in.
 local sound = fs.readFile(ROOT .. "/src/client/Modules/CombatSound.luau")
-check(sound:find("LegendaryWindow = 0, -- legendary_window.mp3", 1, true) and sound:find("\tLegendaryWindow = {", 1, true), "No LegendaryWindow sound")
+check(sound:find("LegendaryWindow = %d+, %-%- legendary_window%.mp3") and sound:find("\tLegendaryWindow = {", 1, true), "No LegendaryWindow sound")
 check(fs.isFile(ROOT .. "/assets/sounds/combat/legendary_window.mp3"), "No legendary_window.mp3")
 check(source:find('CombatSound.play("LegendaryWindow"', 1, true), "The window plays no sound")
 

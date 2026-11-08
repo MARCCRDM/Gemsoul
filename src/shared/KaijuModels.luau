@@ -33,6 +33,7 @@
 	  KaijuModels.scale(model, scale)     resize, keeping the joints' rest poses
 ]]
 local KaijuShapes = require(script.Parent.KaijuShapes)
+local CreatureStyle = require(script.Parent.CreatureStyle)
 
 local KaijuModels = {}
 
@@ -40,13 +41,9 @@ local V, C = Vector3.new, Color3.fromRGB
 local CF, A = CFrame.new, CFrame.Angles
 local rad = math.rad
 
--- Each element's plates, the glow of its eyes, core and vents, and a darker trim.
-KaijuModels.Palettes = {
-	Fire = { Plate = C(236, 138, 44), Glow = C(255, 196, 96), Trim = C(150, 72, 26) },
-	Frost = { Plate = C(72, 178, 198), Glow = C(140, 238, 255), Trim = C(36, 104, 132) },
-	Shock = { Plate = C(234, 198, 62), Glow = C(150, 222, 255), Trim = C(140, 112, 34) },
-	Poison = { Plate = C(112, 196, 84), Glow = C(200, 255, 120), Trim = C(56, 116, 46) },
-}
+-- Each element's plates, the glow of its eyes, core and vents, and a darker
+-- trim: the one look every creature wears (Shared.CreatureStyle).
+KaijuModels.Palettes = CreatureStyle.Palettes
 local BODY, BODY2, CLAW = C(46, 54, 74), C(68, 78, 104), C(176, 170, 156)
 
 local function make(

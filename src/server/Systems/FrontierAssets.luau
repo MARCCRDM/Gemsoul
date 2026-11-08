@@ -201,6 +201,13 @@ function Assets.shield(folder, arm, mount, rarity, accent, finish, family)
 	-- Recessed central socket housing; leave the gemstone's face clear.
 	add(0, 0.1, -0.215, 0.46, 0.48, 0.035, dark)
 	add(0, -0.43, -0.215, 0.65, 0.035, 0.035, steel)
+	-- A bevelled rim standing proud behind the plates, and the element's
+	-- seams at every rank (its glow is the kit's, as the suit's vents are).
+	add(0, 0.14, 0.15, 1.5, 1.72, 0.08, dark:Lerp(Color3.new(0, 0, 0), 0.35))
+	for _, side in { -1, 1 } do
+		add(side * 0.58, -0.6, -0.235, 0.05, 0.3, 0.03, accent, Enum.Material.Neon)
+		add(side * 0.3, 0.74, -0.235, 0.26, 0.035, 0.03, accent, Enum.Material.Neon)
+	end
 	for _, side in { -1, 1 } do
 		add(side * 0.46, 0.7, -0.22, 0.055, 0.055, 0.035, steel, Enum.Material.Metal)
 	end
