@@ -28,7 +28,9 @@
 	      the Shelter's counters, for their prompts), Crew ({ { Id, CFrame } }:
 	      where the Shelter's crew stand, by Shared.Vendors id, for
 	      OutpostServer to build them: Brutus among them, behind his
-	      bounty counter), Shelter ({ Box, Lift, Ramps,
+	      bounty counter), Stalls ({ { Id, CFrame } }: where the vendor
+	      rows' keepers stand, behind their counters by the ring road,
+	      Shared.Outpost.stallSpots), Shelter ({ Box, Lift, Ramps,
 	      Feet }: its half size, x and z, kept clear of rocks; how high its
 	      floor stands; each ramp's footprint, { Middle (on the quarry
 	      floor), Half (half sizes, x and z), SlopeHalf (the slope's half
@@ -1752,6 +1754,18 @@ local STATION = {
 	Quarry = HAZARD,
 	Exit = Color3.fromRGB(76, 190, 110),
 }
+-- The vendor rows' stalls (Shared.Outpost.Settlement.Stalls), by the
+-- keeper's Shared.Vendors id: its station's colour and the name on its
+-- fascia.
+local PAVE_STALL = Color3.fromRGB(70, 78, 94)
+OutpostWorld.StallLooks = {
+	GemBuyer = { Color = STATION.Gems, Sign = "GEMS" },
+	Broker = { Color = STATION.Market, Sign = "MARKET" },
+	Outfitter = { Color = STATION.Store, Sign = "STORE" },
+	Foreman = { Color = STATION.Quarry, Sign = "REFILLS" },
+	ArenaMaster = { Color = STATION.Arena, Sign = "DUELS" },
+	BountyClerk = { Color = Color3.fromRGB(240, 178, 48), Sign = "BOUNTIES" },
+}
 local function shelter(parent, at: CFrame, rules)
 	local m = folder(parent, "Shelter")
 	local lift = rules.ShelterLift
@@ -2879,7 +2893,51 @@ local function settlement(parent, at: CFrame, rules, rng)
 	steelPlate(enchanter, ef * CFrame.new(0, 2.4, -3.15) * CFrame.Angles(0, math.pi, 0), Vector3.new(5.4, 1.4, 0.2), "ENCHANTER")
 	table.insert(keepOut, { ef.Position, 12 })
 
-	return { Pads = pads, Gates = gates, Enchanter = desk, Heart = at, KeepOut = keepOut, Lines = lines }
+	-- The vendor rows (set.Stalls: Outpost.stallSpots): along the ring road
+	-- either side of the north road, between the pods' walkways, a matching
+	-- stall each: a paved deck edged in its station's colour, a counter,
+	-- a back wall, a canopy on two posts with its name on a fascia in that
+	-- colour and a lamp under it. Its keeper stands behind the counter,
+	-- facing the road (OutpostServer builds them: Stalls).
+	local stallsFolder = folder(m, "VendorRows")
+	local stalls = {}
+	for _, spot in rules.stallSpots() do
+		local info = OutpostWorld.StallLooks[spot.Id]
+		if not info then
+			continue
+		end
+		local color = info.Color
+		local frame = facingPoint(world(spot.Offset), at.Position) -- (-Z to the middle)
+		local stall = folder(stallsFolder, spot.Side .. spot.Id)
+		local function at3(x, y, z)
+			return frame * CFrame.new(x, y, z)
+		end
+		-- (-Z: toward the middle, the road; +Z: toward the pods)
+		solid(part(stall, at3(0, 0.2, 0), Vector3.new(12, 0.4, 9), PAVE_STALL, Enum.Material.SmoothPlastic))
+		part(stall, at3(0, 0.42, -4.35), Vector3.new(12, 0.06, 0.3), color, Enum.Material.SmoothPlastic)
+		-- the counter: dark metal, a pale top, its colour along the front
+		local counter = solid(part(stall, at3(0, 1.9, -1.4), Vector3.new(9, 3, 1.6), HULL_DARK, Enum.Material.Metal))
+		counter.Name = "Counter"
+		part(stall, at3(0, 3.5, -1.4), Vector3.new(9.4, 0.2, 2), Color3.fromRGB(206, 212, 224), Enum.Material.SmoothPlastic)
+		part(stall, at3(0, 2.7, -2.23), Vector3.new(9, 0.4, 0.06), color, Enum.Material.SmoothPlastic)
+		-- the back wall and the canopy on its posts
+		solid(part(stall, at3(0, 4.4, 4.2), Vector3.new(12, 8, 0.5), ARMOR, Enum.Material.Metal))
+		part(stall, at3(0, 6.4, 3.92), Vector3.new(10, 0.3, 0.06), color, Enum.Material.SmoothPlastic)
+		for _, x in { -5.7, 5.7 } do
+			solid(part(stall, at3(x, 4.4, -4), Vector3.new(0.4, 8, 0.4), STEEL, Enum.Material.Metal))
+		end
+		part(stall, at3(0, 8.6, 0), Vector3.new(12.6, 0.35, 9.4), HULL, Enum.Material.Metal)
+		local fascia = part(stall, at3(0, 8.4, -4.75), Vector3.new(12.6, 1.3, 0.2), color, Enum.Material.SmoothPlastic)
+		fascia.Name = "Sign"
+		painted(stall, fascia.CFrame * CFrame.new(0, 0, -0.12), Vector3.new(11, 1.1, 0.02), info.Sign, Color3.fromRGB(18, 20, 26))
+		local lamp = part(stall, at3(0, 8.38, -0.6), Vector3.new(4, 0.1, 1), Color3.fromRGB(236, 240, 246), Enum.Material.Neon)
+		lamp.Name = "Lamp"
+		light(lamp, Color3.fromRGB(255, 236, 210), 16, 0.9)
+		table.insert(stalls, { Id = spot.Id, CFrame = at3(0, 0.4, 1.6) })
+		table.insert(keepOut, { frame.Position, 9 })
+	end
+
+	return { Pads = pads, Gates = gates, Enchanter = desk, Heart = at, KeepOut = keepOut, Lines = lines, Stalls = stalls }
 end
 
 -- Landmarks in the settlement's outer belt (Shared.Outpost.Settlement:
@@ -3835,6 +3893,7 @@ function OutpostWorld.build(at: CFrame, parent: Instance)
 		Front = front,
 		Stations = { Store = home.Store, Market = home.Market },
 		Crew = home.Crew,
+		Stalls = town.Stalls,
 		Shelter = { Box = home.Box, Lift = lift, Ramps = home.Ramps, Feet = home.Feet },
 		-- The stairs down to the Kaiju Arena: { Landing (CFrame), Size, Top (CFrame) }.
 		Stairs = home.Stairs,

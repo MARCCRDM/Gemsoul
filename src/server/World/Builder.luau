@@ -850,7 +850,7 @@ end
 	head. It stands at the frame's origin facing -Z. Talking to it opens the
 	dialogue for `vendorId` (see Shared.Vendors).
 ]]
-function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info): Model
+function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info, quiet: boolean?): Model
 	local model = Instance.new("Model")
 	model.Name = info.Name
 	local limb = { Color = C.Chrome, Material = Enum.Material.Metal }
@@ -975,7 +975,9 @@ function Builder.vendor(parent: Instance, frame: CFrame, vendorId: string, info)
 	-- recorded spot, and receive the whole robot at once, or a half-loaded
 	-- robot can be "turned" to the wrong place.
 	model:SetAttribute("Home", torso.CFrame)
-	Builder.landmark(vendorId, torso.CFrame.Position)
+	if not quiet then -- (a second post's keeper: the guides keep pointing at the first)
+		Builder.landmark(vendorId, torso.CFrame.Position)
+	end
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	CollectionService:AddTag(model, "Vendor")
 	model.Parent = parent

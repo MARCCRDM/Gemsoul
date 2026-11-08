@@ -39,7 +39,8 @@
 	Spar, Duel, Party) for the client to act on. The Shelter's crew
 	(site.Crew: Ilsa the gem buyer, Brutus for duels, Marlo for bounties, Garrick
 	for refills, Tamsin, Borin and INFO-9) are Builder.vendor robots: their
-	Talk prompt opens Client.Dialogue.
+	Talk prompt opens Client.Dialogue. Six of them keep stalls in the vendor
+	rows by the pods too (site.Stalls), either side of the north road.
 
 	Every swing out past the core makes noise (OutpostServer.onSwing:
 	FrontierServer.swing, which brings the critters). A player Rift Charged
@@ -1167,6 +1168,18 @@ function OutpostServer.start()
 		local info = Vendors[spot.Id]
 		if info then
 			Builder.vendor(crew, spot.CFrame, spot.Id, info)
+		end
+	end
+	-- The vendor rows by the pods (site.Stalls): the same crew at stalls
+	-- of their own, either side of the north road. (No landmark of their
+	-- own: the guides still point at the Shelter's.)
+	local rows = Instance.new("Folder")
+	rows.Name = "Stalls"
+	rows.Parent = site.Model
+	for _, spot in site.Stalls or {} do
+		local info = Vendors[spot.Id]
+		if info then
+			Builder.vendor(rows, spot.CFrame, spot.Id, info, true)
 		end
 	end
 	-- The hidden Easter eggs: a prompt that says nothing about what it is.

@@ -380,13 +380,13 @@ World.Frontier = Frontier
 World.Rules = Rules
 -- The Shelter's crew: Builder.vendor's robots, recorded where they're built.
 local Vendors = load("src/shared/Vendors.luau", "Vendors", {})
-local crewBuilt = {}
+local crewBuilt, stallsBuilt = {}, {}
 local Builder = {
-	vendor = function(parent, frame, id, info)
+	vendor = function(parent, frame, id, info, quiet)
 		local model = R.Instance.new("Model")
 		model.Name = info.Name
 		model.Parent = parent
-		table.insert(crewBuilt, { Parent = parent, Frame = frame, Id = id, Info = info })
+		table.insert(if parent.Name == "Stalls" then stallsBuilt else crewBuilt, { Parent = parent, Frame = frame, Id = id, Info = info, Quiet = quiet })
 		return model
 	end,
 }
@@ -1666,6 +1666,59 @@ do
 	end
 	check(Frontier.Core >= set.Wall, "The safe core stops short of the wall")
 end
+-- The vendor rows: either side of the north road along the ring road,
+-- each side the same six keepers in the same order from the road out, a
+-- stall each between the pods' walkways, no doorstep rock in one, its
+-- keeper behind the counter facing the road (and no second landmark).
+do
+	local set = Rules.Settlement
+	local stalls = set.Stalls
+	check(#stallsBuilt == 2 * #stalls.Crew and #site.Stalls == #stallsBuilt, "The vendor rows aren't all there: " .. #stallsBuilt)
+	local spots = Rules.stallSpots()
+	local middle = Rules.Location.Position
+	for i, built in stallsBuilt do
+		local spot = spots[i]
+		check(built.Id == spot.Id and built.Info == Vendors[spot.Id], "A stall's keeper isn't the one for it: " .. built.Id)
+		check(built.Quiet == true, built.Id .. "'s stall moved the guides' landmark off the Shelter")
+		check(built.Parent.Parent == site.Model, built.Id .. "'s stall keeper isn't in the Outpost")
+		-- (the side's order: the same keeper the same number of stalls from the road)
+		local side = if spot.Side == "West" then stalls.West else stalls.East
+		check(stalls.Crew[table.find(side, spot.Angle) :: number] == built.Id, "The two rows aren't in the same order")
+		local p = built.Frame.Position - middle
+		local r = R.Vector3.new(p.X, 0, p.Z).Magnitude
+		check(r > set.Ring + 9 and r < set.Tiers[1].R - set.Pad - 4, built.Id .. "'s stall isn't between the ring road and the pods: " .. r)
+		check(math.abs(p.X) > 18, built.Id .. "'s stall is on the north road")
+		local inward = R.Vector3.new(-p.X, 0, -p.Z).Unit
+		check(built.Frame.LookVector:Dot(inward) > 0.99, built.Id .. " doesn't face the road from the stall")
+		-- clear of every pad's walkway (at the pads' angles, 6 wide)
+		for _, pad in Rules.padSpots() do
+			if pad.Tier == 1 then
+				local a = math.rad(pad.Angle)
+				local along = R.Vector3.new(math.cos(a), 0, math.sin(a))
+				local flatP = R.Vector3.new(p.X, 0, p.Z)
+				local across = (flatP - along * flatP:Dot(along)).Magnitude
+				check(across > 3 + 6.5, built.Id .. "'s stall stands on a pad's walkway")
+			end
+		end
+		check(Rules.isStall(spot.Angle), "A stall's angle isn't kept free of doorstep rocks")
+	end
+	-- the two rows mirror each other across the north road
+	for i = 1, #stalls.Crew do
+		check(math.abs((stalls.West[i] + stalls.East[i]) / 2 - 270) < 0.01, "The rows don't mirror each other at stall " .. i)
+	end
+	for _, offset in Rules.doorstepSpots() do
+		for _, spot in spots do
+			check((offset - spot.Offset).Magnitude > 12, "A doorstep rock in a stall")
+		end
+	end
+	-- a sign on each, in its station's colour
+	local rows = site.Model:FindFirstChild("VendorRows", true)
+	check(rows and #rows:GetChildren() == #stallsBuilt, "The stalls weren't built")
+	for _, stall in rows:GetChildren() do
+		check(stall:FindFirstChild("Sign") and stall:FindFirstChild("Counter") and stall:FindFirstChild("Lamp"), stall.Name .. " is missing its sign, counter or lamp")
+	end
+end
+
 -- The Hall of Fame's ropes run post to post (the Shelter is turned: never
 -- along the world's axes), each end at a stanchion's top.
 do
@@ -1703,5 +1756,5 @@ end
 print(
 	"PASS: "
 		.. checks
-		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, Garrick's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave, X for the kit and T for the target, the Hall of Fame's ropes)"
+		.. " Outpost checks (rock sizes, swings, claims, pops, loot, respawns, picks wearing out, Garrick's refills, old picks to swings, free pick charge, retired secrets, mech bays, enter/leave, X for the kit and T for the target, the Hall of Fame's ropes, the vendor rows)"
 )

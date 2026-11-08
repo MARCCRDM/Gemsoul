@@ -99,6 +99,8 @@ end
 	  Outpost.padSpots() -> { { Offset: Vector3, Angle: number, Tier: number } }
 	                     every pad, tier by tier, round from the west
 	  Outpost.doorstepSpots() -> { Vector3 }   rocks at the pods' doorsteps
+	  Outpost.stallSpots() -> { { Id: string, Angle: number, Offset: Vector3, Side: string } }
+	                     the vendor rows' stalls, west then east, from the north road out
 	  Outpost.place(angle, r) -> Vector3       an offset from an angle and a radius
 ]]
 Outpost.Settlement = {
@@ -163,6 +165,17 @@ Outpost.Settlement = {
 	Pad = 12,
 	RoadGap = 6,
 	Doorstep = { R = { 196, 206, 214 } }, -- (rocks between the inner pads: Outpost.doorstepSpots)
+	-- The vendor rows: a stall each for the crew who trade (Shared.Vendors
+	-- ids, Crew), along the ring road on both sides of the north road,
+	-- between it and the pods: R studs out, at the doorstep's angles, each
+	-- between two pads' walkways (no doorstep rocks there). Each side reads
+	-- the same from the north road out: Crew[1] nearest it.
+	Stalls = {
+		R = 181,
+		Crew = { "GemBuyer", "Broker", "Outfitter", "Foreman", "ArenaMaster", "BountyClerk" },
+		West = { 259.5, 252.5, 245.5, 238.5, 231.5, 224.5 },
+		East = { 280.5, 287.5, 294.5, 301.5, 308.5, 315.5 },
+	},
 	Daycare = { Angle = 160, R = 255 },
 	Market = { Angle = 40, R = 255 },
 	Enchanter = { Angle = 62, R = 150 },
@@ -184,8 +197,33 @@ function Outpost.padSpots(): { { Offset: Vector3, Angle: number, Tier: number } 
 	end
 	return list
 end
+function Outpost.stallSpots(): { { Id: string, Angle: number, Offset: Vector3, Side: string } }
+	local rules = Outpost.Settlement.Stalls
+	local list = {}
+	for _, side in { "West", "East" } do
+		for i, angle in rules[side] do
+			local id = rules.Crew[i]
+			if id then
+				table.insert(list, { Id = id, Angle = angle, Offset = Outpost.place(angle, rules.R), Side = side })
+			end
+		end
+	end
+	return list
+end
+-- (a stall stands at this doorstep angle)
+function Outpost.isStall(angle: number): boolean
+	local rules = Outpost.Settlement.Stalls
+	for _, side in { rules.West, rules.East } do
+		for _, a in side do
+			if math.abs(a - angle) < 1 then
+				return true
+			end
+		end
+	end
+	return false
+end
 -- (between the inner pads, where their walkways don't run, a little in
--- and out by turns)
+-- and out by turns; none where a stall stands)
 function Outpost.doorstepSpots(): { Vector3 }
 	local rules = Outpost.Settlement.Doorstep
 	local row = Outpost.Settlement.Tiers[1]
@@ -193,7 +231,7 @@ function Outpost.doorstepSpots(): { Vector3 }
 	local list, k = {}, 0
 	for i = 0, row.Count - 2 do
 		local angle = row.From + (i + 0.5) * step
-		if math.abs(angle - 270) >= Outpost.Settlement.RoadGap + 2 then
+		if math.abs(angle - 270) >= Outpost.Settlement.RoadGap + 2 and not Outpost.isStall(angle) then
 			for _, r in { rules.R[1 + k % #rules.R], rules.R[1 + (k + 1) % #rules.R] } do
 				table.insert(list, Outpost.place(angle, r))
 			end
