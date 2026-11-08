@@ -28,6 +28,9 @@ def module(path,name):
  return '\nlocal '+name+'=(function()\n'+s+'\nend)()\n'
 code=setup+module('src/client/Modules/CombatSound.luau','CombatSound')+module('src/client/Modules/LotterySound.luau','LotterySound')+'''
 local function sounds() local t={} for _,v in made do if v.Kind=="Sound" then table.insert(t,v) end end return t end
+-- (the budget is counted on the built-in layers, whatever's been uploaded)
+for name in CombatSound.Ids do CombatSound.Ids[name]=0 end
+for name in LotterySound.Ids do LotterySound.Ids[name]=0 end
 for i=1,11 do now+=1; CombatSound.play("Hit") end
 assert(#sounds()==22,"ordinary voice budget")
 now+=1; CombatSound.play("Hit"); assert(#sounds()==22,"ordinary budget overflow")

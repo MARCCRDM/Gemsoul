@@ -49,7 +49,7 @@ Narration.Ids = {
 	BasicsDodge = 114278772210482, -- basics_dodge.mp3
 	BasicsResources = 119618357055313, -- basics_resources.mp3
 	FinaleMine = 0, -- finale_mine.mp3
-	FinaleGems = 0, -- finale_gems.mp3
+	FinaleGems = 90856840007746, -- finale_gems.mp3
 	FinaleFight = 0, -- finale_fight.mp3
 	FinaleDone = 127824470453716, -- finale_done.mp3
 }

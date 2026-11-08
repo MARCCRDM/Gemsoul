@@ -26,13 +26,13 @@ LotterySound.Ids = {
 	SealBreak = 0, -- seal_break.mp3
 	SpinHum = 0, -- spin_hum.ogg
 	Tick = 131724631621226, -- tick.mp3
-	Lock = 0, -- lock.mp3
+	Lock = 72590156400479, -- lock.mp3
 	Reveal1 = 110954780846923, -- reveal_1.mp3
-	Reveal2 = 0, -- reveal_2.mp3
-	Reveal3 = 0, -- reveal_3.mp3
+	Reveal2 = 72180794320653, -- reveal_2.mp3
+	Reveal3 = 75586552652493, -- reveal_3.mp3
 	Reveal4 = 127810925228683, -- reveal_4.mp3
 	Reveal5 = 0, -- reveal_5.mp3
-	Attune = 0, -- attune.mp3
+	Attune = 94171431537440, -- attune.mp3
 }
 
 LotterySound.Volume = 0.8
