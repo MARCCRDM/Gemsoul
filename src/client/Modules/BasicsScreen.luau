@@ -55,8 +55,8 @@ local function build(onSkip: () -> ())
 	local panel = Instance.new("Frame")
 	panel.Name = "Panel"
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
-	panel.Position = UDim2.fromScale(0.5, 0.4)
-	panel.Size = UDim2.fromScale(0.86, 0.6)
+	panel.Position = UDim2.fromScale(0.5, 0.42)
+	panel.Size = UDim2.fromScale(0.6, 0.44) -- (room round it: not right up in your face, clear of the screen's edge buttons)
 	panel.BackgroundColor3 = Color3.fromRGB(4, 5, 8)
 	panel.BorderSizePixel = 0
 	panel.Parent = back
@@ -68,6 +68,14 @@ local function build(onSkip: () -> ())
 	rim.Color = GOLD
 	rim.Thickness = 3
 	rim.Parent = panel
+	-- (the LEDs inset a little from the rim)
+	local face = Instance.new("Frame")
+	face.Name = "Face"
+	face.AnchorPoint = Vector2.new(0.5, 0.5)
+	face.Position = UDim2.fromScale(0.5, 0.5)
+	face.Size = UDim2.fromScale(0.95, 0.9)
+	face.BackgroundTransparency = 1
+	face.Parent = panel
 	local dots = {}
 	local w, h = Led.W, Led.H
 	local dotSize = UDim2.fromScale(BasicsScreen.Dot / w, BasicsScreen.Dot / h)
@@ -79,15 +87,15 @@ local function build(onSkip: () -> ())
 			dot.Position = UDim2.fromScale((x + 0.5) / w, (y + 0.5) / h)
 			dot.Size = dotSize
 			dot.BackgroundColor3 = OFF
-			dot.Parent = panel
+			dot.Parent = face
 			dots[y * w + x + 1] = dot
 		end
 	end
 	local words = Instance.new("TextLabel")
 	words.Name = "Words"
 	words.AnchorPoint = Vector2.new(0.5, 0)
-	words.Position = UDim2.fromScale(0.5, 0.74)
-	words.Size = UDim2.fromScale(0.7, 0.09)
+	words.Position = UDim2.fromScale(0.5, 0.71)
+	words.Size = UDim2.fromScale(0.6, 0.08)
 	words.BackgroundTransparency = 1
 	words.Font = Enum.Font.GothamBold
 	words.TextColor3 = Color3.fromRGB(240, 244, 250)
