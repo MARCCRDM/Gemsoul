@@ -36,18 +36,18 @@ local CombatSound = {}
 -- Numbered names are takes of one sound: Hit1, Hit2 and Hit3 all play as "Hit".
 CombatSound.Ids = {
 	Swing1 = 0, -- swing_1.mp3
-	Swing2 = 0, -- swing_2.mp3
+	Swing2 = 101756592623663, -- swing_2.mp3
 	Swing3 = 120033083033068, -- swing_3.mp3
 	Swing4 = 0, -- swing_4.mp3
-	HeavySwing1 = 0, -- heavy_swing_1.mp3
+	HeavySwing1 = 104976314070415, -- heavy_swing_1.mp3
 	HeavySwing2 = 0, -- heavy_swing_2.mp3
 	HeavySwing3 = 0, -- heavy_swing_3.mp3
 	Hit1 = 0, -- hit_1.mp3
-	Hit2 = 0, -- hit_2.mp3
+	Hit2 = 98536263515745, -- hit_2.mp3
 	Hit3 = 0, -- hit_3.mp3
 	HeavyHit1 = 138400868012278, -- heavy_hit_1.mp3
-	HeavyHit2 = 0, -- heavy_hit_2.mp3
-	Crit1 = 0, -- crit_1.mp3
+	HeavyHit2 = 111777047099286, -- heavy_hit_2.mp3
+	Crit1 = 104048992736628, -- crit_1.mp3
 	Crit2 = 128810265479120, -- crit_2.mp3
 	-- Your own blade landing (Combat: Contact): felt more than heard.
 	Contact1 = 0, -- contact_1.mp3
@@ -56,41 +56,41 @@ CombatSound.Ids = {
 	Contact4 = 0, -- contact_4.mp3
 	HeavyContact1 = 0, -- heavy_contact_1.mp3
 	HeavyContact2 = 0, -- heavy_contact_2.mp3
-	Deflect1 = 0, -- deflect_1.mp3
+	Deflect1 = 101228643782539, -- deflect_1.mp3
 	Deflect2 = 0, -- deflect_2.mp3
-	Block1 = 0, -- block_1.mp3
-	Block2 = 0, -- block_2.mp3
+	Block1 = 111071665278380, -- block_1.mp3
+	Block2 = 113679622949340, -- block_2.mp3
 	GuardBreak = 136185372272565, -- guard_break.mp3
 	Parry = 0, -- parry.mp3
 	Hop1 = 116869110382459, -- hop_1.mp3
 	Hop2 = 136025844167285, -- hop_2.mp3
 	Roll = 127771079015819, -- roll.mp3
 	CastFire = 0, -- cast_fire.mp3
-	CastFrost = 0, -- cast_frost.mp3
-	CastShock = 0, -- cast_shock.mp3
+	CastFrost = 107250633168106, -- cast_frost.mp3
+	CastShock = 114171581446407, -- cast_shock.mp3
 	CastPoison = 0, -- cast_poison.mp3
 	ImpactFire = 133893493577722, -- impact_fire.mp3
 	ImpactFrost = 121995747342605, -- impact_frost.mp3
 	ImpactShock = 139061650256739, -- impact_shock.mp3
-	ImpactPoison = 0, -- impact_poison.mp3
+	ImpactPoison = 113207081892038, -- impact_poison.mp3
 	Cast = 115242901396024, -- cast.mp3
 	Bolt = 0, -- bolt.mp3
 	Beam = 134672665591575, -- beam.mp3
-	NovaWarn = 0, -- nova_warn.mp3
+	NovaWarn = 100995994042165, -- nova_warn.mp3
 	Blast = 126528067580454, -- blast.mp3
 	Zap = 0, -- zap.mp3
 	Burn = 0, -- burn.mp3
 	Freeze = 0, -- freeze.mp3
-	Corrode = 0, -- corrode.mp3
+	Corrode = 112289031698690, -- corrode.mp3
 	Heal = 129256173226950, -- heal.mp3
 	Shield = 0, -- shield.mp3
 	Hurt1 = 0, -- hurt_1.mp3
 	Hurt2 = 126750042869699, -- hurt_2.mp3
 	Stun = 131897461514193, -- stun.mp3
 	Winded = 116697236197782, -- winded.mp3
-	Combo = 0, -- combo.mp3
+	Combo = 104270898950248, -- combo.mp3
 	Death = 118841231323668, -- death.mp3
-	Warn = 0, -- warn.mp3
+	Warn = 108128465084069, -- warn.mp3
 	Kill = 0, -- kill.mp3
 	-- A wild kaiju's roar, by its kind (tools/make_kaiju_sounds.py).
 	RoarBulwark = 0, -- roar_bulwark.mp3
@@ -100,22 +100,22 @@ CombatSound.Ids = {
 	-- A kaiju's footfall, and a cast gathering at its mouth (KaijuMotionFx; the
 	-- charge has no built-in stand-in, so it's silent until it's uploaded).
 	Stomp1 = 0, -- stomp_1.mp3
-	Stomp2 = 0, -- stomp_2.mp3
+	Stomp2 = 114424924457993, -- stomp_2.mp3
 	Charge = 0, -- charge.mp3
 	-- A rift critter's evil giggles and its cackle (tools/make_critter_sounds.py).
 	Giggle1 = 0, -- critter_giggle_1.mp3
-	Giggle2 = 0, -- critter_giggle_2.mp3
+	Giggle2 = 104091626940815, -- critter_giggle_2.mp3
 	Giggle3 = 0, -- critter_giggle_3.mp3
-	Cackle = 0, -- critter_cackle.mp3
+	Cackle = 105784260822823, -- critter_cackle.mp3
 	-- Levelling up, and a kaiju team called back or deployed
 	-- (tools/make_levelup_sounds.py; LevelUpFx).
 	LevelUp = 0, -- level_up.mp3
-	KaijuLevelUp = 0, -- kaiju_level_up.mp3
+	KaijuLevelUp = 98094522153879, -- kaiju_level_up.mp3
 	CallBack = 0, -- call_back.mp3
 	Deploy = 0, -- deploy.mp3
 	-- A critter's coins: bursting out, landing, each reaching you, the last
 	-- one in (tools/make_coin_sounds.py; CritterCoinFx).
-	CoinPop = 0, -- coin_pop.mp3
+	CoinPop = 101718724921895, -- coin_pop.mp3
 	CoinClink1 = 139532404333178, -- coin_clink_1.mp3
 	CoinClink2 = 128488944455831, -- coin_clink_2.mp3
 	CoinClink3 = 0, -- coin_clink_3.mp3
@@ -123,14 +123,14 @@ CombatSound.Ids = {
 	CoinCashIn = 131363749472109, -- coin_cash_in.mp3
 	-- A kaiju jumping after you: its take-off and its landing
 	-- (tools/make_kaiju_jump_sounds.py; CreatureAnimation).
-	KaijuJump1 = 0, -- kaiju_jump_1.mp3
+	KaijuJump1 = 108823253006651, -- kaiju_jump_1.mp3
 	KaijuJump2 = 0, -- kaiju_jump_2.mp3
 	KaijuJump3 = 0, -- kaiju_jump_3.mp3
-	KaijuLand1 = 0, -- kaiju_land_1.mp3
+	KaijuLand1 = 106368311220997, -- kaiju_land_1.mp3
 	KaijuLand2 = 0, -- kaiju_land_2.mp3
 	-- A Legendary mined: its window bursting open over the miner
 	-- (tools/make_legendary_sounds.py; LegendaryWindow).
-	LegendaryWindow = 0, -- legendary_window.mp3
+	LegendaryWindow = 110414765675266, -- legendary_window.mp3
 }
 
 -- 0 mutes combat, 1 is full.
