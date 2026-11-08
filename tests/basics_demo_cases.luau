@@ -130,8 +130,17 @@ local tweens = {
 		end }
 	end,
 }
+local heard = {} -- (what the demo played: sound name -> times)
+local function heardOne(name)
+	heard[name] = (heard[name] or 0) + 1
+end
 local modules = {
 	GemClient = { request = function() return { Ok = true } end },
+	CombatSound = {
+		play = function(name) heardOne(name) end,
+		element = function(kind, element) heardOne(kind .. tostring(element)) end,
+	},
+	UiSound = { play = function(name) heardOne("Ui" .. name) end },
 	UiKit = { round = function(p, r)
 		local c = Instance.new("UICorner")
 		c.Parent = p
@@ -216,6 +225,7 @@ for index, name in { "BasicsAttack", "BasicsBlock", "BasicsAbilities" } do
 	local base = clock
 	local t = 0
 	local seen, swung, flinched, guarded, keyShown = {}, 0, false, false, {}
+	table.clear(heard)
 	local foeChest = foeCopy.UpperTorso.CFrame
 	local barBefore, barAfter = nil, nil
 	while t < lengths[name] do
@@ -263,15 +273,26 @@ for index, name in { "BasicsAttack", "BasicsBlock", "BasicsAbilities" } do
 		check(seen[p[2]], name .. ": never showed " .. p[2])
 	end
 	check(flinched, name .. ": the rival never moved")
+	-- and heard: the fight's own sounds at each blow, block and cast
+	local function count(sound)
+		return heard[sound] or 0
+	end
 	if name == "BasicsAttack" then
 		check(swung > 30, name .. ": the hero's blade barely moved (" .. swung .. " frames)")
 		check(keyShown.CLICK, name .. ": the attack's control never showed")
+		check(count("Swing") >= 4 and count("HeavySwing") >= 1 and count("Charge") >= 1, name .. ": the swings weren't heard")
+		check(count("Hit") >= 4 and count("HeavyHit") >= 1 and count("Combo") >= 1, name .. ": the blows weren't heard")
+		check(count("UiClick") >= 5, name .. ": the clicks weren't heard")
 	elseif name == "BasicsBlock" then
 		check(guarded, name .. ": the hero's guard never went up")
 		check(keyShown["R-CLICK"], name .. ": the block's control never showed")
+		check(count("Swing") >= 2 and count("Block") >= 1 and count("Parry") >= 1 and count("Stun") >= 1, name .. ": the blocks weren't heard")
 	else
 		check(keyShown.Q and keyShown.E, name .. ": Q and E never showed")
 		check(barBefore and barAfter and barAfter < barBefore - 0.2, name .. ": casting didn't spend charge (" .. tostring(barBefore) .. " -> " .. tostring(barAfter) .. ")")
+		check(count("CastFire") >= 1 and count("Bolt") >= 1 and count("ImpactFire") >= 1, name .. ": the bolt wasn't heard")
+		check(count("NovaWarn") >= 1 and count("Blast") >= 1 and count("ImpactFrost") >= 1, name .. ": the blast wasn't heard")
+		check(count("UiEnchant") >= 3 and count("UiClick") >= 2, name .. ": the gems and keys weren't heard")
 	end
 end
 -- The narrator's welcome first: its own script (the fighters squared up,

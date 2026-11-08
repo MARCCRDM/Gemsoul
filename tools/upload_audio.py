@@ -29,6 +29,9 @@ run it again later; --limit N uploads at most N files this run, --dry-run
 shows what it would do, --force re-uploads everything, --only PREFIX uploads
 just the files whose path starts with PREFIX (e.g. the new narration:
 --only assets/sounds/narration/basics_).
+
+No API key? Import the files in Studio (View > Asset Manager > Import) and
+run tools/apply_sound_ids.py on the ids instead: it writes the same lines.
 """
 import argparse
 import json

@@ -34,6 +34,8 @@ local TweenService = game:GetService("TweenService")
 local RivalPose = require(ReplicatedStorage.Shared.RivalPose)
 local GemClient = require(script.Parent.GemClient)
 local UiKit = require(script.Parent.UiKit)
+local CombatSound = require(script.Parent.CombatSound)
+local UiSound = require(script.Parent.UiSound)
 
 local BasicsDemo = {}
 
@@ -51,7 +53,9 @@ local GEMS = { Q = Color3.fromRGB(255, 120, 60), E = Color3.fromRGB(90, 200, 255
 -- Blocked: when the hero's shield takes a blow; Pops: what shows over the
 -- rival, when; Presses: the control pressed (Hold: let go then); Shots /
 -- Rings: a bolt flying to the rival, a blast's ring out over the floor;
--- Gems: when Q, E and R light; Spend: charge spent, when, how much.
+-- Gems: when Q, E and R light; Spend: charge spent, when, how much. A
+-- cast's Element: what's heard as it's thrown (and lands: Shots / Rings
+-- by their gem's, GEM_ELEMENTS).
 BasicsDemo.Scripts = {
 	-- The narrator's welcome, before the basics: the fighters squared up, the
 	-- hero's arms thrown wide in greeting.
@@ -92,8 +96,8 @@ BasicsDemo.Scripts = {
 	BasicsAbilities = {
 		Title = "ABILITIES",
 		Hero = {
-			{ "Bolt", 6.2, 6.6 },
-			{ "Nova", 8.7, 9.15 },
+			{ "Bolt", 6.2, 6.6, Element = "Fire" },
+			{ "Nova", 8.7, 9.15, Element = "Frost" },
 		},
 		Foe = { { "Stagger", 9.45, 9.65 } },
 		FoeHurt = { 6.95 },
@@ -110,6 +114,26 @@ local KEYS = {
 	Desk = { Attack = "CLICK", Block = "R-CLICK", Q = "Q", E = "E", R = "R" },
 	Touch = { Attack = "ATTACK", Block = "BLOCK", Q = "Q", E = "E", R = "R" },
 }
+-- What's heard (Client CombatSound and UiSound, the fight's own sounds):
+-- flat, not placed (the stage is a picture, not a place), and a little
+-- under the narrator. An action as it starts, by RivalPose's kind; the
+-- gems' elements for a cast and its landing.
+local HEARD = 0.7
+local ACTION_SOUNDS = { Slash = "Swing", Heavy = "HeavySwing", Charge = "Charge", Stagger = "Stun", Nova = "NovaWarn" }
+local GEM_ELEMENTS = { Q = "Fire", E = "Frost" }
+local function hear(name: string?)
+	if name then
+		pcall(CombatSound.play, name, nil, { Volume = HEARD })
+	end
+end
+local function hearElement(kind: string, element: string?)
+	if element then
+		pcall(CombatSound.element, kind, element, nil, { Volume = HEARD })
+	end
+end
+local function click(name: string)
+	pcall(UiSound.play, name)
+end
 
 -- The server's fighters (asked for, then waited on), or nil.
 function BasicsDemo.fighters(timeout: number): (Model?, Model?)
@@ -418,6 +442,52 @@ function BasicsDemo.new(stage: GuiObject, heroSource: Model, foeSource: Model, t
 		foe.Model:SetAttribute("HurtSide", 1)
 		local blocked = latest(s.Blocked, t)
 		hero.Model:SetAttribute("BlockedAt", if blocked then blocked + line.Offset else nil)
+		-- what's heard: each action as it starts (a cast's element with it),
+		-- each blow as it lands (a heavy's heavier, a combo's third rings),
+		-- the shield taking a blow (a perfect block rings), each key pressed
+		for who, list in { Hero = s.Hero or {}, Foe = s.Foe or {} } do
+			for i, a in list do
+				if once(who .. "Sound" .. i, t, a[2]) then
+					hear(ACTION_SOUNDS[a[1]])
+					hearElement("Cast", a.Element)
+				end
+			end
+		end
+		for i, at in s.FoeHurt or {} do
+			if once("hurtSound" .. i, t, at) then
+				local heavy, combo = false, false
+				for _, a in s.Hero or {} do
+					if a[1] == "Heavy" and math.abs(a[3] - at) < 0.01 then
+						heavy = true
+					end
+				end
+				for _, p in s.Pops or {} do
+					if math.abs(p[1] - at) < 0.01 and string.find(p[2], "COMBO", 1, true) then
+						combo = true
+					end
+				end
+				hear(if heavy then "HeavyHit" else "Hit")
+				if combo then
+					hear("Combo")
+				end
+			end
+		end
+		for i, at in s.Blocked or {} do
+			if once("blockSound" .. i, t, at) then
+				local perfect = false
+				for _, p in s.Pops or {} do
+					if math.abs(p[1] - at) < 0.01 and string.find(p[2], "PERFECT", 1, true) then
+						perfect = true
+					end
+				end
+				hear(if perfect then "Parry" else "Block")
+			end
+		end
+		for i, p in s.Presses or {} do
+			if once("pressSound" .. i, t, p[1]) then
+				click("Click")
+			end
+		end
 		local heroHead = hero.Model:FindFirstChild("Head") :: BasePart?
 		local foeHead = foe.Model:FindFirstChild("Head") :: BasePart?
 		pcall(RivalPose.update, hero.Model, dt, now, now, false, nil, foeHead and foeHead.CFrame.Position)
@@ -475,6 +545,7 @@ function BasicsDemo.new(stage: GuiObject, heroSource: Model, foeSource: Model, t
 			for key, at in s.Gems do
 				local slot = gemSlots[key]
 				if once("gem" .. key, t, at) then
+					click("Enchant")
 					slot.Ring.Transparency = 0
 					slot.Letter.TextColor3 = TEXT
 					slot.Slot.BackgroundColor3 = GEMS[key]:Lerp(INK, 0.55)
@@ -497,6 +568,7 @@ function BasicsDemo.new(stage: GuiObject, heroSource: Model, foeSource: Model, t
 				local from = if heroHand then heroHand.CFrame.Position else heroFront
 				if not line.Fired["shot" .. i] then
 					line.Fired["shot" .. i] = piece(CFrame.new(from), Vector3.one * 0.9, GEMS[shot[3]], Enum.Material.Neon, Enum.PartType.Ball)
+					hear("Bolt")
 				end
 				local ball = line.Fired["shot" .. i]
 				if typeof(ball) == "Instance" then
@@ -506,12 +578,15 @@ function BasicsDemo.new(stage: GuiObject, heroSource: Model, foeSource: Model, t
 				line.Fired["shot" .. i]:Destroy()
 				line.Fired["shot" .. i] = true
 				flash(foeChest, GEMS[shot[3]], 3.4)
+				hearElement("Impact", GEM_ELEMENTS[shot[3]])
 			end
 		end
 		for i, ring in s.Rings or {} do
 			if t >= ring[1] and t < ring[2] + 0.3 then
 				if not line.Fired["ring" .. i] then
 					line.Fired["ring" .. i] = piece(CFrame.new(hero.Root.CFrame.Position.X, 0.1, 0) * flat, Vector3.new(0.1, 1, 1), GEMS[ring[3]], Enum.Material.Neon, Enum.PartType.Cylinder)
+					hear("Blast")
+					hearElement("Impact", GEM_ELEMENTS[ring[3]])
 				end
 				local disc = line.Fired["ring" .. i]
 				if typeof(disc) == "Instance" then
