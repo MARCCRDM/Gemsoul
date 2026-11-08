@@ -265,4 +265,55 @@ function Brain.pickMove(moves, choice: string, now: number, distance: number, ro
 	return nil
 end
 
+-- A rival never leaves its ring, and never stands stuck (Server.Duelist
+-- keeps it so every frame). Knocked, dashed or dodged off the floor's edge
+-- (a dash carried Korr through the ring's thin fence, and from outside it
+-- couldn't walk back in: it stood there casting), it's put straight back
+-- on the floor, PullIn studs in from the edge; standing on one spot for
+-- StuckAfter seconds while it means to close in (wedged on scenery, a
+-- corner), it's set down StuckStep studs toward its foe. Pure.
+Brain.PullIn = 4
+Brain.StuckAfter = 3.5 -- seconds on the spot, meaning to move
+Brain.StuckStep = 4 -- studs toward the foe then
+Brain.StillStep = 0.5 -- studs: moved less than this, it's standing still
+-- Where a fighter off its floor (round `center`, `radius`) goes back to:
+-- straight in from where it is, at its own height; nil when it's on it.
+function Brain.backOnFloor(center: Vector3?, radius: number?, position: Vector3): Vector3?
+	if typeof(center) ~= "Vector3" or type(radius) ~= "number" then
+		return nil
+	end
+	local offset = Vector3.new(position.X - center.X, 0, position.Z - center.Z)
+	if offset.Magnitude <= radius then
+		return nil
+	end
+	local inward = if offset.Magnitude > 0.1 then offset.Unit else Vector3.new(0, 0, 1)
+	local spot = center + inward * math.max(0, radius - Brain.PullIn)
+	return Vector3.new(spot.X, position.Y, spot.Z)
+end
+-- Where a stuck fighter steps to: `step` studs along `dir`, kept on the floor.
+function Brain.unstuckSpot(center: Vector3?, radius: number?, position: Vector3, dir: Vector3, step: number): Vector3
+	local to = position + Vector3.new(dir.X, 0, dir.Z) * step
+	if typeof(center) == "Vector3" and type(radius) == "number" then
+		local offset = Vector3.new(to.X - center.X, 0, to.Z - center.Z)
+		local reach = radius - Brain.PullIn
+		if offset.Magnitude > reach then
+			local spot = center + offset.Unit * reach
+			to = Vector3.new(spot.X, to.Y, spot.Z)
+		end
+	end
+	return to
+end
+-- Standing still, meaning to move, for how long: `still` is the record
+-- { At = where it was, Since = when } or nil; returns the new record and
+-- whether it's been stuck StuckAfter seconds.
+function Brain.stuck(still, position: Vector3, now: number, closing: boolean): (any, boolean)
+	if not closing then
+		return nil, false
+	end
+	if not still or (position - still.At).Magnitude > Brain.StillStep then
+		return { At = position, Since = now }, false
+	end
+	return still, now - still.Since > Brain.StuckAfter
+end
+
 return Brain

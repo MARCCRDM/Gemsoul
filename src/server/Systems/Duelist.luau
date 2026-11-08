@@ -1569,6 +1569,35 @@ local function tutorialThink(duel, enemy, now: number, target: BasePart, distanc
 	return true
 end
 
+-- A rival off its floor or stuck on the spot is put right (the rules:
+-- Shared.DuelistBrain backOnFloor, stuck, unstuckSpot). A dungeon's or a
+-- raid's fighter has no ring: only the unsticking.
+local function keepPlaced(enemy, duel, owner: Player, now: number, distance: number, dir: Vector3)
+	local root = enemy.Root
+	local center, radius = nil, nil
+	if not duel.Dungeon and not duel.Raid then
+		center = Combat.arenaCenter(owner)
+		local landmarks = ReplicatedStorage:FindFirstChild("Landmarks")
+		radius = landmarks and landmarks:GetAttribute("ArenaRadius")
+		local back = Brain.backOnFloor(center, radius, root.Position)
+		if back then
+			enemy.Model:PivotTo(CFrame.new(back) * root.CFrame.Rotation)
+			root.AssemblyLinearVelocity = Vector3.zero
+			duel.Still = nil
+			return
+		end
+	end
+	-- (meaning to close in: nothing under way, the foe out of reach, not stunned)
+	local closing = not duel.Action and distance > 5 and now >= (enemy.StunUntil or 0)
+	local still, stuck = Brain.stuck(duel.Still, root.Position, now, closing)
+	duel.Still = still
+	if stuck then
+		enemy.Model:PivotTo(CFrame.new(Brain.unstuckSpot(center, radius, root.Position, dir, Brain.StuckStep)) * root.CFrame.Rotation)
+		root.AssemblyLinearVelocity = Vector3.zero
+		duel.Still = nil
+	end
+end
+
 local function think(enemy, now: number)
 	local duel = enemy.Duel
 	if duel.Ended then
@@ -1626,6 +1655,7 @@ local function think(enemy, now: number)
 	local distance = offset.Magnitude
 	local dir = if distance > 0.01 then offset.Unit else Vector3.new(0, 0, -1)
 	local side = Vector3.new(-dir.Z, 0, dir.X)
+	keepPlaced(enemy, duel, owner, now, distance, dir)
 	refill(duel, now, guarding(enemy, now))
 	local kit = duel.Kit
 	if kit then

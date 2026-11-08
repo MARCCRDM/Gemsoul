@@ -8,7 +8,7 @@
 	   3 First fight      intro round 1 is over (won, lost or left)
 	   4 Round 1 won      won it (Server.IntroRoundsServer)
 	   5 Second duel      played intro round 2 (or another duel)
-	   6 Hunt bounty      pressed HUNT BOUNTY on the rounds' card (from round 3)
+	   6 Hunt bounty      pressed HUNT BOUNTY on the set's card (after all six)
 	   7 Dungeon entered  in the first dungeon (Server.RiftServer)
 	   8 Dungeon boss     its boss came for them
 	   9 Dungeon cleared  the boss is down

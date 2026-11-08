@@ -442,6 +442,28 @@ do
 	check(near > far, "A stun nearer the centre lasts longer")
 	check(StatusEffects.Catalog.Staggered ~= nil, "Staggered status missing")
 end
+-- Off its floor it's put straight back on it; stuck on the spot, meaning to
+-- close in, it steps toward its foe; on the floor and moving, left alone.
+do
+	local center, radius = Vector3.new(100, 2, -50), 30
+	check(DuelistBrain.backOnFloor(center, radius, center + Vector3.new(10, 0, 5)) == nil, "A rival on its floor was moved")
+	local back = DuelistBrain.backOnFloor(center, radius, center + Vector3.new(36, 1, 0))
+	check(back ~= nil and math.abs(back.X - (center.X + radius - DuelistBrain.PullIn)) < 0.01 and back.Y == center.Y + 1 and math.abs(back.Z - center.Z) < 0.01, "A rival past the fence wasn't put back on the floor")
+	check(DuelistBrain.backOnFloor(nil, radius, center) == nil and DuelistBrain.backOnFloor(center, nil, center) == nil, "No ring, yet moved")
+	local still, stuck = DuelistBrain.stuck(nil, center, 10, true)
+	check(still ~= nil and not stuck, "Standing still a moment counts as stuck")
+	still, stuck = DuelistBrain.stuck(still, center + Vector3.new(0.1, 0, 0), 12, true)
+	check(not stuck, "Stuck before StuckAfter")
+	still, stuck = DuelistBrain.stuck(still, center + Vector3.new(0.2, 0, 0), 10 + DuelistBrain.StuckAfter + 0.1, true)
+	check(stuck, "Standing on the spot past StuckAfter isn't stuck")
+	still, stuck = DuelistBrain.stuck(still, center + Vector3.new(3, 0, 0), 20, true)
+	check(still.Since == 20 and not stuck, "Moving on didn't start the count again")
+	check(DuelistBrain.stuck(still, center, 30, false) == nil, "Not meaning to move, yet counted")
+	local to = DuelistBrain.unstuckSpot(center, radius, center + Vector3.new(27, 0, 0), Vector3.new(1, 0, 0), DuelistBrain.StuckStep)
+	check(math.abs(to.X - (center.X + radius - DuelistBrain.PullIn)) < 0.01, "A step toward the foe left the floor")
+	local free = DuelistBrain.unstuckSpot(nil, nil, center, Vector3.new(0, 0, -1), 4)
+	check(free.Z == center.Z - 4, "A stuck fighter with no ring didn't step on")
+end
 print("PASS: " .. checks .. " Duelist checks (matchup, hop and roll, dodgeable bolts, combat log lines and details, server log, status effects, health recovery, decisions, reads, punishes, lunges, three-surge choice, maneuvers, guard, dodge, heavy vs guard, poses)")
 
 -- Sword elbows bend as hinges instead of twisting a quarter-turn sideways.
