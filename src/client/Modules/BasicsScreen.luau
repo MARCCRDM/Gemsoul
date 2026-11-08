@@ -3,7 +3,8 @@
 	(Client Intro plays it once the loading's done, then the ability roll,
 	then the six intro rounds). The narrator's lines in Led.BasicsOrder
 	(Modules.Narration: BasicsAttack, BasicsBlock, BasicsAbilities), each
-	shown on a full-screen LED panel as it's read
+	shown as it's read: acted out by two real fighters on a small stage
+	(Modules.BasicsDemo), or if they can't be had, on an LED panel
 	(Shared.Led.basics, timed off the voice itself: Narration.elapsed and the
 	line's Cues), its words under it phrase by phrase (its own caption: the
 	narrator's usual one sits too low, over the panel on a phone).
@@ -22,6 +23,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Led = require(ReplicatedStorage.Shared.Led)
+local BasicsDemo = require(script.Parent.BasicsDemo)
 local Narration = require(script.Parent.Narration)
 local UiKit = require(script.Parent.UiKit)
 
@@ -29,6 +31,8 @@ local BasicsScreen = {}
 BasicsScreen.Fps = 20
 BasicsScreen.Dot = 0.72
 BasicsScreen.Order = 29
+BasicsScreen.FighterWait = 25 -- seconds, at most, for the demo's fighters to arrive (from the start)
+BasicsScreen.FighterGrace = 3 -- and once the loading's done, at most this much longer
 
 local OFF = Color3.fromRGB(22, 25, 34)
 local INK = Color3.fromRGB(5, 7, 12)
@@ -126,7 +130,7 @@ local function build(onSkip: () -> ())
 	edge.Thickness = 1.5
 	edge.Parent = button
 	button.Activated:Connect(onSkip)
-	return { Gui = gui, Back = back, Dots = dots, Shown = {}, Words = words }
+	return { Gui = gui, Back = back, Panel = panel, Face = face, Dots = dots, Shown = {}, Words = words }
 end
 
 -- One frame on the screen (only the dots that change).
@@ -148,11 +152,33 @@ local function play(state, ready: (() -> ())?)
 		skipped = true
 	end)
 	state.Gui = screen.Gui
+	-- The live demo's fighters (Modules.BasicsDemo), asked for now so they
+	-- arrive while the loading finishes; without them, the LED panel.
+	local hero, foe, asked = nil, nil, true
+	task.spawn(function()
+		hero, foe = BasicsDemo.fighters(BasicsScreen.FighterWait)
+		asked = false
+	end)
 	if ready then
 		pcall(ready)
 	end
+	local waited = os.clock()
+	while asked and not hero and os.clock() - waited < BasicsScreen.FighterGrace do
+		task.wait(0.1)
+	end
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	for _, name in Led.BasicsOrder do
+	local demo = nil
+	if hero and foe then
+		local ok, made = pcall(BasicsDemo.new, screen.Panel, hero, foe, touch)
+		if ok then
+			demo = made
+			state.Demo = made
+			screen.Face.Visible = false
+		else
+			warn("[BasicsScreen] the demo didn't build:", made)
+		end
+	end
+	for index, name in Led.BasicsOrder do
 		local seconds = Narration.Seconds[name] or 8
 		local scene = Led.basics(name, Narration.Cues[name] or { 0 }, seconds, touch)
 		local voiced = Narration.play(name, true) > 0
@@ -161,6 +187,9 @@ local function play(state, ready: (() -> ())?)
 		local started = os.clock()
 		local last = -1
 		skipped = false
+		if demo then
+			demo.show(name, index, #Led.BasicsOrder)
+		end
 		while not skipped do
 			local t = if voiced then Narration.elapsed() else os.clock() - started
 			if t >= seconds or os.clock() - started > seconds + 4 then
@@ -173,8 +202,17 @@ local function play(state, ready: (() -> ())?)
 				end
 			end
 			screen.Words.Text = phrases[at] or ""
+			if demo then
+				local ok, problem = pcall(demo.step, name, t)
+				if not ok then
+					warn("[BasicsScreen] the demo stopped:", problem)
+					demo.destroy()
+					demo, state.Demo = nil, nil
+					screen.Face.Visible = true
+				end
+			end
 			local frame = math.floor(t * BasicsScreen.Fps)
-			if frame ~= last then
+			if not demo and frame ~= last then
 				last = frame
 				local ok, buffer = pcall(scene.Draw, frame / BasicsScreen.Fps)
 				if ok then
@@ -216,6 +254,9 @@ function BasicsScreen.run(ready: (() -> ())?)
 		Narration.stop()
 	end
 	-- (gone however it ended)
+	if state.Demo then
+		pcall(state.Demo.destroy)
+	end
 	if state.Gui then
 		state.Gui:Destroy()
 	end

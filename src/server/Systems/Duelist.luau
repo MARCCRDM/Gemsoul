@@ -3114,6 +3114,49 @@ function Duelist.start()
 			tutorialProgress(duel, kind)
 		end
 	end)
+	-- The combat basics' demo (Client BasicsScreen): two fighters for the
+	-- player's own screen, a miner in starter gear and round 1's rival in its
+	-- outfit, kept in a store in their PlayerGui (as Equipment's
+	-- MinerPreviews), built once a visit.
+	local demoBusy: { [Player]: boolean } = {}
+	Shop.register("BasicsDemo", function(player)
+		local gui = player:FindFirstChildOfClass("PlayerGui")
+		if not gui then
+			return Shop.reply(false, "Not ready yet.")
+		end
+		local store = gui:FindFirstChild("BasicsDemo")
+		if store and store:FindFirstChild("Hero") and store:FindFirstChild("Foe") then
+			return Shop.reply(true, "")
+		end
+		if demoBusy[player] then
+			return Shop.reply(false, "Building.")
+		end
+		demoBusy[player] = true
+		local ok, why = pcall(function()
+			local rng = Random.new()
+			local hero = buildRig(rollLoadout(rng), "Hero", CFrame.new(0, 2000, 0))
+			local foeLoadout = rollLoadout(rng)
+			foeLoadout.RoundLooks = IntroRounds.looks(1)
+			local foe = buildRig(foeLoadout, "Foe", CFrame.new(12, 2000, 0))
+			assert(hero and foe, "the demo's fighters weren't built")
+			local made = Instance.new("ScreenGui")
+			made.Name, made.Enabled, made.ResetOnSpawn = "BasicsDemo", false, false
+			hero.Parent, foe.Parent = made, made
+			if store then
+				store:Destroy()
+			end
+			made.Parent = gui
+		end)
+		demoBusy[player] = nil
+		if not ok then
+			warn("[Duelist] BasicsDemo:", why)
+			return Shop.reply(false, "Couldn't build the demo.")
+		end
+		return Shop.reply(true, "")
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		demoBusy[player] = nil
+	end)
 	Shop.register("CombatTutorialSkip", function(player)
 		local duel = duels[player]
 		if duel and duel.Tutorial and not duel.FastTutorial and duel.Tutorial.Step < Tutorial.count() then
