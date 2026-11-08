@@ -156,7 +156,8 @@ function MatchResult.mount(parent: Instance)
 	end
 	-- The league.
 	ui.LeagueRule = rule(panel, 0)
-	ui.Badge = LeagueBadge.new(panel, 48)
+	local made, badge = pcall(LeagueBadge.new, panel, 48)
+	ui.Badge = if made then badge else { Frame = new("Frame", { BackgroundTransparency = 1 }, panel), set = function() end }
 	ui.LeagueName = label(panel, "", 20, P.Text, HEADING, PAD + 60, 0, 240, 24)
 	ui.LeagueNote = label(panel, "", 11, P.Dim, BOLD, PAD + 60, 0, INNER - 60, 14)
 	ui.Climb = label(panel, "", 11, P.Dim, BOLD, PAD + 60, 0, INNER - 60, 14)
@@ -292,11 +293,11 @@ function MatchResult.show(info, seconds: number)
 	ui.Rules[2].Position = UDim2.fromOffset(PAD + third * 2 + 12, y + 4)
 	y = HEAD_H + FIG_H
 	-- The league.
-	local league = info.League
+	local league = if type(info.League) == "table" and type(info.League.After) == "number" then info.League else nil
 	for _, part in { ui.LeagueRule, ui.Badge.Frame, ui.LeagueName, ui.LeagueNote, ui.Climb, ui.LeagueTag } do
 		part.Visible = league ~= nil
 	end
-	if league then
+	if league and not pcall(function()
 		local now = Leagues.info(league.After)
 		ui.LeagueRule.Position = UDim2.fromOffset(PAD, y)
 		ui.Badge.Frame.Position = UDim2.fromOffset(PAD, y + 12)
@@ -328,6 +329,11 @@ function MatchResult.show(info, seconds: number)
 			else ""
 		ui.Climb:SetAttribute("NoTranslate", true) -- (a name)
 		y += LEAGUE_H
+	end) then
+		-- (something wrong with it: the card goes on without it)
+		for _, part in { ui.LeagueRule, ui.Badge.Frame, ui.LeagueName, ui.LeagueNote, ui.Climb, ui.LeagueTag } do
+			part.Visible = false
+		end
 	end
 	-- The tournament.
 	local t = info.Tournament

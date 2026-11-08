@@ -162,8 +162,10 @@ function Duels.record(player: Player)
 	record.Solo = record.Solo or record.Wins or 0
 	-- Its league (Shared.Leagues): from the rating, the first time.
 	if type(record.League) ~= "table" then
-		local step = Leagues.stepOf(record.Rating or Matchmaking.StartRating)
-		record.League = { Step = step, Season = Season.Name, Best = step, Safe = 0 }
+		pcall(function()
+			local step = Leagues.stepOf(record.Rating or Matchmaking.StartRating)
+			record.League = { Step = step, Season = Season.Name, Best = step, Safe = 0 }
+		end)
 	end
 	return profile.Duel
 end
@@ -207,9 +209,11 @@ local function publish(player: Player)
 	if record then
 		player:SetAttribute("DuelRating", record.Rating)
 		-- (its league's step, 1-16: nameplates, PLAY, the versus card)
-		local league = (record :: any).League
-		player:SetAttribute("League", if league and (league.Played or 0) > 0 then league.Step else nil)
-		player:SetAttribute("LeagueSafe", (record :: any).League and (record :: any).League.Safe or 0)
+		pcall(function()
+			local league = (record :: any).League
+			player:SetAttribute("League", if type(league) == "table" and (league.Played or 0) > 0 then league.Step else nil)
+			player:SetAttribute("LeagueSafe", if type(league) == "table" then league.Safe or 0 else 0)
+		end)
 		player:SetAttribute("DuelWins", record.Wins)
 		player:SetAttribute("DuelsPlayed", (record :: any).Played or 0)
 		player:SetAttribute("DuelAuto", AutoQueue.setting(record))
@@ -369,7 +373,7 @@ local function teamsInfo(match)
 				Name = member.DisplayName,
 				Rating = rating,
 				-- (the versus card: Client SocialUI)
-				League = if record and record.League then record.League.Step else Leagues.stepOf(rating),
+				League = if record and type(record.League) == "table" then record.League.Step else Leagues.stepOf(rating),
 				Wins = if record then record.Wins or 0 else 0,
 				Played = if record then (record.Wins or 0) + (record.Losses or 0) else 0,
 				Streak = if record then record.RankedStreak or 0 else 0,
@@ -559,6 +563,7 @@ function finish(match, winner: number?, reason: string)
 					-- Its league moves with it, and the season's track pays
 					-- the first time each tier is reached (Shared.Leagues).
 					if #match.Teams[1] == 1 and #match.Teams[2] == 1 then
+						pcall(function() -- (never in the way of finishing the match)
 						local held = record :: any
 						local saved, change = Leagues.update(held.League, after, Season.Name, before)
 						held.League = saved
@@ -571,6 +576,7 @@ function finish(match, winner: number?, reason: string)
 						end
 						change.Paid = paid
 						leagueChange[member] = change
+						end)
 					end
 				end
 				record.Wins += if won then 1 else 0
@@ -680,7 +686,10 @@ function finish(match, winner: number?, reason: string)
 					-- the league move (Shared.Leagues: Before, After, Promoted,
 					-- Demoted, Shielded, NewLeague, Safe, Paid) and the ladder
 					League = leagueChange[member],
-					Ladder = if leagueChange[member] then Duels.ladder(member, before) else nil,
+					Ladder = if leagueChange[member] then (function()
+						local ok, ladder = pcall(Duels.ladder, member, before)
+						return if ok then ladder else nil
+					end)() else nil,
 					Tournament = tournament,
 					WinReward = winReward ~= nil,
 					Plays = if record then RewardRoll.plays(record) else nil,

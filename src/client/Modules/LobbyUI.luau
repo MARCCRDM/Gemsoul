@@ -386,14 +386,18 @@ local rankedCard = card({
 })
 -- Your league's crest in Ranked's top right corner (Shared.Leagues), beside
 -- its streak track; the kicker under it names the league and the way on.
-local rankedBadge = require(script.Parent.LeagueBadge).new(rankedCard, 112)
-rankedBadge.Frame.Position = UDim2.fromOffset(rankedCard.Size.X.Offset - 128, 10)
-for _, d in rankedBadge.Frame:GetDescendants() do
-	if d:IsA("GuiObject") then
-		d.ZIndex = 24
+-- (never in the way of the menu: anything wrong here, and it's just left out)
+local rankedBadge = nil
+pcall(function()
+	rankedBadge = require(script.Parent.LeagueBadge).new(rankedCard, 112)
+	rankedBadge.Frame.Position = UDim2.fromOffset(rankedCard.Size.X.Offset - 128, 10)
+	for _, d in rankedBadge.Frame:GetDescendants() do
+		if d:IsA("GuiObject") then
+			d.ZIndex = 24
+		end
 	end
-end
-rankedBadge.Frame.ZIndex = 24
+	rankedBadge.Frame.ZIndex = 24
+end)
 -- Ranked's reward track, across the top of its card: the streak's
 -- milestones (Shared.ArenaStreak: an Arena Cache at each, its coins and
 -- gear's floor), the bar filled to your Ranked win streak (RankedStreak).
@@ -762,6 +766,8 @@ local function refreshCards()
 		entry.Lock.Text =
 			string.format("LOCKED\nComplete %d more duel%s to unlock", left, if left == 1 then "" else "s")
 		if entry.Spec.Unlock == "Ranked" then
+			entry.Kicker.Text = string.format("RATING %d", player:GetAttribute("DuelRating") or 1000)
+			pcall(function()
 			local Leagues = require(game:GetService("ReplicatedStorage").Shared.Leagues)
 			local rating = player:GetAttribute("DuelRating") or Leagues.Start
 			local step = player:GetAttribute("League") or Leagues.stepOf(rating)
@@ -769,7 +775,10 @@ local function refreshCards()
 			local _, toNext = Leagues.progress(step, rating)
 			entry.Kicker.Text = string.format("%s  ·  RATING %d", info.Label, rating)
 				.. if toNext then string.format("  ·  %d TO %s", toNext, Leagues.info(step + 1).Label) else ""
-			rankedBadge:set(step)
+			if rankedBadge then
+				rankedBadge:set(step)
+			end
+			end)
 		end
 		if entry.Live then
 			local searching = 0

@@ -48,7 +48,9 @@ pcall(function() -- (voice chat louder, fading gently: Shared.VoiceVolume, the s
 end)
 -- The quarry's edge, for now: a dome that says the expansion's coming.
 require(script.Parent.Modules.EdgeDome).start()
-require(script.Parent.Modules.LeagueTags).start() -- (ranked players' crests over their heads)
+pcall(function() -- (ranked players' crests over their heads; never in the way of starting)
+	require(script.Parent.Modules.LeagueTags).start()
+end)
 
 -- Your mini kaiju: its card, RECALL, HUNT and TAME, and the kaiju panel.
 if Config.Features == nil or Config.Features.Kaiju ~= false then

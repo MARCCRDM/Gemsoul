@@ -109,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.89 · 2026-11-08 ranked leagues: Stone to Titan, safe after a promotion, a season track, crests on the result, PLAY and over heads, the versus card",
+		Build = "1.90 · 2026-11-09 the new league and rival code can never stop the game from starting",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error

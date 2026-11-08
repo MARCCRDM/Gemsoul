@@ -1925,9 +1925,9 @@ faceCount.AutomaticSize, faceCount.TextXAlignment = Enum.AutomaticSize.None, Enu
 faceCount.Position, faceCount.Size = UDim2.new(0, 0, 1, -50), UDim2.new(1, 0, 0, 40)
 -- The versus card's lines for a 1v1 (Shared.Leagues): each side's crest,
 -- league and rating, record and streak, and lead kaiju.
-local LeagueBadge = require(script.Parent.LeagueBadge)
-local Leagues = require(ReplicatedStorage.Shared.Leagues)
 local faceSides = {}
+pcall(function() -- (never in the way of the duel overlay)
+local LeagueBadge = require(script.Parent.LeagueBadge)
 for i, right in { false, true } do
 	local sideOf = {}
 	sideOf.Badge = LeagueBadge.new(faceoff, 40)
@@ -1946,7 +1946,12 @@ for i, right in { false, true } do
 	sideOf.Kaiju = line(11, 123, P.Dim)
 	faceSides[i] = sideOf
 end
+end)
+local Leagues = require(ReplicatedStorage.Shared.Leagues)
 local function showSide(sideOf, entry)
+	if not sideOf then
+		return
+	end
 	local on = entry ~= nil
 	for _, part in { sideOf.Badge.Frame, sideOf.League, sideOf.Record, sideOf.Kaiju } do
 		part.Visible = on
@@ -2012,8 +2017,8 @@ local function showReveal(info)
 	end
 	faceKind.Text = string.format("ROUND %d  ·  YOU %d – %d THEM", info.Round, info.Wins.Mine, info.Wins.Theirs)
 	faceLeft.Text, faceRight.Text = picked(info.Picks.Mine), picked(info.Picks.Theirs)
-	showSide(faceSides[1], nil)
-	showSide(faceSides[2], nil)
+	pcall(showSide, faceSides[1], nil)
+	pcall(showSide, faceSides[2], nil)
 	faceoff.Size = UDim2.fromOffset(560, 150)
 	faceoff.Visible = true
 end
@@ -2044,8 +2049,8 @@ local function showFaceoff(info)
 	faceLeft.Text, faceRight.Text = names(mine), names(theirs)
 	-- A 1v1: the versus card's lines under each name; the card grows for them.
 	local solo = #(mine or {}) == 1 and #(theirs or {}) == 1 and not info.Intro
-	showSide(faceSides[1], if solo then mine[1] else nil)
-	showSide(faceSides[2], if solo then theirs[1] else nil)
+	pcall(showSide, faceSides[1], if solo then mine[1] else nil)
+	pcall(showSide, faceSides[2], if solo then theirs[1] else nil)
 	faceoff.Size = UDim2.fromOffset(560, if solo then 200 else 150)
 	if info.Rounds then
 		info.Score, info.Round = { Mine = 0, Theirs = 0 }, 1

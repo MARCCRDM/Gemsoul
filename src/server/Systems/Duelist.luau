@@ -1655,7 +1655,7 @@ local function think(enemy, now: number)
 	local distance = offset.Magnitude
 	local dir = if distance > 0.01 then offset.Unit else Vector3.new(0, 0, -1)
 	local side = Vector3.new(-dir.Z, 0, dir.X)
-	keepPlaced(enemy, duel, owner, now, distance, dir)
+	pcall(keepPlaced, enemy, duel, owner, now, distance, dir) -- (never in the way of its fighting)
 	refill(duel, now, guarding(enemy, now))
 	local kit = duel.Kit
 	if kit then
