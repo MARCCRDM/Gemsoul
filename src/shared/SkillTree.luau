@@ -15,16 +15,16 @@
 	and four tiers down each branch (Trees: { tier 1, tier 2, tier 3,
 	capstone }, each a list of move ids from Shared.GemTraits):
 
-	  tier 1     one move, given free with the tree's element at the start
+	  tier 1     one move, learned from the start in every tree (free)
 	  tier 2-3   a few to choose from: learn one (or more) to go deeper
 	  capstone   the branch's last move
 
 	A move is learned with skill points: one per level after the first
 	(Shared.AugmentTree's level), Costs by tier, and its tier opens at
 	Levels. A tier needs a move of the tier above it learned in the same
-	branch. Branches of other trees can be learned too (a Fire Q with a
-	Frost R): their first tier costs Costs[1] then. Equip any learned move
-	on its own key (a Q move on Q only); swap freely out of a fight.
+	branch. Every tree's tier 1 is learned from the start, so any tree's
+	branches can be climbed (a Fire Q with a Frost R). Equip any learned
+	move on its own key (a Q move on Q only); swap freely out of a fight.
 
 	Saved on the loadout (profile.Character.Skills, so every fight and
 	screen that reads the loadout reads it):
@@ -60,7 +60,7 @@ SkillTree.Lanes = { Q = "Offense", E = "Ability", R = "Defense" }
 SkillTree.KeyOfLane = { Offense = "Q", Ability = "E", Defense = "R" }
 SkillTree.TierNames = { "Tier 1", "Tier 2", "Tier 3", "Capstone" }
 SkillTree.Levels = { 1, 3, 6, 10 } -- the level each tier opens at
-SkillTree.Costs = { 1, 1, 2, 3 } -- points to learn a move of each tier (tier 1 of your own tree is free)
+SkillTree.Costs = { 0, 1, 2, 3 } -- points to learn a move of each tier (every tier 1 is learned from the start)
 SkillTree.Affinity = 0.10 -- a gem of the move's own element: +10% output
 
 -- Each element's branches, tier by tier (Shared.GemTraits' moves).
@@ -116,33 +116,36 @@ function SkillTree.first(element: string): { [string]: string }?
 	return { Q = tree.Offense[1][1], E = tree.Ability[1][1], R = tree.Defense[1][1] }
 end
 
+-- Every tree's tier-1 moves (learned from the start).
+local function firsts(): { [string]: boolean }
+	local learned = {}
+	for _, lanes in SkillTree.Trees do
+		for _, tiers in lanes do
+			for _, id in tiers[1] do
+				learned[id] = true
+			end
+		end
+	end
+	return learned
+end
+
 function SkillTree.start(element: string)
 	local first = SkillTree.first(element)
 	if not first then
 		return nil
 	end
-	local learned = {}
-	for _, id in first do
-		learned[id] = true
-	end
-	return { Element = element, Learned = learned, Moves = table.clone(first) }
+	return { Element = element, Learned = firsts(), Moves = table.clone(first) }
 end
 
 function SkillTree.points(level: number): number
 	return math.max(0, math.floor(level or 1) - 1)
 end
 
--- What learning `id` costs: its tier's cost, but a tier 1 of your own
--- element's tree is free (given at the start).
-function SkillTree.cost(skills, id: string): number
+-- What learning `id` costs: its tier's cost (tier 1: nothing, it's
+-- learned from the start).
+function SkillTree.cost(_skills, id: string): number
 	local p = PLACE[id]
-	if not p then
-		return 0
-	end
-	if p.Tier == 1 and skills and p.Element == skills.Element then
-		return 0
-	end
-	return SkillTree.Costs[p.Tier] or 0
+	return if p then SkillTree.Costs[p.Tier] or 0 else 0
 end
 
 function SkillTree.spent(skills): number
@@ -250,7 +253,7 @@ function SkillTree.move(loadout, key: string): string?
 end
 
 -- A saved record made safe: known element, only moves on the tree, each
--- key's move learned and on its own key, the element's tier 1 learned.
+-- key's move learned and on its own key, every tier 1 learned.
 function SkillTree.clean(skills)
 	if type(skills) ~= "table" or not SkillTree.Trees[skills.Element or ""] then
 		return nil
@@ -262,7 +265,7 @@ function SkillTree.clean(skills)
 		end
 	end
 	local first = SkillTree.first(skills.Element) :: { [string]: string }
-	for _, id in first do
+	for id in firsts() do
 		learned[id] = true
 	end
 	local moves = {}

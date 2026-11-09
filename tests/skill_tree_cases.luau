@@ -110,10 +110,15 @@ ok, why = SkillTree.canLearn(skills, "E_HeatHaze", 3)
 check(not ok and string.find(why or "", "point", 1, true), "Learned with no points left")
 check(not SkillTree.learn(skills, "Q_CinderDrill", 3), "Learned twice")
 check(not SkillTree.learn(skills, "Nope", 30), "Learned something not on the tree")
--- Another tree's tier 1 costs a point.
-check(SkillTree.cost(skills, "R_FrozenWall") == 1 and SkillTree.cost(skills, "R_HeatShield") == 0, "Another tree's tier 1 should cost a point")
-ok = SkillTree.learn(skills, "R_FrozenWall", 5)
-check(ok and skills.Moves.R == "R_HeatShield", "A tier-1 move of another tree took a key over a move as deep")
+-- Every tree's tier 1 is learned from the start, free, ready to equip.
+for element in SkillTree.Trees do
+	for _, id in SkillTree.first(element) do
+		check(skills.Learned[id] and SkillTree.cost(skills, id) == 0, id .. " isn't learned from the start")
+	end
+end
+check(not SkillTree.learn(skills, "R_FrozenWall", 5), "Learned a tier 1 again")
+-- Another tree's branch climbs from its tier 1.
+check(SkillTree.canLearn(SkillTree.start("Fire"), "R_IceArmor", 3), "Couldn't climb another tree's branch from its tier 1")
 -- A whole branch: 1 + 2 + 3 points past tier 1, the capstone at level 10.
 do
 	local s = SkillTree.start("Frost")
@@ -127,7 +132,7 @@ end
 check(SkillTree.equip(skills, "Q", "Q_CinderDrill") and skills.Moves.Q == "Q_CinderDrill", "Couldn't swap Q to another learned move")
 check(not SkillTree.equip(skills, "E", "Q_CinderDrill"), "A Q move went on E")
 check(not SkillTree.equip(skills, "E", "E_Supernova"), "An unlearned move was equipped")
-check(SkillTree.equip(skills, "R", "R_FrozenWall") and skills.Moves.R == "R_FrozenWall", "A learned move from another tree wouldn't go on its key")
+check(SkillTree.equip(skills, "R", "R_FrozenWall") and skills.Moves.R == "R_FrozenWall", "Another tree's tier 1 wouldn't go on its key")
 -- Reset: back to the element's tier 1, nothing spent.
 local reset = SkillTree.reset(skills)
 check(reset.Element == "Fire" and SkillTree.spent(reset) == 0 and reset.Moves.Q == FIRST.Fire.Q and not reset.Learned.Q_CinderDrill, "Reset didn't go back to tier 1")
@@ -135,7 +140,7 @@ check(reset.Element == "Fire" and SkillTree.spent(reset) == 0 and reset.Moves.Q 
 -- A saved record made safe.
 check(SkillTree.clean(nil) == nil and SkillTree.clean({ Element = "Mud" }) == nil, "A bad record wasn't refused")
 local cleaned = SkillTree.clean({ Element = "Poison", Learned = { Q_Dissolution = "yes", Fake = true }, Moves = { Q = "E_AcidSpray", E = "E_ToxicTide", R = 4 } })
-check(cleaned.Learned.Q_BreachCut and not cleaned.Learned.Fake and not cleaned.Learned.Q_Dissolution, "Cleaning kept junk or lost tier 1")
+check(cleaned.Learned.Q_BreachCut and cleaned.Learned.Q_CinderCleave and not cleaned.Learned.Fake and not cleaned.Learned.Q_Dissolution, "Cleaning kept junk or lost a tier 1")
 check(cleaned.Moves.Q == "Q_BreachCut" and cleaned.Moves.E == "E_AcidSpray" and cleaned.Moves.R == "R_RadShield", "Cleaning kept a move on the wrong key or one not learned")
 
 -- What a key fires: the tree's move, powered by that socket's gem; with no

@@ -17,6 +17,12 @@ local GemConfig = require(ReplicatedStorage.Shared.GemConfig)
 local GemTraits = require(ReplicatedStorage.Shared.GemTraits)
 local SkillTree = require(ReplicatedStorage.Shared.SkillTree)
 local UiKit = require(script.Parent.UiKit)
+local Icons = (function()
+	local ok, module = pcall(function()
+		return require(script.Parent.SurgeIcons)
+	end)
+	return if ok then module else nil
+end)()
 
 local ElementPick = {}
 ElementPick.Cards = SkillTree.Elements
@@ -84,7 +90,7 @@ function ElementPick.run(): string
 		Name = "Title",
 		Size = UDim2.new(1, 0, 0, 40),
 	})
-	text(holder, "It sets your skill tree and your first three stones: Common gems of it in your sword, chest and shield. They power Q, E and R.", 16, DIM, Enum.Font.GothamMedium, {
+	text(holder, "Your skill tree, and three Common stones of it for your sword, chest and shield: they power Q, E and R.", 16, DIM, Enum.Font.GothamMedium, {
 		Name = "Subtitle",
 		Position = UDim2.fromOffset(60, 44),
 		Size = UDim2.new(1, -120, 0, 44),
@@ -113,10 +119,12 @@ function ElementPick.run(): string
 		for element, card in cards do
 			local on = element == chosen
 			local color = GemConfig.ElementColors[element] or GOLD
-			card.Stroke.Color = if on then color else LINE
+			card.Stroke.Color = if on then color:Lerp(Color3.new(1, 1, 1), 0.3) elseif chosen then LINE:Lerp(INK, 0.4) else LINE
 			card.Stroke.Thickness = if on then 3 else 1
-			card.Button.BackgroundColor3 = if on then CARD:Lerp(color, 0.14) else CARD
+			card.Button.BackgroundColor3 = if on then CARD:Lerp(color, 0.16) else CARD
 			card.Check.Visible = on
+			card.Halo.Visible = on
+			card.Pop.Scale = if on then 1.03 elseif chosen then 0.97 else 1
 		end
 		if chosen then
 			local color = GemConfig.ElementColors[chosen] or GOLD
@@ -140,22 +148,55 @@ function ElementPick.run(): string
 			Text = "",
 		}, holder)
 		UiKit.round(button, 14)
+		local pop = new("UIScale", {}, button)
+		-- (picked: a glow round it)
+		local halo = new("Frame", {
+			Name = "Halo",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, 22, 1, 22),
+			BackgroundColor3 = color,
+			BackgroundTransparency = 0.78,
+			ZIndex = 0,
+			Visible = false,
+		}, button)
+		UiKit.round(halo, 22)
 		local stroke = new("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = LINE, Thickness = 1 }, button)
 		-- its colour along the top, a gem in it
 		local band = new("Frame", { Size = UDim2.new(1, 0, 0, 86), BackgroundColor3 = color, BorderSizePixel = 0 }, button)
 		UiKit.round(band, 14)
 		new("Frame", { Position = UDim2.new(0, 0, 1, -14), Size = UDim2.new(1, 0, 0, 14), BackgroundColor3 = color, BorderSizePixel = 0 }, band)
 		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.2), color:Lerp(INK, 0.35)) }, band)
+		-- a cut gem: a glow, the stone, a lighter table on it and a glint
+		local aura = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(70, 70),
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.82,
+			BorderSizePixel = 0,
+		}, band)
+		UiKit.round(aura, 35)
 		local gem = new("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(40, 40),
+			Size = UDim2.fromOffset(44, 44),
 			Rotation = 45,
-			BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.45),
+			BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.35),
 			BorderSizePixel = 0,
 		}, band)
-		UiKit.round(gem, 6)
-		new("UIStroke", { Color = Color3.new(1, 1, 1), Transparency = 0.3, Thickness = 2 }, gem)
+		UiKit.round(gem, 7)
+		new("UIGradient", { Rotation = 45, Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.65), color:Lerp(INK, 0.15)) }, gem)
+		new("UIStroke", { Color = Color3.new(1, 1, 1), Transparency = 0.15, Thickness = 2 }, gem)
+		local face = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.5, 0.5),
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.45,
+			BorderSizePixel = 0,
+		}, gem)
+		UiKit.round(face, 3)
 		text(button, string.upper(GemConfig.ElementLabels[element] or element), 24, color:Lerp(Color3.new(1, 1, 1), 0.25), Enum.Font.GothamBlack, {
 			Name = "Label",
 			Position = UDim2.fromOffset(12, 96),
@@ -170,7 +211,7 @@ function ElementPick.run(): string
 		for row, key in KEYS do
 			local y = 190 + (row - 1) * 52
 			local cap = new("TextLabel", {
-				Position = UDim2.fromOffset(14, y + 6),
+				Position = UDim2.fromOffset(12, y + 6),
 				Size = UDim2.fromOffset(32, 32),
 				BackgroundColor3 = color:Lerp(INK, 0.55),
 				Font = Enum.Font.GothamBlack,
@@ -180,15 +221,30 @@ function ElementPick.run(): string
 			}, button)
 			UiKit.round(cap, 8)
 			local move = GemTraits.Moves[first[key] or ""]
-			text(button, move and move.Name or "", 15, TEXT, Enum.Font.GothamBold, {
-				Position = UDim2.fromOffset(56, y + 2),
-				Size = UDim2.new(1, -66, 0, 22),
+			-- its painted icon
+			local art = new("TextLabel", {
+				Position = UDim2.fromOffset(52, y + 2),
+				Size = UDim2.fromOffset(40, 40),
+				BackgroundColor3 = INK,
+				Font = Enum.Font.GothamBlack,
+				TextSize = 16,
+				TextColor3 = TEXT,
+				Text = move and string.sub(move.Name, 1, 1) or "",
+			}, button)
+			UiKit.round(art, 9)
+			new("UIStroke", { Color = color, Transparency = 0.4, Thickness = 1 }, art)
+			if Icons and first[key] then
+				pcall(Icons.apply, art, first[key])
+			end
+			text(button, move and move.Name or "", 14, TEXT, Enum.Font.GothamBold, {
+				Position = UDim2.fromOffset(100, y + 3),
+				Size = UDim2.new(1, -106, 0, 20),
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 			})
-			text(button, KEY_WORDS[key], 12, DIM, Enum.Font.GothamMedium, {
-				Position = UDim2.fromOffset(56, y + 22),
-				Size = UDim2.new(1, -66, 0, 18),
+			text(button, KEY_WORDS[key], 11, DIM, Enum.Font.GothamMedium, {
+				Position = UDim2.fromOffset(100, y + 23),
+				Size = UDim2.new(1, -106, 0, 16),
 				TextXAlignment = Enum.TextXAlignment.Left,
 			})
 		end
@@ -206,7 +262,7 @@ function ElementPick.run(): string
 			chosen = element
 			refresh()
 		end)
-		cards[element] = { Button = button, Stroke = stroke, Check = check, Index = i }
+		cards[element] = { Button = button, Stroke = stroke, Check = check, Index = i, Halo = halo, Pop = pop }
 	end
 
 	-- Laid out for the screen: a row of four, or two by two on a narrow one.
