@@ -35,6 +35,7 @@ local Icons = require(script.Parent.Modules.SurgeIcons)
 local CardFX = require(script.Parent.Modules.ElementCardFX)
 local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
 local BasicsScreen = require(script.Parent.Modules.BasicsScreen)
+local ElementPick = require(script.Parent.Modules.ElementPick)
 while not GemClient.Profile do
 	GemClient.Changed:Wait()
 end
@@ -2840,6 +2841,7 @@ if not FastStart.Pick then
 				end)
 			end)
 		end
+		local pickedElement: string? = nil
 		local function roll()
 			if rolling or closed then
 				return
@@ -2856,7 +2858,15 @@ if not FastStart.Pick then
 					end
 				end
 				kicker.Text = ""
-				local answer = GemClient.request("PrepareStarterLottery")
+				-- (With the skill tree: they choose it first, Modules.ElementPick;
+				-- a retry keeps the choice.)
+				if FastStart.ChooseElement and not pickedElement then
+					local ok, element = pcall(ElementPick.run)
+					pickedElement = if ok then element else nil
+				end
+				local answer = if pickedElement
+					then GemClient.request("PrepareStarterLottery", FastStart.DefaultStyle, pickedElement)
+					else GemClient.request("PrepareStarterLottery")
 				rolling = false
 				if closed or not veil.Parent then
 					return

@@ -34,6 +34,7 @@ local FastStart = load("FastStart")
 local Lottery = load("StarterLottery")
 local Traits = load("GemTraits")
 local Tech = load("CombatTechnology")
+local SkillTree = load("SkillTree")
 
 -- Who sees it: brand-new saves only. An old save that's been playing
 -- without finishing the intro is marked done (its gear is kept).
@@ -63,7 +64,9 @@ for _, element in FastStart.Elements do
 		local lane = ({ "Offense", "Ability", "Defense" })[index]
 		check(#pool >= 1, element .. " " .. lane .. " has nothing to roll")
 		if Traits.Enabled then
-			check(#pool == 2, element .. " " .. lane .. " should roll one of two")
+			-- (with the skill tree: its element's tier-1 move, one each)
+			local first = SkillTree.first(element)
+			check(#pool == 1 and pool[1] == first[({ "Q", "E", "R" })[index]], element .. " " .. lane .. " isn't the tree's tier 1")
 		end
 		for _, id in pool do
 			check(Tech.Catalog[id] ~= nil, id .. " isn't a real move")
@@ -95,6 +98,38 @@ for _, element in FastStart.Elements do
 		-- Retrying never rerolls.
 		check(Lottery.prepareChoice(profile, "Juggernaut", element, function() return { Id = "h" } end, function() return 1 end) == kit, element .. " kit rerolled on retry")
 	end
+end
+
+-- The element: chosen by the player (any of the four), else rolled.
+check(FastStart.ChooseElement == true, "New players don't choose their element")
+for _, element in FastStart.Elements do
+	check(FastStart.element(element) == element, element .. " chosen wasn't kept")
+end
+for _, bad in { "Water", 7, nil } do
+	check(table.find(FastStart.StarterElements, FastStart.element(bad, { NextInteger = function(_, a) return a end } :: any)) ~= nil, "A bad choice wasn't rolled instead")
+end
+-- Claimed, the kit's element's tree is saved: its tier 1 learned and on Q, E, R.
+do
+	local made = 0
+	local profile = { Intro = {}, Gems = {}, Character = { Weapon = "Sword", Armor = "Vest", Shield = "Buckler", ItemGems = {} } }
+	Lottery.prepareChoice(profile, "Prospector", "Shock", function()
+		made += 1
+		return { Id = "s" .. made }
+	end)
+	check(Lottery.finish(profile, 50), "The Shock kit wasn't claimed")
+	local skills = profile.Character.Skills
+	local first = SkillTree.first("Shock")
+	check(skills and skills.Element == "Shock", "The kit didn't save its element's tree")
+	for _, key in { "Q", "E", "R" } do
+		check(skills.Moves[key] == first[key] and skills.Learned[first[key]], "Key " .. key .. " isn't the tree's tier 1")
+		local fired = Tech.surgeGem(profile.Character, key)
+		check(fired and fired.Surge == first[key] and fired.Skill, "Key " .. key .. " doesn't fire the tree's move")
+	end
+	for _, slot in { "Weapon", "Armor", "Shield" } do
+		local gem = profile.Character[slot .. "Gem"]
+		check(gem and gem.Tier == "Common" and gem.Element == "Shock", "The " .. slot .. "'s starting stone isn't a Common Shock gem")
+	end
+	check(#profile.Gems == 0, "Stones besides the three Q, E and R ones")
 end
 
 -- Claimed, the three stones go where their keys are: the sword, the chest
@@ -166,8 +201,10 @@ for _ = 1, 200 do
 end
 check(seen.Fire and seen.Frost, "One of Thermal or Cryo never comes up")
 local intro = fs.readFile(ROOT .. "/src/server/Systems/Intro.luau")
-check(string.find(intro, "style, element = FastStart.DefaultStyle, FastStart.rollElement()", 1, true) ~= nil, "The server doesn't roll the element itself")
 local client = fs.readFile(ROOT .. "/src/client/Intro.client.luau")
+-- (the server decides it: the one chosen if it may be, else rolled; the style always its own)
+check(string.find(intro, "style, element = FastStart.DefaultStyle, FastStart.element(element)", 1, true) ~= nil, "The server doesn't decide the element itself")
+check(string.find(client, "ElementPick.run", 1, true) ~= nil, "New players aren't asked their element")
 check(not string.find(client, "KaijuRoll", 1, true), "The intro still plays the kaiju roll")
 -- The kaiju roll plays in the lobby instead, after the first fight, with
 -- nothing over the screen (KaijuHud), and they deploy from there.

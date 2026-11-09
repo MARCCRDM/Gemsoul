@@ -24,6 +24,9 @@
 	  FastStart.Enabled                  off = no picker and no first fight
 	  FastStart.Pick                     the old picker (off: rolled for them)
 	  FastStart.rollElement(random?)     -> "Fire" | "Frost" (StarterElements)
+	  FastStart.ChooseElement            the player picks it (all four) instead
+	  FastStart.element(sent, random?)   -> the kit's element: the one sent if
+	                                        it may be chosen, else rolled
 	  FastStart.Styles / Elements        in the order the screens show them
 	  FastStart.SaveVersion              saves older than this were made before
 	                                     the fast start (see migrate)
@@ -44,12 +47,22 @@ FastStart.ElementScreen = false
 FastStart.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
 FastStart.Elements = { "Fire", "Frost", "Shock", "Poison" }
 FastStart.StarterElements = { "Fire", "Frost" } -- Thermal or Cryo, at random
+-- With the skill tree: the new player chooses their element (any of the
+-- four, Client ElementPick) after the combat basics; their tree's tier-1
+-- moves and three Common stones of it (sword, chest, shield) are the kit.
+FastStart.ChooseElement = true
 FastStart.DefaultStyle = "Prospector" -- (never shown: everyone starts in it, with sword and shield)
 
 -- A new player's element (Pick off): one of StarterElements at random.
 function FastStart.rollElement(random: Random?): string
 	local list = FastStart.StarterElements
 	return list[(random or Random.new()):NextInteger(1, #list)]
+end
+function FastStart.element(sent: any, random: Random?): string
+	if FastStart.ChooseElement and type(sent) == "string" and table.find(FastStart.Elements, sent) then
+		return sent
+	end
+	return FastStart.rollElement(random)
 end
 -- Each style's own gem (as its armor art shows it).
 

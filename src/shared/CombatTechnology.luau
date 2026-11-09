@@ -74,9 +74,19 @@ Tech.SurgeSockets = { Q = "Surge1", E = "Surge2", R = "Surge3" }
 -- With the triad on (GemTraits), each key reads its own socket instead:
 -- Q the sword's gem (its Offense), E the chest's (its Ability) and R
 -- the shield's (its Defense), as a projected copy carrying that trait.
+-- With the skill tree (Shared.SkillTree: loadout.Skills), the key fires
+-- the tree's move, powered by that socket's gem.
+local SkillTree = (function()
+	local ok, module = pcall(function()
+		return require(script.Parent.SkillTree)
+	end)
+	return if ok then module else nil
+end)()
+Tech.SkillTree = SkillTree
 function Tech.surgeGem(loadout, key: string)
 	if GemTraits.active(loadout) then
-		return GemTraits.project(GemTraits.socketGem(loadout, key), key)
+		local skill = SkillTree and SkillTree.move(loadout, key)
+		return GemTraits.project(GemTraits.socketGem(loadout, key), key, skill)
 	end
 	local slot = Tech.SurgeSockets[key]
 	local gem = if slot and loadout then loadout[slot .. "Gem"] else nil

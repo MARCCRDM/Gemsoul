@@ -120,8 +120,9 @@ local function prepareLottery(player: Player, style, element)
 	end
 	-- No picker (FastStart.Pick off): the server rolls it, Thermal or Cryo,
 	-- in the default style, whatever was sent. (A kit already rolled stays.)
+	-- (With ChooseElement: the element they chose, Client ElementPick.)
 	if not FastStart.Pick and not profile.Intro.Lottery then
-		style, element = FastStart.DefaultStyle, FastStart.rollElement()
+		style, element = FastStart.DefaultStyle, FastStart.element(element)
 	end
 	if not profile.Intro.Lottery and not Lottery.validChoice(style, element) then
 		return reply(false, "Choose an armor style and starter element first.")

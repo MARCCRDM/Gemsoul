@@ -1412,6 +1412,10 @@ local function inventoryUpgradeLabel(hints)
 end
 UpgradeHints.Changed:Connect(inventoryUpgradeLabel)
 inventoryUpgradeLabel(UpgradeHints.Current)
+-- SKILLS: the skill tree (Modules.SkillTreeUI: your Q, E and R moves).
+tile("SKILLS", "Enchant", ICON, function()
+	require(script.Parent.SkillTreeUI).toggle()
+end)
 -- STORE (the Store: kaiju, bundles, skins, suits, helmets, visors,
 -- pickaxes), right after INVENTORY (third on a phone, after PLAY), blue.
 local SKINS_TOP, SKINS_BOTTOM = Color3.fromRGB(86, 156, 255), Color3.fromRGB(34, 92, 214)

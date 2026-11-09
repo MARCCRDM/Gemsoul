@@ -1,6 +1,14 @@
 -- Server-owned, persisted onboarding rewards. Animation never determines a reward.
 local GemRoller = require(script.Parent.GemRoller)
 local GemTraits = require(script.Parent.GemTraits)
+-- (The skill tree: a new kit's moves are its element's tier 1, and the
+-- tree is saved with the kit. Offline harnesses may not have it.)
+local SkillTree = (function()
+	local ok, module = pcall(function()
+		return require(script.Parent.SkillTree)
+	end)
+	return if ok then module else nil
+end)()
 local Lottery = {}
 Lottery.Version = 1
 Lottery.GearOrder = { "Boots", "Gloves", "Weapon", "Shield", "Armor", "Helmet" }
@@ -12,6 +20,11 @@ Lottery.Styles = { "Prospector", "Skirmisher", "Juggernaut" }
 -- never a shield). Without it, the element's three classic surges.
 local LANES = { "Offense", "Ability", "Defense" }
 function Lottery.starterPools(element): { { string } }
+	-- With the skill tree: the tree's tier-1 moves, one each.
+	local first = SkillTree and SkillTree.Enabled and GemTraits.Enabled and SkillTree.first(element)
+	if first then
+		return { { first.Q }, { first.E }, { first.R } }
+	end
 	local intro = GemTraits.Enabled and GemTraits.Intro[element]
 	if intro then
 		local pools = {}
@@ -175,6 +188,11 @@ function Lottery.finish(profile, maxGems)
 		end
 	end
 	reward.Granted = true
+	-- The kit's element's tree: its tier-1 moves learned and on Q, E and R
+	-- (kept if one's already saved).
+	if SkillTree and SkillTree.Enabled and not c.Skills and SkillTree.Trees[reward.Element or ""] then
+		c.Skills = SkillTree.start(reward.Element)
+	end
 	profile.Intro.Spun, profile.Intro.FirstStone, profile.Intro.Done = true, true, true
 	return true
 end

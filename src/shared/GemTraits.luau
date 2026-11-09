@@ -56,6 +56,8 @@ GemTraits.NormalizedOutput = 0.8
 GemTraits.SizePotency = 0.10 -- Size 10: +10% potency
 GemTraits.ClarityDuration = 0.15 -- Clarity 10: +15% duration
 GemTraits.CutCooldown = 0.15 -- Cut 10: -15% cooldown
+-- A skill-tree move (Shared.SkillTree) powered by a gem of its own element.
+GemTraits.Affinity = 0.10
 
 -- Signature moves roll at this share of the others' odds.
 GemTraits.SignatureWeight = 0.5
@@ -1028,14 +1030,21 @@ end
 
 -- What a key fires: a copy of the socket's gem carrying the trait id as its
 -- surge (Surge), its own surge kept as LegacySurge. The saved gem is untouched.
-function GemTraits.project(gem, key: string)
-	local id = gem and GemTraits.traitFor(gem, key)
+-- `skill`: the move the skill tree has on that key (Shared.SkillTree), fired
+-- in place of the gem's own; the gem then only powers it (Skill set: its
+-- Affinity counts, GemTraits.stats).
+function GemTraits.project(gem, key: string, skill: string?)
+	if not gem then
+		return nil
+	end
+	local id = if skill and M[skill] then skill else GemTraits.traitFor(gem, key)
 	if not id then
 		return nil
 	end
 	local projected = table.clone(gem)
 	projected.Surge, projected.LegacySurge = id, gem.Surge
 	projected.TraitKey, projected.TraitLane, projected.SourceId = key, GemTraits.Lanes[key], gem.Id
+	projected.Skill = if id == skill then true else nil
 	return projected
 end
 
@@ -1091,6 +1100,12 @@ function GemTraits.stats(id: string, gem, normalized: boolean?)
 		d.Flourished = true
 	end
 	local output = GemTraits.output(gem, normalized)
+	-- (a skill-tree move powered by a gem of its own element: Affinity)
+	local place = GemTraits.Index[id]
+	if gem and gem.Skill and not normalized and place and place.Element == gem.Element then
+		output *= 1 + GemTraits.Affinity
+		d.Affinity = true
+	end
 	local potency = output * (1 + GemTraits.SizePotency * metric(gem, "Size"))
 	local stretch = 1 + GemTraits.ClarityDuration * metric(gem, "Clarity")
 	d.Output, d.Potency, d.Stretch = output, potency, stretch

@@ -308,6 +308,42 @@ local function drawTree(parent: Frame, gem)
 	local spineX = nodeX + node + 26
 	line(parent, C.Line, nodeX + node, nodeY + node / 2 - 1, 26, 2, 0.75)
 	line(parent, C.Line, spineX, top + rowH / 2 - 1, 2, rowH * 2 + 2, 0.75)
+	-- With the skill tree (Shared.SkillTree): the stone gives no moves of
+	-- its own; it powers the move your tree has on the key of the socket
+	-- it sits in. Each branch says which, and how strong with this stone.
+	local character = GemClient.Profile and GemClient.Profile.Character
+	local SkillTree = Tech.SkillTree
+	if SkillTree and character and SkillTree.move(character, "Q") then
+		for row, key in KEYS do
+			local color = KEY_COLORS[key]
+			local y = top + (row - 1) * rowH
+			local mid = y + rowH / 2
+			line(parent, color, spineX, mid - 1, 22, 2, 0.35)
+			local badge = box(parent, color, spineX + 22, mid - 16, 32, 32)
+			round(badge, 8)
+			local letter = text(badge, key, 16, C.Ink, HEAVY, 0, 0, 32, 32)
+			letter.TextXAlignment = Enum.TextXAlignment.Center
+			text(parent, KEY_LANE[key], 10, color, HEAVY, spineX + 62, mid - 14, 74, 13)
+			text(parent, KEY_SOCKET[key], 9, C.Dim, HEADING, spineX + 62, mid + 1, 74, 12)
+			local id = SkillTree.move(character, key)
+			local move = id and Tech.Catalog[id]
+			local stats = id and Traits.stats(id, Traits.project(gem, key, id))
+			text(parent, if move then "POWERS YOUR " .. string.upper(move.Name) else "POWERS THIS KEY'S MOVE", 13, C.Text, HEAVY, spineX + 146, mid - 22, 420, 18)
+			text(
+				parent,
+				if stats then Traits.summary(stats) .. (if stats.Affinity then "  ·  +10% affinity" else "") else "",
+				12,
+				if stats and stats.Affinity then C.Gold else C.Dim,
+				MEDIUM,
+				spineX + 146,
+				mid - 2,
+				420,
+				16
+			)
+		end
+		text(parent, "Your moves come from your skill tree (SKILLS). This stone powers the move on the key of the socket it's in.", 11, C.Dim, MEDIUM, spineX + 24, top + rowH * 3 + 2, 520, 16)
+		return
+	end
 	if not traits then
 		text(parent, "This stone has no moves to show.", 13, C.Dim, MEDIUM, spineX + 24, top + rowH, 400, 20)
 		return

@@ -3116,7 +3116,9 @@ local function drawRows(loadout)
 		local rowKey = if triadOn(loadout) then Traits.KeyOfSocket[slot] else nil
 		local socketText = nil
 		if gem then
-			local move = rowKey and Tech.Catalog[Traits.traitFor(gem, rowKey) or ""]
+			-- (with the skill tree: the tree's move on that key, the gem powering it)
+			local skill = rowKey and Tech.SkillTree and Tech.SkillTree.move(loadout, rowKey)
+			local move = rowKey and Tech.Catalog[skill or Traits.traitFor(gem, rowKey) or ""]
 			socketText = if move
 				then string.format('<font color="#%s">%s</font>  <font color="#%s">%s</font>', KEY_COLORS[rowKey]:ToHex(), rowKey, gemColor(gem):ToHex(), string.upper(move.Name))
 				else string.format('<font color="#%s">%s</font>', gemColor(gem):ToHex(), string.upper(gemName(gem)))
@@ -3833,7 +3835,8 @@ local function drawDetail(loadout)
 		end
 		-- The triad: the sword's gem is your Q, the chest's your E, the shield's your R.
 		local slotKey = if triadOn(loadout) then Traits.KeyOfSocket[slot] else nil
-		local move = slotKey and gem and Tech.Catalog[Traits.traitFor(gem, slotKey) or ""]
+		local skill = slotKey and Tech.SkillTree and Tech.SkillTree.move(loadout, slotKey)
+		local move = slotKey and gem and Tech.Catalog[skill or Traits.traitFor(gem, slotKey) or ""]
 		if move then
 			gw.Sub.Text = slotKey .. "  ·  " .. string.upper(move.Name)
 			gw.Sub.TextColor3 = KEY_COLORS[slotKey]

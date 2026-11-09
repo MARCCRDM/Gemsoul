@@ -25,6 +25,7 @@ COVERS = {
     "src/client/Modules/FirstDungeonUI.luau": "the Rot Beachhead's loading slides: full-screen art and centred words, no buttons up top",
     "src/client/Modules/PodArrival.luau": "your pod landing: letterbox bars, the caption low down and the centred roll card under the top bar, no buttons",
     "src/client/Modules/FirstPersonCombat.luau": "the MOUSE FREE dim: a full-screen shade, its words and key buttons centred, nothing up top",
+    "src/client/Modules/ElementPick.luau": "a new player's element: a dark backdrop, the four cards and CHOOSE centred, nothing up top",
     "src/client/Modules/BasicsScreen.luau": "the combat basics: a dark backdrop, the centred LED panel and words, SKIP at the bottom middle, nothing up top",
 }
 HELPERS = ("UiKit.clearTopbar", "UiKit.topbar", "UiKit.onTopbar", "UiKit.reserveTopbar")
