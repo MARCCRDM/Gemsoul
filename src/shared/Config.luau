@@ -109,7 +109,7 @@ local Config = {
 	Playtest = {
 		-- Shown on the dashboard and stamped on every report, so feedback
 		-- names the build it came from. Change it whenever you publish.
-		Build = "1.95 · 2026-11-09 a new look for the skill tree and the element pick; every tree's first three moves are yours",
+		Build = "1.96 · 2026-11-09 never stranded on the old base: every system starts on its own, DEV > ERRORS shows what broke",
 		-- The only UserIds with the DEV tools: the DEV button and panel, the
 		-- test-admin actions (regenerating gear, rerolls, replaying the fast
 		-- start, test caches, dungeon tests) and the feedback and error

@@ -7,6 +7,8 @@
 	                               Studio): the latest feedback and the most
 	                               frequent errors
 	  Remotes.Report "Error", message, trace   a client script error
+	  "DevRecentErrors"            owners: this server's latest errors at once
+	                               (and the most frequent saved ones): DEV > ERRORS
 
 	Server script errors are caught too (ScriptContext.Error). Errors are
 	grouped by message and counted, then written once a minute. Every report
@@ -99,9 +101,27 @@ function Feedback.mergeErrors(saved, pending, keep: number)
 	return list
 end
 
-local function noteError(side: string, message: string, trace: string)
+-- This server's latest errors, newest first, for DEV > ERRORS (no waiting
+-- for the once-a-minute write): { Side, Message, Trace, Count, At, Build }.
+Feedback.RecentKeep = 30
+local recent = {}
+local function remember(side: string, message: string, trace: string, who: string?)
+	local top = recent[1]
+	if top and top.Side == side and top.Message == message then
+		top.Count += 1
+		top.At = os.time()
+		return
+	end
+	table.insert(recent, 1, { Side = side, Message = message, Trace = trace, Count = 1, At = os.time(), Build = build(), Who = who })
+	while #recent > Feedback.RecentKeep do
+		table.remove(recent)
+	end
+end
+
+local function noteError(side: string, message: string, trace: string, who: string?)
 	message = string.sub(tostring(message), 1, 300)
 	trace = string.sub(tostring(trace or ""), 1, 600)
+	remember(side, message, trace, who)
 	local key = side .. ":" .. message
 	local entry = pendingErrors[key]
 	if entry then
@@ -194,14 +214,47 @@ local function read(player: Player)
 	return result
 end
 
+-- DEV > ERRORS: this server's latest errors at once, and the most frequent
+-- saved ones (every server, every build). Owners only.
+local function readRecent(player: Player)
+	if not Feedback.isOwner(player) then
+		return reply(false, "Only the game's owners can read errors.")
+	end
+	local stored = {}
+	if store then
+		local ok, saved = pcall(store.GetAsync, store, "errors")
+		stored = if ok and type(saved) == "table" then table.move(saved, 1, math.min(#saved, 12), 1, {}) else {}
+	end
+	local result = reply(true, "")
+	result.Recent = table.move(recent, 1, math.min(#recent, 15), 1, {})
+	result.Stored = stored
+	result.Now = os.time()
+	result.Build = build()
+	return result
+end
+
+-- Server errors are caught from the moment this is required (Main requires
+-- it first, before the world is built), not only once it starts.
+local hooked = false
+function Feedback.hook()
+	if hooked then
+		return
+	end
+	hooked = pcall(function()
+		ScriptContext.Error:Connect(function(message, trace)
+			noteError("Server", message, trace)
+		end)
+	end)
+end
+Feedback.hook()
+
 function Feedback.start()
 	local ok, result = pcall(DataStoreService.GetDataStore, DataStoreService, "Playtest_Reports_v1")
 	store = if ok then result else nil
 	Shop.register("SendFeedback", send)
 	Shop.register("ReadReports", read)
-	ScriptContext.Error:Connect(function(message, trace)
-		noteError("Server", message, trace)
-	end)
+	Shop.register("DevRecentErrors", readRecent)
+	Feedback.hook()
 	Remotes.Report.OnServerEvent:Connect(function(player, kind, message, trace)
 		if kind ~= "Error" or type(message) ~= "string" then
 			return
@@ -217,7 +270,7 @@ function Feedback.start()
 		end
 		table.insert(times, now)
 		clientErrors[player] = times
-		noteError("Client", message, if type(trace) == "string" then trace else "")
+		noteError("Client", message, if type(trace) == "string" then trace else "", player.Name)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		lastSent[player], clientErrors[player] = nil, nil

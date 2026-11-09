@@ -2167,6 +2167,7 @@ end
 -- it (the scene closed, or the server no longer has you there). `respawn`
 -- also walks you back to the spawn when you're already in (UNSTUCK).
 local lastEnsure = 0
+local lastSaid = 0
 function OutpostScene.ensure(respawn: boolean?)
 	if busy or os.clock() - lastEnsure < 2 then
 		return
@@ -2182,8 +2183,12 @@ function OutpostScene.ensure(respawn: boolean?)
 		busy = false
 		if not result.Ok then
 			cover.cancel()
-			if respawn then
-				UiKit.toast(result.Message, P.Bad)
+			-- (never a silent failure: what the server said, now and then, so
+			-- someone stuck on the base can see why)
+			warn("[OutpostScene] couldn't enter the Outpost: " .. tostring(result.Message))
+			if respawn or os.clock() - lastSaid > 8 then
+				lastSaid = os.clock()
+				UiKit.toast("Can't get into the Outpost: " .. tostring(result.Message or "no answer"), P.Bad)
 			end
 			return
 		end

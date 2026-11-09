@@ -101,6 +101,9 @@ function Art.pose(record) assert(record.View.Parent,"Animating a destroyed previ
 local CardFX={Themes={},create=function() return {} end,update=function() end}
 -- The kaiju starter roll after the gem roll (KaijuRoll): straight on here.
 local KaijuRoll={play=function(after) if after then after() end end}
+-- The combat basics before the roll (BasicsScreen): over at once here.
+local basicsRan=0
+local BasicsScreen={run=function() basicsRan+=1 end}
 -- The loading screen the intro hands over to when it closes (LoadingFlow).
 local held,heldOptions={},{}
 local LoadingFlow={home="Outpost",hold=function(name,options) table.insert(held,name); table.insert(heldOptions,options or {}) end}
@@ -148,6 +151,11 @@ local GemClient={Profile=profile,Changed=signal()}
 -- nothing (no picker), it rolls the element itself, Thermal or Cryo
 -- (autoElement here), in the default style.
 local autoElement="Frost"
+-- The element pick (ElementPick, FastStart.ChooseElement): picks
+-- pickElement (autoElement if unset) at once.
+local pickElement=nil
+local picksShown=0
+local ElementPick={run=function() picksShown+=1; return pickElement or autoElement end}
 function GemClient.request(action,...)
  table.insert(requests,action)
  if action=="PrepareStarterLottery" then

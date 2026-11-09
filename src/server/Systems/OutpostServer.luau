@@ -1173,13 +1173,17 @@ function OutpostServer.start()
 	-- The vendor rows by the pods (site.Stalls): the same crew at stalls
 	-- of their own, either side of the north road. (No landmark of their
 	-- own: the guides still point at the Shelter's.)
+	-- (Never in the way of the Outpost opening: a stall that fails is left out.)
 	local rows = Instance.new("Folder")
 	rows.Name = "Stalls"
 	rows.Parent = site.Model
 	for _, spot in site.Stalls or {} do
 		local info = Vendors[spot.Id]
 		if info then
-			Builder.vendor(rows, spot.CFrame, spot.Id, info, true)
+			local ok, problem = pcall(Builder.vendor, rows, spot.CFrame, spot.Id, info, true)
+			if not ok then
+				warn("[Outpost] stall keeper " .. tostring(spot.Id) .. ": " .. tostring(problem))
+			end
 		end
 	end
 	-- The hidden Easter eggs: a prompt that says nothing about what it is.

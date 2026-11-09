@@ -1,6 +1,19 @@
 -- Server entry point: build the world, then start the gameplay systems that
 -- hook into it through CollectionService tags.
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+-- Errors are caught from here on (DEV > ERRORS: Systems/Feedback), before
+-- anything else is built.
+local Feedback = require(script.Parent.Systems.Feedback)
+-- One system failing to start must never stop the rest (a stranded server:
+-- no Outpost, everyone left on the old base). Each start runs on its own;
+-- a failure is warned and noted for DEV > ERRORS, and the next goes on.
+local function safe(name: string, fn: () -> ())
+	local ok, problem = pcall(fn)
+	if not ok then
+		warn("[Main] " .. name .. " failed to start: " .. tostring(problem))
+		pcall(Feedback.note, "Server", "Start failed: " .. name, tostring(problem))
+	end
+end
 local WorldBuilder = require(script.Parent.World.WorldBuilder)
 local PlayerData = require(script.Parent.Systems.PlayerData)
 local Vip = require(script.Parent.Systems.Vip)
@@ -18,13 +31,13 @@ local TopPlayers = require(script.Parent.Systems.TopPlayers)
 local Trading = require(script.Parent.Systems.Trading)
 local Equipment = require(script.Parent.Systems.Equipment)
 -- Everyone's body is the rival's rig, before anyone spawns (FighterRig).
-require(script.Parent.Systems.FighterRig).start()
+safe("FighterRig", function() require(script.Parent.Systems.FighterRig).start() end)
 -- The fallen miners in the dungeons and the Rift wear that rig too, in
 -- random gear (FallenCrew), before any of those worlds is built.
-require(script.Parent.Systems.FallenCrew).start()
+safe("FallenCrew", function() require(script.Parent.Systems.FallenCrew).start() end)
 -- Bodies pass through each other (nobody stands on their foe) and nobody
 -- jumps in a fight (FighterBodies).
-require(script.Parent.Systems.FighterBodies).start()
+safe("FighterBodies", function() require(script.Parent.Systems.FighterBodies).start() end)
 
 -- Bodies blown apart on death (client ElementalDeath): the flying pieces hit
 -- the ground and walls but not each other, so a body that starts packed
@@ -44,7 +57,7 @@ if Config.MenuOnly then
 	require(script.Parent.World.Lighting)(true)
 	-- The Moon Mine's expedition site, far from the spawn pad, walked on foot.
 	local MiningSite = require(game:GetService("ReplicatedStorage").Shared.MiningSite)
-	MiningSite.build(MiningSite.Location, workspace)
+	safe("MiningSite", function() MiningSite.build(MiningSite.Location, workspace) end)
 	if Config.CombatEnabled then
 		local arena = Instance.new("Folder")
 		arena.Name = "CombatArena"
@@ -61,92 +74,94 @@ if Config.MenuOnly then
 		pad.Parent = workspace
 	end
 else
-	WorldBuilder.build()
+	safe("WorldBuilder", function() WorldBuilder.build() end)
 end
 -- The onboarding funnel (analytics) listens for loads, so it starts first.
-require(script.Parent.Systems.Funnel).start()
-require(game:GetService("ReplicatedStorage").Shared.VoiceVolume).start() -- (voice chat louder, fading gently; the client runs it too)
+safe("Funnel", function() require(script.Parent.Systems.Funnel).start() end)
+safe("VoiceVolume", function() require(game:GetService("ReplicatedStorage").Shared.VoiceVolume).start() end) -- (voice chat louder, fading gently; the client runs it too)
 -- A new player's first session as a journey (Systems/Journey: Creator Dashboard > Journeys).
-require(script.Parent.Systems.Journey).listen()
+safe("Journey", function() require(script.Parent.Systems.Journey).listen() end)
 -- Coins, feature events and the Store funnel (Creator Dashboard > Analytics).
-require(script.Parent.Systems.Analytics).start(
-	require(script.Parent.Systems.Remotes).Funnel,
-	require(game:GetService("ReplicatedStorage").Shared.Store).productKey
-)
+safe("Analytics", function()
+	require(script.Parent.Systems.Analytics).start(
+		require(script.Parent.Systems.Remotes).Funnel,
+		require(game:GetService("ReplicatedStorage").Shared.Store).productKey
+	)
+end)
 -- The game's own event log, in its own DataStore (tools/telemetry: the dashboard).
 -- Dev and test accounts are left out of every number (Systems/DevAccounts).
-require(script.Parent.Systems.DevAccounts).start()
-require(script.Parent.Systems.Telemetry).start(require(script.Parent.Systems.Remotes).Telemetry)
-PlayerData.start()
-Vip.start()
-Mining.start()
-MineWall.start()
-Shop.start()
-require(script.Parent.Systems.TrainingRewardsServer).start()
-require(script.Parent.Systems.Augments).start()
-require(script.Parent.Systems.SkillTreeServer).start()
-require(script.Parent.Systems.Presets).start()
-Intro.start()
-Enchanting.start()
-Forge.start()
-Trading.start()
-require(script.Parent.Systems.MarketBoard).start()
-require(script.Parent.Systems.ArenaStreaks).start()
-Party.start()
-require(script.Parent.Systems.ChatChannels).start()
+safe("DevAccounts", function() require(script.Parent.Systems.DevAccounts).start() end)
+safe("Telemetry", function() require(script.Parent.Systems.Telemetry).start(require(script.Parent.Systems.Remotes).Telemetry) end)
+safe("PlayerData", function() PlayerData.start() end)
+safe("Vip", function() Vip.start() end)
+safe("Mining", function() Mining.start() end)
+safe("MineWall", function() MineWall.start() end)
+safe("Shop", function() Shop.start() end)
+safe("TrainingRewardsServer", function() require(script.Parent.Systems.TrainingRewardsServer).start() end)
+safe("Augments", function() require(script.Parent.Systems.Augments).start() end)
+safe("SkillTreeServer", function() require(script.Parent.Systems.SkillTreeServer).start() end)
+safe("Presets", function() require(script.Parent.Systems.Presets).start() end)
+safe("Intro", function() Intro.start() end)
+safe("Enchanting", function() Enchanting.start() end)
+safe("Forge", function() Forge.start() end)
+safe("Trading", function() Trading.start() end)
+safe("MarketBoard", function() require(script.Parent.Systems.MarketBoard).start() end)
+safe("ArenaStreaks", function() require(script.Parent.Systems.ArenaStreaks).start() end)
+safe("Party", function() Party.start() end)
+safe("ChatChannels", function() require(script.Parent.Systems.ChatChannels).start() end)
 -- Playtest feedback and error reports (Social > Feedback).
-require(script.Parent.Systems.Feedback).start()
-StoreServer.start()
-require(script.Parent.Systems.Referrals).start()
+safe("Feedback", function() require(script.Parent.Systems.Feedback).start() end)
+safe("StoreServer", function() StoreServer.start() end)
+safe("Referrals", function() require(script.Parent.Systems.Referrals).start() end)
 -- Reward coupons from invites (Shared.Coupons): the INVITE menu spends them.
 local CouponServer = require(script.Parent.Systems.CouponServer)
-CouponServer.start()
-require(script.Parent.Systems.FreeRewards).start()
+safe("CouponServer", function() CouponServer.start() end)
+safe("FreeRewards", function() require(script.Parent.Systems.FreeRewards).start() end)
 -- Another player's gear, to look at (GEAR on the card beside them).
-require(script.Parent.Systems.GearInspect).start()
+safe("GearInspect", function() require(script.Parent.Systems.GearInspect).start() end)
 -- The Kaiju Daycare: kaiju boarded (stored or trained), in a pen by the Kennel.
-require(script.Parent.Systems.DaycareServer).start()
+safe("DaycareServer", function() require(script.Parent.Systems.DaycareServer).start() end)
 -- A new miner's intro rounds: six wins in the Arena, a piece of gear each.
-require(script.Parent.Systems.IntroRoundsServer).start()
+safe("IntroRoundsServer", function() require(script.Parent.Systems.IntroRoundsServer).start() end)
 -- The Owners hear (and see) whenever someone joins, any server.
-require(script.Parent.Systems.DevAlerts).start()
+safe("DevAlerts", function() require(script.Parent.Systems.DevAlerts).start() end)
 -- A player's settings (music, sound), saved with their profile.
-require(script.Parent.Systems.SettingsServer).start()
+safe("SettingsServer", function() require(script.Parent.Systems.SettingsServer).start() end)
 -- The Owners' ANALYTICS window: this server, today, the last 7 days.
-require(script.Parent.Systems.AnalyticsPanel).start()
+safe("AnalyticsPanel", function() require(script.Parent.Systems.AnalyticsPanel).start() end)
 -- DEV > SPECTATE: an Owner watches a player in third person (Systems/DevSpectate).
-require(script.Parent.Systems.DevSpectate).start()
+safe("DevSpectate", function() require(script.Parent.Systems.DevSpectate).start() end)
 -- The DEV desk in the Shelter: lit while an Owner's in (Systems/DevDesk).
-require(script.Parent.Systems.DevDesk).start()
+safe("DevDesk", function() require(script.Parent.Systems.DevDesk).start() end)
 -- What players tap and open (Systems/UiTrack), into the log the ANALYTICS window reads.
-require(script.Parent.Systems.UiTrack).start()
-TopPlayers.start()
-Equipment.start()
+safe("UiTrack", function() require(script.Parent.Systems.UiTrack).start() end)
+safe("TopPlayers", function() TopPlayers.start() end)
+safe("Equipment", function() Equipment.start() end)
 -- One health-recovery rule for players and computer fighters alike.
-require(script.Parent.Systems.HealthRegen).start()
+safe("HealthRegen", function() require(script.Parent.Systems.HealthRegen).start() end)
 -- The dashboard opens Arena sessions; the full town also enables the Wilds.
 if Config.CombatEnabled or not Config.MenuOnly then
-	Enemies.start(Config.MenuOnly)
-	CombatServer.start()
-	require(script.Parent.Systems.ArenaSessions).start()
-	require(script.Parent.Systems.PrivateArenas).start()
+	safe("Enemies", function() Enemies.start(Config.MenuOnly) end)
+	safe("CombatServer", function() CombatServer.start() end)
+	safe("ArenaSessions", function() require(script.Parent.Systems.ArenaSessions).start() end)
+	safe("PrivateArenas", function() require(script.Parent.Systems.PrivateArenas).start() end)
 	-- PvP sessions bring a computer rival with a random loadout.
-	require(script.Parent.Systems.Duelist).start()
+	safe("Duelist", function() require(script.Parent.Systems.Duelist).start() end)
 	-- Player duels: the 1v1 and 2v2 queues, challenges and rated matches.
-	require(script.Parent.Systems.Duels).start()
+	safe("Duels", function() require(script.Parent.Systems.Duels).start() end)
 	-- Party Raids: a party of three or more against a raid boss.
-	require(script.Parent.Systems.Raids).start()
-	require(script.Parent.Systems.Dungeons).start()
-	require(script.Parent.Systems.DungeonQueue).start()
+	safe("Raids", function() require(script.Parent.Systems.Raids).start() end)
+	safe("Dungeons", function() require(script.Parent.Systems.Dungeons).start() end)
+	safe("DungeonQueue", function() require(script.Parent.Systems.DungeonQueue).start() end)
 end
 -- Saga Outpost: the shared mining basin (mine, trade at the Market, duel).
 if Config.Features == nil or Config.Features.Mining ~= false then
 	local OutpostServer = require(script.Parent.Systems.OutpostServer)
-	OutpostServer.start()
+	safe("OutpostServer", function() OutpostServer.start() end)
 	-- A pod for everyone on the settlement's pads: where you start and come back
 	-- to; it lands with you inside the first time you come in.
 	local PodServer = require(script.Parent.Systems.PodServer)
-	PodServer.start(OutpostServer.site())
+	safe("PodServer", function() PodServer.start(OutpostServer.site()) end)
 	OutpostServer.podArrival = PodServer.land
 	-- Its style (Shared.PodStyle) and its showcase's kaiju, from the profile;
 	-- MY POD (Client.PodUI) reads them and sets them.
@@ -248,30 +263,30 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 	-- Friendly sparring there: 1 swaps the pick for your combat kit.
 	if Config.CombatEnabled or not Config.MenuOnly then
 		local SparServer = require(script.Parent.Systems.SparServer)
-		SparServer.start()
+		safe("SparServer", function() SparServer.start() end)
 		-- Mini kaiju: yours beside you, wild ones to hunt, and moon bugs
 		-- through rifts round anyone out past the core (the frontier).
 		if Config.Features == nil or Config.Features.Kaiju ~= false then
 			local KaijuServer = require(script.Parent.Systems.KaijuServer)
-			KaijuServer.start()
+			safe("KaijuServer", function() KaijuServer.start() end)
 			-- Revives for Robux (the KaijuRevive product) and Revive coupons.
 			StoreServer.reviveKaiju = KaijuServer.reviveAll
 			StoreServer.kaijuSale = KaijuServer.saleGrant
 			CouponServer.reviveKaiju = KaijuServer.reviveAll
 			-- The team's HYPERBEAM: their mana, SAVE CHARGE and the blast.
-			require(script.Parent.Systems.KaijuBeamServer).start()
+			safe("KaijuBeamServer", function() require(script.Parent.Systems.KaijuBeamServer).start() end)
 			-- Kaiju battles: two players' teams placed in a formation, then
 			-- fighting it out by themselves.
-			require(script.Parent.Systems.KaijuBattles).start()
+			safe("KaijuBattles", function() require(script.Parent.Systems.KaijuBattles).start() end)
 			local KaijuWilds = require(script.Parent.Systems.KaijuWilds)
-			KaijuWilds.start(OutpostServer.site())
+			safe("KaijuWilds", function() KaijuWilds.start(OutpostServer.site()) end)
 			local FrontierServer = require(script.Parent.Systems.FrontierServer)
-			FrontierServer.start(OutpostServer.site())
+			safe("FrontierServer", function() FrontierServer.start(OutpostServer.site()) end)
 			-- Swings out past the core draw critters; a pick bonks them.
 			-- A new miner's first swings out there also start the Meteor
 			-- Golem's clock (once, theirs alone: Systems/MeteorGolemServer).
 			local MeteorGolemServer = require(script.Parent.Systems.MeteorGolemServer)
-			MeteorGolemServer.start()
+			safe("MeteorGolemServer", function() MeteorGolemServer.start() end)
 			OutpostServer.onSwing = function(player, strikes)
 				FrontierServer.swing(player, strikes)
 				MeteorGolemServer.swing(player)
@@ -309,15 +324,15 @@ if Config.Features == nil or Config.Features.Mining ~= false then
 					OutpostServer.podArrival(player)
 				end
 			end
-			RiftServer.start(OutpostServer.site())
+			safe("RiftServer", function() RiftServer.start(OutpostServer.site()) end)
 			-- The Kaiju Arena, down the Shelter's stairs: rows of courts, a pad
 			-- at each end to wait on, stakes, and every kaiju battle fought there.
-			require(script.Parent.Systems.KaijuPitServer).start(OutpostServer.site())
+			safe("KaijuPitServer", function() require(script.Parent.Systems.KaijuPitServer).start(OutpostServer.site()) end)
 		end
 	end
 	-- The garage's machines, for driving round the quarry (Config.Features:
 	-- off leaves the bays empty).
 	if Config.Features == nil or Config.Features.Mechs ~= false then
-		require(script.Parent.Systems.OutpostVehicles).start(OutpostServer.site())
+		safe("OutpostVehicles", function() require(script.Parent.Systems.OutpostVehicles).start(OutpostServer.site()) end)
 	end
 end

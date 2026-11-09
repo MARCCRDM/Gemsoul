@@ -62,6 +62,98 @@ status.TextSize = 12
 status.Font = Enum.Font.GothamBold
 status.Text = "DEV TOOLS · Onboarding is currently paused."
 status.Parent = panel
+status.Size = UDim2.new(1, -92, 0, 36)
+
+-- ERRORS: this server's latest script errors (server and every player's
+-- client) at once, and the most frequent saved ones, with their build
+-- (Server Feedback). Over the panel; CLOSE or ERRORS again shuts it.
+do
+	local open = Instance.new("TextButton")
+	open.Name = "Errors"
+	open.Size = UDim2.fromOffset(78, 28)
+	open.Position = UDim2.new(1, -84, 0, 8)
+	open.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+	open.TextColor3 = Color3.fromRGB(255, 236, 230)
+	open.Font = Enum.Font.GothamBold
+	open.TextSize = 12
+	open.Text = "ERRORS"
+	open.Parent = panel
+	corner(open, 5)
+	local sheet = Instance.new("Frame")
+	sheet.Name = "ErrorSheet"
+	sheet.Size = UDim2.new(1, -12, 1, -46)
+	sheet.Position = UDim2.fromOffset(6, 42)
+	sheet.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
+	sheet.ZIndex = 20
+	sheet.Visible = false
+	sheet.Parent = panel
+	corner(sheet, 6)
+	local list = Instance.new("ScrollingFrame")
+	list.Size = UDim2.new(1, -8, 1, -8)
+	list.Position = UDim2.fromOffset(4, 4)
+	list.BackgroundTransparency = 1
+	list.ScrollBarThickness = 5
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.ZIndex = 21
+	list.Parent = sheet
+	local body = Instance.new("TextLabel")
+	body.Size = UDim2.new(1, -8, 0, 0)
+	body.AutomaticSize = Enum.AutomaticSize.Y
+	body.BackgroundTransparency = 1
+	body.TextWrapped = true
+	body.TextXAlignment = Enum.TextXAlignment.Left
+	body.TextYAlignment = Enum.TextYAlignment.Top
+	body.Font = Enum.Font.Code
+	body.TextSize = 11
+	body.TextColor3 = Color3.fromRGB(230, 236, 244)
+	body.RichText = false
+	body.ZIndex = 22
+	body.Text = ""
+	body.Parent = list
+	local function ago(seconds: number): string
+		if seconds < 90 then
+			return math.max(0, math.floor(seconds)) .. "s ago"
+		elseif seconds < 5400 then
+			return math.floor(seconds / 60) .. "m ago"
+		end
+		return math.floor(seconds / 3600) .. "h ago"
+	end
+	local function show()
+		body.Text = "Loading..."
+		local ok, result = pcall(function()
+			return request:InvokeServer("DevRecentErrors")
+		end)
+		if not ok or not result or not result.Ok then
+			body.Text = "Couldn't read errors: " .. tostring(if ok and result then result.Message else result)
+			return
+		end
+		local lines = { "THIS SERVER (build " .. tostring(result.Build) .. "), newest first:" }
+		if #result.Recent == 0 then
+			table.insert(lines, "  none")
+		end
+		for _, e in result.Recent do
+			table.insert(lines, string.format("\n[%s%s] x%d, %s, %s", e.Side, if e.Who then " " .. e.Who else "", e.Count or 1, ago((result.Now or 0) - (e.At or 0)), tostring(e.Build)))
+			table.insert(lines, e.Message)
+			if e.Trace and e.Trace ~= "" then
+				table.insert(lines, (string.sub(e.Trace, 1, 300)))
+			end
+		end
+		table.insert(lines, "\n\nSAVED (every server), most frequent:")
+		for _, e in result.Stored or {} do
+			table.insert(lines, string.format("\n[%s] x%s, %s", tostring(e.Side), tostring(e.Count), tostring(e.Build)))
+			table.insert(lines, tostring(e.Message))
+		end
+		body.Text = table.concat(lines, "\n")
+	end
+	open.Activated:Connect(function()
+		sheet.Visible = not sheet.Visible
+		open.Text = if sheet.Visible then "CLOSE" else "ERRORS"
+		if sheet.Visible then
+			task.spawn(show)
+		end
+	end)
+end
 
 -- Touch screens: the bottom-right corner is the thumb's (Combat's buttons).
 -- So the DEV button goes up into Roblox's top bar strip, at its empty right

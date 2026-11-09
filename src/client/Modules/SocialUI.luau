@@ -1439,24 +1439,9 @@ function SocialUI.feedback()
 	sheet.Visible = true
 end
 
--- Client script errors go to the server's report log (a few a minute at most).
-do
-	local sent = {}
-	ScriptContext.Error:Connect(function(message, trace)
-		local now = os.clock()
-		while sent[1] and now - sent[1] > 60 do
-			table.remove(sent, 1)
-		end
-		if #sent < 5 then
-			table.insert(sent, now)
-			local folder = ReplicatedStorage:FindFirstChild("Remotes")
-			local report = folder and folder:FindFirstChild("Report")
-			if report then
-				report:FireServer("Error", string.sub(tostring(message), 1, 300), string.sub(tostring(trace), 1, 600))
-			end
-		end
-	end)
-end
+-- (Client script errors go to the server's report log from the first
+-- moment: Client ErrorReport, not from here, which can load too late.)
+local _ = ScriptContext
 
 -- Popups and the searching banner -----------------------------------------------------
 

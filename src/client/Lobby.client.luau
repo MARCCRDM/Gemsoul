@@ -16,7 +16,18 @@ local RunService = game:GetService("RunService")
 local ArenaScene = require(script.Parent.Modules.ArenaScene)
 local GemClient = require(script.Parent.Modules.GemClient)
 local LoadingFlow = require(script.Parent.Modules.LoadingFlow)
-local LobbyUI = require(script.Parent.Modules.LobbyUI)
+-- (The lobby's HUD failing to load must never keep anyone out of the
+-- Outpost: without it, its calls do nothing and the rest goes on.)
+local LobbyUI = (function()
+	local ok, module = pcall(require, script.Parent.Modules.LobbyUI)
+	if ok then
+		return module
+	end
+	warn("[Lobby] the lobby HUD failed to load: " .. tostring(module))
+	return setmetatable({}, { __index = function()
+		return function() end
+	end })
+end)()
 local OutpostScene = require(script.Parent.Modules.OutpostScene)
 local UiKit = require(script.Parent.Modules.UiKit)
 local SparKit = require(script.Parent.Modules.SparKit)
